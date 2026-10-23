@@ -15,6 +15,40 @@ namespace backend = rhi::backend;
 
 namespace {
 
+TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  for (bool enabled : {CoreDesc{}.enable_debug, false, true, false}) {
+    auto core = rhix::CreateCore(BACKEND_API_METAL, {enabled});
+    ASSERT_TRUE(core);
+    auto device = core.CreateDeviceByAutoSelection();
+    ASSERT_TRUE(device);
+    auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+    auto commands = native->CreateCommandBuffer();
+    ASSERT_TRUE(commands);
+    EXPECT_EQ(commands->errorOptions(),
+              enabled ? MTL::CommandBufferErrorOptionEncoderExecutionStatus : MTL::CommandBufferErrorOptionNone);
+    EXPECT_TRUE(commands->retainedReferences());
+    auto buffer = NS::TransferPtr(native->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
+    ASSERT_TRUE(buffer);
+    auto blit = commands->blitCommandEncoder();
+    ASSERT_NE(blit, nullptr);
+    blit->fillBuffer(buffer.get(), NS::Range::Make(0, 256), 0x5a);
+    blit->endEncoding();
+    commands->commit();
+    commands->waitUntilCompleted();
+    ASSERT_EQ(commands->status(), MTL::CommandBufferStatusCompleted);
+    for (size_t i = 0; i < 256; ++i)
+      EXPECT_EQ(static_cast<const uint8_t *>(buffer->contents())[i], 0x5a);
+    auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+    auto context = device.CreateCommandContext();
+    ASSERT_TRUE(queue);
+    ASSERT_TRUE(context);
+    auto done = queue.Submit(std::move(context));
+    ASSERT_TRUE(done);
+    EXPECT_TRUE(done.WaitHost());
+  }
+}
+
 TEST(RhiMetal, CapabilitiesMatchNativeDeviceAndEnumerationRemainsStable) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto core = rhix::CreateCore(BACKEND_API_METAL);

@@ -7,11 +7,16 @@
 
 namespace grassland::rhi::backend::metal {
 
-MetalCore::MetalCore() = default;
+MetalCore::MetalCore(const CoreDesc &desc) : enable_debug_(desc.enable_debug) {
+}
 
-MetalCore *MetalCore::CreateMetalCore() {
+bool MetalCore::DebugEnabled() const {
+  return enable_debug_;
+}
+
+MetalCore *MetalCore::CreateMetalCore(const CoreDesc &desc) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto core = std::unique_ptr<MetalCore>(new MetalCore());
+  auto core = std::unique_ptr<MetalCore>(new MetalCore(desc));
   uint64_t host_memory = 0;
   size_t size = sizeof(host_memory);
   if (sysctlbyname("hw.memsize", &host_memory, &size, nullptr, 0) != 0)

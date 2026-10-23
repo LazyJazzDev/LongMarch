@@ -32,7 +32,7 @@ class ICore : public IObject {
 // Success transfers one owned reference; failure returns nullptr.
 // D3D12/Vulkan native validation; unavailable requested validation fails creation.
 // The caller must ensure only one Core exists at a time and release its children first.
-// Metal validation remains controlled by the native environment/tools.
+// Metal enables enhanced command-buffer error reporting; API Validation is controlled by native tools/environment.
 ICore *CreateCore(BackendAPI api = BACKEND_API_DEFAULT, const CoreDesc &desc = {});
 
 }  // namespace grassland::rhi

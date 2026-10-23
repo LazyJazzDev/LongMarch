@@ -1,11 +1,11 @@
 ﻿#include "grassland/rhi/backend/metal/metal_device.h"
 
-#include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
+#include "grassland/rhi/backend/metal/metal_core.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
@@ -61,10 +61,19 @@ std::mutex &MetalDevice::QueueMutex() {
   return queue_mutex_;
 }
 
+NS::SharedPtr<MTL::CommandBuffer> MetalDevice::CreateCommandBuffer() {
+  auto descriptor = NS::TransferPtr(MTL::CommandBufferDescriptor::alloc()->init());
+  descriptor->setRetainedReferences(true);
+  descriptor->setErrorOptions(static_cast<MetalCore *>(OwnerCore())->DebugEnabled()
+                                  ? MTL::CommandBufferErrorOptionEncoderExecutionStatus
+                                  : MTL::CommandBufferErrorOptionNone);
+  return NS::RetainPtr(queue_->commandBuffer(descriptor.get()));
+}
+
 bool MetalDevice::WaitIdle() {
   // Caller serializes this marker with commits using QueueMutex().
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto marker = NS::RetainPtr(queue_->commandBuffer());
+  auto marker = CreateCommandBuffer();
   if (!marker) {
     ReportError(-1, "Metal idle marker allocation failed.");
     return false;

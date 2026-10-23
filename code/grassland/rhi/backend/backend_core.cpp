@@ -36,7 +36,7 @@ Core *CreateCore(BackendAPI api, const CoreDesc &desc) {
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
     case BACKEND_API_METAL:
-      return metal::MetalCore::CreateMetalCore();
+      return metal::MetalCore::CreateMetalCore(desc);
 #endif
     default:
       ReportError(-1, "Requested RHI backend is unavailable in this build.");
