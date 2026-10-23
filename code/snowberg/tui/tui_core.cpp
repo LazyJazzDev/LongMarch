@@ -1,4 +1,4 @@
-#include "snowberg/tui/tui_core.h"
+﻿#include "snowberg/tui/tui_core.h"
 
 #include <algorithm>
 #include <deque>
@@ -35,7 +35,7 @@ class Terminal {
   DWORD input_mode_{}, output_mode_{};
   DWORD mouse_buttons_{};
   wchar_t high_surrogate_{};
-  UINT code_page_{};
+  UINT input_code_page_{}, output_code_page_{};
   CONSOLE_CURSOR_INFO cursor_{};
 #else
   termios original_{};
@@ -57,8 +57,19 @@ bool Terminal::Open(bool enhanced) {
     return false;
   }
   GetConsoleCursorInfo(output_, &cursor_);
-  code_page_ = GetConsoleOutputCP();
-  SetConsoleOutputCP(CP_UTF8);
+  input_code_page_ = GetConsoleCP();
+  output_code_page_ = GetConsoleOutputCP();
+  if (!SetConsoleCP(CP_UTF8)) {
+    SetConsoleMode(input_, input_mode_);
+    SetConsoleMode(output_, output_mode_);
+    return false;
+  }
+  if (!SetConsoleOutputCP(CP_UTF8)) {
+    SetConsoleCP(input_code_page_);
+    SetConsoleMode(input_, input_mode_);
+    SetConsoleMode(output_, output_mode_);
+    return false;
+  }
 #else
   if (tcgetattr(STDIN_FILENO, &original_) != 0)
     return false;
@@ -135,7 +146,8 @@ Terminal::~Terminal() {
     CloseHandle(screen_);
   SetConsoleMode(input_, input_mode_);
   SetConsoleMode(output_, output_mode_);
-  SetConsoleOutputCP(code_page_);
+  SetConsoleCP(input_code_page_);
+  SetConsoleOutputCP(output_code_page_);
   if (cursor_.dwSize)
     SetConsoleCursorInfo(output_, &cursor_);
 #else
@@ -173,7 +185,7 @@ bool Terminal::Read(std::deque<InputEvent> &events) {
         }
         continue;
       }
-      KeyEvent event{MapVirtualKey(key.wVirtualKeyCode), 0, modifiers, bool(key.bKeyDown), key.wRepeatCount};
+      KeyEvent event{KeyFromVirtualKey(key.wVirtualKeyCode), 0, modifiers, bool(key.bKeyDown), key.wRepeatCount};
       char32_t code = key.uChar.UnicodeChar;
       if (code >= 0xd800 && code <= 0xdbff) {
         high_surrogate_ = static_cast<wchar_t>(code);

@@ -6,6 +6,13 @@
 #include "message_editor.h"
 #include "snowberg/tui/tui.h"
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace {
 using namespace snowberg::tui;
 using Clock = std::chrono::steady_clock;
@@ -16,9 +23,29 @@ class Messages : public Core {
     EnableEnhancedInput();
   }
 
-  void Dump() const {
+  bool Dump() const {
+#if defined(_WIN32)
+    // Core has restored the caller's code page. Dump remains UTF-8, including
+    // when redirected, but a native console needs UTF-8 enabled for this write.
+    DWORD mode{};
+    const auto console = GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &mode);
+    const auto code_page = GetConsoleOutputCP();
+    if (console) {
+      std::cout << std::flush;
+      if (!SetConsoleOutputCP(CP_UTF8))
+        return false;
+    }
+#endif
     for (size_t i = 0; i < messages_.size(); ++i)
       std::cout << "--- Message " << i + 1 << " ---\n" << tui_demo::UTF8(messages_[i]) << '\n';
+#if defined(_WIN32)
+    if (console) {
+      std::cout << std::flush;
+      if (!SetConsoleOutputCP(code_page))
+        return false;
+    }
+#endif
+    return static_cast<bool>(std::cout);
   }
 
  protected:
@@ -276,7 +303,11 @@ int main(int argc, char **argv) {
     std::cerr << "Terminal input or output failed.\n";
     return 1;
   }
-  if (dump)
-    app.Dump();
+  if (dump) {
+    if (!app.Dump()) {
+      std::cerr << "Message output failed.\n";
+      return 1;
+    }
+  }
   return 0;
 }

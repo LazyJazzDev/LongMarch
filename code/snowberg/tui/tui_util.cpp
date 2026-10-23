@@ -1,4 +1,4 @@
-#include "snowberg/tui/tui_util.h"
+﻿#include "snowberg/tui/tui_util.h"
 
 #include <algorithm>
 #include <charconv>
@@ -70,7 +70,7 @@ bool IsTerminalAvailable() {
   }
 }
 
-Key MapVirtualKey(unsigned key) {
+Key KeyFromVirtualKey(unsigned key) {
   switch (key) {
     case 0x08:
       return Key::Backspace;

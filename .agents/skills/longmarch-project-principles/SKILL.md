@@ -21,6 +21,8 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 
 ## 构建
 
+- 默认所有交互、命令输出和报告读写使用 UTF-8。Windows 上特别注意输入与输出代码页（CP）：交互终端应同时设置 `SetConsoleCP(CP_UTF8)` 和 `SetConsoleOutputCP(CP_UTF8)`，检查失败并在交互结束时恢复调用者状态；重定向文件仍写 UTF-8。PowerShell 读写文本显式指定 UTF-8，避免通过系统默认编码传递中文。
+
 - LongMarch 默认使用 CMake 的 `Ninja` 生成器（`-G Ninja`），除非用户明确指定其他方案。单配置 Release 构建使用 `-DCMAKE_BUILD_TYPE=Release`。
 - 常规工作区只使用 `cmake-build-release` 和 `cmake-build-debug`，分别对应 CLion 的 Release / Debug CMake 配置；配置由 CLion 管理，命令行构建沿用对应配置生成的目录，不另建临时 `cmake-build-*` 或 `build-*` 目录。
 - 特殊后端、交叉编译或其他独立构建需求，通过 CLion 添加 CMake 配置及其独立构建目录；不复用生成器、工具链或目标平台不兼容的缓存。特殊配置不再需要时清理其构建产物。

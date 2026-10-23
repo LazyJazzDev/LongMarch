@@ -12,6 +12,7 @@ int main(int argc, char **argv) {
   GetConsoleMode(input, &input_mode);
   GetConsoleMode(output, &output_mode);
   const auto code_page = GetConsoleOutputCP();
+  const auto input_code_page = GetConsoleCP();
   CONSOLE_CURSOR_INFO cursor{};
   GetConsoleCursorInfo(output, &cursor);
   cursor.bVisible = FALSE;
@@ -34,7 +35,8 @@ int main(int argc, char **argv) {
   CONSOLE_CURSOR_INFO restored_cursor{};
   GetConsoleCursorInfo(output, &restored_cursor);
   if (new_input != input_mode || new_output != output_mode || GetConsoleOutputCP() != code_page ||
-      restored_cursor.bVisible != cursor.bVisible || restored_cursor.dwSize != cursor.dwSize)
+      GetConsoleCP() != input_code_page || restored_cursor.bVisible != cursor.bVisible ||
+      restored_cursor.dwSize != cursor.dwSize)
     return 100;
 #endif
   return result ? static_cast<int>(*result) + 10 : 0;

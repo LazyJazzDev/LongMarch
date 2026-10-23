@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 
 #include "snowberg/tui/tui_util.h"
 
@@ -64,7 +64,7 @@ TEST(TuiUtil, RejectsMalformedMouseWithoutLosingFollowingKeys) {
   parser.Parse(events);
   ASSERT_EQ(events.size(), 1);
   EXPECT_EQ(std::get<KeyEvent>(events[0]).key, Key::Down);
-  EXPECT_EQ(MapVirtualKey(0x26), Key::Up);
+  EXPECT_EQ(KeyFromVirtualKey(0x26), Key::Up);
   EXPECT_EQ(MapTerminalKey('~', 24), Key::F12);
 }
 }  // namespace snowberg::tui

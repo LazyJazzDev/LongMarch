@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <chrono>
 #include <cstdint>
@@ -71,7 +71,7 @@ using InputEvent = std::variant<KeyEvent, MouseEvent, PasteEvent>;
 // Read-only capability check. POSIX waits up to 500 ms for an IDE PTY's size.
 bool IsTerminalAvailable();
 bool GetTerminalSize(int &columns, int &rows);
-Key MapVirtualKey(unsigned key);  // Windows virtual-key values; no platform headers required.
+Key KeyFromVirtualKey(unsigned key);  // Windows virtual-key values; no platform headers required.
 Key MapTerminalKey(char final, int parameter = 0);
 
 namespace detail {
