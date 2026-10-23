@@ -1,5 +1,7 @@
 #include "../../module.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <chrono>
 #include <iostream>
@@ -7,6 +9,7 @@
 #include <thread>
 
 #include "grassland/rhi/rhi.h"
+#include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
 
 namespace {
@@ -28,7 +31,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ObjPtr<IWindow> window;
   std::vector<ColorSpace> spaces{COLOR_SPACE_SRGB_NONLINEAR};
   if (!headless) {
-    window = device->CreateGLFWWindow({960, 540, "RHI HDR - H: color space, Escape: close"});
+    window = device->CreateGLFWWindow({960, 540, "RHI HDR - H: color space, P: toggle VSync, Escape: close"});
     if (!window)
       return 1;
     for (const auto &option : window->GetSupportedPresentationOptions()) {
@@ -61,6 +64,10 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
   float previous_scale = -1.0f;
   float previous_headroom = -1.0f;
   bool previous_h = false;
+  bool previous_p = false;
+  bool title_dirty = true;
+  grassland::FPSCounter fps;
+  auto title_time = std::chrono::steady_clock::now();
   int rendered = 0;
   while (!frames || rendered < frames) {
     if (!headless) {
@@ -76,8 +83,21 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
         selected = (selected + 1) % spaces.size();
         if (!window->SetColorSpace(spaces[selected]))
           return 1;
+        fps.Reset();
+        title_dirty = true;
       }
       previous_h = h;
+      const bool p = window->IsKeyDown(GLFW_KEY_P);
+      if (p && !previous_p) {
+        const auto requested =
+            window->GetPresentMode() == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+        if (!window->SetPresentMode(requested))
+          return 1;
+        std::cout << "hdr: presentation mode " << PresentModeName(window->GetPresentMode()) << '\n';
+        fps.Reset();
+        title_dirty = true;
+      }
+      previous_p = p;
     } else {
       selected = (rendered / std::max(1, frames / static_cast<int>(spaces.size()))) % spaces.size();
     }
@@ -141,10 +161,18 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
     if (!token || !token->WaitHost())
       return 1;
-    // The image and recording leave scope before a color-space switch or PollEvents.
-    if (!headless && !window->SetTitle("RHI HDR - " + ColorSpaceName(color_space) +
-                                       " - 0.25x | 0.5x | 1x | 2x | 4x white - H: color space"))
-      return 1;
+    fps.TickFrame();
+    // The image and recording leave scope before a mode switch or PollEvents.
+    const auto now = std::chrono::steady_clock::now();
+    if (!headless && (title_dirty || now - title_time >= std::chrono::milliseconds(250))) {
+      if (!window->SetTitle(fmt::format(
+              "RHI HDR - {} - FPS: {:.1f} - VSync: {} - 0.25x | 0.5x | 1x | 2x | 4x white - H: color space, P: toggle VSync",
+              ColorSpaceName(color_space), fps.GetFPS(),
+              window->GetPresentMode() == PRESENT_MODE_VSYNC ? "On" : "Off")))
+        return 1;
+      title_time = now;
+      title_dirty = false;
+    }
     ++rendered;
   }
   std::cout << "hdr: completed " << rendered << " frames ("
