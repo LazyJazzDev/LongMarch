@@ -1,4 +1,4 @@
-﻿#include "buffer_helper.slang"
+#include "buffer_helper.slang"
 
 struct PSInput {
   float4 position : SV_POSITION;

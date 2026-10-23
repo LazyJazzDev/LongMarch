@@ -175,16 +175,6 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 
 class RhiRayTracing : public testing::TestWithParam<BackendAPI> {
  protected:
-  void SetUp() override {
-#if defined(LONGMARCH_D3D12_ENABLED)
-    if (GetParam() == BACKEND_API_D3D12) {
-      backend::d3d12::ComPtr<ID3D12Debug> debug;
-      ASSERT_TRUE(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))));
-      debug->EnableDebugLayer();
-    }
-#endif
-  }
-
   void CheckNativeErrors(IDevice *device) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
@@ -207,7 +197,7 @@ class RhiRayTracing : public testing::TestWithParam<BackendAPI> {
 
 TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
   const auto api = GetParam();
-  ObjPtr<ICore> core = CreateCore(api);
+  ObjPtr<ICore> core = CreateCore(api, {true});
   ASSERT_TRUE(core);
   DeviceFeatureRequirement required;
   required.ray_query = true;
@@ -348,7 +338,7 @@ void CSMain() {
 
 TEST_P(RhiRayTracing, ProceduralQueriesUseArraysMasksAndCapturedBindings) {
   const auto api = GetParam();
-  ObjPtr<ICore> core = CreateCore(api);
+  ObjPtr<ICore> core = CreateCore(api, {true});
   ASSERT_TRUE(core);
   DeviceFeatureRequirement required;
   required.ray_query = true;
@@ -433,7 +423,7 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,8,output);
 
 TEST_P(RhiRayTracing, CustomShaderBindingTablesRouteRecordsAndRestoreDefault) {
   const auto api = GetParam();
-  ObjPtr<ICore> core = CreateCore(api);
+  ObjPtr<ICore> core = CreateCore(api, {true});
   ASSERT_TRUE(core);
   DeviceFeatureRequirement required;
   required.ray_tracing_pipeline = true;
@@ -607,7 +597,7 @@ void Sphere(inout Payload p, Attributes attr) { p.result = 222; }
 }
 
 TEST_P(RhiRayTracing, CompactedLargeBlasSupportsInPlaceUpdate) {
-  ObjPtr<ICore> core = CreateCore(GetParam());
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
   DeviceFeatureRequirement required;
   required.ray_query = true;
@@ -661,7 +651,7 @@ TEST_P(RhiRayTracing, CompactedLargeBlasSupportsInPlaceUpdate) {
 
 TEST_P(RhiRayTracing, RebuildsTlasWithChangingInstanceCountWithinCapacity) {
   const auto api = GetParam();
-  ObjPtr<ICore> core = CreateCore(api);
+  ObjPtr<ICore> core = CreateCore(api, {true});
   ASSERT_TRUE(core);
   DeviceFeatureRequirement required;
   required.ray_query = true;
@@ -745,7 +735,7 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
 }
 
 TEST_P(RhiRayTracing, ScratchPoolSharesStorageAndShrinksAfterDemandExpires) {
-  ObjPtr<ICore> core = CreateCore(GetParam());
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
   DeviceFeatureRequirement required;
   required.ray_query = true;
@@ -800,7 +790,7 @@ TEST_P(RhiRayTracing, ScratchPoolSharesStorageAndShrinksAfterDemandExpires) {
 
 TEST_P(RhiRayTracing, SharedScratchSurvivesResizingAndOutOfOrderContextSubmission) {
   const auto api = GetParam();
-  ObjPtr<ICore> core = CreateCore(api);
+  ObjPtr<ICore> core = CreateCore(api, {true});
   ASSERT_TRUE(core);
   DeviceFeatureRequirement required;
   required.ray_query = true;
@@ -909,7 +899,7 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
 }
 
 TEST_P(RhiRayTracing, ProgramCreationRejectsInvalidDescriptionAndShader) {
-  ObjPtr<ICore> core = CreateCore(GetParam());
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
   DeviceFeatureRequirement required;
   required.ray_tracing_pipeline = true;

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "material/shader_graph/surface_sampler.slang"
 
 #define SAMPLE_SHADOW_ANY_HIT

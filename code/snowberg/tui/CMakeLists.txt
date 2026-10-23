@@ -1,0 +1,4 @@
+add_library(${SNOWBERG_SUBLIB_NAME} tui_menu.cpp tui_core.cpp tui_util.cpp)
+target_include_directories(${SNOWBERG_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
+list(APPEND SNOWBERG_LIBS ${SNOWBERG_SUBLIB_NAME})
+set(SNOWBERG_LIBS ${SNOWBERG_LIBS} PARENT_SCOPE)

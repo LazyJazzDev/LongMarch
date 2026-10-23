@@ -239,20 +239,13 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
 TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutClear) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 to run native resource-state tests.";
-#if defined(LONGMARCH_D3D12_ENABLED)
-  backend::d3d12::ComPtr<ID3D12Debug> debug;
-  if (GetParam() == BACKEND_API_D3D12 && std::getenv("LONGMARCH_RHI_VALIDATION")) {
-    ASSERT_TRUE(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))));
-    debug->EnableDebugLayer();
-  }
-#endif
-  auto core = rhix::CreateCore(GetParam());
+  auto core = rhix::CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
 #if defined(LONGMARCH_D3D12_ENABLED)
   backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
-  if (debug) {
+  if (GetParam() == BACKEND_API_D3D12 && std::getenv("LONGMARCH_RHI_VALIDATION")) {
     auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
     ASSERT_TRUE(SUCCEEDED(native->NativeDevice()->QueryInterface(IID_PPV_ARGS(&messages))));
     messages->ClearStoredMessages();

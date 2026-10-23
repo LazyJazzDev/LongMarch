@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "software/layout.slang"
 #ifndef SOFTWARE_EXTERNAL_BINDINGS
 #include "bindings.slang"

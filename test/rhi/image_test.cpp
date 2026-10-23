@@ -198,14 +198,9 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
 
 class RhiImage : public testing::TestWithParam<BackendAPI> {
  protected:
-  void SetUp() override {
-#if defined(LONGMARCH_D3D12_ENABLED)
-    if (GetParam() == BACKEND_API_D3D12) {
-      backend::d3d12::ComPtr<ID3D12Debug> debug;
-      ASSERT_TRUE(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))));
-      debug->EnableDebugLayer();
-    }
-#endif
+  // Keep validation enabled for every image test, including newly added cases.
+  ICore *CreateCore(BackendAPI api) {
+    return grassland::rhi::CreateCore(api, {true});
   }
 
   void Track(IDevice *device) {
@@ -364,7 +359,7 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
 
 #if defined(LONGMARCH_D3D12_ENABLED)
 TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
-  ObjPtr<ICore> core = CreateCore(BACKEND_API_D3D12);
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_D3D12, {true});
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -432,13 +427,6 @@ TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch)
 }
 
 TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
-#if defined(LONGMARCH_D3D12_ENABLED)
-  backend::d3d12::ComPtr<ID3D12Debug> debug;
-  if (GetParam() == BACKEND_API_D3D12) {
-    ASSERT_TRUE(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))));
-    debug->EnableDebugLayer();
-  }
-#endif
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();

@@ -1,4 +1,4 @@
-﻿
+
 RWByteAddressBuffer buffer : register(u0, space0);
 
 struct Metadata {

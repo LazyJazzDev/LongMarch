@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <d3d12sdklayers.h>
+
 #include <tuple>
 
 #include "grassland/rhi/backend/backend_device.h"
@@ -63,6 +65,8 @@ class D3D12Device final : public Device {
   std::mutex command_pool_mutex_;
   std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>, HANDLE>> command_pool_;
   ComPtr<ID3D12Device> device_;
+  ComPtr<ID3D12InfoQueue1> debug_messages_;
+  DWORD debug_callback_cookie_{};
   ComPtr<D3D12MA::Allocator> allocator_;
   D3D12DescriptorPool rtv_pool_;
   D3D12DescriptorPool dsv_pool_;

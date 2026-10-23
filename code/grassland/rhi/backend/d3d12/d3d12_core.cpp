@@ -8,7 +8,6 @@ namespace grassland::rhi::backend::d3d12 {
 D3D12Core::D3D12Core() = default;
 
 namespace {
-
 bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice &info) {
   DXGI_ADAPTER_DESC1 desc{};
   const HRESULT result = adapter->GetDesc1(&desc);
@@ -39,9 +38,23 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice
 
 }  // namespace
 
-D3D12Core *D3D12Core::CreateD3D12Core() {
+D3D12Core::~D3D12Core() {
+  adapters_.clear();
+  factory_.Reset();
+  if (debug_controller_) {
+    // Caller-owned Devices have already been released under the parent/child contract.
+    debug_controller_->DisableDebugLayer();
+  }
+}
+
+D3D12Core *D3D12Core::CreateD3D12Core(const CoreDesc &desc) {
   auto core = std::unique_ptr<D3D12Core>(new D3D12Core());
-  HRESULT result = CreateDXGIFactory2(0, IID_PPV_ARGS(&core->factory_));
+  if (desc.enable_debug) {
+    if (!Check(D3D12GetDebugInterface(IID_PPV_ARGS(&core->debug_controller_)), "Get D3D12 debug interface"))
+      return nullptr;
+    core->debug_controller_->EnableDebugLayer();
+  }
+  HRESULT result = CreateDXGIFactory2(desc.enable_debug ? DXGI_CREATE_FACTORY_DEBUG : 0, IID_PPV_ARGS(&core->factory_));
   if (FAILED(result)) {
     ReportError(result, "CreateDXGIFactory2 failed.");
     return {};

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "principled_util.slang"
 
 #define CLOSURE_COUNT 6

@@ -1,8 +1,13 @@
 ﻿#include "sparkium/core/code_lines.h"
 
+#include <string_view>
+
 namespace sparkium {
 
 CodeLines::CodeLines(const char *code) {
+  // A file BOM is not shader text and must not survive fragment composition.
+  if (std::string_view(code).substr(0, 3) == "\xEF\xBB\xBF")
+    code += 3;
   // separate code into lines
   std::string line;
   while (*code) {

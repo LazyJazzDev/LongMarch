@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "material/light/eval_direct_light.slang"
 
 __generic<BufferType : IBufferReader> struct MaterialEvaluator {
