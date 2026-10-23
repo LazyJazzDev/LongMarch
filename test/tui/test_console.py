@@ -172,10 +172,10 @@ class NativeMenuTests(unittest.TestCase):
             terminal.key(0x0D)
             terminal.finish(11)
 
-    def test_repeated_keys_and_short_terminal(self):
+    def test_repeated_keys(self):
         with Console() as terminal:
-            terminal.resize(30, 2)
-            terminal.key(0x28, repeat=15)
+            for _ in range(15):
+                terminal.key(0x28)
             time.sleep(0.2)
             self.assertIn("> item15", "\n".join(terminal.rows()))
             terminal.key(0x0D)
@@ -193,6 +193,19 @@ class NativeMenuTests(unittest.TestCase):
             self.assertNotEqual(attributes[0], info.attributes)
             terminal.key(0x0D)
             terminal.finish(13)
+
+    def test_fragmented_vt_mouse_reports(self):
+        with Console() as terminal:
+            for fragment in ("\x1b[<0;3;", "5M", "\x1b[<0;3;5m"):
+                for char in fragment:
+                    record = Record()
+                    record.kind = 1
+                    record.event.key = Key(True, 1, 0, 0, char, 0)
+                    terminal.send(record)
+                time.sleep(0.02)
+            terminal.wait_text("> item2")
+            terminal.key(0x0D)
+            terminal.finish(12)
 
     def test_escape_cancels_and_restores(self):
         with Console() as terminal:

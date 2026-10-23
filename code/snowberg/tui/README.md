@@ -23,8 +23,10 @@ if (!choice)
 - UTF-8 text supports CJK full-width characters and common combining accents;
   control characters are replaced with spaces. Complex emoji clusters and
   terminal-specific ambiguous-width characters are not normalized.
-- Windows uses console input events; Linux/macOS use termios and xterm-compatible
-  arrow/mouse sequences. Terminal input modes, mouse reporting, cursor visibility
+- Windows accepts both native console events and VT input from ConPTY/winpty;
+  Linux/macOS use termios and xterm-compatible arrow/mouse sequences. Mouse reporting
+  is explicitly enabled on every platform. ConPTY requires VT input mode to forward
+  these requests to an outer terminal such as the CLion Terminal tool window. Terminal input modes, mouse reporting, cursor visibility
   and the alternate screen are cleaned up when selection ends. Don't run other
   console writers or menus concurrently. Forced process termination cannot restore
   terminal state.
@@ -35,3 +37,11 @@ if (!choice)
 Tests: `test_tui` exercises UTF-8 clipping and animation boundaries;
 `test/tui/test_console.py` drives native Windows console keyboard/mouse/resize events
 against `tui_menu_probe` and the three demo launchers.
+
+`test/tui/test_conpty.py <tui_menu_probe.exe> [conpty.dll] checks the actual ConPTY
+stream for mouse capture enable/disable and feeds SGR mouse reports and wheel
+events. The optional DLL path tests IDE-bundled ConPTY implementations.
+
+In CLion's Run window, enable **Emulate terminal in the output console**; the
+ordinary output console is not a full terminal. This setting is separate from
+the Terminal tool window, where ConPTY mouse capture is negotiated by the module.

@@ -43,17 +43,19 @@ class Terminal {
   Event Read();
 
  private:
+  Event ParseInput();
   bool active_{};
+  std::string pending_;
+  Clock::time_point escape_time_{};
 #if defined(_WIN32)
   HANDLE input_{GetStdHandle(STD_INPUT_HANDLE)};
   HANDLE output_{GetStdHandle(STD_OUTPUT_HANDLE)};
+  HANDLE screen_{INVALID_HANDLE_VALUE};
   DWORD input_mode_{}, output_mode_{};
   UINT code_page_{};
   CONSOLE_CURSOR_INFO cursor_{};
 #else
   termios original_{};
-  std::string pending_;
-  Clock::time_point escape_time_{};
 #endif
 };
 
@@ -61,9 +63,9 @@ bool Terminal::Open() {
 #if defined(_WIN32)
   if (!GetConsoleMode(input_, &input_mode_) || !GetConsoleMode(output_, &output_mode_))
     return false;
-  const DWORD mode = (input_mode_ | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT | ENABLE_EXTENDED_FLAGS) &
-                     ~(ENABLE_QUICK_EDIT_MODE | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT |
-                       ENABLE_VIRTUAL_TERMINAL_INPUT);
+  const DWORD mode =
+      (input_mode_ | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT | ENABLE_EXTENDED_FLAGS | ENABLE_VIRTUAL_TERMINAL_INPUT) &
+      ~(ENABLE_QUICK_EDIT_MODE | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT);
   if (!SetConsoleMode(input_, mode))
     return false;
   if (!SetConsoleMode(output_, output_mode_ | ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT)) {
@@ -88,22 +90,25 @@ bool Terminal::Open() {
     return false;
 #endif
   active_ = true;
-  std::cout << "\x1b[?1049h\x1b[?25l";
-#if !defined(_WIN32)
-  std::cout << "\x1b[?1000h\x1b[?1006h";
-#endif
+  // ConPTY forwards mouse tracking to the outer terminal only with VT input enabled.
+  // Read() accepts both native console events and VT sequences from terminal bridges.
+  std::cout << "\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h";
   std::cout << std::flush;
+#if defined(_WIN32)
+  // Query dimensions and mouse coordinates from the active alternate screen.
+  screen_ =
+      CreateFileW(L"CONOUT$", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+#endif
   return true;
 }
 
 Terminal::~Terminal() {
   if (!active_)
     return;
-#if !defined(_WIN32)
-  std::cout << "\x1b[?1006l\x1b[?1000l";
-#endif
-  std::cout << "\x1b[0m\x1b[?25h\x1b[?1049l" << std::flush;
+  std::cout << "\x1b[?1006l\x1b[?1000l\x1b[0m\x1b[?25h\x1b[?1049l" << std::flush;
 #if defined(_WIN32)
+  if (screen_ != INVALID_HANDLE_VALUE)
+    CloseHandle(screen_);
   SetConsoleMode(input_, input_mode_);
   SetConsoleMode(output_, output_mode_);
   SetConsoleOutputCP(code_page_);
@@ -119,7 +124,7 @@ void Terminal::Size(int &columns, int &rows) const {
   rows = 24;
 #if defined(_WIN32)
   CONSOLE_SCREEN_BUFFER_INFO info{};
-  if (GetConsoleScreenBufferInfo(output_, &info)) {
+  if (GetConsoleScreenBufferInfo(screen_ != INVALID_HANDLE_VALUE ? screen_ : output_, &info)) {
     columns = info.srWindow.Right - info.srWindow.Left + 1;
     rows = info.srWindow.Bottom - info.srWindow.Top + 1;
   }
@@ -135,10 +140,15 @@ void Terminal::Size(int &columns, int &rows) const {
 }
 
 Event Terminal::Read() {
+  if (!pending_.empty()) {
+    const auto event = ParseInput();
+    if (event.action != NONE)
+      return event;
+  }
 #if defined(_WIN32)
   const auto wait = WaitForSingleObject(input_, 40);
   if (wait == WAIT_TIMEOUT)
-    return {};
+    return ParseInput();
   if (wait != WAIT_OBJECT_0)
     return {CANCEL};
   INPUT_RECORD record{};
@@ -151,6 +161,12 @@ Event Terminal::Read() {
       return {UP, -1, key.wRepeatCount};
     if (key.wVirtualKeyCode == VK_DOWN)
       return {DOWN, -1, key.wRepeatCount};
+    if (key.uChar.UnicodeChar > 0 && key.uChar.UnicodeChar < 128) {
+      if (pending_.empty())
+        escape_time_ = Clock::now();
+      pending_.append(key.wRepeatCount, static_cast<char>(key.uChar.UnicodeChar));
+      return ParseInput();
+    }
     if (key.wVirtualKeyCode == VK_RETURN)
       return {CONFIRM};
     if (key.wVirtualKeyCode == VK_ESCAPE || key.uChar.UnicodeChar == 3)
@@ -162,7 +178,7 @@ Event Terminal::Read() {
     if ((mouse.dwEventFlags == 0 || mouse.dwEventFlags == DOUBLE_CLICK) &&
         (mouse.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED)) {
       CONSOLE_SCREEN_BUFFER_INFO info{};
-      if (GetConsoleScreenBufferInfo(output_, &info))
+      if (GetConsoleScreenBufferInfo(screen_ != INVALID_HANDLE_VALUE ? screen_ : output_, &info))
         return {CLICK, mouse.dwMousePosition.Y - info.srWindow.Top};
     }
   }
@@ -183,6 +199,11 @@ Event Terminal::Read() {
       escape_time_ = Clock::now();
     pending_.append(bytes, static_cast<size_t>(count));
   }
+  return ParseInput();
+#endif
+}
+
+Event Terminal::ParseInput() {
   if (pending_.empty())
     return {};
   const char first = pending_[0];
@@ -224,7 +245,6 @@ Event Terminal::Read() {
     return {CANCEL};
   }
   return {};
-#endif
 }
 
 std::optional<size_t> SelectText(const std::string &title, const std::vector<MenuOption> &options) {
