@@ -18,11 +18,14 @@ float4 PSMain(float4 pos : SV_POSITION) : SV_TARGET {
   }
   if (pixel_coord.x < 640) {
     if (((pixel_coord.x ^ pixel_coord.y) & 1) == 1) {
-      return pow(float4(color, 1.0), 1.0);
+      return float4(color, 1.0);
     } else {
       return float4(0.0, 0.0, 0.0, 1.0);
     }
   } else {
-    return pow(float4(color * 0.5, 1.0) * 1.055, 1.0 / 2.4) - 0.055;
+    float3 linear = color * 0.5;
+    // Match an SDR display with a pure gamma 2.2 response.
+    float3 encoded = pow(linear, 1.0 / 2.2);
+    return float4(encoded, 1.0);
   }
 }

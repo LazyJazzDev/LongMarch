@@ -78,12 +78,17 @@ typedef enum {
   IMAGE_FORMAT_BGRA8_UNORM,
   IMAGE_FORMAT_D32_FLOAT,
   IMAGE_FORMAT_D24_UNORM_S8_UINT,
+  IMAGE_FORMAT_RGBA16_FLOAT,
+  IMAGE_FORMAT_RGB10A2_UNORM,
+  IMAGE_FORMAT_BGR10A2_UNORM,
 } ImageFormat;
 
 std::string to_string(ImageFormat value);
 std::string ImageFormatName(ImageFormat value);
 bool IsDepthFormat(ImageFormat format);
 bool HasStencil(ImageFormat format);
+uint32_t ImageFormatSize(ImageFormat format);
+bool IsColorFormat(ImageFormat format);
 
 enum CompareOp {
   COMPARE_NEVER,
@@ -121,9 +126,23 @@ struct DepthStencilDesc {
   StencilFaceDesc front, back;
 };
 
+// Values written to a swapchain must use its declared encoding. No implicit
+// tonemapping or color conversion is performed by Present.
+enum ColorSpace {
+  COLOR_SPACE_SRGB_NONLINEAR,
+  // Linear Rec.709/scRGB: 1.0 corresponds to 80 cd/m^2; values may exceed 1.
+  COLOR_SPACE_EXTENDED_SRGB_LINEAR,
+  // Rec.2020 primaries, ST.2084/PQ encoded absolute luminance (0..10000 cd/m^2).
+  COLOR_SPACE_HDR10_ST2084,
+};
+
+std::string to_string(ColorSpace value);
+std::string ColorSpaceName(ColorSpace value);
+
 struct WindowPresentationOption {
   PresentMode present_mode;
   ImageFormat format;
+  ColorSpace color_space{COLOR_SPACE_SRGB_NONLINEAR};
 };
 
 struct WindowDesc {
@@ -131,6 +150,7 @@ struct WindowDesc {
   int height{720};
   std::string title{"LongMarch RHI"};
   PresentMode present_mode{PRESENT_MODE_VSYNC};
+  ColorSpace color_space{COLOR_SPACE_SRGB_NONLINEAR};
 };
 
 struct ImageDesc {

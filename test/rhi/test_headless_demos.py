@@ -18,7 +18,7 @@ def run(executable, args, success=True):
 
 def check(executable, backend):
     scenes = run(executable, ["--list"]).splitlines()
-    expected_scenes = ["window", "triangle", "cube", "texture", "blend", "nbody", "raytracing", "ray_query"]
+    expected_scenes = ["window", "triangle", "cube", "texture", "blend", "nbody", "raytracing", "ray_query", "hdr"]
     if scenes != expected_scenes:
         raise RuntimeError(f"Unexpected module list for {executable.name}: {scenes}")
     for scene in (*scenes, "all"):
@@ -28,9 +28,12 @@ def check(executable, backend):
         skipped = re.findall(r"(\w+): SKIPPED \(ray tracing unavailable\)", output)
         if any(item not in ("raytracing", "ray_query") for item in skipped):
             raise RuntimeError(output)
-        expected = [item for item in (scenes if scene == "all" else [scene]) if item not in skipped]
+        expected = [item for item in (scenes if scene == "all" else [scene]) if item not in skipped and item != "hdr"]
         if [row[0] for row in rows] != expected:
             raise RuntimeError(f"Missing or repeated scene results:\n{output}")
+        if scene in ("hdr", "all"):
+            if "hdr: completed 7 frames (offscreen encoding; no HDR display validation)." not in output:
+                raise RuntimeError(output)
         for _, frames, seconds, fps in rows:
             if int(frames) != 7 or float(seconds) <= 0 or float(fps) <= 0:
                 raise RuntimeError(f"Invalid timing results:\n{output}")

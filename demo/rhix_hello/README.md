@@ -1,6 +1,6 @@
 # rhix_hello
 
-Eight independent modules use `rhix` typed containers. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
+Nine independent modules use `rhix` typed containers. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
 
 ```text
 demo_rhix_hello --list
@@ -28,7 +28,7 @@ Shader stores original Slang source, entry point and stage; creation does not co
 
 `RHI_INPUT(location, type, name)` is expanded by a generated prefix into the C++ layout's Vulkan/Metal attribute locations or D3D12 input semantics. Source BOM is preserved by Shader and omitted only when concatenating the compilation input. C++ `PipelineLayoutDesc` and `BindingLayoutDesc` describe groups, binding numbers, resource types, fixed array capacities and shader visibility. Layouts are copied into Programs/Groups and remain fixed; group resources can be rebound. Generated `RHI_UNIFORM`, `RHI_STRUCTURED_BUFFER`, `RHI_RW_STRUCTURED_BUFFER`, `RHI_TEXTURE2D`, `RHI_RW_TEXTURE2D`, `RHI_SAMPLER` and corresponding `_ARRAY` macros use this layout. Resource macros take `(group,binding,type,name)`; sampler macros omit `type`. Arrays get their length from C++, not from reflection. Reflection checks used resources against the expected type, position, array count and stage; unused declarations may be eliminated.
 
-D3D12 assigns b/t/u/s registers in binding order within each group/space, and uses separate resource/sampler tables. Vulkan preserves group/binding as set/binding. Programs also describe up to eight RGBA8/BGRA8 color outputs and an optional D32 or D24S8 depth/stencil format, depth compare/write, front/back stencil operations, masks and reference. Triangle-list topology and float/float2/float3/float4 vertex attributes remain supported; culling and runtime-sized descriptor arrays are outside this change.
+D3D12 assigns b/t/u/s registers in binding order within each group/space, and uses separate resource/sampler tables. Vulkan preserves group/binding as set/binding. Programs also describe up to eight color outputs (RGBA8/BGRA8, plus RGBA16 float and RGB10A2 on D3D12/Vulkan; BGR10A2 on Vulkan) and an optional D32 or D24S8 depth/stencil format, depth compare/write, front/back stencil operations, masks and reference. Triangle-list topology and float/float2/float3/float4 vertex attributes remain supported; culling and runtime-sized descriptor arrays are outside this change.
 
 ## Buffer and command lifetime
 
@@ -68,9 +68,9 @@ demo_rhix_hello --headless --all --backend vulkan --frames 10000
 demo_rhix_hello --headless --module triangle --backend d3d12 --frames 10000
 ```
 
-`--all` runs all eight modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
+`--all` runs all nine modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
 
-Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports seven scenes in both windowed and headless mode; `raytracing` is skipped because Metal RT pipelines are not implemented.
+Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports eight scenes in both windowed and headless mode; `raytracing` is skipped because Metal RT pipelines are not implemented.
 
 ## Regression tests
 
@@ -89,7 +89,7 @@ ComputeProgram creation, CmdBindComputeProgram and CmdDispatch are also wrapped 
 
 ## Nbody
 
-`--module nbody` or menu item 6 runs the same 65,536-particle simulation and additive drawing as `rhi_hello`, using rhix containers. It supports D3D12, Vulkan and Metal, window controls (P toggles VSync, Escape exits), and `--headless --frames N`. Both demos list `window`, `triangle`, `cube`, `texture`, `blend`, `nbody`, `raytracing`, `ray_query`; `--all` runs all eight, skipping unsupported RT pipelines.
+`--module nbody` or menu item 6 runs the same 65,536-particle simulation and additive drawing as `rhi_hello`, using rhix containers. It supports D3D12, Vulkan and Metal, window controls (P toggles VSync, Escape exits), and `--headless --frames N`. Both demos list `window`, `triangle`, `cube`, `texture`, `blend`, `nbody`, `raytracing`, `ray_query`, `hdr`; `--all` runs all nine, skipping unsupported RT pipelines.
 
 The compute and particle shaders, initialization seed (42), simulation step (0.03), 128-thread tiles, three headless targets and 60 warmup frames match `rhi_hello`. Submission moves the command container into Queue; tokens retain submitted work until completion. FPS and estimated TFLOP/s use the same whole-frame timing and 20 FLOP per particle pair (`20 * 65536^2` FLOP/frame), with decimal units.
 
@@ -98,3 +98,28 @@ The compute and particle shaders, initialization seed (42), simulation step (0.0
 `ray_query` uses rhix containers for triangle/AABB BLAS construction, explicit compaction, per-frame TLAS refit, compute ray queries and display. D3D12, Vulkan and Metal are supported. `raytracing` uses the RT pipeline on D3D12/Vulkan and is skipped on Metal. Both modules support the menu, `--all` and headless runs.
 
 The AS capacity, update, compaction, binding lifetime and shared scratch contracts match [rhi_hello](../rhi_hello/README.md#acceleration-structures-and-ray-queries-d3d12--vulkan--metal). Metal uses native AS encoders and tracked scratch/AS resources; it retains indirect BLAS resources for compute and render ray queries.
+
+## HDR display
+
+```text
+demo_rhix_hello --module hdr --backend d3d12
+demo_rhix_hello --module hdr --backend vulkan
+demo_rhix_hello --module hdr --backend metal
+demo_rhix_hello --module hdr --backend vulkan --headless --frames 12
+```
+
+`hdr` renders 20, 80, 203, 400 and 1000 nit patches, with neutral patches above Rec.709 red/green/blue patches. H cycles the surface's available color spaces; Escape closes the window. Bounded window runs of at least nine frames also cycle automatically. The demo starts in HDR when a supported HDR encoding is available; otherwise it explicitly reports SDR. Headless runs exercise SDR, floating-point scRGB and 10-bit PQ rendering without claiming HDR display validation. This diagnostic waits after each frame and is not a throughput benchmark. Metal also runs this module in windowed and headless modes.
+
+`WindowDesc::color_space` selects the initial encoding. `GetSupportedPresentationOptions()` reports `(present_mode, format, color_space)` combinations; `SetColorSpace()` explicitly rebuilds the swapchain, and `GetColorSpace()` reports the last successfully configured drawable swapchain. Release caller-held frames and recordings before switching, just as for resize/rebuild. Unsupported requests fail without silently selecting SDR or replacing the current frame; native failures can invalidate the swapchain. When minimized, a successful request may remain pending until restoration. A shader/pipeline must match the acquired image format and active color space.
+
+- `COLOR_SPACE_SRGB_NONLINEAR`: SDR sRGB encoded output in RGBA8/BGRA8 UNORM.
+- `COLOR_SPACE_EXTENDED_SRGB_LINEAR`: linear Rec.709/scRGB in RGBA16 float, where 1.0 represents 80 cd/m^2. Values above 1.0 preserve highlights.
+- `COLOR_SPACE_HDR10_ST2084`: Rec.2020 primaries and ST.2084/PQ absolute luminance in RGB10A2 UNORM (also BGR10A2 on Vulkan).
+
+Present performs no implicit transfer-function conversion, gamut conversion or tone mapping. The demo implements the sRGB encoding, Rec.709-to-Rec.2020 conversion and PQ encoding in its fragment shader. `CmdUploadImage` accepts native packed pixels and byte row pitch; RGBA16 float uses eight bytes per pixel, 10-bit formats use four.
+
+D3D12 HDR options require Windows HDR enabled on the monitor containing the window, and native color-space support is checked again when configuring the swapchain. Vulkan enables `VK_EXT_swapchain_colorspace` when available and uses advertised surface format/color-space pairs. Surface support does not prove the physical display is currently emitting HDR luminance; the compositor and OS HDR settings still matter. Neither HDR metadata nor OS HDR settings are changed by the demo. Resize and explicit settings operations rebuild outside command recording; submission failures do not trigger implicit reconstruction.
+
+Metal maps SDR to BGRA8Unorm / sRGB, linear HDR to RGBA16Float / extended linear sRGB, and PQ to RGB10A2Unorm / ITU-R BT.2100 PQ. HDR enables CAMetalLayer EDR content; returning to SDR disables it. Core Animation performs display color matching. The layer accepts these encodings on SDR displays too, so enumeration does not assert HDR headroom. macOS maps extended-linear values relative to its current reference white; the demo's nominal 80-nit scale is not a physical luminance calibration or a guarantee that scRGB and PQ patches match on every display. No mastering metadata is supplied.
+
+Independent Metal images also support BGR10A2Unorm; RGBA16Float supports storage writes. HDR upload/readback tests cover all three new formats, including padded rows and highlights above 1.0. Shader source files use UTF-8 without BOM to permit source concatenation.

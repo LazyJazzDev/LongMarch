@@ -86,6 +86,22 @@ rhi::PresentMode Window::GetPresentMode() const {
   return Get()->GetPresentMode();
 }
 
+bool Window::SetColorSpace(rhi::ColorSpace color_space) const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->SetColorSpace(color_space);
+}
+
+rhi::ColorSpace Window::GetColorSpace() const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return rhi::COLOR_SPACE_SRGB_NONLINEAR;
+#endif
+  return Get()->GetColorSpace();
+}
+
 std::vector<rhi::WindowPresentationOption> Window::GetSupportedPresentationOptions() const {
 #if !defined(NDEBUG)
   if (!*this)

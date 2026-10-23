@@ -20,6 +20,8 @@ class Window : public ObjectContainer {
   bool RebuildSwapChain() const;
   bool SetPresentMode(rhi::PresentMode mode) const;
   rhi::PresentMode GetPresentMode() const;
+  bool SetColorSpace(rhi::ColorSpace color_space) const;
+  rhi::ColorSpace GetColorSpace() const;
   std::vector<rhi::WindowPresentationOption> GetSupportedPresentationOptions() const;
 };
 

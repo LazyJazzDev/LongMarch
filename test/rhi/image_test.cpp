@@ -26,7 +26,8 @@
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
 namespace {
-void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint32_t y, std::array<uint8_t, 4> &output) {
+template <size_t N>
+void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint32_t y, std::array<uint8_t, N> &output) {
 #if defined(LONGMARCH_METAL_ENABLED)
   if (api == BACKEND_API_METAL) {
     using namespace backend::metal;
@@ -234,6 +235,91 @@ class RhiImage : public testing::TestWithParam<BackendAPI> {
   backend::d3d12::ComPtr<ID3D12InfoQueue> messages_;
 #endif
 };
+
+TEST_P(RhiImage, HDRUploadUsesFullPixelStrideAndRenderingPreservesHighlights) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  for (auto format : {IMAGE_FORMAT_RGBA16_FLOAT, IMAGE_FORMAT_RGB10A2_UNORM, IMAGE_FORMAT_BGR10A2_UNORM}) {
+    if (format == IMAGE_FORMAT_BGR10A2_UNORM && GetParam() == BACKEND_API_D3D12)
+      continue;
+    SCOPED_TRACE(ImageFormatName(format));
+    const bool floating = format == IMAGE_FORMAT_RGBA16_FLOAT;
+    const uint32_t bytes = ImageFormatSize(format), pitch = 5 * bytes + 16;
+    ObjPtr<IImage> image = device->CreateImage({5, 3, format});
+    ASSERT_TRUE(image);
+    // Half floats 2, 4, .5, 1 must survive upload without UNORM clamping.
+    const uint16_t half[] = {0x4000, 0x4400, 0x3800, 0x3c00};
+    const uint32_t packed = 123 | (456u << 10) | (789u << 20) | (3u << 30);
+    std::vector<uint8_t> pixels(pitch * 3, 0xab);
+    for (uint32_t y = 0; y < 3; ++y)
+      for (uint32_t x = 0; x < 5; ++x)
+        std::memcpy(pixels.data() + y * pitch + x * bytes,
+                    floating ? static_cast<const void *>(half) : static_cast<const void *>(&packed), bytes);
+    ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+    ASSERT_TRUE(upload->CmdUploadImage(image.Get(), pixels.data(), pitch));
+    ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
+    ASSERT_TRUE(uploaded && uploaded->WaitHost());
+    if (floating) {
+      std::array<uint8_t, 8> actual{};
+      ReadPixel(device.Get(), image.Get(), GetParam(), 4, 2, actual);
+      EXPECT_EQ(std::memcmp(actual.data(), half, 8), 0);
+    } else {
+      std::array<uint8_t, 4> actual{};
+      ReadPixel(device.Get(), image.Get(), GetParam(), 4, 2, actual);
+      EXPECT_EQ(std::memcmp(actual.data(), &packed, 4), 0);
+    }
+    const std::string source = std::string(floating ? "#define FLOATING 1\n" : "#define FLOATING 0\n") + R"(
+      float4 VSMain(uint id:SV_VertexID):SV_Position {
+        float2 p[3] = {float2(-1,-1),float2(3,-1),float2(-1,3)};
+        return float4(p[id],0,1);
+      }
+      float4 PSMain():SV_Target0 {
+      #if FLOATING
+        return float4(2,4,.5,1);
+      #else
+        return float4(.25,.5,.75,1);
+      #endif
+      }
+    )";
+    ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+    ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+    ASSERT_TRUE(vs && ps);
+    ProgramDesc desc;
+    desc.vertex_shader = vs.Get();
+    desc.fragment_shader = ps.Get();
+    desc.color_formats = {format};
+    ObjPtr<IProgram> program = device->CreateProgram(desc);
+    ASSERT_TRUE(program);
+    ObjPtr<ICommandContext> draw = device->CreateCommandContext();
+    ASSERT_TRUE(draw->CmdBindProgram(program.Get()));
+    ASSERT_TRUE(draw->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE}}}));
+    ASSERT_TRUE(draw->CmdSetViewport({0, 0, 5, 3, 0, 1}));
+    ASSERT_TRUE(draw->CmdSetScissor({0, 0, 5, 3}));
+    ASSERT_TRUE(draw->CmdDraw(3));
+    ASSERT_TRUE(draw->CmdEndRendering());
+    ObjPtr<ISubmissionToken> done = queue->Submit(draw.Get());
+    ASSERT_TRUE(done && done->WaitHost());
+    if (floating) {
+      std::array<uint8_t, 8> actual{};
+      ReadPixel(device.Get(), image.Get(), GetParam(), 2, 1, actual);
+      EXPECT_EQ(std::memcmp(actual.data(), half, 8), 0);
+    } else {
+      std::array<uint8_t, 4> actual{};
+      ReadPixel(device.Get(), image.Get(), GetParam(), 2, 1, actual);
+      uint32_t value{};
+      std::memcpy(&value, actual.data(), 4);
+      EXPECT_NEAR(value & 1023u, format == IMAGE_FORMAT_BGR10A2_UNORM ? 767 : 256, 1);
+      EXPECT_NEAR((value >> 10) & 1023u, 512, 1);
+      EXPECT_NEAR((value >> 20) & 1023u, format == IMAGE_FORMAT_BGR10A2_UNORM ? 256 : 767, 1);
+      EXPECT_EQ(value >> 30, 3u);
+    }
+  }
+}
 
 TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
   ObjPtr<ICore> core = CreateCore(GetParam());

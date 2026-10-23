@@ -25,6 +25,65 @@ namespace {
 
 class RhiWindow : public testing::TestWithParam<BackendAPI> {};
 
+TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupportedModes) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto window = device.CreateGLFWWindow({320, 240, "RHI HDR transitions"});
+  ASSERT_TRUE(window);
+  const auto options = window.GetSupportedPresentationOptions();
+  ASSERT_FALSE(options.empty());
+  {
+    auto frame = window.GetNextImage();
+    EXPECT_FALSE(window.SetColorSpace(static_cast<ColorSpace>(-1)));
+    EXPECT_FALSE(window.IsSwapChainInvalid());
+    EXPECT_EQ(frame.Get(), window.GetNextImage().Get());
+  }
+  for (auto space : {COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084, COLOR_SPACE_SRGB_NONLINEAR}) {
+    const bool supported =
+        std::any_of(options.begin(), options.end(), [&](const auto &option) { return option.color_space == space; });
+    EXPECT_EQ(window.SetColorSpace(space), supported);
+    if (!supported) {
+      EXPECT_FALSE(window.IsSwapChainInvalid());
+      EXPECT_TRUE(window.GetNextImage());
+      continue;
+    }
+    EXPECT_EQ(window.GetColorSpace(), space);
+    for (int i = 0; i < 4; ++i) {
+      auto frame = window.GetNextImage();
+      ASSERT_TRUE(frame);
+      EXPECT_EQ(frame.Get(), window.GetNextImage().Get());
+      EXPECT_TRUE(std::any_of(options.begin(), options.end(), [&](const auto &option) {
+        return option.color_space == space && option.format == frame.GetDesc().format;
+      }));
+      auto context = device.CreateCommandContext();
+      ASSERT_TRUE(context.CmdClearColor(frame, space == COLOR_SPACE_EXTENDED_SRGB_LINEAR
+                                                   ? std::array<float, 4>{2, 2, 2, 1}
+                                                   : std::array<float, 4>{.5f, .5f, .5f, 1}));
+      ASSERT_TRUE(context.CmdPresent(window));
+      auto done = queue.Submit(std::move(context));
+      ASSERT_TRUE(done && done.WaitHost());
+    }
+    glfwSetWindowSize(window.GLFWWindow(), 360, 260);
+    ASSERT_TRUE(Window::PollEvents());
+    ASSERT_TRUE(window.RebuildSwapChain());
+    EXPECT_EQ(window.GetColorSpace(), space);
+  }
+  // Also exercise creation in the requested encoding, not only transitions.
+  for (auto space : {COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084}) {
+    const bool supported =
+        std::any_of(options.begin(), options.end(), [&](const auto &o) { return o.color_space == space; });
+    auto created = device.CreateGLFWWindow({320, 240, "RHI HDR creation", PRESENT_MODE_VSYNC, space});
+    EXPECT_EQ(bool(created), supported);
+    if (created)
+      EXPECT_EQ(created.GetColorSpace(), space);
+  }
+}
+
 TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 on a desktop to run presentation tests.";
@@ -67,7 +126,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   for (size_t i = 0; i < options.size(); ++i) {
     EXPECT_NE(options[i].format, IMAGE_FORMAT_UNKNOWN);
     for (size_t j = 0; j < i; ++j)
-      EXPECT_FALSE(options[i].format == options[j].format && options[i].present_mode == options[j].present_mode);
+      EXPECT_FALSE(options[i].format == options[j].format && options[i].present_mode == options[j].present_mode &&
+                   options[i].color_space == options[j].color_space);
     ASSERT_TRUE(first.SetPresentMode(options[i].present_mode));
     EXPECT_EQ(first.GetPresentMode(), options[i].present_mode);
   }

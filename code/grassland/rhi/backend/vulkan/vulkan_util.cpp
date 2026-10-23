@@ -47,6 +47,12 @@ bool SupportsImageStorage(VkPhysicalDevice device, ImageFormat format) {
 
 VkFormat NativeImageFormat(ImageFormat format) {
   switch (format) {
+    case IMAGE_FORMAT_RGBA16_FLOAT:
+      return VK_FORMAT_R16G16B16A16_SFLOAT;
+    case IMAGE_FORMAT_RGB10A2_UNORM:
+      return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+    case IMAGE_FORMAT_BGR10A2_UNORM:
+      return VK_FORMAT_A2R10G10B10_UNORM_PACK32;
     case IMAGE_FORMAT_RGBA8_UNORM:
       return VK_FORMAT_R8G8B8A8_UNORM;
     case IMAGE_FORMAT_BGRA8_UNORM:

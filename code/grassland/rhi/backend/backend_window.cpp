@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/backend_window.h"
 
+#include <algorithm>
 #include <cstdlib>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -60,6 +61,12 @@ bool Window::RebuildSwapChain() {
   if (!glfw::IsWindowThread())
     return false;
 #endif
+  const auto options = GetSupportedPresentationOptions();
+  if (std::none_of(options.begin(), options.end(),
+                   [&](const auto &option) { return option.color_space == requested_color_space_; })) {
+    ReportError(-1, "Requested swapchain color space is unavailable.");
+    return false;
+  }
   invalid_ = true;
   ReleaseNextImage();
   if (!RebuildNativeSwapChain(requested_mode_))
@@ -68,6 +75,7 @@ bool Window::RebuildSwapChain() {
   glfwGetFramebufferSize(window_, &width, &height);
   if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
     return true;
+  color_space_ = requested_color_space_;
   invalid_ = false;
   if (UpdateNextImage())
     return true;
@@ -84,6 +92,31 @@ bool Window::SetPresentMode(PresentMode mode) {
   return RebuildSwapChain();
 }
 
+bool Window::SetColorSpace(ColorSpace color_space) {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  const auto options = GetSupportedPresentationOptions();
+  if (std::none_of(options.begin(), options.end(),
+                   [&](const auto &option) { return option.color_space == color_space; }))
+    return false;
+  const auto previous = requested_color_space_;
+  requested_color_space_ = color_space;
+  if (RebuildSwapChain())
+    return true;
+  requested_color_space_ = previous;
+  return false;
+}
+
+ColorSpace Window::GetColorSpace() const {
+  return color_space_;
+}
+
+ColorSpace Window::RequestedColorSpace() const {
+  return requested_color_space_;
+}
+
 Window::~Window() {
   glfw::UnregisterWindow(window_);
   glfw::DestroyWindow(window_);
@@ -91,6 +124,7 @@ Window::~Window() {
 
 bool Window::InitializeWindow(const WindowDesc &desc) {
   requested_mode_ = desc.present_mode;
+  requested_color_space_ = desc.color_space;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
   if (!window_)
     return false;

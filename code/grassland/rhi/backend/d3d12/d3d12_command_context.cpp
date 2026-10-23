@@ -749,8 +749,10 @@ bool D3D12CommandContext::PrepareGroups() {
 bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
   auto native = dynamic_cast<D3D12Image *>(image);
   if (!native || native->DeviceIdentity() != device_ || !native->IsValid() || !data || sealed_ || rendering_active_ ||
-      IsDepthFormat(image->GetDesc().format) || row_pitch < uint64_t(image->GetDesc().width) * 4 ||
-      (image->GetDesc().height - 1) > (SIZE_MAX - uint64_t(image->GetDesc().width) * 4) / row_pitch) {
+      IsDepthFormat(image->GetDesc().format) ||
+      row_pitch < uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) ||
+      (image->GetDesc().height - 1) >
+          (SIZE_MAX - uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format)) / row_pitch) {
     recording_failed_ = true;
     return false;
   }

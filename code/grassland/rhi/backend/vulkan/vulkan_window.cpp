@@ -3,12 +3,33 @@
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
 #include <cstdlib>
+#include <optional>
 
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 namespace grassland::rhi::backend::vulkan {
+
+namespace {
+std::optional<WindowPresentationOption> PresentationFormat(VkSurfaceFormatKHR native) {
+  if (native.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+    if (native.format == VK_FORMAT_R8G8B8A8_UNORM)
+      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA8_UNORM};
+    if (native.format == VK_FORMAT_B8G8R8A8_UNORM || native.format == VK_FORMAT_UNDEFINED)
+      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_BGRA8_UNORM};
+  }
+  if (native.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT && native.format == VK_FORMAT_R16G16B16A16_SFLOAT)
+    return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA16_FLOAT, COLOR_SPACE_EXTENDED_SRGB_LINEAR};
+  if (native.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT) {
+    if (native.format == VK_FORMAT_A2B10G10R10_UNORM_PACK32)
+      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGB10A2_UNORM, COLOR_SPACE_HDR10_ST2084};
+    if (native.format == VK_FORMAT_A2R10G10B10_UNORM_PACK32)
+      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_BGR10A2_UNORM, COLOR_SPACE_HDR10_ST2084};
+  }
+  return std::nullopt;
+}
+}  // namespace
 
 VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
 }
@@ -195,8 +216,9 @@ std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOpti
   VkSurfaceCapabilitiesKHR caps{};
   if (!Check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface_, &caps), "Surface capabilities"))
     return {};
-  if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
-    ReportError(-1, "Surface does not support transfer clears.");
+  if ((caps.supportedUsageFlags & (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) !=
+      (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
+    ReportError(-1, "Surface does not support color attachments and transfer clears.");
     return {};
   }
   std::vector<VkSurfaceFormatKHR> formats;
@@ -216,17 +238,16 @@ std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOpti
                           std::find(modes.begin(), modes.end(), VK_PRESENT_MODE_MAILBOX_KHR) != modes.end();
   std::vector<WindowPresentationOption> options;
   for (const auto &format : formats) {
-    // Match the formats and color space implemented by RebuildNativeSwapChain.
-    if (format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR ||
-        (format.format != VK_FORMAT_R8G8B8A8_UNORM && format.format != VK_FORMAT_B8G8R8A8_UNORM))
+    const auto option = PresentationFormat(format);
+    if (!option)
       continue;
-    const auto image_format =
-        format.format == VK_FORMAT_R8G8B8A8_UNORM ? IMAGE_FORMAT_RGBA8_UNORM : IMAGE_FORMAT_BGRA8_UNORM;
-    if (std::any_of(options.begin(), options.end(), [&](const auto &option) { return option.format == image_format; }))
+    if (std::any_of(options.begin(), options.end(), [&](const auto &other) {
+          return other.format == option->format && other.color_space == option->color_space;
+        }))
       continue;
-    options.push_back({PRESENT_MODE_VSYNC, image_format});
+    options.push_back(*option);
     if (continuous)
-      options.push_back({PRESENT_MODE_CONTINUOUS, image_format});
+      options.push_back({PRESENT_MODE_CONTINUOUS, option->format, option->color_space});
   }
   return options;
 }
@@ -274,8 +295,9 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   VkSurfaceCapabilitiesKHR caps{};
   if (!Check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface_, &caps), "Surface capabilities"))
     return false;
-  if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
-    ReportError(-1, "Surface does not support transfer clears.");
+  if ((caps.supportedUsageFlags & (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) !=
+      (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
+    ReportError(-1, "Surface does not support color attachments and transfer clears.");
     return false;
   }
   std::vector<VkSurfaceFormatKHR> formats;
@@ -291,14 +313,15 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
           },
           modes))
     return false;
-  auto format = std::find_if(formats.begin(), formats.end(), [](const auto &f) {
-    return (f.format == VK_FORMAT_B8G8R8A8_UNORM || f.format == VK_FORMAT_R8G8B8A8_UNORM) &&
-           f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+  auto format = std::find_if(formats.begin(), formats.end(), [&](const auto &native) {
+    const auto option = PresentationFormat(native);
+    return option && option->color_space == RequestedColorSpace();
   });
   if (format == formats.end()) {
-    ReportError(-1, "No supported UNORM swapchain format.");
+    ReportError(-1, "No surface format for the requested color space.");
     return false;
   }
+  const auto image_format = PresentationFormat(*format)->format;
   VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
   if (requested_mode == PRESENT_MODE_CONTINUOUS) {
     for (auto candidate : {VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR}) {
@@ -313,7 +336,7 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   create.minImageCount = std::max(3u, caps.minImageCount);
   if (caps.maxImageCount)
     create.minImageCount = std::min(create.minImageCount, caps.maxImageCount);
-  create.imageFormat = format->format;
+  create.imageFormat = NativeImageFormat(image_format);
   create.imageColorSpace = format->colorSpace;
   create.imageExtent = caps.currentExtent;
   if (create.imageExtent.width == UINT32_MAX) {
@@ -348,9 +371,7 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
     return false;
   image_views_.resize(images_.size());
   for (size_t i = 0; i < images_.size(); ++i) {
-    if (!image_views_[i].Initialize(
-            device, images_[i],
-            format->format == VK_FORMAT_B8G8R8A8_UNORM ? IMAGE_FORMAT_BGRA8_UNORM : IMAGE_FORMAT_RGBA8_UNORM, false))
+    if (!image_views_[i].Initialize(device, images_[i], image_format, false))
       return false;
   }
   acquire_sync_.resize(images_.size() + 1);
@@ -368,8 +389,7 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   for (auto &entry : rendered_)
     if (!Check(vkCreateSemaphore(device, &semaphore, nullptr, &entry), "Create present semaphore"))
       return false;
-  desc_ = {create.imageExtent.width, create.imageExtent.height,
-           format->format == VK_FORMAT_B8G8R8A8_UNORM ? IMAGE_FORMAT_BGRA8_UNORM : IMAGE_FORMAT_RGBA8_UNORM};
+  desc_ = {create.imageExtent.width, create.imageExtent.height, image_format};
   mode_ = mode == VK_PRESENT_MODE_FIFO_KHR ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
   return true;
 }

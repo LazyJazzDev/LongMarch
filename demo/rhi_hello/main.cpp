@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
       continue;
     }
     if (arg == "--list") {
-      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\n";
+      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\nhdr\n";
       return 0;
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -105,6 +105,10 @@ int main(int argc, char **argv) {
       std::cerr << "ray_query: FAILED\n";
       result = 1;
     }
+    if (RunHDR(api, frames, headless) != 0) {
+      std::cerr << "hdr: FAILED\n";
+      result = 1;
+    }
     return result;
   }
   if (tui && !module.empty()) {
@@ -121,8 +125,9 @@ int main(int argc, char **argv) {
                  "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan/Metal)\n";
     std::cout << "  7. raytracing  Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)\n"
                  "  8. ray_query   Inline ray queries (D3D12/Vulkan/Metal)\n";
+    std::cout << "  9. hdr         HDR presentation and encoding test (D3D12/Vulkan/Metal)\n";
     for (;;) {
-      std::cout << "\nSelect module [1-8 or name], q to quit: " << std::flush;
+      std::cout << "\nSelect module [1-9 or name], q to quit: " << std::flush;
       std::string input;
       if (!std::getline(std::cin, input))
         return 0;
@@ -164,6 +169,10 @@ int main(int argc, char **argv) {
         module = "ray_query";
         break;
       }
+      if (input == "9" || input == "hdr") {
+        module = "hdr";
+        break;
+      }
       std::cout << "Invalid selection. Enter a listed number or module name.\n";
     }
   }
@@ -183,6 +192,8 @@ int main(int argc, char **argv) {
     return RunRayTracing(api, frames, headless);
   if (module == "ray_query")
     return RunRayQuery(api, frames, headless);
+  if (module == "hdr")
+    return RunHDR(api, frames, headless);
   std::cerr << "Unknown module: " << module << '\n';
   return 1;
 }
