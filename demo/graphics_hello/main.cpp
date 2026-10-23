@@ -150,13 +150,14 @@ void RunModule(const ModuleInfo &info, BackendAPI api, int frames, bool headless
 }
 
 void PrintHelp(const char *executable) {
-  std::cout << "Usage: " << executable
-            << " [--module NAME | --tui | --all] [--backend auto|metal|vulkan|d3d12] [--frames N] [--headless]\n"
-               "       --headless Benchmark window/triangle/cube/texture/blend without a window (default 600 frames)\n"
-               "       --all      Run all five headless benchmarks (requires --headless)\n"
-               "       --list     List all modules without opening a window\n"
-               "       --help     Show this help\n"
-               "With no module specified, the terminal selection menu opens.\n\n";
+  std::cout
+      << "Usage: " << executable
+      << " [--module NAME | --tui | --all] [--backend auto|metal|vulkan|d3d12] [--frames N] [--headless]\n"
+         "       --headless Benchmark window/triangle/cube/texture/blend without a window (default 600 frames)\n"
+         "       --all      Run all five headless benchmarks (requires --headless)\n"
+         "       --list     List all modules without opening a window\n"
+         "       --help     Show this help\n"
+         "Missing backend or module: select each missing option in the terminal menu.\n--backend auto explicitly uses the default API.\n\n";
   ListModules();
 }
 }  // namespace
@@ -167,6 +168,7 @@ int Main(int argc, char **argv) {
     BackendAPI api = BACKEND_API_DEFAULT;
     const ModuleInfo *module = nullptr;
     int frames = 0;
+    bool backend_specified = false;
     bool tui = false;
     bool list = false;
     bool headless = false;
@@ -191,9 +193,10 @@ int Main(int argc, char **argv) {
           module = FindModule(value);
           if (!module)
             throw std::invalid_argument("Unknown module: " + value + "; use --list to see available modules");
-        } else if (option == "--backend")
+        } else if (option == "--backend") {
           api = ParseBackend(value);
-        else
+          backend_specified = true;
+        } else
           frames = PositiveInteger(value);
       } else
         throw std::invalid_argument("Unknown or incomplete option: " + option);
@@ -213,6 +216,21 @@ int Main(int argc, char **argv) {
     if (list) {
       ListModules();
       return 0;
+    }
+    if (!backend_specified) {
+      std::vector<BackendAPI> backends;
+      std::vector<snowberg::tui::MenuOption> options;
+      for (const auto backend : {BACKEND_API_D3D12, BACKEND_API_VULKAN, BACKEND_API_METAL}) {
+        if (SupportBackendAPI(backend)) {
+          backends.push_back(backend);
+          options.push_back({BackendAPIString(backend), ""});
+        }
+      }
+      snowberg::tui::Menu menu;
+      const auto selected = menu.Select("Graphics Hello - API Selection", options);
+      if (!selected)
+        return 0;
+      api = backends[*selected];
     }
     if (!SupportBackendAPI(api))
       throw std::runtime_error("Requested graphics backend is unavailable");

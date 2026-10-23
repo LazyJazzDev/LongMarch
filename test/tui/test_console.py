@@ -68,7 +68,7 @@ def check(result):
 
 
 class Console:
-    def __init__(self, executable=PROBE, args=()):
+    def __init__(self, executable=PROBE, args=(), initial_title=None):
         startup = subprocess.STARTUPINFO()
         startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
         startup.wShowWindow = 0
@@ -85,7 +85,7 @@ class Console:
             time.sleep(0.02)
         self.input = k.CreateFileW("CONIN$", 0xC0000000, 3, None, 3, 0, None)
         self.output = None
-        self.wait_text("Module Selection" if executable != PROBE else "TUI integration probe")
+        self.wait_text(initial_title or ("Module Selection" if executable != PROBE else "TUI integration probe"))
 
     def refresh(self):
         # Opening CONOUT$ resolves the active alternate buffer, unlike a saved old handle.
@@ -240,7 +240,15 @@ class NativeMenuTests(unittest.TestCase):
     def test_demo_default_menu_and_one_frame(self):
         for executable in DEMOS:
             with self.subTest(executable=executable):
-                with Console(executable) as terminal:
+                with Console(executable, initial_title="API Selection") as terminal:
+                    terminal.key(0x0D)
+                    terminal.wait_text("Module Selection")
+                    terminal.key(0x1B)
+                    terminal.finish(0)
+                with Console(executable, ("--module", "window", "--frames", "1"), "API Selection") as terminal:
+                    terminal.key(0x0D)
+                    terminal.finish(0)
+                with Console(executable, ("--all", "--headless"), "API Selection") as terminal:
                     terminal.key(0x1B)
                     terminal.finish(0)
                 # Select the first module through the real menu, then render one frame.

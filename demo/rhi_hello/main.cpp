@@ -9,6 +9,7 @@ int main(int argc, char **argv) {
   using namespace grassland::rhi;
   BackendAPI api = BACKEND_API_DEFAULT;
   std::string module;
+  bool backend_specified = false;
   bool tui = false;
   bool headless = false;
   bool all = false;
@@ -33,7 +34,7 @@ int main(int argc, char **argv) {
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -61,10 +62,36 @@ int main(int argc, char **argv) {
       std::cerr << "Unknown option: " << arg << '\n';
       return 1;
     }
+    backend_specified = true;
   }
   if (all && (tui || !module.empty())) {
     std::cerr << "Use --all without --module or --tui\n";
     return 1;
+  }
+  if (tui && !module.empty()) {
+    std::cerr << "Use either --module or --tui, not both\n";
+    return 1;
+  }
+  if (!backend_specified) {
+    const std::vector<BackendAPI> backends{
+#if defined(LONGMARCH_D3D12_ENABLED)
+        BACKEND_API_D3D12,
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+        BACKEND_API_VULKAN,
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+        BACKEND_API_METAL,
+#endif
+    };
+    std::vector<snowberg::tui::MenuOption> options;
+    for (const auto backend : backends)
+      options.push_back({BackendAPIName(backend), ""});
+    snowberg::tui::Menu menu;
+    const auto selected = menu.Select("RHI Hello - API Selection", options);
+    if (!selected)
+      return 0;
+    api = backends[*selected];
   }
   if (!frames) {
     if (headless)
@@ -107,10 +134,6 @@ int main(int argc, char **argv) {
       result = 1;
     }
     return result;
-  }
-  if (tui && !module.empty()) {
-    std::cerr << "Use either --module or --tui, not both\n";
-    return 1;
   }
   if (module.empty()) {
     const std::vector<snowberg::tui::MenuOption> options{
