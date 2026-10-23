@@ -6,6 +6,10 @@
 #include <map>
 #include <thread>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/virtual_file_system.h"
 
@@ -15,6 +19,14 @@ namespace {
 
 int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
+
+#if defined(__APPLE__) && TARGET_OS_OSX
+  // Match PQ 100 nits to extended-linear 1.0 in the macOS EDR presentation path.
+  constexpr int pq_nits_per_unit = 100;
+#else
+  // Windows scRGB defines linear 1.0 as 80 nits.
+  constexpr int pq_nits_per_unit = 80;
+#endif
 
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
@@ -42,8 +54,8 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
   } else {
     spaces = {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084};
   }
-  std::cout
-      << "hdr: nominal columns 20, 80, 203, 400, 1000 nits; PQ uses 100 nits/unit (1.25x): 25, 100, 253.75, 500, 1250 nits; top neutral, bottom Rec.709 primaries.\n";
+  std::cout << "hdr: linear patch levels 0.25, 1, 2.5375, 5, 12.5; PQ uses " << pq_nits_per_unit
+            << " nits/unit; top neutral, bottom Rec.709 primaries.\n";
   const auto pq = std::find(spaces.begin(), spaces.end(), COLOR_SPACE_HDR10_ST2084);
   size_t selected = pq != spaces.end() ? static_cast<size_t>(pq - spaces.begin()) : (spaces.size() > 1 ? 1 : 0);
   if (window && !window->SetColorSpace(spaces[selected]))
@@ -94,7 +106,8 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     const auto extent = image->GetDesc();
     auto &program = programs[{extent.format, color_space}];
     if (!program) {
-      const auto source = "#define OUTPUT_COLOR_SPACE " + std::to_string(static_cast<int>(color_space)) + "\n" + shader;
+      const auto source = "#define OUTPUT_COLOR_SPACE " + std::to_string(static_cast<int>(color_space)) +
+                          "\n#define PQ_NITS_PER_UNIT " + std::to_string(pq_nits_per_unit) + ".0\n" + shader;
       ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
       ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
       if (!vs || !ps)

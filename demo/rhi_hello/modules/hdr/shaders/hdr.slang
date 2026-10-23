@@ -12,11 +12,11 @@ Varying VSMain(uint id : SV_VertexID) {
 
 float3 Encode(float3 linear709) {
 #if OUTPUT_COLOR_SPACE == 1
-  return linear709;  // scRGB: 1 = 80 nits.
+  return linear709;  // 1 = reference white; Windows scRGB uses 80 nits.
 #elif OUTPUT_COLOR_SPACE == 2
   const float3x3 to2020 =
       float3x3(0.627404, 0.329283, 0.043313, 0.069097, 0.919540, 0.011362, 0.016391, 0.088013, 0.895595);
-  float3 normalized = max(mul(to2020, linear709), 0) * (100.0 / 10000.0);
+  float3 normalized = max(mul(to2020, linear709), 0) * (PQ_NITS_PER_UNIT / 10000.0);
   float3 p = pow(normalized, 2610.0 / 16384.0);
   return pow((3424.0 / 4096.0 + (2413.0 / 128.0) * p) / (1 + (2392.0 / 128.0) * p), 2523.0 / 32.0);
 #else
