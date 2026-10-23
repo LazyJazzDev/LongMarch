@@ -42,7 +42,8 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
   } else {
     spaces = {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084};
   }
-  std::cout << "hdr: columns 20, 80, 203, 400, 1000 nits; top neutral, bottom Rec.709 primaries.\n";
+  std::cout
+      << "hdr: nominal columns 20, 80, 203, 400, 1000 nits; PQ uses 100 nits/unit (1.25x): 25, 100, 253.75, 500, 1250 nits; top neutral, bottom Rec.709 primaries.\n";
   const auto pq = std::find(spaces.begin(), spaces.end(), COLOR_SPACE_HDR10_ST2084);
   size_t selected = pq != spaces.end() ? static_cast<size_t>(pq - spaces.begin()) : (spaces.size() > 1 ? 1 : 0);
   if (window && !window->SetColorSpace(spaces[selected]))
