@@ -105,8 +105,15 @@ int main(int argc, char **argv) {
     if (backends.size() == 1) {
       api = backends.front();
     } else {
+      size_t initial_selection = 0;
+      for (size_t i = 0; i < backends.size(); ++i) {
+        if (backends[i] == BACKEND_API_DEFAULT) {
+          initial_selection = i;
+          break;
+        }
+      }
       snowberg::tui::Menu menu;
-      const auto selected = menu.Select("RHIx Hello - API Selection", options);
+      const auto selected = menu.Select("RHIx Hello - API Selection", options, initial_selection);
       if (!selected)
         return 0;
       api = backends[*selected];
