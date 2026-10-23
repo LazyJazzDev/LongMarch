@@ -101,7 +101,7 @@ class Messages : public Core {
       dirty_ = true;
     } else if (event.action == MouseAction::Press && event.button == MouseButton::Left) {
       Layout();
-      if (event.row >= input_top_ + 1 && event.row < Rows() - 1 && event.column >= 0 && event.column < Columns()) {
+      if (event.row >= input_top_ + 1 && event.row < Rows() - 2 && event.column >= 0 && event.column < Columns()) {
         editor_.PlaceCursor(input_scroll_ + event.row - input_top_ - 1, event.column - 2, TextWidth());
         Changed();
       }
@@ -114,6 +114,7 @@ class Messages : public Core {
     if (!dirty_ && blink == last_blink_)
       return;
     Layout();
+    const std::string hint = " Enter send | Shift/Alt+Enter newline | PgUp/PgDn history | Esc exit";
     std::vector<std::string> frame(Rows());
     const bool usable = Columns() >= 12 && Rows() >= 6;
     if (!usable) {
@@ -128,7 +129,6 @@ class Messages : public Core {
         if (index >= 0 && index < static_cast<int>(history_.size()))
           frame[row + 1] = history_[index];
       }
-      frame[input_top_] = " Message";
       const auto lines = tui_demo::Wrap(editor_.Text(), TextWidth());
       for (int row = 0; row < edit_rows_; ++row) {
         const size_t index = input_scroll_ + row;
@@ -139,12 +139,12 @@ class Messages : public Core {
             (row == 0 ? "> " : "  ") +
             tui_demo::UTF8(std::u32string_view(editor_.Text()).substr(line.begin, line.end - line.begin));
       }
-      frame.back() = " Enter send | Shift/Alt+Enter newline | PgUp/PgDn history | Esc exit";
+      frame.back() = hint;
     }
     const auto caret = editor_.CursorPosition(TextWidth());
     const int caret_row = usable ? input_top_ + 1 + caret.row - input_scroll_ : -1;
     for (int row = 0; row < Rows(); ++row) {
-      const bool input = usable && row >= input_top_;
+      const bool input = usable && row >= input_top_ && row < Rows() - 1;
       auto text = detail::TextSlice(frame[row], 0, Columns());
       text.append(std::max(0, Columns() - detail::TextWidth(text)), ' ');
       frame[row] = std::move(text);
@@ -153,10 +153,20 @@ class Messages : public Core {
           row == last_caret_row_ || input_top_ != previous_input_top_) {
         SetForegroundColor(input ? 235 : 210, input ? 239 : 217, input ? 245 : 226);
         SetBackgroundColor(input ? 43 : 20, input ? 50 : 24, input ? 65 : 32);
+        if (usable && row == Rows() - 1)
+          SetForegroundColor(160, 170, 185);
         UpdateRow(row, 0, frame[row]);
+        if (usable && row == Rows() - 1) {
+          SetForegroundColor(236, 214, 150);
+          for (const auto key : {"Enter", "Shift/Alt+Enter", "PgUp/PgDn", "Esc"}) {
+            const auto column = hint.find(key);
+            if (column < static_cast<size_t>(Columns()))
+              UpdateRow(row, static_cast<int>(column), key);
+          }
+        }
       }
     }
-    if (usable && blink && caret_row >= input_top_ + 1 && caret_row < Rows() - 1) {
+    if (usable && blink && caret_row >= input_top_ + 1 && caret_row < Rows() - 2) {
       std::string glyph = " ";
       if (caret.column < TextWidth() && editor_.Cursor() < editor_.Text().size() &&
           editor_.Text()[editor_.Cursor()] != U'\n') {
@@ -194,7 +204,7 @@ class Messages : public Core {
     const auto lines = tui_demo::Wrap(editor_.Text(), TextWidth());
     const int maximum = std::max(1, std::min(8, Rows() / 2 - 2));
     edit_rows_ = std::clamp(static_cast<int>(lines.size()), 1, maximum);
-    input_top_ = std::max(0, Rows() - edit_rows_ - 2);
+    input_top_ = std::max(0, Rows() - edit_rows_ - 3);
     const auto caret = editor_.CursorPosition(TextWidth());
     input_scroll_ = std::clamp(input_scroll_, std::max(0, caret.row - edit_rows_ + 1), caret.row);
     const int last = std::max(0, static_cast<int>(history_.size()) - HistoryHeight());

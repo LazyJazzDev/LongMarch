@@ -34,7 +34,7 @@ class MessageDemoTest(unittest.TestCase):
         with self.start(columns=60, rows=14) as terminal:
             self.ready(terminal)
             terminal.send(b"abc\x1b[D\x7f\x1b[3~Z")  # aZ
-            terminal.send(b"\x1b[<0;3;13MX\x1b[13;2uY\r")
+            terminal.send(b"\x1b[<0;3;12MX\x1b[13;2uY\r")
             terminal.until(lambda: b"1 recorded" in terminal.output)
             terminal.send(b"next\r")
             terminal.until(lambda: b"2 recorded" in terminal.output)

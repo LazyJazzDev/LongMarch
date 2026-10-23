@@ -10,8 +10,9 @@ explanation and exits; the editor requires a terminal.
 
 The upper pane shows session-local recorded messages. The lower pane has a
 contrasting background, a `>` prompt and a blinking block cursor. It starts at
-three rows (padding/label, editor, help), grows with multiline input, and scrolls
-internally when it reaches its height limit. Resize reflows both panes. Very
+three rows (blank padding, editor, blank padding), grows with multiline input, and scrolls
+internally when it reaches its height limit. Shortcut hints sit below the colored
+input region, with pale-yellow keys and muted descriptions. Resize reflows both panes. Very
 small terminals show a resize hint until at least 12 columns and 6 rows are
 available, without discarding the draft/history.
 
