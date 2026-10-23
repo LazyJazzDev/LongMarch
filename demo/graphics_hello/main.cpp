@@ -228,7 +228,7 @@ int Main(int argc, char **argv) {
               options.push_back({BackendAPIString(backend), "Microsoft | Windows"});
               break;
             case BACKEND_API_VULKAN:
-              options.push_back({BackendAPIString(backend), "Khronos Group | Windows, Linux, Android"});
+              options.push_back({BackendAPIString(backend), "Khronos Group | Windows, Linux, macOS"});
               break;
             case BACKEND_API_METAL:
               options.push_back({BackendAPIString(backend), "Apple | macOS, iOS, iPadOS"});
