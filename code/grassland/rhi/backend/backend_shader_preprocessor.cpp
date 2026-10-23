@@ -209,7 +209,7 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
     request->addTranslationUnitSourceFile(unit, desc.filename.c_str());
   } else {
     const size_t offset = desc.source.compare(0, 3, "\xef\xbb\xbf") == 0 ? 3 : 0;
-    request->addTranslationUnitSourceString(unit, desc.filename.empty() ? "shader.slang" : desc.filename.c_str(),
+    request->addTranslationUnitSourceString(unit, desc.filename.empty() ? "main.slang" : desc.filename.c_str(),
                                             desc.source.c_str() + offset);
   }
   const auto result = request->compile();

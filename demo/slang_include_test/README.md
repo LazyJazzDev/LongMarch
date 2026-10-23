@@ -45,7 +45,7 @@ auto shader = device.CreateShader("shaders/main.slang", "VSMain", SHADER_STAGE_V
 // 自定义文件系统。VirtualFileSystem 实现 grassland::FileSystem。
 auto shader = device.CreateShader("shaders/main.slang", "VSMain", SHADER_STAGE_VERTEX, &files);
 
-// 直接提供源码；默认虚拟文件名为 shader.slang。
+// 直接提供源码；默认虚拟文件名为 main.slang。
 auto shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
 ```
 

@@ -74,7 +74,7 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
       header += "\n";
     }
   }
-  header += "#line 1 \"shader.slang\"\n";
+  header += "#line 1 \"main.slang\"\n";
   return header;
 }
 
@@ -143,8 +143,7 @@ bool CompileSlang(const ShaderDesc &shader,
   };
   const size_t start = shader.source.compare(0, 3, "\xef\xbb\xbf") == 0 ? 3 : 0;
   const auto source = prefix + shader.source.substr(start);
-  auto module =
-      session->loadModuleFromSourceString("rhi_shader", "shader.slang", source.c_str(), diagnostics.writeRef());
+  auto module = session->loadModuleFromSourceString("rhi_shader", "main.slang", source.c_str(), diagnostics.writeRef());
   if (!module) {
     report();
     return false;
