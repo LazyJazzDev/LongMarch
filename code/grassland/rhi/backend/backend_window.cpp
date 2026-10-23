@@ -10,7 +10,7 @@ namespace grassland::rhi::backend {
 
 Window::Window() = default;
 
-bool Window::EnableImGui(bool enabled) {
+bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_size) {
   if (!glfw::IsWindowThread() || recording_imgui_)
     return false;
   if (!enabled) {
@@ -18,7 +18,7 @@ bool Window::EnableImGui(bool enabled) {
     return true;
   }
   if (!imgui_)
-    imgui_ = WindowImGui::Create(device_, window_);
+    imgui_ = WindowImGui::Create(device_, window_, font_file_path, font_size);
   return bool(imgui_);
 }
 

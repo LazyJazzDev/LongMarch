@@ -36,7 +36,10 @@ class IWindow : public IObject {
 
   // Creates a separate ImGui context and font texture. Disabling releases them.
   // Completed/in-flight recordings own the GPU resources they use independently.
-  virtual bool EnableImGui(bool enabled = true) = 0;
+  // Font options apply only when creating the context. nullptr uses the built-in
+  // font; file fonts include the ChineseFull glyph range, matching graphics.
+  // Repeated enable calls keep the existing font. Disable first to reinitialize.
+  virtual bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) = 0;
   virtual ImGuiContext *GetImGuiContext() const = 0;
 
   // Borrowed handle; Window owns it. Use GLFW operations on the main thread.

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/event_manager.h"
 #include "imgui.h"
@@ -24,7 +24,10 @@ class ImGuiContextScope {
 
 class WindowImGui {
  public:
-  static std::unique_ptr<WindowImGui> Create(Device *device, GLFWwindow *window);
+  static std::unique_ptr<WindowImGui> Create(Device *device,
+                                             GLFWwindow *window,
+                                             const char *font_file_path,
+                                             float font_size);
   ~WindowImGui();
 
   ImGuiContext *Context() const {
@@ -37,7 +40,7 @@ class WindowImGui {
   explicit WindowImGui(Device *device) : device_(device) {
   }
 
-  bool Initialize(GLFWwindow *window);
+  bool Initialize(GLFWwindow *window, const char *font_file_path, float font_size);
   bool Render(ICommandContext *commands, IImage *image, ImDrawData *data);
   Device *device_;
   ImGuiContext *context_{};

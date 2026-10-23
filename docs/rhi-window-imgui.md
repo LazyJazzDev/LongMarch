@@ -32,6 +32,15 @@ if (!commands->CmdPresent(window))
 ```
 
 The rhix equivalents use `window.EnableImGui()` and `window.ImGuiEvent()`.
+Initialization accepts a font file and pixel size:
+`window->EnableImGui(true, "fonts/MyFont.ttf", 24.0f)` (rhix uses `.`).
+The defaults are `nullptr` and 13 pixels. A null path selects the built-in font
+at the requested size; a file font uses the ChineseFull glyph range, matching
+graphics D3D12/Vulkan (the font must contain the desired glyphs). Font data is
+copied and the atlas is built/uploaded once during initialization. Repeated enable
+calls preserve the existing context and font; disable before reinitializing to
+change either option. An unreadable file or nonpositive/nonfinite size returns
+false. Runtime font-atlas changes are not supported.
 The independent `imgui` module of both hello demos demonstrates an interactive
 overlay and the built-in ImGui demo. Press I to toggle UI recording, P to toggle
 VSync, and Escape to close. I skips UI calls inside the callback without disabling

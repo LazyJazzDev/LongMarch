@@ -1,8 +1,10 @@
-#include "grassland/rhi/backend/backend_window_imgui.h"
+﻿#include "grassland/rhi/backend/backend_window_imgui.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <fstream>
+#include <limits>
 
 #include "grassland/rhi/backend/backend_device.h"
 #include "imgui_impl_glfw.h"
@@ -60,14 +62,19 @@ float4 PSMain(Varying input) : SV_Target0 {
 )";
 }  // namespace
 
-std::unique_ptr<WindowImGui> WindowImGui::Create(Device *device, GLFWwindow *window) {
+std::unique_ptr<WindowImGui> WindowImGui::Create(Device *device,
+                                                 GLFWwindow *window,
+                                                 const char *font_file_path,
+                                                 float font_size) {
   auto result = std::unique_ptr<WindowImGui>(new WindowImGui(device));
-  if (!result->Initialize(window))
+  if (!result->Initialize(window, font_file_path, font_size))
     return {};
   return result;
 }
 
-bool WindowImGui::Initialize(GLFWwindow *window) {
+bool WindowImGui::Initialize(GLFWwindow *window, const char *font_file_path, float font_size) {
+  if (!std::isfinite(font_size) || font_size <= 0)
+    return false;
   // CreateContext selects the new context when none existed, so save before it.
   ImGuiContextScope scope(ImGui::GetCurrentContext());
   context_ = ImGui::CreateContext();
@@ -76,6 +83,31 @@ bool WindowImGui::Initialize(GLFWwindow *window) {
   io.IniFilename = nullptr;
   io.BackendRendererName = "longmarch_rhi";
   io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
+  ImFontConfig font_config;
+  font_config.SizePixels = font_size;
+  if (font_file_path) {
+    // Read explicitly: AddFontFromFileTTF asserts when a file cannot be opened.
+    std::ifstream file(font_file_path, std::ios::binary | std::ios::ate);
+    if (!file)
+      return false;
+    const auto size = file.tellg();
+    if (size <= 100 || size > std::numeric_limits<int>::max())
+      return false;
+    std::vector<char> data(static_cast<size_t>(size));
+    file.seekg(0);
+    if (!file.read(data.data(), static_cast<std::streamsize>(size)))
+      return false;
+    // ImGui copies non-owned data into its atlas, so the input can be released.
+    font_config.FontDataOwnedByAtlas = false;
+    if (!io.Fonts->AddFontFromMemoryTTF(data.data(), static_cast<int>(size), font_size, &font_config,
+                                        io.Fonts->GetGlyphRangesChineseFull()))
+      return false;
+  } else {
+    if (!io.Fonts->AddFontDefault(&font_config))
+      return false;
+  }
+  if (!io.Fonts->Build())
+    return false;
   platform_initialized_ = ImGui_ImplGlfw_InitForOther(window, false);
   if (!platform_initialized_)
     return false;

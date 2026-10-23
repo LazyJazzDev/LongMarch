@@ -10,8 +10,8 @@ rhi::IWindow *Window::Get() const noexcept {
   return static_cast<rhi::IWindow *>(GetObject());
 }
 
-bool Window::EnableImGui(bool enabled) const {
-  return Get() && Get()->EnableImGui(enabled);
+bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_size) const {
+  return Get() && Get()->EnableImGui(enabled, font_file_path, font_size);
 }
 
 ImGuiContext *Window::GetImGuiContext() const {

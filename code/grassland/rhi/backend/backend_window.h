@@ -13,7 +13,7 @@ class Device;
 class Window : public Object<rhi::IWindow> {
  public:
   Window();
-  bool EnableImGui(bool enabled = true) override;
+  bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
   ImGuiContext *GetImGuiContext() const override;
   bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image);
 

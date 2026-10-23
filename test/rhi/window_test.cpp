@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <filesystem>
 #include <thread>
 
 #include "imgui.h"
@@ -63,6 +64,53 @@ TEST(RhiWindowEvents, CopyKeepsIndependentCallbackState) {
   EXPECT_EQ(value, 2);
   original.InvokeCallbacks();
   EXPECT_EQ(value, 2);
+}
+
+TEST_P(RhiWindow, ImGuiFontInitializationOptions) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto window = device.CreateGLFWWindow({320, 240, "ImGui fonts"});
+  ASSERT_TRUE(window);
+  auto previous = ImGui::GetCurrentContext();
+  EXPECT_FALSE(window.EnableImGui(true, nullptr, 0));
+  EXPECT_FALSE(window.EnableImGui(true, "missing-rhi-font.ttf", 20));
+  EXPECT_EQ(window.GetImGuiContext(), nullptr);
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+  ASSERT_TRUE(window.EnableImGui(true, nullptr, 24));
+  ImGui::SetCurrentContext(window.GetImGuiContext());
+  EXPECT_FLOAT_EQ(ImGui::GetIO().Fonts->Fonts[0]->FontSize, 24);
+  ImGui::SetCurrentContext(previous);
+  auto context = window.GetImGuiContext();
+  ASSERT_TRUE(window.EnableImGui(true, nullptr, 32));
+  EXPECT_EQ(window.GetImGuiContext(), context);
+  ASSERT_TRUE(window.EnableImGui(false));
+  const auto path = (std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() /
+                     "external/imgui/misc/fonts/Roboto-Medium.ttf")
+                        .string();
+  ASSERT_TRUE(window.EnableImGui(true, path.c_str(), 28));
+  ImGui::SetCurrentContext(window.GetImGuiContext());
+  EXPECT_FLOAT_EQ(ImGui::GetIO().Fonts->Fonts[0]->FontSize, 28);
+  EXPECT_NE(ImGui::GetIO().Fonts->Fonts[0]->FindGlyphNoFallback('A'), nullptr);
+  EXPECT_NE(ImGui::GetIO().Fonts->TexID, ImTextureID{});
+  ImGui::SetCurrentContext(previous);
+  window.ImGuiEvent().RegisterCallback([] {
+    ImGui::Begin("Custom font");
+    ImGui::TextUnformatted("Font file at 28 pixels");
+    ImGui::End();
+  });
+  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  auto commands = device.CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands.CmdPresent(window));
+  auto token = queue.Submit(std::move(commands));
+  ASSERT_TRUE(token);
+  EXPECT_TRUE(token.WaitHost());
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
 }
 
 TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {

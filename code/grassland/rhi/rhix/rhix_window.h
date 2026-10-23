@@ -15,7 +15,7 @@ class Window : public ObjectContainer {
   bool ShouldClose() const;
   bool IsKeyDown(int key) const;
   bool SetTitle(const std::string &title) const;
-  bool EnableImGui(bool enabled = true) const;
+  bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) const;
   ImGuiContext *GetImGuiContext() const;
   EventManager<void(int, int)> &ResizeEvent() const;
   EventManager<void(int, int)> &FramebufferResizeEvent() const;
