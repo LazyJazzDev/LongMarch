@@ -1,5 +1,7 @@
 ﻿#include "grassland/rhi/backend/backend_glfw_helper.h"
 
+#include <cstdlib>
+#include <cstring>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
@@ -75,7 +77,41 @@ bool Initialize() {
     return true;
 #endif
   }
-  if (!glfwInit()) {
+  bool initialized = false;
+#if defined(__linux__) && defined(GLFW_PLATFORM)
+  const char *platform = std::getenv("LONGMARCH_WINDOW_SYSTEM");
+  if (platform && std::strcmp(platform, "auto") != 0) {
+    int requested;
+    if (std::strcmp(platform, "wayland") == 0)
+      requested = GLFW_PLATFORM_WAYLAND;
+    else if (std::strcmp(platform, "x11") == 0)
+      requested = GLFW_PLATFORM_X11;
+    else {
+      ReportError(-1, "LONGMARCH_WINDOW_SYSTEM must be auto, wayland or x11.");
+      return false;
+    }
+    if (!glfwPlatformSupported(requested)) {
+      ReportError(-1, "Requested window system was not compiled into GLFW.");
+      return false;
+    }
+    glfwInitHint(GLFW_PLATFORM, requested);
+    initialized = glfwInit() == GLFW_TRUE;
+  } else {
+    if (glfwPlatformSupported(GLFW_PLATFORM_WAYLAND)) {
+      glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
+      initialized = glfwInit() == GLFW_TRUE;
+      if (!initialized)
+        glfwGetError(nullptr);
+    }
+    if (!initialized && glfwPlatformSupported(GLFW_PLATFORM_X11)) {
+      glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+      initialized = glfwInit() == GLFW_TRUE;
+    }
+  }
+#else
+  initialized = glfwInit() == GLFW_TRUE;
+#endif
+  if (!initialized) {
     const char *message{};
     const int code = glfwGetError(&message);
     ReportError(code, message ? message : "GLFW initialization failed.");

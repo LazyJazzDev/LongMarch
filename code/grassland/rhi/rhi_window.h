@@ -33,8 +33,26 @@ class IWindow : public IObject {
   virtual bool RebuildSwapChain() = 0;
   virtual bool SetPresentMode(PresentMode mode) = 0;
   virtual PresentMode GetPresentMode() const = 0;
+  // Explicit replacement, with the same recording/lifetime rules as RebuildSwapChain.
+  // Unsupported requests return false without replacing the current swapchain.
+  // A native failure can invalidate it; inspect IsSwapChainInvalid(). No SDR fallback.
+  virtual bool SetColorSpace(ColorSpace color_space) = 0;
+  // Encoding of the last successfully configured, drawable swapchain.
+  virtual ColorSpace GetColorSpace() const = 0;
+  // Query reference white in cd/m^2 on the window thread. Windows requires HDR enabled.
+  // Unsupported platforms (including Linux) and failed queries return false.
+  // On failure nits is unchanged. This does not change presentation encoding.
+  virtual bool GetHDRReferenceWhiteNits(float &nits) const = 0;
+  // Multiply relative linear RGB by this to align 1.0 with SDR white.
+  // Windows: reference white / 80; macOS EDR and Linux: 1. Unavailable: 1.
+  // Linux uses fixed source encoding parameters without an output-white query.
+  virtual float GetHDRReferenceWhiteScale() const = 0;
+  // Peak / reference white, in relative linear units, at least 1.
+  // Unavailable display information returns 10, not a measured capability.
+  virtual float GetHDRHeadroom() const = 0;
   // Currently implemented combinations supported by this window's surface.
-  // Formats are selected automatically at creation/rebuild. Empty on failure.
+  // Formats are selected within the requested color space at creation/rebuild.
+  // This is presentation capability, not a measurement of display luminance. Empty on failure.
   virtual std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const = 0;
 
  protected:

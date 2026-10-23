@@ -1,8 +1,6 @@
 # Apple metal-cpp headers are supplied by vcpkg or an external Apple SDK.
 option(LONGMARCH_ENABLE_METAL "Build the native metal-cpp backend on macOS" ${APPLE})
 if (LONGMARCH_ENABLE_METAL AND APPLE)
-    enable_language(OBJCXX)
-    set(CMAKE_OBJCXX_STANDARD 17)
     set(LONGMARCH_METAL_ENABLED ON)
     # Older builds cached an empty optional override. find_path treats that as
     # an existing result and skips discovery, even when vcpkg installed headers.

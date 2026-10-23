@@ -220,15 +220,15 @@ bool MetalCommandContext::CmdCopyBuffer(IBuffer *source,
 
 bool MetalCommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
   auto native = dynamic_cast<MetalImage *>(image);
+  const uint64_t pitch = native ? uint64_t(native->GetDesc().width) * ImageFormatSize(native->GetDesc().format) : 0;
   if (sealed_ || encoder_ || !native || !native->IsValid() || native->DeviceIdentity() != device_ || !data ||
-      IsDepthFormat(native->GetDesc().format) || row_pitch < uint64_t(native->GetDesc().width) * 4 ||
-      (native->GetDesc().height - 1) > (SIZE_MAX - uint64_t(native->GetDesc().width) * 4) / row_pitch) {
+      !IsColorFormat(native->GetDesc().format) || !pitch || row_pitch < pitch ||
+      (native->GetDesc().height - 1) > (SIZE_MAX - pitch) / row_pitch) {
     recording_failed_ = true;
     return false;
   }
 
   const auto desc = native->GetDesc();
-  const uint64_t pitch = uint64_t(desc.width) * 4;
   const uint64_t size = pitch * desc.height;
   auto upload = device_->UploadPool().Acquire(size);
   if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {

@@ -1,12 +1,41 @@
 ﻿#include "grassland/rhi/backend/metal/metal_window.h"
 
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 #define GLFW_EXPOSE_NATIVE_COCOA
 #import <Cocoa/Cocoa.h>
 #include <GLFW/glfw3native.h>
 #import <QuartzCore/CAMetalLayer.h>
 
 namespace grassland::rhi::backend::metal {
+
+namespace {
+ImageFormat PresentationFormat(ColorSpace space) {
+  switch (space) {
+    case COLOR_SPACE_SRGB_NONLINEAR:
+      return IMAGE_FORMAT_BGRA8_UNORM;
+    case COLOR_SPACE_EXTENDED_SRGB_LINEAR:
+      return IMAGE_FORMAT_RGBA16_FLOAT;
+    case COLOR_SPACE_HDR10_ST2084:
+      return IMAGE_FORMAT_RGB10A2_UNORM;
+    default:
+      return IMAGE_FORMAT_UNKNOWN;
+  }
+}
+
+CGColorSpaceRef CreatePresentationColorSpace(ColorSpace space) {
+  switch (space) {
+    case COLOR_SPACE_SRGB_NONLINEAR:
+      return CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    case COLOR_SPACE_EXTENDED_SRGB_LINEAR:
+      return CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
+    case COLOR_SPACE_HDR10_ST2084:
+      return CGColorSpaceCreateWithName(kCGColorSpaceITUR_2100_PQ);
+    default:
+      return nullptr;
+  }
+}
+}  // namespace
 
 MetalWindow::MetalWindow(MetalDevice *device) : device_(device) {
 }
@@ -34,16 +63,11 @@ MetalWindow *MetalWindow::Create(MetalDevice *device, const WindowDesc &desc) {
     return nullptr;
   }
   object->layer_->setDevice(object->device_->NativeDevice());
-  object->layer_->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
   // RHI images may also be read back/copied, rather than only render targets.
   object->layer_->setFramebufferOnly(false);
   auto view = [glfwGetCocoaWindow(object->GLFWWindow()) contentView];
   [view setWantsLayer:YES];
   [view setLayer:(CAMetalLayer *)object->layer_.get()];
-  auto colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-  ((CAMetalLayer *)object->layer_.get()).colorspace = colorspace;
-  if (colorspace)
-    CGColorSpaceRelease(colorspace);
   if (!object->RebuildSwapChain())
     return nullptr;
   return object.release();
@@ -65,10 +89,22 @@ bool MetalWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return true;
+  const auto format = PresentationFormat(RequestedColorSpace());
+  auto color_space = CreatePresentationColorSpace(RequestedColorSpace());
+  if (!color_space || format == IMAGE_FORMAT_UNKNOWN) {
+    if (color_space)
+      CGColorSpaceRelease(color_space);
+    ReportError(-1, "Metal presentation color space is unavailable.");
+    return false;
+  }
+  layer.pixelFormat = static_cast<MTLPixelFormat>(NativeImageFormat(format));
+  layer.colorspace = color_space;
+  layer.wantsExtendedDynamicRangeContent = RequestedColorSpace() != COLOR_SPACE_SRGB_NONLINEAR;
+  CGColorSpaceRelease(color_space);
   layer_->setDrawableSize(CGSizeMake(width, height));
   NSWindow *native = glfwGetCocoaWindow(GLFWWindow());
   ((CAMetalLayer *)layer_.get()).contentsScale = native.backingScaleFactor;
-  desc_ = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), IMAGE_FORMAT_BGRA8_UNORM};
+  desc_ = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), format};
   valid_ = true;
   return true;
 }
@@ -98,7 +134,19 @@ PresentMode MetalWindow::GetPresentMode() const {
 }
 
 std::vector<WindowPresentationOption> MetalWindow::GetSupportedPresentationOptions() const {
-  return {{PRESENT_MODE_VSYNC, IMAGE_FORMAT_BGRA8_UNORM}, {PRESENT_MODE_CONTINUOUS, IMAGE_FORMAT_BGRA8_UNORM}};
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  std::vector<WindowPresentationOption> options;
+  // EDR content is accepted even on SDR displays; current display headroom controls
+  // visible luminance, not the layer's supported input encodings.
+  for (auto space : {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084}) {
+    auto color_space = CreatePresentationColorSpace(space);
+    if (!color_space)
+      continue;
+    CGColorSpaceRelease(color_space);
+    for (auto mode : {PRESENT_MODE_VSYNC, PRESENT_MODE_CONTINUOUS})
+      options.push_back({mode, PresentationFormat(space), space});
+  }
+  return options;
 }
 
 bool MetalWindow::IsFrameValid(uint64_t generation) const {

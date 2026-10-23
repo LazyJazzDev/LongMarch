@@ -693,13 +693,15 @@ bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStag
 bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
   auto native = dynamic_cast<VulkanImage *>(image);
   if (sealed_ || render_target_ || !native || !native->IsValid() || native->DeviceIdentity() != device_ || !data ||
-      IsDepthFormat(native->GetDesc().format) || row_pitch < uint64_t(native->GetDesc().width) * 4 ||
-      (native->GetDesc().height - 1) > (SIZE_MAX - uint64_t(native->GetDesc().width) * 4) / row_pitch) {
+      IsDepthFormat(native->GetDesc().format) ||
+      row_pitch < uint64_t(native->GetDesc().width) * ImageFormatSize(native->GetDesc().format) ||
+      (native->GetDesc().height - 1) >
+          (SIZE_MAX - uint64_t(native->GetDesc().width) * ImageFormatSize(native->GetDesc().format)) / row_pitch) {
     recording_failed_ = true;
     return false;
   }
   const auto desc = native->GetDesc();
-  const uint64_t packed = uint64_t(desc.width) * 4;
+  const uint64_t packed = uint64_t(desc.width) * ImageFormatSize(desc.format);
   std::vector<uint8_t> pixels(packed * desc.height);
   for (uint32_t y = 0; y < desc.height; ++y)
     std::memcpy(pixels.data() + y * packed, static_cast<const uint8_t *>(data) + y * row_pitch, packed);

@@ -266,3 +266,32 @@ an accidental second output-white adjustment in the presentation shader.
 - [Wayland color-management protocol](https://wayland.app/protocols/color-management-v1)
 - [GLFW build options](https://www.glfw.org/docs/latest/compile_guide.html)
 - [Vulkan HDR metadata](https://registry.khronos.org/vulkan/specs/latest/man/html/VK_EXT_hdr_metadata.html)
+
+## RHI / rhix HDR windows
+
+The RHI and rhix hello HDR modules require a window; explicit headless requests
+are rejected, and headless `--all` runs skip HDR. They use a fixed 203-nit Linux PQ content reference
+white, linear scale 1 and unknown-headroom default 10. On Linux,
+`GetHDRReferenceWhiteNits` returns false without modifying its argument. RHI does
+not query Wayland color-management feedback or add protocol build dependencies.
+These constants describe demo encoding policy, not measured display brightness.
+The optional Sparkium diagnostic described above remains separate.
+
+RHI exposes `COLOR_SPACE_BT709_LINEAR` when Vulkan advertises
+`RGBA16_FLOAT + BT709_LINEAR_EXT`. Both hello HDR demos show this as **Linear
+Rec.709** and write linear values directly, without PQ or sRGB encoding or scRGB
+white compensation. This is separate from scRGB; the compositor determines the
+luminance mapping. The existing Sparkium negotiation policy is unchanged.
+
+RHI defaults to trying compiled-in Wayland first, then X11 on initialization failure,
+and honors `LONGMARCH_WINDOW_SYSTEM=auto|wayland|x11`. Explicit requests do not fall
+back. A working SDR-only Wayland connection stays on Wayland.
+
+### RHI HDR demo validation, 2026-10-23
+
+Release builds of both window-only HDR demos passed. Both completed 12-frame native
+Wayland runs covering linear Rec.709, PQ and SDR. Explicit headless HDR requests
+were rejected, and both headless `--all --frames 1` runs succeeded while skipping
+HDR. XWayland key-event checks verified P toggles V-Sync once per press, the title
+shows positive FPS and On/Off state, and Escape exits cleanly. Physical brightness,
+native Wayland keyboard input and Windows/macOS were not validated in this update.

@@ -39,6 +39,39 @@ SamplerArray CreateSamplers(IDevice *device, std::initializer_list<SamplerDesc> 
 
 class RhiProgram : public testing::TestWithParam<BackendAPI> {};
 
+TEST_P(RhiProgram, SlangPlatformMacrosMatchExecutionPlatform) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+#ifdef _WIN32
+  const std::string expected = "#define EXPECT_WINDOWS 1\n#define EXPECT_MACOS 0\n#define EXPECT_LINUX 0\n";
+#elif defined(__APPLE__)
+  const std::string expected = "#define EXPECT_WINDOWS 0\n#define EXPECT_MACOS 1\n#define EXPECT_LINUX 0\n";
+#else
+  const std::string expected = "#define EXPECT_WINDOWS 0\n#define EXPECT_MACOS 0\n#define EXPECT_LINUX 1\n";
+#endif
+  const auto source = expected + R"(
+#if !defined(RHI_PLATFORM_WINDOWS) || !defined(RHI_PLATFORM_MACOS) || !defined(RHI_PLATFORM_LINUX)
+#error Missing platform macro
+#endif
+#if RHI_PLATFORM_WINDOWS != EXPECT_WINDOWS || RHI_PLATFORM_MACOS != EXPECT_MACOS || RHI_PLATFORM_LINUX != EXPECT_LINUX
+#error Incorrect execution platform
+#endif
+float4 VSMain(uint id : SV_VertexID) : SV_Position { return float4(0,0,0,1); }
+float4 PSMain() : SV_Target0 { return float4(1,1,1,1); }
+)";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ASSERT_TRUE(vs && ps);
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.color_formats = {IMAGE_FORMAT_RGBA8_UNORM};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  EXPECT_TRUE(program);
+}
+
 TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);

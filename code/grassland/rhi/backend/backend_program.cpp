@@ -37,7 +37,7 @@ bool Program::ValidateLayout() const {
   if (desc_.color_formats.size() > 8 || (desc_.color_formats.empty() && !IsDepthFormat(desc_.depth_stencil.format)))
     return false;
   for (auto format : desc_.color_formats)
-    if (format != IMAGE_FORMAT_RGBA8_UNORM && format != IMAGE_FORMAT_BGRA8_UNORM)
+    if (!IsColorFormat(format))
       return false;
   if (!desc_.blend_states.empty() && desc_.blend_states.size() != desc_.color_formats.size())
     return false;

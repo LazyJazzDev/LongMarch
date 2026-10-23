@@ -1,6 +1,6 @@
 # rhi_hello
 
-Eight independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
+Nine independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
 
 ```text
 demo_rhi_hello --list
@@ -28,7 +28,7 @@ Shader stores original Slang source, entry point and stage; creation does not co
 
 `RHI_INPUT(location, type, name)` is expanded by a generated prefix into the C++ layout's Vulkan/Metal attribute locations or D3D12 input semantics. Source BOM is preserved by Shader and omitted only when concatenating the compilation input. C++ `PipelineLayoutDesc` and `BindingLayoutDesc` describe groups, binding numbers, resource types, fixed array capacities and shader visibility. Layouts are copied into Programs/Groups and remain fixed; group resources can be rebound. Generated `RHI_UNIFORM`, `RHI_STRUCTURED_BUFFER`, `RHI_RW_STRUCTURED_BUFFER`, `RHI_TEXTURE2D`, `RHI_RW_TEXTURE2D`, `RHI_SAMPLER` and corresponding `_ARRAY` macros use this layout. Resource macros take `(group,binding,type,name)`; sampler macros omit `type`. Arrays get their length from C++, not from reflection. Reflection checks used resources against the expected type, position, array count and stage; unused declarations may be eliminated.
 
-D3D12 assigns b/t/u/s registers in binding order within each group/space, and uses separate resource/sampler tables. Vulkan preserves group/binding as set/binding. Programs also describe up to eight RGBA8/BGRA8 color outputs and an optional D32 or D24S8 depth/stencil format, depth compare/write, front/back stencil operations, masks and reference. Triangle-list topology and float/float2/float3/float4 vertex attributes remain supported; culling and runtime-sized descriptor arrays are outside this change.
+D3D12 assigns b/t/u/s registers in binding order within each group/space, and uses separate resource/sampler tables. Vulkan preserves group/binding as set/binding. Programs also describe up to eight color outputs (RGBA8/BGRA8, plus RGBA16 float and RGB10A2 on D3D12/Vulkan; BGR10A2 on Vulkan) and an optional D32 or D24S8 depth/stencil format, depth compare/write, front/back stencil operations, masks and reference. Triangle-list topology and float/float2/float3/float4 vertex attributes remain supported; culling and runtime-sized descriptor arrays are outside this change.
 
 ## Buffer and command lifetime
 
@@ -81,9 +81,9 @@ demo_rhi_hello --headless --all --backend vulkan --frames 10000
 demo_rhi_hello --headless --module triangle --backend d3d12 --frames 10000
 ```
 
-`--all` runs all eight modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
+`--all` runs all nine modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
 
-Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports seven scenes in both windowed and headless mode; `raytracing` is skipped because Metal RT pipelines are not implemented.
+Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports eight scenes in both windowed and headless mode; `raytracing` is skipped because Metal RT pipelines are not implemented.
 
 ## Regression tests
 
@@ -177,3 +177,47 @@ existing shaders and the shared DX-compatible Vulkan layout.
 
 The standalone [TLAS pressure test](../tlas_pressure_test/README.md) is built as
 `demo_tlas_pressure_test` and is not included in this demo's module list or `--all`.
+
+## HDR display
+
+```text
+demo_rhi_hello --module hdr --backend d3d12
+demo_rhi_hello --module hdr --backend vulkan
+demo_rhi_hello --module hdr --backend metal
+```
+
+`hdr` displays **0.25x, 0.5x, 1x, 2x and 4x relative to SDR reference white**, with neutral patches above Rec.709 primaries. Rendering consumes two window queries:
+
+- `GetHDRReferenceWhiteScale()`: multiplier aligning relative linear 1.0 with SDR white in the native linear HDR encoding. Windows computes reference-white nits / 80 on the CPU; macOS EDR and Linux return 1. Linux uses fixed source encoding parameters. Unavailable information returns 1.
+- `GetHDRHeadroom()`: peak brightness divided by reference white, in relative linear units. Windows matches the window's monitor across DXGI adapters and uses `IDXGIOutput6::GetDesc1().MaxLuminance`; macOS uses the current window screen's `maximumExtendedDynamicRangeColorComponentValue` through shared Cocoa code for both Metal and Vulkan. Valid results are at least 1; unavailable information returns **10.0**. Linux retains this default; no display peak is queried.
+
+The demo updates uniforms each frame. Before encoding it scales all RGB components by the same factor if their maximum exceeds headroom, preserving RGB ratios rather than clipping channels independently. SDR uses a limit of 1. This is a simple peak limiter, not a perceptual tone mapper, and does not guarantee gamut handling by the physical display. The shader defines `PQ_NITS_PER_UNIT` as 100 on macOS, 203 on Linux and 80 on Windows, unless overridden in the shader source prefix. It computes PQ normalization as `display.linear_scale * (PQ_NITS_PER_UNIT / 10000.0)`; C++ only supplies white scale and headroom. macOS linear EDR remains unscaled.
+
+`GetHDRReferenceWhiteNits(float &nits)` reads `DISPLAYCONFIG_SDR_WHITE_LEVEL` on Windows (HDR must be enabled). On macOS it returns false without changing the argument: the EDR ratio is available, but absolute reference-white luminance is not queried. On Linux it returns false without changing the argument; no Wayland color-management feedback is queried. The Linux defaults are not measurements.
+
+H cycles available color spaces; P toggles V-Sync once per press; Escape closes the window. Bounded window runs with at least three frames per available color space cycle automatically. The title shows FPS, the current V-Sync state and relative levels, refreshing every 250 ms or after a mode change. FPS counts completed render-loop frames and resets on color-space or V-Sync changes; it is not a measurement of physical scanout rate. The console reports presentation-mode changes, white scale and relative headroom (including defaults when unavailable). HDR requires a window: `--module hdr --headless` reports an error, and `--headless --all` skips HDR. The demo waits after each frame and is not a throughput benchmark.
+
+`WindowDesc::color_space` selects the initial encoding. `GetSupportedPresentationOptions()` reports `(present_mode, format, color_space)` combinations; `SetColorSpace()` explicitly rebuilds the swapchain, and `GetColorSpace()` reports the last successfully configured drawable swapchain. Release caller-held frames and recordings before switching, just as for resize/rebuild. Unsupported requests fail without silently selecting SDR or replacing the current frame; native failures can invalidate the swapchain. When minimized, a successful request may remain pending until restoration. A shader/pipeline must match the acquired image format and active color space.
+
+- `COLOR_SPACE_SRGB_NONLINEAR`: SDR sRGB encoded output in RGBA8/BGRA8 UNORM.
+- `COLOR_SPACE_EXTENDED_SRGB_LINEAR`: linear Rec.709/scRGB in RGBA16 float, where native 1.0 represents 80 cd/m^2 on Windows and system reference white on macOS EDR. Values above 1.0 preserve highlights.
+- `COLOR_SPACE_BT709_LINEAR`: native linear Rec.709 in RGBA16 float when Vulkan advertises `BT709_LINEAR_EXT`. The demo writes linear values directly, preserving highlights above 1; luminance mapping is platform-defined and is not assumed to match scRGB.
+- `COLOR_SPACE_HDR10_ST2084`: Rec.2020 primaries and ST.2084/PQ absolute luminance in RGB10A2 UNORM (also BGR10A2 on Vulkan).
+
+Present performs no implicit transfer-function conversion, gamut conversion or tone mapping. The demo implements the sRGB encoding, Rec.709-to-Rec.2020 conversion and PQ encoding in its fragment shader. `CmdUploadImage` accepts native packed pixels and byte row pitch; RGBA16 float uses eight bytes per pixel, 10-bit formats use four.
+
+D3D12 HDR options require Windows HDR enabled on the monitor containing the window, and native color-space support is checked again when configuring the swapchain. Vulkan enables `VK_EXT_swapchain_colorspace` when available and uses advertised surface format/color-space pairs. Surface support does not prove the physical display is currently emitting HDR luminance; the compositor and OS HDR settings still matter. Neither HDR metadata nor OS HDR settings are changed by the demo. Resize and explicit settings operations rebuild outside command recording; submission failures do not trigger implicit reconstruction.
+
+Metal maps SDR to BGRA8Unorm / sRGB, linear HDR to RGBA16Float / extended linear sRGB, and PQ to RGB10A2Unorm / ITU-R BT.2100 PQ. HDR enables CAMetalLayer EDR content; returning to SDR disables it. Core Animation performs display color matching. The layer accepts these encodings on SDR displays too, so enumeration does not assert HDR headroom. macOS maps extended-linear values relative to its current reference white; the demo compensates with a 100-nit PQ scale on macOS and the queried SDR reference-white nits on Windows. This is a demo presentation convention based on the observed EDR mapping, not a physical luminance calibration or a guarantee of a match on every display and setting. No mastering metadata is supplied.
+
+Independent Metal images also support BGR10A2Unorm; RGBA16Float supports storage writes. HDR upload/readback tests cover all three new formats, including padded rows and highlights above 1.0. Shader source files use UTF-8 without BOM to permit source concatenation.
+
+RHI `CompileSlang` defines `RHI_PLATFORM_WINDOWS`, `RHI_PLATFORM_MACOS` and `RHI_PLATFORM_LINUX` as 0 or 1 for every shader session, including imported modules. Use `#if RHI_PLATFORM_MACOS`, not `#ifdef`, to select platform behavior. These describe the execution platform, independently of the shader output target (including Metal via SPIR-V). All three are zero on other platforms.
+
+On Linux, RHI tries Wayland first and falls back to X11 if initialization fails.
+`LONGMARCH_WINDOW_SYSTEM=auto|wayland|x11` can select the policy; explicit selections
+fail if unavailable. HDR capability does not trigger an X11 fallback.
+RHI requires no additional Wayland color-management protocol dependency. X11 remains supported.
+Linux PQ source reference white is **203 nits**; compositor output reference white
+must not be multiplied into the pixels again. This follows the existing
+[Linux HDR convention](../../docs/linux-hdr.md), not a physical brightness measurement.
