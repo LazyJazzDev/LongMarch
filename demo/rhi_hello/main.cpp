@@ -123,7 +123,8 @@ int main(int argc, char **argv) {
         {"raytracing", "Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)"},
         {"ray_query", "Inline ray queries (D3D12/Vulkan/Metal)"},
     };
-    const auto selected = snowberg::tui::Select("RHI Hello - Module Selection", options);
+    snowberg::tui::Menu menu;
+    const auto selected = menu.Select("RHI Hello - Module Selection", options);
     if (!selected)
       return 0;
     module = options[*selected].name;

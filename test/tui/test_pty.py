@@ -120,6 +120,18 @@ class PtyMenuTest(unittest.TestCase):
             terminal.finish(0)
             self.assertIn(b"resize:8:4", terminal.output)
 
+    def test_reuse_public_menu_resets_selection_and_result(self):
+        with Terminal([PROBE, "--reuse"]) as terminal:
+            terminal.ready()
+            terminal.send(b"\x1b[B\x1b[B\r")
+            terminal.until(lambda: b"[1/1]" in terminal.output)
+            self.assertIn(b"> again", terminal.output)
+            terminal.send(b"\x1b")
+            terminal.finish(12)
+        result = subprocess.run([PROBE, "--reuse"], input="3\nq\n", text=True, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 12)
+        self.assertIn("Second selection", result.stdout)
+
     def test_keyboard_highlight_and_confirm(self):
         with Terminal() as terminal:
             terminal.ready()

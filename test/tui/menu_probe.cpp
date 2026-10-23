@@ -4,7 +4,7 @@
 #include <windows.h>
 #endif
 
-int main() {
+int main(int argc, char **argv) {
 #if defined(_WIN32)
   DWORD input_mode{}, output_mode{};
   const auto input = GetStdHandle(STD_INPUT_HANDLE);
@@ -20,7 +20,13 @@ int main() {
   std::vector<snowberg::tui::MenuOption> options;
   for (int i = 0; i < 20; ++i)
     options.push_back({"item" + std::to_string(i), "A long description that eventually reveals END_OF_DESCRIPTION"});
-  const auto result = snowberg::tui::Select("TUI integration probe", options);
+  snowberg::tui::Menu menu;
+  const auto result = menu.Select("TUI integration probe", options);
+  if (argc > 1 && std::string(argv[1]) == "--reuse") {
+    const auto next = menu.Select("Second selection", {{"again", "Cancel this selection"}});
+    if (next)
+      return 101;
+  }
 #if defined(_WIN32)
   DWORD new_input{}, new_output{};
   GetConsoleMode(input, &new_input);

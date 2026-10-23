@@ -93,7 +93,8 @@ const ModuleInfo *SelectModule(BackendAPI api) {
   std::vector<snowberg::tui::MenuOption> options;
   for (const auto &module : modules)
     options.push_back({module.name, module.description});
-  const auto selected = snowberg::tui::Select(
+  snowberg::tui::Menu menu;
+  const auto selected = menu.Select(
       "Graphics Hello - Module Selection (" + std::string(grassland::graphics::BackendAPIString(api)) + ")", options);
   if (!selected)
     return nullptr;

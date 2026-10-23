@@ -31,7 +31,7 @@ const auto status = app.Run();
 - `tui_text.h/cpp`: UTF-8 display-cell widths, safe slicing/prefix fitting and
   scrolling calculations. Complex emoji clusters and ambiguous-width characters
   are not fully normalized across terminals.
-- `tui.cpp`: a menu application derived from `Core`, exposed by `Select` for the
+- `tui_menu.h/cpp`: the public `Menu` application derived from `Core`, with `Menu::Select` for the
   three hello demos, plus its plain-text fallback.
 
 `Run()` checks the environment and enables terminal modes. It calls `OnStart`,
@@ -94,18 +94,30 @@ does not retain a framebuffer or automatically clear unchanged content.
 
 ## Selection menu and ordinary consoles
 
-`Select(title, options, initial_selection)` returns a zero-based option index or
+`Menu::Select(title, options, initial_selection)` returns a zero-based option index or
 `std::nullopt` on cancellation, EOF, failure, or an empty menu. The menu implements
 Up/Down, Enter, Esc/Ctrl+C/Ctrl+D, single-click selection, double-click confirmation
 (within 400 ms), and wheel navigation through Core callbacks. Hover is delivered
 by Core but does not change menu selection.
+
+```cpp
+snowberg::tui::Menu menu;
+const auto choice = menu.Select("Example", {
+    {"triangle", "Colored triangle"},
+    {"texture", "Sampled texture"},
+});
+```
+
+`Menu` is declared in `tui_menu.h` and included by `tui.h`. The same instance can
+perform multiple selections; each call resets its options, result, selection,
+scrolling and click state. There is no namespace-level `Select` function.
 
 Each option occupies one row. Short viewports scroll vertically. Narrow rows
 clip safely; a selected long label pauses one second, scrolls at 12.5 cells per
 second, pauses at the end, and repeats. Only changed rows are rewritten. The menu
 leaves the last column unused; the general Core API can write it.
 
-If Core reports `Unavailable`, Select prints options sequentially and accepts an
+If Core reports `Unavailable`, Menu::Select prints options sequentially and accepts an
 option's one-based number or name. Invalid input retries; q/quit/Esc/EOF cancels.
 The demos retain their direct CLI options such as `--module`.
 
