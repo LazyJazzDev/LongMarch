@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
       continue;
     }
     if (arg == "--list") {
-      std::cout << "imgui\nwindow\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\n";
+      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\nimgui\n";
       return 0;
     }
     if (arg == "--help") {
       std::cout
-          << "[--module imgui|window|triangle|cube|texture|blend|nbody|raytracing|ray_query | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|imgui | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -73,10 +73,6 @@ int main(int argc, char **argv) {
   }
   if (all) {
     int result = 0;
-    if (RunImGui(api, frames, headless) != 0) {
-      std::cerr << "imgui: FAILED\n";
-      result = 1;
-    }
     if (RunWindow(api, frames, headless) != 0) {
       std::cerr << "window: FAILED\n";
       result = 1;
@@ -109,6 +105,10 @@ int main(int argc, char **argv) {
       std::cerr << "ray_query: FAILED\n";
       result = 1;
     }
+    if (RunImGui(api, frames, headless) != 0) {
+      std::cerr << "imgui: FAILED\n";
+      result = 1;
+    }
     return result;
   }
   if (tui && !module.empty()) {
@@ -117,7 +117,6 @@ int main(int argc, char **argv) {
   }
   if (module.empty()) {
     std::cout << "\nModule Selection\n"
-                 "  9. imgui     ImGui overlay (I: toggle recording)\n"
                  "  1. window    Clear and present a window\n"
                  "  2. triangle  Colored indexed triangle (D3D12/Vulkan/Metal)\n"
                  "  3. cube      Rotating cube with depth and uniform binding\n"
@@ -125,7 +124,8 @@ int main(int argc, char **argv) {
                  "  5. blend     Source-alpha blended triangles\n"
                  "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan/Metal)\n";
     std::cout << "  7. raytracing  Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)\n"
-                 "  8. ray_query   Inline ray queries (D3D12/Vulkan/Metal)\n";
+                 "  8. ray_query   Inline ray queries (D3D12/Vulkan/Metal)\n"
+                 "  9. imgui       ImGui overlay (I: toggle recording)\n";
     for (;;) {
       std::cout << "\nSelect module [1-9 or name], q to quit: " << std::flush;
       std::string input;
