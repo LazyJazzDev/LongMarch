@@ -11,3 +11,5 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless);
 
 int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless);
 int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless);
+
+int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless);

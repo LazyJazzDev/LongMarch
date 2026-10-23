@@ -366,7 +366,9 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
   const uint32_t green = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), &green, 4));
+  ImVec2 framebuffer_scale;
   window->ImGuiEvent().RegisterCallback([&] {
+    framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
     auto *draw = ImGui::GetForegroundDrawList();
     // Force 16-bit draw-index rollover and VtxOffset handling.
     for (int i = 0; i < 17000; ++i)
@@ -386,7 +388,8 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ASSERT_TRUE(done->WaitHost());
   auto read = [&](int x, int y, std::array<uint8_t, 4> expected) {
     std::array<uint8_t, 4> pixel{};
-    ReadPixel(device.Get(), target.Get(), GetParam(), uint32_t(x) * width / 160, uint32_t(y) * height / 120, pixel);
+    ReadPixel(device.Get(), target.Get(), GetParam(), uint32_t(x * framebuffer_scale.x),
+              uint32_t(y * framebuffer_scale.y), pixel);
     for (int i = 0; i < 4; ++i)
       EXPECT_NEAR(pixel[i], expected[i], 1) << "pixel " << x << "," << y << " channel " << i;
   };
@@ -395,6 +398,48 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   read(60, 20, {0, 0, 255, 255});
   read(90, 20, {0, 255, 0, 255});
   read(135, 95, {255, 255, 255, 255});
+}
+
+TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "ImGui empty frame"});
+  ASSERT_TRUE(window);
+  ASSERT_TRUE(window->EnableImGui());
+  ObjPtr<IImage> frame = window->GetNextImage();
+  ASSERT_TRUE(frame);
+  ObjPtr<IImage> target =
+      device->CreateImage({frame->GetDesc().width, frame->GetDesc().height, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(target);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  bool record_ui = true;
+  window->ImGuiEvent().RegisterCallback([&] {
+    if (!record_ui)
+      return;
+    ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, ImGui::GetIO().DisplaySize, IM_COL32_WHITE);
+  });
+  auto original_context = window->GetImGuiContext();
+  for (bool visible : {true, false, false, true, false}) {
+    record_ui = visible;
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
+    ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ASSERT_TRUE(done);
+    ASSERT_TRUE(done->WaitHost());
+    std::array<uint8_t, 4> pixel{};
+    ReadPixel(device.Get(), target.Get(), GetParam(), 20, 20, pixel);
+    const uint8_t channel = visible ? 255 : 0;
+    EXPECT_EQ(pixel, (std::array<uint8_t, 4>{channel, channel, 255, 255}));
+    EXPECT_EQ(window->GetImGuiContext(), original_context);
+  }
 }
 
 TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {

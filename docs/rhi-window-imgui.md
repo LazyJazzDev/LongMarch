@@ -32,8 +32,13 @@ if (!commands->CmdPresent(window))
 ```
 
 The rhix equivalents use `window.EnableImGui()` and `window.ImGuiEvent()`.
-The `window` module of both hello demos demonstrates an interactive overlay and
-key callbacks. Headless mode keeps its existing rendering/performance behavior.
+The independent `imgui` module of both hello demos demonstrates an interactive
+overlay and the built-in ImGui demo. Press I to toggle UI recording, P to toggle
+VSync, and Escape to close. I skips UI calls inside the callback without disabling
+or recreating the context: empty frames produce no overlay and never replay old
+draw data. The `window` module remains a plain clear/present example.
+Select `imgui` from the menu or pass `--module imgui`; `--all` includes it.
+Headless runs explicitly skip this platform-input example.
 
 Each enabled window owns a separate ImGui context and default font atlas.
 `CmdPresent` starts a frame, invokes ImGuiEvent, renders, then appends an overlay
