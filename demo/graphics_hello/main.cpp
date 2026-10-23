@@ -18,6 +18,7 @@
 #include "modules/texture/module.h"
 #include "modules/triangle/module.h"
 #include "modules/window/module.h"
+#include "snowberg/tui/tui.h"
 
 namespace graphics_hello {
 namespace {
@@ -88,33 +89,15 @@ void ListModules() {
     std::cout << fmt::format("  {}. {:<21} {}\n", i + 1, modules[i].name, modules[i].description);
 }
 
-// A line-based TUI works in native terminals, IDE consoles and redirected input,
-// without changing terminal modes or requiring a platform-specific dependency.
 const ModuleInfo *SelectModule(BackendAPI api) {
-  std::cout << "\nGraphics Hello - Module Selection\n"
-            << "Backend API: " << grassland::graphics::BackendAPIString(api) << "\n\n";
-  ListModules();
-  for (;;) {
-    std::cout << "\nSelect module [1-" << modules.size() << " or name], q to quit: " << std::flush;
-    std::string input;
-    if (!std::getline(std::cin, input))
-      return nullptr;
-    const auto first = input.find_first_not_of(" \t\r");
-    if (first == std::string::npos)
-      continue;
-    input = input.substr(first, input.find_last_not_of(" \t\r") - first + 1);
-    if (input == "q" || input == "quit")
-      return nullptr;
-    if (auto module = FindModule(input))
-      return module;
-    try {
-      const int index = PositiveInteger(input);
-      if (index <= static_cast<int>(modules.size()))
-        return &modules[index - 1];
-    } catch (const std::invalid_argument &) {
-    }
-    std::cout << "Invalid selection. Enter a listed number or module name.\n";
-  }
+  std::vector<snowberg::tui::MenuOption> options;
+  for (const auto &module : modules)
+    options.push_back({module.name, module.description});
+  const auto selected = snowberg::tui::Select(
+      "Graphics Hello - Module Selection (" + std::string(grassland::graphics::BackendAPIString(api)) + ")", options);
+  if (!selected)
+    return nullptr;
+  return &modules[*selected];
 }
 
 void RunModule(const ModuleInfo &info, BackendAPI api, int frames, bool headless) {

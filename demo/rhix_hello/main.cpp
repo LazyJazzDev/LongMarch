@@ -3,6 +3,7 @@
 #include <string>
 
 #include "module.h"
+#include "snowberg/tui/tui.h"
 
 int main(int argc, char **argv) {
   using namespace grassland::rhi;
@@ -112,60 +113,20 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (module.empty()) {
-    std::cout << "\nModule Selection\n"
-                 "  1. window    Clear and present a window\n"
-                 "  2. triangle  Colored indexed triangle (D3D12/Vulkan/Metal)\n"
-                 "  3. cube      Rotating cube with depth and uniform binding\n"
-                 "  4. texture   Sampled XOR texture triangle\n"
-                 "  5. blend     Source-alpha blended triangles\n"
-                 "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan/Metal)\n";
-    std::cout << "  7. raytracing  Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)\n"
-                 "  8. ray_query   Inline ray queries (D3D12/Vulkan/Metal)\n";
-    for (;;) {
-      std::cout << "\nSelect module [1-8 or name], q to quit: " << std::flush;
-      std::string input;
-      if (!std::getline(std::cin, input))
-        return 0;
-      const auto first = input.find_first_not_of(" \t\r");
-      if (first == std::string::npos)
-        continue;
-      input = input.substr(first, input.find_last_not_of(" \t\r") - first + 1);
-      if (input == "q" || input == "quit")
-        return 0;
-      if (input == "1" || input == "window") {
-        module = "window";
-        break;
-      }
-      if (input == "2" || input == "triangle") {
-        module = "triangle";
-        break;
-      }
-      if (input == "3" || input == "cube") {
-        module = "cube";
-        break;
-      }
-      if (input == "4" || input == "texture") {
-        module = "texture";
-        break;
-      }
-      if (input == "5" || input == "blend") {
-        module = "blend";
-        break;
-      }
-      if (input == "6" || input == "nbody") {
-        module = "nbody";
-        break;
-      }
-      if (input == "7" || input == "raytracing") {
-        module = "raytracing";
-        break;
-      }
-      if (input == "8" || input == "ray_query") {
-        module = "ray_query";
-        break;
-      }
-      std::cout << "Invalid selection. Enter a listed number or module name.\n";
-    }
+    const std::vector<snowberg::tui::MenuOption> options{
+        {"window", "Clear and present a window"},
+        {"triangle", "Colored indexed triangle (D3D12/Vulkan/Metal)"},
+        {"cube", "Rotating cube with depth and uniform binding"},
+        {"texture", "Sampled XOR texture triangle"},
+        {"blend", "Source-alpha blended triangles"},
+        {"nbody", "Compute simulation and particle rendering (D3D12/Vulkan/Metal)"},
+        {"raytracing", "Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)"},
+        {"ray_query", "Inline ray queries (D3D12/Vulkan/Metal)"},
+    };
+    const auto selected = snowberg::tui::Select("RHIx Hello - Module Selection", options);
+    if (!selected)
+      return 0;
+    module = options[*selected].name;
   }
   if (module == "window")
     return RunWindow(api, frames, headless);
