@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
+#include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
@@ -147,10 +148,8 @@ SubmissionStatus MetalCommandContext::WaitForProgress() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   commands_->waitUntilCompleted();
   if (commands_->status() == MTL::CommandBufferStatusError) {
-    auto error = commands_->error();
-    ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal command buffer failed.");
-    if (error && error->userInfo() && (commands_->errorOptions() & MTL::CommandBufferErrorOptionEncoderExecutionStatus))
-      ReportError(-1, error->userInfo()->description()->utf8String());
+    ReportMetalError(commands_->error(), "Metal command buffer failed",
+                     commands_->errorOptions() & MTL::CommandBufferErrorOptionEncoderExecutionStatus);
     return SUBMISSION_STATUS_FAILED;
   }
   if (commands_->status() != MTL::CommandBufferStatusCompleted)

@@ -39,6 +39,7 @@ class MetalDevice final : public Device {
 
   NS::SharedPtr<MTL::Device> device_;
   NS::SharedPtr<MTL::CommandQueue> queue_;
+  NS::SharedPtr<MTL::CommandBufferDescriptor> command_buffer_descriptor_;
   std::mutex queue_mutex_;
   MetalUploadPool uploads_{this};
   MetalScratchPool scratch_{this};

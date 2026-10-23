@@ -21,3 +21,11 @@ D3D12 Devices forward native warning/error messages (including message IDs) to t
 same console logger used by Vulkan through ID3D12InfoQueue1 callbacks. Callbacks are
 unregistered when the Device is destroyed. Older runtimes without this interface
 retain native debugger output and emit a console warning about unavailable forwarding.
+
+Metal command-buffer descriptors are immutable per Device and reused for command
+creation. Command execution, idle-marker and shader compilation failures use the
+console logger; native NSError reports include domain and code. Enhanced command
+buffer diagnostics also include user information. Metal API Validation assertions
+are emitted directly by Apple's layer to stderr and may terminate the process
+before a command buffer completes; they are not forwarded through an RHI callback.
+`MTLLogState` handles shader logging and is not an API Validation callback.

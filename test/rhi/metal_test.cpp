@@ -6,6 +6,7 @@
 
 #include "grassland/rhi/backend/metal/metal_core.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
 #include "grassland/rhi/rhix/rhix.h"
 
@@ -14,6 +15,29 @@ using namespace rhi;
 namespace backend = rhi::backend;
 
 namespace {
+
+TEST(RhiMetal, NativeCompilationErrorsReachConsole) {
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto core = rhix::CreateCore(BACKEND_API_METAL, {true});
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+  NS::Error *error = nullptr;
+  auto library = NS::TransferPtr(native->NativeDevice()->newLibrary(
+      NS::String::string("#error RHI_Metal_console_probe", NS::UTF8StringEncoding), nullptr, &error));
+  ASSERT_FALSE(library);
+  ASSERT_NE(error, nullptr);
+  testing::internal::CaptureStdout();
+  backend::metal::ReportMetalError(error, "Metal library compilation failed", true);
+  backend::metal::ReportMetalError(nullptr, "Metal idle marker failed");
+  auto output = testing::internal::GetCapturedStdout();
+  EXPECT_NE(output.find("[ERROR]"), std::string::npos);
+  EXPECT_NE(output.find("RHI_Metal_console_probe"), std::string::npos);
+  EXPECT_NE(output.find(error->domain()->utf8String()), std::string::npos);
+  EXPECT_NE(output.find("Metal diagnostic information:"), std::string::npos);
+  EXPECT_NE(output.find("Metal idle marker failed"), std::string::npos);
+}
 
 TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
