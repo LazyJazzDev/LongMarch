@@ -86,6 +86,22 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
   ASSERT_NE(first.GetImGuiContext(), nullptr);
   ASSERT_NE(first.GetImGuiContext(), second.GetImGuiContext());
+#ifdef _WIN32
+  // Native messages can arrive outside PollEvents with no current context, or
+  // while a different window's context is selected.
+  ImGui::SetCurrentContext(first.GetImGuiContext());
+  auto first_native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+  ImGui::SetCurrentContext(second.GetImGuiContext());
+  auto second_native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+  ImGui::SetCurrentContext(nullptr);
+  SendMessageW(first_native, WM_NULL, 0, 0);
+  SendMessageW(second_native, WM_NULL, 0, 0);
+  EXPECT_EQ(ImGui::GetCurrentContext(), nullptr);
+  ImGui::SetCurrentContext(first.GetImGuiContext());
+  SendMessageW(second_native, WM_NULL, 0, 0);
+  EXPECT_EQ(ImGui::GetCurrentContext(), first.GetImGuiContext());
+  ImGui::SetCurrentContext(previous);
+#endif
   EXPECT_EQ(glfwGetWindowUserPointer(first.GLFWWindow()), &marker);
   int first_draws = 0, second_draws = 0, keys = 0;
   const auto key_id = first.KeyEvent().RegisterCallback([&](int key, int, int action, int) {

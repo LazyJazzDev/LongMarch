@@ -7,8 +7,25 @@
 #include "grassland/rhi/backend/backend_device.h"
 #include "imgui_impl_glfw.h"
 
+#ifdef _WIN32
+#define NOMINMAX
+#include <Windows.h>
+#endif
+
 namespace grassland::rhi::backend {
 namespace {
+#ifdef _WIN32
+constexpr wchar_t context_property[] = L"LongMarch.RHI.ImGuiContext";
+constexpr wchar_t procedure_property[] = L"LongMarch.RHI.ImGuiWndProc";
+
+LRESULT CALLBACK ImGuiWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
+  auto context = reinterpret_cast<ImGuiContext *>(GetPropW(window, context_property));
+  auto procedure = reinterpret_cast<WNDPROC>(GetPropW(window, procedure_property));
+  ImGuiContextScope scope(context);
+  return CallWindowProcW(procedure, window, message, wparam, lparam);
+}
+#endif
+
 // RHI currently exposes float vertex attributes. Convert ImGui packed colors and
 // positions while snapshotting its transient CPU lists for this recording.
 struct Vertex {
@@ -62,6 +79,25 @@ bool WindowImGui::Initialize(GLFWwindow *window) {
   platform_initialized_ = ImGui_ImplGlfw_InitForOther(window, false);
   if (!platform_initialized_)
     return false;
+#ifdef _WIN32
+  // The GLFW backend installs a Win32 hook even with install_callbacks=false.
+  // Select this HWND's context before that hook reads BackendPlatformUserData;
+  // native messages also arrive outside PollEvents and ImGui frame recording.
+  auto native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+  auto procedure = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(native, GWLP_WNDPROC));
+  if (!SetPropW(native, context_property, context_))
+    return false;
+  if (!SetPropW(native, procedure_property, reinterpret_cast<HANDLE>(procedure))) {
+    RemovePropW(native, context_property);
+    return false;
+  }
+  SetLastError(0);
+  if (!SetWindowLongPtrW(native, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(ImGuiWindowProc)) && GetLastError()) {
+    RemovePropW(native, procedure_property);
+    RemovePropW(native, context_property);
+    return false;
+  }
+#endif
   unsigned char *pixels;
   int width, height;
   io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
@@ -86,8 +122,15 @@ WindowImGui::~WindowImGui() {
     return;
   auto previous = ImGui::GetCurrentContext();
   ImGui::SetCurrentContext(context_);
-  if (platform_initialized_)
+  if (platform_initialized_) {
+#ifdef _WIN32
+    auto native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+    if (auto procedure = RemovePropW(native, procedure_property))
+      SetWindowLongPtrW(native, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(procedure));
+    RemovePropW(native, context_property);
+#endif
     ImGui_ImplGlfw_Shutdown();
+  }
   ImGui::DestroyContext(context_);
   ImGui::SetCurrentContext(previous == context_ ? nullptr : previous);
 }
