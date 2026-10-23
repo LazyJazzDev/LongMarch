@@ -86,8 +86,19 @@ bool Terminal::Open() {
   if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO) || !term || !*term || std::string_view(term) == "dumb")
     return false;
   winsize size{};
-  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) != 0 || size.ws_col < 2 || size.ws_row < 2)
-    return false;
+  // IDE terminal widgets may publish their size after starting the process.
+  // Leave input modes untouched until the viewport is ready; a permanently
+  // unusable viewport still falls back to the sequential text menu.
+  const auto deadline = Clock::now() + std::chrono::milliseconds(500);
+  for (;;) {
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) != 0)
+      return false;
+    if (size.ws_col >= 2 && size.ws_row >= 2)
+      break;
+    if (Clock::now() >= deadline)
+      return false;
+    poll(nullptr, 0, 10);
+  }
   if (tcgetattr(STDIN_FILENO, &original_) != 0)
     return false;
   auto mode = original_;

@@ -177,6 +177,17 @@ class PtyMenuTest(unittest.TestCase):
                     terminal.finish(expected, interactive=False)
                     self.assertNotIn(b"\x1b", terminal.output)
 
+    def test_delayed_terminal_size_enters_tui(self):
+        for columns, rows in ((0, 0), (120, 1)):
+            with self.subTest(size=(columns, rows)), Terminal(columns=columns, rows=rows) as terminal:
+                time.sleep(0.15)
+                self.assertEqual(termios.tcgetattr(terminal.slave), terminal.original)
+                terminal.resize(120, 24)
+                terminal.ready()
+                terminal.send(b"\x1b[B\r")
+                terminal.finish(11)
+                self.assertNotIn(b"Select option", terminal.output)
+
     def test_empty_term_falls_back(self):
         with Terminal(term="") as terminal:
             terminal.until(lambda: b"Select option" in terminal.output)

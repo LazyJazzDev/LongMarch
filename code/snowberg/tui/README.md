@@ -46,6 +46,9 @@ CLion's ordinary Run output console uses the sequential text menu: enter an
 option's one-based number or its name, then Enter. Pipes, missing/empty/dumb TERM
 on POSIX, unavailable terminal dimensions, and initial viewports smaller than two
 rows or two columns take this path before any mode changes or escape sequences.
+On POSIX, an initially undersized viewport is retried for up to 500 ms because
+CLion may initialize the terminal widget after launching the process. A ready
+viewport proceeds immediately; a persistently undersized one falls back.
 The size check also handles IDE bridges exposing a one-line pseudo-console.
 This is capability-based detection, not a check for an IDE process name.
 
