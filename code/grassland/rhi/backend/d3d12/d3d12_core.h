@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <d3d12sdklayers.h>
+
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
@@ -19,7 +21,7 @@ class D3D12Core final : public Core {
     PhysicalDevice info;
   };
 
-  bool registered_{};
+  ComPtr<ID3D12Debug4> debug_controller_;
   ComPtr<IDXGIFactory4> factory_;
   std::vector<Adapter> adapters_;
 };

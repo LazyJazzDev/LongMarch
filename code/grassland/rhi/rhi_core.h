@@ -31,7 +31,7 @@ class ICore : public IObject {
 
 // Success transfers one owned reference; failure returns nullptr.
 // D3D12/Vulkan native validation; unavailable requested validation fails creation.
-// Concurrent D3D12 Cores must agree on enable_debug (a process-wide setting).
+// The caller must ensure only one Core exists at a time and release its children first.
 // Metal validation remains controlled by the native environment/tools.
 ICore *CreateCore(BackendAPI api = BACKEND_API_DEFAULT, const CoreDesc &desc = {});
 

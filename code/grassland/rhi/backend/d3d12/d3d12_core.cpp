@@ -1,9 +1,5 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_core.h"
 
-#include <d3d12sdklayers.h>
-
-#include <mutex>
-
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/util/string_convert.h"
 
@@ -12,11 +8,6 @@ namespace grassland::rhi::backend::d3d12 {
 D3D12Core::D3D12Core() = default;
 
 namespace {
-std::mutex core_mutex;
-uint32_t core_count{};
-bool debug_enabled{};
-ComPtr<ID3D12Debug4> debug_controller;
-
 bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice &info) {
   DXGI_ADAPTER_DESC1 desc{};
   const HRESULT result = adapter->GetDesc1(&desc);
@@ -48,36 +39,21 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice
 }  // namespace
 
 D3D12Core::~D3D12Core() {
-  std::lock_guard<std::mutex> lock(core_mutex);
-  if (!registered_)
-    return;
   adapters_.clear();
   factory_.Reset();
-  if (--core_count == 0 && debug_controller) {
+  if (debug_controller_) {
     // Caller-owned Devices have already been released under the parent/child contract.
-    debug_controller->DisableDebugLayer();
-    debug_controller.Reset();
+    debug_controller_->DisableDebugLayer();
   }
 }
 
 D3D12Core *D3D12Core::CreateD3D12Core(const CoreDesc &desc) {
   auto core = std::unique_ptr<D3D12Core>(new D3D12Core());
-  // Declared after core: unlock before a failed factory destroys its partial Core.
-  std::lock_guard<std::mutex> lock(core_mutex);
-  if (core_count && debug_enabled != desc.enable_debug) {
-    ReportError(-1, "Concurrent D3D12 Cores must use the same enable_debug setting.");
-    return nullptr;
+  if (desc.enable_debug) {
+    if (!Check(D3D12GetDebugInterface(IID_PPV_ARGS(&core->debug_controller_)), "Get D3D12 debug interface"))
+      return nullptr;
+    core->debug_controller_->EnableDebugLayer();
   }
-  if (!core_count) {
-    if (desc.enable_debug) {
-      if (!Check(D3D12GetDebugInterface(IID_PPV_ARGS(&debug_controller)), "Get D3D12 debug interface"))
-        return nullptr;
-      debug_controller->EnableDebugLayer();
-    }
-    debug_enabled = desc.enable_debug;
-  }
-  ++core_count;
-  core->registered_ = true;
   HRESULT result = CreateDXGIFactory2(desc.enable_debug ? DXGI_CREATE_FACTORY_DEBUG : 0, IID_PPV_ARGS(&core->factory_));
   if (FAILED(result)) {
     ReportError(result, "CreateDXGIFactory2 failed.");
