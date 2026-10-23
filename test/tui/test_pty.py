@@ -90,6 +90,36 @@ class Terminal:
 
 
 class PtyMenuTest(unittest.TestCase):
+    def test_core_callbacks_colors_clipping_and_queue(self):
+        core = str(pathlib.Path(PROBE).with_name("tui_core_probe"))
+        with Terminal([core], columns=20, rows=6) as terminal:
+            terminal.until(lambda: b"CORE_READY" in terminal.output)
+            self.assertIn(b"\x1b[?1003h", terminal.output)
+            self.assertIn(b"\x1b[38;2;1;2;3m", terminal.output)
+            self.assertIn(b"\x1b[48;2;4;5;6m", terminal.output)
+            self.assertIn("A中".encode(), terminal.output)
+            self.assertNotIn("文".encode(), terminal.output)
+            self.assertNotIn(b"invalid", terminal.output)
+            terminal.send(b"a\x1b[<35;7;4M\x1b[<0;7;4M\x1b[<0;7;4m\rZ")
+            terminal.finish(0)
+            tail = terminal.output.split(b"\x1b[?1049l")[-1]
+            self.assertIn(b"start\r\nresize:20:6\r\nkey:97\r\nmouse:0:6:3\r\nmouse:1:6:3\r\nmouse:2:6:3\r\nkey:13\r\nstop", tail)
+            self.assertNotIn(b"key:90", tail)
+            self.assertIn(b"\x1b[?1003l", terminal.output)
+        result = subprocess.run([core], capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "UNAVAILABLE\n")
+
+    def test_core_resize_callback(self):
+        core = str(pathlib.Path(PROBE).with_name("tui_core_probe"))
+        with Terminal([core], columns=20, rows=6) as terminal:
+            terminal.until(lambda: b"SIZE20:6" in terminal.output)
+            terminal.resize(8, 4)
+            terminal.until(lambda: b"SIZE8:4" in terminal.output)
+            terminal.send(b"\r")
+            terminal.finish(0)
+            self.assertIn(b"resize:8:4", terminal.output)
+
     def test_keyboard_highlight_and_confirm(self):
         with Terminal() as terminal:
             terminal.ready()

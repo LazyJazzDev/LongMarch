@@ -1,7 +1,9 @@
-﻿#pragma once
+#pragma once
 #include <optional>
 #include <string>
 #include <vector>
+
+#include "snowberg/tui/tui_core.h"
 
 namespace snowberg::tui {
 

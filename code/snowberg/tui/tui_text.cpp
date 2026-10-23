@@ -1,8 +1,11 @@
-﻿#include "snowberg/tui/tui_text.h"
+#include "snowberg/tui/tui_text.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
+
+#include "snowberg/tui/tui_util.h"
 
 namespace snowberg::tui::detail {
 namespace {
@@ -45,6 +48,27 @@ Glyph Next(std::string_view &text) {
   return {bytes, wide ? 2 : 1, false};
 }
 }  // namespace
+
+RowText FitRow(std::string_view content, int cells) {
+  RowText result;
+  if (cells <= 0)
+    return result;
+  int used = 0;
+  bool base = false;
+  while (!content.empty()) {
+    const auto before = content.size();
+    const auto glyph = Next(content);
+    const auto bytes = before - content.size();
+    if (glyph.width > cells - used || bytes > static_cast<size_t>(std::numeric_limits<int>::max() - result.bytes))
+      break;
+    if (glyph.width || base)
+      result.text += glyph.replace ? std::string_view(" ") : glyph.bytes;
+    result.bytes += static_cast<int>(bytes);
+    used += glyph.width;
+    base = base || glyph.width > 0;
+  }
+  return result;
+}
 
 int TextWidth(std::string_view text) {
   int width = 0;
