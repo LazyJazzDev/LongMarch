@@ -4,6 +4,9 @@
 #include <slang.h>
 
 #include <cstring>
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_util.h"
@@ -104,6 +107,22 @@ bool CompileSlang(const ShaderDesc &shader,
                                  : api == BACKEND_API_VULKAN ? "spirv"
                                                              : "dxil",
                                  "-fvk-use-entrypoint-name"};
+  // Execution platform, independent of the intermediate shader target (Metal uses SPIR-V).
+#ifdef _WIN32
+  args.push_back("-DRHI_PLATFORM_WINDOWS=1");
+#else
+  args.push_back("-DRHI_PLATFORM_WINDOWS=0");
+#endif
+#if defined(__APPLE__) && TARGET_OS_OSX
+  args.push_back("-DRHI_PLATFORM_MACOS=1");
+#else
+  args.push_back("-DRHI_PLATFORM_MACOS=0");
+#endif
+#ifdef __linux__
+  args.push_back("-DRHI_PLATFORM_LINUX=1");
+#else
+  args.push_back("-DRHI_PLATFORM_LINUX=0");
+#endif
   if (api == BACKEND_API_VULKAN) {
     args.push_back("-emit-spirv-directly");
     args.push_back("-fvk-use-dx-layout");

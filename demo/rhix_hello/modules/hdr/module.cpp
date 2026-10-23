@@ -6,10 +6,6 @@
 #include <map>
 #include <thread>
 
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
-
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/virtual_file_system.h"
 
@@ -19,14 +15,6 @@ namespace {
 
 int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
-
-#if defined(__APPLE__) && TARGET_OS_OSX
-  // Match PQ 100 nits to extended-linear 1.0 in the macOS EDR presentation path.
-  constexpr float pq_nits_per_native_unit = 100.0f;
-#else
-  // Windows scRGB defines linear 1.0 as 80 nits.
-  constexpr float pq_nits_per_native_unit = 80.0f;
-#endif
 
   grassland::rhix::Core core = grassland::rhix::CreateCore(api);
   if (!core)
@@ -93,14 +81,12 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     }
     const float linear_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     const float headroom = window ? window.GetHDRHeadroom() : 10.0f;
-    // PQ is absolute; convert the relative white scale to its normalized encoding on the CPU.
-    const float pq_scale = pq_nits_per_native_unit * linear_scale / 10000.0f;
     if (linear_scale != previous_scale || headroom != previous_headroom) {
       std::cout << "hdr: reference white scale " << linear_scale << "; relative headroom " << headroom << '\n';
       previous_scale = linear_scale;
       previous_headroom = headroom;
     }
-    const float settings[4] = {linear_scale, pq_scale, headroom, 0};
+    const float settings[4] = {linear_scale, headroom, 0, 0};
     const auto color_space = headless ? spaces[selected] : window.GetColorSpace();
     grassland::rhix::Image image;
     if (headless) {

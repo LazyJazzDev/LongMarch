@@ -1,8 +1,16 @@
+// Platform presentation convention; callers may override it in the source prefix.
+#ifndef PQ_NITS_PER_UNIT
+#if RHI_PLATFORM_MACOS
+#define PQ_NITS_PER_UNIT 100.0
+#else
+#define PQ_NITS_PER_UNIT 80.0
+#endif
+#endif
+
 struct DisplaySettings {
   float linear_scale;
-  float pq_scale;
   float headroom;
-  float padding;
+  float2 padding;
 };
 
 RHI_UNIFORM(0, 0, DisplaySettings, display);
@@ -25,7 +33,7 @@ float3 Encode(float3 linear709) {
 #elif OUTPUT_COLOR_SPACE == 2
   const float3x3 to2020 =
       float3x3(0.627404, 0.329283, 0.043313, 0.069097, 0.919540, 0.011362, 0.016391, 0.088013, 0.895595);
-  float3 normalized = max(mul(to2020, linear709), 0) * display.pq_scale;
+  float3 normalized = max(mul(to2020, linear709), 0) * (display.linear_scale * (PQ_NITS_PER_UNIT / 10000.0));
   normalized /= max(1.0, max(normalized.r, max(normalized.g, normalized.b)));
   float3 p = pow(normalized, 2610.0 / 16384.0);
   return pow((3424.0 / 4096.0 + (2413.0 / 128.0) * p) / (1 + (2392.0 / 128.0) * p), 2523.0 / 32.0);

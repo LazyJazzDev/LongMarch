@@ -8,6 +8,8 @@ namespace grassland::rhi::backend {
 std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                               BackendAPI api,
                               const std::vector<VertexAttributeDesc> &attributes = {});
+// Defines RHI_PLATFORM_WINDOWS/MACOS/LINUX as 0 or 1 for the execution platform,
+// independently of api/output target. These macros are also visible to imports.
 bool CompileSlang(const ShaderDesc &shader,
                   const std::string &prefix,
                   BackendAPI api,
