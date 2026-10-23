@@ -86,8 +86,7 @@ VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_dev
   std::vector<std::vector<uint8_t>> code(shaders.size());
   auto header = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_VULKAN);
   for (size_t i = 0; i < shaders.size(); ++i)
-    if (!CompileSlang(ShaderCompileDesc(shaders[i]), header, BACKEND_API_VULKAN, code[i],
-                      &object->desc_.pipeline_layout))
+    if (!CompileSlang(shaders[i], header, BACKEND_API_VULKAN, code[i], &object->desc_.pipeline_layout))
       return nullptr;
   std::vector<VkPipelineShaderStageCreateInfo> stages(shaders.size());
   constexpr VkShaderStageFlagBits native_stages[] = {

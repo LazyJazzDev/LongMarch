@@ -12,20 +12,15 @@ const ShaderDesc &Shader::GetDesc() const {
 
 Shader *Shader::Create(const ShaderDesc &desc, BackendAPI api) {
   auto shader = new Shader(desc);
-  shader->compiled_desc_ = desc;
-  shader->compiled_desc_.file_system = nullptr;
-  if (!PreprocessShader(desc, api, shader->compiled_desc_.source)) {
+  if (!PreprocessShader(desc, api, shader->preprocessed_shader_code_)) {
     delete shader;
     return nullptr;
   }
   return shader;
 }
 
-const ShaderDesc &Shader::CompileDesc() const {
-  return compiled_desc_;
+const std::string &Shader::GetPreprocessedShaderCode() const {
+  return preprocessed_shader_code_;
 }
 
-const ShaderDesc &ShaderCompileDesc(const IShader *shader) {
-  return static_cast<const Shader *>(shader)->CompileDesc();
-}
 }  // namespace grassland::rhi::backend

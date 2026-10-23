@@ -24,7 +24,7 @@ MetalComputeProgram *MetalComputeProgram::Create(MetalDevice *owner_device, cons
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   std::array<uint32_t, 3> threads{};
-  auto function = object->CompileFunction(ShaderCompileDesc(object->desc_.compute_shader), {}, &threads);
+  auto function = object->CompileFunction(object->desc_.compute_shader, {}, &threads);
   if (!function)
     return nullptr;
   auto device = owner_device->NativeDevice();

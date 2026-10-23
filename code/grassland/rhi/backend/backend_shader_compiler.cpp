@@ -9,6 +9,7 @@
 #endif
 
 #include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
@@ -78,12 +79,14 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
   return header;
 }
 
-bool CompileSlang(const ShaderDesc &shader,
+bool CompileSlang(const IShader *shader_object,
                   const std::string &prefix,
                   BackendAPI api,
                   std::vector<uint8_t> &code,
                   const PipelineLayoutDesc *binding_layout,
                   std::array<uint32_t, 3> *thread_group_size) {
+  const auto &shader = shader_object->GetDesc();
+  const auto &preprocessed = static_cast<const Shader *>(shader_object)->GetPreprocessedShaderCode();
   code.clear();
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
   if (!global) {
@@ -141,8 +144,7 @@ bool CompileSlang(const ShaderDesc &shader,
       ReportError(
           -1, std::string(static_cast<const char *>(diagnostics->getBufferPointer()), diagnostics->getBufferSize()));
   };
-  const size_t start = shader.source.compare(0, 3, "\xef\xbb\xbf") == 0 ? 3 : 0;
-  const auto source = prefix + shader.source.substr(start);
+  const auto source = prefix + preprocessed;
   auto module =
       session->loadModuleFromSourceString("rhi_shader", "shader.slang", source.c_str(), diagnostics.writeRef());
   if (!module) {

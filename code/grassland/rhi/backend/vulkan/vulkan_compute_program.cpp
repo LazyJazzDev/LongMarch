@@ -27,9 +27,8 @@ VulkanComputeProgram *VulkanComputeProgram::Create(VulkanDevice *owner_device, c
     return nullptr;
   std::vector<uint8_t> code;
   std::array<uint32_t, 3> threads{};
-  if (!CompileSlang(ShaderCompileDesc(object->desc_.compute_shader),
-                    ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_VULKAN), BACKEND_API_VULKAN, code,
-                    &object->desc_.pipeline_layout, &threads))
+  if (!CompileSlang(object->desc_.compute_shader, ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_VULKAN),
+                    BACKEND_API_VULKAN, code, &object->desc_.pipeline_layout, &threads))
     return nullptr;
   VkPhysicalDeviceProperties properties{};
   vkGetPhysicalDeviceProperties(owner_device->NativePhysicalDevice(), &properties);

@@ -10,7 +10,7 @@
 namespace grassland::rhi::backend::metal {
 // Both backends consume the same DX-layout SPIR-V. Argument IDs come from the
 // complete C++ layout, so unused declarations never shift a captured version.
-static bool CompileMetal(const ShaderDesc &shader,
+static bool CompileMetal(const IShader *shader,
                          const PipelineLayoutDesc &layout,
                          const std::vector<VertexAttributeDesc> &attributes,
                          std::string &source,
@@ -24,10 +24,10 @@ static bool CompileMetal(const ShaderDesc &shader,
   std::memcpy(words.data(), code.data(), code.size());
   try {
     spirv_cross::CompilerMSL compiler(std::move(words));
-    auto stage = shader.stage == SHADER_STAGE_COMPUTE  ? spv::ExecutionModelGLCompute
-                 : shader.stage == SHADER_STAGE_VERTEX ? spv::ExecutionModelVertex
-                                                       : spv::ExecutionModelFragment;
-    compiler.set_entry_point(shader.entry_point, stage);
+    auto stage = shader->GetDesc().stage == SHADER_STAGE_COMPUTE  ? spv::ExecutionModelGLCompute
+                 : shader->GetDesc().stage == SHADER_STAGE_VERTEX ? spv::ExecutionModelVertex
+                                                                  : spv::ExecutionModelFragment;
+    compiler.set_entry_point(shader->GetDesc().entry_point, stage);
     auto options = compiler.get_msl_options();
     options.set_msl_version(3, 0);
     options.argument_buffers = true;
@@ -71,7 +71,7 @@ static bool CompileMetal(const ShaderDesc &shader,
       compiler.set_msl_options(options);
     }
     source = compiler.compile();
-    entry = compiler.get_cleansed_entry_point_name(shader.entry_point, stage);
+    entry = compiler.get_cleansed_entry_point_name(shader->GetDesc().entry_point, stage);
     return true;
   } catch (const spirv_cross::CompilerError &e) {
     ReportError(-1, e.what());
@@ -88,7 +88,7 @@ const PipelineLayoutDesc &MetalProgramBase::BindingLayout() const {
   return layout_;
 }
 
-NS::SharedPtr<MTL::Function> MetalProgramBase::CompileFunction(const ShaderDesc &shader,
+NS::SharedPtr<MTL::Function> MetalProgramBase::CompileFunction(const IShader *shader,
                                                                const std::vector<VertexAttributeDesc> &attributes,
                                                                std::array<uint32_t, 3> *threads) const {
   for (const auto &group : layout_.groups)

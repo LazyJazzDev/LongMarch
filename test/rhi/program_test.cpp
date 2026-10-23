@@ -4,7 +4,7 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_program.h"
-#include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/util/virtual_file_system.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include <d3d12sdklayers.h>
@@ -67,7 +67,7 @@ float4 PSMain():SV_Target0 { return settings.color; }
     ASSERT_TRUE(fragment);
     EXPECT_EQ(vertex->GetDesc().file_system, &fs);
     EXPECT_EQ(vertex->GetDesc().filename, R"(shaders\main.slang)");
-    const auto &expanded = backend::ShaderCompileDesc(vertex.Get()).source;
+    const auto &expanded = static_cast<const backend::Shader *>(vertex.Get())->GetPreprocessedShaderCode();
     EXPECT_EQ(expanded.find("#include"), std::string::npos);
     EXPECT_NE(expanded.find("RHI_INPUT"), std::string::npos);
     EXPECT_NE(expanded.find("RHI_UNIFORM"), std::string::npos);

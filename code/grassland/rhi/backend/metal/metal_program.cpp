@@ -44,7 +44,7 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
   NS::SharedPtr<MTL::Function> functions[2];
   const IShader *shaders[] = {object->desc_.vertex_shader, object->desc_.fragment_shader};
   for (int i = 0; i < 2; ++i) {
-    functions[i] = object->CompileFunction(ShaderCompileDesc(shaders[i]), object->desc_.vertex_attributes);
+    functions[i] = object->CompileFunction(shaders[i], object->desc_.vertex_attributes);
     if (!functions[i])
       return nullptr;
   }

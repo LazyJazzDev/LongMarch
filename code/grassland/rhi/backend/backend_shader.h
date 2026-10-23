@@ -6,12 +6,12 @@ namespace grassland::rhi::backend {
 class Shader final : public Object<IShader> {
  public:
   static Shader *Create(const ShaderDesc &desc, BackendAPI api);
-  const ShaderDesc &CompileDesc() const;
+  const std::string &GetPreprocessedShaderCode() const;
   const ShaderDesc &GetDesc() const override;
 
  private:
   explicit Shader(const ShaderDesc &desc);
   ShaderDesc desc_;
-  ShaderDesc compiled_desc_;
+  std::string preprocessed_shader_code_;
 };
 }  // namespace grassland::rhi::backend
