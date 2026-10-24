@@ -883,4 +883,91 @@ bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint
   return true;
 }
 
+IDownloadToken *VulkanCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+  auto native = dynamic_cast<VulkanBuffer *>(buffer);
+  if (sealed_ || recording_failed_ || render_target_ || !native || native->Owner() != device_ || !size ||
+      offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto lease = device_->AcquireDownload(size);
+  if (!lease || !CmdCopyBuffer(native, offset, lease.get(), 0, size)) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (!TransitionBuffer(lease.get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
+    return nullptr;
+  return TrackDownload(size, [lease, size](void *data) { return lease->Read(data, size); });
+}
+
+IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+  auto native = dynamic_cast<VulkanImage *>(image);
+  if (sealed_ || recording_failed_ || render_target_ || !native || !native->IsValid() ||
+      native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (auto swap = dynamic_cast<VulkanSwapChainImage *>(native); swap && !swap->Owner()->SupportsImageDownload()) {
+    ReportError(-1, "This surface does not support swapchain image downloads.");
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const auto desc = native->GetDesc();
+  if (region.x >= desc.width || region.y >= desc.height) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint32_t width = region.width ? region.width : desc.width - region.x;
+  const uint32_t height = region.height ? region.height : desc.height - region.y;
+  const uint64_t packed = uint64_t(width) * ImageFormatSize(desc.format);
+  if (width > desc.width - region.x || height > desc.height - region.y || !packed || height > SIZE_MAX / packed) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint64_t pitch = packed;
+  const bool stencil = HasStencil(desc.format);
+  auto lease = device_->AcquireDownload(pitch * height + (stencil ? uint64_t(width) * height : 0));
+  if (!lease || !RetainResource(native) || !RetainResource(lease.get())) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_ACCESS_TRANSFER_READ_BIT) ||
+      !TransitionBuffer(lease.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT))
+    return nullptr;
+  VkBufferImageCopy copy{};
+  copy.imageSubresource = {static_cast<VkImageAspectFlags>(IsDepthFormat(desc.format) ? VK_IMAGE_ASPECT_DEPTH_BIT
+                                                                                      : VK_IMAGE_ASPECT_COLOR_BIT),
+                           0, 0, 1};
+  copy.imageOffset = {static_cast<int32_t>(region.x), static_cast<int32_t>(region.y), 0};
+  copy.imageExtent = {width, height, 1};
+  vkCmdCopyImageToBuffer(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, lease->NativeBuffer(),
+                         1, &copy);
+  if (stencil) {
+    copy.bufferOffset = pitch * height;
+    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+    vkCmdCopyImageToBuffer(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, lease->NativeBuffer(),
+                           1, &copy);
+  }
+  if (!TransitionBuffer(lease.get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
+    return nullptr;
+  return TrackDownload(packed * height, [lease, pitch, packed, height, width, stencil](void *data) {
+    if (stencil) {
+      if (!lease->Read(data, packed * height))
+        return false;
+      std::vector<uint8_t> values(uint64_t(width) * height);
+      if (!lease->Read(values.data(), values.size(), packed * height))
+        return false;
+      for (size_t i = 0; i < values.size(); ++i)
+        static_cast<uint8_t *>(data)[i * 4 + 3] = values[i];
+      return true;
+    }
+    if (pitch == packed)
+      return lease->Read(data, packed * height);
+    for (uint32_t y = 0; y < height; ++y)
+      if (!lease->Read(static_cast<uint8_t *>(data) + y * packed, packed, y * pitch))
+        return false;
+    return true;
+  });
+}
 }  // namespace grassland::rhi::backend::vulkan

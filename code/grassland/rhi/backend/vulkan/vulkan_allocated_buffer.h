@@ -7,8 +7,12 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanAllocatedBuffer final : public VulkanBuffer {
  public:
   ~VulkanAllocatedBuffer() override;
-  static VulkanAllocatedBuffer *Create(VulkanDevice *device, const BufferDesc &desc, bool upload = false);
+  static VulkanAllocatedBuffer *Create(VulkanDevice *device,
+                                       const BufferDesc &desc,
+                                       bool upload = false,
+                                       bool download = false);
   VkBuffer NativeBuffer() const override;
+  bool Read(void *data, uint64_t size, uint64_t offset = 0);
   bool Write(const void *data, uint64_t size);
 
  private:

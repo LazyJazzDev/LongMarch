@@ -203,6 +203,7 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
 
 D3D12Device::~D3D12Device() {
   ShutdownQueues();
+  downloads_.Clear();
   upload_pool_.Clear();
   scratch_pool_.Clear();
   for (auto &entry : command_pool_)

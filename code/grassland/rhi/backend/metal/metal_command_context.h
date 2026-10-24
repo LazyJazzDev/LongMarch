@@ -29,6 +29,8 @@ class MetalCommandContext final : public CommandContext {
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
   bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override;
+  IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
+  IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
   bool CmdCopyBuffer(IBuffer *source,
                      uint64_t source_offset,

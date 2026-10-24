@@ -5,6 +5,7 @@
 #include "grassland/rhi/rhi_compute_program.h"
 #include "grassland/rhi/rhi_core.h"
 #include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_download_token.h"
 #include "grassland/rhi/rhi_image.h"
 #include "grassland/rhi/rhi_obj_ptr.h"
 #include "grassland/rhi/rhi_object.h"

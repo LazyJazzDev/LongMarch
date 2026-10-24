@@ -6,6 +6,7 @@
 #include "grassland/rhi/rhix/rhix_binding_group.h"
 #include "grassland/rhi/rhix/rhix_buffer.h"
 #include "grassland/rhi/rhix/rhix_compute_program.h"
+#include "grassland/rhi/rhix/rhix_download_token.h"
 #include "grassland/rhi/rhix/rhix_image.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
 #include "grassland/rhi/rhix/rhix_program.h"
@@ -36,6 +37,15 @@ class CommandContext : public ObjectContainer {
   CommandContext &operator=(CommandContext &&) noexcept;
   CommandContext(const CommandContext &) = delete;
   CommandContext &operator=(const CommandContext &) = delete;
+
+  DownloadToken CmdDownloadBuffer(const Buffer &buffer, uint64_t offset, uint64_t size) {
+    return *this ? Get()->CmdDownloadBuffer(buffer.Get(), offset, size) : nullptr;
+  }
+
+  DownloadToken CmdDownloadImage(const Image &image, const rhi::ImageDownloadRegion &region = {}) {
+    return *this ? Get()->CmdDownloadImage(image.Get(), region) : nullptr;
+  }
+
   bool CmdUploadBuffer(const Buffer &buffer, uint64_t offset, const void *data, uint64_t size);
   bool CmdCopyBuffer(const Buffer &source,
                      uint64_t source_offset,

@@ -109,24 +109,29 @@ const void *Device::NativeIdentity() const {
 
 ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands,
                                           const std::vector<ObjectPtr<SubmissionToken>> &waits) {
+  auto reject = [&] {
+    if (!commands->WasSubmitted())
+      commands->CompleteDownloads(SUBMISSION_STATUS_CANCELED);
+    return ObjectPtr<SubmissionToken>{};
+  };
   if (!commands->Seal())
-    return {};
+    return reject();
 #if !defined(NDEBUG)
   if (commands->DeviceIdentity() != NativeIdentity()) {
     ReportError(-1, "Submission requires a context from this device.");
-    return {};
+    return reject();
   }
 #endif
   for (const auto &wait : waits) {
 #if !defined(NDEBUG)
     if (!wait || wait->Owner() != this) {
       ReportError(-1, "Submission dependency is empty or belongs to another device.");
-      return {};
+      return reject();
     }
 #endif
     if (wait->GetStatus() == SUBMISSION_STATUS_FAILED || wait->GetStatus() == SUBMISSION_STATUS_CANCELED) {
       ReportError(-1, "Submission dependency failed or was canceled.");
-      return {};
+      return reject();
     }
   }
   // Both logical roles share one physical queue. Its ordering already supplies
@@ -134,7 +139,7 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(this));
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopping_)
-    return {};
+    return reject();
   if (!collector_.joinable())
     collector_ = std::thread([this] { Collect(); });
   // Allocate the retirement record before submitting any GPU work.
@@ -150,11 +155,13 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
       changed_.notify_one();
     } else {
       pending_.pop_back();
+      commands->CompleteDownloads(SUBMISSION_STATUS_FAILED);
     }
     throw;
   }
   if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
     pending_.pop_back();
+    commands->CompleteDownloads(SUBMISSION_STATUS_FAILED);
     return {};
   }
   commands->MarkSubmitted();
@@ -179,6 +186,7 @@ void Device::Collect() {
       status = pending.commands->WaitForProgress();
     } while (status == SUBMISSION_STATUS_PENDING);
     // Release payload before publishing completion; tokens never keep it alive.
+    pending.commands->CompleteDownloads(status);
     pending.commands.Reset();
     pending.completion->Complete(status);
   }

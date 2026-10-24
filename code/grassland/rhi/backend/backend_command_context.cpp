@@ -99,7 +99,31 @@ bool CommandContext::RenderingMatches(const IProgram *program) const {
 CommandContext::CommandContext(const void *identity) : identity_(identity) {
 }
 
-CommandContext::~CommandContext() = default;
+CommandContext::~CommandContext() {
+  CompleteDownloads(SUBMISSION_STATUS_CANCELED);
+}
+
+void CommandContext::CompleteDownloads(SubmissionStatus status) {
+  for (auto &token : downloads_)
+    token->Complete(status);
+  downloads_.clear();
+}
+
+IDownloadToken *CommandContext::TrackDownload(uint64_t size, std::function<bool(void *)> copy) {
+  auto token = ObjectPtr<DownloadToken>::Adopt(new DownloadToken(size, std::move(copy)));
+  downloads_.push_back(token);
+  return token.Detach();
+}
+
+IDownloadToken *CommandContext::CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t) {
+  recording_failed_ = true;
+  return nullptr;
+}
+
+IDownloadToken *CommandContext::CmdDownloadImage(IImage *, const ImageDownloadRegion &) {
+  recording_failed_ = true;
+  return nullptr;
+}
 
 bool CommandContext::RetainResource(rhi::IObject *resource) {
 #if !defined(NDEBUG)

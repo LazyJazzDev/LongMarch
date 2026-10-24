@@ -2,6 +2,7 @@
 #include <array>
 #include <unordered_map>
 
+#include "grassland/rhi/backend/backend_download_token.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_command_context.h"
@@ -61,6 +62,9 @@ class CommandContext : public Object<rhi::ICommandContext> {
                       uint32_t first_index = 0,
                       int32_t vertex_offset = 0,
                       uint32_t first_instance = 0) override;
+  IDownloadToken *CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t) override;
+  IDownloadToken *CmdDownloadImage(IImage *, const ImageDownloadRegion & = {}) override;
+  void CompleteDownloads(SubmissionStatus status);
   bool Seal();
   const void *DeviceIdentity() const;
   void MarkSubmitted();
@@ -70,6 +74,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
 
  protected:
   // Call before encoding each resource use. Retains each exact object once.
+  IDownloadToken *TrackDownload(uint64_t size, std::function<bool(void *)> copy);
   bool RetainResource(rhi::IObject *resource);
   virtual bool EndRecording() = 0;
   bool PrepareRendering(const RenderingInfo &info);
@@ -82,6 +87,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
   const void *identity_;
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_;
   bool submitted_{};
+  std::vector<ObjectPtr<DownloadToken>> downloads_;
 };
 
 }  // namespace grassland::rhi::backend

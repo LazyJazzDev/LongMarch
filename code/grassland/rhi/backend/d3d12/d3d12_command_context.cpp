@@ -850,4 +850,111 @@ bool D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint3
   return true;
 }
 
+IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  if (sealed_ || recording_failed_ || rendering_active_ || !native || native->Owner() != device_ || !size ||
+      offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto lease = device_->AcquireDownload(size);
+  if (!lease || !CmdCopyBuffer(native, offset, lease.get(), 0, size)) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  return TrackDownload(size, [lease, size](void *data) { return lease->Read(data, size); });
+}
+
+IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+  auto native = dynamic_cast<D3D12Image *>(image);
+  if (sealed_ || recording_failed_ || rendering_active_ || !native || !native->IsValid() ||
+      native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const auto desc = native->GetDesc();
+  if (region.x >= desc.width || region.y >= desc.height) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint32_t width = region.width ? region.width : desc.width - region.x;
+  const uint32_t height = region.height ? region.height : desc.height - region.y;
+  const uint64_t packed = uint64_t(width) * ImageFormatSize(desc.format);
+  if (width > desc.width - region.x || height > desc.height - region.y || !packed || height > SIZE_MAX / packed) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (IsDepthFormat(desc.format)) {
+    auto native_desc = native->NativeImage()->GetDesc();
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprints[2]{};
+    UINT rows[2]{};
+    UINT64 row_bytes[2]{}, total{};
+    const UINT planes = HasStencil(desc.format) ? 2 : 1;
+    device_->NativeDevice()->GetCopyableFootprints(&native_desc, 0, planes, 0, footprints, rows, row_bytes, &total);
+    auto lease = device_->AcquireDownload(total);
+    if (!lease || !RetainResource(native) || !RetainResource(lease.get())) {
+      recording_failed_ = true;
+      return nullptr;
+    }
+    if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState()))
+      return nullptr;
+    for (UINT plane = 0; plane < planes; ++plane) {
+      D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
+      src.pResource = native->NativeImage();
+      src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+      src.SubresourceIndex = plane;
+      dst.pResource = lease->NativeBuffer();
+      dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+      dst.PlacedFootprint = footprints[plane];
+      list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    }
+    const auto depth = footprints[0], stencil = footprints[1];
+    return TrackDownload(packed * height, [lease, depth, stencil, planes, region, width, height, packed](void *data) {
+      for (uint32_t y = 0; y < height; ++y) {
+        auto destination = static_cast<uint8_t *>(data) + y * packed;
+        if (!lease->Read(destination, packed,
+                         depth.Offset + uint64_t(region.y + y) * depth.Footprint.RowPitch + uint64_t(region.x) * 4))
+          return false;
+        if (planes == 2) {
+          std::vector<uint8_t> values(width);
+          if (!lease->Read(values.data(), width,
+                           stencil.Offset + uint64_t(region.y + y) * stencil.Footprint.RowPitch + region.x))
+            return false;
+          for (uint32_t x = 0; x < width; ++x)
+            destination[x * 4 + 3] = values[x];
+        }
+      }
+      return true;
+    });
+  }
+  const uint64_t pitch =
+      (packed + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) & ~(uint64_t(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) - 1);
+  if (pitch > UINT32_MAX || height > SIZE_MAX / pitch) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto lease = device_->AcquireDownload(pitch * height);
+  if (!lease || !RetainResource(native) || !RetainResource(lease.get())) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState()))
+    return nullptr;
+  D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
+  src.pResource = native->NativeImage();
+  src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  dst.pResource = lease->NativeBuffer();
+  dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+  dst.PlacedFootprint.Footprint = {native->NativeImage()->GetDesc().Format, width, height, 1, static_cast<UINT>(pitch)};
+  D3D12_BOX box{region.x, region.y, 0, region.x + width, region.y + height, 1};
+  list_->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
+  return TrackDownload(packed * height, [lease, pitch, packed, height](void *data) {
+    if (pitch == packed)
+      return lease->Read(data, packed * height);
+    for (uint32_t y = 0; y < height; ++y)
+      if (!lease->Read(static_cast<uint8_t *>(data) + y * packed, packed, y * pitch))
+        return false;
+    return true;
+  });
+}
 }  // namespace grassland::rhi::backend::d3d12

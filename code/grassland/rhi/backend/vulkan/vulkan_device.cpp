@@ -62,6 +62,7 @@ VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core)
 
 VulkanDevice::~VulkanDevice() {
   ShutdownQueues();
+  downloads_.Clear();
   upload_pool_.Clear();
   scratch_pool_.Clear();
   render_targets_.reset();

@@ -616,4 +616,85 @@ bool MetalCommandContext::CmdDrawIndexed(uint32_t index_count,
       vertex_offset, first_instance);
   return true;
 }
+
+IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
+  if (sealed_ || recording_failed_ || render_target_ || !native || native->Owner() != device_ || !size ||
+      offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto lease = device_->AcquireDownload(size);
+  if (!lease || !CmdCopyBuffer(native, offset, lease.get(), 0, size)) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  return TrackDownload(size, [lease, size](void *data) { return lease->Read(data, size); });
+}
+
+IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+  auto native = dynamic_cast<MetalImage *>(image);
+  if (sealed_ || recording_failed_ || render_target_ || !native || !native->IsValid() ||
+      native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const auto desc = native->GetDesc();
+  if (region.x >= desc.width || region.y >= desc.height) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint32_t width = region.width ? region.width : desc.width - region.x;
+  const uint32_t height = region.height ? region.height : desc.height - region.y;
+  const uint64_t packed = uint64_t(width) * ImageFormatSize(desc.format);
+  if (width > desc.width - region.x || height > desc.height - region.y || !packed || height > SIZE_MAX / packed) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint64_t pitch = packed;
+  const bool stencil = HasStencil(desc.format);
+  auto lease = device_->AcquireDownload(pitch * height + (stencil ? uint64_t(width) * height : 0));
+  if (!lease || !RetainResource(native) || !RetainResource(lease.get())) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto blit = commands_->blitCommandEncoder();
+  if (!blit) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (stencil) {
+    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+                          MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height,
+                          MTL::BlitOptionDepthFromDepthStencil);
+    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+                          MTL::Size::Make(width, height, 1), lease->NativeBuffer(), pitch * height, width,
+                          uint64_t(width) * height, MTL::BlitOptionStencilFromDepthStencil);
+  } else {
+    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+                          MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height);
+  }
+  blit->endEncoding();
+  return TrackDownload(packed * height, [lease, pitch, packed, height, width, stencil](void *data) {
+    if (stencil) {
+      std::vector<float> depths(uint64_t(width) * height);
+      std::vector<uint8_t> values(depths.size());
+      if (!lease->Read(depths.data(), packed * height) || !lease->Read(values.data(), values.size(), packed * height))
+        return false;
+      for (size_t i = 0; i < values.size(); ++i) {
+        const uint32_t value =
+            uint32_t(std::clamp(double(depths[i]), 0.0, 1.0) * 16777215.0 + 0.5) | (uint32_t(values[i]) << 24);
+        std::memcpy(static_cast<uint8_t *>(data) + i * 4, &value, 4);
+      }
+      return true;
+    }
+    if (pitch == packed)
+      return lease->Read(data, packed * height);
+    for (uint32_t y = 0; y < height; ++y)
+      if (!lease->Read(static_cast<uint8_t *>(data) + y * packed, packed, y * pitch))
+        return false;
+    return true;
+  });
+}
 }  // namespace grassland::rhi::backend::metal

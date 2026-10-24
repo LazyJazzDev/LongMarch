@@ -37,6 +37,7 @@ MetalDevice::MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Dev
 
 MetalDevice::~MetalDevice() {
   ShutdownQueues();
+  downloads_.Clear();
   uploads_.Clear();
   scratch_.Clear();
 }

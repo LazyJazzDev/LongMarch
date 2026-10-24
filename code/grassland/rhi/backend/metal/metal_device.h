@@ -1,8 +1,8 @@
 ﻿#pragma once
-
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_download_pool.h"
 #include "grassland/rhi/backend/metal/metal_scratch_pool.h"
 #include "grassland/rhi/backend/metal/metal_upload_pool.h"
 
@@ -20,6 +20,12 @@ class MetalDevice final : public Device {
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   MetalUploadPool &UploadPool();
+
+  std::shared_ptr<MetalAllocatedBuffer> AcquireDownload(uint64_t size) {
+    return downloads_.Acquire(
+        size, [this](uint64_t capacity) { return MetalAllocatedBuffer::Create(this, {capacity}, false, true); });
+  }
+
   MetalScratchPool &ScratchPool();
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override;
@@ -41,6 +47,7 @@ class MetalDevice final : public Device {
   NS::SharedPtr<MTL::CommandQueue> queue_;
   NS::SharedPtr<MTL::CommandBufferDescriptor> command_buffer_descriptor_;
   std::mutex queue_mutex_;
+  DownloadPool<MetalAllocatedBuffer> downloads_;
   MetalUploadPool uploads_{this};
   MetalScratchPool scratch_{this};
 };

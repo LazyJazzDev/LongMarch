@@ -2,6 +2,7 @@
 #include <tuple>
 
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_download_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device_procedures.h"
 #include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
@@ -44,6 +45,12 @@ class VulkanDevice final : public Device {
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   VulkanUploadPool &UploadPool();
+
+  std::shared_ptr<VulkanAllocatedBuffer> AcquireDownload(uint64_t size) {
+    return downloads_.Acquire(
+        size, [this](uint64_t capacity) { return VulkanAllocatedBuffer::Create(this, {capacity}, false, true); });
+  }
+
   VulkanScratchPool &ScratchPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::ICommandContext *CreateCommandContext() override;
@@ -55,6 +62,7 @@ class VulkanDevice final : public Device {
   void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command);
 
  private:
+  DownloadPool<VulkanAllocatedBuffer> downloads_;
   VulkanUploadPool upload_pool_;
   VulkanScratchPool scratch_pool_;
   std::mutex resource_pool_mutex_;
