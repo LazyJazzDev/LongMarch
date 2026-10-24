@@ -12,7 +12,7 @@ namespace grassland::rhi::backend::metal {
 // complete C++ layout, so unused declarations never shift a captured version.
 static bool CompileMetal(const IShader *shader,
                          const PipelineLayoutDesc &layout,
-                         const std::vector<VertexAttributeDesc> &attributes,
+                         const std::vector<InputAttributeDesc> &attributes,
                          std::string &source,
                          std::string &entry,
                          std::array<uint32_t, 3> *threads) {
@@ -89,7 +89,7 @@ const PipelineLayoutDesc &MetalProgramBase::BindingLayout() const {
 }
 
 NS::SharedPtr<MTL::Function> MetalProgramBase::CompileFunction(const IShader *shader,
-                                                               const std::vector<VertexAttributeDesc> &attributes,
+                                                               const std::vector<InputAttributeDesc> &attributes,
                                                                std::array<uint32_t, 3> *threads) const {
   for (const auto &group : layout_.groups)
     if (!ValidateMetalBindingLayout(native_device_, group))

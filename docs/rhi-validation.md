@@ -164,6 +164,7 @@ channel count. Vulkan checks the required color-format features before allocatio
 
 `VertexFormat` is now `InputType`, with `INPUT_TYPE_FLOAT[2/3/4]`,
 `INPUT_TYPE_INT[2/3/4]`, and `INPUT_TYPE_UINT[2/3/4]` (the unsuffixed name is scalar).
+Attributes use `InputAttributeDesc`, whose `type` member selects the `InputType`.
 Each component occupies 32 bits. `InputTypeSize` returns the byte size; existing
 vertex binding, attribute location, offset, and stride semantics are unchanged.
 All RHI/RHIX call sites use the new names; old enum/type aliases are not retained.

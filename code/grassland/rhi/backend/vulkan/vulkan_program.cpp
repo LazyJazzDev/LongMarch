@@ -76,7 +76,7 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
                               VK_FORMAT_R32G32_UINT,         VK_FORMAT_R32G32B32_UINT,    VK_FORMAT_R32G32B32A32_UINT};
   std::vector<VkVertexInputAttributeDescription> attributes;
   for (const auto &a : object->desc_.vertex_attributes)
-    attributes.push_back({a.location, a.binding, formats[a.format], a.offset});
+    attributes.push_back({a.location, a.binding, formats[a.type], a.offset});
   VkPipelineVertexInputStateCreateInfo input{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
   input.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
   input.pVertexBindingDescriptions = bindings.data();

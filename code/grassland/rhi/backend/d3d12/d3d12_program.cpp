@@ -36,7 +36,7 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
   for (const auto &a : object->desc_.vertex_attributes) {
     auto instance = object->desc_.vertex_bindings[a.binding].per_instance;
     inputs.push_back(
-        {"TEXCOORD", a.location, formats[a.format], a.binding, a.offset,
+        {"TEXCOORD", a.location, formats[a.type], a.binding, a.offset,
          instance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
          instance ? 1u : 0u});
   }

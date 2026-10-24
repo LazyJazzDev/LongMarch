@@ -74,7 +74,7 @@ bool Program::ValidateLayout() const {
   for (const auto &attribute : desc_.vertex_attributes) {
     if (attribute.binding >= desc_.vertex_bindings.size())
       return false;
-    auto size = InputTypeSize(attribute.format);
+    auto size = InputTypeSize(attribute.type);
     auto stride = desc_.vertex_bindings[attribute.binding].stride;
     if (!size || attribute.offset > stride || size > stride - attribute.offset)
       return false;

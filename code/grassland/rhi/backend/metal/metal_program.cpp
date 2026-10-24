@@ -103,7 +103,7 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
                                        MTL::VertexFormatUInt2,  MTL::VertexFormatUInt3,  MTL::VertexFormatUInt4};
   for (const auto &a : object->desc_.vertex_attributes) {
     auto attribute = vertex->attributes()->object(a.location);
-    attribute->setFormat(formats[a.format]);
+    attribute->setFormat(formats[a.type]);
     attribute->setBufferIndex(a.binding + VertexBufferBase);
     attribute->setOffset(a.offset);
   }
