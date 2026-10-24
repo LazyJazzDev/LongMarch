@@ -59,7 +59,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
   std::vector<ColorSpace> spaces{COLOR_SPACE_SRGB_NONLINEAR};
   ObjPtr<IWindow> window;
   if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI nbody - P: VSync; Space: pause; R: reset"});
+    window = device->CreateGLFWWindow({1280, 720, "RHI nbody"});
     if (!window)
       return 1;
     if (!window->EnableImGui(true, LONGMARCH_ASSETS_DIR "fonts/simhei.ttf", 20.0f))
@@ -217,7 +217,6 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
     });
   }
   grassland::FPSCounter fps;
-  auto title_time = std::chrono::steady_clock::now();
   // Warm up allocations and pipelines before measuring completed GPU work.
   auto benchmark_start = std::chrono::steady_clock::now();
   int rendered = headless ? -60 : 0;
@@ -231,15 +230,14 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
             ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
             ImGui::SetNextWindowBgAlpha(0.3f);
             if (ImGui::Begin("NBody", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
-              ImGui::TextUnformatted("Statistics");
-              ImGui::Separator();
+              ImGui::SeparatorText("Statistics");
               ImGui::Text("Backend: %s", BackendAPIName(api).c_str());
               ImGui::Text("Particles: %u", particle_count);
               const double rate = fps.GetFPS();
+              ImGui::Text("FPS: %.1f", rate);
               ImGui::Text("Frame Duration: %.3f ms", rate > 0 ? 1000.0 / rate : 0.0);
-              ImGui::Text("Estimated: %.2f GFLOP/s", running ? flops_per_frame * rate * 1e-9 : 0.0);
-              ImGui::TextUnformatted("Control");
-              ImGui::Separator();
+              ImGui::Text("Estimated: %.2f TFLOP/s", running ? flops_per_frame * rate * 1e-12 : 0.0);
+              ImGui::SeparatorText("Control");
               if (ImGui::Button("Reset"))
                 reset_requested = true;
               ImGui::SameLine();
@@ -248,15 +246,12 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
               ImGui::SliderFloat("Delta Time", &delta_t, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
               ImGui::SliderInt("Galaxy Number", &galaxy_count, 1, 20);
               ImGui::TextUnformatted("Galaxy count applies on Reset. Drag outside UI to rotate.");
-              ImGui::TextUnformatted("Visualizer");
-              ImGui::Separator();
-              bool vsync = requested == PRESENT_MODE_VSYNC;
-              if (ImGui::Checkbox("VSync", &vsync)) {
-                requested = vsync ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
-                present_mode_changed = true;
-              }
+              ImGui::TextUnformatted("P: VSync; Space: pause/resume; R: reset; Escape: close");
               ImGui::SeparatorText("ColorSpace");
-              ImGui::SetNextItemWidth(-1.0f);
+              const auto &style = ImGui::GetStyle();
+              const float vsync_width =
+                  ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize("VSync").x;
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - vsync_width - style.ItemSpacing.x);
               if (ImGui::BeginCombo("##ColorSpace", ColorSpaceName(window->GetColorSpace()).c_str())) {
                 for (auto space : spaces) {
                   if (ImGui::Selectable(ColorSpaceName(space).c_str(), space == window->GetColorSpace())) {
@@ -265,6 +260,12 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
                   }
                 }
                 ImGui::EndCombo();
+              }
+              ImGui::SameLine();
+              bool vsync = requested == PRESENT_MODE_VSYNC;
+              if (ImGui::Checkbox("VSync", &vsync)) {
+                requested = vsync ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
+                present_mode_changed = true;
               }
               if (!status.empty())
                 ImGui::TextUnformatted(status.c_str());
@@ -415,14 +416,6 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
       pending[slot] = std::move(token);
     ++rendered;
     fps.TickFrame();
-    auto now = std::chrono::steady_clock::now();
-    if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      const double frame_rate = fps.GetFPS();
-      if (!window->SetTitle(fmt::format("RHI nbody - FPS: {:.1f} - est. {:.2f} TFLOP/s - P: toggle VSync", frame_rate,
-                                        running ? flops_per_frame * frame_rate * 1e-12 : 0.0)))
-        return 1;
-      title_time = now;
-    }
   }
   if (headless) {
     for (const auto &token : pending) {
