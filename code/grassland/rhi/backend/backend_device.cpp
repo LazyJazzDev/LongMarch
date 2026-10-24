@@ -109,29 +109,24 @@ const void *Device::NativeIdentity() const {
 
 ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands,
                                           const std::vector<ObjectPtr<SubmissionToken>> &waits) {
-  auto reject = [&] {
-    if (!commands->WasSubmitted())
-      commands->CancelDownloads(SUBMISSION_STATUS_CANCELED);
-    return ObjectPtr<SubmissionToken>{};
-  };
   if (!commands->Seal())
-    return reject();
+    return {};
 #if !defined(NDEBUG)
   if (commands->DeviceIdentity() != NativeIdentity()) {
     ReportError(-1, "Submission requires a context from this device.");
-    return reject();
+    return {};
   }
 #endif
   for (const auto &wait : waits) {
 #if !defined(NDEBUG)
     if (!wait || wait->Owner() != this) {
       ReportError(-1, "Submission dependency is empty or belongs to another device.");
-      return reject();
+      return {};
     }
 #endif
     if (wait->GetStatus() == SUBMISSION_STATUS_FAILED || wait->GetStatus() == SUBMISSION_STATUS_CANCELED) {
       ReportError(-1, "Submission dependency failed or was canceled.");
-      return reject();
+      return {};
     }
   }
   // Both logical roles share one physical queue. Its ordering already supplies
@@ -139,7 +134,7 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(this));
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopping_)
-    return reject();
+    return {};
   if (!collector_.joinable())
     collector_ = std::thread([this] { Collect(); });
   // Allocate the retirement record before submitting any GPU work.

@@ -46,14 +46,17 @@ if (!pixels->CopyTo(cpu.data(), cpu.size())) return false;
 ```
 
 RHIX exposes the same operations through `CommandContext` and `DownloadToken`.
-For asynchronous use, poll `DownloadToken::GetStatus()`. `DownloadToken::WaitHost()`
-waits on the associated SubmissionToken; before submission it returns false without
-blocking. The association is established before native submission, and callers may
-release their SubmissionToken handle while retaining the DownloadToken. `CopyTo` does
-not wait for GPU completion: it returns false for pending/failed/canceled work,
-a null destination, or insufficient capacity. A valid token starts pending; abandoned
-recordings and rejected submissions become canceled (native submit failures become
-failed). Release all tokens before their Device, like other RHI resource handles.
+Query status only after the submission call has returned, and publish tokens to
+other threads only after submission. `GetStatus()` delegates to the associated
+SubmissionToken, or returns PENDING when no submission is associated. The caller
+manages abandonment/cancellation of recordings; it is not fed back into downloads.
+`WaitHost()` delegates to SubmissionToken and returns false if none is associated.
+Callers may release their SubmissionToken handle while retaining the DownloadToken.
+
+Call `CopyTo()` only after observing COMPLETED or a successful `WaitHost()`, and
+perform copies on a single thread. DownloadToken does not lock, duplicate completion
+state, or recheck readiness in `CopyTo()`. Destination/capacity validation remains.
+Release all tokens before their Device, like other RHI resource handles.
 
 Each token holds an intrusive lease from a Device-owned `TemporalBufferPool`, grouped
 into power-of-two size classes starting at 64 KiB. Upload and download share the same
@@ -122,6 +125,7 @@ non-finite velocities fail the demo. With frame capture enabled, `nbody_speeds.c
 contains the latest completed histogram, including bin edges, particle counts and
 normalized values. The curve can lag rendering by a frame or more while the GPU is
 busy. `*RhiDownload*` tests cover byte ranges, color/depth/stencil rectangles, compact
-rows, early token release, retained snapshots, canceled recordings/submissions, direct and concurrent waits after releasing the
+rows, early token release, retained snapshots, abandoned recordings, rejected
+submissions remaining unassociated, direct and concurrent waits after releasing the
 submission handle, and temporal-pool lease retention/reuse/shrinking. The Metal test
 also checks that both pool accessors refer to the same pool and reuse the same storage.

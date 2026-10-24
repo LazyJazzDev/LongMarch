@@ -1,5 +1,4 @@
 #pragma once
-#include <mutex>
 
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/rhi_download_token.h"
@@ -22,16 +21,12 @@ class DownloadToken : public Object<IDownloadToken> {
   uint64_t GetSize() const override;
   bool CopyTo(void *destination, uint64_t size) const override;
   void BindSubmission(SubmissionToken *submission);
-  void Cancel(SubmissionStatus status);
 
  protected:
   virtual bool CopyData(void *destination) const = 0;
 
  private:
   const uint64_t size_;
-  mutable std::mutex state_mutex_;
-  mutable std::mutex copy_mutex_;
   ObjectPtr<SubmissionToken> submission_;
-  SubmissionStatus unsubmitted_status_{SUBMISSION_STATUS_PENDING};
 };
 }  // namespace grassland::rhi::backend

@@ -99,15 +99,7 @@ bool CommandContext::RenderingMatches(const IProgram *program) const {
 CommandContext::CommandContext(const void *identity) : identity_(identity) {
 }
 
-CommandContext::~CommandContext() {
-  CancelDownloads(SUBMISSION_STATUS_CANCELED);
-}
-
-void CommandContext::CancelDownloads(SubmissionStatus status) {
-  for (auto &token : downloads_)
-    token->Cancel(status);
-  downloads_.clear();
-}
+CommandContext::~CommandContext() = default;
 
 void CommandContext::BindDownloads(SubmissionToken *submission) {
   for (const auto &token : downloads_)

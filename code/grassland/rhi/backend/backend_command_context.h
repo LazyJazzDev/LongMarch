@@ -64,7 +64,6 @@ class CommandContext : public Object<rhi::ICommandContext> {
                       uint32_t first_instance = 0) override;
   IDownloadToken *CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t) override;
   IDownloadToken *CmdDownloadImage(IImage *, const ImageDownloadRegion & = {}) override;
-  void CancelDownloads(SubmissionStatus status);
   void BindDownloads(SubmissionToken *submission);
   void ReleaseDownloads();
   bool Seal();

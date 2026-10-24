@@ -45,10 +45,6 @@ TEST_P(RhiDownload, BufferRangeSnapshotsAndRetainedLeases) {
   ObjPtr<IDownloadToken> unaligned = commands->CmdDownloadBuffer(buffer.Get(), 7, 19);
   ASSERT_TRUE(unaligned);
   std::array<uint32_t, 25> output{};
-  EXPECT_EQ(first->GetStatus(), SUBMISSION_STATUS_PENDING);
-  EXPECT_FALSE(first->WaitHost());
-  EXPECT_FALSE(first->CopyTo(output.data(), sizeof(output)));
-  EXPECT_EQ(output[0], 0);
   ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
   ASSERT_TRUE(done);
   commands.Release();
@@ -93,10 +89,8 @@ TEST_P(RhiDownload, AbandonedAndInvalidDownloads) {
   ObjPtr<IDownloadToken> token = commands->CmdDownloadBuffer(buffer.Get(), 0, 64);
   ASSERT_TRUE(token);
   commands.Release();
-  EXPECT_EQ(token->GetStatus(), SUBMISSION_STATUS_CANCELED);
-  EXPECT_FALSE(token->WaitHost());
-  std::array<uint8_t, 64> bytes{};
-  EXPECT_FALSE(token->CopyTo(bytes.data(), bytes.size()));
+  // Abandonment is owned by the caller; release the unused download explicitly.
+  token.Release();
   for (auto range : {std::pair<uint64_t, uint64_t>{64, 1}, {0, 0}, {UINT64_MAX, 16}, {1, 64}}) {
     commands = device->CreateCommandContext();
     EXPECT_EQ(commands->CmdDownloadBuffer(buffer.Get(), range.first, range.second), nullptr);
@@ -183,7 +177,7 @@ TEST_P(RhiDownload, DepthStencilSubrectangleHasPortablePackedLayout) {
   }
 }
 
-TEST_P(RhiDownload, RejectedSubmissionCancelsRecordedDownloads) {
+TEST_P(RhiDownload, RejectedSubmissionLeavesDownloadUnassociated) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -196,7 +190,7 @@ TEST_P(RhiDownload, RejectedSubmissionCancelsRecordedDownloads) {
   EXPECT_EQ(commands->CmdDownloadBuffer(buffer.Get(), 64, 1), nullptr);
   ObjPtr<ISubmissionToken> rejected = queue->Submit(commands.Get());
   EXPECT_FALSE(rejected);
-  EXPECT_EQ(token->GetStatus(), SUBMISSION_STATUS_CANCELED);
+  EXPECT_EQ(token->GetStatus(), SUBMISSION_STATUS_PENDING);
   EXPECT_FALSE(token->WaitHost());
 }
 
