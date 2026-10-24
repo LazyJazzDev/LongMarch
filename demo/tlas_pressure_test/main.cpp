@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
                                      {1, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
                                      {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
                                      {3, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 16}}}}};
-  ObjPtr<IShader> cs = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ObjPtr<IShader> cs = device->CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE);
   if (!cs)
     return 1;
   ObjPtr<IComputeProgram> trace = device->CreateComputeProgram({cs.Get(), trace_layout});
@@ -114,10 +114,10 @@ int main(int argc, char **argv) {
 
   const auto &display_source = shader_list.at("shaders/display.slang");
   std::string display(display_source.first, display_source.second);
-  ObjPtr<IShader> vs = device->CreateShader({display, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(display, "VSMain", SHADER_STAGE_VERTEX);
   if (!vs)
     return 1;
-  ObjPtr<IShader> ps = device->CreateShader({display, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(display, "PSMain", SHADER_STAGE_FRAGMENT);
   if (!ps)
     return 1;
   ProgramDesc graphics;

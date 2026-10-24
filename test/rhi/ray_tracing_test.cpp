@@ -306,7 +306,7 @@ void CSMain() {
 )";
   PipelineLayoutDesc layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_COMPUTE},
                                {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}}};
-  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
   ASSERT_TRUE(program);
@@ -391,7 +391,7 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,8,output);
   PipelineLayoutDesc layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 2, SHADER_VISIBILITY_COMPUTE},
                                {3, BINDING_ACCELERATION_STRUCTURE, 2, SHADER_VISIBILITY_COMPUTE},
                                {8, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}}};
-  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
   ASSERT_TRUE(program);
@@ -499,26 +499,27 @@ void Intersection() {
 [shader("closesthit")]
 void Sphere(inout Payload p, Attributes attr) { p.result = 222; }
 )";
-  ObjPtr<IShader> raygen = device->CreateShader({source, "RayGen", SHADER_STAGE_RAY_GENERATION});
+  ObjPtr<IShader> raygen = device->CreateShaderFromSource(source, "RayGen", SHADER_STAGE_RAY_GENERATION);
   ASSERT_TRUE(raygen);
-  ObjPtr<IShader> miss = device->CreateShader({source, "Miss", SHADER_STAGE_MISS});
+  ObjPtr<IShader> miss = device->CreateShaderFromSource(source, "Miss", SHADER_STAGE_MISS);
   ASSERT_TRUE(miss);
-  ObjPtr<IShader> hit = device->CreateShader({source, "Triangle", SHADER_STAGE_CLOSEST_HIT});
+  ObjPtr<IShader> hit = device->CreateShaderFromSource(source, "Triangle", SHADER_STAGE_CLOSEST_HIT);
   ASSERT_TRUE(hit);
-  ObjPtr<IShader> sphere_hit = device->CreateShader({source, "Sphere", SHADER_STAGE_CLOSEST_HIT});
+  ObjPtr<IShader> sphere_hit = device->CreateShaderFromSource(source, "Sphere", SHADER_STAGE_CLOSEST_HIT);
   ASSERT_TRUE(sphere_hit);
-  ObjPtr<IShader> intersection = device->CreateShader({source, "Intersection", SHADER_STAGE_INTERSECTION});
+  ObjPtr<IShader> intersection = device->CreateShaderFromSource(source, "Intersection", SHADER_STAGE_INTERSECTION);
   ASSERT_TRUE(intersection);
   RayTracingProgramDesc desc;
   desc.ray_generation = raygen.Get();
   desc.miss_shaders = {miss.Get()};
   desc.hit_groups = {{hit.Get(), nullptr, nullptr}, {sphere_hit.Get(), nullptr, intersection.Get()}};
-  ObjPtr<IShader> callable = device->CreateShader({source, "Callable", SHADER_STAGE_CALLABLE});
+  ObjPtr<IShader> callable = device->CreateShaderFromSource(source, "Callable", SHADER_STAGE_CALLABLE);
   ASSERT_TRUE(callable);
   desc.callable_shaders = {callable.Get()};
-  ObjPtr<IShader> alternate_hit = device->CreateShader({source, "AlternateTriangle", SHADER_STAGE_CLOSEST_HIT});
-  ObjPtr<IShader> alternate_miss = device->CreateShader({source, "AlternateMiss", SHADER_STAGE_MISS});
-  ObjPtr<IShader> alternate_callable = device->CreateShader({source, "AlternateCallable", SHADER_STAGE_CALLABLE});
+  ObjPtr<IShader> alternate_hit = device->CreateShaderFromSource(source, "AlternateTriangle", SHADER_STAGE_CLOSEST_HIT);
+  ObjPtr<IShader> alternate_miss = device->CreateShaderFromSource(source, "AlternateMiss", SHADER_STAGE_MISS);
+  ObjPtr<IShader> alternate_callable =
+      device->CreateShaderFromSource(source, "AlternateCallable", SHADER_STAGE_CALLABLE);
   ASSERT_TRUE(alternate_hit);
   ASSERT_TRUE(alternate_miss);
   ASSERT_TRUE(alternate_callable);
@@ -689,7 +690,7 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
 )";
   PipelineLayoutDesc layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_COMPUTE},
                                {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}}};
-  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
   ASSERT_TRUE(program);
@@ -869,7 +870,7 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
 )";
   PipelineLayoutDesc layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_COMPUTE},
                                {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}}};
-  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
   ASSERT_TRUE(program);
@@ -908,14 +909,15 @@ TEST_P(RhiRayTracing, ProgramCreationRejectsInvalidDescriptionAndShader) {
     GTEST_SKIP();
   ObjPtr<IRayTracingProgram> program = device->CreateRayTracingProgram({});
   EXPECT_FALSE(program);
-  ObjPtr<IShader> invalid = device->CreateShader({"invalid shader code", "RayGen", SHADER_STAGE_RAY_GENERATION});
+  ObjPtr<IShader> invalid =
+      device->CreateShaderFromSource("invalid shader code", "RayGen", SHADER_STAGE_RAY_GENERATION);
   ASSERT_TRUE(invalid);
   RayTracingProgramDesc desc;
   desc.ray_generation = invalid.Get();
   program = device->CreateRayTracingProgram(desc);
   EXPECT_FALSE(program);
-  ObjPtr<IShader> raygen =
-      device->CreateShader({"[shader(\"raygeneration\")] void RayGen() {}", "RayGen", SHADER_STAGE_RAY_GENERATION});
+  ObjPtr<IShader> raygen = device->CreateShaderFromSource("[shader(\"raygeneration\")] void RayGen() {}", "RayGen",
+                                                          SHADER_STAGE_RAY_GENERATION);
   ASSERT_TRUE(raygen);
   desc.ray_generation = raygen.Get();
   desc.max_recursion_depth = 0;

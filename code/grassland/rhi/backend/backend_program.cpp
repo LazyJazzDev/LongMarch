@@ -30,9 +30,9 @@ bool Program::ValidateLayout() const {
       return false;
   if (!desc_.vertex_shader || !desc_.fragment_shader)
     return false;
-  if (desc_.vertex_shader->GetDesc().stage != SHADER_STAGE_VERTEX)
+  if (desc_.vertex_shader->GetStage() != SHADER_STAGE_VERTEX)
     return false;
-  if (desc_.fragment_shader->GetDesc().stage != SHADER_STAGE_FRAGMENT)
+  if (desc_.fragment_shader->GetStage() != SHADER_STAGE_FRAGMENT)
     return false;
   if (desc_.color_formats.size() > 8 || (desc_.color_formats.empty() && !IsDepthFormat(desc_.depth_stencil.format)))
     return false;

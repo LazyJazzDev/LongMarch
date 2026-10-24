@@ -4,6 +4,7 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_program.h"
+#include "grassland/util/virtual_file_system.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include <d3d12sdklayers.h>
 
@@ -39,6 +40,114 @@ SamplerArray CreateSamplers(IDevice *device, std::initializer_list<SamplerDesc> 
 
 class RhiProgram : public testing::TestWithParam<BackendAPI> {};
 
+TEST_P(RhiProgram, FileShadersOwnPreprocessedIncludesAndDeferLayoutMacros) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IShader> vertex, fragment;
+  {
+    VirtualFileSystem fs;
+    ASSERT_EQ(fs.WriteFile(R"(shaders\include\types.slang)", "#pragma once\nstruct Settings { float4 color; };\n"), 0);
+    ASSERT_EQ(
+        fs.WriteFile("shaders/common.slang", "#include \"include/types.slang\"\nRHI_UNIFORM(0,0,Settings,settings);\n"),
+        0);
+    ASSERT_EQ(fs.WriteFile("shaders/main.slang", R"(
+#include "common.slang"
+#include "include/types.slang"
+struct Input { RHI_INPUT(0,float3,position); };
+float4 VSMain(Input input):SV_Position { return float4(input.position,1); }
+float4 PSMain():SV_Target0 { return settings.color; }
+)"),
+              0);
+    vertex = device->CreateShader(R"(shaders\main.slang)", "VSMain", SHADER_STAGE_VERTEX, &fs);
+    fragment = device->CreateShader("shaders/main.slang", "PSMain", SHADER_STAGE_FRAGMENT, &fs);
+    ASSERT_TRUE(vertex);
+    EXPECT_EQ(vertex->GetStage(), SHADER_STAGE_VERTEX);
+    EXPECT_EQ(vertex->GetEntry(), "VSMain");
+    ASSERT_TRUE(fragment);
+    const auto &expanded = vertex->GetPreprocessedCode();
+    EXPECT_EQ(expanded.find("#include"), std::string::npos);
+    EXPECT_NE(expanded.find("RHI_INPUT"), std::string::npos);
+    EXPECT_NE(expanded.find("RHI_UNIFORM"), std::string::npos);
+  }  // Compilation below must not dereference the destroyed filesystem.
+  ProgramDesc desc;
+  desc.vertex_shader = vertex.Get();
+  desc.fragment_shader = fragment.Get();
+  desc.vertex_bindings = {{12, false}};
+  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}};
+  desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+}
+
+TEST_P(RhiProgram, DiskAndMemoryShadersUseOfficialPreprocessing) {
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  const auto filename = (std::filesystem::path(__FILE__).parent_path() / "shaders/include_compute.slang").string();
+  auto shader = device.CreateShader(filename, "CSMain", SHADER_STAGE_COMPUTE);
+  ASSERT_TRUE(shader);
+  auto program = device.CreateComputeProgram({shader.Get()});
+  ASSERT_TRUE(program);
+  auto memory = device.CreateShaderFromSource("[numthreads(1,1,1)] void CSMain() {}", "CSMain", SHADER_STAGE_COMPUTE);
+  ASSERT_TRUE(memory);
+  EXPECT_EQ(memory.GetStage(), SHADER_STAGE_COMPUTE);
+  EXPECT_EQ(memory.GetEntry(), "CSMain");
+  EXPECT_NE(memory.GetPreprocessedCode().find("CSMain"), std::string::npos);
+  // The helper's temporary VFS has already been destroyed.
+  EXPECT_TRUE(device.CreateComputeProgram({memory.Get()}));
+  VirtualFileSystem fs;
+  fs.WriteFile("lib/settings.slang", "#if ENABLED\n#define GROUP_SIZE 1\n#else\n#error missing define\n#endif\n");
+  fs.WriteFile("main.slang", "#include <settings.slang>\n[numthreads(GROUP_SIZE,1,1)] void CSMain() {}");
+  ShaderDesc desc;
+  desc.entry_point = "CSMain";
+  desc.stage = SHADER_STAGE_COMPUTE;
+  desc.file_system = &fs;
+  desc.include_paths = {"lib"};
+  desc.defines = {{"ENABLED", "1"}};
+  auto configured = device.CreateShader(desc);
+  ASSERT_TRUE(configured);
+  EXPECT_TRUE(device.CreateComputeProgram({configured.Get()}));
+  auto file_overload =
+      device.CreateShader("main.slang", "CSMain", SHADER_STAGE_COMPUTE, &fs, {"lib"}, {{"ENABLED", "1"}});
+  ASSERT_TRUE(file_overload);
+  EXPECT_TRUE(device.CreateComputeProgram({file_overload.Get()}));
+  const std::string source_with_include =
+      "#if ENABLED != 7\n#error missing define\n#endif\n"
+      "#include <include_settings.slang>\n[numthreads(GROUP_SIZE,1,1)] void CSMain() {}";
+  const std::vector<std::string> disk_paths{std::filesystem::path(filename).parent_path().generic_u8string()};
+  auto source_overload = device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, disk_paths,
+                                                       {{"ENABLED", "7"}});
+  ASSERT_TRUE(source_overload);
+  EXPECT_TRUE(device.CreateComputeProgram({source_overload.Get()}));
+  EXPECT_FALSE(
+      device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, {}, {{"ENABLED", "7"}}));
+  EXPECT_FALSE(device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, disk_paths,
+                                             {{"ENABLED", "0"}}));
+}
+
+TEST_P(RhiProgram, ShaderPreprocessingReportsMissingIncludesAndDirectiveErrors) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  VirtualFileSystem fs;
+  ObjPtr<IShader> missing = device->CreateShader("missing.slang", "Main", SHADER_STAGE_COMPUTE, &fs);
+  EXPECT_FALSE(missing);
+  fs.WriteFile("main.slang", "#include \"missing.slang\"\n");
+  ShaderDesc desc{"main.slang", "Main", SHADER_STAGE_COMPUTE};
+  desc.file_system = &fs;
+  ObjPtr<IShader> include = device->CreateShader(desc);
+  EXPECT_FALSE(include);
+  ObjPtr<IShader> error = device->CreateShaderFromSource("#error preprocessing failed\n", "Main", SHADER_STAGE_COMPUTE);
+  EXPECT_FALSE(error);
+  ObjPtr<IShader> warning = device->CreateShaderFromSource("#warning harmless\n[numthreads(1,1,1)] void Main() {}",
+                                                           "Main", SHADER_STAGE_COMPUTE);
+  EXPECT_TRUE(warning);
+}
+
 TEST_P(RhiProgram, SlangPlatformMacrosMatchExecutionPlatform) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
@@ -61,8 +170,8 @@ TEST_P(RhiProgram, SlangPlatformMacrosMatchExecutionPlatform) {
 float4 VSMain(uint id : SV_VertexID) : SV_Position { return float4(0,0,0,1); }
 float4 PSMain() : SV_Target0 { return float4(1,1,1,1); }
 )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ASSERT_TRUE(vs && ps);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
@@ -122,8 +231,7 @@ TEST_P(RhiProgram, CreationCompilesAndOwnsSourcesUsingInputMacros) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ShaderDesc source;
-  source.source =
+  const std::string source =
       "\xef\xbb\xbf"
       R"(
  struct Input { RHI_INPUT(0,float3,position); RHI_INPUT(1,float3,color); };
@@ -131,11 +239,8 @@ TEST_P(RhiProgram, CreationCompilesAndOwnsSourcesUsingInputMacros) {
  Varying VSMain(Input input) { Varying output; output.position=float4(input.position,1); output.color=input.color; return output; }
  float4 PSMain(Varying input) : SV_Target0 { return float4(input.color,1); }
  )";
-  source.entry_point = "VSMain";
-  ObjPtr<IShader> vertex = device->CreateShader(source);
-  source.entry_point = "PSMain";
-  source.stage = SHADER_STAGE_FRAGMENT;
-  ObjPtr<IShader> fragment = device->CreateShader(source);
+  ObjPtr<IShader> vertex = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> fragment = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ASSERT_TRUE(vertex);
   ASSERT_TRUE(fragment);
   ProgramDesc desc;
@@ -147,8 +252,8 @@ TEST_P(RhiProgram, CreationCompilesAndOwnsSourcesUsingInputMacros) {
   ASSERT_TRUE(program);
   vertex.Release();
   fragment.Release();
-  EXPECT_EQ(program->GetDesc().vertex_shader->GetDesc().entry_point, "VSMain");
-  EXPECT_EQ(program->GetDesc().fragment_shader->GetDesc().entry_point, "PSMain");
+  EXPECT_EQ(program->GetDesc().vertex_shader->GetEntry(), "VSMain");
+  EXPECT_EQ(program->GetDesc().fragment_shader->GetEntry(), "PSMain");
 }
 
 TEST_P(RhiProgram, InvalidShaderIsRejectedAtProgramCreationNotSourceCreation) {
@@ -156,8 +261,8 @@ TEST_P(RhiProgram, InvalidShaderIsRejectedAtProgramCreationNotSourceCreation) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IShader> vertex = device->CreateShader({"invalid shader code", "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> fragment = device->CreateShader({"invalid shader code", "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vertex = device->CreateShaderFromSource("invalid shader code", "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> fragment = device->CreateShaderFromSource("invalid shader code", "PSMain", SHADER_STAGE_FRAGMENT);
   ASSERT_TRUE(vertex);
   ASSERT_TRUE(fragment);
   ProgramDesc desc;
@@ -191,9 +296,9 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
     float4 VSMain(Input input) : SV_Position { return float4(input.position,1); }
     float4 PSMain() : SV_Target0 { return float4(1,0,0,1); }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   ASSERT_TRUE(vs);
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ASSERT_TRUE(ps);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
@@ -368,8 +473,8 @@ TEST_P(RhiProgram, BindingLayoutRejectsIncorrectStageTypeCountAndRange) {
     float4 VSMain(uint id:SV_VertexID):SV_Position {return float4(0,0,0,1);}
     float4 PSMain():SV_Target0 {return data.color;}
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -389,8 +494,8 @@ TEST_P(RhiProgram, BindingLayoutRejectsIncorrectStageTypeCountAndRange) {
     float4 VSMain(uint id:SV_VertexID):SV_Position {return float4(0,0,0,1);}
     float4 PSMain():SV_Target0 {return textures[2].Load(int3(0,0,0));}
   )");
-  vs = device->CreateShader({manual, "VSMain", SHADER_STAGE_VERTEX});
-  ps = device->CreateShader({manual, "PSMain", SHADER_STAGE_FRAGMENT});
+  vs = device->CreateShaderFromSource(manual, "VSMain", SHADER_STAGE_VERTEX);
+  ps = device->CreateShaderFromSource(manual, "PSMain", SHADER_STAGE_FRAGMENT);
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
   desc.pipeline_layout.groups[0].bindings[0].count = 2;
@@ -555,8 +660,8 @@ TEST_P(RhiProgram, StructuredStridesMustMatchExplicitLayoutAcrossStages) {
     RHI_STRUCTURED_BUFFER(0,0,float2,colors);
     float4 PSMain():SV_Target0 { return float4(colors[0],0,1); }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({vertex, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({fragment, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(vertex, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(fragment, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -566,11 +671,11 @@ TEST_P(RhiProgram, StructuredStridesMustMatchExplicitLayoutAcrossStages) {
   // Repeated creation must still reject the incompatible shader.
   mismatch = device->CreateProgram(desc);
   EXPECT_FALSE(mismatch);
-  ps = device->CreateShader({R"(
+  ps = device->CreateShaderFromSource(R"(
     RHI_STRUCTURED_BUFFER(0,0,float4,colors);
     float4 PSMain():SV_Target0 { return colors[0]; }
   )",
-                             "PSMain", SHADER_STAGE_FRAGMENT});
+                                      "PSMain", SHADER_STAGE_FRAGMENT);
   desc.fragment_shader = ps.Get();
   ObjPtr<IProgram> matching = device->CreateProgram(desc);
   ASSERT_TRUE(matching);
@@ -588,8 +693,8 @@ TEST_P(RhiProgram, StructuredStridesMustMatchExplicitLayoutAcrossStages) {
       outputValues[0]=values[1][1];return outputValues[0].color*outputValues[0].scale;
     }
   )";
-  vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
   desc.pipeline_layout.groups = {{{{0, BINDING_STRUCTURED_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT, 20},
@@ -635,8 +740,8 @@ TEST_P(RhiProgram, StructuredLayoutStrideControlsCompatibilityAndRanges) {
     float4 VSMain(uint id:SV_VertexID):SV_Position { return float4(values[id],0,1); }
     float4 PSMain():SV_Target0 { return 1; }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -672,8 +777,8 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
     source += "float4 VSMain(uint id:SV_VertexID):SV_Position { return float4(0,0,0,1); }";
     source += wide ? "float4 PSMain():SV_Target0 { return values[0]; }"
                    : "float4 PSMain():SV_Target0 { return float4(values[0],0,1); }";
-    ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-    ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+    ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+    ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
     ProgramDesc desc;
     desc.vertex_shader = vs.Get();
     desc.fragment_shader = ps.Get();
@@ -734,8 +839,8 @@ TEST_P(RhiProgram, InvalidBlendStateFailsCreation) {
     float4 VSMain(uint id:SV_VertexID):SV_Position { return float4(0,0,0,1); }
     float4 PSMain():SV_Target0 { return 1; }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();

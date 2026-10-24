@@ -10,7 +10,15 @@ rhi::IShader *Shader::Get() const noexcept {
   return static_cast<rhi::IShader *>(GetObject());
 }
 
-const rhi::ShaderDesc &Shader::GetDesc() const {
-  return Get()->GetDesc();
+rhi::ShaderStage Shader::GetStage() const {
+  return Get()->GetStage();
+}
+
+const std::string &Shader::GetEntry() const {
+  return Get()->GetEntry();
+}
+
+const std::string &Shader::GetPreprocessedCode() const {
+  return Get()->GetPreprocessedCode();
 }
 }  // namespace grassland::rhix

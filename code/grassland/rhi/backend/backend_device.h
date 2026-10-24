@@ -21,7 +21,7 @@ class Device : public Object<rhi::IDevice> {
   ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
       const TopLevelAccelerationStructureDesc &desc) override;
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
-  Device(PhysicalDevice info, Core *core);
+  Device(PhysicalDevice info, Core *core, BackendAPI api = BACKEND_API_DEFAULT);
   ~Device() override;
   const PhysicalDevice &GetPhysicalDevice() const noexcept;
   std::string Name() const override;
@@ -54,6 +54,7 @@ class Device : public Object<rhi::IDevice> {
   };
 
   void Collect();
+  BackendAPI api_;
   Core *core_;
   PhysicalDevice info_;
   std::mutex mutex_;

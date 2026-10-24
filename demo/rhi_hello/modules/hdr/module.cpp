@@ -109,8 +109,8 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
     auto &program = programs[{extent.format, color_space}];
     if (!program) {
       const auto source = "#define OUTPUT_COLOR_SPACE " + std::to_string(static_cast<int>(color_space)) + "\n" + shader;
-      ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-      ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+      ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+      ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
       if (!vs || !ps)
         return 1;
       ProgramDesc desc;

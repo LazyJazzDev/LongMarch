@@ -12,7 +12,7 @@ class MetalProgramBase {
   const PipelineLayoutDesc &BindingLayout() const;
 
  protected:
-  NS::SharedPtr<MTL::Function> CompileFunction(const ShaderDesc &shader,
+  NS::SharedPtr<MTL::Function> CompileFunction(const IShader *shader,
                                                const std::vector<VertexAttributeDesc> &attributes = {},
                                                std::array<uint32_t, 3> *threads = nullptr) const;
 

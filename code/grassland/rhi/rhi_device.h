@@ -3,6 +3,7 @@
 #include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
+#include "grassland/util/file_system.h"
 
 namespace grassland::rhi {
 class IImage;
@@ -37,6 +38,17 @@ class IDevice : public IObject {
   virtual IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;
   virtual IProgram *CreateProgram(const ProgramDesc &desc) = 0;
   virtual IShader *CreateShader(const ShaderDesc &desc) = 0;
+  IShader *CreateShader(const std::string &filename,
+                        const std::string &entry_point,
+                        ShaderStage stage,
+                        FileSystem *fs = nullptr,
+                        const std::vector<std::string> &include_paths = {},
+                        const std::vector<std::pair<std::string, std::string>> &defines = {});
+  IShader *CreateShaderFromSource(const std::string &source,
+                                  const std::string &entry_point,
+                                  ShaderStage stage,
+                                  const std::vector<std::string> &include_paths = {},
+                                  const std::vector<std::pair<std::string, std::string>> &defines = {});
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   virtual IQueue *GetQueue(QueueType type) = 0;
   virtual ICommandContext *CreateCommandContext() = 0;

@@ -189,7 +189,7 @@ bool D3D12Device::WaitIdle() {
 }
 
 D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
-    : Device(std::move(info), core),
+    : Device(std::move(info), core, BACKEND_API_D3D12),
       upload_pool_(this),
       scratch_pool_(this),
       device_(std::move(device)),

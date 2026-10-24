@@ -64,10 +64,10 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
   }
   const auto &embedded = shader_list.at("modules/nbody/shaders/particle.slang");
   std::string source(embedded.first, embedded.second);
-  grassland::rhix::Shader vertex_shader = device.CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  grassland::rhix::Shader vertex_shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   if (!vertex_shader)
     return 1;
-  grassland::rhix::Shader fragment_shader = device.CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  grassland::rhix::Shader fragment_shader = device.CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   if (!fragment_shader)
     return 1;
   ProgramDesc desc;
@@ -92,8 +92,8 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
   if (!program)
     return 1;
   const auto &compute_source = shader_list.at("modules/nbody/shaders/nbody.slang");
-  grassland::rhix::Shader compute_shader =
-      device.CreateShader({std::string(compute_source.first, compute_source.second), "CSMain", SHADER_STAGE_COMPUTE});
+  grassland::rhix::Shader compute_shader = device.CreateShaderFromSource(
+      std::string(compute_source.first, compute_source.second), "CSMain", SHADER_STAGE_COMPUTE);
   if (!compute_shader)
     return 1;
   ComputeProgramDesc compute_desc;

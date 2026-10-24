@@ -31,7 +31,7 @@ MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<
 }
 
 MetalDevice::MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device)
-    : Device(std::move(info), core),
+    : Device(std::move(info), core, BACKEND_API_METAL),
       device_(std::move(device)) {
 }
 

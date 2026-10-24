@@ -22,7 +22,7 @@ IRayTracingProgram *Device::CreateRayTracingProgram(const RayTracingProgramDesc 
   return nullptr;
 }
 
-Device::Device(PhysicalDevice info, Core *core) : core_(core), info_(std::move(info)) {
+Device::Device(PhysicalDevice info, Core *core, BackendAPI api) : api_(api), core_(core), info_(std::move(info)) {
 }
 
 rhi::IImage *Device::CreateImage(const ImageDesc &) {
@@ -46,10 +46,10 @@ rhi::IProgram *Device::CreateProgram(const ProgramDesc &) {
 }
 
 rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
-  if (desc.source.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+  if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
       desc.stage > SHADER_STAGE_CALLABLE)
     return nullptr;
-  return new Shader(desc);
+  return Shader::Create(desc, api_);
 }
 
 ISampler *Device::CreateSampler(const SamplerDesc &) {
