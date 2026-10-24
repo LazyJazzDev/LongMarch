@@ -11,6 +11,21 @@
 
 namespace grassland::rhi::backend::metal {
 
+namespace {
+MTL::ClearColor NativeClearColor(ImageFormat format, const ClearValue &value) {
+  if (IsSignedIntegerFormat(format)) {
+    const auto &c = value.color.int32;
+    return MTL::ClearColor::Make(c[0], c[1], c[2], c[3]);
+  }
+  if (IsUnsignedIntegerFormat(format)) {
+    const auto &c = value.color.uint32;
+    return MTL::ClearColor::Make(c[0], c[1], c[2], c[3]);
+  }
+  const auto &c = value.color.float32;
+  return MTL::ClearColor::Make(c[0], c[1], c[2], c[3]);
+}
+}  // namespace
+
 MetalCommandContext::MetalCommandContext(MetalDevice *device) : CommandContext(device), device_(device) {
 }
 
@@ -27,7 +42,7 @@ MetalCommandContext *MetalCommandContext::Create(MetalDevice *device) {
   return object.release();
 }
 
-bool MetalCommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
+bool MetalCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
 #if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
@@ -35,9 +50,9 @@ bool MetalCommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
     return false;
   }
   const auto native = dynamic_cast<MetalImage *>(image);
-  if (!native || !native->IsValid() || native->DeviceIdentity() != device_ || IsDepthFormat(native->GetDesc().format)) {
+  if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
     recording_failed_ = true;
-    ReportError(-1, "CmdClearColor requires a valid image from this device.");
+    ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
   }
 #else
@@ -51,11 +66,27 @@ bool MetalCommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
     recording_failed_ = true;
     return false;
   }
-  auto attachment = pass->colorAttachments()->object(0);
-  attachment->setTexture(native->NativeImage());
-  attachment->setLoadAction(MTL::LoadActionClear);
-  attachment->setStoreAction(MTL::StoreActionStore);
-  attachment->setClearColor(MTL::ClearColor::Make(color[0], color[1], color[2], color[3]));
+  const auto format = native->GetDesc().format;
+  if (IsDepthFormat(format)) {
+    auto depth = pass->depthAttachment();
+    depth->setTexture(native->NativeImage());
+    depth->setLoadAction(MTL::LoadActionClear);
+    depth->setStoreAction(MTL::StoreActionStore);
+    depth->setClearDepth(value.depth_stencil.depth);
+    if (HasStencil(format)) {
+      auto stencil = pass->stencilAttachment();
+      stencil->setTexture(native->NativeImage());
+      stencil->setLoadAction(MTL::LoadActionClear);
+      stencil->setStoreAction(MTL::StoreActionStore);
+      stencil->setClearStencil(value.depth_stencil.stencil);
+    }
+  } else {
+    auto attachment = pass->colorAttachments()->object(0);
+    attachment->setTexture(native->NativeImage());
+    attachment->setLoadAction(MTL::LoadActionClear);
+    attachment->setStoreAction(MTL::StoreActionStore);
+    attachment->setClearColor(NativeClearColor(format, value));
+  }
   auto encoder = commands_->renderCommandEncoder(pass);
   if (!encoder) {
     recording_failed_ = true;
@@ -423,7 +454,8 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     color->setTexture(image->NativeImage());
     color->setLoadAction(loads[a.load_op]);
     color->setStoreAction(store(a.store_op));
-    color->setClearColor(MTL::ClearColor::Make(a.clear_color[0], a.clear_color[1], a.clear_color[2], a.clear_color[3]));
+    if (a.load_op == ATTACHMENT_LOAD_OP_CLEAR)
+      color->setClearColor(NativeClearColor(image->GetDesc().format, a.clear_value));
   }
 
   depth_format_ = IMAGE_FORMAT_UNKNOWN;
@@ -442,13 +474,13 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     depth->setTexture(image->NativeImage());
     depth->setLoadAction(loads[ds.depth_load_op]);
     depth->setStoreAction(store(ds.depth_store_op));
-    depth->setClearDepth(ds.clear_depth);
+    depth->setClearDepth(ds.clear_value.depth_stencil.depth);
     if (HasStencil(depth_format_)) {
       auto stencil = pass->stencilAttachment();
       stencil->setTexture(image->NativeImage());
       stencil->setLoadAction(loads[ds.stencil_load_op]);
       stencil->setStoreAction(store(ds.stencil_store_op));
-      stencil->setClearStencil(ds.clear_stencil);
+      stencil->setClearStencil(ds.clear_value.depth_stencil.stencil);
     }
   }
   encoder_ = NS::RetainPtr(commands_->renderCommandEncoder(pass));

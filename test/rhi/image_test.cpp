@@ -382,7 +382,7 @@ TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
   EXPECT_EQ(owner->DSVPool().GetPageCounts().second, 1u);
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands);
-  ASSERT_TRUE(commands->CmdClearColor(color.Get(), {0, 0, 0, 1}));
+  ASSERT_TRUE(commands->CmdClearImage(color.Get(), {0, 0, 0, 1}));
   RenderingInfo rendering;
   rendering.color_attachments = {{color.Get(), ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_STORE_OP_STORE}};
   rendering.depth_stencil.image = depth.Get();
@@ -469,7 +469,7 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   };
   ASSERT_TRUE(window->UpdateImGui(draw_window));
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
-  ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
+  ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0, 0, 1, 1}));
   const uint32_t green = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), &green, 4));
   ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
@@ -551,7 +551,7 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   ObjPtr<IImage> sdr = device->CreateImage({160, 120, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(sdr && ui->Update(draw));
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
-  ASSERT_TRUE(commands && commands->CmdClearColor(sdr.Get(), {0.2f, 0.3f, 0.4f, 1}));
+  ASSERT_TRUE(commands && commands->CmdClearImage(sdr.Get(), {0.2f, 0.3f, 0.4f, 1}));
   ASSERT_TRUE(ui->Record(commands.Get(), sdr.Get()));
   ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
   ASSERT_TRUE(done && done->WaitHost());
@@ -580,7 +580,7 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
       blend(1, {40.0 / 255, 180.0 / 255, 200.0 / 255}, 96.0 / 255);
       blend(2, {128.0 * 180 / (255 * 255), 64.0 * 220 / (255 * 255), 200.0 / 255}, 128.0 * 192 / (255 * 255));
       commands = device->CreateCommandContext();
-      ASSERT_TRUE(commands && commands->CmdClearColor(target.Get(), {float(bg[0]), float(bg[1]), float(bg[2]), 1}));
+      ASSERT_TRUE(commands && commands->CmdClearImage(target.Get(), {float(bg[0]), float(bg[1]), float(bg[2]), 1}));
       ASSERT_TRUE(ui->Record(commands.Get(), target.Get(), space, white));
       done = queue->Submit(commands.Get());
       ASSERT_TRUE(done && done->WaitHost());
@@ -597,7 +597,7 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
       const auto highlight = encode({4, 2, 1}, space, white);
       ASSERT_TRUE(ui->Update(draw));
       commands = device->CreateCommandContext();
-      ASSERT_TRUE(commands && commands->CmdClearColor(
+      ASSERT_TRUE(commands && commands->CmdClearImage(
                                   target.Get(), {float(highlight[0]), float(highlight[1]), float(highlight[2]), 1}));
       ASSERT_TRUE(ui->Record(commands.Get(), target.Get(), space, white));
       done = queue->Submit(commands.Get());
@@ -642,7 +642,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
     ASSERT_TRUE(window->UpdateImGui(draw_window));
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
-    ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
+    ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0, 0, 1, 1}));
     ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
     ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
     ASSERT_TRUE(done);
@@ -680,7 +680,7 @@ TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
     }));
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
-    ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
+    ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0, 0, 1, 1}));
     ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
     targets.push_back(target);
     recordings.push_back(commands);
@@ -719,7 +719,7 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(target && queue);
   int updates = 0;
-  std::array<float, 4> background{0, 0, 1, 1};
+  ClearValue background{0, 0, 1, 1};
   ImVec2 target_scale{};
   auto draw_window = [&] {
     ++updates;
@@ -737,7 +737,7 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
     const auto before = updates;
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
-    ASSERT_TRUE(commands->CmdClearColor(target.Get(), background));
+    ASSERT_TRUE(commands->CmdClearImage(target.Get(), background));
     ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
     EXPECT_EQ(updates, before);  // Recording must not run UI logic.
     ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
@@ -752,7 +752,7 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
   };
   ASSERT_TRUE(window->UpdateImGui(draw_window));
   EXPECT_EQ(updates, 1);
-  EXPECT_EQ(background, (std::array<float, 4>{0, 1, 0, 1}));
+  EXPECT_EQ(background.color.float32, (std::array<float, 4>{0, 1, 0, 1}));
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
   ASSERT_TRUE(window->UpdateImGui(draw_window));  // Replaces pending red UI with white UI.
   EXPECT_EQ(updates, 2);
@@ -807,7 +807,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
     for (int frame = 0; frame < 3; ++frame) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       ASSERT_TRUE(commands);
-      ASSERT_TRUE(commands->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1}));
+      ASSERT_TRUE(commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1}));
       ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
       ASSERT_TRUE(commands->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_STORE_OP_STORE}}}));
       ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
@@ -1971,7 +1971,7 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   ASSERT_TRUE(ga->BindResource(0, a.Get()));
   ObjPtr<ICommandContext> ctx = device->CreateCommandContext();
   ASSERT_TRUE(ctx);
-  ASSERT_TRUE(ctx->CmdClearColor(a.Get(), {0, 0, 0, 1}));
+  ASSERT_TRUE(ctx->CmdClearImage(a.Get(), {0, 0, 0, 1}));
   for (int round = 0; round < 40; ++round) {
     ASSERT_TRUE(ctx->CmdBindComputeProgram(compute.Get()));
     ASSERT_TRUE(ctx->CmdBindGroup(0, ca.Get()));

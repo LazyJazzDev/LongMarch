@@ -19,7 +19,7 @@ struct ColorAttachmentInfo {
   Image image;
   rhi::AttachmentLoadOp load_op{rhi::ATTACHMENT_LOAD_OP_LOAD};
   rhi::AttachmentStoreOp store_op{rhi::ATTACHMENT_STORE_OP_STORE};
-  std::array<float, 4> clear_color{};
+  rhi::ClearValue clear_value{};
 };
 
 struct RenderingInfo {
@@ -66,7 +66,7 @@ class CommandContext : public ObjectContainer {
   bool CmdBeginRendering(const Image &image,
                          rhi::AttachmentLoadOp load_op = rhi::ATTACHMENT_LOAD_OP_LOAD,
                          rhi::AttachmentStoreOp store_op = rhi::ATTACHMENT_STORE_OP_STORE,
-                         const std::array<float, 4> &clear_color = {});
+                         const rhi::ClearValue &clear_value = {});
   bool CmdBeginRendering(const RenderingInfo &info);
   bool CmdEndRendering();
   bool CmdBindVertexBuffer(uint32_t binding, const Buffer &buffer, uint64_t offset = 0);
@@ -84,7 +84,7 @@ class CommandContext : public ObjectContainer {
                       uint32_t first_index = 0,
                       int32_t vertex_offset = 0,
                       uint32_t first_instance = 0);
-  bool CmdClearColor(const Image &image, const std::array<float, 4> &color);
+  bool CmdClearImage(const Image &image, const rhi::ClearValue &value);
   bool CmdPresent(const Window &window);
 };
 

@@ -80,7 +80,13 @@ TEST_P(RhiFormats, IntegerClearsUseNumericValuesForTransferAndRenderPass) {
     if (c.channels == 3 && !image)
       continue;
     ASSERT_TRUE(image);
-    const std::array<float, 4> values{signed_integer ? -7.0f : 7.0f, 23, 65, 101};
+    ClearValue values;
+    if (signed_integer)
+      values.color.int32 = c.bytes == 1 ? std::array<int32_t, 4>{-7, 23, -65, 101}
+                                        : std::array<int32_t, 4>{-16777217, INT32_MAX, INT32_MIN, 16777217};
+    else
+      values.color.uint32 = c.bytes == 1 ? std::array<uint32_t, 4>{7, 23, 65, 255}
+                                         : std::array<uint32_t, 4>{UINT32_MAX, 16777217u, 0x80000001u, 0x12345678u};
     for (bool render_pass : {false, true}) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       if (render_pass) {
@@ -88,7 +94,7 @@ TEST_P(RhiFormats, IntegerClearsUseNumericValuesForTransferAndRenderPass) {
             {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, values}}}));
         ASSERT_TRUE(commands->CmdEndRendering());
       } else {
-        ASSERT_TRUE(commands->CmdClearColor(image.Get(), values));
+        ASSERT_TRUE(commands->CmdClearImage(image.Get(), values));
       }
       ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {3, 2, 1, 1});
       ASSERT_TRUE(token);
@@ -97,12 +103,56 @@ TEST_P(RhiFormats, IntegerClearsUseNumericValuesForTransferAndRenderPass) {
       std::array<uint8_t, 16> actual{};
       ASSERT_TRUE(token->CopyTo(actual.data(), actual.size()));
       for (uint32_t i = 0; i < c.channels; ++i) {
+        const auto expected = signed_integer ? static_cast<uint32_t>(values.color.int32[i]) : values.color.uint32[i];
         if (c.bytes == 1)
-          EXPECT_EQ(actual[i], static_cast<uint8_t>(static_cast<int>(values[i])));
+          EXPECT_EQ(actual[i], static_cast<uint8_t>(expected));
         else {
           uint32_t v;
           std::memcpy(&v, actual.data() + 4 * i, 4);
-          EXPECT_EQ(v, static_cast<uint32_t>(static_cast<int32_t>(values[i])));
+          EXPECT_EQ(v, expected);
+        }
+      }
+    }
+  }
+}
+
+TEST_P(RhiFormats, FloatClearValuesPreserveFloatAndNormalizedColors) {
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  for (auto c : formats) {
+    if (IsSignedIntegerFormat(c.format) || IsUnsignedIntegerFormat(c.format))
+      continue;
+    SCOPED_TRACE(to_string(c.format));
+    ObjPtr<IImage> image = device->CreateImage({7, 5, c.format});
+    if (c.channels == 3 && !image)
+      continue;
+    ASSERT_TRUE(image);
+    const ClearValue value =
+        c.bytes == 1 ? ClearValue{0.25f, 0.5f, 0.75f, 1.0f} : ClearValue{-1.25f, 0.5f, 16777216.0f, 4.0f};
+    for (bool render_pass : {false, true}) {
+      ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+      if (render_pass) {
+        ASSERT_TRUE(
+            commands->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, value}}}));
+        ASSERT_TRUE(commands->CmdEndRendering());
+      } else
+        ASSERT_TRUE(commands->CmdClearImage(image.Get(), value));
+      ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {2, 1, 1, 1});
+      ASSERT_TRUE(token);
+      ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+      ASSERT_TRUE(done && done->WaitHost());
+      std::array<uint8_t, 16> pixel{};
+      ASSERT_TRUE(token->CopyTo(pixel.data(), pixel.size()));
+      for (uint32_t channel = 0; channel < c.channels; ++channel) {
+        if (c.bytes == 1)
+          EXPECT_NEAR(pixel[channel], value.color.float32[channel] * 255, 0.5f);
+        else {
+          float actual;
+          std::memcpy(&actual, pixel.data() + channel * 4, 4);
+          EXPECT_FLOAT_EQ(actual, value.color.float32[channel]);
         }
       }
     }
@@ -120,7 +170,7 @@ TEST_P(RhiFormats, D16DepthSubrectangleKeepsTwoBytePixels) {
   RenderingInfo info;
   info.depth_stencil.image = image.Get();
   info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-  info.depth_stencil.clear_depth = 0.25f;
+  info.depth_stencil.clear_value.depth_stencil.depth = 0.25f;
   ASSERT_TRUE(commands->CmdBeginRendering(info));
   ASSERT_TRUE(commands->CmdEndRendering());
   ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {3, 2, 5, 3});
@@ -251,16 +301,23 @@ TEST_P(RhiFormats, IntegerStorageWritesAndRenderTargetsPreserveValues) {
     pd.color_formats = {c.format};
     ObjPtr<IProgram> graphics = device->CreateProgram(pd);
     ASSERT_TRUE(graphics);
+    ClearValue zero;
+    if (signed_integer)
+      zero.color.int32 = {};
+    else
+      zero.color.uint32 = {};
     for (bool storage : {true, false}) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+      // Initialize attachment metadata before using a newly allocated image as storage.
+      ASSERT_TRUE(commands->CmdClearImage(image.Get(), zero));
       if (storage) {
         ASSERT_TRUE(commands->CmdBindComputeProgram(compute.Get()));
         ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
         ASSERT_TRUE(commands->CmdDispatch(1));
       } else {
         ASSERT_TRUE(commands->CmdBindProgram(graphics.Get()));
-        ASSERT_TRUE(commands->CmdBeginRendering(
-            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 0}}}}));
+        ASSERT_TRUE(
+            commands->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, zero}}}));
         ASSERT_TRUE(commands->CmdSetViewport({0, 0, 8, 8, 0, 1}));
         ASSERT_TRUE(commands->CmdSetScissor({0, 0, 8, 8}));
         ASSERT_TRUE(commands->CmdDraw(3));
@@ -282,6 +339,107 @@ TEST_P(RhiFormats, IntegerStorageWritesAndRenderTargetsPreserveValues) {
         }
       }
     }
+  }
+}
+
+TEST_P(RhiFormats, ClearValueSelectsDepthAndStencilForStandaloneAndRendering) {
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  for (auto format : {IMAGE_FORMAT_D16_UNORM, IMAGE_FORMAT_D32_SFLOAT, IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
+    SCOPED_TRACE(to_string(format));
+    ObjPtr<IImage> image = device->CreateImage({7, 5, format});
+    ASSERT_TRUE(image);
+    for (bool render_pass : {false, true}) {
+      ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+      ASSERT_TRUE(commands);
+      const ClearValue value{ClearDepthStencilValue{0.25f, 0xa5}};
+      ASSERT_TRUE(commands->CmdClearImage(image.Get(), ClearDepthStencilValue{0.75f, 0x12}));
+      if (render_pass) {
+        RenderingInfo info;
+        info.depth_stencil.image = image.Get();
+        info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+        info.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+        info.depth_stencil.clear_value = value;
+        ASSERT_TRUE(commands->CmdBeginRendering(info));
+        ASSERT_TRUE(commands->CmdEndRendering());
+      } else
+        ASSERT_TRUE(commands->CmdClearImage(image.Get(), value));
+      ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {2, 1, 3, 2});
+      ASSERT_TRUE(token);
+      ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+      ASSERT_TRUE(done && done->WaitHost());
+      std::vector<uint8_t> pixels(token->GetSize());
+      ASSERT_TRUE(token->CopyTo(pixels.data(), pixels.size()));
+      for (size_t i = 0; i < 6; ++i) {
+        if (format == IMAGE_FORMAT_D16_UNORM) {
+          uint16_t depth;
+          std::memcpy(&depth, pixels.data() + 2 * i, 2);
+          EXPECT_NEAR(depth, 16384, 1);
+        } else if (format == IMAGE_FORMAT_D32_SFLOAT) {
+          float depth;
+          std::memcpy(&depth, pixels.data() + 4 * i, 4);
+          EXPECT_FLOAT_EQ(depth, 0.25f);
+        } else {
+          uint32_t packed;
+          std::memcpy(&packed, pixels.data() + 4 * i, 4);
+          EXPECT_NEAR(packed & 0xffffff, 4194304, 1);
+          EXPECT_EQ(packed >> 24, 0xa5u);
+        }
+      }
+    }
+  }
+}
+
+TEST_P(RhiFormats, IntegerClearsPreserveBoundDescriptorTablesAndOrderWrites) {
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IImage> image = device->CreateImage({4, 4, IMAGE_FORMAT_R32_UINT});
+  ASSERT_TRUE(image);
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
+    RHI_RW_TEXTURE2D(0, 0, uint, target);
+    [numthreads(4, 4, 1)] void CSMain(uint3 id:SV_DispatchThreadID) {
+      target[id.xy] += 1u;
+    }
+  )",
+                                                          "CSMain", SHADER_STAGE_COMPUTE);
+  ASSERT_TRUE(shader);
+  ComputeProgramDesc desc;
+  desc.compute_shader = shader.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}}};
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group && group->BindResource(0, image.Get()));
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  std::array<ObjPtr<IDownloadToken>, 4> tokens;
+  for (uint32_t i = 0; i < tokens.size(); ++i) {
+    ClearValue value;
+    value.color.uint32 = {0x80000001u + i * 4, 0, 0, 0};
+    if (i % 2) {
+      ASSERT_TRUE(
+          commands->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, value}}}));
+      ASSERT_TRUE(commands->CmdEndRendering());
+    } else
+      ASSERT_TRUE(commands->CmdClearImage(image.Get(), value));
+    // Keep the same program/group bound across the clear, including its heap changes.
+    ASSERT_TRUE(commands->CmdDispatch(1));
+    tokens[i] = commands->CmdDownloadImage(image.Get());
+    ASSERT_TRUE(tokens[i]);
+  }
+  ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
+  ASSERT_TRUE(done && done->WaitHost());
+  for (uint32_t i = 0; i < tokens.size(); ++i) {
+    std::array<uint32_t, 16> pixels{};
+    ASSERT_TRUE(tokens[i]->CopyTo(pixels.data(), sizeof(pixels)));
+    for (auto pixel : pixels)
+      EXPECT_EQ(pixel, 0x80000002u + i * 4);
   }
 }
 

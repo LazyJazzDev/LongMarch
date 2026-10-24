@@ -36,7 +36,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
     return 1;
 
   std::array<bool, 2> visible{true, true};
-  std::array<std::array<float, 4>, 2> colors{{{0.6f, 0.7f, 0.8f, 1}, {0.12f, 0.16f, 0.22f, 1}}};
+  std::array<ClearValue, 2> colors{{{0.6f, 0.7f, 0.8f, 1}, {0.12f, 0.16f, 0.22f, 1}}};
   std::array<ObjPtr<IWindow>, 2> windows;
   std::array<ObjPtr<ISubmissionToken>, 2> pending;
   const char *titles[] = {"ImGui multi - Controls - I: UI; Esc: close", "ImGui multi - Plot - I: UI; Esc: close"};
@@ -78,7 +78,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
             ++clicks;
           ImGui::Text("Local clicks: %d", clicks);
           ImGui::InputText("Local text", text.data(), text.size());
-          ImGui::ColorEdit3("Background", colors[0].data());
+          ImGui::ColorEdit3("Background", colors[0].color.float32.data());
           ImGui::Separator();
           ImGui::TextWrapped(
               "I hides only this window's UI. Escape or the title-bar close button closes only this window.");
@@ -101,7 +101,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
           ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 1.0f);
           ImGui::Checkbox("Pause", &paused);
           ImGui::PlotLines("Signal", samples.data(), int(samples.size()), 0, nullptr, -1, 1, {0, 160});
-          ImGui::ColorEdit3("Background", colors[1].data());
+          ImGui::ColorEdit3("Background", colors[1].color.float32.data());
           ImGui::TextUnformatted("I: toggle this UI; Escape: close this window");
           ImGui::End();
         }))
@@ -132,7 +132,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       if (!commands)
         return 1;
-      if (!commands->CmdClearColor(image.Get(), colors[i]))
+      if (!commands->CmdClearImage(image.Get(), colors[i]))
         return 1;
       if (!commands->CmdPresent(window.Get()))
         return 1;

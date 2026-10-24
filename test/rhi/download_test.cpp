@@ -151,7 +151,7 @@ TEST_P(RhiDownload, DepthSubrectangleIsTightlyPacked) {
   RenderingInfo info;
   info.depth_stencil.image = image.Get();
   info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-  info.depth_stencil.clear_depth = 0.25f;
+  info.depth_stencil.clear_value.depth_stencil.depth = 0.25f;
   ASSERT_TRUE(commands->CmdBeginRendering(info));
   ASSERT_TRUE(commands->CmdEndRendering());
   ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {3, 2, 5, 3});

@@ -100,7 +100,7 @@ int RunWindow(grassland::rhi::IDevice *device,
     ObjPtr<ICommandContext> context = device->CreateCommandContext();
     if (!context)
       return 1;
-    if (!context->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
+    if (!context->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
       return 1;
     if (!headless) {
       if (!context->CmdPresent(window))

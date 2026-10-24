@@ -30,6 +30,46 @@ are emitted directly by Apple's layer to stderr and may terminate the process
 before a command buffer completes; they are not forwarded through an RHI callback.
 `MTLLogState` handles shader logging and is not an API Validation callback.
 
+## Format-aware image clears
+
+RHI and RHIX use CmdClearImage(image, ClearValue). ColorAttachmentInfo and
+DepthStencilAttachmentInfo both store clear_value. The image format selects the
+union member; initialize color.float32 for UNORM/SFLOAT colors, color.int32 for
+SINT colors, color.uint32 for UINT colors, or depth_stencil for depth formats.
+
+```cpp
+ClearValue color{0.1f, 0.2f, 0.3f, 1.0f};
+commands->CmdClearImage(color_image, color);
+
+ClearValue integer;
+integer.color.uint32 = {0xffffffffu, 16777217u, 0x80000001u, 0};
+commands->CmdClearImage(uint_image, integer);
+
+ClearValue depth{ClearDepthStencilValue{1.0f, 0}};
+commands->CmdClearImage(depth_image, depth);
+
+RenderingInfo rendering;
+rendering.color_attachments = {
+    {uint_image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, integer}};
+rendering.depth_stencil.image = depth_image;
+rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+rendering.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+rendering.depth_stencil.clear_value = depth;
+```
+
+Standalone depth clears also clear stencil when the image format includes it.
+Rendering scopes retain independent depth/stencil load and store operations;
+their default depth clear value remains 1 and stencil remains 0.
+
+Vulkan passes the corresponding native clear member. Metal converts integer color
+components to its double-valued clear color without losing 32-bit integer precision.
+D3D12 uses integer UAV clears for integer targets and preserves descriptor bindings
+and resource ordering; integer formats without UAV support use an exact-byte upload.
+Floating color and depth/stencil clears use their respective native clear commands.
+Integer values never pass through float. Tests read back extreme signed/unsigned
+32-bit values, 8-bit negative values, depth/stencil, and interleaved clear/dispatch
+results.
+
 ## Buffer and image readback
 
 Record downloads outside a rendering scope, before submitting the command context:
