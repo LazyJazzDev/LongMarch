@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
   bool all = false;
   int frames = 0;
   const char *font_file = nullptr;
-  float font_size = 13.0f;
+  float font_size = 20.0f;
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--headless") {
@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N] [--font PATH] [--font-size PIXELS]\nFont options apply to ImGui modules; defaults: built-in font, 13 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N] [--font PATH] [--font-size PIXELS]\nFont options apply to ImGui modules; defaults: built-in font, 20 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
