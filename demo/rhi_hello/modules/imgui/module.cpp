@@ -6,7 +6,6 @@
 #include <iostream>
 #include <thread>
 
-#include "../../window_key_input.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
@@ -26,15 +25,24 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
+  PresentMode requested = PRESENT_MODE_VSYNC;
+  bool present_mode_changed = false;
+  bool record_ui = true;
   ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "ImGui - I: toggle UI recording; P: VSync"});
   if (!window)
     return 1;
   if (!window->EnableImGui())
     return 1;
-  bool record_ui = true;
-  WindowKeyInput keys(headless ? nullptr : &window->KeyEvent());
   window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
-    if (key == GLFW_KEY_I && action == GLFW_PRESS) {
+    if (action != GLFW_PRESS)
+      return;
+    if (key == GLFW_KEY_ESCAPE)
+      glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+    if (key == GLFW_KEY_P) {
+      requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+      present_mode_changed = true;
+    }
+    if (key == GLFW_KEY_I) {
       record_ui = !record_ui;
       std::cout << "ImGui recording: " << std::boolalpha << record_ui << '\n';
     }
@@ -58,14 +66,15 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless) {
   for (int rendered = 0; !frames || rendered < frames;) {
     if (!PollEvents())
       return 1;
-    if (window->ShouldClose() || keys.CloseRequested())
+    if (window->ShouldClose())
       break;
     if (window->IsSwapChainInvalid()) {
       if (!window->RebuildSwapChain())
         return 1;
     }
-    if (const auto requested = keys.TakePresentMode()) {
-      if (!window->SetPresentMode(*requested))
+    if (present_mode_changed) {
+      present_mode_changed = false;
+      if (!window->SetPresentMode(requested))
         return 1;
     }
     ObjPtr<IImage> image = window->GetNextImage();

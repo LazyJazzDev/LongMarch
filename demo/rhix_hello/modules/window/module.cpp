@@ -9,7 +9,6 @@
 #include <thread>
 #include <utility>
 
-#include "../../../rhi_hello/window_key_input.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 
@@ -41,6 +40,8 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
             << "Enabled: ray tracing pipeline=" << device.SupportRayTracingPipeline()
             << ", ray query=" << device.SupportRayQuery() << ", geometry shader=" << device.SupportGeometryShader()
             << '\n';
+  PresentMode requested = PRESENT_MODE_VSYNC;
+  bool present_mode_changed = false;
   grassland::rhix::Window window;
   if (!headless) {
     window = device.CreateGLFWWindow({1280, 720, "LongMarch RHIX - P: toggle VSync"});
@@ -69,7 +70,18 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
     }
   }
-  WindowKeyInput keys(headless ? nullptr : &window.KeyEvent());
+  if (!headless) {
+    window.KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+      if (action != GLFW_PRESS)
+        return;
+      if (key == GLFW_KEY_ESCAPE)
+        glfwSetWindowShouldClose(window.GLFWWindow(), GLFW_TRUE);
+      if (key == GLFW_KEY_P) {
+        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+        present_mode_changed = true;
+      }
+    });
+  }
   grassland::FPSCounter fps_counter;
   auto title_time = std::chrono::steady_clock::now();
   // Warm up allocations and pipelines before measuring completed GPU work.
@@ -81,15 +93,14 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
         break;
       if (window.ShouldClose())
         break;
-      if (keys.CloseRequested())
-        break;
       // Previous loop locals are gone; rebuild only before recording this frame.
       if (window.IsSwapChainInvalid()) {
         if (!window.RebuildSwapChain())
           return 1;
       }
-      if (const auto requested = keys.TakePresentMode()) {
-        if (!window.SetPresentMode(*requested))
+      if (present_mode_changed) {
+        present_mode_changed = false;
+        if (!window.SetPresentMode(requested))
           return 1;
         std::cout << "Present mode: " << PresentModeName(window.GetPresentMode()) << std::endl;
       }

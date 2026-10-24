@@ -10,7 +10,6 @@
 #include <map>
 #include <thread>
 
-#include "../../window_key_input.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
@@ -31,6 +30,8 @@ int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless) {
     std::cout << "ray_query: SKIPPED (ray tracing unavailable)\n";
     return 0;
   }
+  PresentMode requested = PRESENT_MODE_VSYNC;
+  bool present_mode_changed = false;
   ObjPtr<IWindow> window;
   if (!headless) {
     window = device->CreateGLFWWindow({1280, 720, "RHI ray_query - P: toggle VSync"});
@@ -181,7 +182,18 @@ int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ObjPtr<IImage> output;
   if (!trace_group->BindResource(2, camera_buffer.Get()))
     return 1;
-  WindowKeyInput keys(headless ? nullptr : &window->KeyEvent());
+  if (!headless) {
+    window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+      if (action != GLFW_PRESS)
+        return;
+      if (key == GLFW_KEY_ESCAPE)
+        glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+      if (key == GLFW_KEY_P) {
+        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+        present_mode_changed = true;
+      }
+    });
+  }
   grassland::FPSCounter fps;
   auto title_time = std::chrono::steady_clock::now();
   // Warm up allocations and pipelines before measuring completed GPU work.
@@ -194,14 +206,13 @@ int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless) {
         break;
       if (window->ShouldClose())
         break;
-      if (keys.CloseRequested())
-        break;
       if (window->IsSwapChainInvalid()) {
         if (!window->RebuildSwapChain())
           return 1;
       }
-      if (const auto requested = keys.TakePresentMode()) {
-        if (!window->SetPresentMode(*requested))
+      if (present_mode_changed) {
+        present_mode_changed = false;
+        if (!window->SetPresentMode(requested))
           return 1;
       }
     }
