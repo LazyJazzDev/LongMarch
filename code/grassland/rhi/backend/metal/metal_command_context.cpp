@@ -93,6 +93,10 @@ bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
   if (!frame || !RetainResource(frame.Get()))
     return false;
 
+  if (!target->RecordImGui(this, frame.Get())) {
+    recording_failed_ = true;
+    return false;
+  }
   presents_.emplace_back(target, frame.Get());
   return true;
 }

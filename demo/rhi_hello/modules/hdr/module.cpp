@@ -11,6 +11,7 @@
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
+#include "imgui.h"
 
 namespace {
 #include "built_in_shaders.inl"
@@ -28,10 +29,15 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
+  size_t color_space_changes = 0;
+  bool present_mode_changed = false;
+  PresentMode requested = PRESENT_MODE_VSYNC;
   ObjPtr<IWindow> window;
   std::vector<ColorSpace> spaces{COLOR_SPACE_SRGB_NONLINEAR};
   window = device->CreateGLFWWindow({960, 540, "RHI HDR - H: color space, P: toggle VSync, Escape: close"});
   if (!window)
+    return 1;
+  if (!window->EnableImGui())
     return 1;
   for (const auto &option : window->GetSupportedPresentationOptions()) {
     std::cout << ColorSpaceName(option.color_space) << " / " << ImageFormatName(option.format) << " / "
@@ -57,40 +63,46 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
     return 1;
   float previous_scale = -1.0f;
   float previous_headroom = -1.0f;
-  bool previous_h = false;
-  bool previous_p = false;
+  window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+    if (action != GLFW_PRESS)
+      return;
+    if (key == GLFW_KEY_ESCAPE)
+      glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+    if (key == GLFW_KEY_H)
+      ++color_space_changes;
+    if (key == GLFW_KEY_P) {
+      requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+      present_mode_changed = true;
+    }
+  });
   bool title_dirty = true;
   grassland::FPSCounter fps;
   auto title_time = std::chrono::steady_clock::now();
   int rendered = 0;
   while (!frames || rendered < frames) {
-    if (!PollEvents() || window->ShouldClose() || window->IsKeyDown(GLFW_KEY_ESCAPE))
+    if (!PollEvents() || window->ShouldClose())
       break;
     if (window->IsSwapChainInvalid() && !window->RebuildSwapChain())
       return 1;
-    const bool h = window->IsKeyDown(GLFW_KEY_H);
     // Bounded runs exercise all available color spaces automatically.
     const bool cycle = frames >= 3 * static_cast<int>(spaces.size()) && rendered > 0 &&
                        rendered % std::max(1, frames / static_cast<int>(spaces.size())) == 0;
-    if ((h && !previous_h) || cycle) {
-      selected = (selected + 1) % spaces.size();
+    if (color_space_changes || cycle) {
+      selected = (selected + (color_space_changes ? color_space_changes : 1)) % spaces.size();
+      color_space_changes = 0;
       if (!window->SetColorSpace(spaces[selected]))
         return 1;
       fps.Reset();
       title_dirty = true;
     }
-    previous_h = h;
-    const bool p = window->IsKeyDown(GLFW_KEY_P);
-    if (p && !previous_p) {
-      const auto requested =
-          window->GetPresentMode() == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+    if (present_mode_changed) {
+      present_mode_changed = false;
       if (!window->SetPresentMode(requested))
         return 1;
       std::cout << "hdr: presentation mode " << PresentModeName(window->GetPresentMode()) << '\n';
       fps.Reset();
       title_dirty = true;
     }
-    previous_p = p;
     const float linear_scale = window->GetHDRReferenceWhiteScale();
     const float headroom = window->GetHDRHeadroom();
     if (linear_scale != previous_scale || headroom != previous_headroom) {
@@ -98,6 +110,23 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
       previous_scale = linear_scale;
       previous_headroom = headroom;
     }
+    if (!window->UpdateImGui([&] {
+          ImGui::Begin("SDR appearance in HDR");
+          ImGui::TextUnformatted("H: switch color space; solid UI colors retain their SDR meaning.");
+          ImGui::Text("Output: %s", ColorSpaceName(window->GetColorSpace()).c_str());
+          ImGui::TextUnformatted("Gray ramp, colored text and translucent controls:");
+          for (int i = 0; i < 5; ++i) {
+            if (i)
+              ImGui::SameLine();
+            const float gray = float(i) / 4;
+            ImGui::PushID(i);
+            ImGui::ColorButton("Gray", {gray, gray, gray, 1}, ImGuiColorEditFlags_NoTooltip, {32, 24});
+            ImGui::PopID();
+          }
+          ImGui::TextColored({1, 0.3f, 0.2f, 1}, "SDR colored text");
+          ImGui::End();
+        }))
+      return 1;
     const float settings[4] = {linear_scale, headroom, 0, 0};
     const auto color_space = window->GetColorSpace();
     ObjPtr<IImage> image = window->GetNextImage();

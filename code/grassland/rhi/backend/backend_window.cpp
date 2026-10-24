@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+
+#include "grassland/rhi/backend/backend_window_imgui.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #ifdef _WIN32
@@ -15,6 +17,64 @@
 namespace grassland::rhi::backend {
 
 Window::Window() = default;
+
+bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_size) {
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+  if (!enabled) {
+    imgui_.reset();
+    return true;
+  }
+  if (!imgui_)
+    imgui_ = WindowImGui::Create(device_, window_, font_file_path, font_size);
+  return bool(imgui_);
+}
+
+ImGuiContext *Window::GetImGuiContext() const {
+  return imgui_ ? imgui_->Context() : nullptr;
+}
+
+bool Window::UpdateImGui(const std::function<void()> &callback) {
+  if (!imgui_)
+    return true;
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+
+  struct ProcessingScope {
+    bool &flag;
+
+    ProcessingScope(bool &value) : flag(value) {
+      flag = true;
+    }
+
+    ~ProcessingScope() {
+      flag = false;
+    }
+  } scope(processing_imgui_);
+
+  return imgui_->Update(callback);
+}
+
+bool Window::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
+  if (!imgui_)
+    return true;
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+
+  struct ProcessingScope {
+    bool &flag;
+
+    ProcessingScope(bool &value) : flag(value) {
+      flag = true;
+    }
+
+    ~ProcessingScope() {
+      flag = false;
+    }
+  } scope(processing_imgui_);
+
+  return imgui_->Record(commands, image, GetColorSpace(), GetHDRReferenceWhiteScale());
+}
 
 rhi::IImage *Window::GetNextImage() {
 #if !defined(NDEBUG)
@@ -208,11 +268,13 @@ ColorSpace Window::RequestedColorSpace() const {
 }
 
 Window::~Window() {
+  imgui_.reset();
   glfw::UnregisterWindow(window_);
   glfw::DestroyWindow(window_);
 }
 
-bool Window::InitializeWindow(const WindowDesc &desc) {
+bool Window::InitializeWindow(Device *device, const WindowDesc &desc) {
+  device_ = device;
   requested_mode_ = desc.present_mode;
   requested_color_space_ = desc.color_space;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());

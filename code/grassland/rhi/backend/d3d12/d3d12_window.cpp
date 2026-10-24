@@ -64,7 +64,7 @@ D3D12Window::~D3D12Window() {
 
 D3D12Window *D3D12Window::Create(D3D12Device *device, const WindowDesc &desc) {
   auto object = std::unique_ptr<D3D12Window>(new D3D12Window(device));
-  if (!object->InitializeWindow(desc))
+  if (!object->InitializeWindow(device, desc))
     return nullptr;
   if (!object->RebuildSwapChain())
     return nullptr;

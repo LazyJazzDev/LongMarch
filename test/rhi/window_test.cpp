@@ -2,7 +2,11 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 #include <limits>
+#include <thread>
+
+#include "imgui.h"
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -146,6 +150,289 @@ TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupported
     if (created)
       EXPECT_EQ(created.GetColorSpace(), space);
   }
+}
+
+TEST(RhiWindowEvents, MutationDuringDispatchPreservesOrderAndState) {
+  grassland::EventManager<void()> events;
+  std::vector<int> seen;
+  uint32_t self{}, removed{};
+  self = events.RegisterCallback(
+      [&] {
+        seen.push_back(1);
+        events.UnregisterCallback(self);
+        events.UnregisterCallback(removed);
+        events.RegisterCallback([&] { seen.push_back(4); });
+      },
+      200);
+  removed = events.RegisterCallback([&] { seen.push_back(2); });
+  events.RegisterCallback([&, count = 0]() mutable { seen.push_back(10 + ++count); });
+  events.InvokeCallbacks();
+  EXPECT_EQ(seen, (std::vector<int>{1, 11}));
+  seen.clear();
+  events.InvokeCallbacks();
+  EXPECT_EQ(seen, (std::vector<int>{12, 4}));
+}
+
+TEST(RhiWindowEvents, CopyKeepsIndependentCallbackState) {
+  grassland::EventManager<void()> original;
+  int value{};
+  original.RegisterCallback([&, count = 0]() mutable { value = ++count; });
+  auto copy = original;
+  original.InvokeCallbacks();
+  EXPECT_EQ(value, 1);
+  copy.InvokeCallbacks();
+  EXPECT_EQ(value, 1);
+  copy.InvokeCallbacks();
+  EXPECT_EQ(value, 2);
+  original.InvokeCallbacks();
+  EXPECT_EQ(value, 2);
+}
+
+TEST_P(RhiWindow, ImGuiFontInitializationOptions) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto window = device.CreateGLFWWindow({320, 240, "ImGui fonts"});
+  ASSERT_TRUE(window);
+  auto previous = ImGui::GetCurrentContext();
+  EXPECT_FALSE(window.EnableImGui(true, nullptr, 0));
+  EXPECT_FALSE(window.EnableImGui(true, "missing-rhi-font.ttf", 20));
+  EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext(), nullptr);
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+  ASSERT_TRUE(window.EnableImGui(true, nullptr, 24));
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext());
+  EXPECT_FLOAT_EQ(ImGui::GetIO().Fonts->Fonts[0]->FontSize, 24);
+  ImGui::SetCurrentContext(previous);
+  auto context = static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext();
+  ASSERT_TRUE(window.EnableImGui(true, nullptr, 32));
+  EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext(), context);
+  ASSERT_TRUE(window.EnableImGui(false));
+  const auto path = (std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() /
+                     "external/imgui/misc/fonts/Roboto-Medium.ttf")
+                        .string();
+  ASSERT_TRUE(window.EnableImGui(true, path.c_str(), 28));
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext());
+  EXPECT_FLOAT_EQ(ImGui::GetIO().Fonts->Fonts[0]->FontSize, 28);
+  EXPECT_NE(ImGui::GetIO().Fonts->Fonts[0]->FindGlyphNoFallback('A'), nullptr);
+  EXPECT_NE(ImGui::GetIO().Fonts->TexID, ImTextureID{});
+  ImGui::SetCurrentContext(previous);
+  auto draw_window = [] {
+    ImGui::Begin("Custom font");
+    ImGui::TextUnformatted("Font file at 28 pixels");
+    ImGui::End();
+  };
+  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ASSERT_TRUE(window.UpdateImGui(draw_window));
+  auto commands = device.CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands.CmdPresent(window));
+  auto token = queue.Submit(std::move(commands));
+  ASSERT_TRUE(token);
+  EXPECT_TRUE(token.WaitHost());
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+}
+
+TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto first = device.CreateGLFWWindow({240, 180, "RHI ImGui first"});
+  auto second = device.CreateGLFWWindow({240, 180, "RHI ImGui second"});
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  auto previous = ImGui::GetCurrentContext();
+  int marker = 7;
+  glfwSetWindowUserPointer(first.GLFWWindow(), &marker);
+  ASSERT_TRUE(first.EnableImGui());
+  ASSERT_TRUE(first.EnableImGui());
+  ASSERT_TRUE(second.EnableImGui());
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+  ASSERT_NE(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(), nullptr);
+  ASSERT_NE(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(),
+            static_cast<grassland::rhi::backend::Window *>(second.Get())->GetImGuiContext());
+#ifdef _WIN32
+  // Native messages can arrive outside PollEvents with no current context, or
+  // while a different window's context is selected.
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
+  auto first_native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(second.Get())->GetImGuiContext());
+  auto second_native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+  ImGui::SetCurrentContext(nullptr);
+  SendMessageW(first_native, WM_NULL, 0, 0);
+  SendMessageW(second_native, WM_NULL, 0, 0);
+  EXPECT_EQ(ImGui::GetCurrentContext(), nullptr);
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
+  SendMessageW(second_native, WM_NULL, 0, 0);
+  EXPECT_EQ(ImGui::GetCurrentContext(), static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
+  ImGui::SetCurrentContext(previous);
+#endif
+  EXPECT_EQ(glfwGetWindowUserPointer(first.GLFWWindow()), &marker);
+  int first_draws = 0, second_draws = 0, keys = 0;
+  const auto key_id = first.KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+    EXPECT_EQ(key, GLFW_KEY_A);
+    EXPECT_EQ(action, GLFW_PRESS);
+    ++keys;
+  });
+  // Invoke the installed GLFW route, without synthesizing OS-wide input.
+  auto key_callback = glfwSetKeyCallback(first.GLFWWindow(), nullptr);
+  ASSERT_NE(key_callback, nullptr);
+  glfwSetKeyCallback(first.GLFWWindow(), key_callback);
+  key_callback(first.GLFWWindow(), GLFW_KEY_A, 0, GLFW_PRESS, 0);
+  EXPECT_EQ(keys, 1);
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+  first.KeyEvent().UnregisterCallback(key_id);
+  key_callback(first.GLFWWindow(), GLFW_KEY_A, 0, GLFW_PRESS, 0);
+  EXPECT_EQ(keys, 1);
+  auto draw_first = [&] {
+    ++first_draws;
+    EXPECT_EQ(ImGui::GetCurrentContext(),
+              static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
+    EXPECT_FALSE(first.EnableImGui(false));
+    EXPECT_FALSE(first.UpdateImGui({}));
+    ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(255, 0, 0, 255));
+    ImGui::GetForegroundDrawList()->AddText({5, 5}, IM_COL32_WHITE, "First window");
+  };
+  auto draw_second = [&] {
+    ++second_draws;
+    EXPECT_EQ(ImGui::GetCurrentContext(),
+              static_cast<grassland::rhi::backend::Window *>(second.Get())->GetImGuiContext());
+    ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(0, 255, 0, 255));
+  };
+  ASSERT_TRUE(first.UpdateImGui(draw_first));
+  EXPECT_EQ(first_draws, 1);
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+  {
+    auto abandoned = device.CreateCommandContext();
+    ASSERT_TRUE(abandoned.CmdPresent(first));
+    EXPECT_EQ(first_draws, 1);
+  }
+  {
+    auto without_update = device.CreateCommandContext();
+    ASSERT_TRUE(without_update.CmdPresent(first));
+    EXPECT_EQ(first_draws, 1);  // Abandoning a recording does not rerun UI logic.
+  }
+  std::vector<SubmissionToken> pending;
+  for (int i = 0; i < 6; ++i) {
+    ASSERT_TRUE(first.UpdateImGui(draw_first));
+    ASSERT_TRUE(second.UpdateImGui(draw_second));
+    EXPECT_EQ(first_draws, i + 2);
+    EXPECT_EQ(second_draws, i + 1);
+    auto commands = device.CreateCommandContext();
+    auto a = first.GetNextImage();
+    auto b = second.GetNextImage();
+    ASSERT_TRUE(commands.CmdClearColor(a, {0, 0, 1, 1}));
+    ASSERT_TRUE(commands.CmdClearColor(b, {0, 0, 1, 1}));
+    ASSERT_TRUE(commands.CmdPresent(first));
+    ASSERT_TRUE(commands.CmdPresent(second));
+    EXPECT_EQ(first_draws, i + 2);
+    EXPECT_EQ(second_draws, i + 1);
+    EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+    auto done = queue.Submit(std::move(commands));
+    ASSERT_TRUE(done);
+    pending.push_back(std::move(done));
+  }
+  EXPECT_EQ(first_draws, 7);
+  EXPECT_EQ(second_draws, 6);
+  // Drop the CPU context/font owner while submitted overlays retain GPU inputs.
+  ASSERT_TRUE(first.EnableImGui(false));
+  EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(), nullptr);
+  for (auto &done : pending)
+    EXPECT_TRUE(done.WaitHost());
+  auto commands = device.CreateCommandContext();
+  ASSERT_TRUE(commands.CmdPresent(first));
+  auto done = queue.Submit(std::move(commands));
+  ASSERT_TRUE(done);
+  EXPECT_TRUE(done.WaitHost());
+  EXPECT_EQ(first_draws, 7);
+  ASSERT_TRUE(first.EnableImGui());
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+  int resize_events = 0;
+  first.FramebufferResizeEvent().RegisterCallback([&](int width, int height) {
+    EXPECT_GT(width, 0);
+    EXPECT_GT(height, 0);
+    ++resize_events;
+  });
+  // No caller-held frame or submitted context remains across this resize.
+  commands.Release();
+  glfwSetWindowSize(first.GLFWWindow(), 280, 200);
+  for (int i = 0; i < 30 && !resize_events; ++i) {
+    ASSERT_TRUE(Window::PollEvents());
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  EXPECT_GT(resize_events, 0);
+  ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_CONTINUOUS));
+  ASSERT_TRUE(first.UpdateImGui(draw_first));
+  commands = device.CreateCommandContext();
+  ASSERT_TRUE(commands.CmdPresent(first));
+  done = queue.Submit(std::move(commands));
+  ASSERT_TRUE(done);
+  EXPECT_TRUE(done.WaitHost());
+  EXPECT_EQ(first_draws, 8);
+  EXPECT_EQ(glfwGetWindowUserPointer(first.GLFWWindow()), &marker);
+}
+
+TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  auto window = device.CreateGLFWWindow({240, 180, "ImGui input verification"});
+  ASSERT_TRUE(window);
+  ASSERT_TRUE(window.EnableImGui());
+  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  int clicked = 0, mouse_events = 0;
+  ImVec2 center{};
+  window.MouseButtonEvent().RegisterCallback([&](int button, int, int, double, double) {
+    EXPECT_EQ(button, GLFW_MOUSE_BUTTON_LEFT);
+    ++mouse_events;
+  });
+  auto draw_window = [&] {
+    ImGui::SetNextWindowPos({0, 0});
+    ImGui::SetNextWindowSize({200, 150});
+    ImGui::Begin("Input", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+    if (ImGui::Button("Button", {100, 40}))
+      ++clicked;
+    const auto min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
+    center = {(min.x + max.x) / 2, (min.y + max.y) / 2};
+    ImGui::End();
+  };
+  auto render = [&] {
+    if (!window.UpdateImGui(draw_window))
+      return false;
+    auto commands = device.CreateCommandContext();
+    if (!commands.CmdPresent(window))
+      return false;
+    auto done = queue.Submit(std::move(commands));
+    return done && done.WaitHost();
+  };
+  ASSERT_TRUE(render());
+  auto enter = glfwSetCursorEnterCallback(window.GLFWWindow(), nullptr);
+  glfwSetCursorEnterCallback(window.GLFWWindow(), enter);
+  auto move = glfwSetCursorPosCallback(window.GLFWWindow(), nullptr);
+  glfwSetCursorPosCallback(window.GLFWWindow(), move);
+  auto button = glfwSetMouseButtonCallback(window.GLFWWindow(), nullptr);
+  glfwSetMouseButtonCallback(window.GLFWWindow(), button);
+  ASSERT_NE(enter, nullptr);
+  ASSERT_NE(move, nullptr);
+  ASSERT_NE(button, nullptr);
+  enter(window.GLFWWindow(), true);
+  move(window.GLFWWindow(), center.x, center.y);
+  ASSERT_TRUE(render());
+  button(window.GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS, 0);
+  ASSERT_TRUE(render());
+  button(window.GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE, 0);
+  ASSERT_TRUE(render());
+  EXPECT_EQ(clicked, 1);
+  EXPECT_EQ(mouse_events, 2);
 }
 
 TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {

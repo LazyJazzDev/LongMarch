@@ -142,3 +142,8 @@ RHI requires no additional Wayland color-management protocol dependency. X11 rem
 Linux PQ source reference white is **203 nits**; compositor output reference white
 must not be multiplied into the pixels again. This follows the existing
 [Linux HDR convention](../../docs/linux-hdr.md), not a physical brightness measurement.
+
+The `imgui` module enables an interactive ImGui overlay through Window callbacks.
+Call `UpdateImGui` before scene recording to apply UI feedback in the same frame;
+Present records the prepared overlay. `window` remains a clear/present example.
+See [Window callbacks and ImGui](../../docs/rhi-window-imgui.md) for input and lifetime rules.

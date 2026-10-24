@@ -18,7 +18,7 @@ function(PACK_SHADER_CODE TARGET_NAME)
     message(STATUS "PACK_SHADER_CODE ${CMAKE_CURRENT_SOURCE_DIR}")
 
     # Find all the shader files under current directory
-    file(GLOB_RECURSE SHADER_FILES
+    file(GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS
             ${CMAKE_CURRENT_SOURCE_DIR}/*.slang
             ${CMAKE_CURRENT_SOURCE_DIR}/*.vert
             ${CMAKE_CURRENT_SOURCE_DIR}/*.frag

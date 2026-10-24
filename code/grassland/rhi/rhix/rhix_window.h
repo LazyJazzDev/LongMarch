@@ -15,6 +15,18 @@ class Window : public ObjectContainer {
   bool ShouldClose() const;
   bool IsKeyDown(int key) const;
   bool SetTitle(const std::string &title) const;
+  bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) const;
+  bool UpdateImGui(const std::function<void()> &callback) const;
+  EventManager<void(int, int)> &ResizeEvent() const;
+  EventManager<void(int, int)> &FramebufferResizeEvent() const;
+  EventManager<void(bool)> &CursorEnterEvent() const;
+  EventManager<void(bool)> &FocusEvent() const;
+  EventManager<void(double, double)> &MouseMoveEvent() const;
+  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() const;
+  EventManager<void(double, double)> &ScrollEvent() const;
+  EventManager<void(int, int, int, int)> &KeyEvent() const;
+  EventManager<void(uint32_t)> &CharEvent() const;
+  EventManager<void(int, const char **)> &DropEvent() const;
   Image GetNextImage() const;
   bool IsSwapChainInvalid() const;
   bool RebuildSwapChain() const;

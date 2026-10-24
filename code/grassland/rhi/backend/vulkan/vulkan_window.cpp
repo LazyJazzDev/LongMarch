@@ -52,7 +52,7 @@ VulkanWindow *VulkanWindow::Create(VulkanDevice *device, const WindowDesc &desc)
     ReportError(-1, "VK_KHR_swapchain is unavailable.");
     return nullptr;
   }
-  if (!object->InitializeWindow(desc))
+  if (!object->InitializeWindow(device, desc))
     return nullptr;
   if (!Check(glfwCreateWindowSurface(object->device_->Instance(), object->GLFWWindow(), nullptr, &object->surface_),
              "glfwCreateWindowSurface"))
