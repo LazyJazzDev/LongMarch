@@ -619,9 +619,16 @@ bool MetalCommandContext::CmdDrawIndexed(uint32_t index_count,
 }
 
 IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+#if !defined(NDEBUG)
   auto native = dynamic_cast<MetalBuffer *>(buffer);
-  if (sealed_ || recording_failed_ || render_target_ || !native || native->Owner() != device_ || !size ||
-      offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<MetalBuffer *>(buffer);
+#endif
+  if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;
     return nullptr;
   }
@@ -634,9 +641,16 @@ IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
 }
 
 IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+#if !defined(NDEBUG)
   auto native = dynamic_cast<MetalImage *>(image);
-  if (sealed_ || recording_failed_ || render_target_ || !native || !native->IsValid() ||
-      native->DeviceIdentity() != device_) {
+  if (sealed_ || render_target_ || !native || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<MetalImage *>(image);
+#endif
+  if (recording_failed_ || !native->IsValid()) {
     recording_failed_ = true;
     return nullptr;
   }

@@ -852,9 +852,16 @@ bool D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint3
 }
 
 IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+#if !defined(NDEBUG)
   auto native = dynamic_cast<D3D12Buffer *>(buffer);
-  if (sealed_ || recording_failed_ || rendering_active_ || !native || native->Owner() != device_ || !size ||
-      offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<D3D12Buffer *>(buffer);
+#endif
+  if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;
     return nullptr;
   }
@@ -867,9 +874,16 @@ IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
 }
 
 IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+#if !defined(NDEBUG)
   auto native = dynamic_cast<D3D12Image *>(image);
-  if (sealed_ || recording_failed_ || rendering_active_ || !native || !native->IsValid() ||
-      native->DeviceIdentity() != device_) {
+  if (sealed_ || rendering_active_ || !native || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<D3D12Image *>(image);
+#endif
+  if (recording_failed_ || !native->IsValid()) {
     recording_failed_ = true;
     return nullptr;
   }
