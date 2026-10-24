@@ -144,11 +144,11 @@ accumulation image is part of the scene renderer, not an intermediate ImGui comp
 The control panel uses `assets/fonts/simhei.ttf` at 20 pixels and shows backend, particle
 count, frame duration and estimated interaction throughput. Reset, pause/resume, logarithmic
 time step and galaxy-count controls match the reference; galaxy count applies on reset.
-HDR toggles to the preferred supported mode (linear scRGB where available), while Output
-selects an explicit supported color space. VSync is also configurable. UI updates finish
+A dedicated ColorSpace section contains a full-width selector for supported color spaces,
+with no duplicate HDR toggle or trailing label. VSync is also configurable. UI updates finish
 before scene command recording, so pause, reset, time-step and output changes affect that frame.
 
-Shortcuts: H toggles HDR, P toggles VSync, Space pauses/resumes, R resets, Escape closes.
+Shortcuts: P toggles VSync, Space pauses/resumes, R resets, Escape closes.
 Text input capture suppresses simulation shortcuts; dragging outside ImGui rotates the view.
 Headless mode retains deterministic initialization, three in-flight frames and 60 warmup
 frames, with SDR encoding and no window or UI. Throughput is an estimate based on whole-frame

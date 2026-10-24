@@ -47,10 +47,9 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
     return 1;
   PresentMode requested = PRESENT_MODE_VSYNC;
   bool present_mode_changed = false;
-  bool running = true, reset_requested = true, hdr_switch_requested = false;
+  bool running = true, reset_requested = true;
   float delta_t = 0.03f;
   int galaxy_count = 10;
-  ColorSpace hdr_space = COLOR_SPACE_SRGB_NONLINEAR;
   glm::mat4 rotation{1.0f};
   glm::dvec2 last_cursor{}, rotation_delta{};
   bool cursor_initialized = false, dragging = false;
@@ -60,7 +59,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
   std::vector<ColorSpace> spaces{COLOR_SPACE_SRGB_NONLINEAR};
   ObjPtr<IWindow> window;
   if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI nbody - H: HDR; P: VSync; Space: pause; R: reset"});
+    window = device->CreateGLFWWindow({1280, 720, "RHI nbody - P: VSync; Space: pause; R: reset"});
     if (!window)
       return 1;
     if (!window->EnableImGui(true, LONGMARCH_ASSETS_DIR "fonts/simhei.ttf", 20.0f))
@@ -68,9 +67,6 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
     for (const auto &option : window->GetSupportedPresentationOptions()) {
       if (std::find(spaces.begin(), spaces.end(), option.color_space) == spaces.end())
         spaces.push_back(option.color_space);
-      if (option.color_space != COLOR_SPACE_SRGB_NONLINEAR &&
-          (hdr_space == COLOR_SPACE_SRGB_NONLINEAR || option.color_space == COLOR_SPACE_EXTENDED_SRGB_LINEAR))
-        hdr_space = option.color_space;
     }
   }
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
@@ -195,8 +191,6 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return;
       if (capture_keyboard && key != GLFW_KEY_ESCAPE)
         return;
-      if (key == GLFW_KEY_H)
-        hdr_switch_requested = true;
       if (key == GLFW_KEY_SPACE)
         running = !running;
       if (key == GLFW_KEY_R)
@@ -256,17 +250,14 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
               ImGui::TextUnformatted("Galaxy count applies on Reset. Drag outside UI to rotate.");
               ImGui::TextUnformatted("Visualizer");
               ImGui::Separator();
-              ImGui::BeginDisabled(hdr_space == COLOR_SPACE_SRGB_NONLINEAR);
-              if (ImGui::Button(window->GetColorSpace() == COLOR_SPACE_SRGB_NONLINEAR ? "HDR: OFF" : "HDR: ON"))
-                hdr_switch_requested = true;
-              ImGui::EndDisabled();
-              ImGui::SameLine();
               bool vsync = requested == PRESENT_MODE_VSYNC;
               if (ImGui::Checkbox("VSync", &vsync)) {
                 requested = vsync ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
                 present_mode_changed = true;
               }
-              if (ImGui::BeginCombo("Output", ColorSpaceName(window->GetColorSpace()).c_str())) {
+              ImGui::SeparatorText("ColorSpace");
+              ImGui::SetNextItemWidth(-1.0f);
+              if (ImGui::BeginCombo("##ColorSpace", ColorSpaceName(window->GetColorSpace()).c_str())) {
                 for (auto space : spaces) {
                   if (ImGui::Selectable(ColorSpaceName(space).c_str(), space == window->GetColorSpace())) {
                     requested_space = space;
@@ -289,12 +280,8 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
             rotation_delta = {};
           }))
         return 1;
-      if (hdr_switch_requested || output_change_requested) {
-        const auto next =
-            output_change_requested
-                ? requested_space
-                : (window->GetColorSpace() == COLOR_SPACE_SRGB_NONLINEAR ? hdr_space : COLOR_SPACE_SRGB_NONLINEAR);
-        hdr_switch_requested = false;
+      if (output_change_requested) {
+        const auto next = requested_space;
         output_change_requested = false;
         if (next == window->GetColorSpace())
           status.clear();
