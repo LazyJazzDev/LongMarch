@@ -1,4 +1,5 @@
 #include <charconv>
+#include <cmath>
 #include <iostream>
 #include <string>
 
@@ -14,6 +15,8 @@ int main(int argc, char **argv) {
   bool headless = false;
   bool all = false;
   int frames = 0;
+  const char *font_file = nullptr;
+  float font_size = 13.0f;
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--headless") {
@@ -34,11 +37,33 @@ int main(int argc, char **argv) {
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|imgui|hdr | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|imgui|hdr | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N] [--font PATH] [--font-size PIXELS]\nFont options apply to ImGui modules; defaults: built-in font, 13 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
       module = argv[++i];
+      continue;
+    }
+    if (arg == "--font") {
+      if (i + 1 >= argc || !argv[i + 1][0]) {
+        std::cerr << "--font requires a font file path\n";
+        return 1;
+      }
+      font_file = argv[++i];
+      continue;
+    }
+    if (arg == "--font-size") {
+      if (i + 1 >= argc) {
+        std::cerr << "--font-size requires a positive pixel size\n";
+        return 1;
+      }
+      std::string value = argv[++i];
+      auto result = std::from_chars(value.data(), value.data() + value.size(), font_size);
+      if (result.ec != std::errc{} || result.ptr != value.data() + value.size() || !std::isfinite(font_size) ||
+          font_size <= 0) {
+        std::cerr << "--font-size requires a finite positive pixel size\n";
+        return 1;
+      }
       continue;
     }
     if (arg == "--frames" && i + 1 < argc) {
@@ -159,7 +184,7 @@ int main(int argc, char **argv) {
       std::cerr << "ray_query: FAILED\n";
       result = 1;
     }
-    if (RunImGui(api, frames, headless) != 0) {
+    if (RunImGui(api, frames, headless, font_file, font_size) != 0) {
       std::cerr << "imgui: FAILED\n";
       result = 1;
     }
@@ -207,7 +232,7 @@ int main(int argc, char **argv) {
   if (module == "ray_query")
     return RunRayQuery(api, frames, headless);
   if (module == "imgui")
-    return RunImGui(api, frames, headless);
+    return RunImGui(api, frames, headless, font_file, font_size);
   if (module == "hdr") {
     if (headless) {
       std::cerr << "hdr requires a window; --headless is unsupported.\n";

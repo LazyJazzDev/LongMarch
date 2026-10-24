@@ -9,7 +9,11 @@
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
 
-int RunImGuiMultiWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
+                        int frames,
+                        bool headless,
+                        const char *font_file,
+                        float font_size) {
   using namespace grassland::rhi;
   if (headless) {
     std::cout << "imgui_multi_window: skipped (requires desktop windows)\n";
@@ -35,7 +39,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api, int frames, bool headles
     if (!windows[i])
       return 1;
     glfwSetWindowPos(windows[i]->GLFWWindow(), 60 + int(i) * 620, 100);
-    if (!windows[i]->EnableImGui())
+    if (!windows[i]->EnableImGui(true, font_file, font_size))
       return 1;
     windows[i]->KeyEvent().RegisterCallback([&, i](int key, int, int action, int) {
       if (action != GLFW_PRESS)

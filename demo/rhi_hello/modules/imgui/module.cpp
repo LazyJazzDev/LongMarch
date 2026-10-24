@@ -10,7 +10,7 @@
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
 
-int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless, const char *font_file, float font_size) {
   using namespace grassland::rhi;
   if (headless) {
     std::cout << "imgui: skipped (requires a window for platform input)\n";
@@ -31,7 +31,7 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "ImGui - I: toggle UI recording; P: VSync"});
   if (!window)
     return 1;
-  if (!window->EnableImGui())
+  if (!window->EnableImGui(true, font_file, font_size))
     return 1;
   window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
     if (action != GLFW_PRESS)

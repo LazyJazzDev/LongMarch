@@ -107,3 +107,12 @@ The renderer uses only RHI operations and is shared by Metal, Vulkan and D3D12.
 The integration includes main's HDR Window API, but color-managed HDR UI
 composition is outside this change. Window, Device and Core retain their existing
 caller-owned lifetime rules.
+
+### Demo font options
+
+Both hello demos accept `--font PATH` and `--font-size PIXELS` for ImGui modules,
+including the RHI multi-window module. Options apply at startup; omit `--font`
+to use the built-in font and omit `--font-size` to use 13 pixels.
+For example: `demo_rhi_hello --backend d3d12 --module imgui --font "C:/Windows/Fonts/arial.ttf" --font-size 24 --frames 120`.
+The size must be finite and positive. An unreadable font file fails initialization.
+Changing these options requires restarting the demo; they do not rebuild the atlas live.
