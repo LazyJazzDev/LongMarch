@@ -60,7 +60,7 @@ D3D12RayTracingProgram *D3D12RayTracingProgram::Create(D3D12Device *owner_device
     if (!CompileSlang(shaders[i], header, BACKEND_API_D3D12, code[i], &object->desc_.pipeline_layout))
       return nullptr;
     names[i] = L"rhi_shader_" + std::to_wstring(i);
-    const auto &entry = shaders[i]->GetDesc().entry_point;
+    const auto &entry = shaders[i]->GetEntry();
     entries[i].assign(entry.begin(), entry.end());
     exports[i].Name = names[i].c_str();
     exports[i].ExportToRename = entries[i].c_str();

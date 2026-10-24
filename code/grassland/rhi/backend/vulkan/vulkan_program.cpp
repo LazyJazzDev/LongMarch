@@ -62,9 +62,9 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
     stages[i].module = modules[i];
   }
   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  stages[0].pName = object->desc_.vertex_shader->GetDesc().entry_point.c_str();
+  stages[0].pName = object->desc_.vertex_shader->GetEntry().c_str();
   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  stages[1].pName = object->desc_.fragment_shader->GetDesc().entry_point.c_str();
+  stages[1].pName = object->desc_.fragment_shader->GetEntry().c_str();
   std::vector<VkVertexInputBindingDescription> bindings;
   for (uint32_t i = 0; i < object->desc_.vertex_bindings.size(); ++i) {
     const auto &b = object->desc_.vertex_bindings[i];

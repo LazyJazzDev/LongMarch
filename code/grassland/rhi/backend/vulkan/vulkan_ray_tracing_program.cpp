@@ -97,8 +97,8 @@ VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_dev
   for (size_t i = 0; i < shaders.size(); ++i) {
     auto &stage = stages[i];
     stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stage.stage = native_stages[shaders[i]->GetDesc().stage];
-    stage.pName = shaders[i]->GetDesc().entry_point.c_str();
+    stage.stage = native_stages[shaders[i]->GetStage()];
+    stage.pName = shaders[i]->GetEntry().c_str();
     VkShaderModuleCreateInfo create{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     create.codeSize = code[i].size();
     create.pCode = reinterpret_cast<const uint32_t *>(code[i].data());

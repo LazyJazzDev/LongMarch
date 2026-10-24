@@ -4,7 +4,6 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_program.h"
-#include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/util/virtual_file_system.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include <d3d12sdklayers.h>
@@ -64,10 +63,10 @@ float4 PSMain():SV_Target0 { return settings.color; }
     vertex = device->CreateShader(R"(shaders\main.slang)", "VSMain", SHADER_STAGE_VERTEX, &fs);
     fragment = device->CreateShader("shaders/main.slang", "PSMain", SHADER_STAGE_FRAGMENT, &fs);
     ASSERT_TRUE(vertex);
+    EXPECT_EQ(vertex->GetStage(), SHADER_STAGE_VERTEX);
+    EXPECT_EQ(vertex->GetEntry(), "VSMain");
     ASSERT_TRUE(fragment);
-    EXPECT_EQ(vertex->GetDesc().file_system, &fs);
-    EXPECT_EQ(vertex->GetDesc().filename, R"(shaders\main.slang)");
-    const auto &expanded = static_cast<const backend::Shader *>(vertex.Get())->GetPreprocessedShaderCode();
+    const auto &expanded = vertex->GetPreprocessedCode();
     EXPECT_EQ(expanded.find("#include"), std::string::npos);
     EXPECT_NE(expanded.find("RHI_INPUT"), std::string::npos);
     EXPECT_NE(expanded.find("RHI_UNIFORM"), std::string::npos);
@@ -94,7 +93,9 @@ TEST_P(RhiProgram, DiskAndMemoryShadersUseOfficialPreprocessing) {
   ASSERT_TRUE(program);
   auto memory = device.CreateShaderFromSource("[numthreads(1,1,1)] void CSMain() {}", "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(memory);
-  EXPECT_EQ(memory.GetDesc().filename, "main.slang");
+  EXPECT_EQ(memory.GetStage(), SHADER_STAGE_COMPUTE);
+  EXPECT_EQ(memory.GetEntry(), "CSMain");
+  EXPECT_NE(memory.GetPreprocessedCode().find("CSMain"), std::string::npos);
   // The helper's temporary VFS has already been destroyed.
   EXPECT_TRUE(device.CreateComputeProgram({memory.Get()}));
   VirtualFileSystem fs;
@@ -112,8 +113,6 @@ TEST_P(RhiProgram, DiskAndMemoryShadersUseOfficialPreprocessing) {
   auto file_overload =
       device.CreateShader("main.slang", "CSMain", SHADER_STAGE_COMPUTE, &fs, {"lib"}, {{"ENABLED", "1"}});
   ASSERT_TRUE(file_overload);
-  EXPECT_EQ(file_overload.GetDesc().include_paths, desc.include_paths);
-  EXPECT_EQ(file_overload.GetDesc().defines, desc.defines);
   EXPECT_TRUE(device.CreateComputeProgram({file_overload.Get()}));
   const std::string source_with_include =
       "#if ENABLED != 7\n#error missing define\n#endif\n"
@@ -122,8 +121,6 @@ TEST_P(RhiProgram, DiskAndMemoryShadersUseOfficialPreprocessing) {
   auto source_overload = device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, disk_paths,
                                                        {{"ENABLED", "7"}});
   ASSERT_TRUE(source_overload);
-  EXPECT_EQ(source_overload.GetDesc().include_paths, disk_paths);
-  EXPECT_EQ(source_overload.GetDesc().defines.front().second, "7");
   EXPECT_TRUE(device.CreateComputeProgram({source_overload.Get()}));
   EXPECT_FALSE(
       device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, {}, {{"ENABLED", "7"}}));
@@ -255,8 +252,8 @@ TEST_P(RhiProgram, CreationCompilesAndOwnsSourcesUsingInputMacros) {
   ASSERT_TRUE(program);
   vertex.Release();
   fragment.Release();
-  EXPECT_EQ(program->GetDesc().vertex_shader->GetDesc().entry_point, "VSMain");
-  EXPECT_EQ(program->GetDesc().fragment_shader->GetDesc().entry_point, "PSMain");
+  EXPECT_EQ(program->GetDesc().vertex_shader->GetEntry(), "VSMain");
+  EXPECT_EQ(program->GetDesc().fragment_shader->GetEntry(), "PSMain");
 }
 
 TEST_P(RhiProgram, InvalidShaderIsRejectedAtProgramCreationNotSourceCreation) {

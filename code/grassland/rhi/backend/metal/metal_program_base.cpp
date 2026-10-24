@@ -24,10 +24,10 @@ static bool CompileMetal(const IShader *shader,
   std::memcpy(words.data(), code.data(), code.size());
   try {
     spirv_cross::CompilerMSL compiler(std::move(words));
-    auto stage = shader->GetDesc().stage == SHADER_STAGE_COMPUTE  ? spv::ExecutionModelGLCompute
-                 : shader->GetDesc().stage == SHADER_STAGE_VERTEX ? spv::ExecutionModelVertex
-                                                                  : spv::ExecutionModelFragment;
-    compiler.set_entry_point(shader->GetDesc().entry_point, stage);
+    auto stage = shader->GetStage() == SHADER_STAGE_COMPUTE  ? spv::ExecutionModelGLCompute
+                 : shader->GetStage() == SHADER_STAGE_VERTEX ? spv::ExecutionModelVertex
+                                                             : spv::ExecutionModelFragment;
+    compiler.set_entry_point(shader->GetEntry(), stage);
     auto options = compiler.get_msl_options();
     options.set_msl_version(3, 0);
     options.argument_buffers = true;
@@ -71,7 +71,7 @@ static bool CompileMetal(const IShader *shader,
       compiler.set_msl_options(options);
     }
     source = compiler.compile();
-    entry = compiler.get_cleansed_entry_point_name(shader->GetDesc().entry_point, stage);
+    entry = compiler.get_cleansed_entry_point_name(shader->GetEntry(), stage);
     return true;
   } catch (const spirv_cross::CompilerError &e) {
     ReportError(-1, e.what());

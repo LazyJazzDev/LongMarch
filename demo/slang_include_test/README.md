@@ -53,10 +53,10 @@ auto shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTE
 `ShaderDesc` 新增 `filename`、`file_system`、`include_paths`、`defines`：
 
 - `filename` 指定入口文件路径和相对 include 基准，默认 `main.slang`。
-- `CreateShaderFromSource()` 把源码写入临时 VirtualFileSystem 的 `main.slang`，再调用描述版 CreateShader；预处理完成即销毁临时 VFS，不再保留原始 source 字符串。该入口返回的 GetDesc 中 FileSystem 指针已失效，不能解引用。字符串入口的 include 未命中临时 VFS 时读取系统文件，可通过 include_paths 指定磁盘搜索目录。若需自定义文件系统，请自行准备 VFS 并使用文件入口。
+- `CreateShaderFromSource()` 把源码写入临时 VirtualFileSystem 的 `main.slang`，再调用描述版 CreateShader；预处理完成即销毁临时 VFS，不再保留原始 source 字符串。字符串入口的 include 未命中临时 VFS 时读取系统文件，可通过 include_paths 指定磁盘搜索目录。若需自定义文件系统，请自行准备 VFS 并使用文件入口。
 - `file_system == nullptr` 时使用 Slang 的系统文件系统；自定义 FileSystem 的 `ReadFile` 返回 0 表示成功。
 - `defines` 是预处理阶段的名称/值对；布局宏由 Program 创建阶段注入，不应在这里定义。
-- `GetDesc()` 保留原始参数，包括借用的 FileSystem 指针。该指针只在创建期间使用；调用者必须自行确认其仍然存活，不能通过 GetDesc 延长其生命周期。
+- IShader / RHIX Shader 提供 `GetStage()`、`GetEntry()`、`GetPreprocessedCode()`；Shader 只保存阶段、入口名称和预处理代码，不保留 ShaderDesc 或 FileSystem 指针。
 - Shader 内部保存独立的预处理结果，FileSystem 可以在 CreateShader 返回后销毁，Program 创建不会再次读取 include。
 
 预处理通过链接的 Slang SDK 的官方 `ICompileRequest`、`-E` 和输出 writer 完成，不启动外部 slangc。该接口已被 Slang 标为 deprecated，目前仍是本实现使用的官方预处理输出路径。Metal 与 Vulkan 使用 SPIR-V 预处理目标，D3D12 使用 DXIL；执行平台宏在预处理阶段提供。

@@ -13,7 +13,6 @@
 #endif
 
 #include "grassland/rhi/backend/backend_binding_group.h"
-#include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/util/log.h"
 
@@ -312,8 +311,7 @@ bool CompileSlang(const IShader *shader_object,
                   std::vector<uint8_t> &code,
                   const PipelineLayoutDesc *binding_layout,
                   std::array<uint32_t, 3> *thread_group_size) {
-  const auto &shader = shader_object->GetDesc();
-  const auto &preprocessed = static_cast<const Shader *>(shader_object)->GetPreprocessedShaderCode();
+  const auto &preprocessed = shader_object->GetPreprocessedCode();
   code.clear();
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
   if (!global) {
@@ -322,7 +320,7 @@ bool CompileSlang(const IShader *shader_object,
       return false;
     }
   }
-  bool ray_tracing = shader.stage >= SHADER_STAGE_RAY_GENERATION;
+  bool ray_tracing = shader_object->GetStage() >= SHADER_STAGE_RAY_GENERATION;
   if (binding_layout)
     for (const auto &group : binding_layout->groups)
       for (auto binding : group.bindings)
@@ -382,8 +380,8 @@ bool CompileSlang(const IShader *shader_object,
   constexpr SlangStage stages[] = {SLANG_STAGE_VERTEX,         SLANG_STAGE_FRAGMENT,     SLANG_STAGE_COMPUTE,
                                    SLANG_STAGE_RAY_GENERATION, SLANG_STAGE_MISS,         SLANG_STAGE_CLOSEST_HIT,
                                    SLANG_STAGE_ANY_HIT,        SLANG_STAGE_INTERSECTION, SLANG_STAGE_CALLABLE};
-  const auto stage = stages[shader.stage];
-  if (SLANG_FAILED(module->findAndCheckEntryPoint(shader.entry_point.c_str(), stage, entry.writeRef(),
+  const auto stage = stages[shader_object->GetStage()];
+  if (SLANG_FAILED(module->findAndCheckEntryPoint(shader_object->GetEntry().c_str(), stage, entry.writeRef(),
                                                   diagnostics.writeRef()))) {
     report();
     return false;
@@ -462,7 +460,7 @@ bool CompileSlang(const IShader *shader_object,
         break;
       }
     }
-    const uint32_t stage_bit = 1u << shader.stage;
+    const uint32_t stage_bit = 1u << shader_object->GetStage();
     if (!match || count != match->desc.count || !(match->desc.visibility & stage_bit)) {
       ReportError(-1, std::string("Shader resource does not match the C++ binding layout: ") + parameter->getName());
       return false;

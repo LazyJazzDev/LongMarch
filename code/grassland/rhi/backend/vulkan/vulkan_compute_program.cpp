@@ -50,7 +50,7 @@ VulkanComputeProgram *VulkanComputeProgram::Create(VulkanDevice *owner_device, c
   create.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   create.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   create.stage.module = module;
-  create.stage.pName = object->desc_.compute_shader->GetDesc().entry_point.c_str();
+  create.stage.pName = object->desc_.compute_shader->GetEntry().c_str();
   create.layout = object->NativeLayout();
   auto result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &create, nullptr, &object->pipeline_);
   vkDestroyShaderModule(device, module, nullptr);
