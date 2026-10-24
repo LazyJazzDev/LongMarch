@@ -103,16 +103,16 @@ bool D3D12CommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
                                  static_cast<UINT8>(value.depth_stencil.stencil), 0, nullptr);
     return true;
   }
-  return ClearColor(native, value);
+  return ClearColor(native, value.color);
 }
 
-bool D3D12CommandContext::ClearColor(D3D12Image *image, const ClearValue &value) {
+bool D3D12CommandContext::ClearColor(D3D12Image *image, const ClearColorValue &value) {
   const auto format = image->GetDesc().format;
   const bool signed_integer = IsSignedIntegerFormat(format);
   if (!signed_integer && !IsUnsignedIntegerFormat(format)) {
     if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
       return false;
-    list_->ClearRenderTargetView(image->AttachmentView(), value.color.float32.data(), 0, nullptr);
+    list_->ClearRenderTargetView(image->AttachmentView(), value.float32.data(), 0, nullptr);
     return true;
   }
   const auto pixel_size = ImageFormatSize(format);
@@ -120,7 +120,7 @@ bool D3D12CommandContext::ClearColor(D3D12Image *image, const ClearValue &value)
       pixel_size > 4 || format == IMAGE_FORMAT_R32_UINT || format == IMAGE_FORMAT_R32_INT ? 4 : 1;
   std::array<UINT, 4> integers{};
   for (size_t i = 0; i < integers.size(); ++i) {
-    integers[i] = signed_integer ? static_cast<UINT>(value.color.int32[i]) : value.color.uint32[i];
+    integers[i] = signed_integer ? static_cast<UINT>(value.int32[i]) : value.uint32[i];
     // Supply the native-width bit pattern, not a sign-extended uint32, to the
     // unsigned clear operation for 8-bit signed views.
     if (component_size == 1)
@@ -468,8 +468,8 @@ bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
     if (HasStencil(depth->GetDesc().format) && ds.stencil_load_op == ATTACHMENT_LOAD_OP_CLEAR)
       flags |= D3D12_CLEAR_FLAG_STENCIL;
     if (flags)
-      list_->ClearDepthStencilView(dsv, static_cast<D3D12_CLEAR_FLAGS>(flags), ds.clear_value.depth_stencil.depth,
-                                   static_cast<UINT8>(ds.clear_value.depth_stencil.stencil), 0, nullptr);
+      list_->ClearDepthStencilView(dsv, static_cast<D3D12_CLEAR_FLAGS>(flags), ds.clear_value.depth,
+                                   static_cast<UINT8>(ds.clear_value.stencil), 0, nullptr);
   }
   list_->OMSetRenderTargets(count, colors.data(), FALSE, depth ? &dsv : nullptr);
   rendering_active_ = true;

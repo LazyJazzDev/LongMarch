@@ -33,7 +33,8 @@ before a command buffer completes; they are not forwarded through an RHI callbac
 ## Format-aware image clears
 
 RHI and RHIX use CmdClearImage(image, ClearValue). ColorAttachmentInfo and
-DepthStencilAttachmentInfo both store clear_value. The image format selects the
+DepthStencilAttachmentInfo store ClearColorValue and ClearDepthStencilValue
+respectively in clear_value. The image format selects the
 union member; initialize color.float32 for UNORM/SFLOAT colors, color.int32 for
 SINT colors, color.uint32 for UINT colors, or depth_stencil for depth formats.
 
@@ -50,11 +51,11 @@ commands->CmdClearImage(depth_image, depth);
 
 RenderingInfo rendering;
 rendering.color_attachments = {
-    {uint_image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, integer}};
+    {uint_image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, integer.color}};
 rendering.depth_stencil.image = depth_image;
 rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
 rendering.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-rendering.depth_stencil.clear_value = depth;
+rendering.depth_stencil.clear_value = depth.depth_stencil;
 ```
 
 Standalone depth clears also clear stencil when the image format includes it.

@@ -78,7 +78,7 @@ bool CommandContext::CmdBindProgram(const Program &program) {
 bool CommandContext::CmdBeginRendering(const Image &image,
                                        rhi::AttachmentLoadOp load_op,
                                        rhi::AttachmentStoreOp store_op,
-                                       const rhi::ClearValue &clear_value) {
+                                       const rhi::ClearColorValue &clear_value) {
 #if !defined(NDEBUG)
   if (!*this)
     return false;

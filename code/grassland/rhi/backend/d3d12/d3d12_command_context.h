@@ -70,7 +70,7 @@ class D3D12CommandContext final : public CommandContext {
  private:
   D3D12CommandContext(D3D12Device *device);
 
-  bool ClearColor(D3D12Image *image, const ClearValue &value);
+  bool ClearColor(D3D12Image *image, const ClearColorValue &value);
   bool PrepareGroups();
 
   struct BoundGroup {

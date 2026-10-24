@@ -12,16 +12,16 @@
 namespace grassland::rhi::backend::metal {
 
 namespace {
-MTL::ClearColor NativeClearColor(ImageFormat format, const ClearValue &value) {
+MTL::ClearColor NativeClearColor(ImageFormat format, const ClearColorValue &value) {
   if (IsSignedIntegerFormat(format)) {
-    const auto &c = value.color.int32;
+    const auto &c = value.int32;
     return MTL::ClearColor::Make(c[0], c[1], c[2], c[3]);
   }
   if (IsUnsignedIntegerFormat(format)) {
-    const auto &c = value.color.uint32;
+    const auto &c = value.uint32;
     return MTL::ClearColor::Make(c[0], c[1], c[2], c[3]);
   }
-  const auto &c = value.color.float32;
+  const auto &c = value.float32;
   return MTL::ClearColor::Make(c[0], c[1], c[2], c[3]);
 }
 }  // namespace
@@ -85,7 +85,7 @@ bool MetalCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
     attachment->setTexture(native->NativeImage());
     attachment->setLoadAction(MTL::LoadActionClear);
     attachment->setStoreAction(MTL::StoreActionStore);
-    attachment->setClearColor(NativeClearColor(format, value));
+    attachment->setClearColor(NativeClearColor(format, value.color));
   }
   auto encoder = commands_->renderCommandEncoder(pass);
   if (!encoder) {
@@ -474,13 +474,13 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     depth->setTexture(image->NativeImage());
     depth->setLoadAction(loads[ds.depth_load_op]);
     depth->setStoreAction(store(ds.depth_store_op));
-    depth->setClearDepth(ds.clear_value.depth_stencil.depth);
+    depth->setClearDepth(ds.clear_value.depth);
     if (HasStencil(depth_format_)) {
       auto stencil = pass->stencilAttachment();
       stencil->setTexture(image->NativeImage());
       stencil->setLoadAction(loads[ds.stencil_load_op]);
       stencil->setStoreAction(store(ds.stencil_store_op));
-      stencil->setClearStencil(ds.clear_value.depth_stencil.stencil);
+      stencil->setClearStencil(ds.clear_value.stencil);
     }
   }
   encoder_ = NS::RetainPtr(commands_->renderCommandEncoder(pass));

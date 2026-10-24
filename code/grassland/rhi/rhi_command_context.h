@@ -18,7 +18,7 @@ struct ColorAttachmentInfo {
   IImage *color_attachment{};
   AttachmentLoadOp load_op{ATTACHMENT_LOAD_OP_LOAD};
   AttachmentStoreOp store_op{ATTACHMENT_STORE_OP_STORE};
-  ClearValue clear_value{};
+  ClearColorValue clear_value{};
 };
 
 struct DepthStencilAttachmentInfo {
@@ -27,7 +27,7 @@ struct DepthStencilAttachmentInfo {
   AttachmentStoreOp depth_store_op{ATTACHMENT_STORE_OP_STORE};
   AttachmentLoadOp stencil_load_op{ATTACHMENT_LOAD_OP_LOAD};
   AttachmentStoreOp stencil_store_op{ATTACHMENT_STORE_OP_STORE};
-  ClearValue clear_value{ClearDepthStencilValue{1.0f, 0}};
+  ClearDepthStencilValue clear_value{1.0f, 0};
 };
 
 struct RenderingInfo {

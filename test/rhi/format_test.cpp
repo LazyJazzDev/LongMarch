@@ -91,7 +91,7 @@ TEST_P(RhiFormats, IntegerClearsUseNumericValuesForTransferAndRenderPass) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       if (render_pass) {
         ASSERT_TRUE(commands->CmdBeginRendering(
-            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, values}}}));
+            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, values.color}}}));
         ASSERT_TRUE(commands->CmdEndRendering());
       } else {
         ASSERT_TRUE(commands->CmdClearImage(image.Get(), values));
@@ -135,8 +135,8 @@ TEST_P(RhiFormats, FloatClearValuesPreserveFloatAndNormalizedColors) {
     for (bool render_pass : {false, true}) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       if (render_pass) {
-        ASSERT_TRUE(
-            commands->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, value}}}));
+        ASSERT_TRUE(commands->CmdBeginRendering(
+            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, value.color}}}));
         ASSERT_TRUE(commands->CmdEndRendering());
       } else
         ASSERT_TRUE(commands->CmdClearImage(image.Get(), value));
@@ -170,7 +170,7 @@ TEST_P(RhiFormats, D16DepthSubrectangleKeepsTwoBytePixels) {
   RenderingInfo info;
   info.depth_stencil.image = image.Get();
   info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-  info.depth_stencil.clear_value.depth_stencil.depth = 0.25f;
+  info.depth_stencil.clear_value.depth = 0.25f;
   ASSERT_TRUE(commands->CmdBeginRendering(info));
   ASSERT_TRUE(commands->CmdEndRendering());
   ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {3, 2, 5, 3});
@@ -316,8 +316,8 @@ TEST_P(RhiFormats, IntegerStorageWritesAndRenderTargetsPreserveValues) {
         ASSERT_TRUE(commands->CmdDispatch(1));
       } else {
         ASSERT_TRUE(commands->CmdBindProgram(graphics.Get()));
-        ASSERT_TRUE(
-            commands->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, zero}}}));
+        ASSERT_TRUE(commands->CmdBeginRendering(
+            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, zero.color}}}));
         ASSERT_TRUE(commands->CmdSetViewport({0, 0, 8, 8, 0, 1}));
         ASSERT_TRUE(commands->CmdSetScissor({0, 0, 8, 8}));
         ASSERT_TRUE(commands->CmdDraw(3));
@@ -362,7 +362,7 @@ TEST_P(RhiFormats, ClearValueSelectsDepthAndStencilForStandaloneAndRendering) {
         info.depth_stencil.image = image.Get();
         info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
         info.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-        info.depth_stencil.clear_value = value;
+        info.depth_stencil.clear_value = value.depth_stencil;
         ASSERT_TRUE(commands->CmdBeginRendering(info));
         ASSERT_TRUE(commands->CmdEndRendering());
       } else
@@ -423,8 +423,8 @@ TEST_P(RhiFormats, IntegerClearsPreserveBoundDescriptorTablesAndOrderWrites) {
     ClearValue value;
     value.color.uint32 = {0x80000001u + i * 4, 0, 0, 0};
     if (i % 2) {
-      ASSERT_TRUE(
-          commands->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, value}}}));
+      ASSERT_TRUE(commands->CmdBeginRendering(
+          {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, value.color}}}));
       ASSERT_TRUE(commands->CmdEndRendering());
     } else
       ASSERT_TRUE(commands->CmdClearImage(image.Get(), value));

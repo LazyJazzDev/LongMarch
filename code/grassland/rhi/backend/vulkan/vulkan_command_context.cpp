@@ -487,7 +487,7 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   for (size_t i = 0; i < formats.size(); ++i) {
     const auto &source = rendering_.color_attachments[i];
     if (source.load_op == ATTACHMENT_LOAD_OP_CLEAR)
-      clear[i] = NativeClearValue(formats[i], source.clear_value);
+      clear[i] = NativeClearValue(formats[i], ClearValue{source.clear_value});
     colors[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colors[i].imageView = lease->Views()[i];
     colors[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -499,7 +499,7 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   VkRenderingAttachmentInfo depth_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO},
       stencil_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   if (depth) {
-    clear[formats.size()] = NativeClearValue(depth_format, ds.clear_value);
+    clear[formats.size()] = NativeClearValue(depth_format, ClearValue{ds.clear_value});
     depth_info.imageView = lease->Views().back();
     depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depth_info.loadOp = loads[ds.depth_load_op];
