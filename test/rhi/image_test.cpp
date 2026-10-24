@@ -719,11 +719,15 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
   ASSERT_TRUE(target && queue);
   int updates = 0;
   std::array<float, 4> background{0, 0, 1, 1};
-  ImVec2 scale{};
+  ImVec2 target_scale{};
   auto draw_window = [&] {
     ++updates;
     background = {0, 1, 0, 1};
-    scale = ImGui::GetIO().DisplayFramebufferScale;
+    // The renderer maps logical UI coordinates to this offscreen target, whose
+    // extent need not match the window's Retina/high-DPI framebuffer.
+    const auto display_size = ImGui::GetIO().DisplaySize;
+    const auto extent = target->GetDesc();
+    target_scale = {float(extent.width) / display_size.x, float(extent.height) / display_size.y};
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {40, 40},
                                                   updates == 1 ? IM_COL32(255, 0, 0, 255) : IM_COL32_WHITE);
   };
@@ -738,7 +742,8 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
     ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
     ASSERT_TRUE(done && done->WaitHost());
     std::array<uint8_t, 4> pixel{};
-    ReadPixel(device.Get(), target.Get(), GetParam(), uint32_t(20 * scale.x), uint32_t(20 * scale.y), pixel);
+    ReadPixel(device.Get(), target.Get(), GetParam(), uint32_t(20 * target_scale.x), uint32_t(20 * target_scale.y),
+              pixel);
     EXPECT_EQ(pixel, (overlay ? std::array<uint8_t, 4>{255, 255, 255, 255} : std::array<uint8_t, 4>{0, 255, 0, 255}));
     ReadPixel(device.Get(), target.Get(), GetParam(), 300, 220, pixel);
     EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 255, 0, 255}));
