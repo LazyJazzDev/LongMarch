@@ -46,6 +46,16 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
   const auto format = NativeImageFormat(desc.format);
   if (format == VK_FORMAT_UNDEFINED)
     return nullptr;
+  // Color images must support the usage RHI exposes; do not let drivers silently
+  // substitute unsupported three-channel formats.
+  if (IsColorFormat(desc.format)) {
+    VkFormatProperties properties{};
+    vkGetPhysicalDeviceFormatProperties(device->NativePhysicalDevice(), format, &properties);
+    const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+                                          VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+    if ((properties.optimalTilingFeatures & required) != required)
+      return nullptr;
+  }
   auto image = std::unique_ptr<VulkanAllocatedImage>(new VulkanAllocatedImage(device, desc));
   VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
   info.imageType = VK_IMAGE_TYPE_2D;

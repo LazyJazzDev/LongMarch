@@ -29,8 +29,10 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
                             D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT))
     return nullptr;
   std::vector<D3D12_INPUT_ELEMENT_DESC> inputs;
-  const DXGI_FORMAT formats[] = {DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT,
-                                 DXGI_FORMAT_R32G32B32A32_FLOAT};
+  const DXGI_FORMAT formats[] = {
+      DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT,
+      DXGI_FORMAT_R32_SINT,  DXGI_FORMAT_R32G32_SINT,  DXGI_FORMAT_R32G32B32_SINT,  DXGI_FORMAT_R32G32B32A32_SINT,
+      DXGI_FORMAT_R32_UINT,  DXGI_FORMAT_R32G32_UINT,  DXGI_FORMAT_R32G32B32_UINT,  DXGI_FORMAT_R32G32B32A32_UINT};
   for (const auto &a : object->desc_.vertex_attributes) {
     auto instance = object->desc_.vertex_bindings[a.binding].per_instance;
     inputs.push_back(

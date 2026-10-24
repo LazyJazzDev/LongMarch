@@ -54,7 +54,7 @@ class TestWindow final : public backend::Window {
   }
 
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override {
-    return {{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA8_UNORM}};
+    return {{PRESENT_MODE_VSYNC, IMAGE_FORMAT_R8G8B8A8_UNORM}};
   }
 
  private:
@@ -64,7 +64,7 @@ class TestWindow final : public backend::Window {
 class TestImage final : public backend::Image {
  public:
   explicit TestImage(std::shared_ptr<Gate> gate, backend::Window *window = nullptr)
-      : backend::Image({16, 16, IMAGE_FORMAT_RGBA8_UNORM}),
+      : backend::Image({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM}),
         gate_(std::move(gate)),
         window_(window) {
   }

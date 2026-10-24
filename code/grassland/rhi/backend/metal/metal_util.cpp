@@ -33,26 +33,62 @@ MTL::BlendOperation NativeBlendOp(BlendOp op) {
 }
 
 bool SupportsImageStorage(ImageFormat format) {
-  // These formats support shader writes on all supported Metal GPU families.
-  return format == IMAGE_FORMAT_RGBA8_UNORM || format == IMAGE_FORMAT_RGBA16_FLOAT;
+  return IsColorFormat(format) && NativeImageFormat(format) != MTL::PixelFormatInvalid &&
+         format != IMAGE_FORMAT_B8G8R8A8_UNORM && format != IMAGE_FORMAT_R10G10B10A2_UNORM &&
+         format != IMAGE_FORMAT_B10G10R10A2_UNORM;
 }
 
 MTL::PixelFormat NativeImageFormat(ImageFormat format) {
   switch (format) {
-    case IMAGE_FORMAT_RGBA8_UNORM:
+    case IMAGE_FORMAT_R8_UINT:
+      return MTL::PixelFormatR8Uint;
+    case IMAGE_FORMAT_R8_INT:
+      return MTL::PixelFormatR8Sint;
+    case IMAGE_FORMAT_R8_UNORM:
+      return MTL::PixelFormatR8Unorm;
+    case IMAGE_FORMAT_R8G8_UINT:
+      return MTL::PixelFormatRG8Uint;
+    case IMAGE_FORMAT_R8G8_INT:
+      return MTL::PixelFormatRG8Sint;
+    case IMAGE_FORMAT_R8G8_UNORM:
+      return MTL::PixelFormatRG8Unorm;
+    case IMAGE_FORMAT_R8G8B8A8_UINT:
+      return MTL::PixelFormatRGBA8Uint;
+    case IMAGE_FORMAT_R8G8B8A8_INT:
+      return MTL::PixelFormatRGBA8Sint;
+    case IMAGE_FORMAT_R8G8B8A8_UNORM:
       return MTL::PixelFormatRGBA8Unorm;
-    case IMAGE_FORMAT_BGRA8_UNORM:
+    case IMAGE_FORMAT_R32_UINT:
+      return MTL::PixelFormatR32Uint;
+    case IMAGE_FORMAT_R32_INT:
+      return MTL::PixelFormatR32Sint;
+    case IMAGE_FORMAT_R32_SFLOAT:
+      return MTL::PixelFormatR32Float;
+    case IMAGE_FORMAT_R32G32_UINT:
+      return MTL::PixelFormatRG32Uint;
+    case IMAGE_FORMAT_R32G32_INT:
+      return MTL::PixelFormatRG32Sint;
+    case IMAGE_FORMAT_R32G32_SFLOAT:
+      return MTL::PixelFormatRG32Float;
+    case IMAGE_FORMAT_R32G32B32A32_UINT:
+      return MTL::PixelFormatRGBA32Uint;
+    case IMAGE_FORMAT_R32G32B32A32_INT:
+      return MTL::PixelFormatRGBA32Sint;
+    case IMAGE_FORMAT_R32G32B32A32_SFLOAT:
+      return MTL::PixelFormatRGBA32Float;
+    case IMAGE_FORMAT_B8G8R8A8_UNORM:
       return MTL::PixelFormatBGRA8Unorm;
-    case IMAGE_FORMAT_RGBA16_FLOAT:
+    case IMAGE_FORMAT_R16G16B16A16_SFLOAT:
       return MTL::PixelFormatRGBA16Float;
-    case IMAGE_FORMAT_RGB10A2_UNORM:
+    case IMAGE_FORMAT_R10G10B10A2_UNORM:
       return MTL::PixelFormatRGB10A2Unorm;
-    case IMAGE_FORMAT_BGR10A2_UNORM:
+    case IMAGE_FORMAT_B10G10R10A2_UNORM:
       return MTL::PixelFormatBGR10A2Unorm;
-    case IMAGE_FORMAT_D32_FLOAT:
+    case IMAGE_FORMAT_D16_UNORM:
+      return MTL::PixelFormatDepth16Unorm;
+    case IMAGE_FORMAT_D32_SFLOAT:
       return MTL::PixelFormatDepth32Float;
     case IMAGE_FORMAT_D24_UNORM_S8_UINT:
-      // Apple GPUs use D32S8; stencil behavior is preserved, depth precision is higher.
       return MTL::PixelFormatDepth32Float_Stencil8;
     default:
       return MTL::PixelFormatInvalid;

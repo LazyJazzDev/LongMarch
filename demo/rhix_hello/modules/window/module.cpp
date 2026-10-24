@@ -70,7 +70,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
   std::array<grassland::rhix::SubmissionToken, 3> pending;
   if (headless) {
     for (auto &target : targets) {
-      target = device.CreateImage({1280, 720, IMAGE_FORMAT_RGBA8_UNORM});
+      target = device.CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!target)
         return 1;
     }

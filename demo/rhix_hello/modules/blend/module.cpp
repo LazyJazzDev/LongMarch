@@ -53,7 +53,7 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   std::array<grassland::rhix::SubmissionToken, 3> pending;
   if (headless) {
     for (auto &target : targets) {
-      target = device.CreateImage({1280, 720, IMAGE_FORMAT_RGBA8_UNORM});
+      target = device.CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!target)
         return 1;
     }
@@ -71,7 +71,7 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   desc.fragment_shader = fragment_shader.Get();
   desc.blend_states = {BlendState(true)};
   desc.vertex_bindings = {{sizeof(Vertex), false}};
-  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT4, 12}};
+  desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}, {1, 0, INPUT_TYPE_FLOAT4, 12}};
   {
     grassland::rhix::Image image;
     if (headless)

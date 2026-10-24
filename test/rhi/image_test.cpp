@@ -247,11 +247,12 @@ TEST_P(RhiImage, HDRUploadUsesFullPixelStrideAndRenderingPreservesHighlights) {
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
-  for (auto format : {IMAGE_FORMAT_RGBA16_FLOAT, IMAGE_FORMAT_RGB10A2_UNORM, IMAGE_FORMAT_BGR10A2_UNORM}) {
-    if (format == IMAGE_FORMAT_BGR10A2_UNORM && GetParam() == BACKEND_API_D3D12)
+  for (auto format :
+       {IMAGE_FORMAT_R16G16B16A16_SFLOAT, IMAGE_FORMAT_R10G10B10A2_UNORM, IMAGE_FORMAT_B10G10R10A2_UNORM}) {
+    if (format == IMAGE_FORMAT_B10G10R10A2_UNORM && GetParam() == BACKEND_API_D3D12)
       continue;
     SCOPED_TRACE(ImageFormatName(format));
-    const bool floating = format == IMAGE_FORMAT_RGBA16_FLOAT;
+    const bool floating = format == IMAGE_FORMAT_R16G16B16A16_SFLOAT;
     const uint32_t bytes = ImageFormatSize(format), pitch = 5 * bytes + 16;
     ObjPtr<IImage> image = device->CreateImage({5, 3, format});
     ASSERT_TRUE(image);
@@ -316,9 +317,9 @@ TEST_P(RhiImage, HDRUploadUsesFullPixelStrideAndRenderingPreservesHighlights) {
       ReadPixel(device.Get(), image.Get(), GetParam(), 2, 1, actual);
       uint32_t value{};
       std::memcpy(&value, actual.data(), 4);
-      EXPECT_NEAR(value & 1023u, format == IMAGE_FORMAT_BGR10A2_UNORM ? 767 : 256, 1);
+      EXPECT_NEAR(value & 1023u, format == IMAGE_FORMAT_B10G10R10A2_UNORM ? 767 : 256, 1);
       EXPECT_NEAR((value >> 10) & 1023u, 512, 1);
-      EXPECT_NEAR((value >> 20) & 1023u, format == IMAGE_FORMAT_BGR10A2_UNORM ? 256 : 767, 1);
+      EXPECT_NEAR((value >> 20) & 1023u, format == IMAGE_FORMAT_B10G10R10A2_UNORM ? 256 : 767, 1);
       EXPECT_EQ(value >> 30, 3u);
     }
   }
@@ -329,8 +330,8 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  for (auto format :
-       {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_BGRA8_UNORM, IMAGE_FORMAT_D32_FLOAT, IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
+  for (auto format : {IMAGE_FORMAT_R8G8B8A8_UNORM, IMAGE_FORMAT_B8G8R8A8_UNORM, IMAGE_FORMAT_D32_SFLOAT,
+                      IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
     ObjPtr<IImage> image = device->CreateImage({16, 16, format});
     ASSERT_TRUE(image);
     const auto native = static_cast<backend::Image *>(image.Get());
@@ -372,8 +373,8 @@ TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto owner = static_cast<backend::d3d12::D3D12Device *>(device.Get());
-  ObjPtr<IImage> color = device->CreateImage({8, 8, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> depth = device->CreateImage({8, 8, IMAGE_FORMAT_D32_FLOAT});
+  ObjPtr<IImage> color = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> depth = device->CreateImage({8, 8, IMAGE_FORMAT_D32_SFLOAT});
   ASSERT_TRUE(color && depth);
   auto handle = static_cast<backend::d3d12::D3D12Image *>(color.Get())->AttachmentView().ptr;
   EXPECT_NE(handle, 0u);
@@ -407,7 +408,7 @@ TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch)
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
-  ObjPtr<IImage> image = device->CreateImage({3, 3, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> image = device->CreateImage({3, 3, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(image);
   // Twelve useful bytes per row, with eight bytes of caller-owned padding.
   // D3D12 uses a different, 256-byte destination pitch for this image.
@@ -449,8 +450,8 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ASSERT_TRUE(frame);
   const auto width = frame->GetDesc().width;
   const auto height = frame->GetDesc().height;
-  ObjPtr<IImage> target = device->CreateImage({width, height, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({width, height, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(target && texture);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ImVec2 framebuffer_scale;
@@ -507,7 +508,7 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   ASSERT_TRUE(ui);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
-  ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(texture);
   ObjPtr<ICommandContext> upload = device->CreateCommandContext();
   const uint8_t texel[] = {128, 64, 200, 128};
@@ -547,7 +548,7 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   };
   // All output encodings are exercised even on an SDR-only desktop.
   std::array<std::array<uint8_t, 4>, 5> baseline{};
-  ObjPtr<IImage> sdr = device->CreateImage({160, 120, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> sdr = device->CreateImage({160, 120, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(sdr && ui->Update(draw));
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands && commands->CmdClearColor(sdr.Get(), {0.2f, 0.3f, 0.4f, 1}));
@@ -562,7 +563,7 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
     for (float white : {1.0f, 2.5f}) {
       SCOPED_TRACE(int(space));
       SCOPED_TRACE(white);
-      ObjPtr<IImage> target = device->CreateImage({160, 120, IMAGE_FORMAT_RGBA16_FLOAT});
+      ObjPtr<IImage> target = device->CreateImage({160, 120, IMAGE_FORMAT_R16G16B16A16_SFLOAT});
       ASSERT_TRUE(target && ui->Update(draw));
       const auto bg = encode({linear(0.2), linear(0.3), linear(0.4)}, space, white);
       std::array<std::array<double, 3>, 5> expected{bg, bg, bg, bg, bg};
@@ -625,7 +626,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
   ObjPtr<IImage> frame = window->GetNextImage();
   ASSERT_TRUE(frame);
   ObjPtr<IImage> target =
-      device->CreateImage({frame->GetDesc().width, frame->GetDesc().height, IMAGE_FORMAT_RGBA8_UNORM});
+      device->CreateImage({frame->GetDesc().width, frame->GetDesc().height, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(target);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
@@ -670,7 +671,7 @@ TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
   std::vector<ObjPtr<ICommandContext>> recordings;
   int frame = 0;
   for (int rectangles : {1, 1, 128, 2, 256, 1}) {
-    ObjPtr<IImage> target = device->CreateImage({320, 240, IMAGE_FORMAT_RGBA8_UNORM});
+    ObjPtr<IImage> target = device->CreateImage({320, 240, IMAGE_FORMAT_R8G8B8A8_UNORM});
     ASSERT_TRUE(target);
     const auto color = frame++ % 2 ? IM_COL32(0, 255, 0, 255) : IM_COL32(255, 0, 0, 255);
     ASSERT_TRUE(window->UpdateImGui([&] {
@@ -714,7 +715,7 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
   ASSERT_TRUE(window->UpdateImGui([&] { disabled_callback_ran = true; }));
   EXPECT_FALSE(disabled_callback_ran);
   ASSERT_TRUE(window->EnableImGui());
-  ObjPtr<IImage> target = device->CreateImage({320, 240, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({320, 240, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(target && queue);
   int updates = 0;
@@ -779,7 +780,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  EXPECT_EQ(device->CreateImage({0, 64, IMAGE_FORMAT_RGBA8_UNORM}), nullptr);
+  EXPECT_EQ(device->CreateImage({0, 64, IMAGE_FORMAT_R8G8B8A8_UNORM}), nullptr);
   EXPECT_EQ(device->CreateImage({64, 64, IMAGE_FORMAT_UNKNOWN}), nullptr);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
@@ -794,7 +795,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
   ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ASSERT_TRUE(vs);
   ASSERT_TRUE(ps);
-  for (auto format : {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_BGRA8_UNORM}) {
+  for (auto format : {IMAGE_FORMAT_R8G8B8A8_UNORM, IMAGE_FORMAT_B8G8R8A8_UNORM}) {
     ObjPtr<IImage> image = device->CreateImage({64, 64, format});
     ASSERT_TRUE(image);
     ProgramDesc desc;
@@ -819,7 +820,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
       ASSERT_TRUE(done->WaitHost());
       std::array<uint8_t, 4> pixel{};
       ReadPixel(device.Get(), image.Get(), GetParam(), 32, 32, pixel);
-      const size_t red = format == IMAGE_FORMAT_RGBA8_UNORM ? 0 : 2;
+      const size_t red = format == IMAGE_FORMAT_R8G8B8A8_UNORM ? 0 : 2;
       const size_t blue = 2 - red;
       EXPECT_EQ(pixel[red], 255);
       EXPECT_EQ(pixel[1], 0);
@@ -849,7 +850,7 @@ TEST_P(RhiImage, FragmentRayQueriesRetainIndirectBlasResources) {
 #endif
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(queue && image);
   BottomLevelAccelerationStructureDesc bottom;
   bottom.geometries = {{3}};
@@ -925,7 +926,7 @@ TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(queue && image);
   ProgramDesc desc;
   std::string source;
@@ -944,7 +945,7 @@ TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
   desc.vertex_bindings = {{8}};
-  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT2, 0}};
+  desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT2, 0}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
   const float vertices[] = {-1, -1, 3, -1, -1, 3};
@@ -986,7 +987,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> image = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> image = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(image);
   const std::string source = R"(
     struct Input { RHI_INPUT(3,float2,position); RHI_INPUT(5,float4,color); };
@@ -1000,7 +1001,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
   desc.vertex_bindings = {{8, false}, {16, true}};
-  desc.vertex_attributes = {{3, 0, VERTEX_FORMAT_FLOAT2, 0}, {5, 1, VERTEX_FORMAT_FLOAT4, 0}};
+  desc.vertex_attributes = {{3, 0, INPUT_TYPE_FLOAT2, 0}, {5, 1, INPUT_TYPE_FLOAT4, 0}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
   // Skip prefixes with binding/index offsets, then use base vertex and base instance.
@@ -1028,7 +1029,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ASSERT_TRUE(commands->CmdDrawIndexed(3, 1, 1, 1, 1));
   ASSERT_TRUE(commands->CmdEndRendering());
   // A smaller attachment must clip an inherited scissor before any rebinding.
-  ObjPtr<IImage> smaller = device->CreateImage({32, 32, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> smaller = device->CreateImage({32, 32, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(smaller);
   ASSERT_TRUE(commands->CmdBeginRendering(
       {{{smaller.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 1, 0, 1}}}}));
@@ -1050,12 +1051,12 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> first = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> first = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   // Keep an intervening view alive so MRT cannot assume contiguous handles.
-  ObjPtr<IImage> spacer = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> spacer = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(spacer);
-  ObjPtr<IImage> second = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D32_FLOAT});
+  ObjPtr<IImage> second = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D32_SFLOAT});
   ASSERT_TRUE(first && second && depth);
   const std::string source = R"(
     struct V { float4 position : SV_Position; float nearValue : COLOR0; };
@@ -1071,8 +1072,8 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
-  desc.color_formats = {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_RGBA8_UNORM};
-  desc.depth_stencil.format = IMAGE_FORMAT_D32_FLOAT;
+  desc.color_formats = {IMAGE_FORMAT_R8G8B8A8_UNORM, IMAGE_FORMAT_R8G8B8A8_UNORM};
+  desc.depth_stencil.format = IMAGE_FORMAT_D32_SFLOAT;
   desc.depth_stencil.depth_test = true;
   desc.depth_stencil.depth_write = true;
   ObjPtr<IProgram> program = device->CreateProgram(desc);
@@ -1109,9 +1110,9 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> red = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> green = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> red = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> green = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> uniform = device->CreateBuffer({512});
   ObjPtr<IBuffer> factors = device->CreateBuffer({256});
   ASSERT_TRUE(target && red && green && uniform && factors);
@@ -1316,7 +1317,7 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
   ASSERT_TRUE(queue);
   ASSERT_TRUE(target);
@@ -1384,7 +1385,7 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
   ASSERT_TRUE(queue);
   ASSERT_TRUE(target);
@@ -1460,8 +1461,8 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64 * 64 * 16});
   ASSERT_TRUE(target && storage && buffer);
   const std::string source = R"(
@@ -1537,8 +1538,8 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64 * 64 * 16});
   ASSERT_TRUE(target && storage && buffer);
   const std::string source = R"(
@@ -1614,8 +1615,8 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> texture = device->CreateImage({2, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> texture = device->CreateImage({2, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<ISampler> nearest = device->CreateSampler({SAMPLER_FILTER_NEAREST});
   ObjPtr<ISampler> linear = device->CreateSampler({SAMPLER_FILTER_LINEAR});
   ASSERT_TRUE(queue && target && texture && nearest && linear);
@@ -1685,7 +1686,7 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({1024});
   ASSERT_TRUE(buffer && target && queue);
   const std::string source = R"(
@@ -1752,7 +1753,7 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D24_UNORM_S8_UINT});
   ASSERT_TRUE(target && depth);
   const std::string source = R"(
@@ -1772,7 +1773,7 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   desc.depth_stencil.stencil_reference = 5;
   desc.depth_stencil.front.pass_op = desc.depth_stencil.back.pass_op = STENCIL_REPLACE;
   ObjPtr<IProgram> writer = device->CreateProgram(desc);
-  desc.color_formats = {IMAGE_FORMAT_RGBA8_UNORM};
+  desc.color_formats = {IMAGE_FORMAT_R8G8B8A8_UNORM};
   desc.fragment_shader = ps.Get();
   desc.depth_stencil.front.pass_op = desc.depth_stencil.back.pass_op = STENCIL_KEEP;
   desc.depth_stencil.front.compare = desc.depth_stencil.back.compare = COMPARE_EQUAL;
@@ -1828,7 +1829,7 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
   ASSERT_TRUE(queue);
   std::array<ObjPtr<IImage>, 3> targets;
   for (auto &target : targets) {
-    target = device->CreateImage({8, 8, IMAGE_FORMAT_RGBA8_UNORM});
+    target = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
     ASSERT_TRUE(target);
   }
   const std::string source = R"(
@@ -1885,7 +1886,7 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
     ProgramDesc desc;
     desc.vertex_shader = vs.Get();
     desc.fragment_shader = ps.Get();
-    desc.color_formats.assign(targets.size(), IMAGE_FORMAT_RGBA8_UNORM);
+    desc.color_formats.assign(targets.size(), IMAGE_FORMAT_R8G8B8A8_UNORM);
     for (size_t j = 0; j < targets.size(); ++j)
       desc.blend_states.push_back(cases[(std::min)(first + j, cases.size() - 1)].state);
     ObjPtr<IProgram> program = device->CreateProgram(desc);
@@ -1924,9 +1925,9 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
-  ObjPtr<IImage> a = device->CreateImage({4, 4, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> a = device->CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(a);
-  ObjPtr<IImage> b = device->CreateImage({4, 4, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> b = device->CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(b);
   ObjPtr<IShader> cs = device->CreateShaderFromSource(R"(
     RHI_RW_TEXTURE2D(0, 0, float4, target);

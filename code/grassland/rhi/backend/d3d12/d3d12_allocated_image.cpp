@@ -28,6 +28,13 @@ D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const Imag
   const auto format = NativeImageFormat(desc.format);
   if (format == DXGI_FORMAT_UNKNOWN)
     return nullptr;
+  D3D12_FEATURE_DATA_FORMAT_SUPPORT support{format};
+  if (FAILED(device->NativeDevice()->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support))))
+    return nullptr;
+  const auto attachment_support =
+      IsDepthFormat(desc.format) ? D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL : D3D12_FORMAT_SUPPORT1_RENDER_TARGET;
+  if (!(support.Support1 & D3D12_FORMAT_SUPPORT1_TEXTURE2D) || !(support.Support1 & attachment_support))
+    return nullptr;
   D3D12_RESOURCE_DESC info{};
   info.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
   info.Width = desc.width;

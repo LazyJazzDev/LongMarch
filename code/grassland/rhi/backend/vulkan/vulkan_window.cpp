@@ -15,19 +15,20 @@ namespace {
 std::optional<WindowPresentationOption> PresentationFormat(VkSurfaceFormatKHR native) {
   if (native.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
     if (native.format == VK_FORMAT_R8G8B8A8_UNORM)
-      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA8_UNORM};
+      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_R8G8B8A8_UNORM};
     if (native.format == VK_FORMAT_B8G8R8A8_UNORM || native.format == VK_FORMAT_UNDEFINED)
-      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_BGRA8_UNORM};
+      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_B8G8R8A8_UNORM};
   }
   if (native.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT && native.format == VK_FORMAT_R16G16B16A16_SFLOAT)
-    return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA16_FLOAT, COLOR_SPACE_EXTENDED_SRGB_LINEAR};
+    return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_R16G16B16A16_SFLOAT,
+                                    COLOR_SPACE_EXTENDED_SRGB_LINEAR};
   if (native.colorSpace == VK_COLOR_SPACE_BT709_LINEAR_EXT && native.format == VK_FORMAT_R16G16B16A16_SFLOAT)
-    return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA16_FLOAT, COLOR_SPACE_BT709_LINEAR};
+    return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_R16G16B16A16_SFLOAT, COLOR_SPACE_BT709_LINEAR};
   if (native.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT) {
     if (native.format == VK_FORMAT_A2B10G10R10_UNORM_PACK32)
-      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGB10A2_UNORM, COLOR_SPACE_HDR10_ST2084};
+      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_R10G10B10A2_UNORM, COLOR_SPACE_HDR10_ST2084};
     if (native.format == VK_FORMAT_A2R10G10B10_UNORM_PACK32)
-      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_BGR10A2_UNORM, COLOR_SPACE_HDR10_ST2084};
+      return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_B10G10R10A2_UNORM, COLOR_SPACE_HDR10_ST2084};
   }
   return std::nullopt;
 }

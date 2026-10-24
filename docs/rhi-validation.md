@@ -138,3 +138,47 @@ rows, early token release, retained snapshots, abandoned recordings, rejected
 submissions remaining unassociated, direct and concurrent waits after releasing the
 submission handle, and temporal-pool lease retention/reuse/shrinking. The Metal test
 also checks that both pool accessors refer to the same pool and reuse the same storage.
+
+## Image formats and vertex input types
+
+RHI image format names spell out channel widths, for example
+`IMAGE_FORMAT_R8G8B8A8_UNORM`, `IMAGE_FORMAT_R32G32_UINT`, and
+`IMAGE_FORMAT_R32G32B32A32_SFLOAT`. Signed integers use the `_INT` suffix;
+backends map it to native SINT formats. Float formats use `_SFLOAT`.
+
+| Channel width | Encodings | Channel counts |
+|---|---|---|
+| 8 bits | UINT, INT, UNORM | 1, 2, 3, 4 |
+| 32 bits | UINT, INT, SFLOAT | 1, 2, 3, 4 |
+
+Existing BGRA8 UNORM, RGBA16 float, and packed RGB10A2/BGR10A2 UNORM formats
+remain available under expanded names. Depth formats are `D16_UNORM`,
+`D32_SFLOAT`, and `D24_UNORM_S8_UINT`. There is no portable native 32-bit UNORM
+or 8-bit SFLOAT texture format, so those encodings are not exposed.
+
+A format definition is not a guarantee of native image support. Metal has no
+three-channel formats in this set; D3D12 has no RGB8 formats, and RGB32 texture
+usage depends on its format capabilities. RHI images require sampled and attachment
+usage; unsupported combinations return an empty image instead of changing its
+channel count. Vulkan checks the required color-format features before allocation.
+
+`VertexFormat` is now `InputType`, with `INPUT_TYPE_FLOAT[2/3/4]`,
+`INPUT_TYPE_INT[2/3/4]`, and `INPUT_TYPE_UINT[2/3/4]` (the unsuffixed name is scalar).
+Each component occupies 32 bits. `InputTypeSize` returns the byte size; existing
+vertex binding, attribute location, offset, and stride semantics are unchanged.
+All RHI/RHIX call sites use the new names; old enum/type aliases are not retained.
+
+Integer render targets require matching integer shader outputs and cannot enable
+blending. Clear values remain numeric floats in the public API (not reinterpreted
+integer bits), so values beyond float's exact integer range should be written via
+upload or shader output. Vulkan converts clear values to the appropriate integer
+union member. Typed storage images must use the matching shader format, e.g.
+`[[vk::image_format("r8ui")]] RHI_RW_TEXTURE2D(0, 0, uint, output_image);`
+for `IMAGE_FORMAT_R8_UINT`. Without an explicit qualifier, Slang can infer R32
+from `uint`, which does not match an R8 image. Integer sampling should use `Load`
+or nearest filtering, not linear filtering.
+
+`RhiFormats` tests cover native-byte upload/subrectangle readback, transfer and
+render-pass integer clears, D16 cropped readback, all 12 input types through real
+vertex fetch and rasterization, and integer storage writes/render-target output
+including full-width uint32 values. Stencil-bearing images are not downloaded.

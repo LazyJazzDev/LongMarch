@@ -925,7 +925,8 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
     }
     const auto depth = footprints[0], stencil = footprints[1];
     DownloadLayout layout;
-    layout.offset = depth.Offset + uint64_t(region.y) * depth.Footprint.RowPitch + uint64_t(region.x) * 4;
+    layout.offset = depth.Offset + uint64_t(region.y) * depth.Footprint.RowPitch +
+                    uint64_t(region.x) * ImageFormatSize(desc.format);
     layout.row_pitch = depth.Footprint.RowPitch;
     layout.row_bytes = packed;
     layout.rows = height;

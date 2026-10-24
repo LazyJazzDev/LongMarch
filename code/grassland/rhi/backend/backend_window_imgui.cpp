@@ -161,7 +161,7 @@ bool WindowImGui::Initialize(GLFWwindow *window, const char *font_file_path, flo
   unsigned char *pixels;
   int width, height;
   io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-  font_ = device_->CreateImage({uint32_t(width), uint32_t(height), IMAGE_FORMAT_RGBA8_UNORM});
+  font_ = device_->CreateImage({uint32_t(width), uint32_t(height), IMAGE_FORMAT_R8G8B8A8_UNORM});
   sampler_ =
       device_->CreateSampler({SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_CLAMP_TO_EDGE});
   if (!font_ || !sampler_)
@@ -248,9 +248,9 @@ bool WindowImGui::Render(ICommandContext *commands,
     desc.vertex_shader = vs.Get();
     desc.fragment_shader = ps.Get();
     desc.vertex_bindings = {{sizeof(Vertex), false}};
-    desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT2, offsetof(Vertex, position)},
-                              {1, 0, VERTEX_FORMAT_FLOAT2, offsetof(Vertex, uv)},
-                              {2, 0, VERTEX_FORMAT_FLOAT4, offsetof(Vertex, color)}};
+    desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT2, offsetof(Vertex, position)},
+                              {1, 0, INPUT_TYPE_FLOAT2, offsetof(Vertex, uv)},
+                              {2, 0, INPUT_TYPE_FLOAT4, offsetof(Vertex, color)}};
     desc.color_formats = {extent.format};
     desc.blend_states = {BlendState(true)};
     desc.pipeline_layout.groups = {

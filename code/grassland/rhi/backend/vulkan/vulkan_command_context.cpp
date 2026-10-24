@@ -1,5 +1,7 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
@@ -13,6 +15,21 @@
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
 namespace grassland::rhi::backend::vulkan {
+namespace {
+VkClearColorValue ClearColor(ImageFormat format, const std::array<float, 4> &color) {
+  VkClearColorValue value{};
+  for (size_t i = 0; i < color.size(); ++i) {
+    const double c = std::isnan(color[i]) ? 0.0 : double(color[i]);
+    if (IsSignedIntegerFormat(format))
+      value.int32[i] = static_cast<int32_t>(std::clamp(c, double(INT32_MIN), double(INT32_MAX)));
+    else if (IsUnsignedIntegerFormat(format))
+      value.uint32[i] = static_cast<uint32_t>(std::clamp(c, 0.0, double(UINT32_MAX)));
+    else
+      value.float32[i] = color[i];
+  }
+  return value;
+}
+}  // namespace
 
 VulkanCommandContext::VulkanCommandContext(VulkanDevice *device) : CommandContext(device), device_(device) {
 }
@@ -88,8 +105,7 @@ bool VulkanCommandContext::CmdClearColor(rhi::IImage *image, const std::array<fl
   if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
                        VK_ACCESS_TRANSFER_WRITE_BIT))
     return false;
-  VkClearColorValue native_color{};
-  std::copy(color.begin(), color.end(), native_color.float32);
+  const auto native_color = ClearColor(native->GetDesc().format, color);
   VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
   vkCmdClearColorImage(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &native_color, 1, &range);
   return true;
@@ -458,7 +474,7 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   std::array<VkRenderingAttachmentInfo, 8> colors{};
   for (size_t i = 0; i < formats.size(); ++i) {
     const auto &source = rendering_.color_attachments[i];
-    std::copy(source.clear_color.begin(), source.clear_color.end(), clear[i].color.float32);
+    clear[i].color = ClearColor(formats[i], source.clear_color);
     colors[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colors[i].imageView = lease->Views()[i];
     colors[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;

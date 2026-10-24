@@ -70,8 +70,10 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
     const auto &b = object->desc_.vertex_bindings[i];
     bindings.push_back({i, b.stride, b.per_instance ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX});
   }
-  const VkFormat formats[] = {VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT,
-                              VK_FORMAT_R32G32B32A32_SFLOAT};
+  const VkFormat formats[] = {VK_FORMAT_R32_SFLOAT,          VK_FORMAT_R32G32_SFLOAT,     VK_FORMAT_R32G32B32_SFLOAT,
+                              VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R32_SINT,          VK_FORMAT_R32G32_SINT,
+                              VK_FORMAT_R32G32B32_SINT,      VK_FORMAT_R32G32B32A32_SINT, VK_FORMAT_R32_UINT,
+                              VK_FORMAT_R32G32_UINT,         VK_FORMAT_R32G32B32_UINT,    VK_FORMAT_R32G32B32A32_UINT};
   std::vector<VkVertexInputAttributeDescription> attributes;
   for (const auto &a : object->desc_.vertex_attributes)
     attributes.push_back({a.location, a.binding, formats[a.format], a.offset});
