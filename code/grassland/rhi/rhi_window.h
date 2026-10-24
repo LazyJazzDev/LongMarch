@@ -4,6 +4,8 @@
 #endif
 #include <GLFW/glfw3.h>
 
+#include <functional>
+
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/util/event_manager.h"
 
@@ -32,7 +34,6 @@ class IWindow : public IObject {
   virtual EventManager<void(int, int, int, int)> &KeyEvent() = 0;
   virtual EventManager<void(uint32_t)> &CharEvent() = 0;
   virtual EventManager<void(int, const char **)> &DropEvent() = 0;
-  virtual EventManager<void()> &ImGuiEvent() = 0;
 
   // Creates a separate ImGui context and font texture. Disabling releases them.
   // Completed/in-flight recordings own the GPU resources they use independently.
@@ -41,10 +42,11 @@ class IWindow : public IObject {
   // Repeated enable calls keep the existing font. Disable first to reinitialize.
   virtual bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) = 0;
   // Run after PollEvents, before acquiring images/recording scene commands.
-  // Executes UI callbacks now, so their feedback affects this frame's rendering.
+  // Invokes callback synchronously without retaining it, so its feedback affects
+  // this frame's rendering. An empty callback prepares an empty UI frame.
   // Replaces any pending UI data; the next CmdPresent consumes it once. Without
   // an update, CmdPresent draws no overlay. Disabled ImGui is a successful no-op.
-  virtual bool UpdateImGui() = 0;
+  virtual bool UpdateImGui(const std::function<void()> &callback) = 0;
   virtual ImGuiContext *GetImGuiContext() const = 0;
 
   // Borrowed handle; Window owns it. Use GLFW operations on the main thread.

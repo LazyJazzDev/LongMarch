@@ -20,13 +20,12 @@ replacing the GLFW callbacks installed by Window.
 // rhi::IWindow* window, created from a Device
 if (!window->EnableImGui())
   return false;
-auto draw_id = window->ImGuiEvent().RegisterCallback([] {
-  ImGui::Begin("Controls");
-  ImGui::TextUnformatted("Automatically drawn before Present");
-  ImGui::End();
-});
 // Each frame: poll input, then update UI before acquiring/recording scene work.
-if (!window->UpdateImGui())
+if (!window->UpdateImGui([&] {
+      ImGui::Begin("Controls");
+      ImGui::TextUnformatted("Drawn before Present");
+      ImGui::End();
+    }))
   return false;
 // UI feedback is available now. Apply scene/swapchain changes, then record
 // scene commands and end any active rendering scope.
@@ -35,8 +34,7 @@ if (!commands->CmdPresent(window))
 // Submit as usual. UpdateImGui handles ImGui NewFrame/Render internally.
 ```
 
-The rhix equivalents use `window.EnableImGui()`, `window.ImGuiEvent()` and
-`window.UpdateImGui()`.
+The rhix equivalents use `window.EnableImGui()` and `window.UpdateImGui(callback)`.
 Initialization accepts a font file and pixel size:
 `window->EnableImGui(true, "fonts/MyFont.ttf", 24.0f)` (rhix uses `.`).
 The defaults are `nullptr` and 13 pixels. A null path selects the built-in font
@@ -63,25 +61,29 @@ also supports `--frames`, appears as item 10 in the selection menu, and skips he
 runs explicitly.
 
 Each enabled window owns a separate ImGui context and default font atlas.
-`UpdateImGui` starts a frame, invokes ImGuiEvent and calls ImGui::Render to prepare
+`UpdateImGui(callback)` starts a frame, invokes the supplied callback and calls ImGui::Render to prepare
 CPU draw data. Call it on the window thread after input polling and before scene
 command recording so UI feedback affects the same frame. Apply swapchain changes
 after the update and before acquiring images. Disabled ImGui updates are successful
-no-ops. Do not recursively call UpdateImGui, CmdPresent or EnableImGui from the UI
+no-ops and do not invoke the callback. The callback executes synchronously and is
+not retained; captures only need to remain valid during the call. Keep persistent
+widget state outside a per-frame lambda and capture it by reference. Passing `{}`
+prepares an empty UI frame without invoking a callback. Do not recursively call
+UpdateImGui, CmdPresent or EnableImGui from the UI
 callback.
 
 `CmdPresent` only consumes prepared draw data and appends GPU overlay commands
 with LOAD/STORE attachment operations before the native present transition. It
-never invokes ImGuiEvent. Each update is consumed by at most one recording, even
+never invokes the UI callback. Each update is consumed by at most one recording, even
 if recording fails or is abandoned; update again for a subsequent overlay. Calling
 UpdateImGui again before consumption replaces pending data with the latest frame.
 An empty update, or a present without an update, draws no UI and never replays old
 content. ImDrawCmd callbacks remain part of renderer command recording; they are
-separate from the application's ImGuiEvent callback.
+separate from the callback supplied to UpdateImGui.
 
 Overlay recording changes graphics bindings; callers recording more draws must
 bind their own state again. Disabling/re-enabling ImGui discards pending draw data
-and starts with a fresh context. Registrations remain attached to Window until removed.
+and starts with a fresh context. UI callbacks are passed per update, with no registration.
 
 The caller's ImGui context is restored after initialization, input delivery and
 UI updates and overlay recording. `GetImGuiContext()` returns a borrowed pointer (null while disabled).

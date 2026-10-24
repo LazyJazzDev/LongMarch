@@ -14,8 +14,8 @@ bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_si
   return Get() && Get()->EnableImGui(enabled, font_file_path, font_size);
 }
 
-bool Window::UpdateImGui() const {
-  return Get() && Get()->UpdateImGui();
+bool Window::UpdateImGui(const std::function<void()> &callback) const {
+  return Get() && Get()->UpdateImGui(callback);
 }
 
 ImGuiContext *Window::GetImGuiContext() const {
@@ -60,10 +60,6 @@ EventManager<void(uint32_t)> &Window::CharEvent() const {
 
 EventManager<void(int, const char **)> &Window::DropEvent() const {
   return Get()->DropEvent();
-}
-
-EventManager<void()> &Window::ImGuiEvent() const {
-  return Get()->ImGuiEvent();
 }
 
 bool Window::PollEvents() {

@@ -14,7 +14,7 @@ class Window : public Object<rhi::IWindow> {
  public:
   Window();
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
-  bool UpdateImGui() override;
+  bool UpdateImGui(const std::function<void()> &callback) override;
   ImGuiContext *GetImGuiContext() const override;
   bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image);
 
@@ -58,10 +58,6 @@ class Window : public Object<rhi::IWindow> {
     return drop_event_;
   }
 
-  EventManager<void()> &ImGuiEvent() override {
-    return imgui_event_;
-  }
-
   ~Window() override;
   rhi::IImage *GetNextImage() override;
   bool IsSwapChainInvalid() const override;
@@ -100,7 +96,6 @@ class Window : public Object<rhi::IWindow> {
   EventManager<void(int, int, int, int)> key_event_;
   EventManager<void(uint32_t)> char_event_;
   EventManager<void(int, const char **)> drop_event_;
-  EventManager<void()> imgui_event_;
   PresentMode requested_mode_{PRESENT_MODE_VSYNC};
   ColorSpace requested_color_space_{COLOR_SPACE_SRGB_NONLINEAR};
   ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};

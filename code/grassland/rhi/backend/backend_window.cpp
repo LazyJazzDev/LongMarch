@@ -34,7 +34,7 @@ ImGuiContext *Window::GetImGuiContext() const {
   return imgui_ ? imgui_->Context() : nullptr;
 }
 
-bool Window::UpdateImGui() {
+bool Window::UpdateImGui(const std::function<void()> &callback) {
   if (!imgui_)
     return true;
   if (!glfw::IsWindowThread() || processing_imgui_)
@@ -52,7 +52,7 @@ bool Window::UpdateImGui() {
     }
   } scope(processing_imgui_);
 
-  return imgui_->Update(imgui_event_);
+  return imgui_->Update(callback);
 }
 
 bool Window::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {

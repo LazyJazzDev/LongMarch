@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <thread>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
@@ -449,7 +450,7 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ASSERT_TRUE(target && texture);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ImVec2 framebuffer_scale;
-  window->ImGuiEvent().RegisterCallback([&] {
+  auto draw_window = [&] {
     framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
     auto *draw = ImGui::GetForegroundDrawList();
     // Force 16-bit draw-index rollover and VtxOffset handling.
@@ -460,8 +461,8 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
     draw->PopClipRect();
     draw->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
     draw->AddImage(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(texture.Get())), {80, 10}, {110, 40});
-  });
-  ASSERT_TRUE(window->UpdateImGui());
+  };
+  ASSERT_TRUE(window->UpdateImGui(draw_window));
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
   const uint32_t green = 0xff00ff00;
@@ -506,15 +507,15 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
   bool record_ui = true;
-  window->ImGuiEvent().RegisterCallback([&] {
+  auto draw_window = [&] {
     if (!record_ui)
       return;
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, ImGui::GetIO().DisplaySize, IM_COL32_WHITE);
-  });
+  };
   auto original_context = window->GetImGuiContext();
   for (bool visible : {true, false, false, true, false}) {
     record_ui = visible;
-    ASSERT_TRUE(window->UpdateImGui());
+    ASSERT_TRUE(window->UpdateImGui(draw_window));
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
@@ -540,7 +541,9 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "ImGui explicit update"});
   ASSERT_TRUE(window);
-  ASSERT_TRUE(window->UpdateImGui());  // Disabled is a no-op.
+  bool disabled_callback_ran = false;
+  ASSERT_TRUE(window->UpdateImGui([&] { disabled_callback_ran = true; }));
+  EXPECT_FALSE(disabled_callback_ran);
   ASSERT_TRUE(window->EnableImGui());
   ObjPtr<IImage> target = device->CreateImage({320, 240, IMAGE_FORMAT_RGBA8_UNORM});
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
@@ -548,13 +551,13 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
   int updates = 0;
   std::array<float, 4> background{0, 0, 1, 1};
   ImVec2 scale{};
-  window->ImGuiEvent().RegisterCallback([&] {
+  auto draw_window = [&] {
     ++updates;
     background = {0, 1, 0, 1};
     scale = ImGui::GetIO().DisplayFramebufferScale;
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {40, 40},
                                                   updates == 1 ? IM_COL32(255, 0, 0, 255) : IM_COL32_WHITE);
-  });
+  };
   const auto previous = ImGui::GetCurrentContext();
   auto record = [&](bool overlay) {
     const auto before = updates;
@@ -572,15 +575,25 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
     EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 255, 0, 255}));
     EXPECT_EQ(ImGui::GetCurrentContext(), previous);
   };
-  ASSERT_TRUE(window->UpdateImGui());
+  ASSERT_TRUE(window->UpdateImGui(draw_window));
   EXPECT_EQ(updates, 1);
   EXPECT_EQ(background, (std::array<float, 4>{0, 1, 0, 1}));
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
-  ASSERT_TRUE(window->UpdateImGui());  // Replaces pending red UI with white UI.
+  ASSERT_TRUE(window->UpdateImGui(draw_window));  // Replaces pending red UI with white UI.
   EXPECT_EQ(updates, 2);
   record(true);
   record(false);  // No update: never replay the previous overlay.
-  ASSERT_TRUE(window->UpdateImGui());
+  ASSERT_TRUE(window->UpdateImGui({}));
+  EXPECT_EQ(updates, 2);  // An empty callback does not reuse a previous callback.
+  record(false);
+  auto lifetime = std::make_shared<int>(0);
+  std::weak_ptr<int> borrowed = lifetime;
+  ASSERT_TRUE(window->UpdateImGui([lifetime] { ++*lifetime; }));
+  EXPECT_EQ(*lifetime, 1);
+  lifetime.reset();
+  EXPECT_TRUE(borrowed.expired());  // Neither the callback nor its captures are retained.
+  record(false);
+  ASSERT_TRUE(window->UpdateImGui(draw_window));
   ASSERT_TRUE(window->EnableImGui(false));
   ASSERT_TRUE(window->EnableImGui());
   record(false);  // Disabling discards pending UI data.

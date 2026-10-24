@@ -47,20 +47,8 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless) {
       std::cout << "ImGui recording: " << std::boolalpha << record_ui << '\n';
     }
   });
-  window->ImGuiEvent().RegisterCallback([&, clicks = 0, show_demo = true]() mutable {
-    // Keep the context enabled: an empty frame must not replay previous UI.
-    if (!record_ui)
-      return;
-    ImGui::Begin("ImGui recording");
-    ImGui::TextUnformatted("I: toggle UI recording; P: VSync; Escape: close");
-    if (ImGui::Button("Click me"))
-      ++clicks;
-    ImGui::Text("Clicks: %d", clicks);
-    ImGui::Checkbox("Show ImGui demo", &show_demo);
-    ImGui::End();
-    if (show_demo)
-      ImGui::ShowDemoWindow(&show_demo);
-  });
+  int clicks = 0;
+  bool show_demo = true;
   grassland::FPSCounter fps;
   auto title_time = std::chrono::steady_clock::now();
   for (int rendered = 0; !frames || rendered < frames;) {
@@ -68,7 +56,20 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless) {
       return 1;
     if (window->ShouldClose())
       break;
-    if (!window->UpdateImGui())
+    if (!window->UpdateImGui([&] {
+          // Keep the context enabled: an empty frame must not replay previous UI.
+          if (!record_ui)
+            return;
+          ImGui::Begin("ImGui recording");
+          ImGui::TextUnformatted("I: toggle UI recording; P: VSync; Escape: close");
+          if (ImGui::Button("Click me"))
+            ++clicks;
+          ImGui::Text("Clicks: %d", clicks);
+          ImGui::Checkbox("Show ImGui demo", &show_demo);
+          ImGui::End();
+          if (show_demo)
+            ImGui::ShowDemoWindow(&show_demo);
+        }))
       return 1;
     if (window->IsSwapChainInvalid()) {
       if (!window->RebuildSwapChain())

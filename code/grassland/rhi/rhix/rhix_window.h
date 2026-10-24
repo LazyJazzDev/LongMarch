@@ -16,7 +16,7 @@ class Window : public ObjectContainer {
   bool IsKeyDown(int key) const;
   bool SetTitle(const std::string &title) const;
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) const;
-  bool UpdateImGui() const;
+  bool UpdateImGui(const std::function<void()> &callback) const;
   ImGuiContext *GetImGuiContext() const;
   EventManager<void(int, int)> &ResizeEvent() const;
   EventManager<void(int, int)> &FramebufferResizeEvent() const;
@@ -28,7 +28,6 @@ class Window : public ObjectContainer {
   EventManager<void(int, int, int, int)> &KeyEvent() const;
   EventManager<void(uint32_t)> &CharEvent() const;
   EventManager<void(int, const char **)> &DropEvent() const;
-  EventManager<void()> &ImGuiEvent() const;
   Image GetNextImage() const;
   bool IsSwapChainInvalid() const;
   bool RebuildSwapChain() const;

@@ -219,14 +219,14 @@ TEST_P(RhiWindow, ImGuiFontInitializationOptions) {
   EXPECT_NE(ImGui::GetIO().Fonts->Fonts[0]->FindGlyphNoFallback('A'), nullptr);
   EXPECT_NE(ImGui::GetIO().Fonts->TexID, ImTextureID{});
   ImGui::SetCurrentContext(previous);
-  window.ImGuiEvent().RegisterCallback([] {
+  auto draw_window = [] {
     ImGui::Begin("Custom font");
     ImGui::TextUnformatted("Font file at 28 pixels");
     ImGui::End();
-  });
+  };
   auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
-  ASSERT_TRUE(window.UpdateImGui());
+  ASSERT_TRUE(window.UpdateImGui(draw_window));
   auto commands = device.CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands.CmdPresent(window));
@@ -290,20 +290,20 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   first.KeyEvent().UnregisterCallback(key_id);
   key_callback(first.GLFWWindow(), GLFW_KEY_A, 0, GLFW_PRESS, 0);
   EXPECT_EQ(keys, 1);
-  first.ImGuiEvent().RegisterCallback([&] {
+  auto draw_first = [&] {
     ++first_draws;
     EXPECT_EQ(ImGui::GetCurrentContext(), first.GetImGuiContext());
     EXPECT_FALSE(first.EnableImGui(false));
-    EXPECT_FALSE(first.UpdateImGui());
+    EXPECT_FALSE(first.UpdateImGui({}));
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(255, 0, 0, 255));
     ImGui::GetForegroundDrawList()->AddText({5, 5}, IM_COL32_WHITE, "First window");
-  });
-  second.ImGuiEvent().RegisterCallback([&] {
+  };
+  auto draw_second = [&] {
     ++second_draws;
     EXPECT_EQ(ImGui::GetCurrentContext(), second.GetImGuiContext());
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(0, 255, 0, 255));
-  });
-  ASSERT_TRUE(first.UpdateImGui());
+  };
+  ASSERT_TRUE(first.UpdateImGui(draw_first));
   EXPECT_EQ(first_draws, 1);
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
   {
@@ -318,8 +318,8 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   }
   std::vector<SubmissionToken> pending;
   for (int i = 0; i < 6; ++i) {
-    ASSERT_TRUE(first.UpdateImGui());
-    ASSERT_TRUE(second.UpdateImGui());
+    ASSERT_TRUE(first.UpdateImGui(draw_first));
+    ASSERT_TRUE(second.UpdateImGui(draw_second));
     EXPECT_EQ(first_draws, i + 2);
     EXPECT_EQ(second_draws, i + 1);
     auto commands = device.CreateCommandContext();
@@ -366,7 +366,7 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   }
   EXPECT_GT(resize_events, 0);
   ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_CONTINUOUS));
-  ASSERT_TRUE(first.UpdateImGui());
+  ASSERT_TRUE(first.UpdateImGui(draw_first));
   commands = device.CreateCommandContext();
   ASSERT_TRUE(commands.CmdPresent(first));
   done = queue.Submit(std::move(commands));
@@ -392,7 +392,7 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
     EXPECT_EQ(button, GLFW_MOUSE_BUTTON_LEFT);
     ++mouse_events;
   });
-  window.ImGuiEvent().RegisterCallback([&] {
+  auto draw_window = [&] {
     ImGui::SetNextWindowPos({0, 0});
     ImGui::SetNextWindowSize({200, 150});
     ImGui::Begin("Input", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
@@ -401,9 +401,9 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
     const auto min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
     center = {(min.x + max.x) / 2, (min.y + max.y) / 2};
     ImGui::End();
-  });
+  };
   auto render = [&] {
-    if (!window.UpdateImGui())
+    if (!window.UpdateImGui(draw_window))
       return false;
     auto commands = device.CreateCommandContext();
     if (!commands.CmdPresent(window))

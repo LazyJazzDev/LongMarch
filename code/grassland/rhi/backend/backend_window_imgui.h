@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi.h"
-#include "grassland/util/event_manager.h"
 #include "imgui.h"
 
 namespace grassland::rhi::backend {
@@ -34,7 +33,7 @@ class WindowImGui {
     return context_;
   }
 
-  bool Update(EventManager<void()> &callbacks);
+  bool Update(const std::function<void()> &callback);
   bool Record(ICommandContext *commands, IImage *image);
 
  private:

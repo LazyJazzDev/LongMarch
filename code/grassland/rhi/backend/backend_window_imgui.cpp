@@ -167,7 +167,7 @@ WindowImGui::~WindowImGui() {
   ImGui::SetCurrentContext(previous == context_ ? nullptr : previous);
 }
 
-bool WindowImGui::Update(EventManager<void()> &callbacks) {
+bool WindowImGui::Update(const std::function<void()> &callback) {
   draw_data_ready_ = false;
   ImGuiContextScope scope(context_);
   ImGui_ImplGlfw_NewFrame();
@@ -182,7 +182,8 @@ bool WindowImGui::Update(EventManager<void()> &callbacks) {
     }
   } frame;
 
-  callbacks.InvokeCallbacks();
+  if (callback)
+    callback();
   ImGui::Render();
   frame.rendered = true;
   draw_data_ready_ = true;

@@ -48,52 +48,54 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api, int frames, bool headles
         glfwSetWindowShouldClose(windows[i]->GLFWWindow(), GLFW_TRUE);
     });
   }
-  windows[0]->ImGuiEvent().RegisterCallback([&, clicks = 0, text = std::array<char, 128>{}]() mutable {
-    if (!visible[0])
-      return;
-    ImGui::SetNextWindowPos({20, 20}, ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize({550, 400}, ImGuiCond_FirstUseEver);
-    ImGui::Begin("Controls");
-    ImGui::TextUnformatted("Window 1: independent controls and background");
-    if (ImGui::Button("Click me"))
-      ++clicks;
-    ImGui::Text("Local clicks: %d", clicks);
-    ImGui::InputText("Local text", text.data(), text.size());
-    ImGui::ColorEdit3("Background", colors[0].data());
-    ImGui::Separator();
-    ImGui::TextWrapped("I hides only this window's UI. Escape or the title-bar close button closes only this window.");
-    ImGui::End();
-  });
-  windows[1]->ImGuiEvent().RegisterCallback(
-      [&, speed = 1.0f, amplitude = 0.7f, paused = false, phase = 0.0f]() mutable {
-        if (!visible[1])
-          return;
-        if (!paused)
-          phase += ImGui::GetIO().DeltaTime * speed;
-        std::array<float, 128> samples;
-        for (size_t i = 0; i < samples.size(); ++i)
-          samples[i] = amplitude * std::sin(phase + float(i) * 0.1f);
-        ImGui::SetNextWindowPos({20, 20}, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize({550, 400}, ImGuiCond_FirstUseEver);
-        ImGui::Begin("Live plot");
-        ImGui::TextUnformatted("Window 2: animated signal, separate ImGui context");
-        ImGui::SliderFloat("Speed", &speed, 0.1f, 5.0f);
-        ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 1.0f);
-        ImGui::Checkbox("Pause", &paused);
-        ImGui::PlotLines("Signal", samples.data(), int(samples.size()), 0, nullptr, -1, 1, {0, 160});
-        ImGui::ColorEdit3("Background", colors[1].data());
-        ImGui::TextUnformatted("I: toggle this UI; Escape: close this window");
-        ImGui::End();
-      });
+  int clicks = 0;
+  std::array<char, 128> text{};
+  float speed = 1.0f, amplitude = 0.7f, phase = 0.0f;
+  bool paused = false;
 
   for (int rendered = 0; !frames || rendered < frames;) {
     if (!PollEvents())
       return 1;
     // Collect all UI feedback before recording any window's scene commands.
-    for (const auto &window : windows) {
-      if (window && !window->ShouldClose() && !window->UpdateImGui())
-        return 1;
-    }
+    if (windows[0] && !windows[0]->ShouldClose() && !windows[0]->UpdateImGui([&] {
+          if (!visible[0])
+            return;
+          ImGui::SetNextWindowPos({20, 20}, ImGuiCond_FirstUseEver);
+          ImGui::SetNextWindowSize({550, 400}, ImGuiCond_FirstUseEver);
+          ImGui::Begin("Controls");
+          ImGui::TextUnformatted("Window 1: independent controls and background");
+          if (ImGui::Button("Click me"))
+            ++clicks;
+          ImGui::Text("Local clicks: %d", clicks);
+          ImGui::InputText("Local text", text.data(), text.size());
+          ImGui::ColorEdit3("Background", colors[0].data());
+          ImGui::Separator();
+          ImGui::TextWrapped(
+              "I hides only this window's UI. Escape or the title-bar close button closes only this window.");
+          ImGui::End();
+        }))
+      return 1;
+    if (windows[1] && !windows[1]->ShouldClose() && !windows[1]->UpdateImGui([&] {
+          if (!visible[1])
+            return;
+          if (!paused)
+            phase += ImGui::GetIO().DeltaTime * speed;
+          std::array<float, 128> samples;
+          for (size_t i = 0; i < samples.size(); ++i)
+            samples[i] = amplitude * std::sin(phase + float(i) * 0.1f);
+          ImGui::SetNextWindowPos({20, 20}, ImGuiCond_FirstUseEver);
+          ImGui::SetNextWindowSize({550, 400}, ImGuiCond_FirstUseEver);
+          ImGui::Begin("Live plot");
+          ImGui::TextUnformatted("Window 2: animated signal, separate ImGui context");
+          ImGui::SliderFloat("Speed", &speed, 0.1f, 5.0f);
+          ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 1.0f);
+          ImGui::Checkbox("Pause", &paused);
+          ImGui::PlotLines("Signal", samples.data(), int(samples.size()), 0, nullptr, -1, 1, {0, 160});
+          ImGui::ColorEdit3("Background", colors[1].data());
+          ImGui::TextUnformatted("I: toggle this UI; Escape: close this window");
+          ImGui::End();
+        }))
+      return 1;
     bool open = false;
     bool submitted = false;
     for (size_t i = 0; i < windows.size(); ++i) {
