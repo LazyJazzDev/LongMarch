@@ -112,10 +112,13 @@ saves separate numbered files. Modules skipped for unavailable features or headl
 window requirements produce no capture. Different invocations should use separate
 directories to preserve previous results.
 
-Capture is optional and disabled by default. When enabled, it records a download
-every frame so closing the window can save the last rendered frame, then waits only
-at exit to write the files. This adds readback overhead and should not be used for
-rendering performance comparisons.
+Every module records an image download after CmdPresent on every rendered frame
+(after rendering in headless mode), and directly retains only the newest DownloadToken
+and its image metadata. The render loop does not query, wait on, or copy this token.
+With --save-last-frame, normal exit waits on the final token, copies its pixels to CPU
+memory, and writes the files. Without the option, no CPU copy or file output is done.
+Image readback overhead is always included in these demo timings. Each demo owns its
+recording/exit flow; save_image only encodes already downloaded CPU pixels.
 
 Both nbody modules download GPU velocities asynchronously and plot a 100-bin speed
 histogram using the same binning and peak normalization as `nbody_cs`. Only one

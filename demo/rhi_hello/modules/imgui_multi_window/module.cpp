@@ -6,7 +6,7 @@
 #include <iostream>
 #include <thread>
 
-#include "../../../rhi_common/last_frame.h"
+#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
 
@@ -27,8 +27,10 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   if (!device)
     return 1;
-  std::array<rhi_demo::LastFrame, 2> captures{
-      {{capture_directory, "imgui_multi_window_0"}, {capture_directory, "imgui_multi_window_1"}}};
+  std::array<ObjPtr<IDownloadToken>, 2> last_frames;
+  std::array<ImageDesc, 2> last_frame_descs{};
+  std::array<ColorSpace, 2> last_frame_spaces{};
+  std::array<float, 2> last_frame_white_scales{};
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
@@ -63,7 +65,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
 
   for (int rendered = 0; !frames || rendered < frames;) {
     if (!PollEvents())
-      return 1;
+      break;
     // Collect all UI feedback before recording any window's scene commands.
     if (windows[0] && !windows[0]->ShouldClose() && !windows[0]->UpdateImGui([&] {
           if (!visible[0])
@@ -134,8 +136,12 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
         return 1;
       if (!commands->CmdPresent(window.Get()))
         return 1;
-      if (!captures[i].Record(commands.Get(), image.Get(), window.Get()))
+      last_frames[i] = commands->CmdDownloadImage(image.Get());
+      if (!last_frames[i])
         return 1;
+      last_frame_descs[i] = image->GetDesc();
+      last_frame_spaces[i] = window->GetColorSpace();
+      last_frame_white_scales[i] = window->GetHDRReferenceWhiteScale();
       pending[i] = queue->Submit(commands.Get());
 
       if (!pending[i])
@@ -155,8 +161,17 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
         return 1;
     }
   }
-  for (auto &capture : captures)
-    if (!capture.Save())
-      return 1;
+  if (!capture_directory.empty()) {
+    for (size_t i = 0; i < last_frames.size(); ++i) {
+      auto &last_frame = last_frames[i];
+      if (!last_frame || !last_frame->WaitHost())
+        return 1;
+      std::vector<uint8_t> pixels(last_frame->GetSize());
+      if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
+          !SaveImage(capture_directory, "imgui_multi_window_" + std::to_string(i), pixels, last_frame_descs[i],
+                     last_frame_spaces[i], last_frame_white_scales[i]))
+        return 1;
+    }
+  }
   return 0;
 }

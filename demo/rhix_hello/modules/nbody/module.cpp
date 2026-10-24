@@ -5,6 +5,10 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <map>
@@ -12,8 +16,7 @@
 #include <string>
 #include <thread>
 
-#include "../../../rhi_common/last_frame.h"
-#include "../../../rhi_common/speed_distribution.h"
+#include "../../save_image.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
@@ -47,7 +50,10 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   grassland::rhix::Device device = core.CreateDeviceByAutoSelection();
   if (!device)
     return 1;
-  rhi_demo::LastFrame capture(capture_directory, "nbody");
+  grassland::rhix::DownloadToken last_frame;
+  ImageDesc last_frame_desc{};
+  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
+  float last_frame_white_scale = 1.0f;
   PresentMode requested = PRESENT_MODE_VSYNC;
   bool present_mode_changed = false;
   bool running = true, reset_requested = true;
@@ -219,13 +225,51 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       cursor_initialized = true;
     });
   }
-  rhi_demo::SpeedDistribution speeds(particle_count);
+  grassland::rhix::DownloadToken velocity_download;
+  std::vector<glm::vec3> downloaded_velocities(particle_count);
+  std::array<uint32_t, 100> speed_counts{};
+  std::array<float, 100> normalized_speeds{};
+  float maximum_speed = 0;
+  bool speeds_ready = false;
+  auto update_speeds = [&]() {
+    if (!velocity_download)
+      return true;
+    const auto status = velocity_download.GetStatus();
+    if (status == SUBMISSION_STATUS_PENDING)
+      return true;
+    if (status != SUBMISSION_STATUS_COMPLETED ||
+        !velocity_download.CopyTo(downloaded_velocities.data(), downloaded_velocities.size() * sizeof(glm::vec3)))
+      return false;
+    velocity_download = {};
+    maximum_speed = 0;
+    for (const auto &velocity : downloaded_velocities) {
+      const float speed = glm::length(velocity);
+      if (!std::isfinite(speed)) {
+        std::cerr << "nbody: non-finite particle speed\n";
+        return false;
+      }
+      maximum_speed = std::max(maximum_speed, speed);
+    }
+    speed_counts.fill(0);
+    for (const auto &velocity : downloaded_velocities) {
+      const size_t bin =
+          maximum_speed > 0
+              ? std::min(size_t(glm::length(velocity) / maximum_speed * speed_counts.size()), speed_counts.size() - 1)
+              : 0;
+      ++speed_counts[bin];
+    }
+    const auto peak = *std::max_element(speed_counts.begin(), speed_counts.end());
+    for (size_t i = 0; i < speed_counts.size(); ++i)
+      normalized_speeds[i] = peak ? float(speed_counts[i]) / peak : 0;
+    speeds_ready = true;
+    return true;
+  };
   grassland::FPSCounter fps;
   // Warm up allocations and pipelines before measuring completed GPU work.
   auto benchmark_start = std::chrono::steady_clock::now();
   int rendered = headless ? -60 : 0;
   while (!frames || rendered < frames) {
-    if (!speeds.Poll())
+    if (!update_speeds())
       return 1;
     if (!headless) {
       if (!PollEvents())
@@ -298,10 +342,10 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
               if (!status.empty())
                 ImGui::TextUnformatted(status.c_str());
               ImGui::SeparatorText("Speed Distribution");
-              if (speeds.Ready()) {
-                ImGui::PlotLines("##Speeds", speeds.Values().data(), int(speeds.Values().size()), 0, nullptr, 0, 1,
+              if (speeds_ready) {
+                ImGui::PlotLines("##Speeds", normalized_speeds.data(), int(normalized_speeds.size()), 0, nullptr, 0, 1,
                                  {ImGui::GetContentRegionAvail().x, 80});
-                ImGui::Text("Speed: 0 - %.3f", speeds.Maximum());
+                ImGui::Text("Speed: 0 - %.3f", maximum_speed);
               } else
                 ImGui::TextUnformatted("Waiting for GPU readback...");
               ImGui::SeparatorText("Instructions");
@@ -446,10 +490,17 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       if (!context.CmdPresent(window))
         return 1;
     }
-    if (!speeds.Record(context.Get(), velocities.Get()))
+    if (!velocity_download) {
+      velocity_download = context.CmdDownloadBuffer(velocities, 0, particle_count * sizeof(glm::vec3));
+      if (!velocity_download)
+        return 1;
+    }
+    last_frame = context.CmdDownloadImage(image);
+    if (!last_frame)
       return 1;
-    if (!capture.Record(context.Get(), image.Get(), window.Get()))
-      return 1;
+    last_frame_desc = image.GetDesc();
+    last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+    last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
 
     if (!token)
@@ -473,9 +524,36 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
         "nbody: {} particles, {} FLOP/frame, estimated {:.3f} TFLOP/s (20 FLOP/interaction, whole-frame time)\n",
         particle_count, flops_per_frame, flops_per_frame * (rendered / seconds) * 1e-12);
   }
-  if (!speeds.Finish(capture_directory))
+  if (velocity_download && !velocity_download.WaitHost())
     return 1;
-  if (!capture.Save())
+  if (!update_speeds())
     return 1;
+  if (speeds_ready) {
+    std::cout << "nbody: downloaded " << particle_count << " particle velocities, max speed " << maximum_speed
+              << ", 100 histogram bins\n";
+    if (!capture_directory.empty()) {
+      std::error_code error;
+      const auto path = std::filesystem::u8path(capture_directory);
+      std::filesystem::create_directories(path, error);
+      if (error)
+        return 1;
+      std::ofstream file(path / "nbody_speeds.csv");
+      file << "speed_min,speed_max,count,normalized\n";
+      for (size_t i = 0; i < speed_counts.size(); ++i)
+        file << maximum_speed * i / speed_counts.size() << ',' << maximum_speed * (i + 1) / speed_counts.size() << ','
+             << speed_counts[i] << ',' << normalized_speeds[i] << '\n';
+      file.close();
+      if (!file)
+        return 1;
+    }
+  }
+  if (!capture_directory.empty()) {
+    if (!last_frame || !last_frame.WaitHost())
+      return 1;
+    std::vector<uint8_t> pixels(last_frame.GetSize());
+    if (!last_frame.CopyTo(pixels.data(), pixels.size()) ||
+        !SaveImage(capture_directory, "nbody", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
+      return 1;
+  }
   return 0;
 }

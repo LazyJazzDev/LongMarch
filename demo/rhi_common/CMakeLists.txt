@@ -1,2 +1,0 @@
-add_library(rhi_demo_common STATIC last_frame.cpp speed_distribution.cpp)
-target_link_libraries(rhi_demo_common PUBLIC grassland_rhi grassland_util)

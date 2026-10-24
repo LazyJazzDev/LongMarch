@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 
-#include "../../../rhi_common/last_frame.h"
+#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 
@@ -20,8 +20,12 @@ int RunWindow(grassland::rhi::IDevice *device,
               bool headless,
               grassland::rhi::PresentMode &requested,
               bool &present_mode_changed,
-              rhi_demo::LastFrame &capture) {
+              const std::string &capture_directory) {
   using namespace grassland::rhi;
+  ObjPtr<IDownloadToken> last_frame;
+  ImageDesc last_frame_desc{};
+  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
+  float last_frame_white_scale = 1.0f;
   if (!headless) {
     const auto options = window->GetSupportedPresentationOptions();
     if (options.empty())
@@ -102,9 +106,13 @@ int RunWindow(grassland::rhi::IDevice *device,
       if (!context->CmdPresent(window))
         return 1;
     }
-    // Submit ends recording and borrows the caller's context reference.
-    if (!capture.Record(context.Get(), image.Get(), window))
+    last_frame = context->CmdDownloadImage(image.Get());
+    if (!last_frame)
       return 1;
+    last_frame_desc = image->GetDesc();
+    last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+    last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
+    // Submit ends recording and borrows the caller's context reference.
     ObjPtr<ISubmissionToken> token = graphics->Submit(context.Get());
 
     if (!token)
@@ -132,8 +140,14 @@ int RunWindow(grassland::rhi::IDevice *device,
     std::cout << fmt::format("window: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
                              rendered, seconds, rendered / seconds);
   }
-  if (!capture.Save())
-    return 1;
+  if (!capture_directory.empty()) {
+    if (!last_frame || !last_frame->WaitHost())
+      return 1;
+    std::vector<uint8_t> pixels(last_frame->GetSize());
+    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
+        !SaveImage(capture_directory, "window", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
+      return 1;
+  }
   return 0;
 }
 }  // namespace
@@ -161,7 +175,6 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
   // For an explicit ID, use core->CreateDevice(id) instead.
   if (!device)
     return 1;
-  rhi_demo::LastFrame capture(capture_directory, "window");
   std::cout << "Selected: " << device->Name() << '\n'
             << "Enabled: ray tracing pipeline=" << device->SupportRayTracingPipeline()
             << ", ray query=" << device->SupportRayQuery() << ", geometry shader=" << device->SupportGeometryShader()
@@ -192,5 +205,5 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
   }
   // Reverse declaration order releases children before their parents on every return.
   return RunWindow(device.Get(), window.Get(), graphics.Get(), frames, headless, requested, present_mode_changed,
-                   capture);
+                   capture_directory);
 }
