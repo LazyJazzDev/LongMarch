@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
+#include "grassland/rhi/backend/vulkan/vulkan_download_token.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
@@ -883,4 +884,84 @@ bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint
   return true;
 }
 
+IDownloadToken *VulkanCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<VulkanBuffer *>(buffer);
+  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<VulkanBuffer *>(buffer);
+#endif
+  if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto lease = device_->DownloadPool().Acquire(size);
+  if (!lease || !CmdCopyBuffer(native, offset, lease.Get(), 0, size)) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (!TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
+    return nullptr;
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new VulkanDownloadToken(std::move(lease), size)));
+}
+
+IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<VulkanImage *>(image);
+  if (sealed_ || render_target_ || !native || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<VulkanImage *>(image);
+#endif
+  if (recording_failed_ || !native->IsValid()) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const auto desc = native->GetDesc();
+  if (region.x >= desc.width || region.y >= desc.height) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint32_t width = region.width ? region.width : desc.width - region.x;
+  const uint32_t height = region.height ? region.height : desc.height - region.y;
+  const uint64_t packed = uint64_t(width) * ImageFormatSize(desc.format);
+  if (width > desc.width - region.x || height > desc.height - region.y || !packed || height > SIZE_MAX / packed) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint64_t pitch = packed;
+  const bool stencil = HasStencil(desc.format);
+  auto lease = device_->DownloadPool().Acquire(pitch * height + (stencil ? uint64_t(width) * height : 0));
+  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_ACCESS_TRANSFER_READ_BIT) ||
+      !TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT))
+    return nullptr;
+  VkBufferImageCopy copy{};
+  copy.imageSubresource = {static_cast<VkImageAspectFlags>(IsDepthFormat(desc.format) ? VK_IMAGE_ASPECT_DEPTH_BIT
+                                                                                      : VK_IMAGE_ASPECT_COLOR_BIT),
+                           0, 0, 1};
+  copy.imageOffset = {static_cast<int32_t>(region.x), static_cast<int32_t>(region.y), 0};
+  copy.imageExtent = {width, height, 1};
+  vkCmdCopyImageToBuffer(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, lease->NativeBuffer(),
+                         1, &copy);
+  if (stencil) {
+    copy.bufferOffset = pitch * height;
+    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+    vkCmdCopyImageToBuffer(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, lease->NativeBuffer(),
+                           1, &copy);
+  }
+  if (!TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
+    return nullptr;
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new VulkanDownloadToken(
+      std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
+}
 }  // namespace grassland::rhi::backend::vulkan

@@ -10,6 +10,7 @@
 #include <map>
 #include <thread>
 
+#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
@@ -18,7 +19,7 @@ namespace {
 #include "built_in_shaders.inl"
 }
 
-int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
   using namespace grassland::rhi;
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
@@ -30,6 +31,10 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
     std::cout << "raytracing: SKIPPED (ray tracing unavailable)\n";
     return 0;
   }
+  ObjPtr<IDownloadToken> last_frame;
+  ImageDesc last_frame_desc{};
+  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
+  float last_frame_white_scale = 1.0f;
   PresentMode requested = PRESENT_MODE_VSYNC;
   bool present_mode_changed = false;
   ObjPtr<IWindow> window;
@@ -324,7 +329,16 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
       if (!context->CmdPresent(window.Get()))
         return 1;
     }
+    if (!capture_directory.empty()) {
+      last_frame = context->CmdDownloadImage(image.Get());
+      if (!last_frame)
+        return 1;
+      last_frame_desc = image->GetDesc();
+      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
+    }
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+
     if (!token)
       return 1;
     if (headless)
@@ -349,6 +363,14 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
     std::cout << fmt::format(
         "raytracing: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered, seconds,
         rendered / seconds);
+  }
+  if (!capture_directory.empty()) {
+    if (!last_frame || !last_frame->WaitHost())
+      return 1;
+    std::vector<uint8_t> pixels(last_frame->GetSize());
+    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
+        !SaveImage(capture_directory, "raytracing", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
+      return 1;
   }
   return 0;
 }

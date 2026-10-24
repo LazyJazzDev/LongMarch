@@ -8,6 +8,7 @@
 #include <map>
 #include <thread>
 
+#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
@@ -17,7 +18,7 @@ namespace {
 #include "built_in_shaders.inl"
 }
 
-int RunHDR(grassland::rhi::BackendAPI api, int frames) {
+int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &capture_directory) {
   using namespace grassland::rhi;
 
   ObjPtr<ICore> core = CreateCore(api);
@@ -26,6 +27,10 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   if (!device)
     return 1;
+  ObjPtr<IDownloadToken> last_frame;
+  ImageDesc last_frame_desc{};
+  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
+  float last_frame_white_scale = 1.0f;
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
@@ -163,7 +168,16 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
       return 1;
     if (!context->CmdPresent(window.Get()))
       return 1;
+    if (!capture_directory.empty()) {
+      last_frame = context->CmdDownloadImage(image.Get());
+      if (!last_frame)
+        return 1;
+      last_frame_desc = image->GetDesc();
+      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
+    }
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+
     if (!token || !token->WaitHost())
       return 1;
     fps.TickFrame();
@@ -181,5 +195,13 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
     ++rendered;
   }
   std::cout << "hdr: completed " << rendered << " frames (window presentation).\n";
+  if (!capture_directory.empty()) {
+    if (!last_frame || !last_frame->WaitHost())
+      return 1;
+    std::vector<uint8_t> pixels(last_frame->GetSize());
+    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
+        !SaveImage(capture_directory, "hdr", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
+      return 1;
+  }
   return 0;
 }

@@ -6,7 +6,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device_procedures.h"
 #include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_scratch_pool.h"
-#include "grassland/rhi/backend/vulkan/vulkan_upload_pool.h"
+#include "grassland/rhi/backend/vulkan/vulkan_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
@@ -43,7 +43,10 @@ class VulkanDevice final : public Device {
   VkResult Wait(uint64_t value, uint64_t timeout = UINT64_MAX) const;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
-  VulkanUploadPool &UploadPool();
+  VulkanTemporalBufferPool &UploadPool();
+
+  VulkanTemporalBufferPool &DownloadPool();
+
   VulkanScratchPool &ScratchPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::ICommandContext *CreateCommandContext() override;
@@ -55,7 +58,8 @@ class VulkanDevice final : public Device {
   void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command);
 
  private:
-  VulkanUploadPool upload_pool_;
+  VulkanTemporalBufferPool upload_pool_;
+  VulkanTemporalBufferPool download_pool_;
   VulkanScratchPool scratch_pool_;
   std::mutex resource_pool_mutex_;
   std::vector<std::tuple<VkCommandPool, VkCommandBuffer>> command_pool_;

@@ -2,6 +2,7 @@
 #include <array>
 
 #include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_download_token.h"
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 
@@ -75,6 +76,8 @@ class ICommandContext : public IObject {
   // Begin/End delimit an explicit, non-nested rendering scope. Draw requires a scope.
   // Upload, copy, standalone clear, Present and Submit require no active scope.
   // Begin consumes attachment operations; backend attachment leases remain automatic.
+  virtual IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) = 0;
+  virtual IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) = 0;
   virtual bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) = 0;
   virtual bool CmdCopyBuffer(IBuffer *source,
                              uint64_t source_offset,

@@ -9,10 +9,11 @@
 #include <thread>
 #include <utility>
 
+#include "../../save_image.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 
-int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
   auto core = grassland::rhix::CreateCore(api);
@@ -36,6 +37,10 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
   // For an explicit ID, use core.CreateDevice(id) instead.
   if (!device)
     return 1;
+  grassland::rhix::DownloadToken last_frame;
+  ImageDesc last_frame_desc{};
+  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
+  float last_frame_white_scale = 1.0f;
   std::cout << "Selected: " << device.Name() << '\n'
             << "Enabled: ray tracing pipeline=" << device.SupportRayTracingPipeline()
             << ", ray query=" << device.SupportRayQuery() << ", geometry shader=" << device.SupportGeometryShader()
@@ -144,7 +149,16 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
       if (!context.CmdPresent(window))
         return 1;
     }
+    if (!capture_directory.empty()) {
+      last_frame = context.CmdDownloadImage(image);
+      if (!last_frame)
+        return 1;
+      last_frame_desc = image.GetDesc();
+      last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+      last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
+    }
     auto token = graphics.Submit(std::move(context));
+
     if (!token)
       return 1;
     if (headless)
@@ -168,6 +182,14 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
     std::cout << fmt::format("window: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
                              rendered, seconds, rendered / seconds);
+  }
+  if (!capture_directory.empty()) {
+    if (!last_frame || !last_frame.WaitHost())
+      return 1;
+    std::vector<uint8_t> pixels(last_frame.GetSize());
+    if (!last_frame.CopyTo(pixels.data(), pixels.size()) ||
+        !SaveImage(capture_directory, "window", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
+      return 1;
   }
   return 0;
 }

@@ -23,33 +23,41 @@ ID3D12Resource *D3D12AllocatedBuffer::NativeBuffer() const {
 }
 
 D3D12_RESOURCE_STATES D3D12AllocatedBuffer::DefaultState() const {
-  return mapped_ ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON;
+  return download_ ? D3D12_RESOURCE_STATE_COPY_DEST
+         : mapped_ ? D3D12_RESOURCE_STATE_GENERIC_READ
+                   : D3D12_RESOURCE_STATE_COMMON;
 }
 
-D3D12AllocatedBuffer *D3D12AllocatedBuffer::Create(D3D12Device *device, const BufferDesc &desc, bool upload) {
+D3D12AllocatedBuffer *D3D12AllocatedBuffer::Create(D3D12Device *device,
+                                                   const BufferDesc &desc,
+                                                   bool upload,
+                                                   bool download) {
   if (!desc.size)
     return nullptr;
   auto object = std::unique_ptr<D3D12AllocatedBuffer>(new D3D12AllocatedBuffer(device, desc));
   D3D12_RESOURCE_DESC info{};
   info.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
   info.Width = object->desc_.size;
-  info.Flags = upload ? D3D12_RESOURCE_FLAG_NONE : D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+  info.Flags = (upload || download) ? D3D12_RESOURCE_FLAG_NONE : D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
   info.Height = 1;
   info.DepthOrArraySize = 1;
   info.MipLevels = 1;
   info.SampleDesc.Count = 1;
   info.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
   D3D12MA::ALLOCATION_DESC memory{};
-  memory.HeapType = upload ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_DEFAULT;
-  if (!Check(
-          static_cast<D3D12Device *>(object->device_)
-              ->Allocator()
-              ->CreateResource(&memory, &info, upload ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON,
-                               nullptr, &object->allocation_, IID_PPV_ARGS(&object->buffer_)),
-          "Allocate buffer"))
+  object->download_ = download;
+  memory.HeapType = download ? D3D12_HEAP_TYPE_READBACK : upload ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_DEFAULT;
+  if (!Check(static_cast<D3D12Device *>(object->device_)
+                 ->Allocator()
+                 ->CreateResource(&memory, &info,
+                                  download ? D3D12_RESOURCE_STATE_COPY_DEST
+                                  : upload ? D3D12_RESOURCE_STATE_GENERIC_READ
+                                           : D3D12_RESOURCE_STATE_COMMON,
+                                  nullptr, &object->allocation_, IID_PPV_ARGS(&object->buffer_)),
+             "Allocate buffer"))
     return nullptr;
-  if (upload) {
-    D3D12_RANGE read{0, 0};
+  if (upload || download) {
+    D3D12_RANGE read{0, download ? static_cast<SIZE_T>(desc.size) : 0};
     if (!Check(object->buffer_->Map(0, &read, &object->mapped_), "Map upload buffer"))
       return nullptr;
   }
@@ -60,6 +68,13 @@ bool D3D12AllocatedBuffer::Write(const void *data, uint64_t size, uint64_t offse
   if (!mapped_ || offset > desc_.size || size > desc_.size - offset)
     return false;
   std::memcpy(static_cast<uint8_t *>(mapped_) + offset, data, static_cast<size_t>(size));
+  return true;
+}
+
+bool D3D12AllocatedBuffer::Read(void *data, uint64_t size, uint64_t offset) {
+  if (!download_ || !mapped_ || !data || offset > desc_.size || size > desc_.size - offset)
+    return false;
+  std::memcpy(data, static_cast<const uint8_t *>(mapped_) + offset, static_cast<size_t>(size));
   return true;
 }
 }  // namespace grassland::rhi::backend::d3d12

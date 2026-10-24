@@ -9,6 +9,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_download_token.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
@@ -850,4 +851,112 @@ bool D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint3
   return true;
 }
 
+IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<D3D12Buffer *>(buffer);
+#endif
+  if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto lease = device_->DownloadPool().Acquire(size);
+  if (!lease || !CmdCopyBuffer(native, offset, lease.Get(), 0, size)) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new D3D12DownloadToken(std::move(lease), size)));
+}
+
+IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<D3D12Image *>(image);
+  if (sealed_ || rendering_active_ || !native || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<D3D12Image *>(image);
+#endif
+  if (recording_failed_ || !native->IsValid()) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const auto desc = native->GetDesc();
+  if (region.x >= desc.width || region.y >= desc.height) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint32_t width = region.width ? region.width : desc.width - region.x;
+  const uint32_t height = region.height ? region.height : desc.height - region.y;
+  const uint64_t packed = uint64_t(width) * ImageFormatSize(desc.format);
+  if (width > desc.width - region.x || height > desc.height - region.y || !packed || height > SIZE_MAX / packed) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (IsDepthFormat(desc.format)) {
+    auto native_desc = native->NativeImage()->GetDesc();
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprints[2]{};
+    UINT rows[2]{};
+    UINT64 row_bytes[2]{}, total{};
+    const UINT planes = HasStencil(desc.format) ? 2 : 1;
+    device_->NativeDevice()->GetCopyableFootprints(&native_desc, 0, planes, 0, footprints, rows, row_bytes, &total);
+    auto lease = device_->DownloadPool().Acquire(total);
+    if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
+      recording_failed_ = true;
+      return nullptr;
+    }
+    if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState()))
+      return nullptr;
+    for (UINT plane = 0; plane < planes; ++plane) {
+      D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
+      src.pResource = native->NativeImage();
+      src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+      src.SubresourceIndex = plane;
+      dst.pResource = lease->NativeBuffer();
+      dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+      dst.PlacedFootprint = footprints[plane];
+      list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    }
+    const auto depth = footprints[0], stencil = footprints[1];
+    DownloadLayout layout;
+    layout.offset = depth.Offset + uint64_t(region.y) * depth.Footprint.RowPitch + uint64_t(region.x) * 4;
+    layout.row_pitch = depth.Footprint.RowPitch;
+    layout.row_bytes = packed;
+    layout.rows = height;
+    if (planes == 2) {
+      layout.stencil_offset = stencil.Offset + uint64_t(region.y) * stencil.Footprint.RowPitch + region.x;
+      layout.stencil_pitch = stencil.Footprint.RowPitch;
+    }
+    return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new D3D12DownloadToken(std::move(lease), layout)));
+  }
+  const uint64_t pitch =
+      (packed + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) & ~(uint64_t(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) - 1);
+  if (pitch > UINT32_MAX || height > SIZE_MAX / pitch) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto lease = device_->DownloadPool().Acquire(pitch * height);
+  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState()))
+    return nullptr;
+  D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
+  src.pResource = native->NativeImage();
+  src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  dst.pResource = lease->NativeBuffer();
+  dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+  dst.PlacedFootprint.Footprint = {native->NativeImage()->GetDesc().Format, width, height, 1, static_cast<UINT>(pitch)};
+  D3D12_BOX box{region.x, region.y, 0, region.x + width, region.y + height, 1};
+  list_->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(
+      new D3D12DownloadToken(std::move(lease), DownloadLayout{0, pitch, packed, height})));
+}
 }  // namespace grassland::rhi::backend::d3d12

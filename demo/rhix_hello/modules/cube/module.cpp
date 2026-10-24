@@ -11,6 +11,7 @@
 #include <thread>
 #include <utility>
 
+#include "../../save_image.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
@@ -24,7 +25,7 @@ struct Vertex {
 };
 }  // namespace
 
-int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
 
@@ -34,6 +35,12 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
   grassland::rhix::Device device = core.CreateDeviceByAutoSelection();
   if (!device)
     return 1;
+  grassland::rhix::DownloadToken last_frame;
+  grassland::rhix::DownloadToken last_depth;
+  ImageDesc last_depth_desc{};
+  ImageDesc last_frame_desc{};
+  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
+  float last_frame_white_scale = 1.0f;
   PresentMode requested = PRESENT_MODE_VSYNC;
   bool present_mode_changed = false;
   grassland::rhix::Window window;
@@ -233,7 +240,20 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
       if (!context.CmdPresent(window))
         return 1;
     }
+    if (!capture_directory.empty()) {
+      last_frame = context.CmdDownloadImage(image);
+      if (!last_frame)
+        return 1;
+      last_depth = context.CmdDownloadImage(depth);
+      if (!last_depth)
+        return 1;
+      last_depth_desc = depth.GetDesc();
+      last_frame_desc = image.GetDesc();
+      last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+      last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
+    }
     grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
+
     if (!token)
       return 1;
     if (headless)
@@ -257,6 +277,20 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
     std::cout << fmt::format("cube: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
                              rendered, seconds, rendered / seconds);
+  }
+  if (!capture_directory.empty()) {
+    if (!last_frame || !last_frame.WaitHost())
+      return 1;
+    std::vector<uint8_t> pixels(last_frame.GetSize());
+    if (!last_frame.CopyTo(pixels.data(), pixels.size()) ||
+        !SaveImage(capture_directory, "cube", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
+      return 1;
+    if (!last_depth || !last_depth.WaitHost())
+      return 1;
+    pixels.resize(last_depth.GetSize());
+    if (!last_depth.CopyTo(pixels.data(), pixels.size()) ||
+        !SaveImage(capture_directory, "cube_depth", pixels, last_depth_desc, COLOR_SPACE_SRGB_NONLINEAR, 1.0f))
+      return 1;
   }
   return 0;
 }

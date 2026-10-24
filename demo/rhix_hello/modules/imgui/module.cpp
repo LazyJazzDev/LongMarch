@@ -7,11 +7,17 @@
 #include <thread>
 #include <utility>
 
+#include "../../save_image.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
 
-int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless, const char *font_file, float font_size) {
+int RunImGui(grassland::rhi::BackendAPI api,
+             int frames,
+             bool headless,
+             const char *font_file,
+             float font_size,
+             const std::string &capture_directory) {
   using namespace grassland::rhi;
   if (headless) {
     std::cout << "imgui: skipped (requires a window for platform input)\n";
@@ -23,6 +29,10 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless, const ch
   auto device = core.CreateDeviceByAutoSelection();
   if (!device)
     return 1;
+  grassland::rhix::DownloadToken last_frame;
+  ImageDesc last_frame_desc{};
+  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
+  float last_frame_white_scale = 1.0f;
   auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
@@ -93,7 +103,16 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless, const ch
       return 1;
     if (!commands.CmdPresent(window))
       return 1;
+    if (!capture_directory.empty()) {
+      last_frame = commands.CmdDownloadImage(image);
+      if (!last_frame)
+        return 1;
+      last_frame_desc = image.GetDesc();
+      last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+      last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
+    }
     auto done = queue.Submit(std::move(commands));
+
     if (!done)
       return 1;
     ++rendered;
@@ -104,6 +123,14 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless, const ch
         return 1;
       title_time = now;
     }
+  }
+  if (!capture_directory.empty()) {
+    if (!last_frame || !last_frame.WaitHost())
+      return 1;
+    std::vector<uint8_t> pixels(last_frame.GetSize());
+    if (!last_frame.CopyTo(pixels.data(), pixels.size()) ||
+        !SaveImage(capture_directory, "imgui", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
+      return 1;
   }
   return 0;
 }

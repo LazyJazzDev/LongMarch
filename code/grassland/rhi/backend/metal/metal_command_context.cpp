@@ -4,6 +4,7 @@
 
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
+#include "grassland/rhi/backend/metal/metal_download_token.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
@@ -615,5 +616,82 @@ bool MetalCommandContext::CmdDrawIndexed(uint32_t index_count,
       index_offset_ + uint64_t(first_index) * (index_format_ == INDEX_FORMAT_UINT16 ? 2 : 4), instance_count,
       vertex_offset, first_instance);
   return true;
+}
+
+IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
+  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<MetalBuffer *>(buffer);
+#endif
+  if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto lease = device_->DownloadPool().Acquire(size);
+  if (!lease || !CmdCopyBuffer(native, offset, lease.Get(), 0, size)) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new MetalDownloadToken(std::move(lease), size)));
+}
+
+IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<MetalImage *>(image);
+  if (sealed_ || render_target_ || !native || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+#else
+  auto native = static_cast<MetalImage *>(image);
+#endif
+  if (recording_failed_ || !native->IsValid()) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const auto desc = native->GetDesc();
+  if (region.x >= desc.width || region.y >= desc.height) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint32_t width = region.width ? region.width : desc.width - region.x;
+  const uint32_t height = region.height ? region.height : desc.height - region.y;
+  const uint64_t packed = uint64_t(width) * ImageFormatSize(desc.format);
+  if (width > desc.width - region.x || height > desc.height - region.y || !packed || height > SIZE_MAX / packed) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  const uint64_t pitch = packed;
+  const bool stencil = HasStencil(desc.format);
+  auto lease = device_->DownloadPool().Acquire(pitch * height + (stencil ? uint64_t(width) * height : 0));
+  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto blit = commands_->blitCommandEncoder();
+  if (!blit) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (stencil) {
+    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+                          MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height,
+                          MTL::BlitOptionDepthFromDepthStencil);
+    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+                          MTL::Size::Make(width, height, 1), lease->NativeBuffer(), pitch * height, width,
+                          uint64_t(width) * height, MTL::BlitOptionStencilFromDepthStencil);
+  } else {
+    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+                          MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height);
+  }
+  blit->endEncoding();
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new MetalDownloadToken(
+      std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 }  // namespace grassland::rhi::backend::metal

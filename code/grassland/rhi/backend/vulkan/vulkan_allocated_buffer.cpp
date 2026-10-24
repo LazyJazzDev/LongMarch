@@ -18,16 +18,20 @@ VkBuffer VulkanAllocatedBuffer::NativeBuffer() const {
   return buffer_;
 }
 
-VulkanAllocatedBuffer *VulkanAllocatedBuffer::Create(VulkanDevice *device, const BufferDesc &desc, bool upload) {
+VulkanAllocatedBuffer *VulkanAllocatedBuffer::Create(VulkanDevice *device,
+                                                     const BufferDesc &desc,
+                                                     bool upload,
+                                                     bool download) {
   if (!desc.size)
     return nullptr;
   auto object = std::unique_ptr<VulkanAllocatedBuffer>(new VulkanAllocatedBuffer(device, desc));
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   info.size = object->desc_.size;
-  info.usage = upload ? VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-                      : VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  info.usage = download ? VK_BUFFER_USAGE_TRANSFER_DST_BIT
+               : upload ? VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+                        : VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                              VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
   if (device->SupportRayTracingPipeline() || device->SupportRayQuery()) {
     info.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
@@ -35,9 +39,11 @@ VulkanAllocatedBuffer *VulkanAllocatedBuffer::Create(VulkanDevice *device, const
       info.usage |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
   }
   VmaAllocationCreateInfo memory{};
-  memory.usage = upload ? VMA_MEMORY_USAGE_AUTO_PREFER_HOST : VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+  memory.usage = (upload || download) ? VMA_MEMORY_USAGE_AUTO_PREFER_HOST : VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
   if (upload)
     memory.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+  if (download)
+    memory.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
   VmaAllocationInfo allocation{};
   if (!Check(vmaCreateBuffer(static_cast<VulkanDevice *>(object->device_)->Allocator(), &info, &memory,
                              &object->buffer_, &object->allocation_, &allocation),
@@ -53,5 +59,15 @@ bool VulkanAllocatedBuffer::Write(const void *data, uint64_t size) {
   std::memcpy(mapped_, data, static_cast<size_t>(size));
   return Check(vmaFlushAllocation(static_cast<VulkanDevice *>(device_)->Allocator(), allocation_, 0, size),
                "Flush upload buffer");
+}
+
+bool VulkanAllocatedBuffer::Read(void *data, uint64_t size, uint64_t offset) {
+  if (!mapped_ || !data || offset > desc_.size || size > desc_.size - offset)
+    return false;
+  if (!Check(vmaInvalidateAllocation(static_cast<VulkanDevice *>(device_)->Allocator(), allocation_, offset, size),
+             "Invalidate readback buffer"))
+    return false;
+  std::memcpy(data, static_cast<const uint8_t *>(mapped_) + offset, static_cast<size_t>(size));
+  return true;
 }
 }  // namespace grassland::rhi::backend::vulkan

@@ -101,6 +101,30 @@ CommandContext::CommandContext(const void *identity) : identity_(identity) {
 
 CommandContext::~CommandContext() = default;
 
+void CommandContext::BindDownloads(SubmissionToken *submission) {
+  for (const auto &token : downloads_)
+    token->BindSubmission(submission);
+}
+
+void CommandContext::ReleaseDownloads() {
+  downloads_.clear();
+}
+
+IDownloadToken *CommandContext::RegisterDownload(ObjectPtr<DownloadToken> token) {
+  downloads_.push_back(token);
+  return token.Detach();
+}
+
+IDownloadToken *CommandContext::CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t) {
+  recording_failed_ = true;
+  return nullptr;
+}
+
+IDownloadToken *CommandContext::CmdDownloadImage(IImage *, const ImageDownloadRegion &) {
+  recording_failed_ = true;
+  return nullptr;
+}
+
 bool CommandContext::RetainResource(rhi::IObject *resource) {
 #if !defined(NDEBUG)
   if (sealed_)

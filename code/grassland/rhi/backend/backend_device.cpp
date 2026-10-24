@@ -139,6 +139,7 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
     collector_ = std::thread([this] { Collect(); });
   // Allocate the retirement record before submitting any GPU work.
   pending_.push_back({{}, completion});
+  commands->BindDownloads(completion.Get());
   CommandContext::SubmitResult result;
   try {
     result = commands->SubmitNative();
@@ -150,11 +151,15 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
       changed_.notify_one();
     } else {
       pending_.pop_back();
+      completion->Complete(SUBMISSION_STATUS_FAILED);
+      commands->ReleaseDownloads();
     }
     throw;
   }
   if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
     pending_.pop_back();
+    completion->Complete(SUBMISSION_STATUS_FAILED);
+    commands->ReleaseDownloads();
     return {};
   }
   commands->MarkSubmitted();
@@ -179,6 +184,7 @@ void Device::Collect() {
       status = pending.commands->WaitForProgress();
     } while (status == SUBMISSION_STATUS_PENDING);
     // Release payload before publishing completion; tokens never keep it alive.
+    pending.commands->ReleaseDownloads();
     pending.commands.Reset();
     pending.completion->Complete(status);
   }
