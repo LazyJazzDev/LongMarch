@@ -3,13 +3,17 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <glm/gtc/packing.hpp>
 #include <memory>
 #include <thread>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_window.h"
+#include "grassland/rhi/backend/backend_window_imgui.h"
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
 #if defined(LONGMARCH_METAL_ENABLED)
@@ -486,6 +490,129 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   read(60, 20, {0, 0, 255, 255});
   read(90, 20, {0, 255, 0, 255});
   read(135, 95, {255, 255, 255, 255});
+}
+
+TEST_P(RhiImage, ImGuiHDRMatchesSDRColorsTexturesAndAlphaBlending) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop for ImGui platform input.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "HDR UI color verification"});
+  ASSERT_TRUE(window);
+  auto ui =
+      backend::WindowImGui::Create(static_cast<backend::Device *>(device.Get()), window->GLFWWindow(), nullptr, 13);
+  ASSERT_TRUE(ui);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(texture);
+  ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+  const uint8_t texel[] = {128, 64, 200, 128};
+  ASSERT_TRUE(upload && upload->CmdUploadImage(texture.Get(), texel, 4));
+  ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
+  ASSERT_TRUE(uploaded && uploaded->WaitHost());
+  auto linear = [](double v) { return v <= 0.04045 ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4); };
+  auto srgb = [](double v) { return v <= 0.0031308 ? v * 12.92 : 1.055 * std::pow(v, 1.0 / 2.4) - 0.055; };
+#if defined(__APPLE__)
+  constexpr double pq_unit = 100;
+#elif defined(_WIN32)
+  constexpr double pq_unit = 80;
+#else
+  constexpr double pq_unit = 203;
+#endif
+  auto encode = [&](std::array<double, 3> c, ColorSpace space, double white) {
+    if (space == COLOR_SPACE_HDR10_ST2084) {
+      c = {0.627404 * c[0] + 0.329283 * c[1] + 0.043313 * c[2], 0.069097 * c[0] + 0.919540 * c[1] + 0.011362 * c[2],
+           0.016391 * c[0] + 0.088013 * c[1] + 0.895595 * c[2]};
+      for (auto &v : c) {
+        const double p = std::pow((std::max)(v, 0.0) * white * pq_unit / 10000, 2610.0 / 16384);
+        v = std::pow((3424.0 / 4096 + (2413.0 / 128) * p) / (1 + (2392.0 / 128) * p), 2523.0 / 32);
+      }
+    } else if (space == COLOR_SPACE_EXTENDED_SRGB_LINEAR) {
+      for (auto &v : c)
+        v *= white;
+    }
+    return c;
+  };
+  auto decode = [&](std::array<double, 3> c, ColorSpace space, double white) {
+    if (space == COLOR_SPACE_HDR10_ST2084) {
+      for (auto &v : c) {
+        const double p = std::pow((std::max)(v, 0.0), 32.0 / 2523);
+        v = std::pow((std::max)(p - 3424.0 / 4096, 0.0) / (2413.0 / 128 - (2392.0 / 128) * p), 16384.0 / 2610) * 10000 /
+            (white * pq_unit);
+      }
+      c = {1.660491 * c[0] - 0.587641 * c[1] - 0.072850 * c[2], -0.124550 * c[0] + 1.132900 * c[1] - 0.008349 * c[2],
+           -0.018151 * c[0] - 0.100579 * c[1] + 1.118730 * c[2]};
+    } else if (space == COLOR_SPACE_EXTENDED_SRGB_LINEAR) {
+      for (auto &v : c)
+        v /= white;
+    }
+    return c;
+  };
+  auto draw = [&] {
+    auto *list = ImGui::GetForegroundDrawList();
+    list->AddRectFilled({0, 0}, {30, 30}, IM_COL32(128, 128, 128, 255));
+    list->AddRectFilled({30, 0}, {60, 30}, IM_COL32(220, 40, 80, 128));
+    list->AddRectFilled({30, 0}, {60, 30}, IM_COL32(40, 180, 200, 96));
+    list->AddImage(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(texture.Get())), {60, 0}, {90, 30}, {0, 0},
+                   {1, 1}, IM_COL32(180, 220, 255, 192));
+  };
+  // All output encodings are exercised even on an SDR-only desktop.
+  std::array<std::array<uint8_t, 4>, 4> baseline{};
+  ObjPtr<IImage> sdr = device->CreateImage({160, 120, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(sdr && ui->Update(draw));
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands && commands->CmdClearColor(sdr.Get(), {0.2f, 0.3f, 0.4f, 1}));
+  ASSERT_TRUE(ui->Record(commands.Get(), sdr.Get()));
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done && done->WaitHost());
+  for (size_t i = 0; i < baseline.size(); ++i)
+    ReadPixel(device.Get(), sdr.Get(), GetParam(), uint32_t(i * 30 + 10), 10, baseline[i]);
+  for (auto space : {COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084, COLOR_SPACE_BT709_LINEAR,
+                     COLOR_SPACE_EXTENDED_SRGB_LINEAR}) {
+    for (float white : {1.0f, 2.5f}) {
+      SCOPED_TRACE(int(space));
+      SCOPED_TRACE(white);
+      ObjPtr<IImage> target = device->CreateImage({160, 120, IMAGE_FORMAT_RGBA16_FLOAT});
+      ASSERT_TRUE(target && ui->Update(draw));
+      const auto bg = encode({linear(0.2), linear(0.3), linear(0.4)}, space, white);
+      commands = device->CreateCommandContext();
+      ASSERT_TRUE(commands && commands->CmdClearColor(target.Get(), {float(bg[0]), float(bg[1]), float(bg[2]), 1}));
+      ASSERT_TRUE(ui->Record(commands.Get(), target.Get(), space, white));
+      done = queue->Submit(commands.Get());
+      ASSERT_TRUE(done && done->WaitHost());
+      for (size_t i = 0; i < baseline.size(); ++i) {
+        std::array<uint8_t, 8> bytes{};
+        ReadPixel(device.Get(), target.Get(), GetParam(), uint32_t(i * 30 + 10), 10, bytes);
+        uint16_t halves[4];
+        std::memcpy(halves, bytes.data(), 8);
+        auto c =
+            decode({glm::unpackHalf1x16(halves[0]), glm::unpackHalf1x16(halves[1]), glm::unpackHalf1x16(halves[2])},
+                   space, white);
+        for (int channel = 0; channel < 3; ++channel)
+          EXPECT_NEAR(srgb(c[channel]), baseline[i][channel] / 255.0, 0.015)
+              << "sample " << i << " channel " << channel;
+      }
+      // Untouched HDR highlights must survive the nonlinear composition round trip.
+      const auto highlight = encode({4, 2, 1}, space, white);
+      ASSERT_TRUE(ui->Update(draw));
+      commands = device->CreateCommandContext();
+      ASSERT_TRUE(commands && commands->CmdClearColor(
+                                  target.Get(), {float(highlight[0]), float(highlight[1]), float(highlight[2]), 1}));
+      ASSERT_TRUE(ui->Record(commands.Get(), target.Get(), space, white));
+      done = queue->Submit(commands.Get());
+      ASSERT_TRUE(done && done->WaitHost());
+      std::array<uint8_t, 8> bytes{};
+      ReadPixel(device.Get(), target.Get(), GetParam(), 120, 90, bytes);
+      uint16_t halves[4];
+      std::memcpy(halves, bytes.data(), 8);
+      for (int channel = 0; channel < 3; ++channel)
+        EXPECT_NEAR(glm::unpackHalf1x16(halves[channel]), highlight[channel], 0.02);
+    }
+  }
 }
 
 TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {

@@ -73,7 +73,7 @@ bool Window::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
     }
   } scope(processing_imgui_);
 
-  return imgui_->Record(commands, image);
+  return imgui_->Record(commands, image, GetColorSpace(), GetHDRReferenceWhiteScale());
 }
 
 rhi::IImage *Window::GetNextImage() {

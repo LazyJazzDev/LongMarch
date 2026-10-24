@@ -116,3 +116,26 @@ to use the built-in font and omit `--font-size` to use 13 pixels.
 For example: `demo_rhi_hello --backend d3d12 --module imgui --font "C:/Windows/Fonts/arial.ttf" --font-size 24 --frames 120`.
 The size must be finite and positive. An unreadable font file fails initialization.
 Changing these options requires restarting the demo; they do not rebuild the atlas live.
+
+### SDR UI appearance on HDR outputs
+
+ImGui colors and custom image samples retain their SDR/sRGB meaning in every window color space.
+For HDR outputs, the renderer decodes the existing background to extended nonlinear sRGB,
+composites ImGui with the same alpha blending as the SDR path, then encodes the result to
+linear extended sRGB, linear Rec.709, or Rec.2020/ST2084 PQ. Values outside the SDR range are
+preserved through the floating-point composition target; the scene is not tone-mapped or
+clamped to SDR. Font coverage, custom image tinting and overlapping translucent widgets
+therefore retain the SDR blending convention. Custom images are interpreted exactly as in
+the SDR UI path; this is not an automatic color-space detector for HDR image previews.
+
+Reference white follows the window's current HDR reference-white scale and the existing
+platform presentation conventions. This matches equivalent SDR content at reference white;
+physical display calibration, compositor behavior and a different HDR background can still
+affect perceived appearance. UI is composited into the window's active color space at
+CmdPresent, so changing output modes does not recreate the ImGui context or lose widget state.
+
+HDR UI uses one reusable RGBA16F image and two fullscreen conversion passes. SDR and empty UI
+frames do not take this path. Vulkan HDR presentation requires a sampleable swapchain surface;
+D3D12 swapchains allow shader input, and Metal drawable textures already allow sampling.
+Both hello demos' `hdr` modules include an SDR UI reference panel; H cycles supported output
+color spaces, and bounded `--frames` runs cycle them automatically.

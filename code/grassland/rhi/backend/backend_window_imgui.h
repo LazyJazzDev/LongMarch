@@ -34,7 +34,10 @@ class WindowImGui {
   }
 
   bool Update(const std::function<void()> &callback);
-  bool Record(ICommandContext *commands, IImage *image);
+  bool Record(ICommandContext *commands,
+              IImage *image,
+              ColorSpace color_space = COLOR_SPACE_SRGB_NONLINEAR,
+              float reference_white_scale = 1.0f);
 
  private:
   explicit WindowImGui(Device *device) : device_(device) {
@@ -42,6 +45,12 @@ class WindowImGui {
 
   bool Initialize(GLFWwindow *window, const char *font_file_path, float font_size);
   bool Render(ICommandContext *commands, IImage *image, ImDrawData *data);
+  bool ConvertPresentation(ICommandContext *commands,
+                           IImage *source,
+                           IImage *target,
+                           ColorSpace color_space,
+                           float reference_white_scale,
+                           bool encode);
   Device *device_;
   ImGuiContext *context_{};
   bool platform_initialized_{};
@@ -51,5 +60,10 @@ class WindowImGui {
   ObjPtr<IProgram> program_;
   ObjPtr<IBuffer> vertex_buffer_;
   ObjPtr<IBuffer> index_buffer_;
+  ObjPtr<IImage> composition_;
+  ObjPtr<IBuffer> display_settings_;
+  ObjPtr<IProgram> decode_program_;
+  ObjPtr<IProgram> encode_program_;
+  ColorSpace conversion_space_{COLOR_SPACE_SRGB_NONLINEAR};
 };
 }  // namespace grassland::rhi::backend

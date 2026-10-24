@@ -11,6 +11,7 @@
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
+#include "imgui.h"
 
 namespace {
 #include "built_in_shaders.inl"
@@ -35,6 +36,8 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
   std::vector<ColorSpace> spaces{COLOR_SPACE_SRGB_NONLINEAR};
   window = device.CreateGLFWWindow({960, 540, "RHIX HDR - H: color space, P: toggle VSync, Escape: close"});
   if (!window)
+    return 1;
+  if (!window.EnableImGui())
     return 1;
   for (const auto &option : window.GetSupportedPresentationOptions()) {
     std::cout << ColorSpaceName(option.color_space) << " / " << ImageFormatName(option.format) << " / "
@@ -107,6 +110,23 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
       previous_scale = linear_scale;
       previous_headroom = headroom;
     }
+    if (!window.UpdateImGui([&] {
+          ImGui::Begin("SDR appearance in HDR");
+          ImGui::TextUnformatted("H: switch color space; UI should retain its SDR appearance.");
+          ImGui::Text("Output: %s", ColorSpaceName(window.GetColorSpace()));
+          ImGui::TextUnformatted("Gray ramp, colored text and translucent controls:");
+          for (int i = 0; i < 5; ++i) {
+            if (i)
+              ImGui::SameLine();
+            const float gray = float(i) / 4;
+            ImGui::PushID(i);
+            ImGui::ColorButton("Gray", {gray, gray, gray, 1}, ImGuiColorEditFlags_NoTooltip, {32, 24});
+            ImGui::PopID();
+          }
+          ImGui::TextColored({1, 0.3f, 0.2f, 1}, "SDR colored text");
+          ImGui::End();
+        }))
+      return 1;
     const float settings[4] = {linear_scale, headroom, 0, 0};
     const auto color_space = window.GetColorSpace();
     grassland::rhix::Image image = window.GetNextImage();
