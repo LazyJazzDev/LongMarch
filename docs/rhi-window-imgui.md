@@ -144,9 +144,10 @@ accumulation image is part of the scene renderer, not an intermediate ImGui comp
 The control panel uses `assets/fonts/simhei.ttf` at 20 pixels and shows backend, particle
 count, frame duration and estimated interaction throughput. Reset, pause/resume, logarithmic
 time step and galaxy-count controls match the reference; galaxy count applies on reset.
-Statistics, Control and ColorSpace use matching separator headings. ColorSpace contains
+Statistics, Control, ColorSpace and Instructions use matching separator headings. ColorSpace contains
 a selector without a trailing label, with VSync on its right. FPS, frame time, throughput
-and shortcut hints live in the ImGui panel; the native window title is fixed. UI updates finish
+live in the ImGui panel; shortcut, drag and reset hints have their own Instructions section.
+The native window title is fixed. UI updates finish
 before scene command recording, so pause, reset, time-step and output changes affect that frame.
 
 Shortcuts: P toggles VSync, Space pauses/resumes, R resets, Escape closes.

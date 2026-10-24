@@ -245,8 +245,6 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
                 running = !running;
               ImGui::SliderFloat("Delta Time", &delta_t, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
               ImGui::SliderInt("Galaxy Number", &galaxy_count, 1, 20);
-              ImGui::TextUnformatted("Galaxy count applies on Reset. Drag outside UI to rotate.");
-              ImGui::TextUnformatted("P: VSync; Space: pause/resume; R: reset; Escape: close");
               ImGui::SeparatorText("ColorSpace");
               const auto &style = ImGui::GetStyle();
               const float vsync_width =
@@ -269,6 +267,9 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
               }
               if (!status.empty())
                 ImGui::TextUnformatted(status.c_str());
+              ImGui::SeparatorText("Instructions");
+              ImGui::TextUnformatted("Galaxy count applies on Reset. Drag outside UI to rotate.");
+              ImGui::TextUnformatted("P: VSync; Space: pause/resume; R: reset; Escape: close");
             }
             ImGui::End();
             capture_keyboard = ImGui::GetIO().WantCaptureKeyboard;
