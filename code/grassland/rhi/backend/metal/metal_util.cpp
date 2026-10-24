@@ -33,9 +33,8 @@ MTL::BlendOperation NativeBlendOp(BlendOp op) {
 }
 
 bool SupportsImageStorage(ImageFormat format) {
-  // Of the currently supported formats, RGBA8Unorm supports shader writes
-  // on all supported Metal GPU families; BGRA8Unorm is read-only.
-  return format == IMAGE_FORMAT_RGBA8_UNORM;
+  // These formats support shader writes on all supported Metal GPU families.
+  return format == IMAGE_FORMAT_RGBA8_UNORM || format == IMAGE_FORMAT_RGBA16_FLOAT;
 }
 
 MTL::PixelFormat NativeImageFormat(ImageFormat format) {
@@ -44,6 +43,12 @@ MTL::PixelFormat NativeImageFormat(ImageFormat format) {
       return MTL::PixelFormatRGBA8Unorm;
     case IMAGE_FORMAT_BGRA8_UNORM:
       return MTL::PixelFormatBGRA8Unorm;
+    case IMAGE_FORMAT_RGBA16_FLOAT:
+      return MTL::PixelFormatRGBA16Float;
+    case IMAGE_FORMAT_RGB10A2_UNORM:
+      return MTL::PixelFormatRGB10A2Unorm;
+    case IMAGE_FORMAT_BGR10A2_UNORM:
+      return MTL::PixelFormatBGR10A2Unorm;
     case IMAGE_FORMAT_D32_FLOAT:
       return MTL::PixelFormatDepth32Float;
     case IMAGE_FORMAT_D24_UNORM_S8_UINT:

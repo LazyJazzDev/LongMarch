@@ -51,12 +51,16 @@ int RunTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
     }
   }
-  const auto &embedded = shader_list.at("modules/triangle/shaders/triangle.slang");
-  std::string source(embedded.first, embedded.second);
-  ObjPtr<IShader> vertex_shader = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  grassland::VirtualFileSystem files;
+  for (const auto &[path, data] : shader_list)
+    if (files.WriteFile(path, data.first, data.second))
+      return 1;
+  ObjPtr<IShader> vertex_shader =
+      device->CreateShader("modules/triangle/shaders/triangle.slang", "VSMain", SHADER_STAGE_VERTEX, &files);
   if (!vertex_shader)
     return 1;
-  ObjPtr<IShader> fragment_shader = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> fragment_shader =
+      device->CreateShader("modules/triangle/shaders/triangle.slang", "PSMain", SHADER_STAGE_FRAGMENT, &files);
   if (!fragment_shader)
     return 1;
   ProgramDesc desc;

@@ -68,6 +68,11 @@ class Window : public Object<rhi::IWindow> {
   virtual bool UpdateNextImage();
   void ReleaseNextImage();
   bool SetPresentMode(PresentMode mode) override;
+  bool SetColorSpace(ColorSpace color_space) override;
+  ColorSpace GetColorSpace() const override;
+  bool GetHDRReferenceWhiteNits(float &nits) const override;
+  float GetHDRReferenceWhiteScale() const override;
+  float GetHDRHeadroom() const override;
   GLFWwindow *GLFWWindow() const override;
   bool ShouldClose() const override;
   bool IsKeyDown(int key) const override;
@@ -78,6 +83,7 @@ class Window : public Object<rhi::IWindow> {
  protected:
   bool InitializeWindow(Device *device, const WindowDesc &desc);
   bool invalid_{true};
+  ColorSpace RequestedColorSpace() const;
 
  private:
   Device *device_{};
@@ -95,6 +101,8 @@ class Window : public Object<rhi::IWindow> {
   EventManager<void(int, const char **)> drop_event_;
   EventManager<void()> imgui_event_;
   PresentMode requested_mode_{PRESENT_MODE_VSYNC};
+  ColorSpace requested_color_space_{COLOR_SPACE_SRGB_NONLINEAR};
+  ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
   GLFWwindow *window_{};
   std::mutex next_image_mutex_;
   ObjectPtr<Image> next_image_;

@@ -54,10 +54,10 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
   }
   const auto &embedded = shader_list.at("modules/cube/shaders/cube.slang");
   std::string source(embedded.first, embedded.second);
-  ObjPtr<IShader> vertex_shader = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> vertex_shader = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   if (!vertex_shader)
     return 1;
-  ObjPtr<IShader> fragment_shader = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> fragment_shader = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   if (!fragment_shader)
     return 1;
   ProgramDesc desc;

@@ -32,6 +32,10 @@ bool SupportsImageStorage(ID3D12Device *device, ImageFormat format) {
 
 DXGI_FORMAT NativeImageFormat(ImageFormat format) {
   switch (format) {
+    case IMAGE_FORMAT_RGBA16_FLOAT:
+      return DXGI_FORMAT_R16G16B16A16_FLOAT;
+    case IMAGE_FORMAT_RGB10A2_UNORM:
+      return DXGI_FORMAT_R10G10B10A2_UNORM;
     case IMAGE_FORMAT_RGBA8_UNORM:
       return DXGI_FORMAT_R8G8B8A8_UNORM;
     case IMAGE_FORMAT_BGRA8_UNORM:

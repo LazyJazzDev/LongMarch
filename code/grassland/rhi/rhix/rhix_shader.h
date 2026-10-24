@@ -8,6 +8,8 @@ class Shader : public ObjectContainer {
   Shader() noexcept;
   Shader(rhi::IShader *object) noexcept;
   rhi::IShader *Get() const noexcept;
-  const rhi::ShaderDesc &GetDesc() const;
+  rhi::ShaderStage GetStage() const;
+  const std::string &GetEntry() const;
+  const std::string &GetPreprocessedCode() const;
 };
 }  // namespace grassland::rhix

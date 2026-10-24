@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/backend_window_imgui.h"
+#include "grassland/rhi/backend/backend_window_imgui.h"
 
 #include <algorithm>
 #include <cmath>
@@ -193,8 +193,8 @@ bool WindowImGui::Render(ICommandContext *commands, IImage *image, ImDrawData *d
     return true;
   const auto extent = image->GetDesc();
   if (!program_ || program_->GetDesc().color_formats[0] != extent.format) {
-    ObjPtr<IShader> vs = device_->CreateShader({shader, "VSMain", SHADER_STAGE_VERTEX});
-    ObjPtr<IShader> ps = device_->CreateShader({shader, "PSMain", SHADER_STAGE_FRAGMENT});
+    ObjPtr<IShader> vs = device_->CreateShaderFromSource(shader, "VSMain", SHADER_STAGE_VERTEX);
+    ObjPtr<IShader> ps = device_->CreateShaderFromSource(shader, "PSMain", SHADER_STAGE_FRAGMENT);
     if (!vs || !ps)
       return false;
     ProgramDesc desc;

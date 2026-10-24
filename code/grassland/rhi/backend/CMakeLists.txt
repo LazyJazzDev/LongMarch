@@ -13,3 +13,8 @@ endif ()
 if (LONGMARCH_METAL_ENABLED)
     add_subdirectory(metal)
 endif ()
+
+if (APPLE)
+    target_sources(grassland_rhi PRIVATE backend_window_cocoa.mm)
+    target_link_libraries(grassland_rhi PRIVATE "-framework Cocoa")
+endif ()

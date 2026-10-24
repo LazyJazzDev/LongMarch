@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/metal/metal_compute_program.h"
 
+#include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 
@@ -23,7 +24,7 @@ MetalComputeProgram *MetalComputeProgram::Create(MetalDevice *owner_device, cons
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   std::array<uint32_t, 3> threads{};
-  auto function = object->CompileFunction(object->desc_.compute_shader->GetDesc(), {}, &threads);
+  auto function = object->CompileFunction(object->desc_.compute_shader, {}, &threads);
   if (!function)
     return nullptr;
   auto device = owner_device->NativeDevice();

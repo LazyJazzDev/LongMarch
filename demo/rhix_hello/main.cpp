@@ -1,13 +1,15 @@
-﻿#include <charconv>
+#include <charconv>
 #include <iostream>
 #include <string>
 
 #include "module.h"
+#include "snowberg/tui/tui.h"
 
 int main(int argc, char **argv) {
   using namespace grassland::rhi;
   BackendAPI api = BACKEND_API_DEFAULT;
   std::string module;
+  bool backend_specified = false;
   bool tui = false;
   bool headless = false;
   bool all = false;
@@ -27,12 +29,12 @@ int main(int argc, char **argv) {
       continue;
     }
     if (arg == "--list") {
-      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\nimgui\n";
+      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\nimgui\nhdr\n";
       return 0;
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|imgui | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|imgui|hdr | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -60,10 +62,62 @@ int main(int argc, char **argv) {
       std::cerr << "Unknown option: " << arg << '\n';
       return 1;
     }
+    backend_specified = true;
   }
   if (all && (tui || !module.empty())) {
     std::cerr << "Use --all without --module or --tui\n";
     return 1;
+  }
+  if (tui && !module.empty()) {
+    std::cerr << "Use either --module or --tui, not both\n";
+    return 1;
+  }
+  if (!backend_specified) {
+    const std::vector<BackendAPI> backends{
+#if defined(LONGMARCH_D3D12_ENABLED)
+        BACKEND_API_D3D12,
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+        BACKEND_API_VULKAN,
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+        BACKEND_API_METAL,
+#endif
+    };
+    std::vector<snowberg::tui::MenuOption> options;
+    for (const auto backend : backends) {
+      switch (backend) {
+        case BACKEND_API_D3D12:
+          options.push_back({BackendAPIName(backend), "Microsoft | Windows"});
+          break;
+        case BACKEND_API_VULKAN:
+          options.push_back({BackendAPIName(backend), "Khronos Group | Windows, Linux, macOS"});
+          break;
+        case BACKEND_API_METAL:
+          options.push_back({BackendAPIName(backend), "Apple | macOS"});
+          break;
+      }
+    }
+    if (backends.empty()) {
+      std::cerr << "No graphics backend is enabled in this build.\n";
+      return 1;
+    }
+    if (backends.size() == 1) {
+      api = backends.front();
+    } else {
+      size_t initial_selection = 0;
+      for (size_t i = 0; i < backends.size(); ++i) {
+        if (backends[i] == BACKEND_API_DEFAULT) {
+          initial_selection = i;
+          break;
+        }
+      }
+      snowberg::tui::Menu menu;
+      const auto selected = menu.Select("RHIx Hello - API Selection", options, initial_selection);
+      if (!selected)
+        return 0;
+      api = backends[*selected];
+    }
   }
   if (!frames) {
     if (headless)
@@ -109,75 +163,33 @@ int main(int argc, char **argv) {
       std::cerr << "imgui: FAILED\n";
       result = 1;
     }
+    if (headless) {
+      std::cout << "hdr: SKIPPED (requires a window)\n";
+    } else if (RunHDR(api, frames) != 0) {
+      std::cerr << "hdr: FAILED\n";
+      result = 1;
+    }
     return result;
   }
-  if (tui && !module.empty()) {
-    std::cerr << "Use either --module or --tui, not both\n";
-    return 1;
-  }
   if (module.empty()) {
-    std::cout << "\nModule Selection\n"
-                 "  1. window    Clear and present a window\n"
-                 "  2. triangle  Colored indexed triangle (D3D12/Vulkan/Metal)\n"
-                 "  3. cube      Rotating cube with depth and uniform binding\n"
-                 "  4. texture   Sampled XOR texture triangle\n"
-                 "  5. blend     Source-alpha blended triangles\n"
-                 "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan/Metal)\n";
-    std::cout << "  7. raytracing  Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)\n"
-                 "  8. ray_query   Inline ray queries (D3D12/Vulkan/Metal)\n"
-                 "  9. imgui       ImGui overlay (I: toggle recording)\n";
-    for (;;) {
-      std::cout << "\nSelect module [1-9 or name], q to quit: " << std::flush;
-      std::string input;
-      if (!std::getline(std::cin, input))
-        return 0;
-      const auto first = input.find_first_not_of(" \t\r");
-      if (first == std::string::npos)
-        continue;
-      input = input.substr(first, input.find_last_not_of(" \t\r") - first + 1);
-      if (input == "q" || input == "quit")
-        return 0;
-      if (input == "9" || input == "imgui") {
-        module = "imgui";
-        break;
-      }
-      if (input == "1" || input == "window") {
-        module = "window";
-        break;
-      }
-      if (input == "2" || input == "triangle") {
-        module = "triangle";
-        break;
-      }
-      if (input == "3" || input == "cube") {
-        module = "cube";
-        break;
-      }
-      if (input == "4" || input == "texture") {
-        module = "texture";
-        break;
-      }
-      if (input == "5" || input == "blend") {
-        module = "blend";
-        break;
-      }
-      if (input == "6" || input == "nbody") {
-        module = "nbody";
-        break;
-      }
-      if (input == "7" || input == "raytracing") {
-        module = "raytracing";
-        break;
-      }
-      if (input == "8" || input == "ray_query") {
-        module = "ray_query";
-        break;
-      }
-      std::cout << "Invalid selection. Enter a listed number or module name.\n";
-    }
+    const std::vector<snowberg::tui::MenuOption> options{
+        {"window", "Clear and present a window"},
+        {"triangle", "Colored indexed triangle"},
+        {"cube", "Rotating cube with depth and uniform binding"},
+        {"texture", "Sampled XOR texture triangle"},
+        {"blend", "Source-alpha blended triangles"},
+        {"nbody", "Compute simulation and particle rendering"},
+        {"raytracing", "Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)"},
+        {"ray_query", "Inline ray queries"},
+        {"imgui", "Interactive ImGui overlay"},
+        {"hdr", "HDR presentation (window only)"},
+    };
+    snowberg::tui::Menu menu;
+    const auto selected = menu.Select("RHIx Hello - Module Selection", options);
+    if (!selected)
+      return 0;
+    module = options[*selected].name;
   }
-  if (module == "imgui")
-    return RunImGui(api, frames, headless);
   if (module == "window")
     return RunWindow(api, frames, headless);
   if (module == "triangle")
@@ -194,6 +206,15 @@ int main(int argc, char **argv) {
     return RunRayTracing(api, frames, headless);
   if (module == "ray_query")
     return RunRayQuery(api, frames, headless);
+  if (module == "imgui")
+    return RunImGui(api, frames, headless);
+  if (module == "hdr") {
+    if (headless) {
+      std::cerr << "hdr requires a window; --headless is unsupported.\n";
+      return 1;
+    }
+    return RunHDR(api, frames);
+  }
   std::cerr << "Unknown module: " << module << '\n';
   return 1;
 }

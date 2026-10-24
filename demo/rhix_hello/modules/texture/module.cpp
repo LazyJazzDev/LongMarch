@@ -56,10 +56,10 @@ int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
   }
   const auto &embedded = shader_list.at("modules/texture/shaders/texture.slang");
   std::string source(embedded.first, embedded.second);
-  grassland::rhix::Shader vertex_shader = device.CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  grassland::rhix::Shader vertex_shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   if (!vertex_shader)
     return 1;
-  grassland::rhix::Shader fragment_shader = device.CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  grassland::rhix::Shader fragment_shader = device.CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   if (!fragment_shader)
     return 1;
   ProgramDesc desc;

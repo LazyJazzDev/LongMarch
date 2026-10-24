@@ -138,6 +138,46 @@ rhi::PresentMode Window::GetPresentMode() const {
   return Get()->GetPresentMode();
 }
 
+bool Window::SetColorSpace(rhi::ColorSpace color_space) const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->SetColorSpace(color_space);
+}
+
+rhi::ColorSpace Window::GetColorSpace() const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return rhi::COLOR_SPACE_SRGB_NONLINEAR;
+#endif
+  return Get()->GetColorSpace();
+}
+
+float Window::GetHDRReferenceWhiteScale() const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return 1.0f;
+#endif
+  return Get()->GetHDRReferenceWhiteScale();
+}
+
+float Window::GetHDRHeadroom() const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return 10.0f;
+#endif
+  return Get()->GetHDRHeadroom();
+}
+
+bool Window::GetHDRReferenceWhiteNits(float &nits) const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->GetHDRReferenceWhiteNits(nits);
+}
+
 std::vector<rhi::WindowPresentationOption> Window::GetSupportedPresentationOptions() const {
 #if !defined(NDEBUG)
   if (!*this)

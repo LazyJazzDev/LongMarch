@@ -407,7 +407,7 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
     desc.pipeline_layout.groups.push_back({{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4}}});
   }
   source += "[numthreads(1, 1, 1)] void CSMain() {\n" + body + "}\n";
-  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
   desc.compute_shader = shader.Get();
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
@@ -451,7 +451,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
       values[id.x] = values[id.x] * 2 + 1;
     }
   )";
-  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
   ComputeProgramDesc desc;
   desc.compute_shader = shader.Get();
@@ -498,7 +498,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   for (uint32_t i = 0; i < 16; ++i)
     EXPECT_EQ(actual[i], i * 2 + 1);
   // A new context sees the completed writes in the same physical buffer.
-  shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  shader = device->CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
   program = device->CreateComputeProgram({shader.Get(), desc.pipeline_layout});
   ASSERT_TRUE(program);
@@ -525,14 +525,14 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
   ASSERT_TRUE(device);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
-  ObjPtr<IShader> shader = device->CreateShader({R"(
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
     RHI_RW_STRUCTURED_BUFFER(0, 0, uint, values);
     [numthreads(2, 3, 2)] void CSMain(uint3 id : SV_DispatchThreadID) {
       uint index = id.x + 4 * (id.y + 6 * id.z);
       values[index] += index + 1;
     }
   )",
-                                                 "CSMain", SHADER_STAGE_COMPUTE});
+                                                          "CSMain", SHADER_STAGE_COMPUTE);
   ComputeProgramDesc desc;
   desc.compute_shader = shader.Get();
   desc.pipeline_layout.groups = {{{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4}}}};
@@ -566,11 +566,11 @@ TEST_P(RhiBuffer, ComputeCreationRejectsWrongStageVisibilityAndStride) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IShader> shader = device->CreateShader({R"(
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
     RHI_RW_STRUCTURED_BUFFER(0, 0, float3, values);
     [numthreads(1, 1, 1)] void CSMain() { values[0] = float3(1, 2, 3); }
   )",
-                                                 "CSMain", SHADER_STAGE_COMPUTE});
+                                                          "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
   ComputeProgramDesc desc;
   desc.compute_shader = shader.Get();
@@ -585,11 +585,11 @@ TEST_P(RhiBuffer, ComputeCreationRejectsWrongStageVisibilityAndStride) {
   program = device->CreateComputeProgram(desc);
   ASSERT_TRUE(program);
   ObjPtr<IShader> vertex =
-      device->CreateShader({"float4 VSMain():SV_Position { return 0; }", "VSMain", SHADER_STAGE_VERTEX});
+      device->CreateShaderFromSource("float4 VSMain():SV_Position { return 0; }", "VSMain", SHADER_STAGE_VERTEX);
   desc.compute_shader = vertex.Get();
   program = device->CreateComputeProgram(desc);
   EXPECT_FALSE(program);
-  shader = device->CreateShader({"invalid shader code", "CSMain", SHADER_STAGE_COMPUTE});
+  shader = device->CreateShaderFromSource("invalid shader code", "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
   desc.compute_shader = shader.Get();
   program = device->CreateComputeProgram(desc);

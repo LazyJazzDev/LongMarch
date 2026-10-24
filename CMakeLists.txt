@@ -13,6 +13,11 @@ project(LongMarch)
 
 set(CMAKE_CXX_STANDARD 17)
 
+if (APPLE)
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 17)
+endif ()
+
 find_package(CUDAToolkit)
 
 if (UNIX AND NOT APPLE)

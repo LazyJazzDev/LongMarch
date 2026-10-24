@@ -20,11 +20,12 @@ cmake-build-release/demo/graphics_hello/demo_graphics_hello --module ray_query -
 cmake-build-release/demo/graphics_hello/demo_graphics_hello --list
 ```
 
-The terminal UI lists module names and descriptions. Enter a number (1–12) or a
-module name, followed by Enter. Invalid choices prompt again; `q`, `quit`, or EOF
-exits without creating a window. This line-based menu works in IDE consoles and
-with redirected input as well as native terminals. Closing a demo window exits
-the executable normally.
+The shared `snowberg::tui` menu highlights one option at a time. Up/Down selects,
+Enter confirms, and Esc exits. Click selects, double-click confirms, and the mouse
+wheel moves selection. Each option occupies one line; overflowing selected text
+scrolls horizontally after a pause. Short terminals scroll the option list vertically.
+Redirected input and unsupported terminals retain the number/name prompt, with
+`q`, `quit`, or EOF to exit. Closing a demo window exits the executable normally.
 
 | Module | Demonstration |
 | --- | --- |

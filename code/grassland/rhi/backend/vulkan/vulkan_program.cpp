@@ -42,11 +42,9 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
   }
   std::vector<uint8_t> code[2];
   auto prefix = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_VULKAN, object->desc_.vertex_attributes);
-  if (!CompileSlang(object->desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[0],
-                    &object->desc_.pipeline_layout))
+  if (!CompileSlang(object->desc_.vertex_shader, prefix, BACKEND_API_VULKAN, code[0], &object->desc_.pipeline_layout))
     return nullptr;
-  if (!CompileSlang(object->desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[1],
-                    &object->desc_.pipeline_layout))
+  if (!CompileSlang(object->desc_.fragment_shader, prefix, BACKEND_API_VULKAN, code[1], &object->desc_.pipeline_layout))
     return nullptr;
   for (int i = 0; i < 2; ++i) {
     VkShaderModuleCreateInfo create{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
@@ -64,9 +62,9 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
     stages[i].module = modules[i];
   }
   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  stages[0].pName = object->desc_.vertex_shader->GetDesc().entry_point.c_str();
+  stages[0].pName = object->desc_.vertex_shader->GetEntry().c_str();
   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  stages[1].pName = object->desc_.fragment_shader->GetDesc().entry_point.c_str();
+  stages[1].pName = object->desc_.fragment_shader->GetEntry().c_str();
   std::vector<VkVertexInputBindingDescription> bindings;
   for (uint32_t i = 0; i < object->desc_.vertex_bindings.size(); ++i) {
     const auto &b = object->desc_.vertex_bindings[i];

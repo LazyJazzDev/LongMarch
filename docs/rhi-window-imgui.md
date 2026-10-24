@@ -83,5 +83,6 @@ its initial font upload. Clip rectangles account for framebuffer scale, and the
 renderer supports ImDrawCmd vertex/index offsets and reset-render-state callbacks.
 
 The renderer uses only RHI operations and is shared by Metal, Vulkan and D3D12.
-This branch starts from main's SDR Window API; HDR composition is outside this
-change. Window, Device and Core retain their existing caller-owned lifetime rules.
+The integration includes main's HDR Window API, but color-managed HDR UI
+composition is outside this change. Window, Device and Core retain their existing
+caller-owned lifetime rules.

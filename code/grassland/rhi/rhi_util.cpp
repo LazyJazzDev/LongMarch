@@ -3,6 +3,56 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi {
+uint32_t ImageFormatSize(ImageFormat format) {
+  switch (format) {
+    case IMAGE_FORMAT_RGBA16_FLOAT:
+      return 8;
+    case IMAGE_FORMAT_RGBA8_UNORM:
+    case IMAGE_FORMAT_BGRA8_UNORM:
+    case IMAGE_FORMAT_RGB10A2_UNORM:
+    case IMAGE_FORMAT_BGR10A2_UNORM:
+    case IMAGE_FORMAT_D32_FLOAT:
+    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
+      return 4;
+    default:
+      return 0;
+  }
+}
+
+bool IsColorFormat(ImageFormat format) {
+  return ImageFormatSize(format) != 0 && !IsDepthFormat(format);
+}
+
+std::string to_string(ColorSpace value) {
+  switch (value) {
+    case COLOR_SPACE_SRGB_NONLINEAR:
+      return "COLOR_SPACE_SRGB_NONLINEAR";
+    case COLOR_SPACE_EXTENDED_SRGB_LINEAR:
+      return "COLOR_SPACE_EXTENDED_SRGB_LINEAR";
+    case COLOR_SPACE_HDR10_ST2084:
+      return "COLOR_SPACE_HDR10_ST2084";
+    case COLOR_SPACE_BT709_LINEAR:
+      return "COLOR_SPACE_BT709_LINEAR";
+    default:
+      return "COLOR_SPACE_UNKNOWN";
+  }
+}
+
+std::string ColorSpaceName(ColorSpace value) {
+  switch (value) {
+    case COLOR_SPACE_SRGB_NONLINEAR:
+      return "SDR sRGB";
+    case COLOR_SPACE_EXTENDED_SRGB_LINEAR:
+      return "HDR linear extended sRGB";
+    case COLOR_SPACE_HDR10_ST2084:
+      return "HDR10 Rec.2020 PQ";
+    case COLOR_SPACE_BT709_LINEAR:
+      return "Linear Rec.709";
+    default:
+      return "Unknown color space";
+  }
+}
+
 bool IsDepthFormat(ImageFormat format) {
   return format == IMAGE_FORMAT_D32_FLOAT || format == IMAGE_FORMAT_D24_UNORM_S8_UINT;
 }
@@ -183,6 +233,12 @@ std::string to_string(ImageFormat value) {
       return "IMAGE_FORMAT_D32_FLOAT";
     case IMAGE_FORMAT_D24_UNORM_S8_UINT:
       return "IMAGE_FORMAT_D24_UNORM_S8_UINT";
+    case IMAGE_FORMAT_RGBA16_FLOAT:
+      return "IMAGE_FORMAT_RGBA16_FLOAT";
+    case IMAGE_FORMAT_RGB10A2_UNORM:
+      return "IMAGE_FORMAT_RGB10A2_UNORM";
+    case IMAGE_FORMAT_BGR10A2_UNORM:
+      return "IMAGE_FORMAT_BGR10A2_UNORM";
     case IMAGE_FORMAT_BGRA8_UNORM:
       return "IMAGE_FORMAT_BGRA8_UNORM";
     default:
@@ -203,6 +259,12 @@ std::string ImageFormatName(ImageFormat value) {
       return "IMAGE_FORMAT_D32_FLOAT";
     case IMAGE_FORMAT_D24_UNORM_S8_UINT:
       return "IMAGE_FORMAT_D24_UNORM_S8_UINT";
+    case IMAGE_FORMAT_RGBA16_FLOAT:
+      return "RGBA16 FLOAT";
+    case IMAGE_FORMAT_RGB10A2_UNORM:
+      return "RGB10A2 UNORM";
+    case IMAGE_FORMAT_BGR10A2_UNORM:
+      return "BGR10A2 UNORM";
     case IMAGE_FORMAT_BGRA8_UNORM:
       return "BGRA8 UNORM";
     default:

@@ -55,7 +55,7 @@ void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer c
 }
 
 VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core)
-    : Device(std::move(info), core),
+    : Device(std::move(info), core, BACKEND_API_VULKAN),
       upload_pool_(this),
       scratch_pool_(this) {
 }

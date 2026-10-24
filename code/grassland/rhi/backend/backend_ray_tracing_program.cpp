@@ -29,7 +29,7 @@ Device *RayTracingProgram::Owner() const {
 }
 
 bool RayTracingProgram::ValidateLayout() const {
-  auto stage = [](IShader *shader, ShaderStage expected) { return shader && shader->GetDesc().stage == expected; };
+  auto stage = [](IShader *shader, ShaderStage expected) { return shader && shader->GetStage() == expected; };
   if (!stage(desc_.ray_generation, SHADER_STAGE_RAY_GENERATION) || !desc_.max_recursion_depth ||
       desc_.pipeline_layout.groups.size() > 8)
     return false;

@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <map>
 
+#include "grassland/util/file_system.h"
 #include "grassland/util/util_util.h"
 
 namespace grassland {
@@ -21,7 +22,7 @@ class VirtualFileSystemEntry {
   VirtualFileSystemEntry *parent_;
 };
 
-class VirtualFileSystem {
+class VirtualFileSystem : public FileSystem {
  public:
   VirtualFileSystem();
 
@@ -31,11 +32,14 @@ class VirtualFileSystem {
   VirtualFileSystem &operator=(const VirtualFileSystem &other);
   VirtualFileSystem &operator=(VirtualFileSystem &&other) noexcept;
 
-  int WriteFile(const std::string &file_name, const std::vector<uint8_t> &data);
-  int WriteFile(const std::string &file_name, const std::string &data);
-  int WriteFile(const std::string &file_name, const char *data, size_t size);
+  // UTF-8 virtual paths: both separators are accepted on every host. Leading
+  // separators refer to the VFS root; drive-qualified paths and root escapes fail.
+  // Paths are lexical and case-sensitive. Directories are implicit.
+  int WriteFile(const std::string &file_path, const std::vector<uint8_t> &data);
+  int WriteFile(const std::string &file_path, const std::string &data);
+  int WriteFile(const std::string &file_path, const char *data, size_t size);
 
-  int ReadFile(const std::string &file_name, std::vector<uint8_t> &data) const;
+  int ReadFile(const std::string &file_path, std::vector<uint8_t> &data) const override;
 
   void Print() const;
 
@@ -44,9 +48,7 @@ class VirtualFileSystem {
   void SaveToDirectory(const std::filesystem::path &path) const;
 
  private:
-  VirtualFileSystemEntry *AccessFile(const std::string &path, bool create_if_not_exists = false) const;
-
-  std::unique_ptr<VirtualFileSystemEntry> root_;
+  std::map<std::string, std::vector<uint8_t>> files_;
 };
 
 }  // namespace grassland

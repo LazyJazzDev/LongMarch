@@ -18,9 +18,8 @@ D3D12ComputeProgram *D3D12ComputeProgram::Create(D3D12Device *owner_device, cons
     return nullptr;
   std::vector<uint8_t> code;
   std::array<uint32_t, 3> threads{};
-  if (!CompileSlang(object->desc_.compute_shader->GetDesc(),
-                    ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_D3D12), BACKEND_API_D3D12, code,
-                    &object->desc_.pipeline_layout, &threads))
+  if (!CompileSlang(object->desc_.compute_shader, ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_D3D12),
+                    BACKEND_API_D3D12, code, &object->desc_.pipeline_layout, &threads))
     return nullptr;
   if (!threads[0] || !threads[1] || !threads[2] || threads[0] > 1024 || threads[1] > 1024 || threads[2] > 64 ||
       uint64_t(threads[0]) * threads[1] * threads[2] > 1024)
