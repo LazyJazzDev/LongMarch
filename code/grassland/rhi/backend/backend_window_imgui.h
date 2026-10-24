@@ -34,7 +34,8 @@ class WindowImGui {
     return context_;
   }
 
-  bool Record(ICommandContext *commands, IImage *image, EventManager<void()> &callbacks);
+  bool Update(EventManager<void()> &callbacks);
+  bool Record(ICommandContext *commands, IImage *image);
 
  private:
   explicit WindowImGui(Device *device) : device_(device) {
@@ -45,6 +46,7 @@ class WindowImGui {
   Device *device_;
   ImGuiContext *context_{};
   bool platform_initialized_{};
+  bool draw_data_ready_{};
   ObjPtr<IImage> font_;
   ObjPtr<ISampler> sampler_;
   ObjPtr<IProgram> program_;

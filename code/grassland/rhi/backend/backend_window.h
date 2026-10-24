@@ -14,6 +14,7 @@ class Window : public Object<rhi::IWindow> {
  public:
   Window();
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
+  bool UpdateImGui() override;
   ImGuiContext *GetImGuiContext() const override;
   bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image);
 
@@ -88,7 +89,7 @@ class Window : public Object<rhi::IWindow> {
  private:
   Device *device_{};
   std::unique_ptr<WindowImGui> imgui_;
-  bool recording_imgui_{};
+  bool processing_imgui_{};
   EventManager<void(int, int)> resize_event_;
   EventManager<void(int, int)> framebufferresize_event_;
   EventManager<void(bool)> cursorenter_event_;

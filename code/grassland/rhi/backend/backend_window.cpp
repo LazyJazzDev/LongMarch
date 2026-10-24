@@ -19,7 +19,7 @@ namespace grassland::rhi::backend {
 Window::Window() = default;
 
 bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_size) {
-  if (!glfw::IsWindowThread() || recording_imgui_)
+  if (!glfw::IsWindowThread() || processing_imgui_)
     return false;
   if (!enabled) {
     imgui_.reset();
@@ -34,25 +34,46 @@ ImGuiContext *Window::GetImGuiContext() const {
   return imgui_ ? imgui_->Context() : nullptr;
 }
 
-bool Window::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
+bool Window::UpdateImGui() {
   if (!imgui_)
     return true;
-  if (!glfw::IsWindowThread() || recording_imgui_)
+  if (!glfw::IsWindowThread() || processing_imgui_)
     return false;
 
-  struct RecordingScope {
+  struct ProcessingScope {
     bool &flag;
 
-    RecordingScope(bool &value) : flag(value) {
+    ProcessingScope(bool &value) : flag(value) {
       flag = true;
     }
 
-    ~RecordingScope() {
+    ~ProcessingScope() {
       flag = false;
     }
-  } scope(recording_imgui_);
+  } scope(processing_imgui_);
 
-  return imgui_->Record(commands, image, imgui_event_);
+  return imgui_->Update(imgui_event_);
+}
+
+bool Window::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
+  if (!imgui_)
+    return true;
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+
+  struct ProcessingScope {
+    bool &flag;
+
+    ProcessingScope(bool &value) : flag(value) {
+      flag = true;
+    }
+
+    ~ProcessingScope() {
+      flag = false;
+    }
+  } scope(processing_imgui_);
+
+  return imgui_->Record(commands, image);
 }
 
 rhi::IImage *Window::GetNextImage() {

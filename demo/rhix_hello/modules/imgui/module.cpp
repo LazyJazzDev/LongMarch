@@ -69,6 +69,8 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless) {
       return 1;
     if (window.ShouldClose())
       break;
+    if (!window.UpdateImGui())
+      return 1;
     if (window.IsSwapChainInvalid()) {
       if (!window.RebuildSwapChain())
         return 1;

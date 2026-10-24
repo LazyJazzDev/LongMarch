@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <array>
@@ -448,10 +448,6 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
   ASSERT_TRUE(target && texture);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
-  ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
-  const uint32_t green = 0xff00ff00;
-  ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), &green, 4));
   ImVec2 framebuffer_scale;
   window->ImGuiEvent().RegisterCallback([&] {
     framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
@@ -465,6 +461,11 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
     draw->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
     draw->AddImage(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(texture.Get())), {80, 10}, {110, 40});
   });
+  ASSERT_TRUE(window->UpdateImGui());
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
+  const uint32_t green = 0xff00ff00;
+  ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), &green, 4));
   ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
   ASSERT_TRUE(window->EnableImGui(false));
   texture.Release();
@@ -513,6 +514,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
   auto original_context = window->GetImGuiContext();
   for (bool visible : {true, false, false, true, false}) {
     record_ui = visible;
+    ASSERT_TRUE(window->UpdateImGui());
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
@@ -526,6 +528,62 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
     EXPECT_EQ(pixel, (std::array<uint8_t, 4>{channel, channel, 255, 255}));
     EXPECT_EQ(window->GetImGuiContext(), original_context);
   }
+}
+
+TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnce) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "ImGui explicit update"});
+  ASSERT_TRUE(window);
+  ASSERT_TRUE(window->UpdateImGui());  // Disabled is a no-op.
+  ASSERT_TRUE(window->EnableImGui());
+  ObjPtr<IImage> target = device->CreateImage({320, 240, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(target && queue);
+  int updates = 0;
+  std::array<float, 4> background{0, 0, 1, 1};
+  ImVec2 scale{};
+  window->ImGuiEvent().RegisterCallback([&] {
+    ++updates;
+    background = {0, 1, 0, 1};
+    scale = ImGui::GetIO().DisplayFramebufferScale;
+    ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {40, 40},
+                                                  updates == 1 ? IM_COL32(255, 0, 0, 255) : IM_COL32_WHITE);
+  });
+  const auto previous = ImGui::GetCurrentContext();
+  auto record = [&](bool overlay) {
+    const auto before = updates;
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ASSERT_TRUE(commands->CmdClearColor(target.Get(), background));
+    ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+    EXPECT_EQ(updates, before);  // Recording must not run UI logic.
+    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ASSERT_TRUE(done && done->WaitHost());
+    std::array<uint8_t, 4> pixel{};
+    ReadPixel(device.Get(), target.Get(), GetParam(), uint32_t(20 * scale.x), uint32_t(20 * scale.y), pixel);
+    EXPECT_EQ(pixel, (overlay ? std::array<uint8_t, 4>{255, 255, 255, 255} : std::array<uint8_t, 4>{0, 255, 0, 255}));
+    ReadPixel(device.Get(), target.Get(), GetParam(), 300, 220, pixel);
+    EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 255, 0, 255}));
+    EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+  };
+  ASSERT_TRUE(window->UpdateImGui());
+  EXPECT_EQ(updates, 1);
+  EXPECT_EQ(background, (std::array<float, 4>{0, 1, 0, 1}));
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
+  ASSERT_TRUE(window->UpdateImGui());  // Replaces pending red UI with white UI.
+  EXPECT_EQ(updates, 2);
+  record(true);
+  record(false);  // No update: never replay the previous overlay.
+  ASSERT_TRUE(window->UpdateImGui());
+  ASSERT_TRUE(window->EnableImGui(false));
+  ASSERT_TRUE(window->EnableImGui());
+  record(false);  // Disabling discards pending UI data.
 }
 
 TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {

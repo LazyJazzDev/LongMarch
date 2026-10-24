@@ -167,7 +167,8 @@ WindowImGui::~WindowImGui() {
   ImGui::SetCurrentContext(previous == context_ ? nullptr : previous);
 }
 
-bool WindowImGui::Record(ICommandContext *commands, IImage *image, EventManager<void()> &callbacks) {
+bool WindowImGui::Update(EventManager<void()> &callbacks) {
+  draw_data_ready_ = false;
   ImGuiContextScope scope(context_);
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
@@ -184,6 +185,15 @@ bool WindowImGui::Record(ICommandContext *commands, IImage *image, EventManager<
   callbacks.InvokeCallbacks();
   ImGui::Render();
   frame.rendered = true;
+  draw_data_ready_ = true;
+  return true;
+}
+
+bool WindowImGui::Record(ICommandContext *commands, IImage *image) {
+  if (!draw_data_ready_)
+    return true;
+  draw_data_ready_ = false;
+  ImGuiContextScope scope(context_);
   return Render(commands, image, ImGui::GetDrawData());
 }
 

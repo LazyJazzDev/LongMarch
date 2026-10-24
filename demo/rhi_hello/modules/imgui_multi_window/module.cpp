@@ -89,6 +89,11 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api, int frames, bool headles
   for (int rendered = 0; !frames || rendered < frames;) {
     if (!PollEvents())
       return 1;
+    // Collect all UI feedback before recording any window's scene commands.
+    for (const auto &window : windows) {
+      if (window && !window->ShouldClose() && !window->UpdateImGui())
+        return 1;
+    }
     bool open = false;
     bool submitted = false;
     for (size_t i = 0; i < windows.size(); ++i) {

@@ -19,9 +19,9 @@ class IWindow : public IObject {
  public:
   // Registries belong to the window; callbacks run on the window thread.
   // ImGui callbacks run with this window's context between NewFrame and Render
-  // when CmdPresent records the overlay. Do not present/reconfigure the window
-  // recursively from these callbacks. Input events are delivered even when ImGui
-  // captures input; inspect WantCaptureMouse/WantCaptureKeyboard in its context.
+  // during UpdateImGui, before scene command recording. Do not update/present or
+  // enable/disable ImGui recursively from these callbacks. Input events are
+  // delivered even when ImGui captures input; inspect WantCaptureMouse/WantCaptureKeyboard.
   virtual EventManager<void(int, int)> &ResizeEvent() = 0;
   virtual EventManager<void(int, int)> &FramebufferResizeEvent() = 0;
   virtual EventManager<void(bool)> &CursorEnterEvent() = 0;
@@ -40,6 +40,11 @@ class IWindow : public IObject {
   // font; file fonts include the ChineseFull glyph range, matching graphics.
   // Repeated enable calls keep the existing font. Disable first to reinitialize.
   virtual bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) = 0;
+  // Run after PollEvents, before acquiring images/recording scene commands.
+  // Executes UI callbacks now, so their feedback affects this frame's rendering.
+  // Replaces any pending UI data; the next CmdPresent consumes it once. Without
+  // an update, CmdPresent draws no overlay. Disabled ImGui is a successful no-op.
+  virtual bool UpdateImGui() = 0;
   virtual ImGuiContext *GetImGuiContext() const = 0;
 
   // Borrowed handle; Window owns it. Use GLFW operations on the main thread.

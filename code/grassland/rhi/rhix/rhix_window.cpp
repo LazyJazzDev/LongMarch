@@ -14,6 +14,10 @@ bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_si
   return Get() && Get()->EnableImGui(enabled, font_file_path, font_size);
 }
 
+bool Window::UpdateImGui() const {
+  return Get() && Get()->UpdateImGui();
+}
+
 ImGuiContext *Window::GetImGuiContext() const {
   return Get() ? Get()->GetImGuiContext() : nullptr;
 }

@@ -226,6 +226,7 @@ TEST_P(RhiWindow, ImGuiFontInitializationOptions) {
   });
   auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_TRUE(queue);
+  ASSERT_TRUE(window.UpdateImGui());
   auto commands = device.CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands.CmdPresent(window));
@@ -293,6 +294,7 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
     ++first_draws;
     EXPECT_EQ(ImGui::GetCurrentContext(), first.GetImGuiContext());
     EXPECT_FALSE(first.EnableImGui(false));
+    EXPECT_FALSE(first.UpdateImGui());
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(255, 0, 0, 255));
     ImGui::GetForegroundDrawList()->AddText({5, 5}, IM_COL32_WHITE, "First window");
   });
@@ -301,12 +303,25 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
     EXPECT_EQ(ImGui::GetCurrentContext(), second.GetImGuiContext());
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(0, 255, 0, 255));
   });
+  ASSERT_TRUE(first.UpdateImGui());
+  EXPECT_EQ(first_draws, 1);
+  EXPECT_EQ(ImGui::GetCurrentContext(), previous);
   {
     auto abandoned = device.CreateCommandContext();
     ASSERT_TRUE(abandoned.CmdPresent(first));
+    EXPECT_EQ(first_draws, 1);
+  }
+  {
+    auto without_update = device.CreateCommandContext();
+    ASSERT_TRUE(without_update.CmdPresent(first));
+    EXPECT_EQ(first_draws, 1);  // Abandoning a recording does not rerun UI logic.
   }
   std::vector<SubmissionToken> pending;
   for (int i = 0; i < 6; ++i) {
+    ASSERT_TRUE(first.UpdateImGui());
+    ASSERT_TRUE(second.UpdateImGui());
+    EXPECT_EQ(first_draws, i + 2);
+    EXPECT_EQ(second_draws, i + 1);
     auto commands = device.CreateCommandContext();
     auto a = first.GetNextImage();
     auto b = second.GetNextImage();
@@ -314,6 +329,8 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
     ASSERT_TRUE(commands.CmdClearColor(b, {0, 0, 1, 1}));
     ASSERT_TRUE(commands.CmdPresent(first));
     ASSERT_TRUE(commands.CmdPresent(second));
+    EXPECT_EQ(first_draws, i + 2);
+    EXPECT_EQ(second_draws, i + 1);
     EXPECT_EQ(ImGui::GetCurrentContext(), previous);
     auto done = queue.Submit(std::move(commands));
     ASSERT_TRUE(done);
@@ -349,6 +366,7 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   }
   EXPECT_GT(resize_events, 0);
   ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_CONTINUOUS));
+  ASSERT_TRUE(first.UpdateImGui());
   commands = device.CreateCommandContext();
   ASSERT_TRUE(commands.CmdPresent(first));
   done = queue.Submit(std::move(commands));
@@ -385,6 +403,8 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
     ImGui::End();
   });
   auto render = [&] {
+    if (!window.UpdateImGui())
+      return false;
     auto commands = device.CreateCommandContext();
     if (!commands.CmdPresent(window))
       return false;
