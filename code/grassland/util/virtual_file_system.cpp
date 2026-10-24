@@ -43,8 +43,8 @@ VirtualFileSystem &VirtualFileSystem::operator=(VirtualFileSystem &&other) noexc
   return *this;
 }
 
-int VirtualFileSystem::WriteFile(const std::string &file_name, const std::vector<uint8_t> &data) {
-  const auto key = NormalizeFilePath(file_name);
+int VirtualFileSystem::WriteFile(const std::string &file_path, const std::vector<uint8_t> &data) {
+  const auto key = NormalizeFilePath(file_path);
   if (!key)
     return -1;
   // A file cannot replace an implicit directory, or live beneath another file.
@@ -62,21 +62,21 @@ int VirtualFileSystem::WriteFile(const std::string &file_name, const std::vector
   return 0;
 }
 
-int VirtualFileSystem::WriteFile(const std::string &file_name, const std::string &data) {
-  return WriteFile(file_name, data.data(), data.size());
+int VirtualFileSystem::WriteFile(const std::string &file_path, const std::string &data) {
+  return WriteFile(file_path, data.data(), data.size());
 }
 
-int VirtualFileSystem::WriteFile(const std::string &file_name, const char *data, size_t size) {
+int VirtualFileSystem::WriteFile(const std::string &file_path, const char *data, size_t size) {
   if (!data && size)
     return -1;
   std::vector<uint8_t> bytes;
   if (size)
     bytes.assign(data, data + size);
-  return WriteFile(file_name, bytes);
+  return WriteFile(file_path, bytes);
 }
 
-int VirtualFileSystem::ReadFile(const std::string &file_name, std::vector<uint8_t> &data) const {
-  const auto key = NormalizeFilePath(file_name);
+int VirtualFileSystem::ReadFile(const std::string &file_path, std::vector<uint8_t> &data) const {
+  const auto key = NormalizeFilePath(file_path);
   if (!key)
     return -1;
   const auto file = files_.find(*key);

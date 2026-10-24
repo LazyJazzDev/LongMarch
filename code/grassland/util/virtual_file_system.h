@@ -35,11 +35,11 @@ class VirtualFileSystem : public FileSystem {
   // UTF-8 virtual paths: both separators are accepted on every host. Leading
   // separators refer to the VFS root; drive-qualified paths and root escapes fail.
   // Paths are lexical and case-sensitive. Directories are implicit.
-  int WriteFile(const std::string &file_name, const std::vector<uint8_t> &data);
-  int WriteFile(const std::string &file_name, const std::string &data);
-  int WriteFile(const std::string &file_name, const char *data, size_t size);
+  int WriteFile(const std::string &file_path, const std::vector<uint8_t> &data);
+  int WriteFile(const std::string &file_path, const std::string &data);
+  int WriteFile(const std::string &file_path, const char *data, size_t size);
 
-  int ReadFile(const std::string &file_name, std::vector<uint8_t> &data) const override;
+  int ReadFile(const std::string &file_path, std::vector<uint8_t> &data) const override;
 
   void Print() const;
 

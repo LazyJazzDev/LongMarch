@@ -8,6 +8,6 @@ namespace grassland {
 class FileSystem {
  public:
   virtual ~FileSystem() = default;
-  virtual int ReadFile(const std::string &filename, std::vector<uint8_t> &data) const = 0;
+  virtual int ReadFile(const std::string &file_path, std::vector<uint8_t> &data) const = 0;
 };
 }  // namespace grassland
