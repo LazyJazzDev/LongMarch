@@ -33,12 +33,12 @@ int main(int argc, char **argv) {
     }
     if (arg == "--list") {
       std::cout
-          << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\nimgui\nimgui_multi_window\nhdr\n";
+          << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\nhdr\nimgui\nimgui_multi_window\n";
       return 0;
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|imgui|imgui_multi_window|hdr | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N] [--font PATH] [--font-size PIXELS]\nFont options apply to ImGui modules; defaults: built-in font, 13 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui|imgui_multi_window | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N] [--font PATH] [--font-size PIXELS]\nFont options apply to ImGui modules; defaults: built-in font, 13 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -185,18 +185,18 @@ int main(int argc, char **argv) {
       std::cerr << "ray_query: FAILED\n";
       result = 1;
     }
+    if (headless) {
+      std::cout << "hdr: SKIPPED (requires a window)\n";
+    } else if (RunHDR(api, frames) != 0) {
+      std::cerr << "hdr: FAILED\n";
+      result = 1;
+    }
     if (RunImGui(api, frames, headless, font_file, font_size) != 0) {
       std::cerr << "imgui: FAILED\n";
       result = 1;
     }
     if (RunImGuiMultiWindow(api, frames, headless, font_file, font_size) != 0) {
       std::cerr << "imgui_multi_window: FAILED\n";
-      result = 1;
-    }
-    if (headless) {
-      std::cout << "hdr: SKIPPED (requires a window)\n";
-    } else if (RunHDR(api, frames) != 0) {
-      std::cerr << "hdr: FAILED\n";
       result = 1;
     }
     return result;
@@ -211,9 +211,9 @@ int main(int argc, char **argv) {
         {"nbody", "Compute simulation and particle rendering"},
         {"raytracing", "Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)"},
         {"ray_query", "Inline ray queries"},
+        {"hdr", "HDR presentation (window only)"},
         {"imgui", "Interactive ImGui overlay"},
         {"imgui_multi_window", "Independent ImGui windows"},
-        {"hdr", "HDR presentation (window only)"},
     };
     snowberg::tui::Menu menu;
     const auto selected = menu.Select("RHI Hello - Module Selection", options);
