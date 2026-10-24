@@ -7,6 +7,7 @@
 #include <thread>
 #include <utility>
 
+#include "../../../rhi_hello/window_key_input.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
@@ -32,7 +33,7 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless) {
   if (!window.EnableImGui())
     return 1;
   bool record_ui = true;
-  PresentMode mode = PRESENT_MODE_VSYNC;
+  WindowKeyInput keys(headless ? nullptr : &window.KeyEvent());
   window.KeyEvent().RegisterCallback([&](int key, int, int action, int) {
     if (key == GLFW_KEY_I && action == GLFW_PRESS) {
       record_ui = !record_ui;
@@ -54,24 +55,20 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless) {
       ImGui::ShowDemoWindow(&show_demo);
   });
   grassland::FPSCounter fps;
-  bool previous_p = false;
   auto title_time = std::chrono::steady_clock::now();
   for (int rendered = 0; !frames || rendered < frames;) {
     if (!grassland::rhix::Window::PollEvents())
       return 1;
-    if (window.ShouldClose() || window.IsKeyDown(GLFW_KEY_ESCAPE))
+    if (window.ShouldClose() || keys.CloseRequested())
       break;
     if (window.IsSwapChainInvalid()) {
       if (!window.RebuildSwapChain())
         return 1;
     }
-    const bool p = window.IsKeyDown(GLFW_KEY_P);
-    if (p && !previous_p) {
-      mode = mode == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-      if (!window.SetPresentMode(mode))
+    if (const auto requested = keys.TakePresentMode()) {
+      if (!window.SetPresentMode(*requested))
         return 1;
     }
-    previous_p = p;
     auto image = window.GetNextImage();
     if (!image) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));

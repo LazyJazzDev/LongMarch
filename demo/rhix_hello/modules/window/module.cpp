@@ -9,6 +9,7 @@
 #include <thread>
 #include <utility>
 
+#include "../../../rhi_hello/window_key_input.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 
@@ -68,8 +69,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
     }
   }
-  bool previous_p = false;
-  PresentMode requested = PRESENT_MODE_VSYNC;
+  WindowKeyInput keys(headless ? nullptr : &window.KeyEvent());
   grassland::FPSCounter fps_counter;
   auto title_time = std::chrono::steady_clock::now();
   // Warm up allocations and pipelines before measuring completed GPU work.
@@ -81,21 +81,18 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
         break;
       if (window.ShouldClose())
         break;
-      if (window.IsKeyDown(GLFW_KEY_ESCAPE))
+      if (keys.CloseRequested())
         break;
       // Previous loop locals are gone; rebuild only before recording this frame.
       if (window.IsSwapChainInvalid()) {
         if (!window.RebuildSwapChain())
           return 1;
       }
-      const bool p = window.IsKeyDown(GLFW_KEY_P);
-      if (p && !previous_p) {
-        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        if (!window.SetPresentMode(requested))
+      if (const auto requested = keys.TakePresentMode()) {
+        if (!window.SetPresentMode(*requested))
           return 1;
         std::cout << "Present mode: " << PresentModeName(window.GetPresentMode()) << std::endl;
       }
-      previous_p = p;
     }
     const size_t slot = (static_cast<int64_t>(rendered) + 60) % targets.size();
     if (headless) {
