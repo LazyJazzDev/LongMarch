@@ -12,7 +12,6 @@ uint32_t ImageFormatSize(ImageFormat format) {
     case IMAGE_FORMAT_RGB10A2_UNORM:
     case IMAGE_FORMAT_BGR10A2_UNORM:
     case IMAGE_FORMAT_D32_FLOAT:
-    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
       return 4;
     default:
       return 0;
@@ -54,11 +53,11 @@ std::string ColorSpaceName(ColorSpace value) {
 }
 
 bool IsDepthFormat(ImageFormat format) {
-  return format == IMAGE_FORMAT_D32_FLOAT || format == IMAGE_FORMAT_D24_UNORM_S8_UINT;
+  return format == IMAGE_FORMAT_D32_FLOAT;
 }
 
-bool HasStencil(ImageFormat format) {
-  return format == IMAGE_FORMAT_D24_UNORM_S8_UINT;
+bool HasStencil(ImageFormat) {
+  return false;
 }
 
 using backend::ReportError;
@@ -231,8 +230,6 @@ std::string to_string(ImageFormat value) {
       return "IMAGE_FORMAT_RGBA8_UNORM";
     case IMAGE_FORMAT_D32_FLOAT:
       return "IMAGE_FORMAT_D32_FLOAT";
-    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
-      return "IMAGE_FORMAT_D24_UNORM_S8_UINT";
     case IMAGE_FORMAT_RGBA16_FLOAT:
       return "IMAGE_FORMAT_RGBA16_FLOAT";
     case IMAGE_FORMAT_RGB10A2_UNORM:
@@ -257,8 +254,6 @@ std::string ImageFormatName(ImageFormat value) {
       return "RGBA8 UNORM";
     case IMAGE_FORMAT_D32_FLOAT:
       return "IMAGE_FORMAT_D32_FLOAT";
-    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
-      return "IMAGE_FORMAT_D24_UNORM_S8_UINT";
     case IMAGE_FORMAT_RGBA16_FLOAT:
       return "RGBA16 FLOAT";
     case IMAGE_FORMAT_RGB10A2_UNORM:

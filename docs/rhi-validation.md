@@ -77,8 +77,7 @@ ranges are 2D rectangles, with zero width/height meaning the remaining extent fr
 x/y. The returned image has `width * height * ImageFormatSize(format)` bytes, ordered
 left-to-right and top-to-bottom without row padding. Color values retain their native
 encoding, including BGRA channel order, packed 10-bit channels and half floats.
-D32 returns float depth. D24S8 returns little-endian words with depth in bits 0-23 and
-stencil in bits 24-31; Metal's native D32S8 depth is quantized to that public layout.
+D32 is the supported depth format and returns float depth. RHI exposes no stencil image format.
 D3D12 requires a full-subresource transfer for depth images; the token crops the
 requested rectangle while copying to CPU memory. Vulkan invalidates mapped memory
 before reading when required by the allocation's memory type.

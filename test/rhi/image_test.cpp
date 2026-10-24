@@ -329,8 +329,7 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  for (auto format :
-       {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_BGRA8_UNORM, IMAGE_FORMAT_D32_FLOAT, IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
+  for (auto format : {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_BGRA8_UNORM, IMAGE_FORMAT_D32_FLOAT}) {
     ObjPtr<IImage> image = device->CreateImage({16, 16, format});
     ASSERT_TRUE(image);
     const auto native = static_cast<backend::Image *>(image.Get());
@@ -1738,68 +1737,6 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
   std::array<uint8_t, 4> pixel{};
   ReadPixel(device.Get(), target.Get(), GetParam(), 4, 4, pixel);
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));
-}
-
-TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
-  ObjPtr<ICore> core = CreateCore(GetParam());
-  ASSERT_TRUE(core);
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  ASSERT_TRUE(device);
-  Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D24_UNORM_S8_UINT});
-  ASSERT_TRUE(target && depth);
-  const std::string source = R"(
-    float4 VSMain(uint id:SV_VertexID):SV_Position {float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};return float4(p[id],.5,1);}
-    void MaskPS() {}
-    float4 PSMain():SV_Target0 {return float4(0,1,0,1);}
-  )";
-  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
-  ObjPtr<IShader> mask = device->CreateShaderFromSource(source, "MaskPS", SHADER_STAGE_FRAGMENT);
-  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
-  ProgramDesc desc;
-  desc.vertex_shader = vs.Get();
-  desc.fragment_shader = mask.Get();
-  desc.color_formats.clear();
-  desc.depth_stencil.format = IMAGE_FORMAT_D24_UNORM_S8_UINT;
-  desc.depth_stencil.stencil_test = true;
-  desc.depth_stencil.stencil_reference = 5;
-  desc.depth_stencil.front.pass_op = desc.depth_stencil.back.pass_op = STENCIL_REPLACE;
-  ObjPtr<IProgram> writer = device->CreateProgram(desc);
-  desc.color_formats = {IMAGE_FORMAT_RGBA8_UNORM};
-  desc.fragment_shader = ps.Get();
-  desc.depth_stencil.front.pass_op = desc.depth_stencil.back.pass_op = STENCIL_KEEP;
-  desc.depth_stencil.front.compare = desc.depth_stencil.back.compare = COMPARE_EQUAL;
-  ObjPtr<IProgram> reader = device->CreateProgram(desc);
-  ASSERT_TRUE(writer && reader);
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
-  RenderingInfo rendering;
-  rendering.depth_stencil.image = depth.Get();
-  rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-  rendering.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-  ASSERT_TRUE(commands->CmdBindProgram(writer.Get()));
-  ASSERT_TRUE(commands->CmdBeginRendering(rendering));
-  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
-  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 32, 64}));
-  ASSERT_TRUE(commands->CmdDraw(3));
-  ASSERT_TRUE(commands->CmdEndRendering());
-  rendering.color_attachments = {{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}};
-  rendering.depth_stencil.depth_load_op = rendering.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_LOAD;
-  ASSERT_TRUE(commands->CmdBindProgram(reader.Get()));
-  ASSERT_TRUE(commands->CmdBeginRendering(rendering));
-  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
-  ASSERT_TRUE(commands->CmdDraw(3));
-  ASSERT_TRUE(commands->CmdEndRendering());
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
-  ASSERT_TRUE(done);
-  commands.Release();
-  ASSERT_TRUE(done->WaitHost());
-  std::array<uint8_t, 4> pixel{};
-  ReadPixel(device.Get(), target.Get(), GetParam(), 16, 32, pixel);
-  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 255, 0, 255}));
-  ReadPixel(device.Get(), target.Get(), GetParam(), 48, 32, pixel);
-  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 0, 0, 255}));
 }
 
 const BackendAPI backends[] = {

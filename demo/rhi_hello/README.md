@@ -19,7 +19,7 @@ The positional backend argument remains supported. Without `--module`, the share
 
 - `nbody`: shared-memory tiled compute simulation of 65,536 particles followed by additive particle drawing.
 
-The first six modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
+The first six modules and the depth, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support.
 
 
 ## Shader and Program contract
@@ -28,7 +28,7 @@ Shader stores original Slang source, entry point and stage; creation does not co
 
 `RHI_INPUT(location, type, name)` is expanded by a generated prefix into the C++ layout's Vulkan/Metal attribute locations or D3D12 input semantics. Source BOM is preserved by Shader and omitted only when concatenating the compilation input. C++ `PipelineLayoutDesc` and `BindingLayoutDesc` describe groups, binding numbers, resource types, fixed array capacities and shader visibility. Layouts are copied into Programs/Groups and remain fixed; group resources can be rebound. Generated `RHI_UNIFORM`, `RHI_STRUCTURED_BUFFER`, `RHI_RW_STRUCTURED_BUFFER`, `RHI_TEXTURE2D`, `RHI_RW_TEXTURE2D`, `RHI_SAMPLER` and corresponding `_ARRAY` macros use this layout. Resource macros take `(group,binding,type,name)`; sampler macros omit `type`. Arrays get their length from C++, not from reflection. Reflection checks used resources against the expected type, position, array count and stage; unused declarations may be eliminated.
 
-D3D12 assigns b/t/u/s registers in binding order within each group/space, and uses separate resource/sampler tables. Vulkan preserves group/binding as set/binding. Programs also describe up to eight color outputs (RGBA8/BGRA8, plus RGBA16 float and RGB10A2 on D3D12/Vulkan; BGR10A2 on Vulkan) and an optional D32 or D24S8 depth/stencil format, depth compare/write, front/back stencil operations, masks and reference. Triangle-list topology and float/float2/float3/float4 vertex attributes remain supported; culling and runtime-sized descriptor arrays are outside this change.
+D3D12 assigns b/t/u/s registers in binding order within each group/space, and uses separate resource/sampler tables. Vulkan preserves group/binding as set/binding. Programs also describe up to eight color outputs (RGBA8/BGRA8, plus RGBA16 float and RGB10A2 on D3D12/Vulkan; BGR10A2 on Vulkan) and an optional D32 depth format and depth compare/write. Triangle-list topology and float/float2/float3/float4 vertex attributes remain supported; culling and runtime-sized descriptor arrays are outside this change.
 
 ## Buffer and command lifetime
 

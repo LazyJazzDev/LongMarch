@@ -138,42 +138,33 @@ TEST_P(RhiDownload, ImageSubrectangleIsTightlyPackedAndUnconverted) {
   }
 }
 
-TEST_P(RhiDownload, DepthStencilSubrectangleHasPortablePackedLayout) {
+TEST_P(RhiDownload, DepthSubrectangleIsTightlyPacked) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  for (auto format : {IMAGE_FORMAT_D32_FLOAT, IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
-    SCOPED_TRACE(ImageFormatName(format));
-    ObjPtr<IImage> image = device->CreateImage({13, 7, format});
-    ASSERT_TRUE(image);
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
-    RenderingInfo info;
-    info.depth_stencil.image = image.Get();
-    info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-    info.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-    info.depth_stencil.clear_depth = 0.25f;
-    info.depth_stencil.clear_stencil = 0x5a;
-    ASSERT_TRUE(commands->CmdBeginRendering(info));
-    ASSERT_TRUE(commands->CmdEndRendering());
-    ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {3, 2, 5, 3});
-    ASSERT_TRUE(token);
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
-    ASSERT_TRUE(done && done->WaitHost());
-    ASSERT_EQ(token->GetSize(), 60);
-    std::array<uint32_t, 15> values{};
-    ASSERT_TRUE(token->CopyTo(values.data(), sizeof(values)));
-    for (auto value : values) {
-      if (format == IMAGE_FORMAT_D32_FLOAT) {
-        float depth;
-        std::memcpy(&depth, &value, 4);
-        EXPECT_FLOAT_EQ(depth, 0.25f);
-      } else {
-        EXPECT_NEAR(value & 0xffffffu, 4194304, 1);
-        EXPECT_EQ(value >> 24, 0x5a);
-      }
-    }
+  const auto format = IMAGE_FORMAT_D32_FLOAT;
+  ObjPtr<IImage> image = device->CreateImage({13, 7, format});
+  ASSERT_TRUE(image);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  RenderingInfo info;
+  info.depth_stencil.image = image.Get();
+  info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+  info.depth_stencil.clear_depth = 0.25f;
+  ASSERT_TRUE(commands->CmdBeginRendering(info));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {3, 2, 5, 3});
+  ASSERT_TRUE(token);
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done && done->WaitHost());
+  ASSERT_EQ(token->GetSize(), 60);
+  std::array<uint32_t, 15> values{};
+  ASSERT_TRUE(token->CopyTo(values.data(), sizeof(values)));
+  for (auto value : values) {
+    float depth;
+    std::memcpy(&depth, &value, 4);
+    EXPECT_FLOAT_EQ(depth, 0.25f);
   }
 }
 

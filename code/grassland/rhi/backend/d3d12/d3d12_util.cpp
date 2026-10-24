@@ -42,8 +42,6 @@ DXGI_FORMAT NativeImageFormat(ImageFormat format) {
       return DXGI_FORMAT_B8G8R8A8_UNORM;
     case IMAGE_FORMAT_D32_FLOAT:
       return DXGI_FORMAT_D32_FLOAT;
-    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
-      return DXGI_FORMAT_D24_UNORM_S8_UINT;
     default:
       return DXGI_FORMAT_UNKNOWN;
   }
