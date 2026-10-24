@@ -35,10 +35,14 @@ class Device : public ObjectContainer {
   Shader CreateShader(const std::string &filename,
                       const std::string &entry_point,
                       rhi::ShaderStage stage,
-                      FileSystem *fs = nullptr) const;
+                      FileSystem *fs = nullptr,
+                      const std::vector<std::string> &include_paths = {},
+                      const std::vector<std::pair<std::string, std::string>> &defines = {}) const;
   Shader CreateShaderFromSource(const std::string &source,
                                 const std::string &entry_point,
-                                rhi::ShaderStage stage) const;
+                                rhi::ShaderStage stage,
+                                const std::vector<std::string> &include_paths = {},
+                                const std::vector<std::pair<std::string, std::string>> &defines = {}) const;
   ComputeProgram CreateComputeProgram(const rhi::ComputeProgramDesc &desc) const;
   Program CreateProgram(const rhi::ProgramDesc &desc) const;
   Image CreateImage(const rhi::ImageDesc &desc) const;

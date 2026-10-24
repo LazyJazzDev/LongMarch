@@ -41,8 +41,14 @@ class IDevice : public IObject {
   IShader *CreateShader(const std::string &filename,
                         const std::string &entry_point,
                         ShaderStage stage,
-                        FileSystem *fs = nullptr);
-  IShader *CreateShaderFromSource(const std::string &source, const std::string &entry_point, ShaderStage stage);
+                        FileSystem *fs = nullptr,
+                        const std::vector<std::string> &include_paths = {},
+                        const std::vector<std::pair<std::string, std::string>> &defines = {});
+  IShader *CreateShaderFromSource(const std::string &source,
+                                  const std::string &entry_point,
+                                  ShaderStage stage,
+                                  const std::vector<std::string> &include_paths = {},
+                                  const std::vector<std::pair<std::string, std::string>> &defines = {});
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   virtual IQueue *GetQueue(QueueType type) = 0;
   virtual ICommandContext *CreateCommandContext() = 0;

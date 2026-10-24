@@ -53,7 +53,7 @@ auto shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTE
 `ShaderDesc` 新增 `filename`、`file_system`、`include_paths`、`defines`：
 
 - `filename` 指定入口文件路径和相对 include 基准，默认 `main.slang`。
-- `CreateShaderFromSource()` 把源码写入临时 VirtualFileSystem 的 `main.slang`，再调用描述版 CreateShader；预处理完成即销毁临时 VFS，不再保留原始 source 字符串。该入口返回的 GetDesc 中 FileSystem 指针已失效，不能解引用。若需多文件输入，请自行准备 VFS 并使用描述版入口。
+- `CreateShaderFromSource()` 把源码写入临时 VirtualFileSystem 的 `main.slang`，再调用描述版 CreateShader；预处理完成即销毁临时 VFS，不再保留原始 source 字符串。该入口返回的 GetDesc 中 FileSystem 指针已失效，不能解引用。字符串入口的 include 未命中临时 VFS 时读取系统文件，可通过 include_paths 指定磁盘搜索目录。若需自定义文件系统，请自行准备 VFS 并使用文件入口。
 - `file_system == nullptr` 时使用 Slang 的系统文件系统；自定义 FileSystem 的 `ReadFile` 返回 0 表示成功。
 - `defines` 是预处理阶段的名称/值对；布局宏由 Program 创建阶段注入，不应在这里定义。
 - `GetDesc()` 保留原始参数，包括借用的 FileSystem 指针。该指针只在创建期间使用；调用者必须自行确认其仍然存活，不能通过 GetDesc 延长其生命周期。
@@ -81,3 +81,14 @@ auto shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTE
 - 虚拟路径按 UTF-8 转换，导入导出使用 `u8path` / `generic_u8string`，避免 Windows 系统代码页参与虚拟文件名转换。
 
 验证入口：`test_virtual_file_system`，以及 `test_rhi` 中的 `FileShadersOwnPreprocessedIncludesAndDeferLayoutMacros` 等 Shader 文件加载测试。反斜杠行为在 macOS 上也实际测试；不等同于已经执行原生 Windows 测试。
+
+两个便捷入口均支持 include_paths 和 defines，默认均为空：
+
+```cpp
+auto from_file = device.CreateShader("main.slang", "CSMain", SHADER_STAGE_COMPUTE,
+                                     &files, {"lib"}, {{"ENABLED", "1"}});
+auto from_source = device.CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE,
+                                                 {"shaders/include"}, {{"ENABLED", "1"}});
+```
+
+文件入口的 include 路径属于传入的文件系统；字符串入口先访问临时 VFS 的 main.slang，再通过系统文件系统加载 include。自定义文件系统不会自动回退到磁盘。

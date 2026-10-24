@@ -109,6 +109,26 @@ TEST_P(RhiProgram, DiskAndMemoryShadersUseOfficialPreprocessing) {
   auto configured = device.CreateShader(desc);
   ASSERT_TRUE(configured);
   EXPECT_TRUE(device.CreateComputeProgram({configured.Get()}));
+  auto file_overload =
+      device.CreateShader("main.slang", "CSMain", SHADER_STAGE_COMPUTE, &fs, {"lib"}, {{"ENABLED", "1"}});
+  ASSERT_TRUE(file_overload);
+  EXPECT_EQ(file_overload.GetDesc().include_paths, desc.include_paths);
+  EXPECT_EQ(file_overload.GetDesc().defines, desc.defines);
+  EXPECT_TRUE(device.CreateComputeProgram({file_overload.Get()}));
+  const std::string source_with_include =
+      "#if ENABLED != 7\n#error missing define\n#endif\n"
+      "#include <include_settings.slang>\n[numthreads(GROUP_SIZE,1,1)] void CSMain() {}";
+  const std::vector<std::string> disk_paths{std::filesystem::path(filename).parent_path().generic_u8string()};
+  auto source_overload = device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, disk_paths,
+                                                       {{"ENABLED", "7"}});
+  ASSERT_TRUE(source_overload);
+  EXPECT_EQ(source_overload.GetDesc().include_paths, disk_paths);
+  EXPECT_EQ(source_overload.GetDesc().defines.front().second, "7");
+  EXPECT_TRUE(device.CreateComputeProgram({source_overload.Get()}));
+  EXPECT_FALSE(
+      device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, {}, {{"ENABLED", "7"}}));
+  EXPECT_FALSE(device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, disk_paths,
+                                             {{"ENABLED", "0"}}));
 }
 
 TEST_P(RhiProgram, ShaderPreprocessingReportsMissingIncludesAndDirectiveErrors) {
