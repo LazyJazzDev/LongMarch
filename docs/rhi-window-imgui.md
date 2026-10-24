@@ -132,3 +132,25 @@ There are no intermediate images, background conversion passes or swapchain samp
 Both hello demos' `hdr` modules include a gray-ramp and colored-text panel; H cycles output
 color spaces, and bounded `--frames` runs cycle them automatically. Physical appearance still
 depends on display calibration and system color management.
+
+### N-body controls and HDR
+
+Both hello demos' `nbody` modules follow `nbody_cs`: particles accumulate linear radiance
+in a reusable RGBA16F image, dense highlights desaturate toward white, and a fullscreen
+pass encodes the result to SDR or the selected HDR output. HDR brightness is bounded by
+the window's reported headroom. ImGui then draws directly into the swapchain. The particle
+accumulation image is part of the scene renderer, not an intermediate ImGui composition image.
+
+The control panel uses `assets/fonts/simhei.ttf` at 20 pixels and shows backend, particle
+count, frame duration and estimated interaction throughput. Reset, pause/resume, logarithmic
+time step and galaxy-count controls match the reference; galaxy count applies on reset.
+HDR toggles to the preferred supported mode (linear scRGB where available), while Output
+selects an explicit supported color space. VSync is also configurable. UI updates finish
+before scene command recording, so pause, reset, time-step and output changes affect that frame.
+
+Shortcuts: H toggles HDR, P toggles VSync, Space pauses/resumes, R resets, Escape closes.
+Text input capture suppresses simulation shortcuts; dragging outside ImGui rotates the view.
+Headless mode retains deterministic initialization, three in-flight frames and 60 warmup
+frames, with SDR encoding and no window or UI. Throughput is an estimate based on whole-frame
+time, not measured GPU FLOP/s. The reference's speed-distribution plot is not ported because
+RHI currently has no public buffer readback API. macOS/Linux runtime validation is separate.
