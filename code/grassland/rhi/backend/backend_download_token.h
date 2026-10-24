@@ -9,6 +9,7 @@ namespace grassland::rhi::backend {
 struct DownloadLayout {
   uint64_t offset{}, row_pitch{}, row_bytes{};
   uint32_t rows{1};
+  uint64_t stencil_offset{}, stencil_pitch{};
 };
 
 class DownloadToken : public Object<IDownloadToken> {

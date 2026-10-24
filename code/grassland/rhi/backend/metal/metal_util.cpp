@@ -51,6 +51,9 @@ MTL::PixelFormat NativeImageFormat(ImageFormat format) {
       return MTL::PixelFormatBGR10A2Unorm;
     case IMAGE_FORMAT_D32_FLOAT:
       return MTL::PixelFormatDepth32Float;
+    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
+      // Apple GPUs use D32S8; stencil behavior is preserved, depth precision is higher.
+      return MTL::PixelFormatDepth32Float_Stencil8;
     default:
       return MTL::PixelFormatInvalid;
   }

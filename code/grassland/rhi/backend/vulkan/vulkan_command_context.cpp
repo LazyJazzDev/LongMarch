@@ -935,7 +935,8 @@ IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const Imag
     return nullptr;
   }
   const uint64_t pitch = packed;
-  auto lease = device_->DownloadPool().Acquire(pitch * height);
+  const bool stencil = HasStencil(desc.format);
+  auto lease = device_->DownloadPool().Acquire(pitch * height + (stencil ? uint64_t(width) * height : 0));
   if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
@@ -952,9 +953,15 @@ IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const Imag
   copy.imageExtent = {width, height, 1};
   vkCmdCopyImageToBuffer(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, lease->NativeBuffer(),
                          1, &copy);
+  if (stencil) {
+    copy.bufferOffset = pitch * height;
+    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+    vkCmdCopyImageToBuffer(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, lease->NativeBuffer(),
+                           1, &copy);
+  }
   if (!TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
     return nullptr;
-  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(
-      new VulkanDownloadToken(std::move(lease), DownloadLayout{0, pitch, packed, height})));
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new VulkanDownloadToken(
+      std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 }  // namespace grassland::rhi::backend::vulkan

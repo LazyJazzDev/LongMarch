@@ -667,7 +667,8 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
     return nullptr;
   }
   const uint64_t pitch = packed;
-  auto lease = device_->DownloadPool().Acquire(pitch * height);
+  const bool stencil = HasStencil(desc.format);
+  auto lease = device_->DownloadPool().Acquire(pitch * height + (stencil ? uint64_t(width) * height : 0));
   if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
@@ -678,10 +679,19 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
     recording_failed_ = true;
     return nullptr;
   }
-  blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
-                        MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height);
+  if (stencil) {
+    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+                          MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height,
+                          MTL::BlitOptionDepthFromDepthStencil);
+    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+                          MTL::Size::Make(width, height, 1), lease->NativeBuffer(), pitch * height, width,
+                          uint64_t(width) * height, MTL::BlitOptionStencilFromDepthStencil);
+  } else {
+    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+                          MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height);
+  }
   blit->endEncoding();
-  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(
-      new MetalDownloadToken(std::move(lease), DownloadLayout{0, pitch, packed, height})));
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new MetalDownloadToken(
+      std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 }  // namespace grassland::rhi::backend::metal
