@@ -30,6 +30,51 @@ are emitted directly by Apple's layer to stderr and may terminate the process
 before a command buffer completes; they are not forwarded through an RHI callback.
 `MTLLogState` handles shader logging and is not an API Validation callback.
 
+## Format-aware image clears
+
+RHI and RHIX use CmdClearImage(image, ClearValue). ColorAttachmentInfo and
+DepthStencilAttachmentInfo store ClearColorValue and ClearDepthStencilValue
+respectively in clear_value. The image format selects the
+union member; initialize color.float32 for UNORM/SFLOAT colors, color.int32 for
+SINT colors, color.uint32 for UINT colors, or depth_stencil for depth formats.
+
+```cpp
+ClearValue color{0.1f, 0.2f, 0.3f, 1.0f};
+commands->CmdClearImage(color_image, color);
+
+ClearValue integer{0xffffffffu, 16777217u, 0x80000001u, 0u};
+commands->CmdClearImage(uint_image, integer);
+
+ClearValue depth{ClearDepthStencilValue{1.0f, 0}};
+commands->CmdClearImage(depth_image, depth);
+
+RenderingInfo rendering;
+rendering.color_attachments = {
+    {uint_image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, integer.color}};
+rendering.depth_stencil.image = depth_image;
+rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+rendering.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+rendering.depth_stencil.clear_value = depth.depth_stencil;
+```
+
+Four-component constructors select float32, int32 or uint32 from their argument
+types. Use floating-point literals for UNORM/SFLOAT clears, signed integers for
+SINT, and uint32_t values (or unsigned literals) for UINT; keep all four arguments
+the same type to avoid ambiguous overloads.
+
+Standalone depth clears also clear stencil when the image format includes it.
+Rendering scopes retain independent depth/stencil load and store operations;
+their default depth clear value remains 1 and stencil remains 0.
+
+Vulkan passes the corresponding native clear member. Metal converts integer color
+components to its double-valued clear color without losing 32-bit integer precision.
+D3D12 uses integer UAV clears for integer targets and preserves descriptor bindings
+and resource ordering; integer formats without UAV support use an exact-byte upload.
+Floating color and depth/stencil clears use their respective native clear commands.
+Integer values never pass through float. Tests read back extreme signed/unsigned
+32-bit values, 8-bit negative values, depth/stencil, and interleaved clear/dispatch
+results.
+
 ## Buffer and image readback
 
 Record downloads outside a rendering scope, before submitting the command context:
@@ -138,3 +183,48 @@ rows, early token release, retained snapshots, abandoned recordings, rejected
 submissions remaining unassociated, direct and concurrent waits after releasing the
 submission handle, and temporal-pool lease retention/reuse/shrinking. The Metal test
 also checks that both pool accessors refer to the same pool and reuse the same storage.
+
+## Image formats and vertex input types
+
+RHI image format names spell out channel widths, for example
+`IMAGE_FORMAT_R8G8B8A8_UNORM`, `IMAGE_FORMAT_R32G32_UINT`, and
+`IMAGE_FORMAT_R32G32B32A32_SFLOAT`. Signed integers use the `_INT` suffix;
+backends map it to native SINT formats. Float formats use `_SFLOAT`.
+
+| Channel width | Encodings | Channel counts |
+|---|---|---|
+| 8 bits | UINT, INT, UNORM | 1, 2, 3, 4 |
+| 32 bits | UINT, INT, SFLOAT | 1, 2, 3, 4 |
+
+Existing BGRA8 UNORM, RGBA16 float, and packed RGB10A2/BGR10A2 UNORM formats
+remain available under expanded names. Depth formats are `D16_UNORM`,
+`D32_SFLOAT`, and `D24_UNORM_S8_UINT`. There is no portable native 32-bit UNORM
+or 8-bit SFLOAT texture format, so those encodings are not exposed.
+
+A format definition is not a guarantee of native image support. Metal has no
+three-channel formats in this set; D3D12 has no RGB8 formats, and RGB32 texture
+usage depends on its format capabilities. RHI images require sampled and attachment
+usage; unsupported combinations return an empty image instead of changing its
+channel count. Vulkan checks the required color-format features before allocation.
+
+`VertexFormat` is now `InputType`, with `INPUT_TYPE_FLOAT[2/3/4]`,
+`INPUT_TYPE_INT[2/3/4]`, and `INPUT_TYPE_UINT[2/3/4]` (the unsuffixed name is scalar).
+Attributes use `InputAttributeDesc`, whose `type` member selects the `InputType`.
+Each component occupies 32 bits. `InputTypeSize` returns the byte size; existing
+vertex binding, attribute location, offset, and stride semantics are unchanged.
+All RHI/RHIX call sites use the new names; old enum/type aliases are not retained.
+
+Integer render targets require matching integer shader outputs and cannot enable
+blending. Clear values remain numeric floats in the public API (not reinterpreted
+integer bits), so values beyond float's exact integer range should be written via
+upload or shader output. Vulkan converts clear values to the appropriate integer
+union member. Typed storage images must use the matching shader format, e.g.
+`[[vk::image_format("r8ui")]] RHI_RW_TEXTURE2D(0, 0, uint, output_image);`
+for `IMAGE_FORMAT_R8_UINT`. Without an explicit qualifier, Slang can infer R32
+from `uint`, which does not match an R8 image. Integer sampling should use `Load`
+or nearest filtering, not linear filtering.
+
+`RhiFormats` tests cover native-byte upload/subrectangle readback, transfer and
+render-pass integer clears, D16 cropped readback, all 12 input types through real
+vertex fetch and rasterization, and integer storage writes/render-target output
+including full-width uint32 values. Stencil-bearing images are not downloaded.

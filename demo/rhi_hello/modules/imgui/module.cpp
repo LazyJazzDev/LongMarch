@@ -98,7 +98,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     if (!commands)
       return 1;
-    if (!commands->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
+    if (!commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
       return 1;
     if (!commands->CmdPresent(window.Get()))
       return 1;

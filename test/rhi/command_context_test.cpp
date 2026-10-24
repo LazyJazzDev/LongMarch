@@ -54,7 +54,7 @@ class TestWindow final : public backend::Window {
   }
 
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override {
-    return {{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA8_UNORM}};
+    return {{PRESENT_MODE_VSYNC, IMAGE_FORMAT_R8G8B8A8_UNORM}};
   }
 
  private:
@@ -64,7 +64,7 @@ class TestWindow final : public backend::Window {
 class TestImage final : public backend::Image {
  public:
   explicit TestImage(std::shared_ptr<Gate> gate, backend::Window *window = nullptr)
-      : backend::Image({16, 16, IMAGE_FORMAT_RGBA8_UNORM}),
+      : backend::Image({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM}),
         gate_(std::move(gate)),
         window_(window) {
   }
@@ -114,7 +114,7 @@ class TestCommandContext final : public backend::CommandContext {
         fail_after_submit_(fail_after_submit) {
   }
 
-  std::vector<std::array<float, 4>> recorded_colors;
+  std::vector<ClearValue> recorded_values;
   int recorded_presents{};
   int ended{};
 
@@ -122,7 +122,7 @@ class TestCommandContext final : public backend::CommandContext {
     return RetainResource(resource);
   }
 
-  bool CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) override {
+  bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override {
 #if !defined(NDEBUG)
     if (!image) {
       recording_failed_ = true;
@@ -131,7 +131,7 @@ class TestCommandContext final : public backend::CommandContext {
 #endif
     if (!RetainResource(image))
       return false;
-    recorded_colors.push_back(color);
+    recorded_values.push_back(value);
     return true;
   }
 
@@ -208,14 +208,14 @@ TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
   auto image = Image(new TestImage(gate));
   auto *native = new TestCommandContext(gate);
   CommandContext context = native;
-  std::array<float, 4> color{1, 0, 0, 1};
-  ASSERT_TRUE(context.CmdClearColor(image, color));
-  ASSERT_EQ(native->recorded_colors.size(), 1u);
-  color = {0, 1, 0, 1};
-  ASSERT_TRUE(context.CmdClearColor(image, color));
-  ASSERT_EQ(native->recorded_colors.size(), 2u);
-  EXPECT_EQ(native->recorded_colors[0], (std::array<float, 4>{1, 0, 0, 1}));
-  EXPECT_EQ(native->recorded_colors[1], color);
+  ClearValue color{1.0f, 0.0f, 0.0f, 1.0f};
+  ASSERT_TRUE(context.CmdClearImage(image, color));
+  ASSERT_EQ(native->recorded_values.size(), 1u);
+  color = {0.0f, 1.0f, 0.0f, 1.0f};
+  ASSERT_TRUE(context.CmdClearImage(image, color));
+  ASSERT_EQ(native->recorded_values.size(), 2u);
+  EXPECT_EQ(native->recorded_values[0].color.float32, (std::array<float, 4>{1, 0, 0, 1}));
+  EXPECT_EQ(native->recorded_values[1].color.float32, color.color.float32);
   EXPECT_EQ(native->ended, 0);
   image.Release();
   EXPECT_EQ(gate->destroyed, 0);
@@ -224,7 +224,7 @@ TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
   auto token = queue.Submit(std::move(context));
   ASSERT_TRUE(token);
   EXPECT_EQ(native->ended, 1);
-  EXPECT_EQ(native->recorded_colors.size(), 2u);
+  EXPECT_EQ(native->recorded_values.size(), 2u);
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     gate->complete = true;
@@ -245,7 +245,7 @@ TEST(RhiCommands, DifferentResourceTypesAreRetainedOnceUntilSubmissionCompletes)
   auto *native = new TestCommandContext(gate);
   CommandContext context = native;
   ASSERT_TRUE(native->CmdUseResource(resource.Get()));
-  ASSERT_TRUE(native->CmdClearColor(image.Get(), {0, 0, 1, 1}));
+  ASSERT_TRUE(native->CmdClearImage(image.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
   ASSERT_TRUE(native->CmdUseResource(another.Get()));
   ASSERT_TRUE(native->CmdUseResource(resource.Get()));
   ASSERT_TRUE(native->CmdUseResource(image.Get()));
@@ -297,7 +297,7 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   auto context = CommandContext(new TestCommandContext(gate));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
-  ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 1, 1}));
+  ASSERT_TRUE(context.CmdClearImage(image, {0.0f, 0.0f, 1.0f, 1.0f}));
   ASSERT_TRUE(context.CmdPresent(window));
   image = {};
   auto recorded = std::move(context);
@@ -330,7 +330,7 @@ TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   auto context = CommandContext(new TestCommandContext(gate));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
-  ASSERT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdClearImage(image, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(context.CmdPresent(window));
   ASSERT_TRUE(queue.Submit(std::move(context)));
   image = {};
@@ -350,10 +350,10 @@ TEST(RhiCommands, CancellationReleasesResourcesAndForeignQueueConsumesRejectedPa
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
   auto context = CommandContext(new TestCommandContext(gate));
-  ASSERT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdClearImage(image, {1.0f, 0.0f, 0.0f, 1.0f}));
   context = {};
   context = CommandContext(new TestCommandContext(gate));
-  ASSERT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdClearImage(image, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(context.CmdPresent(window));
   auto packet = std::move(context);
   auto other = ObjectPtr<TestDevice>::Adopt(new TestDevice(std::make_shared<Gate>()));
@@ -371,10 +371,10 @@ TEST(RhiCommands, SealedContextsCannotRecordOrSubmitAgain) {
   auto image = Image(new TestImage(gate));
   auto native = ObjectPtr<TestCommandContext>::Adopt(new TestCommandContext(gate));
   auto context = CommandContext(ObjPtr<rhi::ICommandContext>::Retain(native.Get()).Detach());
-  ASSERT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdClearImage(image, {1.0f, 0.0f, 0.0f, 1.0f}));
   auto token = queue.Submit(std::move(context));
   ASSERT_TRUE(token);
-  EXPECT_FALSE(native->CmdClearColor(image.Get(), {0, 1, 0, 1}));
+  EXPECT_FALSE(native->CmdClearImage(image.Get(), {0.0f, 1.0f, 0.0f, 1.0f}));
   EXPECT_EQ(queue.Get()->Submit(native.Get()), nullptr);
   native.Reset();
   {
@@ -414,7 +414,7 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
   auto context = CommandContext(new TestCommandContext(gate, true));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
-  ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 1, 1}));
+  ASSERT_TRUE(context.CmdClearImage(image, {0.0f, 0.0f, 1.0f, 1.0f}));
   ASSERT_TRUE(context.CmdPresent(window));
   image = {};
   EXPECT_THROW(queue.Submit(std::move(context)), std::bad_alloc);
@@ -455,7 +455,7 @@ TEST(RhiCommands, CallerReleasesRecordingBeforeWindowAndDevice) {
   auto window = ObjectPtr<TestWindow>::Adopt(new TestWindow(gate));
   auto image = Image(new TestImage(gate, window.Get()));
   auto context = CommandContext(new TestCommandContext(gate));
-  ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdClearImage(image, {0.0f, 0.0f, 0.0f, 1.0f}));
   image.Release();
   EXPECT_TRUE(window->IsUniquelyOwned());
   EXPECT_EQ(gate->destroyed, 0);

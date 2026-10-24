@@ -13,7 +13,7 @@ class MetalProgramBase {
 
  protected:
   NS::SharedPtr<MTL::Function> CompileFunction(const IShader *shader,
-                                               const std::vector<VertexAttributeDesc> &attributes = {},
+                                               const std::vector<InputAttributeDesc> &attributes = {},
                                                std::array<uint32_t, 3> *threads = nullptr) const;
 
  private:

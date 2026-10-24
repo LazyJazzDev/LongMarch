@@ -1,5 +1,7 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
@@ -13,6 +15,24 @@
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
 namespace grassland::rhi::backend::vulkan {
+namespace {
+VkClearValue NativeClearValue(ImageFormat format, const ClearValue &value) {
+  VkClearValue result{};
+  if (IsDepthFormat(format))
+    result.depthStencil = {value.depth_stencil.depth, value.depth_stencil.stencil};
+  else {
+    for (size_t i = 0; i < 4; ++i) {
+      if (IsSignedIntegerFormat(format))
+        result.color.int32[i] = value.color.int32[i];
+      else if (IsUnsignedIntegerFormat(format))
+        result.color.uint32[i] = value.color.uint32[i];
+      else
+        result.color.float32[i] = value.color.float32[i];
+    }
+  }
+  return result;
+}
+}  // namespace
 
 VulkanCommandContext::VulkanCommandContext(VulkanDevice *device) : CommandContext(device), device_(device) {
 }
@@ -67,7 +87,7 @@ bool VulkanCommandContext::TransitionImage(VulkanImage *image,
   return true;
 }
 
-bool VulkanCommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
+bool VulkanCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
 #if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
@@ -77,7 +97,7 @@ bool VulkanCommandContext::CmdClearColor(rhi::IImage *image, const std::array<fl
   const auto native = dynamic_cast<VulkanImage *>(image);
   if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
     recording_failed_ = true;
-    ReportError(-1, "CmdClearColor requires a valid image from this device.");
+    ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
   }
 #else
@@ -88,10 +108,18 @@ bool VulkanCommandContext::CmdClearColor(rhi::IImage *image, const std::array<fl
   if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
                        VK_ACCESS_TRANSFER_WRITE_BIT))
     return false;
-  VkClearColorValue native_color{};
-  std::copy(color.begin(), color.end(), native_color.float32);
+  const auto format = native->GetDesc().format;
+  const auto clear = NativeClearValue(format, value);
   VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  vkCmdClearColorImage(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &native_color, 1, &range);
+  if (IsDepthFormat(format)) {
+    range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (HasStencil(format))
+      range.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    vkCmdClearDepthStencilImage(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                &clear.depthStencil, 1, &range);
+  } else
+    vkCmdClearColorImage(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear.color, 1,
+                         &range);
   return true;
 }
 
@@ -458,7 +486,8 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   std::array<VkRenderingAttachmentInfo, 8> colors{};
   for (size_t i = 0; i < formats.size(); ++i) {
     const auto &source = rendering_.color_attachments[i];
-    std::copy(source.clear_color.begin(), source.clear_color.end(), clear[i].color.float32);
+    if (source.load_op == ATTACHMENT_LOAD_OP_CLEAR)
+      clear[i] = NativeClearValue(formats[i], ClearValue{source.clear_value});
     colors[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colors[i].imageView = lease->Views()[i];
     colors[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -470,7 +499,7 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   VkRenderingAttachmentInfo depth_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO},
       stencil_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
   if (depth) {
-    clear[formats.size()].depthStencil = {ds.clear_depth, ds.clear_stencil};
+    clear[formats.size()] = NativeClearValue(depth_format, ClearValue{ds.clear_value});
     depth_info.imageView = lease->Views().back();
     depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depth_info.loadOp = loads[ds.depth_load_op];

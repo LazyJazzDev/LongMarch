@@ -129,9 +129,9 @@ TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupported
       }));
       auto context = device.CreateCommandContext();
       ASSERT_TRUE(
-          context.CmdClearColor(frame, (space == COLOR_SPACE_EXTENDED_SRGB_LINEAR || space == COLOR_SPACE_BT709_LINEAR)
-                                           ? std::array<float, 4>{2, 2, 2, 1}
-                                           : std::array<float, 4>{.5f, .5f, .5f, 1}));
+          context.CmdClearImage(frame, (space == COLOR_SPACE_EXTENDED_SRGB_LINEAR || space == COLOR_SPACE_BT709_LINEAR)
+                                           ? ClearValue{2.0f, 2.0f, 2.0f, 1.0f}
+                                           : ClearValue{.5f, .5f, .5f, 1.0f}));
       ASSERT_TRUE(context.CmdPresent(window));
       auto done = queue.Submit(std::move(context));
       ASSERT_TRUE(done && done.WaitHost());
@@ -328,8 +328,8 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
     auto commands = device.CreateCommandContext();
     auto a = first.GetNextImage();
     auto b = second.GetNextImage();
-    ASSERT_TRUE(commands.CmdClearColor(a, {0, 0, 1, 1}));
-    ASSERT_TRUE(commands.CmdClearColor(b, {0, 0, 1, 1}));
+    ASSERT_TRUE(commands.CmdClearImage(a, {0.0f, 0.0f, 1.0f, 1.0f}));
+    ASSERT_TRUE(commands.CmdClearImage(b, {0.0f, 0.0f, 1.0f, 1.0f}));
     ASSERT_TRUE(commands.CmdPresent(first));
     ASSERT_TRUE(commands.CmdPresent(second));
     EXPECT_EQ(first_draws, i + 2);
@@ -459,7 +459,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
     auto frame = first.GetNextImage();
     ASSERT_TRUE(frame);
     auto context = device.CreateCommandContext();
-    ASSERT_TRUE(context.CmdClearColor(frame, {0, 0, 0, 1}));
+    ASSERT_TRUE(context.CmdClearImage(frame, {0.0f, 0.0f, 0.0f, 1.0f}));
     ASSERT_TRUE(context.CmdPresent(first));
     EXPECT_FALSE(context.CmdPresent(first));
     EXPECT_FALSE(graphics.Submit(std::move(context)));
@@ -510,8 +510,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
         return option.format == frame.GetDesc().format && option.present_mode == window.GetPresentMode();
       }));
       auto context = device.CreateCommandContext();
-      ASSERT_TRUE(context.CmdClearColor(frame, {1.0f, 0.0f, 0.0f, 1.0f}));
-      ASSERT_TRUE(context.CmdClearColor(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
+      ASSERT_TRUE(context.CmdClearImage(frame, {1.0f, 0.0f, 0.0f, 1.0f}));
+      ASSERT_TRUE(context.CmdClearImage(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(context.CmdPresent(window));
       auto before_submit = window.GetNextImage();
       EXPECT_EQ(frame.Get(), before_submit.Get());
@@ -534,7 +534,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto old_frame = first.GetNextImage();
   ASSERT_TRUE(old_frame);
   auto old_context = device.CreateCommandContext();
-  ASSERT_TRUE(old_context.CmdClearColor(old_frame, {0, 0, 0, 1}));
+  ASSERT_TRUE(old_context.CmdClearImage(old_frame, {0.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(old_context.CmdPresent(first));
   old_context.Release();
   old_frame.Release();
@@ -562,7 +562,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto frame = second.GetNextImage();
   ASSERT_TRUE(frame);
   auto context = device.CreateCommandContext();
-  ASSERT_TRUE(context.CmdClearColor(frame, {0, 0, 1, 1}));
+  ASSERT_TRUE(context.CmdClearImage(frame, {0.0f, 0.0f, 1.0f, 1.0f}));
   ASSERT_TRUE(context.CmdPresent(second));
   frame.Release();
   first.Release();
@@ -613,21 +613,21 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
   ASSERT_TRUE(b);
   {
     auto abandoned = device.CreateCommandContext();
-    ASSERT_TRUE(abandoned.CmdClearColor(a, {1, 0, 0, 1}));
-    ASSERT_TRUE(abandoned.CmdClearColor(b, {0, 1, 0, 1}));
+    ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
+    ASSERT_TRUE(abandoned.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   }  // Recording alone must not change the next context's initial resource state.
   auto clear = device.CreateCommandContext();
-  ASSERT_TRUE(clear.CmdClearColor(a, {1, 0, 0, 1}));
-  ASSERT_TRUE(clear.CmdClearColor(b, {0, 1, 0, 1}));
-  ASSERT_TRUE(clear.CmdClearColor(a, {0, 0, 1, 1}));
+  ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
+  ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
+  ASSERT_TRUE(clear.CmdClearImage(a, {0.0f, 0.0f, 1.0f, 1.0f}));
   auto cleared = queue.Submit(std::move(clear));
   ASSERT_TRUE(cleared);
   ASSERT_TRUE(cleared.WaitHost());
   EXPECT_EQ(a.Get(), first.GetNextImage().Get());
   EXPECT_EQ(b.Get(), second.GetNextImage().Get());
   auto reclear = device.CreateCommandContext();
-  ASSERT_TRUE(reclear.CmdClearColor(b, {0.6f, 0.7f, 0.8f, 1}));
-  ASSERT_TRUE(reclear.CmdClearColor(a, {0.6f, 0.7f, 0.8f, 1}));
+  ASSERT_TRUE(reclear.CmdClearImage(b, {0.6f, 0.7f, 0.8f, 1.0f}));
+  ASSERT_TRUE(reclear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1.0f}));
   auto ready = queue.Submit(std::move(reclear), {{cleared}});
   ASSERT_TRUE(ready);
   auto present = device.CreateCommandContext();
@@ -648,7 +648,7 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
   EXPECT_TRUE(next_done.WaitHost());
   auto cleanup_image = second.GetNextImage();
   auto cleanup = device.CreateCommandContext();
-  ASSERT_TRUE(cleanup.CmdClearColor(cleanup_image, {0, 0, 0, 1}));
+  ASSERT_TRUE(cleanup.CmdClearImage(cleanup_image, {0.0f, 0.0f, 0.0f, 1.0f}));
   auto cleanup_done = queue.Submit(std::move(cleanup));
   ASSERT_TRUE(cleanup_done);
   cleanup_image.Release();
@@ -666,11 +666,11 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
       {
         rhi::ObjPtr<rhi::ICommandContext> abandoned = device.Get()->CreateCommandContext();
         ASSERT_TRUE(abandoned);
-        ASSERT_TRUE(abandoned->CmdClearColor(image.Get(), {1, 0, 0, 1}));
+        ASSERT_TRUE(abandoned->CmdClearImage(image.Get(), {1.0f, 0.0f, 0.0f, 1.0f}));
       }
       rhi::ObjPtr<rhi::ICommandContext> recording = device.Get()->CreateCommandContext();
       ASSERT_TRUE(recording);
-      ASSERT_TRUE(recording->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1}));
+      ASSERT_TRUE(recording->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(recording->CmdPresent(first.Get()));
       completed = queue.Get()->Submit(recording.Get());
       ASSERT_TRUE(completed);
@@ -753,7 +753,7 @@ TEST(RhiVulkanWindow, OutOfDateDefersRebuildAndKeepsSubmittedWorkAlive) {
     auto image = window.GetNextImage();
     ASSERT_TRUE(image);
     auto context = device.CreateCommandContext();
-    ASSERT_TRUE(context.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1}));
+    ASSERT_TRUE(context.CmdClearImage(image, {0.6f, 0.7f, 0.8f, 1.0f}));
     ASSERT_TRUE(context.CmdPresent(window));
     glfwSetWindowSize(native, 400 + 40 * i, 300 + 30 * i);
     // No callback has replaced the prepared object, even though the native
@@ -783,7 +783,7 @@ TEST(RhiVulkanWindow, OutOfDateDefersRebuildAndKeepsSubmittedWorkAlive) {
     EXPECT_EQ(image.GetDesc().width, static_cast<uint32_t>(width));
     EXPECT_EQ(image.GetDesc().height, static_cast<uint32_t>(height));
     auto context = device.CreateCommandContext();
-    ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 1, 1}));
+    ASSERT_TRUE(context.CmdClearImage(image, {0.0f, 0.0f, 1.0f, 1.0f}));
     ASSERT_TRUE(context.CmdPresent(window));
     auto token = queue.Submit(std::move(context));
     ASSERT_TRUE(token);

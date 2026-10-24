@@ -99,7 +99,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
     auto commands = device.CreateCommandContext();
     if (!commands)
       return 1;
-    if (!commands.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}))
+    if (!commands.CmdClearImage(image, {0.6f, 0.7f, 0.8f, 1.0f}))
       return 1;
     if (!commands.CmdPresent(window))
       return 1;

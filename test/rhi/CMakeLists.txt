@@ -1,4 +1,4 @@
-add_executable(test_rhi download_test.cpp core_test.cpp rhi_test.cpp object_ptr_test.cpp obj_ptr_test.cpp raw_api_test.cpp command_context_test.cpp window_test.cpp program_test.cpp buffer_test.cpp image_test.cpp descriptor_pool_test.cpp ray_tracing_test.cpp)
+add_executable(test_rhi format_test.cpp download_test.cpp core_test.cpp rhi_test.cpp object_ptr_test.cpp obj_ptr_test.cpp raw_api_test.cpp command_context_test.cpp window_test.cpp program_test.cpp buffer_test.cpp image_test.cpp descriptor_pool_test.cpp ray_tracing_test.cpp)
 target_link_libraries(test_rhi PRIVATE grassland_rhi GTest::gtest_main)
 include(GoogleTest)
 gtest_discover_tests(test_rhi)

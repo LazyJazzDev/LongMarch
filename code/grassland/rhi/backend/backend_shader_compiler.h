@@ -9,7 +9,7 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
 // The C++ input layout owns locations. Slang expands this prefix; no source parsing.
 std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                               BackendAPI api,
-                              const std::vector<VertexAttributeDesc> &attributes = {});
+                              const std::vector<InputAttributeDesc> &attributes = {});
 // Defines RHI_PLATFORM_WINDOWS/MACOS/LINUX as 0 or 1 for the execution platform,
 // independently of api/output target. These macros are also visible to imports.
 bool CompileSlang(const IShader *shader,

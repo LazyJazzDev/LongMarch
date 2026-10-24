@@ -57,7 +57,7 @@ class MetalCommandContext final : public CommandContext {
                       uint32_t first_index = 0,
                       int32_t vertex_offset = 0,
                       uint32_t first_instance = 0) override;
-  bool CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) override;
+  bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
   bool CmdPresent(rhi::IWindow *window) override;
   SubmitResult SubmitNative() override;
   SubmissionStatus WaitForProgress() override;

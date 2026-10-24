@@ -5,6 +5,7 @@
 #include "grassland/rhi/rhi_download_token.h"
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
+#include "grassland/rhi/rhi_util.h"
 
 namespace grassland::rhi {
 class IBuffer;
@@ -17,7 +18,7 @@ struct ColorAttachmentInfo {
   IImage *color_attachment{};
   AttachmentLoadOp load_op{ATTACHMENT_LOAD_OP_LOAD};
   AttachmentStoreOp store_op{ATTACHMENT_STORE_OP_STORE};
-  std::array<float, 4> clear_color{};
+  ClearColorValue clear_value{};
 };
 
 struct DepthStencilAttachmentInfo {
@@ -26,8 +27,7 @@ struct DepthStencilAttachmentInfo {
   AttachmentStoreOp depth_store_op{ATTACHMENT_STORE_OP_STORE};
   AttachmentLoadOp stencil_load_op{ATTACHMENT_LOAD_OP_LOAD};
   AttachmentStoreOp stencil_store_op{ATTACHMENT_STORE_OP_STORE};
-  float clear_depth{1};
-  uint32_t clear_stencil{};
+  ClearDepthStencilValue clear_value{1.0f, 0};
 };
 
 struct RenderingInfo {
@@ -106,7 +106,8 @@ class ICommandContext : public IObject {
                               uint32_t first_index = 0,
                               int32_t vertex_offset = 0,
                               uint32_t first_instance = 0) = 0;
-  virtual bool CmdClearColor(IImage *image, const std::array<float, 4> &color) = 0;
+  // Clears color, or depth and stencil (if present), according to the image format.
+  virtual bool CmdClearImage(IImage *image, const ClearValue &value) = 0;
   // Presents the target window's next image fixed at this call. Multiple windows
   // may be presented by one context; a preceding clear is not required.
   virtual bool CmdPresent(IWindow *window) = 0;

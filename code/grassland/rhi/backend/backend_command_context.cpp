@@ -77,7 +77,8 @@ bool CommandContext::PrepareRendering(const RenderingInfo &info) {
   if (ds.image &&
       (!validate(ds.image, true, ds.depth_load_op, ds.depth_store_op) || ds.stencil_load_op < ATTACHMENT_LOAD_OP_LOAD ||
        ds.stencil_load_op > ATTACHMENT_LOAD_OP_DISCARD || ds.stencil_store_op < ATTACHMENT_STORE_OP_STORE ||
-       ds.stencil_store_op > ATTACHMENT_STORE_OP_DISCARD || !(ds.clear_depth >= 0 && ds.clear_depth <= 1))) {
+       ds.stencil_store_op > ATTACHMENT_STORE_OP_DISCARD ||
+       !(ds.clear_value.depth >= 0 && ds.clear_value.depth <= 1))) {
     recording_failed_ = true;
     return false;
   }

@@ -75,7 +75,7 @@ float4 PSMain():SV_Target0 { return settings.color; }
   desc.vertex_shader = vertex.Get();
   desc.fragment_shader = fragment.Get();
   desc.vertex_bindings = {{12, false}};
-  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}};
+  desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}};
   desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
@@ -176,7 +176,7 @@ float4 PSMain() : SV_Target0 { return float4(1,1,1,1); }
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
-  desc.color_formats = {IMAGE_FORMAT_RGBA8_UNORM};
+  desc.color_formats = {IMAGE_FORMAT_R8G8B8A8_UNORM};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   EXPECT_TRUE(program);
 }
@@ -247,7 +247,7 @@ TEST_P(RhiProgram, CreationCompilesAndOwnsSourcesUsingInputMacros) {
   desc.vertex_shader = vertex.Get();
   desc.fragment_shader = fragment.Get();
   desc.vertex_bindings = {{24, false}};
-  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT3, 12}};
+  desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}, {1, 0, INPUT_TYPE_FLOAT3, 12}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
   vertex.Release();
@@ -304,7 +304,7 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
   desc.vertex_bindings = {{12, false}};
-  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}};
+  desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}};
   {
     ObjPtr<IImage> frame = window->GetNextImage();
     ASSERT_TRUE(frame);
@@ -387,7 +387,7 @@ TEST_P(RhiProgram, ExplicitRenderingSupportsEmptyScopesAndAttachmentOperations) 
   for (auto load : {ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_LOAD_OP_DISCARD}) {
     for (auto store : {ATTACHMENT_STORE_OP_STORE, ATTACHMENT_STORE_OP_DISCARD}) {
       // Initialize before LOAD, including after a previous DISCARD store.
-      ASSERT_TRUE(commands->CmdClearColor(image.Get(), {0, 0, 0, 1}));
+      ASSERT_TRUE(commands->CmdClearImage(image.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
       ASSERT_TRUE(commands->CmdBeginRendering({{{image.Get(), load, store, {0.6f, 0.7f, 0.8f, 1}}}}));
       ASSERT_TRUE(commands->CmdEndRendering());
     }
@@ -431,7 +431,7 @@ TEST_P(RhiProgram, ExplicitRenderingRejectsUnbalancedScopesAndOutsideCommands) {
           EXPECT_FALSE(commands->CmdBeginRendering({{{image.Get()}}}));
           break;
         case 3:
-          EXPECT_FALSE(commands->CmdClearColor(image.Get(), {0, 0, 0, 1}));
+          EXPECT_FALSE(commands->CmdClearImage(image.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
           break;
         case 4:
           EXPECT_FALSE(commands->CmdPresent(window.Get()));
@@ -525,7 +525,7 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   ASSERT_TRUE(device);
   ObjPtr<IBuffer> a = device->CreateBuffer({512});
   ObjPtr<IBuffer> b = device->CreateBuffer({256});
-  ObjPtr<IImage> image = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> image = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(a);
   ASSERT_TRUE(b);
   ASSERT_TRUE(image);
@@ -599,8 +599,8 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({512});
-  ObjPtr<IImage> first = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> second = device->CreateImage({2, 2, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> first = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> second = device->CreateImage({2, 2, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(buffer);
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);

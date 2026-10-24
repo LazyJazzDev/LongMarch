@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -74,13 +75,37 @@ std::string SubmissionStatusName(SubmissionStatus value);
 
 typedef enum {
   IMAGE_FORMAT_UNKNOWN,
-  IMAGE_FORMAT_RGBA8_UNORM,
-  IMAGE_FORMAT_BGRA8_UNORM,
-  IMAGE_FORMAT_D32_FLOAT,
+  IMAGE_FORMAT_R8_UINT,
+  IMAGE_FORMAT_R8_INT,
+  IMAGE_FORMAT_R8_UNORM,
+  IMAGE_FORMAT_R8G8_UINT,
+  IMAGE_FORMAT_R8G8_INT,
+  IMAGE_FORMAT_R8G8_UNORM,
+  IMAGE_FORMAT_R8G8B8_UINT,
+  IMAGE_FORMAT_R8G8B8_INT,
+  IMAGE_FORMAT_R8G8B8_UNORM,
+  IMAGE_FORMAT_R8G8B8A8_UINT,
+  IMAGE_FORMAT_R8G8B8A8_INT,
+  IMAGE_FORMAT_R8G8B8A8_UNORM,
+  IMAGE_FORMAT_R32_UINT,
+  IMAGE_FORMAT_R32_INT,
+  IMAGE_FORMAT_R32_SFLOAT,
+  IMAGE_FORMAT_R32G32_UINT,
+  IMAGE_FORMAT_R32G32_INT,
+  IMAGE_FORMAT_R32G32_SFLOAT,
+  IMAGE_FORMAT_R32G32B32_UINT,
+  IMAGE_FORMAT_R32G32B32_INT,
+  IMAGE_FORMAT_R32G32B32_SFLOAT,
+  IMAGE_FORMAT_R32G32B32A32_UINT,
+  IMAGE_FORMAT_R32G32B32A32_INT,
+  IMAGE_FORMAT_R32G32B32A32_SFLOAT,
+  IMAGE_FORMAT_B8G8R8A8_UNORM,
+  IMAGE_FORMAT_R16G16B16A16_SFLOAT,
+  IMAGE_FORMAT_R10G10B10A2_UNORM,
+  IMAGE_FORMAT_B10G10R10A2_UNORM,
+  IMAGE_FORMAT_D16_UNORM,
+  IMAGE_FORMAT_D32_SFLOAT,
   IMAGE_FORMAT_D24_UNORM_S8_UINT,
-  IMAGE_FORMAT_RGBA16_FLOAT,
-  IMAGE_FORMAT_RGB10A2_UNORM,
-  IMAGE_FORMAT_BGR10A2_UNORM,
 } ImageFormat;
 
 std::string to_string(ImageFormat value);
@@ -89,6 +114,35 @@ bool IsDepthFormat(ImageFormat format);
 bool HasStencil(ImageFormat format);
 uint32_t ImageFormatSize(ImageFormat format);
 bool IsColorFormat(ImageFormat format);
+bool IsSignedIntegerFormat(ImageFormat format);
+bool IsUnsignedIntegerFormat(ImageFormat format);
+
+union ClearColorValue {
+  std::array<float, 4> float32;
+  std::array<int32_t, 4> int32;
+  std::array<uint32_t, 4> uint32;
+};
+
+struct ClearDepthStencilValue {
+  float depth;
+  uint32_t stencil;
+};
+
+// The image format selects the member: depth_stencil for depth formats,
+// color.int32/uint32 for integer formats, color.float32 for all other colors.
+// Initialize the matching member; no numeric conversion from float to integer
+// is implied by the public interface.
+union ClearValue {
+  ClearColorValue color;
+  ClearDepthStencilValue depth_stencil;
+
+  ClearValue();
+  ClearValue(float r, float g, float b, float a);
+  ClearValue(int32_t r, int32_t g, int32_t b, int32_t a);
+  ClearValue(uint32_t r, uint32_t g, uint32_t b, uint32_t a);
+  ClearValue(const ClearColorValue &value);
+  ClearValue(const ClearDepthStencilValue &value);
+};
 
 enum CompareOp {
   COMPARE_NEVER,
@@ -175,10 +229,23 @@ typedef enum {
 
 std::string to_string(ShaderStage stage);
 
-typedef enum { VERTEX_FORMAT_FLOAT, VERTEX_FORMAT_FLOAT2, VERTEX_FORMAT_FLOAT3, VERTEX_FORMAT_FLOAT4 } VertexFormat;
+typedef enum {
+  INPUT_TYPE_FLOAT,
+  INPUT_TYPE_FLOAT2,
+  INPUT_TYPE_FLOAT3,
+  INPUT_TYPE_FLOAT4,
+  INPUT_TYPE_INT,
+  INPUT_TYPE_INT2,
+  INPUT_TYPE_INT3,
+  INPUT_TYPE_INT4,
+  INPUT_TYPE_UINT,
+  INPUT_TYPE_UINT2,
+  INPUT_TYPE_UINT3,
+  INPUT_TYPE_UINT4,
+} InputType;
 
-std::string to_string(VertexFormat format);
-uint32_t VertexFormatSize(VertexFormat format);
+std::string to_string(InputType format);
+uint32_t InputTypeSize(InputType format);
 
 typedef enum { ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_LOAD_OP_DISCARD } AttachmentLoadOp;
 

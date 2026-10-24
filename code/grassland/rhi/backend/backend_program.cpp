@@ -41,6 +41,11 @@ bool Program::ValidateLayout() const {
       return false;
   if (!desc_.blend_states.empty() && desc_.blend_states.size() != desc_.color_formats.size())
     return false;
+  for (size_t i = 0; i < desc_.blend_states.size(); ++i) {
+    if (desc_.blend_states[i].blend_enable &&
+        (IsSignedIntegerFormat(desc_.color_formats[i]) || IsUnsignedIntegerFormat(desc_.color_formats[i])))
+      return false;
+  }
   for (const auto &blend : desc_.blend_states) {
     for (auto factor : {blend.src_color, blend.dst_color, blend.src_alpha, blend.dst_alpha})
       if (factor < BLEND_FACTOR_ZERO || factor > BLEND_FACTOR_ONE_MINUS_DST_ALPHA)
@@ -69,7 +74,7 @@ bool Program::ValidateLayout() const {
   for (const auto &attribute : desc_.vertex_attributes) {
     if (attribute.binding >= desc_.vertex_bindings.size())
       return false;
-    auto size = VertexFormatSize(attribute.format);
+    auto size = InputTypeSize(attribute.type);
     auto stride = desc_.vertex_bindings[attribute.binding].stride;
     if (!size || attribute.offset > stride || size > stride - attribute.offset)
       return false;
