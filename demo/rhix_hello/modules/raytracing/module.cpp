@@ -10,6 +10,7 @@
 #include <map>
 #include <thread>
 
+#include "../../../rhi_common/last_frame.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
@@ -18,7 +19,7 @@ namespace {
 #include "built_in_shaders.inl"
 }
 
-int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
   Core core = grassland::rhix::CreateCore(api);
@@ -31,6 +32,7 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
     std::cout << "raytracing: SKIPPED (ray tracing unavailable)\n";
     return 0;
   }
+  rhi_demo::LastFrame capture(capture_directory, "raytracing");
   PresentMode requested = PRESENT_MODE_VSYNC;
   bool present_mode_changed = false;
   Window window;
@@ -323,7 +325,10 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
       if (!context.CmdPresent(window))
         return 1;
     }
+    if (!capture.Record(context.Get(), image.Get(), window.Get()))
+      return 1;
     SubmissionToken token = queue.Submit(std::move(context));
+    capture.Submitted(token.Get());
     if (!token)
       return 1;
     if (headless)
@@ -349,5 +354,7 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
         "raytracing: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered, seconds,
         rendered / seconds);
   }
+  if (!capture.Save())
+    return 1;
   return 0;
 }

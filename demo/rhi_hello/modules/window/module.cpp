@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 
+#include "../../../rhi_common/last_frame.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 
@@ -18,7 +19,8 @@ int RunWindow(grassland::rhi::IDevice *device,
               int frames,
               bool headless,
               grassland::rhi::PresentMode &requested,
-              bool &present_mode_changed) {
+              bool &present_mode_changed,
+              rhi_demo::LastFrame &capture) {
   using namespace grassland::rhi;
   if (!headless) {
     const auto options = window->GetSupportedPresentationOptions();
@@ -101,7 +103,10 @@ int RunWindow(grassland::rhi::IDevice *device,
         return 1;
     }
     // Submit ends recording and borrows the caller's context reference.
+    if (!capture.Record(context.Get(), image.Get(), window))
+      return 1;
     ObjPtr<ISubmissionToken> token = graphics->Submit(context.Get());
+    capture.Submitted(token.Get());
     if (!token)
       return 1;
     // Local containers release caller references; accepted work retains its resources.
@@ -127,11 +132,13 @@ int RunWindow(grassland::rhi::IDevice *device,
     std::cout << fmt::format("window: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
                              rendered, seconds, rendered / seconds);
   }
+  if (!capture.Save())
+    return 1;
   return 0;
 }
 }  // namespace
 
-int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
   using namespace grassland::rhi;
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
@@ -154,6 +161,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
   // For an explicit ID, use core->CreateDevice(id) instead.
   if (!device)
     return 1;
+  rhi_demo::LastFrame capture(capture_directory, "window");
   std::cout << "Selected: " << device->Name() << '\n'
             << "Enabled: ray tracing pipeline=" << device->SupportRayTracingPipeline()
             << ", ray query=" << device->SupportRayQuery() << ", geometry shader=" << device->SupportGeometryShader()
@@ -183,5 +191,6 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
     });
   }
   // Reverse declaration order releases children before their parents on every return.
-  return RunWindow(device.Get(), window.Get(), graphics.Get(), frames, headless, requested, present_mode_changed);
+  return RunWindow(device.Get(), window.Get(), graphics.Get(), frames, headless, requested, present_mode_changed,
+                   capture);
 }

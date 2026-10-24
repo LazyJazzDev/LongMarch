@@ -9,10 +9,11 @@
 #include <thread>
 #include <utility>
 
+#include "../../../rhi_common/last_frame.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 
-int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
   auto core = grassland::rhix::CreateCore(api);
@@ -36,6 +37,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
   // For an explicit ID, use core.CreateDevice(id) instead.
   if (!device)
     return 1;
+  rhi_demo::LastFrame capture(capture_directory, "window");
   std::cout << "Selected: " << device.Name() << '\n'
             << "Enabled: ray tracing pipeline=" << device.SupportRayTracingPipeline()
             << ", ray query=" << device.SupportRayQuery() << ", geometry shader=" << device.SupportGeometryShader()
@@ -144,7 +146,10 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
       if (!context.CmdPresent(window))
         return 1;
     }
+    if (!capture.Record(context.Get(), image.Get(), window.Get()))
+      return 1;
     auto token = graphics.Submit(std::move(context));
+    capture.Submitted(token.Get());
     if (!token)
       return 1;
     if (headless)
@@ -169,5 +174,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
     std::cout << fmt::format("window: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
                              rendered, seconds, rendered / seconds);
   }
+  if (!capture.Save())
+    return 1;
   return 0;
 }

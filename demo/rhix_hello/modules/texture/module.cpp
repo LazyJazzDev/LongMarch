@@ -11,6 +11,7 @@
 #include <thread>
 #include <utility>
 
+#include "../../../rhi_common/last_frame.h"
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
@@ -24,7 +25,7 @@ struct Vertex {
 };
 }  // namespace
 
-int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
 
@@ -34,6 +35,7 @@ int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
   grassland::rhix::Device device = core.CreateDeviceByAutoSelection();
   if (!device)
     return 1;
+  rhi_demo::LastFrame capture(capture_directory, "texture");
   PresentMode requested = PRESENT_MODE_VSYNC;
   bool present_mode_changed = false;
   grassland::rhix::Window window;
@@ -215,7 +217,10 @@ int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
       if (!context.CmdPresent(window))
         return 1;
     }
+    if (!capture.Record(context.Get(), image.Get(), window.Get()))
+      return 1;
     grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
+    capture.Submitted(token.Get());
     if (!token)
       return 1;
     if (headless)
@@ -240,5 +245,7 @@ int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
     std::cout << fmt::format("texture: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
                              rendered, seconds, rendered / seconds);
   }
+  if (!capture.Save())
+    return 1;
   return 0;
 }

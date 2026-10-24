@@ -10,6 +10,7 @@ int main(int argc, char **argv) {
   using namespace grassland::rhi;
   BackendAPI api = BACKEND_API_DEFAULT;
   std::string module;
+  std::string capture_directory;
   bool backend_specified = false;
   bool tui = false;
   bool headless = false;
@@ -19,6 +20,14 @@ int main(int argc, char **argv) {
   float font_size = 20.0f;
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
+    if (arg == "--save-last-frame") {
+      if (i + 1 >= argc || !argv[i + 1][0]) {
+        std::cerr << "--save-last-frame requires an output directory\n";
+        return 1;
+      }
+      capture_directory = argv[++i];
+      continue;
+    }
     if (arg == "--headless") {
       headless = true;
       continue;
@@ -37,7 +46,7 @@ int main(int argc, char **argv) {
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N] [--font PATH] [--font-size PIXELS]\nFont options apply to ImGui modules; defaults: built-in font, 20 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N] [--save-last-frame DIR] [--font PATH] [--font-size PIXELS]\n--save-last-frame saves each module as PNG, native .bin pixels and .txt metadata; it adds a GPU readback per frame.\nFont options apply to ImGui modules; defaults: built-in font, 20 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -152,45 +161,45 @@ int main(int argc, char **argv) {
   }
   if (all) {
     int result = 0;
-    if (RunWindow(api, frames, headless) != 0) {
+    if (RunWindow(api, frames, headless, capture_directory) != 0) {
       std::cerr << "window: FAILED\n";
       result = 1;
     }
-    if (RunTriangle(api, frames, headless) != 0) {
+    if (RunTriangle(api, frames, headless, capture_directory) != 0) {
       std::cerr << "triangle: FAILED\n";
       result = 1;
     }
-    if (RunCube(api, frames, headless) != 0) {
+    if (RunCube(api, frames, headless, capture_directory) != 0) {
       std::cerr << "cube: FAILED\n";
       result = 1;
     }
-    if (RunTexture(api, frames, headless) != 0) {
+    if (RunTexture(api, frames, headless, capture_directory) != 0) {
       std::cerr << "texture: FAILED\n";
       result = 1;
     }
-    if (RunBlend(api, frames, headless) != 0) {
+    if (RunBlend(api, frames, headless, capture_directory) != 0) {
       std::cerr << "blend: FAILED\n";
       result = 1;
     }
-    if (RunNBody(api, frames, headless) != 0) {
+    if (RunNBody(api, frames, headless, capture_directory) != 0) {
       std::cerr << "nbody: FAILED\n";
       result = 1;
     }
-    if (RunRayTracing(api, frames, headless) != 0) {
+    if (RunRayTracing(api, frames, headless, capture_directory) != 0) {
       std::cerr << "raytracing: FAILED\n";
       result = 1;
     }
-    if (RunRayQuery(api, frames, headless) != 0) {
+    if (RunRayQuery(api, frames, headless, capture_directory) != 0) {
       std::cerr << "ray_query: FAILED\n";
       result = 1;
     }
     if (headless) {
       std::cout << "hdr: SKIPPED (requires a window)\n";
-    } else if (RunHDR(api, frames) != 0) {
+    } else if (RunHDR(api, frames, capture_directory) != 0) {
       std::cerr << "hdr: FAILED\n";
       result = 1;
     }
-    if (RunImGui(api, frames, headless, font_file, font_size) != 0) {
+    if (RunImGui(api, frames, headless, font_file, font_size, capture_directory) != 0) {
       std::cerr << "imgui: FAILED\n";
       result = 1;
     }
@@ -216,29 +225,29 @@ int main(int argc, char **argv) {
     module = options[*selected].name;
   }
   if (module == "window")
-    return RunWindow(api, frames, headless);
+    return RunWindow(api, frames, headless, capture_directory);
   if (module == "triangle")
-    return RunTriangle(api, frames, headless);
+    return RunTriangle(api, frames, headless, capture_directory);
   if (module == "cube")
-    return RunCube(api, frames, headless);
+    return RunCube(api, frames, headless, capture_directory);
   if (module == "texture")
-    return RunTexture(api, frames, headless);
+    return RunTexture(api, frames, headless, capture_directory);
   if (module == "blend")
-    return RunBlend(api, frames, headless);
+    return RunBlend(api, frames, headless, capture_directory);
   if (module == "nbody")
-    return RunNBody(api, frames, headless);
+    return RunNBody(api, frames, headless, capture_directory);
   if (module == "raytracing")
-    return RunRayTracing(api, frames, headless);
+    return RunRayTracing(api, frames, headless, capture_directory);
   if (module == "ray_query")
-    return RunRayQuery(api, frames, headless);
+    return RunRayQuery(api, frames, headless, capture_directory);
   if (module == "imgui")
-    return RunImGui(api, frames, headless, font_file, font_size);
+    return RunImGui(api, frames, headless, font_file, font_size, capture_directory);
   if (module == "hdr") {
     if (headless) {
       std::cerr << "hdr requires a window; --headless is unsupported.\n";
       return 1;
     }
-    return RunHDR(api, frames);
+    return RunHDR(api, frames, capture_directory);
   }
   std::cerr << "Unknown module: " << module << '\n';
   return 1;

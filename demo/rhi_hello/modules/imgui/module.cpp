@@ -6,11 +6,17 @@
 #include <iostream>
 #include <thread>
 
+#include "../../../rhi_common/last_frame.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
 
-int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless, const char *font_file, float font_size) {
+int RunImGui(grassland::rhi::BackendAPI api,
+             int frames,
+             bool headless,
+             const char *font_file,
+             float font_size,
+             const std::string &capture_directory) {
   using namespace grassland::rhi;
   if (headless) {
     std::cout << "imgui: skipped (requires a window for platform input)\n";
@@ -22,6 +28,7 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless, const ch
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   if (!device)
     return 1;
+  rhi_demo::LastFrame capture(capture_directory, "imgui");
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
@@ -92,7 +99,10 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless, const ch
       return 1;
     if (!commands->CmdPresent(window.Get()))
       return 1;
+    if (!capture.Record(commands.Get(), image.Get(), window.Get()))
+      return 1;
     ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    capture.Submitted(done.Get());
     if (!done)
       return 1;
     ++rendered;
@@ -104,5 +114,7 @@ int RunImGui(grassland::rhi::BackendAPI api, int frames, bool headless, const ch
       title_time = now;
     }
   }
+  if (!capture.Save())
+    return 1;
   return 0;
 }

@@ -6,6 +6,7 @@
 #include <iostream>
 #include <thread>
 
+#include "../../../rhi_common/last_frame.h"
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
 
@@ -13,7 +14,8 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
                         int frames,
                         bool headless,
                         const char *font_file,
-                        float font_size) {
+                        float font_size,
+                        const std::string &capture_directory) {
   using namespace grassland::rhi;
   if (headless) {
     std::cout << "imgui_multi_window: skipped (requires desktop windows)\n";
@@ -25,6 +27,8 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   if (!device)
     return 1;
+  std::array<rhi_demo::LastFrame, 2> captures{
+      {{capture_directory, "imgui_multi_window_0"}, {capture_directory, "imgui_multi_window_1"}}};
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
@@ -130,7 +134,10 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
         return 1;
       if (!commands->CmdPresent(window.Get()))
         return 1;
+      if (!captures[i].Record(commands.Get(), image.Get(), window.Get()))
+        return 1;
       pending[i] = queue->Submit(commands.Get());
+      captures[i].Submitted(pending[i].Get());
       if (!pending[i])
         return 1;
       submitted = true;
@@ -148,5 +155,8 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
         return 1;
     }
   }
+  for (auto &capture : captures)
+    if (!capture.Save())
+      return 1;
   return 0;
 }

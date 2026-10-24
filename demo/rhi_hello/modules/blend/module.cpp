@@ -9,6 +9,7 @@
 #include <string>
 #include <thread>
 
+#include "../../../rhi_common/last_frame.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
@@ -22,7 +23,7 @@ struct Vertex {
 };
 }  // namespace
 
-int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
   using namespace grassland::rhi;
 
   ObjPtr<ICore> core = CreateCore(api);
@@ -31,6 +32,7 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   if (!device)
     return 1;
+  rhi_demo::LastFrame capture(capture_directory, "blend");
   PresentMode requested = PRESENT_MODE_VSYNC;
   bool present_mode_changed = false;
   ObjPtr<IWindow> window;
@@ -198,7 +200,10 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
       if (!context->CmdPresent(window.Get()))
         return 1;
     }
+    if (!capture.Record(context.Get(), image.Get(), window.Get()))
+      return 1;
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+    capture.Submitted(token.Get());
     if (!token)
       return 1;
     if (headless)
@@ -223,5 +228,7 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
     std::cout << fmt::format("blend: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
                              rendered, seconds, rendered / seconds);
   }
+  if (!capture.Save())
+    return 1;
   return 0;
 }

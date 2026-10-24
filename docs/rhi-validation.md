@@ -29,3 +29,82 @@ buffer diagnostics also include user information. Metal API Validation assertion
 are emitted directly by Apple's layer to stderr and may terminate the process
 before a command buffer completes; they are not forwarded through an RHI callback.
 `MTLLogState` handles shader logging and is not an API Validation callback.
+
+## Buffer and image readback
+
+Record downloads outside a rendering scope, before submitting the command context:
+
+```cpp
+ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+ObjPtr<IDownloadToken> bytes = commands->CmdDownloadBuffer(buffer.Get(), offset, size);
+ObjPtr<IDownloadToken> pixels = commands->CmdDownloadImage(image.Get(), {x, y, width, height});
+if (!bytes || !pixels) return false;
+ObjPtr<ISubmissionToken> submitted = queue->Submit(commands.Get());
+if (!submitted || !submitted->WaitHost()) return false;
+std::vector<uint8_t> cpu(pixels->GetSize());
+if (!pixels->CopyTo(cpu.data(), cpu.size())) return false;
+```
+
+RHIX exposes the same operations through `CommandContext` and `DownloadToken`.
+For asynchronous use, poll `DownloadToken::GetStatus()` instead of waiting on the
+submission. `CopyTo` never waits: it returns false for pending/failed/canceled work,
+a null destination, or insufficient capacity. A valid token starts pending; abandoned
+recordings and rejected submissions become canceled (native submit failures become
+failed). Release all tokens before their Device, like other RHI resource handles.
+
+Each token holds a lease from a Device-owned readback pool, grouped into power-of-two
+size classes starting at 64 KiB. The command context retains the token until GPU
+completion. Dropping the caller's token early cannot recycle storage still being
+written by the GPU. Keeping a completed token preserves its snapshot through later
+submissions; its final release returns the lease for reuse. Idle storage is cached
+until Device destruction. Tokens do not retain the source image or buffer after
+command retirement, so keeping a screenshot token does not block swapchain rebuilds.
+
+Buffer ranges are byte offsets and sizes; empty or out-of-bounds ranges fail. Image
+ranges are 2D rectangles, with zero width/height meaning the remaining extent from
+x/y. The returned image has `width * height * ImageFormatSize(format)` bytes, ordered
+left-to-right and top-to-bottom without row padding. Color values retain their native
+encoding, including BGRA channel order, packed 10-bit channels and half floats.
+D32 returns float depth. D24S8 returns little-endian words with depth in bits 0?23 and
+stencil in bits 24?31; Metal's native D32S8 depth is quantized to that public layout.
+D3D12 requires a full-subresource transfer for depth images; the token crops the
+requested rectangle while copying to CPU memory. Vulkan invalidates mapped memory
+before reading when required by the allocation's memory type.
+
+Swapchain downloads must be recorded before submission; recording after `CmdPresent`
+includes its ImGui overlay. Vulkan enables transfer-source usage when supported by
+the surface; an unsupported surface rejects swapchain downloads while ordinary
+window presentation remains available. Independent images support readback on all
+three backends.
+
+## Demo readback checks
+
+All modules of `demo_rhi_hello` and `demo_rhix_hello` accept `--save-last-frame DIR`:
+
+```text
+demo_rhi_hello --backend vulkan --all --frames 30 --save-last-frame out/readback/vulkan
+demo_rhix_hello --backend d3d12 --all --headless --frames 30 --save-last-frame out/readback/d3d12
+```
+
+Each rendered module saves `<module>.png`, `<module>.bin` and `<module>.txt` at normal
+exit. The binary file contains the exact compact pixels; the text file records extent,
+format, color space, row pitch and reference-white scale. PNG is an SDR preview:
+HDR is decoded relative to the window's reference white, converted to sRGB and clipped
+to its range. Use the binary file to inspect unclipped HDR values. Multi-window ImGui
+saves separate numbered files. Modules skipped for unavailable features or headless
+window requirements produce no capture. Different invocations should use separate
+directories to preserve previous results.
+
+Capture is optional and disabled by default. When enabled, it records a download
+every frame so closing the window can save the last rendered frame, then waits only
+at exit to write the files. This adds readback overhead and should not be used for
+rendering performance comparisons.
+
+Both nbody modules download GPU velocities asynchronously and plot a 100-bin speed
+histogram using the same binning and peak normalization as `nbody_cs`. Only one
+velocity download is pending at a time. Zero maximum speed is handled explicitly;
+non-finite velocities fail the demo. With frame capture enabled, `nbody_speeds.csv`
+contains the latest completed histogram, including bin edges, particle counts and
+normalized values. The curve can lag rendering by a frame or more while the GPU is
+busy. `*RhiDownload*` tests cover byte ranges, color/depth/stencil rectangles, compact
+rows, early token release, retained snapshots, and canceled recordings/submissions.
