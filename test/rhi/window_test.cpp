@@ -200,21 +200,21 @@ TEST_P(RhiWindow, ImGuiFontInitializationOptions) {
   auto previous = ImGui::GetCurrentContext();
   EXPECT_FALSE(window.EnableImGui(true, nullptr, 0));
   EXPECT_FALSE(window.EnableImGui(true, "missing-rhi-font.ttf", 20));
-  EXPECT_EQ(window.GetImGuiContext(), nullptr);
+  EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext(), nullptr);
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
   ASSERT_TRUE(window.EnableImGui(true, nullptr, 24));
-  ImGui::SetCurrentContext(window.GetImGuiContext());
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext());
   EXPECT_FLOAT_EQ(ImGui::GetIO().Fonts->Fonts[0]->FontSize, 24);
   ImGui::SetCurrentContext(previous);
-  auto context = window.GetImGuiContext();
+  auto context = static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext();
   ASSERT_TRUE(window.EnableImGui(true, nullptr, 32));
-  EXPECT_EQ(window.GetImGuiContext(), context);
+  EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext(), context);
   ASSERT_TRUE(window.EnableImGui(false));
   const auto path = (std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() /
                      "external/imgui/misc/fonts/Roboto-Medium.ttf")
                         .string();
   ASSERT_TRUE(window.EnableImGui(true, path.c_str(), 28));
-  ImGui::SetCurrentContext(window.GetImGuiContext());
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext());
   EXPECT_FLOAT_EQ(ImGui::GetIO().Fonts->Fonts[0]->FontSize, 28);
   EXPECT_NE(ImGui::GetIO().Fonts->Fonts[0]->FindGlyphNoFallback('A'), nullptr);
   EXPECT_NE(ImGui::GetIO().Fonts->TexID, ImTextureID{});
@@ -255,22 +255,23 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   ASSERT_TRUE(first.EnableImGui());
   ASSERT_TRUE(second.EnableImGui());
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
-  ASSERT_NE(first.GetImGuiContext(), nullptr);
-  ASSERT_NE(first.GetImGuiContext(), second.GetImGuiContext());
+  ASSERT_NE(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(), nullptr);
+  ASSERT_NE(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(),
+            static_cast<grassland::rhi::backend::Window *>(second.Get())->GetImGuiContext());
 #ifdef _WIN32
   // Native messages can arrive outside PollEvents with no current context, or
   // while a different window's context is selected.
-  ImGui::SetCurrentContext(first.GetImGuiContext());
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
   auto first_native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
-  ImGui::SetCurrentContext(second.GetImGuiContext());
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(second.Get())->GetImGuiContext());
   auto second_native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
   ImGui::SetCurrentContext(nullptr);
   SendMessageW(first_native, WM_NULL, 0, 0);
   SendMessageW(second_native, WM_NULL, 0, 0);
   EXPECT_EQ(ImGui::GetCurrentContext(), nullptr);
-  ImGui::SetCurrentContext(first.GetImGuiContext());
+  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
   SendMessageW(second_native, WM_NULL, 0, 0);
-  EXPECT_EQ(ImGui::GetCurrentContext(), first.GetImGuiContext());
+  EXPECT_EQ(ImGui::GetCurrentContext(), static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
   ImGui::SetCurrentContext(previous);
 #endif
   EXPECT_EQ(glfwGetWindowUserPointer(first.GLFWWindow()), &marker);
@@ -292,7 +293,8 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   EXPECT_EQ(keys, 1);
   auto draw_first = [&] {
     ++first_draws;
-    EXPECT_EQ(ImGui::GetCurrentContext(), first.GetImGuiContext());
+    EXPECT_EQ(ImGui::GetCurrentContext(),
+              static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
     EXPECT_FALSE(first.EnableImGui(false));
     EXPECT_FALSE(first.UpdateImGui({}));
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(255, 0, 0, 255));
@@ -300,7 +302,8 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   };
   auto draw_second = [&] {
     ++second_draws;
-    EXPECT_EQ(ImGui::GetCurrentContext(), second.GetImGuiContext());
+    EXPECT_EQ(ImGui::GetCurrentContext(),
+              static_cast<grassland::rhi::backend::Window *>(second.Get())->GetImGuiContext());
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(0, 255, 0, 255));
   };
   ASSERT_TRUE(first.UpdateImGui(draw_first));
@@ -340,7 +343,7 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   EXPECT_EQ(second_draws, 6);
   // Drop the CPU context/font owner while submitted overlays retain GPU inputs.
   ASSERT_TRUE(first.EnableImGui(false));
-  EXPECT_EQ(first.GetImGuiContext(), nullptr);
+  EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(), nullptr);
   for (auto &done : pending)
     EXPECT_TRUE(done.WaitHost());
   auto commands = device.CreateCommandContext();

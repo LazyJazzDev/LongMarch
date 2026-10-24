@@ -9,8 +9,6 @@
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/util/event_manager.h"
 
-struct ImGuiContext;
-
 namespace grassland::rhi {
 class IImage;
 class ICommandContext;
@@ -47,7 +45,6 @@ class IWindow : public IObject {
   // Replaces any pending UI data; the next CmdPresent consumes it once. Without
   // an update, CmdPresent draws no overlay. Disabled ImGui is a successful no-op.
   virtual bool UpdateImGui(const std::function<void()> &callback) = 0;
-  virtual ImGuiContext *GetImGuiContext() const = 0;
 
   // Borrowed handle; Window owns it. Use GLFW operations on the main thread.
   virtual GLFWwindow *GLFWWindow() const = 0;

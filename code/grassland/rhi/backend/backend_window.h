@@ -5,6 +5,8 @@
 #include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/rhi_window.h"
 
+struct ImGuiContext;
+
 namespace grassland::rhi::backend {
 
 class WindowImGui;
@@ -15,7 +17,7 @@ class Window : public Object<rhi::IWindow> {
   Window();
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
   bool UpdateImGui(const std::function<void()> &callback) override;
-  ImGuiContext *GetImGuiContext() const override;
+  ImGuiContext *GetImGuiContext() const;
   bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image);
 
   EventManager<void(int, int)> &ResizeEvent() override {

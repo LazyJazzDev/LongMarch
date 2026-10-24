@@ -86,10 +86,10 @@ bind their own state again. Disabling/re-enabling ImGui discards pending draw da
 and starts with a fresh context. UI callbacks are passed per update, with no registration.
 
 The caller's ImGui context is restored after initialization, input delivery and
-UI updates and overlay recording. `GetImGuiContext()` returns a borrowed pointer (null while disabled).
+UI updates and overlay recording. The public window API does not expose the context.
 Input always reaches application callbacks, even if ImGui wants capture. For
-application controls, select this context and inspect `WantCaptureMouse` or
-`WantCaptureKeyboard`, restoring the previous context afterwards. ImGui's
+application controls, inspect `ImGui::GetIO().WantCaptureMouse` or
+`WantCaptureKeyboard` inside `UpdateImGui(callback)` and store the result in application state. ImGui's
 multi-viewport feature and changes to the uploaded font atlas are not supported.
 
 `ImTextureID` represents an `rhi::IImage*` from the same Device, cast through

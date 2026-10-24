@@ -18,10 +18,6 @@ bool Window::UpdateImGui(const std::function<void()> &callback) const {
   return Get() && Get()->UpdateImGui(callback);
 }
 
-ImGuiContext *Window::GetImGuiContext() const {
-  return Get() ? Get()->GetImGuiContext() : nullptr;
-}
-
 EventManager<void(int, int)> &Window::ResizeEvent() const {
   return Get()->ResizeEvent();
 }

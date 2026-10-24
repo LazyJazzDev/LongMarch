@@ -512,7 +512,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
       return;
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, ImGui::GetIO().DisplaySize, IM_COL32_WHITE);
   };
-  auto original_context = window->GetImGuiContext();
+  auto original_context = static_cast<backend::Window *>(window.Get())->GetImGuiContext();
   for (bool visible : {true, false, false, true, false}) {
     record_ui = visible;
     ASSERT_TRUE(window->UpdateImGui(draw_window));
@@ -527,7 +527,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
     ReadPixel(device.Get(), target.Get(), GetParam(), 20, 20, pixel);
     const uint8_t channel = visible ? 255 : 0;
     EXPECT_EQ(pixel, (std::array<uint8_t, 4>{channel, channel, 255, 255}));
-    EXPECT_EQ(window->GetImGuiContext(), original_context);
+    EXPECT_EQ(static_cast<backend::Window *>(window.Get())->GetImGuiContext(), original_context);
   }
 }
 
