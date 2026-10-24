@@ -136,12 +136,14 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
         return 1;
       if (!commands->CmdPresent(window.Get()))
         return 1;
-      last_frames[i] = commands->CmdDownloadImage(image.Get());
-      if (!last_frames[i])
-        return 1;
-      last_frame_descs[i] = image->GetDesc();
-      last_frame_spaces[i] = window->GetColorSpace();
-      last_frame_white_scales[i] = window->GetHDRReferenceWhiteScale();
+      if (!capture_directory.empty()) {
+        last_frames[i] = commands->CmdDownloadImage(image.Get());
+        if (!last_frames[i])
+          return 1;
+        last_frame_descs[i] = image->GetDesc();
+        last_frame_spaces[i] = window->GetColorSpace();
+        last_frame_white_scales[i] = window->GetHDRReferenceWhiteScale();
+      }
       pending[i] = queue->Submit(commands.Get());
 
       if (!pending[i])

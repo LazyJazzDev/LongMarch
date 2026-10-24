@@ -329,12 +329,14 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, con
       if (!context->CmdPresent(window.Get()))
         return 1;
     }
-    last_frame = context->CmdDownloadImage(image.Get());
-    if (!last_frame)
-      return 1;
-    last_frame_desc = image->GetDesc();
-    last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-    last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
+    if (!capture_directory.empty()) {
+      last_frame = context->CmdDownloadImage(image.Get());
+      if (!last_frame)
+        return 1;
+      last_frame_desc = image->GetDesc();
+      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
+    }
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
     if (!token)

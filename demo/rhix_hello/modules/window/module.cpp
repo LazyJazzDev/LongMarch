@@ -149,12 +149,14 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
       if (!context.CmdPresent(window))
         return 1;
     }
-    last_frame = context.CmdDownloadImage(image);
-    if (!last_frame)
-      return 1;
-    last_frame_desc = image.GetDesc();
-    last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-    last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
+    if (!capture_directory.empty()) {
+      last_frame = context.CmdDownloadImage(image);
+      if (!last_frame)
+        return 1;
+      last_frame_desc = image.GetDesc();
+      last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+      last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
+    }
     auto token = graphics.Submit(std::move(context));
 
     if (!token)

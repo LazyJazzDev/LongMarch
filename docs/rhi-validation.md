@@ -112,13 +112,13 @@ saves separate numbered files. Modules skipped for unavailable features or headl
 window requirements produce no capture. Different invocations should use separate
 directories to preserve previous results.
 
-Every module records an image download after CmdPresent on every rendered frame
-(after rendering in headless mode), and directly retains only the newest DownloadToken
-and its image metadata. The render loop does not query, wait on, or copy this token.
-With --save-last-frame, normal exit waits on the final token, copies its pixels to CPU
-memory, and writes the files. Without the option, no CPU copy or file output is done.
-Image readback overhead is always included in these demo timings. Each demo owns its
-recording/exit flow; save_image only encodes already downloaded CPU pixels.
+With --save-last-frame, every module records an image download after CmdPresent on
+every rendered frame (after rendering in headless mode), and directly retains only
+the newest DownloadToken and its image metadata. The render loop does not query,
+wait on, or copy this token. Normal exit waits on the final token, copies its pixels
+to CPU memory, and writes the files. Without the option, no image download, CPU
+image copy, or file output is performed. Each demo owns its recording/exit flow;
+save_image only encodes already downloaded CPU pixels.
 
 Both nbody modules download GPU velocities asynchronously and plot a 100-bin speed
 histogram using the same binning and peak normalization as `nbody_cs`. Only one
