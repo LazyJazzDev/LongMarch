@@ -387,7 +387,7 @@ TEST_P(RhiProgram, ExplicitRenderingSupportsEmptyScopesAndAttachmentOperations) 
   for (auto load : {ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_LOAD_OP_DISCARD}) {
     for (auto store : {ATTACHMENT_STORE_OP_STORE, ATTACHMENT_STORE_OP_DISCARD}) {
       // Initialize before LOAD, including after a previous DISCARD store.
-      ASSERT_TRUE(commands->CmdClearImage(image.Get(), {0, 0, 0, 1}));
+      ASSERT_TRUE(commands->CmdClearImage(image.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
       ASSERT_TRUE(commands->CmdBeginRendering({{{image.Get(), load, store, {0.6f, 0.7f, 0.8f, 1}}}}));
       ASSERT_TRUE(commands->CmdEndRendering());
     }
@@ -431,7 +431,7 @@ TEST_P(RhiProgram, ExplicitRenderingRejectsUnbalancedScopesAndOutsideCommands) {
           EXPECT_FALSE(commands->CmdBeginRendering({{{image.Get()}}}));
           break;
         case 3:
-          EXPECT_FALSE(commands->CmdClearImage(image.Get(), {0, 0, 0, 1}));
+          EXPECT_FALSE(commands->CmdClearImage(image.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
           break;
         case 4:
           EXPECT_FALSE(commands->CmdPresent(window.Get()));

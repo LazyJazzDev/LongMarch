@@ -82,11 +82,10 @@ TEST_P(RhiFormats, IntegerClearsUseNumericValuesForTransferAndRenderPass) {
     ASSERT_TRUE(image);
     ClearValue values;
     if (signed_integer)
-      values.color.int32 = c.bytes == 1 ? std::array<int32_t, 4>{-7, 23, -65, 101}
-                                        : std::array<int32_t, 4>{-16777217, INT32_MAX, INT32_MIN, 16777217};
+      values = c.bytes == 1 ? ClearValue{-7, 23, -65, 101} : ClearValue{-16777217, INT32_MAX, INT32_MIN, 16777217};
     else
-      values.color.uint32 = c.bytes == 1 ? std::array<uint32_t, 4>{7, 23, 65, 255}
-                                         : std::array<uint32_t, 4>{UINT32_MAX, 16777217u, 0x80000001u, 0x12345678u};
+      values =
+          c.bytes == 1 ? ClearValue{7u, 23u, 65u, 255u} : ClearValue{UINT32_MAX, 16777217u, 0x80000001u, 0x12345678u};
     for (bool render_pass : {false, true}) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       if (render_pass) {

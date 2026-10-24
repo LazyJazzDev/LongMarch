@@ -42,8 +42,7 @@ SINT colors, color.uint32 for UINT colors, or depth_stencil for depth formats.
 ClearValue color{0.1f, 0.2f, 0.3f, 1.0f};
 commands->CmdClearImage(color_image, color);
 
-ClearValue integer;
-integer.color.uint32 = {0xffffffffu, 16777217u, 0x80000001u, 0};
+ClearValue integer{0xffffffffu, 16777217u, 0x80000001u, 0u};
 commands->CmdClearImage(uint_image, integer);
 
 ClearValue depth{ClearDepthStencilValue{1.0f, 0}};
@@ -57,6 +56,11 @@ rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
 rendering.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
 rendering.depth_stencil.clear_value = depth.depth_stencil;
 ```
+
+Four-component constructors select float32, int32 or uint32 from their argument
+types. Use floating-point literals for UNORM/SFLOAT clears, signed integers for
+SINT, and uint32_t values (or unsigned literals) for UINT; keep all four arguments
+the same type to avoid ambiguous overloads.
 
 Standalone depth clears also clear stencil when the image format includes it.
 Rendering scopes retain independent depth/stencil load and store operations;

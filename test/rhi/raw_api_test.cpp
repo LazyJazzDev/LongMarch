@@ -32,7 +32,7 @@ TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   ISubmissionToken *done = queue->Submit(context);
   ASSERT_NE(done, nullptr);
 #if !defined(NDEBUG)
-  EXPECT_FALSE(context->CmdClearImage(nullptr, {0, 0, 0, 1}));
+  EXPECT_FALSE(context->CmdClearImage(nullptr, {0.0f, 0.0f, 0.0f, 1.0f}));
   EXPECT_FALSE(context->CmdPresent(nullptr));
   EXPECT_EQ(queue->Submit(context), nullptr);  // One-shot submission.
 #endif

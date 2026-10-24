@@ -36,7 +36,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
     return 1;
 
   std::array<bool, 2> visible{true, true};
-  std::array<ClearValue, 2> colors{{{0.6f, 0.7f, 0.8f, 1}, {0.12f, 0.16f, 0.22f, 1}}};
+  std::array<ClearValue, 2> colors{{{0.6f, 0.7f, 0.8f, 1.0f}, {0.12f, 0.16f, 0.22f, 1.0f}}};
   std::array<ObjPtr<IWindow>, 2> windows;
   std::array<ObjPtr<ISubmissionToken>, 2> pending;
   const char *titles[] = {"ImGui multi - Controls - I: UI; Esc: close", "ImGui multi - Plot - I: UI; Esc: close"};

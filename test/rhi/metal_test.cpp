@@ -187,14 +187,14 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   auto a = first.GetNextImage();
   auto b = second.GetNextImage();
   auto clear = device.CreateCommandContext();
-  ASSERT_TRUE(clear.CmdClearImage(a, {1, 0, 0, 1}));
-  ASSERT_TRUE(clear.CmdClearImage(b, {0, 1, 0, 1}));
-  ASSERT_TRUE(clear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1}));
+  ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
+  ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
+  ASSERT_TRUE(clear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1.0f}));
   auto done = queue.Submit(std::move(clear));
   ASSERT_TRUE(done.WaitHost());
   {
     auto abandoned = device.CreateCommandContext();
-    ASSERT_TRUE(abandoned.CmdClearImage(a, {1, 0, 0, 1}));
+    ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   }
   auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
   auto readback = NS::TransferPtr(native->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));

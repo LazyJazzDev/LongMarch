@@ -24,6 +24,8 @@ union ClearValue {
 
   ClearValue();
   ClearValue(float r, float g, float b, float a);
+  ClearValue(int32_t r, int32_t g, int32_t b, int32_t a);
+  ClearValue(uint32_t r, uint32_t g, uint32_t b, uint32_t a);
   ClearValue(const ClearColorValue &value);
   ClearValue(const ClearDepthStencilValue &value);
 };
