@@ -96,7 +96,9 @@ multi-viewport feature and changes to the uploaded font atlas are not supported.
 `uintptr_t`; user images must remain valid until CmdPresent finishes recording.
 They are sampled with a linear clamp sampler. The command context retains the
 bound GPU resources, including fonts, after the CPU ImGui context is disabled.
-Each recording snapshots vertices/indices into independent buffers; no hidden
+Each window reuses vertex/index buffers, allocating 50% extra capacity above the required size when growing, without shrinking.
+Uploads snapshot CPU data into staging buffers and execute before drawing on the graphics queue.
+Command contexts retain replaced buffers until their GPU work completes; no hidden
 per-frame GPU wait or reuse of a live upload occurs. EnableImGui waits once for
 its initial font upload. Clip rectangles account for framebuffer scale, and the
 renderer supports ImDrawCmd vertex/index offsets and reset-render-state callbacks.

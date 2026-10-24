@@ -49,5 +49,7 @@ class WindowImGui {
   ObjPtr<IImage> font_;
   ObjPtr<ISampler> sampler_;
   ObjPtr<IProgram> program_;
+  ObjPtr<IBuffer> vertex_buffer_;
+  ObjPtr<IBuffer> index_buffer_;
 };
 }  // namespace grassland::rhi::backend

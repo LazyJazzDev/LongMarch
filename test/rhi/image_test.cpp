@@ -531,6 +531,52 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
   }
 }
 
+TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "ImGui buffer reuse"});
+  ASSERT_TRUE(window && window->EnableImGui());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  std::vector<ObjPtr<IImage>> targets;
+  std::vector<ObjPtr<ICommandContext>> recordings;
+  int frame = 0;
+  for (int rectangles : {1, 1, 128, 2, 256, 1}) {
+    ObjPtr<IImage> target = device->CreateImage({320, 240, IMAGE_FORMAT_RGBA8_UNORM});
+    ASSERT_TRUE(target);
+    const auto color = frame++ % 2 ? IM_COL32(0, 255, 0, 255) : IM_COL32(255, 0, 0, 255);
+    ASSERT_TRUE(window->UpdateImGui([&] {
+      for (int i = 0; i < rectangles; ++i)
+        ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, ImGui::GetIO().DisplaySize, color);
+    }));
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
+    ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+    targets.push_back(target);
+    recordings.push_back(commands);
+  }
+  // Release the owner's buffers before submitting any of the recorded uploads/draws.
+  ASSERT_TRUE(window->EnableImGui(false));
+  std::vector<ObjPtr<ISubmissionToken>> submissions;
+  for (auto &commands : recordings) {
+    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ASSERT_TRUE(done);
+    submissions.push_back(done);
+  }
+  ASSERT_TRUE(submissions.back()->WaitHost());
+  for (size_t i = 0; i < targets.size(); ++i) {
+    std::array<uint8_t, 4> pixel{};
+    ReadPixel(device.Get(), targets[i].Get(), GetParam(), 20, 20, pixel);
+    EXPECT_EQ(pixel, (i % 2 ? std::array<uint8_t, 4>{0, 255, 0, 255} : std::array<uint8_t, 4>{255, 0, 0, 255}));
+  }
+}
+
 TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnce) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Requires a desktop.";

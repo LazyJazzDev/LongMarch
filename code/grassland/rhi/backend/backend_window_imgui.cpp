@@ -237,16 +237,27 @@ bool WindowImGui::Render(ICommandContext *commands, IImage *image, ImDrawData *d
     }
     indices.insert(indices.end(), list->IdxBuffer.begin(), list->IdxBuffer.end());
   }
-  // Each recording owns its allocations: later frames, abandoned recordings and
-  // multiple in-flight submissions never overwrite this snapshot.
-  ObjPtr<IBuffer> vb = device_->CreateBuffer({vertices.size() * sizeof(Vertex)});
-  ObjPtr<IBuffer> ib = device_->CreateBuffer({indices.size() * sizeof(ImDrawIdx)});
-  if (!vb || !ib || !commands->CmdUploadBuffer(vb.Get(), 0, vertices.data(), vertices.size() * sizeof(Vertex)) ||
-      !commands->CmdUploadBuffer(ib.Get(), 0, indices.data(), indices.size() * sizeof(ImDrawIdx)))
+  // Uploads snapshot CPU data and execute before drawing on the command queue.
+  // Command contexts retain old buffers when growth replaces an allocation.
+  auto ensure_capacity = [&](ObjPtr<IBuffer> &buffer, size_t required) {
+    if (buffer && buffer->GetDesc().size >= required)
+      return true;
+    auto replacement = device_->CreateBuffer({required + required / 2});
+    if (!replacement)
+      return false;
+    buffer = std::move(replacement);
+    return true;
+  };
+  const size_t vertex_bytes = vertices.size() * sizeof(Vertex);
+  const size_t index_bytes = indices.size() * sizeof(ImDrawIdx);
+  if (!ensure_capacity(vertex_buffer_, vertex_bytes) || !ensure_capacity(index_buffer_, index_bytes) ||
+      !commands->CmdUploadBuffer(vertex_buffer_.Get(), 0, vertices.data(), vertex_bytes) ||
+      !commands->CmdUploadBuffer(index_buffer_.Get(), 0, indices.data(), index_bytes))
     return false;
   auto setup = [&] {
-    return commands->CmdBindProgram(program_.Get()) && commands->CmdBindVertexBuffer(0, vb.Get()) &&
-           commands->CmdBindIndexBuffer(ib.Get(), sizeof(ImDrawIdx) == 2 ? INDEX_FORMAT_UINT16 : INDEX_FORMAT_UINT32) &&
+    return commands->CmdBindProgram(program_.Get()) && commands->CmdBindVertexBuffer(0, vertex_buffer_.Get()) &&
+           commands->CmdBindIndexBuffer(index_buffer_.Get(),
+                                        sizeof(ImDrawIdx) == 2 ? INDEX_FORMAT_UINT16 : INDEX_FORMAT_UINT32) &&
            commands->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1});
   };
   if (!commands->CmdBindProgram(program_.Get()) ||
