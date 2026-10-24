@@ -6,9 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanWindow final : public Window {
  public:
-  bool SupportsImageDownload() const {
-    return image_download_supported_;
-  }
+  bool SupportsImageDownload() const;
 
   ~VulkanWindow() override;
   static VulkanWindow *Create(VulkanDevice *device, const WindowDesc &desc);

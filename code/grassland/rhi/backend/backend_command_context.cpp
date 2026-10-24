@@ -100,17 +100,25 @@ CommandContext::CommandContext(const void *identity) : identity_(identity) {
 }
 
 CommandContext::~CommandContext() {
-  CompleteDownloads(SUBMISSION_STATUS_CANCELED);
+  CancelDownloads(SUBMISSION_STATUS_CANCELED);
 }
 
-void CommandContext::CompleteDownloads(SubmissionStatus status) {
+void CommandContext::CancelDownloads(SubmissionStatus status) {
   for (auto &token : downloads_)
-    token->Complete(status);
+    token->Cancel(status);
   downloads_.clear();
 }
 
-IDownloadToken *CommandContext::TrackDownload(uint64_t size, std::function<bool(void *)> copy) {
-  auto token = ObjectPtr<DownloadToken>::Adopt(new DownloadToken(size, std::move(copy)));
+void CommandContext::BindDownloads(SubmissionToken *submission) {
+  for (const auto &token : downloads_)
+    token->BindSubmission(submission);
+}
+
+void CommandContext::ReleaseDownloads() {
+  downloads_.clear();
+}
+
+IDownloadToken *CommandContext::RegisterDownload(ObjectPtr<DownloadToken> token) {
   downloads_.push_back(token);
   return token.Detach();
 }

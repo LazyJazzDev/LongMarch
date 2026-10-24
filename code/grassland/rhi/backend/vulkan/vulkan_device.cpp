@@ -56,14 +56,15 @@ void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer c
 
 VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core)
     : Device(std::move(info), core, BACKEND_API_VULKAN),
-      upload_pool_(this),
+      upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
+      download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
       scratch_pool_(this) {
 }
 
 VulkanDevice::~VulkanDevice() {
   ShutdownQueues();
-  downloads_.Clear();
   upload_pool_.Clear();
+  download_pool_.Clear();
   scratch_pool_.Clear();
   render_targets_.reset();
   descriptor_pool_.reset();
@@ -226,7 +227,7 @@ std::mutex &VulkanDevice::QueueMutex() {
   return mutex_;
 }
 
-VulkanUploadPool &VulkanDevice::UploadPool() {
+VulkanTemporalBufferPool &VulkanDevice::UploadPool() {
   return upload_pool_;
 }
 
@@ -281,5 +282,9 @@ IRayTracingProgram *VulkanDevice::CreateRayTracingProgram(const RayTracingProgra
   if (!SupportRayTracingPipeline())
     return nullptr;
   return VulkanRayTracingProgram::Create(this, desc);
+}
+
+VulkanTemporalBufferPool &VulkanDevice::DownloadPool() {
+  return download_pool_;
 }
 }  // namespace grassland::rhi::backend::vulkan

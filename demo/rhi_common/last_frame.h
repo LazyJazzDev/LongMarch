@@ -12,13 +12,11 @@ class LastFrame {
   bool Record(grassland::rhi::ICommandContext *commands,
               grassland::rhi::IImage *image,
               grassland::rhi::IWindow *window = nullptr);
-  void Submitted(grassland::rhi::ISubmissionToken *completion);
   bool Save();
 
  private:
   std::string directory_, name_;
   grassland::rhi::ObjPtr<grassland::rhi::IDownloadToken> download_;
-  grassland::rhi::ObjPtr<grassland::rhi::ISubmissionToken> completion_;
   grassland::rhi::ImageDesc desc_{};
   grassland::rhi::ColorSpace space_{grassland::rhi::COLOR_SPACE_SRGB_NONLINEAR};
   float white_scale_{1};

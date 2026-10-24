@@ -305,7 +305,7 @@ int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless, const
     if (!capture.Record(context.Get(), image.Get(), window.Get()))
       return 1;
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
-    capture.Submitted(token.Get());
+
     if (!token)
       return 1;
     if (headless)

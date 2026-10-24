@@ -111,7 +111,7 @@ TEST(RhiMetalAllocation, FailedLeaseConstructionReturnsBorrowedUploadBuffer) {
   warm.Reset();
   bool propagated = false;
   {
-    FailAllocation fail(sizeof(MetalUploadPool::Lease));
+    FailAllocation fail(sizeof(MetalTemporalBufferPool::Lease));
     try {
       auto lease = pool.Acquire(256);
     } catch (const std::bad_alloc &) {
@@ -133,7 +133,7 @@ TEST(RhiMetalAllocation, RecyclingAllocationFailureReleasesStorageWithoutThrowin
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto &pool = static_cast<MetalDevice *>(device.Get())->UploadPool();
-  std::vector<backend::ObjectPtr<MetalUploadPool::Lease>> leases;
+  std::vector<backend::ObjectPtr<MetalTemporalBufferPool::Lease>> leases;
   // Enough decreasing occupancy samples to grow libc++'s deque storage.
   for (size_t i = 0; i < 1024; ++i) {
     leases.push_back(pool.Acquire(256));

@@ -11,6 +11,8 @@ struct ImageDownloadRegion {
 class IDownloadToken : public IObject {
  public:
   virtual SubmissionStatus GetStatus() const = 0;
+  // Returns false before submission, or if submission fails or is canceled.
+  virtual bool WaitHost() const = 0;
   virtual uint64_t GetSize() const = 0;
   // Nonblocking. Returns false without writing unless GPU execution succeeded
   // and destination_size covers GetSize(). Image rows are tightly packed in
@@ -20,6 +22,6 @@ class IDownloadToken : public IObject {
   virtual bool CopyTo(void *destination, uint64_t destination_size) const = 0;
 
  protected:
-  ~IDownloadToken() override = default;
+  ~IDownloadToken() override;
 };
 }  // namespace grassland::rhi

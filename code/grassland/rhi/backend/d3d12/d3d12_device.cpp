@@ -190,7 +190,8 @@ bool D3D12Device::WaitIdle() {
 
 D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
     : Device(std::move(info), core, BACKEND_API_D3D12),
-      upload_pool_(this),
+      upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
+      download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
       scratch_pool_(this),
       device_(std::move(device)),
       rtv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV),
@@ -203,8 +204,8 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
 
 D3D12Device::~D3D12Device() {
   ShutdownQueues();
-  downloads_.Clear();
   upload_pool_.Clear();
+  download_pool_.Clear();
   scratch_pool_.Clear();
   for (auto &entry : command_pool_)
     CloseHandle(std::get<2>(entry));
@@ -223,7 +224,7 @@ rhi::IProgram *D3D12Device::CreateProgram(const ProgramDesc &desc) {
   return D3D12Program::Create(this, desc);
 }
 
-D3D12UploadPool &D3D12Device::UploadPool() {
+D3D12TemporalBufferPool &D3D12Device::UploadPool() {
   return upload_pool_;
 }
 
@@ -278,5 +279,9 @@ IRayTracingProgram *D3D12Device::CreateRayTracingProgram(const RayTracingProgram
   if (!SupportRayTracingPipeline())
     return nullptr;
   return D3D12RayTracingProgram::Create(this, desc);
+}
+
+D3D12TemporalBufferPool &D3D12Device::DownloadPool() {
+  return download_pool_;
 }
 }  // namespace grassland::rhi::backend::d3d12

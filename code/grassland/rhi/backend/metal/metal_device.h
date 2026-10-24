@@ -2,9 +2,8 @@
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/backend_download_pool.h"
 #include "grassland/rhi/backend/metal/metal_scratch_pool.h"
-#include "grassland/rhi/backend/metal/metal_upload_pool.h"
+#include "grassland/rhi/backend/metal/metal_temporal_buffer_pool.h"
 
 namespace grassland::rhi::backend::metal {
 
@@ -19,12 +18,9 @@ class MetalDevice final : public Device {
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
-  MetalUploadPool &UploadPool();
+  MetalTemporalBufferPool &UploadPool();
 
-  std::shared_ptr<MetalAllocatedBuffer> AcquireDownload(uint64_t size) {
-    return downloads_.Acquire(
-        size, [this](uint64_t capacity) { return MetalAllocatedBuffer::Create(this, {capacity}, false, true); });
-  }
+  MetalTemporalBufferPool &DownloadPool();
 
   MetalScratchPool &ScratchPool();
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
@@ -47,8 +43,8 @@ class MetalDevice final : public Device {
   NS::SharedPtr<MTL::CommandQueue> queue_;
   NS::SharedPtr<MTL::CommandBufferDescriptor> command_buffer_descriptor_;
   std::mutex queue_mutex_;
-  DownloadPool<MetalAllocatedBuffer> downloads_;
-  MetalUploadPool uploads_{this};
+  // Shared storage is reused across uploads and downloads.
+  MetalTemporalBufferPool temporal_buffers_;
   MetalScratchPool scratch_{this};
 };
 

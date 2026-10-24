@@ -149,7 +149,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
     if (!capture.Record(context.Get(), image.Get(), window.Get()))
       return 1;
     auto token = graphics.Submit(std::move(context));
-    capture.Submitted(token.Get());
+
     if (!token)
       return 1;
     if (headless)

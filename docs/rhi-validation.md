@@ -40,24 +40,33 @@ ObjPtr<IDownloadToken> bytes = commands->CmdDownloadBuffer(buffer.Get(), offset,
 ObjPtr<IDownloadToken> pixels = commands->CmdDownloadImage(image.Get(), {x, y, width, height});
 if (!bytes || !pixels) return false;
 ObjPtr<ISubmissionToken> submitted = queue->Submit(commands.Get());
-if (!submitted || !submitted->WaitHost()) return false;
+if (!submitted || !pixels->WaitHost()) return false;
 std::vector<uint8_t> cpu(pixels->GetSize());
 if (!pixels->CopyTo(cpu.data(), cpu.size())) return false;
 ```
 
 RHIX exposes the same operations through `CommandContext` and `DownloadToken`.
-For asynchronous use, poll `DownloadToken::GetStatus()` instead of waiting on the
-submission. `CopyTo` never waits: it returns false for pending/failed/canceled work,
+For asynchronous use, poll `DownloadToken::GetStatus()`. `DownloadToken::WaitHost()`
+waits on the associated SubmissionToken; before submission it returns false without
+blocking. The association is established before native submission, and callers may
+release their SubmissionToken handle while retaining the DownloadToken. `CopyTo` does
+not wait for GPU completion: it returns false for pending/failed/canceled work,
 a null destination, or insufficient capacity. A valid token starts pending; abandoned
 recordings and rejected submissions become canceled (native submit failures become
 failed). Release all tokens before their Device, like other RHI resource handles.
 
-Each token holds a lease from a Device-owned readback pool, grouped into power-of-two
-size classes starting at 64 KiB. The command context retains the token until GPU
-completion. Dropping the caller's token early cannot recycle storage still being
+Each token holds an intrusive lease from a Device-owned `TemporalBufferPool`, grouped
+into power-of-two size classes starting at 64 KiB. Upload and download share the same
+pool implementation and the existing UploadPool lease/reclamation semantics. D3D12
+and Vulkan use separate instances for their upload/readback allocation policies;
+Metal uses one Shared-storage pool for both directions. The command context retains
+the token until GPU completion. Dropping the caller's token early cannot recycle storage still being
 written by the GPU. Keeping a completed token preserves its snapshot through later
-submissions; its final release returns the lease for reuse. Idle storage is cached
-until Device destruction. Tokens do not retain the source image or buffer after
+submissions; its final release returns the lease for reuse. Idle capacity shrinks
+against the peak occupancy of the previous second, just as
+in the original UploadPool. The pool template is implemented and explicitly
+instantiated in a `.cpp`; native buffer/lease types remain statically known. Tokens
+do not retain the source image or buffer after
 command retirement, so keeping a screenshot token does not block swapchain rebuilds.
 
 Buffer ranges are byte offsets and sizes; empty or out-of-bounds ranges fail. Image
@@ -65,8 +74,8 @@ ranges are 2D rectangles, with zero width/height meaning the remaining extent fr
 x/y. The returned image has `width * height * ImageFormatSize(format)` bytes, ordered
 left-to-right and top-to-bottom without row padding. Color values retain their native
 encoding, including BGRA channel order, packed 10-bit channels and half floats.
-D32 returns float depth. D24S8 returns little-endian words with depth in bits 0?23 and
-stencil in bits 24?31; Metal's native D32S8 depth is quantized to that public layout.
+D32 returns float depth. D24S8 returns little-endian words with depth in bits 0-23 and
+stencil in bits 24-31; Metal's native D32S8 depth is quantized to that public layout.
 D3D12 requires a full-subresource transfer for depth images; the token crops the
 requested rectangle while copying to CPU memory. Vulkan invalidates mapped memory
 before reading when required by the allocation's memory type.
@@ -76,6 +85,12 @@ includes its ImGui overlay. Vulkan enables transfer-source usage when supported 
 the surface; an unsupported surface rejects swapchain downloads while ordinary
 window presentation remains available. Independent images support readback on all
 three backends.
+
+Concrete backend DownloadToken implementations store the lease and native copy
+layout as members. CPU copy, row compaction and stencil packing live in their `.cpp`
+files, without `std::function` copy callbacks or `shared_ptr` lease control blocks.
+Tokens query and wait on the existing SubmissionToken completion state; the collector
+does not publish a second completion state to each DownloadToken.
 
 ## Demo readback checks
 
@@ -107,4 +122,6 @@ non-finite velocities fail the demo. With frame capture enabled, `nbody_speeds.c
 contains the latest completed histogram, including bin edges, particle counts and
 normalized values. The curve can lag rendering by a frame or more while the GPU is
 busy. `*RhiDownload*` tests cover byte ranges, color/depth/stencil rectangles, compact
-rows, early token release, retained snapshots, and canceled recordings/submissions.
+rows, early token release, retained snapshots, canceled recordings/submissions, direct and concurrent waits after releasing the
+submission handle, and temporal-pool lease retention/reuse/shrinking. The Metal test
+also checks that both pool accessors refer to the same pool and reuse the same storage.

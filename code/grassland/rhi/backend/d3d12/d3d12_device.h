@@ -4,11 +4,10 @@
 #include <tuple>
 
 #include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/backend_download_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_scratch_pool.h"
+#include "grassland/rhi/backend/d3d12/d3d12_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_transient_descriptor_pool.h"
-#include "grassland/rhi/backend/d3d12/d3d12_upload_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
@@ -43,12 +42,9 @@ class D3D12Device final : public Device {
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
-  D3D12UploadPool &UploadPool();
+  D3D12TemporalBufferPool &UploadPool();
 
-  std::shared_ptr<D3D12AllocatedBuffer> AcquireDownload(uint64_t size) {
-    return downloads_.Acquire(
-        size, [this](uint64_t capacity) { return D3D12AllocatedBuffer::Create(this, {capacity}, false, true); });
-  }
+  D3D12TemporalBufferPool &DownloadPool();
 
   D3D12ScratchPool &ScratchPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
@@ -67,8 +63,8 @@ class D3D12Device final : public Device {
  private:
   D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
 
-  DownloadPool<D3D12AllocatedBuffer> downloads_;
-  D3D12UploadPool upload_pool_;
+  D3D12TemporalBufferPool upload_pool_;
+  D3D12TemporalBufferPool download_pool_;
   D3D12ScratchPool scratch_pool_;
   std::mutex command_pool_mutex_;
   std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>, HANDLE>> command_pool_;

@@ -168,7 +168,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &captur
     if (!capture.Record(context.Get(), image.Get(), window.Get()))
       return 1;
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
-    capture.Submitted(token.Get());
+
     if (!token || !token->WaitHost())
       return 1;
     fps.TickFrame();

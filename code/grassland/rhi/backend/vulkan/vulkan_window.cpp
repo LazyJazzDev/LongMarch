@@ -399,4 +399,7 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   return true;
 }
 
+bool VulkanWindow::SupportsImageDownload() const {
+  return image_download_supported_;
+}
 }  // namespace grassland::rhi::backend::vulkan

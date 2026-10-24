@@ -4,6 +4,7 @@
 
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
+#include "grassland/rhi/backend/metal/metal_download_token.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
@@ -624,12 +625,12 @@ IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
     recording_failed_ = true;
     return nullptr;
   }
-  auto lease = device_->AcquireDownload(size);
-  if (!lease || !CmdCopyBuffer(native, offset, lease.get(), 0, size)) {
+  auto lease = device_->DownloadPool().Acquire(size);
+  if (!lease || !CmdCopyBuffer(native, offset, lease.Get(), 0, size)) {
     recording_failed_ = true;
     return nullptr;
   }
-  return TrackDownload(size, [lease, size](void *data) { return lease->Read(data, size); });
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new MetalDownloadToken(std::move(lease), size)));
 }
 
 IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
@@ -653,8 +654,8 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
   }
   const uint64_t pitch = packed;
   const bool stencil = HasStencil(desc.format);
-  auto lease = device_->AcquireDownload(pitch * height + (stencil ? uint64_t(width) * height : 0));
-  if (!lease || !RetainResource(native) || !RetainResource(lease.get())) {
+  auto lease = device_->DownloadPool().Acquire(pitch * height + (stencil ? uint64_t(width) * height : 0));
+  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
   }
@@ -676,25 +677,7 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
                           MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height);
   }
   blit->endEncoding();
-  return TrackDownload(packed * height, [lease, pitch, packed, height, width, stencil](void *data) {
-    if (stencil) {
-      std::vector<float> depths(uint64_t(width) * height);
-      std::vector<uint8_t> values(depths.size());
-      if (!lease->Read(depths.data(), packed * height) || !lease->Read(values.data(), values.size(), packed * height))
-        return false;
-      for (size_t i = 0; i < values.size(); ++i) {
-        const uint32_t value =
-            uint32_t(std::clamp(double(depths[i]), 0.0, 1.0) * 16777215.0 + 0.5) | (uint32_t(values[i]) << 24);
-        std::memcpy(static_cast<uint8_t *>(data) + i * 4, &value, 4);
-      }
-      return true;
-    }
-    if (pitch == packed)
-      return lease->Read(data, packed * height);
-    for (uint32_t y = 0; y < height; ++y)
-      if (!lease->Read(static_cast<uint8_t *>(data) + y * packed, packed, y * pitch))
-        return false;
-    return true;
-  });
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new MetalDownloadToken(
+      std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 }  // namespace grassland::rhi::backend::metal

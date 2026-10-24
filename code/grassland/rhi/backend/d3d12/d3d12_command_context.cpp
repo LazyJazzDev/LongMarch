@@ -9,6 +9,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_download_token.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
@@ -857,12 +858,12 @@ IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
     recording_failed_ = true;
     return nullptr;
   }
-  auto lease = device_->AcquireDownload(size);
-  if (!lease || !CmdCopyBuffer(native, offset, lease.get(), 0, size)) {
+  auto lease = device_->DownloadPool().Acquire(size);
+  if (!lease || !CmdCopyBuffer(native, offset, lease.Get(), 0, size)) {
     recording_failed_ = true;
     return nullptr;
   }
-  return TrackDownload(size, [lease, size](void *data) { return lease->Read(data, size); });
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new D3D12DownloadToken(std::move(lease), size)));
 }
 
 IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
@@ -891,8 +892,8 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
     UINT64 row_bytes[2]{}, total{};
     const UINT planes = HasStencil(desc.format) ? 2 : 1;
     device_->NativeDevice()->GetCopyableFootprints(&native_desc, 0, planes, 0, footprints, rows, row_bytes, &total);
-    auto lease = device_->AcquireDownload(total);
-    if (!lease || !RetainResource(native) || !RetainResource(lease.get())) {
+    auto lease = device_->DownloadPool().Acquire(total);
+    if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
       recording_failed_ = true;
       return nullptr;
     }
@@ -909,23 +910,16 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
       list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
     }
     const auto depth = footprints[0], stencil = footprints[1];
-    return TrackDownload(packed * height, [lease, depth, stencil, planes, region, width, height, packed](void *data) {
-      for (uint32_t y = 0; y < height; ++y) {
-        auto destination = static_cast<uint8_t *>(data) + y * packed;
-        if (!lease->Read(destination, packed,
-                         depth.Offset + uint64_t(region.y + y) * depth.Footprint.RowPitch + uint64_t(region.x) * 4))
-          return false;
-        if (planes == 2) {
-          std::vector<uint8_t> values(width);
-          if (!lease->Read(values.data(), width,
-                           stencil.Offset + uint64_t(region.y + y) * stencil.Footprint.RowPitch + region.x))
-            return false;
-          for (uint32_t x = 0; x < width; ++x)
-            destination[x * 4 + 3] = values[x];
-        }
-      }
-      return true;
-    });
+    DownloadLayout layout;
+    layout.offset = depth.Offset + uint64_t(region.y) * depth.Footprint.RowPitch + uint64_t(region.x) * 4;
+    layout.row_pitch = depth.Footprint.RowPitch;
+    layout.row_bytes = packed;
+    layout.rows = height;
+    if (planes == 2) {
+      layout.stencil_offset = stencil.Offset + uint64_t(region.y) * stencil.Footprint.RowPitch + region.x;
+      layout.stencil_pitch = stencil.Footprint.RowPitch;
+    }
+    return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new D3D12DownloadToken(std::move(lease), layout)));
   }
   const uint64_t pitch =
       (packed + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) & ~(uint64_t(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) - 1);
@@ -933,8 +927,8 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
     recording_failed_ = true;
     return nullptr;
   }
-  auto lease = device_->AcquireDownload(pitch * height);
-  if (!lease || !RetainResource(native) || !RetainResource(lease.get())) {
+  auto lease = device_->DownloadPool().Acquire(pitch * height);
+  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
   }
@@ -948,13 +942,7 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
   dst.PlacedFootprint.Footprint = {native->NativeImage()->GetDesc().Format, width, height, 1, static_cast<UINT>(pitch)};
   D3D12_BOX box{region.x, region.y, 0, region.x + width, region.y + height, 1};
   list_->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
-  return TrackDownload(packed * height, [lease, pitch, packed, height](void *data) {
-    if (pitch == packed)
-      return lease->Read(data, packed * height);
-    for (uint32_t y = 0; y < height; ++y)
-      if (!lease->Read(static_cast<uint8_t *>(data) + y * packed, packed, y * pitch))
-        return false;
-    return true;
-  });
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(
+      new D3D12DownloadToken(std::move(lease), DownloadLayout{0, pitch, packed, height})));
 }
 }  // namespace grassland::rhi::backend::d3d12

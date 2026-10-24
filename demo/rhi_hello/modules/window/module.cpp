@@ -106,7 +106,7 @@ int RunWindow(grassland::rhi::IDevice *device,
     if (!capture.Record(context.Get(), image.Get(), window))
       return 1;
     ObjPtr<ISubmissionToken> token = graphics->Submit(context.Get());
-    capture.Submitted(token.Get());
+
     if (!token)
       return 1;
     // Local containers release caller references; accepted work retains its resources.

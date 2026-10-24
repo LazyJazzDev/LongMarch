@@ -32,13 +32,13 @@ MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<
 
 MetalDevice::MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device)
     : Device(std::move(info), core, BACKEND_API_METAL),
-      device_(std::move(device)) {
+      device_(std::move(device)),
+      temporal_buffers_(this, TEMPORAL_BUFFER_UPLOAD) {
 }
 
 MetalDevice::~MetalDevice() {
   ShutdownQueues();
-  downloads_.Clear();
-  uploads_.Clear();
+  temporal_buffers_.Clear();
   scratch_.Clear();
 }
 
@@ -126,7 +126,11 @@ ISampler *MetalDevice::CreateSampler(const SamplerDesc &desc) {
   return MetalSampler::Create(this, desc);
 }
 
-MetalUploadPool &MetalDevice::UploadPool() {
-  return uploads_;
+MetalTemporalBufferPool &MetalDevice::UploadPool() {
+  return temporal_buffers_;
+}
+
+MetalTemporalBufferPool &MetalDevice::DownloadPool() {
+  return temporal_buffers_;
 }
 }  // namespace grassland::rhi::backend::metal

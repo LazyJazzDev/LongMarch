@@ -1,8 +1,21 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <chrono>
 #include <cstring>
+#include <thread>
 
+#include "grassland/rhi/rhix/rhix_download_token.h"
+
+#if defined(LONGMARCH_D3D12_ENABLED)
+#include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+#include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+#include "grassland/rhi/backend/metal/metal_device.h"
+#endif
 #include "grassland/rhi/rhi.h"
 
 namespace grassland::rhi {
@@ -33,6 +46,7 @@ TEST_P(RhiDownload, BufferRangeSnapshotsAndRetainedLeases) {
   ASSERT_TRUE(unaligned);
   std::array<uint32_t, 25> output{};
   EXPECT_EQ(first->GetStatus(), SUBMISSION_STATUS_PENDING);
+  EXPECT_FALSE(first->WaitHost());
   EXPECT_FALSE(first->CopyTo(output.data(), sizeof(output)));
   EXPECT_EQ(output[0], 0);
   ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
@@ -80,6 +94,7 @@ TEST_P(RhiDownload, AbandonedAndInvalidDownloads) {
   ASSERT_TRUE(token);
   commands.Release();
   EXPECT_EQ(token->GetStatus(), SUBMISSION_STATUS_CANCELED);
+  EXPECT_FALSE(token->WaitHost());
   std::array<uint8_t, 64> bytes{};
   EXPECT_FALSE(token->CopyTo(bytes.data(), bytes.size()));
   for (auto range : {std::pair<uint64_t, uint64_t>{64, 1}, {0, 0}, {UINT64_MAX, 16}, {1, 64}}) {
@@ -182,6 +197,111 @@ TEST_P(RhiDownload, RejectedSubmissionCancelsRecordedDownloads) {
   ObjPtr<ISubmissionToken> rejected = queue->Submit(commands.Get());
   EXPECT_FALSE(rejected);
   EXPECT_EQ(token->GetStatus(), SUBMISSION_STATUS_CANCELED);
+  EXPECT_FALSE(token->WaitHost());
+}
+
+TEST_P(RhiDownload, WaitHostSurvivesSubmissionHandleReleaseAndSupportsMultipleWaiters) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({64});
+  ASSERT_TRUE(buffer);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  std::array<uint32_t, 16> source{};
+  source.fill(0x12345678);
+  ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, source.data(), sizeof(source)));
+  ObjPtr<IDownloadToken> token = commands->CmdDownloadBuffer(buffer.Get(), 0, sizeof(source));
+  ASSERT_TRUE(token);
+  ObjPtr<IDownloadToken> other = commands->CmdDownloadBuffer(buffer.Get(), 4, 8);
+  ASSERT_TRUE(other);
+  ObjPtr<ISubmissionToken> submitted = queue->Submit(commands.Get());
+  ASSERT_TRUE(submitted);
+  submitted.Release();
+  commands.Release();
+  buffer.Release();
+  bool first = false, second = false;
+  std::thread a([&] { first = token->WaitHost(); });
+  std::thread b([&] { second = token->WaitHost(); });
+  a.join();
+  b.join();
+  EXPECT_TRUE(first);
+  EXPECT_TRUE(second);
+  EXPECT_TRUE(other->WaitHost());
+  grassland::rhix::DownloadToken wrapped(token.Detach());
+  EXPECT_TRUE(wrapped.WaitHost());
+  std::array<uint32_t, 16> output{};
+  ASSERT_TRUE(wrapped.CopyTo(output.data(), sizeof(output)));
+  EXPECT_EQ(output, source);
+}
+
+TEST_P(RhiDownload, TemporalPoolRetainsTokenLeaseAndShrinksExpiredDemand) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({64});
+  ASSERT_TRUE(buffer);
+  {
+    ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+    std::array<uint32_t, 16> data{};
+    ASSERT_TRUE(upload->CmdUploadBuffer(buffer.Get(), 0, data.data(), sizeof(data)));
+    ObjPtr<ISubmissionToken> submitted = queue->Submit(upload.Get());
+    upload.Release();
+    ASSERT_TRUE(submitted && submitted->WaitHost());
+  }
+  auto check = [&](auto *owner) {
+    auto &pool = owner->DownloadPool();
+    pool.Clear();
+    EXPECT_EQ(&pool == &owner->UploadPool(), GetParam() == BACKEND_API_METAL);
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<IDownloadToken> token = commands->CmdDownloadBuffer(buffer.Get(), 0, 64);
+    ASSERT_TRUE(token);
+    EXPECT_EQ(pool.GetBufferCounts(64).second, 1u);
+    ObjPtr<ISubmissionToken> submitted = queue->Submit(commands.Get());
+    ASSERT_TRUE(submitted);
+    commands.Release();
+    submitted.Release();
+    ASSERT_TRUE(token->WaitHost());
+    EXPECT_EQ(pool.GetBufferCounts(64).second, 1u);
+    auto other = pool.Acquire(64);
+    ASSERT_TRUE(other);
+    EXPECT_EQ(pool.GetBufferCounts(64).first, 2u);
+    EXPECT_EQ(pool.GetBufferCounts(64).second, 2u);
+    token.Release();
+    EXPECT_EQ(pool.GetBufferCounts(64).second, 1u);
+    auto reused = pool.Acquire(64);
+    ASSERT_TRUE(reused);
+    EXPECT_EQ(pool.GetBufferCounts(64).first, 2u);
+    other.Reset();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    reused.Reset();
+    EXPECT_EQ(pool.GetBufferCounts(64).first, 0u);
+    EXPECT_EQ(pool.GetBufferCounts(64).second, 0u);
+    if (GetParam() == BACKEND_API_METAL) {
+      auto upload = owner->UploadPool().Acquire(64);
+      ASSERT_TRUE(upload);
+      auto native = upload->NativeBuffer();
+      upload.Reset();
+      auto download = pool.Acquire(64);
+      ASSERT_TRUE(download);
+      EXPECT_EQ(download->NativeBuffer(), native);
+    }
+  };
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (GetParam() == BACKEND_API_D3D12)
+    check(static_cast<backend::d3d12::D3D12Device *>(device.Get()));
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (GetParam() == BACKEND_API_VULKAN)
+    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get()));
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (GetParam() == BACKEND_API_METAL)
+    check(static_cast<backend::metal::MetalDevice *>(device.Get()));
+#endif
 }
 
 const BackendAPI download_backends[] = {

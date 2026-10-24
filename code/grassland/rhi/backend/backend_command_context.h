@@ -64,7 +64,9 @@ class CommandContext : public Object<rhi::ICommandContext> {
                       uint32_t first_instance = 0) override;
   IDownloadToken *CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t) override;
   IDownloadToken *CmdDownloadImage(IImage *, const ImageDownloadRegion & = {}) override;
-  void CompleteDownloads(SubmissionStatus status);
+  void CancelDownloads(SubmissionStatus status);
+  void BindDownloads(SubmissionToken *submission);
+  void ReleaseDownloads();
   bool Seal();
   const void *DeviceIdentity() const;
   void MarkSubmitted();
@@ -74,7 +76,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
 
  protected:
   // Call before encoding each resource use. Retains each exact object once.
-  IDownloadToken *TrackDownload(uint64_t size, std::function<bool(void *)> copy);
+  IDownloadToken *RegisterDownload(ObjectPtr<DownloadToken> token);
   bool RetainResource(rhi::IObject *resource);
   virtual bool EndRecording() = 0;
   bool PrepareRendering(const RenderingInfo &info);

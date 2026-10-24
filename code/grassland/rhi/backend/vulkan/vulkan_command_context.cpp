@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
+#include "grassland/rhi/backend/vulkan/vulkan_download_token.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
@@ -890,14 +891,14 @@ IDownloadToken *VulkanCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_
     recording_failed_ = true;
     return nullptr;
   }
-  auto lease = device_->AcquireDownload(size);
-  if (!lease || !CmdCopyBuffer(native, offset, lease.get(), 0, size)) {
+  auto lease = device_->DownloadPool().Acquire(size);
+  if (!lease || !CmdCopyBuffer(native, offset, lease.Get(), 0, size)) {
     recording_failed_ = true;
     return nullptr;
   }
-  if (!TransitionBuffer(lease.get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
+  if (!TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
     return nullptr;
-  return TrackDownload(size, [lease, size](void *data) { return lease->Read(data, size); });
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new VulkanDownloadToken(std::move(lease), size)));
 }
 
 IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
@@ -926,14 +927,14 @@ IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const Imag
   }
   const uint64_t pitch = packed;
   const bool stencil = HasStencil(desc.format);
-  auto lease = device_->AcquireDownload(pitch * height + (stencil ? uint64_t(width) * height : 0));
-  if (!lease || !RetainResource(native) || !RetainResource(lease.get())) {
+  auto lease = device_->DownloadPool().Acquire(pitch * height + (stencil ? uint64_t(width) * height : 0));
+  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
   }
   if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
                        VK_ACCESS_TRANSFER_READ_BIT) ||
-      !TransitionBuffer(lease.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT))
+      !TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT))
     return nullptr;
   VkBufferImageCopy copy{};
   copy.imageSubresource = {static_cast<VkImageAspectFlags>(IsDepthFormat(desc.format) ? VK_IMAGE_ASPECT_DEPTH_BIT
@@ -949,25 +950,9 @@ IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const Imag
     vkCmdCopyImageToBuffer(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, lease->NativeBuffer(),
                            1, &copy);
   }
-  if (!TransitionBuffer(lease.get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
+  if (!TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
     return nullptr;
-  return TrackDownload(packed * height, [lease, pitch, packed, height, width, stencil](void *data) {
-    if (stencil) {
-      if (!lease->Read(data, packed * height))
-        return false;
-      std::vector<uint8_t> values(uint64_t(width) * height);
-      if (!lease->Read(values.data(), values.size(), packed * height))
-        return false;
-      for (size_t i = 0; i < values.size(); ++i)
-        static_cast<uint8_t *>(data)[i * 4 + 3] = values[i];
-      return true;
-    }
-    if (pitch == packed)
-      return lease->Read(data, packed * height);
-    for (uint32_t y = 0; y < height; ++y)
-      if (!lease->Read(static_cast<uint8_t *>(data) + y * packed, packed, y * pitch))
-        return false;
-    return true;
-  });
+  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new VulkanDownloadToken(
+      std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 }  // namespace grassland::rhi::backend::vulkan

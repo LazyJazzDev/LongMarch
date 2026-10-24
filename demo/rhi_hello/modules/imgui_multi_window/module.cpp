@@ -137,7 +137,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
       if (!captures[i].Record(commands.Get(), image.Get(), window.Get()))
         return 1;
       pending[i] = queue->Submit(commands.Get());
-      captures[i].Submitted(pending[i].Get());
+
       if (!pending[i])
         return 1;
       submitted = true;

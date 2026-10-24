@@ -102,7 +102,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
     if (!capture.Record(commands.Get(), image.Get(), window.Get()))
       return 1;
     ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
-    capture.Submitted(done.Get());
+
     if (!done)
       return 1;
     ++rendered;

@@ -200,7 +200,7 @@ int RunTriangle(grassland::rhi::BackendAPI api, int frames, bool headless, const
     if (!capture.Record(context.Get(), image.Get(), window.Get()))
       return 1;
     grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
-    capture.Submitted(token.Get());
+
     if (!token)
       return 1;
     if (headless)

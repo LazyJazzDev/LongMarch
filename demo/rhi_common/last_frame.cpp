@@ -28,11 +28,6 @@ bool LastFrame::Record(ICommandContext *commands, IImage *image, IWindow *window
   return true;
 }
 
-void LastFrame::Submitted(ISubmissionToken *completion) {
-  if (!directory_.empty())
-    completion_ = ObjPtr<ISubmissionToken>::Retain(completion);
-}
-
 namespace {
 float EncodeSRGB(float x) {
   return x <= 0.0031308f ? 12.92f * x : 1.055f * std::pow(x, 1.0f / 2.4f) - 0.055f;
@@ -51,7 +46,7 @@ bool LastFrame::Save() {
     std::cerr << name_ << ": no rendered frame to save\n";
     return false;
   }
-  if (!completion_ || !completion_->WaitHost())
+  if (!download_->WaitHost())
     return false;
   std::vector<uint8_t> pixels(download_->GetSize());
   if (!download_->CopyTo(pixels.data(), pixels.size()))

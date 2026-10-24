@@ -38,14 +38,8 @@ class CommandContext : public ObjectContainer {
   CommandContext(const CommandContext &) = delete;
   CommandContext &operator=(const CommandContext &) = delete;
 
-  DownloadToken CmdDownloadBuffer(const Buffer &buffer, uint64_t offset, uint64_t size) {
-    return *this ? Get()->CmdDownloadBuffer(buffer.Get(), offset, size) : nullptr;
-  }
-
-  DownloadToken CmdDownloadImage(const Image &image, const rhi::ImageDownloadRegion &region = {}) {
-    return *this ? Get()->CmdDownloadImage(image.Get(), region) : nullptr;
-  }
-
+  DownloadToken CmdDownloadBuffer(const Buffer &buffer, uint64_t offset, uint64_t size);
+  DownloadToken CmdDownloadImage(const Image &image, const rhi::ImageDownloadRegion &region = {});
   bool CmdUploadBuffer(const Buffer &buffer, uint64_t offset, const void *data, uint64_t size);
   bool CmdCopyBuffer(const Buffer &source,
                      uint64_t source_offset,

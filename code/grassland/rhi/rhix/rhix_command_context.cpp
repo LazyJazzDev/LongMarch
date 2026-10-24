@@ -202,4 +202,13 @@ bool CommandContext::CmdBindRayTracingProgram(const RayTracingProgram &program) 
 bool CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth, const ShaderBindingTable &sbt) {
   return Get()->CmdDispatchRays(width, height, depth, sbt.Get());
 }
+
+DownloadToken CommandContext::CmdDownloadBuffer(const Buffer &buffer, uint64_t offset, uint64_t size) {
+  return *this ? Get()->CmdDownloadBuffer(buffer.Get(), offset, size) : nullptr;
+}
+
+DownloadToken CommandContext::CmdDownloadImage(const Image &image, const rhi::ImageDownloadRegion &region) {
+  return *this ? Get()->CmdDownloadImage(image.Get(), region) : nullptr;
+}
+
 }  // namespace grassland::rhix
