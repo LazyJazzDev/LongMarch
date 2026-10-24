@@ -49,10 +49,11 @@ auto shader = device.CreateShader("shaders/main.slang", "VSMain", SHADER_STAGE_V
 auto shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
 ```
 
-仍支持 `CreateShader(ShaderDesc)`，原有 `{source, entry_point, stage}` 调用兼容。
+`CreateShader(ShaderDesc)` 统一从文件加载；描述不再包含 source，聚合参数为 `{filename, entry_point, stage}`。字符串调用迁移到 `CreateShaderFromSource()`。
 `ShaderDesc` 新增 `filename`、`file_system`、`include_paths`、`defines`：
 
-- `source` 非空时使用内存源码，`filename` 指定其诊断路径和相对 include 基准；否则读取 `filename`。
+- `filename` 指定入口文件路径和相对 include 基准，默认 `main.slang`。
+- `CreateShaderFromSource()` 把源码写入临时 VirtualFileSystem 的 `main.slang`，再调用描述版 CreateShader；预处理完成即销毁临时 VFS，不再保留原始 source 字符串。该入口返回的 GetDesc 中 FileSystem 指针已失效，不能解引用。若需多文件输入，请自行准备 VFS 并使用描述版入口。
 - `file_system == nullptr` 时使用 Slang 的系统文件系统；自定义 FileSystem 的 `ReadFile` 返回 0 表示成功。
 - `defines` 是预处理阶段的名称/值对；布局宏由 Program 创建阶段注入，不应在这里定义。
 - `GetDesc()` 保留原始参数，包括借用的 FileSystem 指针。该指针只在创建期间使用；调用者必须自行确认其仍然存活，不能通过 GetDesc 延长其生命周期。

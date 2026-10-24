@@ -281,8 +281,8 @@ TEST_P(RhiImage, HDRUploadUsesFullPixelStrideAndRenderingPreservesHighlights) {
       #endif
       }
     )";
-    ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-    ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+    ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+    ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
     ASSERT_TRUE(vs && ps);
     ProgramDesc desc;
     desc.vertex_shader = vs.Get();
@@ -443,8 +443,8 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
     }
     float4 PSMain() : SV_Target0 { return float4(1,0,0,1); }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ASSERT_TRUE(vs);
   ASSERT_TRUE(ps);
   for (auto format : {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_BGRA8_UNORM}) {
@@ -538,8 +538,8 @@ float4 PSMain():SV_Target0 {
  return query.CommittedStatus()==COMMITTED_TRIANGLE_HIT ? float4(0,1,0,1) : float4(1,0,0,1);
 }
 )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ASSERT_TRUE(vs && ps);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
@@ -591,8 +591,8 @@ TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
   source += "struct Input { RHI_INPUT(0,float2,position); };\n";
   source += "float4 VSMain(Input input):SV_Position { return float4(input.position,0,1); }\n";
   source += "float4 PSMain():SV_Target0 { return " + sum + "; }\n";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ASSERT_TRUE(vs && ps);
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -647,8 +647,8 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
     Varying VSMain(Input input) { Varying result; result.position=float4(input.position,0,1); result.color=input.color; return result; }
     float4 PSMain(Varying input) : SV_Target0 { return input.color; }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -719,8 +719,8 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
     struct P { float4 a : SV_Target0; float4 b : SV_Target1; };
     P PSMain(V v) { P p; p.a=float4(v.nearValue,1-v.nearValue,0,1); p.b=float4(0,1-v.nearValue,v.nearValue,1); return p; }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -780,8 +780,8 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
     }
     float4 PSMain():SV_Target0 {return (selection.textureIndex==0?textures[0].Sample(nearestSampler,float2(.5,.5)):textures[1].Sample(changingSampler,float2(.5,.5)))*factors[1][0];}
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -983,8 +983,8 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
     }
     float4 PSMain():SV_Target0 { return values[1].color*values[1].scale; }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -1052,8 +1052,8 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
     }
     float4 PSMain():SV_Target0 { return float4(values[1].samples[1].color * values[1].scale * values[1].samples[1].weight, values[1].tail.z); }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -1132,9 +1132,10 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
     float4 ReadPS(float4 pos:SV_Position):SV_Target0 {uint2 xy=uint2(pos.xy);return inputImage.Load(int3(xy,0))+inputBuffer[xy.y*64+xy.x];}
     #endif
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> write = device->CreateShader({"#define WRITE_PASS\n" + source, "WritePS", SHADER_STAGE_FRAGMENT});
-  ObjPtr<IShader> read = device->CreateShader({source, "ReadPS", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> write =
+      device->CreateShaderFromSource("#define WRITE_PASS\n" + source, "WritePS", SHADER_STAGE_FRAGMENT);
+  ObjPtr<IShader> read = device->CreateShaderFromSource(source, "ReadPS", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = write.Get();
@@ -1145,10 +1146,10 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   const auto write_layout = desc.pipeline_layout.groups[0], read_layout = desc.pipeline_layout.groups[1];
   desc.pipeline_layout.groups = {write_layout};
   // Each entry is compiled against its own authoritative layout.
-  vs = device->CreateShader({"#define WRITE_PASS\n" + source, "VSMain", SHADER_STAGE_VERTEX});
+  vs = device->CreateShaderFromSource("#define WRITE_PASS\n" + source, "VSMain", SHADER_STAGE_VERTEX);
   desc.vertex_shader = vs.Get();
   ObjPtr<IProgram> writer = device->CreateProgram(desc);
-  vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = read.Get();
   desc.pipeline_layout.groups = {read_layout};
@@ -1208,9 +1209,10 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
     float4 ReadPS(float4 pos:SV_Position):SV_Target0 {uint2 xy=uint2(pos.xy);return inputImage.Load(int3(xy,0))+inputBuffer.Load<float4>((xy.y*64+xy.x)*16);}
     #endif
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> write = device->CreateShader({"#define WRITE_PASS\n" + source, "WritePS", SHADER_STAGE_FRAGMENT});
-  ObjPtr<IShader> read = device->CreateShader({source, "ReadPS", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> write =
+      device->CreateShaderFromSource("#define WRITE_PASS\n" + source, "WritePS", SHADER_STAGE_FRAGMENT);
+  ObjPtr<IShader> read = device->CreateShaderFromSource(source, "ReadPS", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = write.Get();
@@ -1221,10 +1223,10 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
   const auto write_layout = desc.pipeline_layout.groups[0], read_layout = desc.pipeline_layout.groups[1];
   desc.pipeline_layout.groups = {write_layout};
   // Each entry is compiled against its own authoritative layout.
-  vs = device->CreateShader({"#define WRITE_PASS\n" + source, "VSMain", SHADER_STAGE_VERTEX});
+  vs = device->CreateShaderFromSource("#define WRITE_PASS\n" + source, "VSMain", SHADER_STAGE_VERTEX);
   desc.vertex_shader = vs.Get();
   ObjPtr<IProgram> writer = device->CreateProgram(desc);
-  vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = read.Get();
   desc.pipeline_layout.groups = {read_layout};
@@ -1281,8 +1283,8 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
       return image.Sample(samplers[1],float2(.375,.5));
     }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -1355,8 +1357,8 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
       return n0==1 && n1==2 && s0==16 && s1==16 && b0==4 && b1==8 ? colors[1].value : float4(0,1,0,1);
     }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
@@ -1411,9 +1413,9 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
     void MaskPS() {}
     float4 PSMain():SV_Target0 {return float4(0,1,0,1);}
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> mask = device->CreateShader({source, "MaskPS", SHADER_STAGE_FRAGMENT});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> mask = device->CreateShaderFromSource(source, "MaskPS", SHADER_STAGE_FRAGMENT);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = mask.Get();
@@ -1490,8 +1492,8 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
     struct Output { float4 a:SV_Target0; float4 b:SV_Target1; float4 c:SV_Target2; };
     Output PSMain() { Output o; o.a=o.b=o.c=float4(.25,.5,.75,.5); return o; }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
-  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
 
   struct Case {
     BlendState state;
@@ -1579,13 +1581,13 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   ASSERT_TRUE(a);
   ObjPtr<IImage> b = device->CreateImage({4, 4, IMAGE_FORMAT_RGBA8_UNORM});
   ASSERT_TRUE(b);
-  ObjPtr<IShader> cs = device->CreateShader({R"(
+  ObjPtr<IShader> cs = device->CreateShaderFromSource(R"(
     RHI_RW_TEXTURE2D(0, 0, float4, target);
     [numthreads(4, 4, 1)] void CSMain(uint3 id:SV_DispatchThreadID) {
       target[id.xy] += float4(1.0 / 255.0, 0, 0, 0);
     }
   )",
-                                             "CSMain", SHADER_STAGE_COMPUTE});
+                                                      "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(cs);
   ComputeProgramDesc cd;
   cd.compute_shader = cs.Get();
@@ -1600,9 +1602,9 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
     }
     float4 PSMain(float4 p:SV_Position):SV_Target0 { return source_image.Load(int3(uint2(p.xy),0)); }
   )";
-  ObjPtr<IShader> vs = device->CreateShader({render_source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(render_source, "VSMain", SHADER_STAGE_VERTEX);
   ASSERT_TRUE(vs);
-  ObjPtr<IShader> ps = device->CreateShader({render_source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(render_source, "PSMain", SHADER_STAGE_FRAGMENT);
   ASSERT_TRUE(ps);
   ProgramDesc gd;
   gd.vertex_shader = vs.Get();

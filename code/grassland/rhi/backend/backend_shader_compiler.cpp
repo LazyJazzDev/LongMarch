@@ -211,13 +211,7 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
   output.attach(new TextWriter);
   request->setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, output);
   const auto unit = request->addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, "rhi_shader");
-  if (desc.source.empty()) {
-    request->addTranslationUnitSourceFile(unit, desc.filename.c_str());
-  } else {
-    const size_t offset = desc.source.compare(0, 3, "\xef\xbb\xbf") == 0 ? 3 : 0;
-    request->addTranslationUnitSourceString(unit, desc.filename.empty() ? "main.slang" : desc.filename.c_str(),
-                                            desc.source.c_str() + offset);
-  }
+  request->addTranslationUnitSourceFile(unit, desc.filename.c_str());
   const auto result = request->compile();
   const char *diagnostics = request->getDiagnosticOutput();
   // Slang's preprocessing-only request can return success even after errors.

@@ -46,7 +46,7 @@ rhi::IProgram *Device::CreateProgram(const ProgramDesc &) {
 }
 
 rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
-  if ((desc.source.empty() && desc.filename.empty()) || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+  if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
       desc.stage > SHADER_STAGE_CALLABLE)
     return nullptr;
   return Shader::Create(desc, api_);

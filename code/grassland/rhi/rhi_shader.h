@@ -4,11 +4,9 @@
 
 namespace grassland::rhi {
 struct ShaderDesc {
-  // Nonempty source selects in-memory input; filename then supplies its virtual path.
-  std::string source;
+  std::string filename{"main.slang"};
   std::string entry_point;
   ShaderStage stage{SHADER_STAGE_VERTEX};
-  std::string filename{"main.slang"};
   // Borrowed only during CreateShader. GetDesc retains this pointer as metadata;
   // callers must establish its lifetime before dereferencing it. nullptr uses disk.
   FileSystem *file_system{};

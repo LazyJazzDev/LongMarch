@@ -53,22 +53,22 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
   PipelineLayoutDesc trace_layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_RAY_GENERATION},
                                      {1, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_RAY_GENERATION},
                                      {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_RAY_GENERATION}}}}};
-  Shader raygen = device.CreateShader({source, "RayGenMain", SHADER_STAGE_RAY_GENERATION});
+  Shader raygen = device.CreateShaderFromSource(source, "RayGenMain", SHADER_STAGE_RAY_GENERATION);
   if (!raygen)
     return 1;
-  Shader miss = device.CreateShader({source, "MissMain", SHADER_STAGE_MISS});
+  Shader miss = device.CreateShaderFromSource(source, "MissMain", SHADER_STAGE_MISS);
   if (!miss)
     return 1;
-  Shader hit = device.CreateShader({source, "ClosestHitMain", SHADER_STAGE_CLOSEST_HIT});
+  Shader hit = device.CreateShaderFromSource(source, "ClosestHitMain", SHADER_STAGE_CLOSEST_HIT);
   if (!hit)
     return 1;
-  Shader sphere_hit = device.CreateShader({source, "SphereClosestHitMain", SHADER_STAGE_CLOSEST_HIT});
+  Shader sphere_hit = device.CreateShaderFromSource(source, "SphereClosestHitMain", SHADER_STAGE_CLOSEST_HIT);
   if (!sphere_hit)
     return 1;
-  Shader intersection = device.CreateShader({source, "SphereIntersectionMain", SHADER_STAGE_INTERSECTION});
+  Shader intersection = device.CreateShaderFromSource(source, "SphereIntersectionMain", SHADER_STAGE_INTERSECTION);
   if (!intersection)
     return 1;
-  Shader callable = device.CreateShader({source, "CallableMain", SHADER_STAGE_CALLABLE});
+  Shader callable = device.CreateShaderFromSource(source, "CallableMain", SHADER_STAGE_CALLABLE);
   if (!callable)
     return 1;
   RayTracingProgramDesc desc;
@@ -85,10 +85,10 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
 
   const auto &display_source = shader_list.at("modules/raytracing/shaders/display.slang");
   std::string display(display_source.first, display_source.second);
-  Shader vs = device.CreateShader({display, "VSMain", SHADER_STAGE_VERTEX});
+  Shader vs = device.CreateShaderFromSource(display, "VSMain", SHADER_STAGE_VERTEX);
   if (!vs)
     return 1;
-  Shader ps = device.CreateShader({display, "PSMain", SHADER_STAGE_FRAGMENT});
+  Shader ps = device.CreateShaderFromSource(display, "PSMain", SHADER_STAGE_FRAGMENT);
   if (!ps)
     return 1;
   ProgramDesc graphics;
