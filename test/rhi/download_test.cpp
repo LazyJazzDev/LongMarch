@@ -103,9 +103,9 @@ TEST_P(RhiDownload, ImageSubrectangleIsTightlyPackedAndUnconverted) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  for (auto format : {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_BGRA8_UNORM, IMAGE_FORMAT_RGBA16_FLOAT,
-                      IMAGE_FORMAT_RGB10A2_UNORM, IMAGE_FORMAT_BGR10A2_UNORM}) {
-    if (format == IMAGE_FORMAT_BGR10A2_UNORM && GetParam() == BACKEND_API_D3D12)
+  for (auto format : {IMAGE_FORMAT_R8G8B8A8_UNORM, IMAGE_FORMAT_B8G8R8A8_UNORM, IMAGE_FORMAT_R16G16B16A16_SFLOAT,
+                      IMAGE_FORMAT_R10G10B10A2_UNORM, IMAGE_FORMAT_B10G10R10A2_UNORM}) {
+    if (format == IMAGE_FORMAT_B10G10R10A2_UNORM && GetParam() == BACKEND_API_D3D12)
       continue;
     SCOPED_TRACE(ImageFormatName(format));
     const uint32_t pixel = ImageFormatSize(format), pitch = 11 * pixel + 16;
@@ -144,14 +144,14 @@ TEST_P(RhiDownload, DepthSubrectangleIsTightlyPacked) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  const auto format = IMAGE_FORMAT_D32_FLOAT;
+  const auto format = IMAGE_FORMAT_D32_SFLOAT;
   ObjPtr<IImage> image = device->CreateImage({13, 7, format});
   ASSERT_TRUE(image);
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   RenderingInfo info;
   info.depth_stencil.image = image.Get();
   info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-  info.depth_stencil.clear_depth = 0.25f;
+  info.depth_stencil.clear_value.depth = 0.25f;
   ASSERT_TRUE(commands->CmdBeginRendering(info));
   ASSERT_TRUE(commands->CmdEndRendering());
   ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {3, 2, 5, 3});

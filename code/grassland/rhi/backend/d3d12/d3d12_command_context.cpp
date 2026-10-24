@@ -74,7 +74,7 @@ bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
   return true;
 }
 
-bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
+bool D3D12CommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
 #if !defined(NDEBUG)
   if (rendering_active_) {
     recording_failed_ = true;
@@ -84,7 +84,7 @@ bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
   const auto native = dynamic_cast<D3D12Image *>(image);
   if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
     recording_failed_ = true;
-    ReportError(-1, "CmdClearColor requires a valid image from this device.");
+    ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
   }
 #else
@@ -92,10 +92,79 @@ bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
 #endif
   if (!RetainResource(native))
     return false;
-  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, native->DefaultState()))
+  const auto format = native->GetDesc().format;
+  if (IsDepthFormat(format)) {
+    if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_DEPTH_WRITE, native->DefaultState()))
+      return false;
+    auto flags = D3D12_CLEAR_FLAG_DEPTH;
+    if (HasStencil(format))
+      flags = static_cast<D3D12_CLEAR_FLAGS>(flags | D3D12_CLEAR_FLAG_STENCIL);
+    list_->ClearDepthStencilView(native->AttachmentView(), flags, value.depth_stencil.depth,
+                                 static_cast<UINT8>(value.depth_stencil.stencil), 0, nullptr);
+    return true;
+  }
+  return ClearColor(native, value.color);
+}
+
+bool D3D12CommandContext::ClearColor(D3D12Image *image, const ClearColorValue &value) {
+  const auto format = image->GetDesc().format;
+  const bool signed_integer = IsSignedIntegerFormat(format);
+  if (!signed_integer && !IsUnsignedIntegerFormat(format)) {
+    if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
+      return false;
+    list_->ClearRenderTargetView(image->AttachmentView(), value.float32.data(), 0, nullptr);
+    return true;
+  }
+  if (!image->SupportsStorage()) {
+    recording_failed_ = true;
+    ReportError(-1, "D3D12 integer image clears require UAV support.");
     return false;
-  list_->ClearRenderTargetView(native->AttachmentView(), color.data(), 0, nullptr);
-  return true;
+  }
+  const auto pixel_size = ImageFormatSize(format);
+  const uint32_t component_size =
+      pixel_size > 4 || format == IMAGE_FORMAT_R32_UINT || format == IMAGE_FORMAT_R32_INT ? 4 : 1;
+  std::array<UINT, 4> integers{};
+  for (size_t i = 0; i < integers.size(); ++i) {
+    integers[i] = signed_integer ? static_cast<UINT>(value.int32[i]) : value.uint32[i];
+    // Supply the native-width bit pattern, not a sign-extended uint32, to the
+    // unsigned clear operation for 8-bit signed views.
+    if (component_size == 1)
+      integers[i] &= 0xff;
+  }
+  auto storage = device_->ResourceDescriptorStorage().Acquire(1);
+  auto visible = device_->ResourceDescriptors().Acquire(1);
+  if (!storage || !visible) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(storage.Get()) || !RetainResource(visible.Get()) ||
+      !TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, image->DefaultState()))
+    return false;
+  D3D12_UNORDERED_ACCESS_VIEW_DESC view{};
+  view.Format = NativeImageFormat(format);
+  view.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+  device_->NativeDevice()->CreateUnorderedAccessView(image->NativeImage(), nullptr, &view, storage->CPU());
+  device_->NativeDevice()->CopyDescriptorsSimple(1, visible->CPU(), storage->CPU(),
+                                                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+  auto heap = visible->Heap();
+  list_->SetDescriptorHeaps(1, &heap);
+  // UAV clears are compute-like and need ordering even if the state was already UAV.
+  D3D12_RESOURCE_BARRIER barrier{};
+  barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+  barrier.UAV.pResource = image->NativeImage();
+  list_->ResourceBarrier(1, &barrier);
+  list_->ClearUnorderedAccessViewUint(visible->GPU(), storage->CPU(), image->NativeImage(), integers.data(), 0,
+                                      nullptr);
+  // Restore existing heaps; their root tables must be rebound on the next draw/dispatch.
+  ID3D12DescriptorHeap *heaps[2]{};
+  UINT count = 0;
+  for (auto page : descriptor_pages_)
+    if (page)
+      heaps[count++] = page->Heap();
+  if (count)
+    list_->SetDescriptorHeaps(count, heaps);
+  tables_dirty_ = true;
+  return TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState());
 }
 
 bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
@@ -368,13 +437,16 @@ bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
   for (UINT i = 0; i < count; ++i) {
     const auto &attachment = rendering_.color_attachments[i];
     auto image = static_cast<D3D12Image *>(attachment.color_attachment);
-    if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
-      return false;
+    if (attachment.load_op == ATTACHMENT_LOAD_OP_CLEAR) {
+      if (!ClearColor(image, attachment.clear_value))
+        return false;
+    } else {
+      if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
+        return false;
+      if (attachment.load_op == ATTACHMENT_LOAD_OP_DISCARD)
+        list_->DiscardResource(image->NativeImage(), nullptr);
+    }
     colors[i] = image->AttachmentView();
-    if (attachment.load_op == ATTACHMENT_LOAD_OP_CLEAR)
-      list_->ClearRenderTargetView(colors[i], attachment.clear_color.data(), 0, nullptr);
-    else if (attachment.load_op == ATTACHMENT_LOAD_OP_DISCARD)
-      list_->DiscardResource(image->NativeImage(), nullptr);
   }
   auto depth = static_cast<D3D12Image *>(rendering_.depth_stencil.image);
   D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
@@ -387,8 +459,8 @@ bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
     if (HasStencil(depth->GetDesc().format) && ds.stencil_load_op == ATTACHMENT_LOAD_OP_CLEAR)
       flags |= D3D12_CLEAR_FLAG_STENCIL;
     if (flags)
-      list_->ClearDepthStencilView(dsv, static_cast<D3D12_CLEAR_FLAGS>(flags), ds.clear_depth,
-                                   static_cast<UINT8>(ds.clear_stencil), 0, nullptr);
+      list_->ClearDepthStencilView(dsv, static_cast<D3D12_CLEAR_FLAGS>(flags), ds.clear_value.depth,
+                                   static_cast<UINT8>(ds.clear_value.stencil), 0, nullptr);
   }
   list_->OMSetRenderTargets(count, colors.data(), FALSE, depth ? &dsv : nullptr);
   rendering_active_ = true;
@@ -925,7 +997,8 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
     }
     const auto depth = footprints[0], stencil = footprints[1];
     DownloadLayout layout;
-    layout.offset = depth.Offset + uint64_t(region.y) * depth.Footprint.RowPitch + uint64_t(region.x) * 4;
+    layout.offset = depth.Offset + uint64_t(region.y) * depth.Footprint.RowPitch +
+                    uint64_t(region.x) * ImageFormatSize(desc.format);
     layout.row_pitch = depth.Footprint.RowPitch;
     layout.row_bytes = packed;
     layout.rows = height;

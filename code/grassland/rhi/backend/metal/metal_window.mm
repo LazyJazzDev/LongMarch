@@ -13,11 +13,11 @@ namespace {
 ImageFormat PresentationFormat(ColorSpace space) {
   switch (space) {
     case COLOR_SPACE_SRGB_NONLINEAR:
-      return IMAGE_FORMAT_BGRA8_UNORM;
+      return IMAGE_FORMAT_B8G8R8A8_UNORM;
     case COLOR_SPACE_EXTENDED_SRGB_LINEAR:
-      return IMAGE_FORMAT_RGBA16_FLOAT;
+      return IMAGE_FORMAT_R16G16B16A16_SFLOAT;
     case COLOR_SPACE_HDR10_ST2084:
-      return IMAGE_FORMAT_RGB10A2_UNORM;
+      return IMAGE_FORMAT_R10G10B10A2_UNORM;
     default:
       return IMAGE_FORMAT_UNKNOWN;
   }

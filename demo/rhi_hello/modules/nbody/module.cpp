@@ -85,7 +85,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   std::array<ObjPtr<ISubmissionToken>, 3> pending;
   if (headless) {
     for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_RGBA8_UNORM});
+      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!target)
         return 1;
     }
@@ -104,9 +104,9 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   desc.blend_states = {BlendState(BLEND_FACTOR_ONE, BLEND_FACTOR_ONE, BLEND_OP_ADD, BLEND_FACTOR_ONE,
                                   BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, BLEND_OP_ADD)};
   desc.vertex_bindings = {{sizeof(glm::vec3), true}};
-  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}};
+  desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}};
   desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
-  desc.color_formats = {IMAGE_FORMAT_RGBA16_FLOAT};
+  desc.color_formats = {IMAGE_FORMAT_R16G16B16A16_SFLOAT};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   if (!program)
     return 1;
@@ -419,7 +419,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     }
     auto extent = image->GetDesc();
     if (!radiance || radiance->GetDesc().width != extent.width || radiance->GetDesc().height != extent.height) {
-      radiance = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_RGBA16_FLOAT});
+      radiance = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_R16G16B16A16_SFLOAT});
       if (!radiance || !output_group->BindResource(1, radiance.Get()))
         return 1;
     }

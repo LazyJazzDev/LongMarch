@@ -97,11 +97,13 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
                                                                           : MTL::VertexStepFunctionPerVertex);
     layout->setStepRate(1);
   }
-  const MTL::VertexFormat formats[] = {MTL::VertexFormatFloat, MTL::VertexFormatFloat2, MTL::VertexFormatFloat3,
-                                       MTL::VertexFormatFloat4};
+  const MTL::VertexFormat formats[] = {MTL::VertexFormatFloat,  MTL::VertexFormatFloat2, MTL::VertexFormatFloat3,
+                                       MTL::VertexFormatFloat4, MTL::VertexFormatInt,    MTL::VertexFormatInt2,
+                                       MTL::VertexFormatInt3,   MTL::VertexFormatInt4,   MTL::VertexFormatUInt,
+                                       MTL::VertexFormatUInt2,  MTL::VertexFormatUInt3,  MTL::VertexFormatUInt4};
   for (const auto &a : object->desc_.vertex_attributes) {
     auto attribute = vertex->attributes()->object(a.location);
-    attribute->setFormat(formats[a.format]);
+    attribute->setFormat(formats[a.type]);
     attribute->setBufferIndex(a.binding + VertexBufferBase);
     attribute->setOffset(a.offset);
   }

@@ -241,7 +241,7 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
 
 std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                               BackendAPI api,
-                              const std::vector<VertexAttributeDesc> &attributes) {
+                              const std::vector<InputAttributeDesc> &attributes) {
   std::string header = "#define RHI_INPUT_I(L,T,N) RHI_INPUT_##L(T,N)\n#define RHI_INPUT(L,T,N) RHI_INPUT_I(L,T,N)\n";
   for (const auto &attribute : attributes) {
     auto location = std::to_string(attribute.location);

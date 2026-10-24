@@ -6,7 +6,7 @@ namespace grassland::rhix {
 bool CommandContext::CmdBeginRendering(const RenderingInfo &info) {
   rhi::RenderingInfo native;
   for (const auto &color : info.colors)
-    native.color_attachments.push_back({color.image.Get(), color.load_op, color.store_op, color.clear_color});
+    native.color_attachments.push_back({color.image.Get(), color.load_op, color.store_op, color.clear_value});
   native.depth_stencil = info.depth_stencil_ops;
   native.depth_stencil.image = info.depth_stencil.Get();
   return Get()->CmdBeginRendering(native);
@@ -23,12 +23,12 @@ rhi::ICommandContext *CommandContext::Get() const noexcept {
   return static_cast<rhi::ICommandContext *>(GetObject());
 }
 
-bool CommandContext::CmdClearColor(const Image &image, const std::array<float, 4> &color) {
+bool CommandContext::CmdClearImage(const Image &image, const rhi::ClearValue &value) {
 #if !defined(NDEBUG)
   if (!*this)
     return false;
 #endif
-  return Get()->CmdClearColor(image.Get(), color);
+  return Get()->CmdClearImage(image.Get(), value);
 }
 
 bool CommandContext::CmdPresent(const Window &window) {
@@ -78,12 +78,12 @@ bool CommandContext::CmdBindProgram(const Program &program) {
 bool CommandContext::CmdBeginRendering(const Image &image,
                                        rhi::AttachmentLoadOp load_op,
                                        rhi::AttachmentStoreOp store_op,
-                                       const std::array<float, 4> &clear_color) {
+                                       const rhi::ClearColorValue &clear_value) {
 #if !defined(NDEBUG)
   if (!*this)
     return false;
 #endif
-  return Get()->CmdBeginRendering({{{image.Get(), load_op, store_op, clear_color}}});
+  return Get()->CmdBeginRendering({{{image.Get(), load_op, store_op, clear_value}}});
 }
 
 bool CommandContext::CmdEndRendering() {

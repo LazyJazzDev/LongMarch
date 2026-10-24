@@ -3,15 +3,88 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi {
+ClearValue::ClearValue() : color{} {
+}
+
+ClearValue::ClearValue(float r, float g, float b, float a) : color{{r, g, b, a}} {
+}
+
+ClearValue::ClearValue(int32_t r, int32_t g, int32_t b, int32_t a) {
+  color.int32 = {r, g, b, a};
+}
+
+ClearValue::ClearValue(uint32_t r, uint32_t g, uint32_t b, uint32_t a) {
+  color.uint32 = {r, g, b, a};
+}
+
+ClearValue::ClearValue(const ClearColorValue &value) : color(value) {
+}
+
+ClearValue::ClearValue(const ClearDepthStencilValue &value) : depth_stencil(value) {
+}
+
 uint32_t ImageFormatSize(ImageFormat format) {
   switch (format) {
-    case IMAGE_FORMAT_RGBA16_FLOAT:
+    case IMAGE_FORMAT_R8_UINT:
+      return 1;
+    case IMAGE_FORMAT_R8_INT:
+      return 1;
+    case IMAGE_FORMAT_R8_UNORM:
+      return 1;
+    case IMAGE_FORMAT_R8G8_UINT:
+      return 2;
+    case IMAGE_FORMAT_R8G8_INT:
+      return 2;
+    case IMAGE_FORMAT_R8G8_UNORM:
+      return 2;
+    case IMAGE_FORMAT_R8G8B8_UINT:
+      return 3;
+    case IMAGE_FORMAT_R8G8B8_INT:
+      return 3;
+    case IMAGE_FORMAT_R8G8B8_UNORM:
+      return 3;
+    case IMAGE_FORMAT_R8G8B8A8_UINT:
+      return 4;
+    case IMAGE_FORMAT_R8G8B8A8_INT:
+      return 4;
+    case IMAGE_FORMAT_R8G8B8A8_UNORM:
+      return 4;
+    case IMAGE_FORMAT_R32_UINT:
+      return 4;
+    case IMAGE_FORMAT_R32_INT:
+      return 4;
+    case IMAGE_FORMAT_R32_SFLOAT:
+      return 4;
+    case IMAGE_FORMAT_R32G32_UINT:
       return 8;
-    case IMAGE_FORMAT_RGBA8_UNORM:
-    case IMAGE_FORMAT_BGRA8_UNORM:
-    case IMAGE_FORMAT_RGB10A2_UNORM:
-    case IMAGE_FORMAT_BGR10A2_UNORM:
-    case IMAGE_FORMAT_D32_FLOAT:
+    case IMAGE_FORMAT_R32G32_INT:
+      return 8;
+    case IMAGE_FORMAT_R32G32_SFLOAT:
+      return 8;
+    case IMAGE_FORMAT_R32G32B32_UINT:
+      return 12;
+    case IMAGE_FORMAT_R32G32B32_INT:
+      return 12;
+    case IMAGE_FORMAT_R32G32B32_SFLOAT:
+      return 12;
+    case IMAGE_FORMAT_R32G32B32A32_UINT:
+      return 16;
+    case IMAGE_FORMAT_R32G32B32A32_INT:
+      return 16;
+    case IMAGE_FORMAT_R32G32B32A32_SFLOAT:
+      return 16;
+    case IMAGE_FORMAT_B8G8R8A8_UNORM:
+      return 4;
+    case IMAGE_FORMAT_R16G16B16A16_SFLOAT:
+      return 8;
+    case IMAGE_FORMAT_R10G10B10A2_UNORM:
+      return 4;
+    case IMAGE_FORMAT_B10G10R10A2_UNORM:
+      return 4;
+    case IMAGE_FORMAT_D16_UNORM:
+      return 2;
+    case IMAGE_FORMAT_D32_SFLOAT:
+      return 4;
     case IMAGE_FORMAT_D24_UNORM_S8_UINT:
       return 4;
     default:
@@ -54,7 +127,8 @@ std::string ColorSpaceName(ColorSpace value) {
 }
 
 bool IsDepthFormat(ImageFormat format) {
-  return format == IMAGE_FORMAT_D32_FLOAT || format == IMAGE_FORMAT_D24_UNORM_S8_UINT;
+  return format == IMAGE_FORMAT_D16_UNORM || format == IMAGE_FORMAT_D32_SFLOAT ||
+         format == IMAGE_FORMAT_D24_UNORM_S8_UINT;
 }
 
 bool HasStencil(ImageFormat format) {
@@ -227,51 +301,173 @@ std::string to_string(ImageFormat value) {
   switch (value) {
     case IMAGE_FORMAT_UNKNOWN:
       return "IMAGE_FORMAT_UNKNOWN";
-    case IMAGE_FORMAT_RGBA8_UNORM:
-      return "IMAGE_FORMAT_RGBA8_UNORM";
-    case IMAGE_FORMAT_D32_FLOAT:
-      return "IMAGE_FORMAT_D32_FLOAT";
+    case IMAGE_FORMAT_R8_UINT:
+      return "IMAGE_FORMAT_R8_UINT";
+    case IMAGE_FORMAT_R8_INT:
+      return "IMAGE_FORMAT_R8_INT";
+    case IMAGE_FORMAT_R8_UNORM:
+      return "IMAGE_FORMAT_R8_UNORM";
+    case IMAGE_FORMAT_R8G8_UINT:
+      return "IMAGE_FORMAT_R8G8_UINT";
+    case IMAGE_FORMAT_R8G8_INT:
+      return "IMAGE_FORMAT_R8G8_INT";
+    case IMAGE_FORMAT_R8G8_UNORM:
+      return "IMAGE_FORMAT_R8G8_UNORM";
+    case IMAGE_FORMAT_R8G8B8_UINT:
+      return "IMAGE_FORMAT_R8G8B8_UINT";
+    case IMAGE_FORMAT_R8G8B8_INT:
+      return "IMAGE_FORMAT_R8G8B8_INT";
+    case IMAGE_FORMAT_R8G8B8_UNORM:
+      return "IMAGE_FORMAT_R8G8B8_UNORM";
+    case IMAGE_FORMAT_R8G8B8A8_UINT:
+      return "IMAGE_FORMAT_R8G8B8A8_UINT";
+    case IMAGE_FORMAT_R8G8B8A8_INT:
+      return "IMAGE_FORMAT_R8G8B8A8_INT";
+    case IMAGE_FORMAT_R8G8B8A8_UNORM:
+      return "IMAGE_FORMAT_R8G8B8A8_UNORM";
+    case IMAGE_FORMAT_R32_UINT:
+      return "IMAGE_FORMAT_R32_UINT";
+    case IMAGE_FORMAT_R32_INT:
+      return "IMAGE_FORMAT_R32_INT";
+    case IMAGE_FORMAT_R32_SFLOAT:
+      return "IMAGE_FORMAT_R32_SFLOAT";
+    case IMAGE_FORMAT_R32G32_UINT:
+      return "IMAGE_FORMAT_R32G32_UINT";
+    case IMAGE_FORMAT_R32G32_INT:
+      return "IMAGE_FORMAT_R32G32_INT";
+    case IMAGE_FORMAT_R32G32_SFLOAT:
+      return "IMAGE_FORMAT_R32G32_SFLOAT";
+    case IMAGE_FORMAT_R32G32B32_UINT:
+      return "IMAGE_FORMAT_R32G32B32_UINT";
+    case IMAGE_FORMAT_R32G32B32_INT:
+      return "IMAGE_FORMAT_R32G32B32_INT";
+    case IMAGE_FORMAT_R32G32B32_SFLOAT:
+      return "IMAGE_FORMAT_R32G32B32_SFLOAT";
+    case IMAGE_FORMAT_R32G32B32A32_UINT:
+      return "IMAGE_FORMAT_R32G32B32A32_UINT";
+    case IMAGE_FORMAT_R32G32B32A32_INT:
+      return "IMAGE_FORMAT_R32G32B32A32_INT";
+    case IMAGE_FORMAT_R32G32B32A32_SFLOAT:
+      return "IMAGE_FORMAT_R32G32B32A32_SFLOAT";
+    case IMAGE_FORMAT_B8G8R8A8_UNORM:
+      return "IMAGE_FORMAT_B8G8R8A8_UNORM";
+    case IMAGE_FORMAT_R16G16B16A16_SFLOAT:
+      return "IMAGE_FORMAT_R16G16B16A16_SFLOAT";
+    case IMAGE_FORMAT_R10G10B10A2_UNORM:
+      return "IMAGE_FORMAT_R10G10B10A2_UNORM";
+    case IMAGE_FORMAT_B10G10R10A2_UNORM:
+      return "IMAGE_FORMAT_B10G10R10A2_UNORM";
+    case IMAGE_FORMAT_D16_UNORM:
+      return "IMAGE_FORMAT_D16_UNORM";
+    case IMAGE_FORMAT_D32_SFLOAT:
+      return "IMAGE_FORMAT_D32_SFLOAT";
     case IMAGE_FORMAT_D24_UNORM_S8_UINT:
       return "IMAGE_FORMAT_D24_UNORM_S8_UINT";
-    case IMAGE_FORMAT_RGBA16_FLOAT:
-      return "IMAGE_FORMAT_RGBA16_FLOAT";
-    case IMAGE_FORMAT_RGB10A2_UNORM:
-      return "IMAGE_FORMAT_RGB10A2_UNORM";
-    case IMAGE_FORMAT_BGR10A2_UNORM:
-      return "IMAGE_FORMAT_BGR10A2_UNORM";
-    case IMAGE_FORMAT_BGRA8_UNORM:
-      return "IMAGE_FORMAT_BGRA8_UNORM";
     default:
-#if !defined(NDEBUG)
-      ReportError(-1, "Unknown ImageFormat value.");
-#endif
-      return {};
+      return "UNKNOWN";
   }
 }
 
 std::string ImageFormatName(ImageFormat value) {
   switch (value) {
     case IMAGE_FORMAT_UNKNOWN:
-      return "Unknown";
-    case IMAGE_FORMAT_RGBA8_UNORM:
-      return "RGBA8 UNORM";
-    case IMAGE_FORMAT_D32_FLOAT:
-      return "IMAGE_FORMAT_D32_FLOAT";
+      return "UNKNOWN";
+    case IMAGE_FORMAT_R8_UINT:
+      return "R8_UINT";
+    case IMAGE_FORMAT_R8_INT:
+      return "R8_INT";
+    case IMAGE_FORMAT_R8_UNORM:
+      return "R8_UNORM";
+    case IMAGE_FORMAT_R8G8_UINT:
+      return "R8G8_UINT";
+    case IMAGE_FORMAT_R8G8_INT:
+      return "R8G8_INT";
+    case IMAGE_FORMAT_R8G8_UNORM:
+      return "R8G8_UNORM";
+    case IMAGE_FORMAT_R8G8B8_UINT:
+      return "R8G8B8_UINT";
+    case IMAGE_FORMAT_R8G8B8_INT:
+      return "R8G8B8_INT";
+    case IMAGE_FORMAT_R8G8B8_UNORM:
+      return "R8G8B8_UNORM";
+    case IMAGE_FORMAT_R8G8B8A8_UINT:
+      return "R8G8B8A8_UINT";
+    case IMAGE_FORMAT_R8G8B8A8_INT:
+      return "R8G8B8A8_INT";
+    case IMAGE_FORMAT_R8G8B8A8_UNORM:
+      return "R8G8B8A8_UNORM";
+    case IMAGE_FORMAT_R32_UINT:
+      return "R32_UINT";
+    case IMAGE_FORMAT_R32_INT:
+      return "R32_INT";
+    case IMAGE_FORMAT_R32_SFLOAT:
+      return "R32_SFLOAT";
+    case IMAGE_FORMAT_R32G32_UINT:
+      return "R32G32_UINT";
+    case IMAGE_FORMAT_R32G32_INT:
+      return "R32G32_INT";
+    case IMAGE_FORMAT_R32G32_SFLOAT:
+      return "R32G32_SFLOAT";
+    case IMAGE_FORMAT_R32G32B32_UINT:
+      return "R32G32B32_UINT";
+    case IMAGE_FORMAT_R32G32B32_INT:
+      return "R32G32B32_INT";
+    case IMAGE_FORMAT_R32G32B32_SFLOAT:
+      return "R32G32B32_SFLOAT";
+    case IMAGE_FORMAT_R32G32B32A32_UINT:
+      return "R32G32B32A32_UINT";
+    case IMAGE_FORMAT_R32G32B32A32_INT:
+      return "R32G32B32A32_INT";
+    case IMAGE_FORMAT_R32G32B32A32_SFLOAT:
+      return "R32G32B32A32_SFLOAT";
+    case IMAGE_FORMAT_B8G8R8A8_UNORM:
+      return "B8G8R8A8_UNORM";
+    case IMAGE_FORMAT_R16G16B16A16_SFLOAT:
+      return "R16G16B16A16_SFLOAT";
+    case IMAGE_FORMAT_R10G10B10A2_UNORM:
+      return "R10G10B10A2_UNORM";
+    case IMAGE_FORMAT_B10G10R10A2_UNORM:
+      return "B10G10R10A2_UNORM";
+    case IMAGE_FORMAT_D16_UNORM:
+      return "D16_UNORM";
+    case IMAGE_FORMAT_D32_SFLOAT:
+      return "D32_SFLOAT";
     case IMAGE_FORMAT_D24_UNORM_S8_UINT:
-      return "IMAGE_FORMAT_D24_UNORM_S8_UINT";
-    case IMAGE_FORMAT_RGBA16_FLOAT:
-      return "RGBA16 FLOAT";
-    case IMAGE_FORMAT_RGB10A2_UNORM:
-      return "RGB10A2 UNORM";
-    case IMAGE_FORMAT_BGR10A2_UNORM:
-      return "BGR10A2 UNORM";
-    case IMAGE_FORMAT_BGRA8_UNORM:
-      return "BGRA8 UNORM";
+      return "D24_UNORM_S8_UINT";
     default:
-#if !defined(NDEBUG)
-      ReportError(-1, "Unknown ImageFormat value.");
-#endif
-      return {};
+      return "UNKNOWN";
+  }
+}
+
+bool IsSignedIntegerFormat(ImageFormat format) {
+  switch (format) {
+    case IMAGE_FORMAT_R8_INT:
+    case IMAGE_FORMAT_R8G8_INT:
+    case IMAGE_FORMAT_R8G8B8_INT:
+    case IMAGE_FORMAT_R8G8B8A8_INT:
+    case IMAGE_FORMAT_R32_INT:
+    case IMAGE_FORMAT_R32G32_INT:
+    case IMAGE_FORMAT_R32G32B32_INT:
+    case IMAGE_FORMAT_R32G32B32A32_INT:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsUnsignedIntegerFormat(ImageFormat format) {
+  switch (format) {
+    case IMAGE_FORMAT_R8_UINT:
+    case IMAGE_FORMAT_R8G8_UINT:
+    case IMAGE_FORMAT_R8G8B8_UINT:
+    case IMAGE_FORMAT_R8G8B8A8_UINT:
+    case IMAGE_FORMAT_R32_UINT:
+    case IMAGE_FORMAT_R32G32_UINT:
+    case IMAGE_FORMAT_R32G32B32_UINT:
+    case IMAGE_FORMAT_R32G32B32A32_UINT:
+      return true;
+    default:
+      return false;
   }
 }
 
@@ -299,30 +495,62 @@ std::string to_string(ShaderStage stage) {
   return "UNKNOWN";
 }
 
-uint32_t VertexFormatSize(VertexFormat format) {
-  switch (format) {
-    case VERTEX_FORMAT_FLOAT:
+uint32_t InputTypeSize(InputType type) {
+  switch (type) {
+    case INPUT_TYPE_FLOAT:
       return 4;
-    case VERTEX_FORMAT_FLOAT2:
+    case INPUT_TYPE_FLOAT2:
       return 8;
-    case VERTEX_FORMAT_FLOAT3:
+    case INPUT_TYPE_FLOAT3:
       return 12;
-    case VERTEX_FORMAT_FLOAT4:
+    case INPUT_TYPE_FLOAT4:
+      return 16;
+    case INPUT_TYPE_INT:
+      return 4;
+    case INPUT_TYPE_INT2:
+      return 8;
+    case INPUT_TYPE_INT3:
+      return 12;
+    case INPUT_TYPE_INT4:
+      return 16;
+    case INPUT_TYPE_UINT:
+      return 4;
+    case INPUT_TYPE_UINT2:
+      return 8;
+    case INPUT_TYPE_UINT3:
+      return 12;
+    case INPUT_TYPE_UINT4:
       return 16;
   }
   return 0;
 }
 
-std::string to_string(VertexFormat format) {
-  switch (format) {
-    case VERTEX_FORMAT_FLOAT:
-      return "VERTEX_FORMAT_FLOAT";
-    case VERTEX_FORMAT_FLOAT2:
-      return "VERTEX_FORMAT_FLOAT2";
-    case VERTEX_FORMAT_FLOAT3:
-      return "VERTEX_FORMAT_FLOAT3";
-    case VERTEX_FORMAT_FLOAT4:
-      return "VERTEX_FORMAT_FLOAT4";
+std::string to_string(InputType type) {
+  switch (type) {
+    case INPUT_TYPE_FLOAT:
+      return "INPUT_TYPE_FLOAT";
+    case INPUT_TYPE_FLOAT2:
+      return "INPUT_TYPE_FLOAT2";
+    case INPUT_TYPE_FLOAT3:
+      return "INPUT_TYPE_FLOAT3";
+    case INPUT_TYPE_FLOAT4:
+      return "INPUT_TYPE_FLOAT4";
+    case INPUT_TYPE_INT:
+      return "INPUT_TYPE_INT";
+    case INPUT_TYPE_INT2:
+      return "INPUT_TYPE_INT2";
+    case INPUT_TYPE_INT3:
+      return "INPUT_TYPE_INT3";
+    case INPUT_TYPE_INT4:
+      return "INPUT_TYPE_INT4";
+    case INPUT_TYPE_UINT:
+      return "INPUT_TYPE_UINT";
+    case INPUT_TYPE_UINT2:
+      return "INPUT_TYPE_UINT2";
+    case INPUT_TYPE_UINT3:
+      return "INPUT_TYPE_UINT3";
+    case INPUT_TYPE_UINT4:
+      return "INPUT_TYPE_UINT4";
   }
   return "UNKNOWN";
 }

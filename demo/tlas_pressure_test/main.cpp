@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
   std::array<ObjPtr<ISubmissionToken>, 3> pending;
   if (headless)
     for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_RGBA8_UNORM});
+      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!target)
         return 1;
     }
@@ -320,7 +320,7 @@ int main(int argc, char **argv) {
     if (!context)
       return 1;
     if (!output || output->GetDesc().width != extent.width || output->GetDesc().height != extent.height) {
-      output = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_RGBA8_UNORM});
+      output = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!output)
         return 1;
       if (!trace_group->BindResource(1, output.Get()))

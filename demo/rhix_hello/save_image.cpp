@@ -36,7 +36,7 @@ bool SaveImage(const std::string &directory_name,
     std::cerr << error.message() << '\n';
     return false;
   }
-  const bool depth = desc.format == IMAGE_FORMAT_D32_FLOAT;
+  const bool depth = desc.format == IMAGE_FORMAT_D32_SFLOAT;
   const auto base = directory / name;
   // Preserve exact HDR/10-bit/half-float values alongside the SDR PNG preview.
   auto raw_path = base;
@@ -68,23 +68,23 @@ bool SaveImage(const std::string &directory_name,
       std::memcpy(&value, source, sizeof(value));
       c[0] = c[1] = c[2] = value;
       c[3] = 1.0f;
-    } else if (desc.format == IMAGE_FORMAT_RGBA16_FLOAT) {
+    } else if (desc.format == IMAGE_FORMAT_R16G16B16A16_SFLOAT) {
       uint16_t halves[4];
       std::memcpy(halves, source, 8);
       for (int k = 0; k < 4; ++k)
         c[k] = glm::unpackHalf1x16(halves[k]);
-    } else if (desc.format == IMAGE_FORMAT_RGB10A2_UNORM || desc.format == IMAGE_FORMAT_BGR10A2_UNORM) {
+    } else if (desc.format == IMAGE_FORMAT_R10G10B10A2_UNORM || desc.format == IMAGE_FORMAT_B10G10R10A2_UNORM) {
       uint32_t value;
       std::memcpy(&value, source, 4);
       for (int k = 0; k < 3; ++k)
         c[k] = float((value >> (10 * k)) & 1023) / 1023.0f;
       c[3] = float(value >> 30) / 3.0f;
-      if (desc.format == IMAGE_FORMAT_BGR10A2_UNORM)
+      if (desc.format == IMAGE_FORMAT_B10G10R10A2_UNORM)
         std::swap(c[0], c[2]);
     } else {
       for (int k = 0; k < 4; ++k)
         c[k] = source[k] / 255.0f;
-      if (desc.format == IMAGE_FORMAT_BGRA8_UNORM)
+      if (desc.format == IMAGE_FORMAT_B8G8R8A8_UNORM)
         std::swap(c[0], c[2]);
     }
     if (!depth && space == COLOR_SPACE_HDR10_ST2084) {

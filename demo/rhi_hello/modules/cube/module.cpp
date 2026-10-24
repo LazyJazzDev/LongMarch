@@ -54,7 +54,7 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
   std::array<ObjPtr<ISubmissionToken>, 3> pending;
   if (headless) {
     for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_RGBA8_UNORM});
+      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!target)
         return 1;
     }
@@ -71,7 +71,7 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
   desc.vertex_shader = vertex_shader.Get();
   desc.fragment_shader = fragment_shader.Get();
   desc.vertex_bindings = {{sizeof(Vertex), false}};
-  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT3, 12}};
+  desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}, {1, 0, INPUT_TYPE_FLOAT3, 12}};
   {
     ObjPtr<IImage> image;
     if (headless)
@@ -83,7 +83,7 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
     desc.color_formats = {image->GetDesc().format};
   }
   desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
-  desc.depth_stencil.format = IMAGE_FORMAT_D32_FLOAT;
+  desc.depth_stencil.format = IMAGE_FORMAT_D32_SFLOAT;
   desc.depth_stencil.depth_test = true;
   desc.depth_stencil.depth_write = true;
   ObjPtr<IProgram> program = device->CreateProgram(desc);
@@ -208,7 +208,7 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
     if (!context->CmdUploadBuffer(uniform.Get(), 0, &ubo, sizeof(ubo)))
       return 1;
     if (!depth || depth->GetDesc().width != extent.width || depth->GetDesc().height != extent.height) {
-      depth = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_D32_FLOAT});
+      depth = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_D32_SFLOAT});
       if (!depth)
         return 1;
     }

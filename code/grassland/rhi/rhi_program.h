@@ -8,10 +8,10 @@ struct VertexBindingDesc {
   bool per_instance{};
 };
 
-struct VertexAttributeDesc {
+struct InputAttributeDesc {
   uint32_t location{};
   uint32_t binding{};
-  VertexFormat format{VERTEX_FORMAT_FLOAT3};
+  InputType type{INPUT_TYPE_FLOAT3};
   uint32_t offset{};
 };
 
@@ -19,9 +19,9 @@ struct ProgramDesc {
   IShader *vertex_shader{};
   IShader *fragment_shader{};
   std::vector<VertexBindingDesc> vertex_bindings;
-  std::vector<VertexAttributeDesc> vertex_attributes;
+  std::vector<InputAttributeDesc> vertex_attributes;
   // Empty means no color attachments.
-  std::vector<ImageFormat> color_formats{IMAGE_FORMAT_RGBA8_UNORM};
+  std::vector<ImageFormat> color_formats{IMAGE_FORMAT_R8G8B8A8_UNORM};
   // Empty disables blending. Otherwise provide one state per color attachment.
   std::vector<BlendState> blend_states;
   DepthStencilDesc depth_stencil;
