@@ -492,7 +492,7 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   read(135, 95, {255, 255, 255, 255});
 }
 
-TEST_P(RhiImage, ImGuiHDRMatchesSDRColorsTexturesAndAlphaBlending) {
+TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Requires a desktop for ImGui platform input.";
   ObjPtr<ICore> core = CreateCore(GetParam());
@@ -515,7 +515,6 @@ TEST_P(RhiImage, ImGuiHDRMatchesSDRColorsTexturesAndAlphaBlending) {
   ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
   ASSERT_TRUE(uploaded && uploaded->WaitHost());
   auto linear = [](double v) { return v <= 0.04045 ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4); };
-  auto srgb = [](double v) { return v <= 0.0031308 ? v * 12.92 : 1.055 * std::pow(v, 1.0 / 2.4) - 0.055; };
 #if defined(__APPLE__)
   constexpr double pq_unit = 100;
 #elif defined(_WIN32)
@@ -537,31 +536,17 @@ TEST_P(RhiImage, ImGuiHDRMatchesSDRColorsTexturesAndAlphaBlending) {
     }
     return c;
   };
-  auto decode = [&](std::array<double, 3> c, ColorSpace space, double white) {
-    if (space == COLOR_SPACE_HDR10_ST2084) {
-      for (auto &v : c) {
-        const double p = std::pow((std::max)(v, 0.0), 32.0 / 2523);
-        v = std::pow((std::max)(p - 3424.0 / 4096, 0.0) / (2413.0 / 128 - (2392.0 / 128) * p), 16384.0 / 2610) * 10000 /
-            (white * pq_unit);
-      }
-      c = {1.660491 * c[0] - 0.587641 * c[1] - 0.072850 * c[2], -0.124550 * c[0] + 1.132900 * c[1] - 0.008349 * c[2],
-           -0.018151 * c[0] - 0.100579 * c[1] + 1.118730 * c[2]};
-    } else if (space == COLOR_SPACE_EXTENDED_SRGB_LINEAR) {
-      for (auto &v : c)
-        v /= white;
-    }
-    return c;
-  };
   auto draw = [&] {
     auto *list = ImGui::GetForegroundDrawList();
     list->AddRectFilled({0, 0}, {30, 30}, IM_COL32(128, 128, 128, 255));
+    list->AddRectFilled({90, 0}, {120, 30}, IM_COL32(180, 50, 100, 255));
     list->AddRectFilled({30, 0}, {60, 30}, IM_COL32(220, 40, 80, 128));
     list->AddRectFilled({30, 0}, {60, 30}, IM_COL32(40, 180, 200, 96));
     list->AddImage(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(texture.Get())), {60, 0}, {90, 30}, {0, 0},
                    {1, 1}, IM_COL32(180, 220, 255, 192));
   };
   // All output encodings are exercised even on an SDR-only desktop.
-  std::array<std::array<uint8_t, 4>, 4> baseline{};
+  std::array<std::array<uint8_t, 4>, 5> baseline{};
   ObjPtr<IImage> sdr = device->CreateImage({160, 120, IMAGE_FORMAT_RGBA8_UNORM});
   ASSERT_TRUE(sdr && ui->Update(draw));
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
@@ -571,6 +556,7 @@ TEST_P(RhiImage, ImGuiHDRMatchesSDRColorsTexturesAndAlphaBlending) {
   ASSERT_TRUE(done && done->WaitHost());
   for (size_t i = 0; i < baseline.size(); ++i)
     ReadPixel(device.Get(), sdr.Get(), GetParam(), uint32_t(i * 30 + 10), 10, baseline[i]);
+  EXPECT_EQ(baseline[0], (std::array<uint8_t, 4>{128, 128, 128, 255}));
   for (auto space : {COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084, COLOR_SPACE_BT709_LINEAR,
                      COLOR_SPACE_EXTENDED_SRGB_LINEAR}) {
     for (float white : {1.0f, 2.5f}) {
@@ -579,6 +565,19 @@ TEST_P(RhiImage, ImGuiHDRMatchesSDRColorsTexturesAndAlphaBlending) {
       ObjPtr<IImage> target = device->CreateImage({160, 120, IMAGE_FORMAT_RGBA16_FLOAT});
       ASSERT_TRUE(target && ui->Update(draw));
       const auto bg = encode({linear(0.2), linear(0.3), linear(0.4)}, space, white);
+      std::array<std::array<double, 3>, 5> expected{bg, bg, bg, bg, bg};
+      expected[3] = encode({linear(180.0 / 255), linear(50.0 / 255), linear(100.0 / 255)}, space, white);
+      expected[0] = encode({linear(128.0 / 255), linear(128.0 / 255), linear(128.0 / 255)}, space, white);
+      auto blend = [&](size_t sample, std::array<double, 3> rgb, double alpha) {
+        for (auto &v : rgb)
+          v = linear(v);
+        const auto encoded = encode(rgb, space, white);
+        for (size_t c = 0; c < 3; ++c)
+          expected[sample][c] = encoded[c] * alpha + expected[sample][c] * (1 - alpha);
+      };
+      blend(1, {220.0 / 255, 40.0 / 255, 80.0 / 255}, 128.0 / 255);
+      blend(1, {40.0 / 255, 180.0 / 255, 200.0 / 255}, 96.0 / 255);
+      blend(2, {128.0 * 180 / (255 * 255), 64.0 * 220 / (255 * 255), 200.0 / 255}, 128.0 * 192 / (255 * 255));
       commands = device->CreateCommandContext();
       ASSERT_TRUE(commands && commands->CmdClearColor(target.Get(), {float(bg[0]), float(bg[1]), float(bg[2]), 1}));
       ASSERT_TRUE(ui->Record(commands.Get(), target.Get(), space, white));
@@ -589,14 +588,11 @@ TEST_P(RhiImage, ImGuiHDRMatchesSDRColorsTexturesAndAlphaBlending) {
         ReadPixel(device.Get(), target.Get(), GetParam(), uint32_t(i * 30 + 10), 10, bytes);
         uint16_t halves[4];
         std::memcpy(halves, bytes.data(), 8);
-        auto c =
-            decode({glm::unpackHalf1x16(halves[0]), glm::unpackHalf1x16(halves[1]), glm::unpackHalf1x16(halves[2])},
-                   space, white);
         for (int channel = 0; channel < 3; ++channel)
-          EXPECT_NEAR(srgb(c[channel]), baseline[i][channel] / 255.0, 0.015)
+          EXPECT_NEAR(glm::unpackHalf1x16(halves[channel]), expected[i][channel], 0.002)
               << "sample " << i << " channel " << channel;
       }
-      // Untouched HDR highlights must survive the nonlinear composition round trip.
+      // Direct rendering must leave background highlights untouched.
       const auto highlight = encode({4, 2, 1}, space, white);
       ASSERT_TRUE(ui->Update(draw));
       commands = device->CreateCommandContext();

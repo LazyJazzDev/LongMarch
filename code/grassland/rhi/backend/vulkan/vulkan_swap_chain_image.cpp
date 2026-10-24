@@ -4,16 +4,11 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanSwapChainImage::VulkanSwapChainImage(ImageDesc desc,
-                                           VulkanWindow *window,
-                                           VkImage image,
-                                           VkImageView attachment,
-                                           VkImageView binding)
+VulkanSwapChainImage::VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image, VkImageView attachment)
     : VulkanImage(desc, window->DeviceIdentity(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR),
       window_(window),
       image_(image),
-      attachment_(attachment),
-      binding_(binding) {
+      attachment_(attachment) {
 }
 
 VulkanSwapChainImage::~VulkanSwapChainImage() = default;
@@ -23,7 +18,7 @@ VkImageView VulkanSwapChainImage::AttachmentView() const {
 }
 
 VkImageView VulkanSwapChainImage::BindingView() const {
-  return binding_;
+  return VK_NULL_HANDLE;
 }
 
 bool VulkanSwapChainImage::IsValid() const {

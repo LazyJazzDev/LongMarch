@@ -179,9 +179,8 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     Check(result, "vkAcquireNextImageKHR");
     return {};
   }
-  return ObjectPtr<Image>::Adopt(new VulkanSwapChainImage(desc_, this, images_[current_image_],
-                                                          image_views_[current_image_].Attachment(),
-                                                          image_views_[current_image_].Binding()));
+  return ObjectPtr<Image>::Adopt(
+      new VulkanSwapChainImage(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
 }
 
 VkSemaphore VulkanWindow::AcquireSemaphore() const {
@@ -243,8 +242,6 @@ std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOpti
   for (const auto &format : formats) {
     const auto option = PresentationFormat(format);
     if (!option)
-      continue;
-    if (option->color_space != COLOR_SPACE_SRGB_NONLINEAR && !(caps.supportedUsageFlags & VK_IMAGE_USAGE_SAMPLED_BIT))
       continue;
     if (std::any_of(options.begin(), options.end(), [&](const auto &other) {
           return other.format == option->format && other.color_space == option->color_space;
@@ -352,12 +349,6 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   }
   create.imageArrayLayers = 1;
   create.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  const bool sampled = RequestedColorSpace() != COLOR_SPACE_SRGB_NONLINEAR;
-  if (sampled) {
-    if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_SAMPLED_BIT))
-      return false;
-    create.imageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
-  }
   create.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   create.preTransform = caps.currentTransform;
   for (auto alpha : {VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
@@ -382,7 +373,7 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
     return false;
   image_views_.resize(images_.size());
   for (size_t i = 0; i < images_.size(); ++i) {
-    if (!image_views_[i].Initialize(device, images_[i], image_format, sampled))
+    if (!image_views_[i].Initialize(device, images_[i], image_format, false))
       return false;
   }
   acquire_sync_.resize(images_.size() + 1);

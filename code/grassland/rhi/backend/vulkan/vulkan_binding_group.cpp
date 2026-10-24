@@ -170,8 +170,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                    const std::vector<IImage *> &images) {
   const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
-    if (!dynamic_cast<VulkanImage *>(image) || !static_cast<VulkanImage *>(image)->BindingView() ||
-        (binding.type != BINDING_TEXTURE2D && !dynamic_cast<VulkanAllocatedImage *>(image)))
+    if (!dynamic_cast<VulkanAllocatedImage *>(image))
       return false;
   auto native = static_cast<VulkanDevice *>(device_)->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(images.size());

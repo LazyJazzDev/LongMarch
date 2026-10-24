@@ -157,8 +157,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                   const std::vector<IImage *> &images) {
   const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
-    if (!dynamic_cast<D3D12Image *>(image) ||
-        (binding.type != BINDING_TEXTURE2D && !dynamic_cast<D3D12AllocatedImage *>(image)))
+    if (!dynamic_cast<D3D12AllocatedImage *>(image))
       return false;
   auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
   if (binding.type == BINDING_TEXTURE2D) {

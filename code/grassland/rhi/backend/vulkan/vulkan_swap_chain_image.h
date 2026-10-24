@@ -8,11 +8,7 @@ class VulkanWindow;
 
 class VulkanSwapChainImage final : public VulkanImage {
  public:
-  VulkanSwapChainImage(ImageDesc desc,
-                       VulkanWindow *window,
-                       VkImage image,
-                       VkImageView attachment,
-                       VkImageView binding);
+  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image, VkImageView attachment);
   ~VulkanSwapChainImage() override;
   bool IsValid() const override;
   VkImage NativeImage() const override;
@@ -24,7 +20,6 @@ class VulkanSwapChainImage final : public VulkanImage {
   VulkanWindow *window_;
   VkImage image_{};
   VkImageView attachment_{};
-  VkImageView binding_{};
 };
 
 }  // namespace grassland::rhi::backend::vulkan

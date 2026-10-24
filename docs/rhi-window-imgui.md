@@ -117,25 +117,18 @@ For example: `demo_rhi_hello --backend d3d12 --module imgui --font "C:/Windows/F
 The size must be finite and positive. An unreadable font file fails initialization.
 Changing these options requires restarting the demo; they do not rebuild the atlas live.
 
-### SDR UI appearance on HDR outputs
+### UI colors on HDR outputs
 
-ImGui colors and custom image samples retain their SDR/sRGB meaning in every window color space.
-For HDR outputs, the renderer decodes the existing background to extended nonlinear sRGB,
-composites ImGui with the same alpha blending as the SDR path, then encodes the result to
-linear extended sRGB, linear Rec.709, or Rec.2020/ST2084 PQ. Values outside the SDR range are
-preserved through the floating-point composition target; the scene is not tone-mapped or
-clamped to SDR. Font coverage, custom image tinting and overlapping translucent widgets
-therefore retain the SDR blending convention. Custom images are interpreted exactly as in
-the SDR UI path; this is not an automatic color-space detector for HDR image previews.
+ImGui renders directly into the swapchain in every output color space. The fragment shader
+converts SDR/sRGB UI colors and sampled custom images to the target encoding: linear Rec.709,
+reference-white-scaled scRGB, or Rec.2020/ST2084 PQ. Alpha remains unchanged. Solid regions
+retain the same color and reference-white meaning as SDR; alpha blending takes place directly
+in the target encoding, so translucent controls and text edges need not match SDR blending.
 
-Reference white follows the window's current HDR reference-white scale and the existing
-platform presentation conventions. This matches equivalent SDR content at reference white;
-physical display calibration, compositor behavior and a different HDR background can still
-affect perceived appearance. UI is composited into the window's active color space at
-CmdPresent, so changing output modes does not recreate the ImGui context or lose widget state.
-
-HDR UI uses one reusable RGBA16F image and two fullscreen conversion passes. SDR and empty UI
-frames do not take this path. Vulkan HDR presentation requires a sampleable swapchain surface;
-D3D12 swapchains allow shader input, and Metal drawable textures already allow sampling.
-Both hello demos' `hdr` modules include an SDR UI reference panel; H cycles supported output
-color spaces, and bounded `--frames` runs cycle them automatically.
+Reference white follows the window's current scale and existing platform conventions.
+Custom images retain their SDR sampling interpretation; there is no automatic HDR image
+color-space detection. HDR mode changes preserve the ImGui context and widget state.
+There are no intermediate images, background conversion passes or swapchain sampling requirements.
+Both hello demos' `hdr` modules include a gray-ramp and colored-text panel; H cycles output
+color spaces, and bounded `--frames` runs cycle them automatically. Physical appearance still
+depends on display calibration and system color management.

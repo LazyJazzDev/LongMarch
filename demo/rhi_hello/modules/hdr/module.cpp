@@ -112,7 +112,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames) {
     }
     if (!window->UpdateImGui([&] {
           ImGui::Begin("SDR appearance in HDR");
-          ImGui::TextUnformatted("H: switch color space; UI should retain its SDR appearance.");
+          ImGui::TextUnformatted("H: switch color space; solid UI colors retain their SDR meaning.");
           ImGui::Text("Output: %s", ColorSpaceName(window->GetColorSpace()).c_str());
           ImGui::TextUnformatted("Gray ramp, colored text and translucent controls:");
           for (int i = 0; i < 5; ++i) {

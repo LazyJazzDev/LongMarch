@@ -39,6 +39,10 @@ struct Vertex {
 constexpr const char *shader = R"(
 RHI_TEXTURE2D(0, 0, float4, texture);
 RHI_SAMPLER(0, 1, textureSampler);
+#if OUTPUT_COLOR_SPACE != 0
+struct Settings { float white_scale; float3 padding; };
+RHI_UNIFORM(0, 2, Settings, settings);
+#endif
 struct Input {
   RHI_INPUT(0, float2, position);
   RHI_INPUT(1, float2, uv);
@@ -57,75 +61,33 @@ Varying VSMain(Input input) {
   return o;
 }
 float4 PSMain(Varying input) : SV_Target0 {
-  return input.color * texture.Sample(textureSampler, input.uv);
-}
-)";
-
-constexpr const char *presentation_shader = R"(
-struct Settings { float white_scale; float3 padding; };
-RHI_UNIFORM(0, 0, Settings, settings);
-RHI_TEXTURE2D(0, 1, float4, source);
-struct Varying { float4 position : SV_Position; };
-Varying VSMain(uint id : SV_VertexID) {
-  Varying o;
-  float2 uv = float2((id << 1) & 2, id & 2);
-  o.position = float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);
-  return o;
-}
-float3 ToLinear(float3 c) {
-  float3 a = abs(c);
-  return sign(c) * select(a <= 0.04045, a / 12.92, pow((a + 0.055) / 1.055, 2.4));
-}
-float3 ToSRGB(float3 c) {
-  float3 a = abs(c);
-  return sign(c) * select(a <= 0.0031308, a * 12.92, 1.055 * pow(a, 1.0 / 2.4) - 0.055);
-}
+  float4 color = input.color * texture.Sample(textureSampler, input.uv);
+#if OUTPUT_COLOR_SPACE != 0
+  color.rgb = select(color.rgb <= 0.04045, color.rgb / 12.92,
+                     pow((max(color.rgb, 0) + 0.055) / 1.055, 2.4));
+#if OUTPUT_COLOR_SPACE == 1
+  color.rgb *= settings.white_scale;
+#elif OUTPUT_COLOR_SPACE == 2
 #if RHI_PLATFORM_MACOS
-#define PQ_NITS_PER_UNIT 100.0
+  const float nits_per_unit = 100.0;
 #elif RHI_PLATFORM_LINUX
-#define PQ_NITS_PER_UNIT 203.0
+  const float nits_per_unit = 203.0;
 #else
-#define PQ_NITS_PER_UNIT 80.0
+  const float nits_per_unit = 80.0;
 #endif
-float3 Decode(float3 c) {
-#if COLOR_SPACE == 1
-  return c / settings.white_scale;
-#elif COLOR_SPACE == 3
-  return c;
-#else
-  float3 p = pow(max(c, 0), 32.0 / 2523.0);
-  float3 linear2020 = pow(max(p - 3424.0 / 4096.0, 0) /
-                         max(2413.0 / 128.0 - (2392.0 / 128.0) * p, 1e-7), 16384.0 / 2610.0);
-  linear2020 *= 10000.0 / (settings.white_scale * PQ_NITS_PER_UNIT);
-  const float3x3 to709 = float3x3(1.660491, -0.587641, -0.072850,
-                                -0.124550, 1.132900, -0.008349,
-                                -0.018151, -0.100579, 1.118730);
-  return mul(to709, linear2020);
-#endif
-}
-float3 Encode(float3 c) {
-#if COLOR_SPACE == 1
-  return c * settings.white_scale;
-#elif COLOR_SPACE == 3
-  return c;
-#else
   const float3x3 to2020 = float3x3(0.627404, 0.329283, 0.043313,
                                  0.069097, 0.919540, 0.011362,
                                  0.016391, 0.088013, 0.895595);
-  float3 normalized = saturate(mul(to2020, c) * (settings.white_scale * PQ_NITS_PER_UNIT / 10000.0));
+  float3 normalized = saturate(mul(to2020, color.rgb) * (settings.white_scale * nits_per_unit / 10000.0));
   float3 p = pow(normalized, 2610.0 / 16384.0);
-  return pow((3424.0 / 4096.0 + (2413.0 / 128.0) * p) / (1 + (2392.0 / 128.0) * p), 2523.0 / 32.0);
+  color.rgb = pow((3424.0 / 4096.0 + (2413.0 / 128.0) * p) / (1 + (2392.0 / 128.0) * p), 2523.0 / 32.0);
 #endif
-}
-float4 PSMain(Varying input) : SV_Target0 {
-  float4 c = source.Load(int3(int2(input.position.xy), 0));
-#if ENCODE
-  return float4(Encode(ToLinear(c.rgb)), c.a);
-#else
-  return float4(ToSRGB(Decode(c.rgb)), c.a);
 #endif
+  // Alpha is coverage; blend directly in the target's native encoding, including PQ.
+  return color;
 }
 )";
+
 }  // namespace
 
 std::unique_ptr<WindowImGui> WindowImGui::Create(Device *device,
@@ -264,79 +226,22 @@ bool WindowImGui::Record(ICommandContext *commands,
     return true;
   draw_data_ready_ = false;
   ImGuiContextScope scope(context_);
-  auto data = ImGui::GetDrawData();
-  if (color_space == COLOR_SPACE_SRGB_NONLINEAR || !data || !data->TotalVtxCount || !data->TotalIdxCount)
-    return Render(commands, image, data);
-  const auto extent = image->GetDesc();
-  if (!composition_ || composition_->GetDesc().width != extent.width ||
-      composition_->GetDesc().height != extent.height) {
-    composition_ = device_->CreateImage({extent.width, extent.height, IMAGE_FORMAT_RGBA16_FLOAT});
-    if (!composition_)
-      return false;
-  }
-  // Preserve SDR's nonlinear alpha blending, including text coverage and textures.
-  // Extended sRGB values keep HDR background highlights rather than clipping them.
-  return ConvertPresentation(commands, image, composition_.Get(), color_space, reference_white_scale, false) &&
-         Render(commands, composition_.Get(), data) &&
-         ConvertPresentation(commands, composition_.Get(), image, color_space, reference_white_scale, true);
+  return Render(commands, image, ImGui::GetDrawData(), color_space, reference_white_scale);
 }
 
-bool WindowImGui::ConvertPresentation(ICommandContext *commands,
-                                      IImage *source,
-                                      IImage *target,
-                                      ColorSpace color_space,
-                                      float reference_white_scale,
-                                      bool encode) {
-  if (!std::isfinite(reference_white_scale) || reference_white_scale <= 0)
-    return false;
-  if (conversion_space_ != color_space) {
-    decode_program_.Release();
-    encode_program_.Release();
-    conversion_space_ = color_space;
-  }
-  const auto extent = target->GetDesc();
-  auto &program = encode ? encode_program_ : decode_program_;
-  if (!program || program->GetDesc().color_formats[0] != extent.format) {
-    const auto source_code = "#define COLOR_SPACE " + std::to_string(int(color_space)) + "\n#define ENCODE " +
-                             std::to_string(int(encode)) + "\n" + presentation_shader;
-    ObjPtr<IShader> vs = device_->CreateShaderFromSource(source_code, "VSMain", SHADER_STAGE_VERTEX);
-    ObjPtr<IShader> ps = device_->CreateShaderFromSource(source_code, "PSMain", SHADER_STAGE_FRAGMENT);
-    if (!vs || !ps)
-      return false;
-    ProgramDesc desc;
-    desc.vertex_shader = vs.Get();
-    desc.fragment_shader = ps.Get();
-    desc.color_formats = {extent.format};
-    desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
-                                     {1, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}}};
-    program = device_->CreateProgram(desc);
-    if (!program)
-      return false;
-  }
-  if (!display_settings_)
-    display_settings_ = device_->CreateBuffer({256});
-  const float settings[] = {reference_white_scale, 0, 0, 0};
-  ObjPtr<IBindingGroup> group = device_->CreateBindingGroup(program->GetDesc().pipeline_layout.groups[0]);
-  if (!display_settings_ || !group || !group->BindResource(0, display_settings_.Get()) ||
-      !group->BindResource(1, source) ||
-      !commands->CmdUploadBuffer(display_settings_.Get(), 0, settings, sizeof(settings)) ||
-      !commands->CmdBindProgram(program.Get()) || !commands->CmdBindGroup(0, group.Get()) ||
-      !commands->CmdBeginRendering({{{target, ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE}}}))
-    return false;
-  const bool drawn = commands->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}) &&
-                     commands->CmdSetScissor({0, 0, extent.width, extent.height}) && commands->CmdDraw(3);
-  const bool ended = commands->CmdEndRendering();
-  return drawn && ended;
-}
-
-bool WindowImGui::Render(ICommandContext *commands, IImage *image, ImDrawData *data) {
+bool WindowImGui::Render(ICommandContext *commands,
+                         IImage *image,
+                         ImDrawData *data,
+                         ColorSpace color_space,
+                         float reference_white_scale) {
   if (!data || data->TotalVtxCount == 0 || data->TotalIdxCount == 0 || data->DisplaySize.x <= 0 ||
       data->DisplaySize.y <= 0)
     return true;
   const auto extent = image->GetDesc();
-  if (!program_ || program_->GetDesc().color_formats[0] != extent.format) {
-    ObjPtr<IShader> vs = device_->CreateShaderFromSource(shader, "VSMain", SHADER_STAGE_VERTEX);
-    ObjPtr<IShader> ps = device_->CreateShaderFromSource(shader, "PSMain", SHADER_STAGE_FRAGMENT);
+  if (!program_ || program_->GetDesc().color_formats[0] != extent.format || program_color_space_ != color_space) {
+    const auto source_code = "#define OUTPUT_COLOR_SPACE " + std::to_string(int(color_space)) + "\n" + shader;
+    ObjPtr<IShader> vs = device_->CreateShaderFromSource(source_code, "VSMain", SHADER_STAGE_VERTEX);
+    ObjPtr<IShader> ps = device_->CreateShaderFromSource(source_code, "PSMain", SHADER_STAGE_FRAGMENT);
     if (!vs || !ps)
       return false;
     ProgramDesc desc;
@@ -350,8 +255,20 @@ bool WindowImGui::Render(ICommandContext *commands, IImage *image, ImDrawData *d
     desc.blend_states = {BlendState(true)};
     desc.pipeline_layout.groups = {
         {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+    if (color_space != COLOR_SPACE_SRGB_NONLINEAR)
+      desc.pipeline_layout.groups[0].bindings.push_back({2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT});
     program_ = device_->CreateProgram(desc);
+    program_color_space_ = color_space;
     if (!program_)
+      return false;
+  }
+  if (color_space != COLOR_SPACE_SRGB_NONLINEAR) {
+    if (!std::isfinite(reference_white_scale) || reference_white_scale <= 0)
+      return false;
+    if (!display_settings_)
+      display_settings_ = device_->CreateBuffer({256});
+    const float settings[] = {reference_white_scale, 0, 0, 0};
+    if (!display_settings_ || !commands->CmdUploadBuffer(display_settings_.Get(), 0, settings, sizeof(settings)))
       return false;
   }
   std::vector<Vertex> vertices;
@@ -421,6 +338,7 @@ bool WindowImGui::Render(ICommandContext *commands, IImage *image, ImDrawData *d
         ObjPtr<IBindingGroup> group = device_->CreateBindingGroup(program_->GetDesc().pipeline_layout.groups[0]);
         success =
             texture && group && group->BindResource(0, texture) && group->BindResource(1, sampler_.Get()) &&
+            (color_space == COLOR_SPACE_SRGB_NONLINEAR || group->BindResource(2, display_settings_.Get())) &&
             commands->CmdBindGroup(0, group.Get()) &&
             commands->CmdSetScissor({x, y, uint32_t(right - x), uint32_t(bottom - y)}) &&
             commands->CmdDrawIndexed(draw.ElemCount, 1, index_offset + draw.IdxOffset, vertex_offset + draw.VtxOffset);
