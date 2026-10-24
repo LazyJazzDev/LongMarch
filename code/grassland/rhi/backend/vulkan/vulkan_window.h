@@ -6,8 +6,6 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanWindow final : public Window {
  public:
-  bool SupportsImageDownload() const;
-
   ~VulkanWindow() override;
   static VulkanWindow *Create(VulkanDevice *device, const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
@@ -21,7 +19,6 @@ class VulkanWindow final : public Window {
   VkResult PresentFrame();
 
  private:
-  bool image_download_supported_{};
   VulkanWindow(VulkanDevice *device);
 
   void DestroySwapchain();

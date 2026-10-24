@@ -84,9 +84,8 @@ requested rectangle while copying to CPU memory. Vulkan invalidates mapped memor
 before reading when required by the allocation's memory type.
 
 Swapchain downloads must be recorded before submission; recording after `CmdPresent`
-includes its ImGui overlay. Vulkan enables transfer-source usage when supported by
-the surface; an unsupported surface rejects swapchain downloads while ordinary
-window presentation remains available. Independent images support readback on all
+includes its ImGui overlay. Vulkan swapchains always enable transfer-source usage;
+swapchain readback support is assumed. Independent images support readback on all
 three backends.
 
 Concrete backend DownloadToken implementations store the lease and native copy

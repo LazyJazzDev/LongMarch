@@ -348,10 +348,8 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
         std::clamp(static_cast<uint32_t>(height), caps.minImageExtent.height, caps.maxImageExtent.height);
   }
   create.imageArrayLayers = 1;
-  image_download_supported_ = (caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
-  create.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  if (image_download_supported_)
-    create.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+  create.imageUsage =
+      VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   create.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   create.preTransform = caps.currentTransform;
   for (auto alpha : {VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
@@ -397,9 +395,5 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   desc_ = {create.imageExtent.width, create.imageExtent.height, image_format};
   mode_ = mode == VK_PRESENT_MODE_FIFO_KHR ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
   return true;
-}
-
-bool VulkanWindow::SupportsImageDownload() const {
-  return image_download_supported_;
 }
 }  // namespace grassland::rhi::backend::vulkan

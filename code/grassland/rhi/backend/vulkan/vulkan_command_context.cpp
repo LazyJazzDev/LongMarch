@@ -922,11 +922,6 @@ IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const Imag
     recording_failed_ = true;
     return nullptr;
   }
-  if (auto swap = dynamic_cast<VulkanSwapChainImage *>(native); swap && !swap->Owner()->SupportsImageDownload()) {
-    ReportError(-1, "This surface does not support swapchain image downloads.");
-    recording_failed_ = true;
-    return nullptr;
-  }
   const auto desc = native->GetDesc();
   if (region.x >= desc.width || region.y >= desc.height) {
     recording_failed_ = true;
