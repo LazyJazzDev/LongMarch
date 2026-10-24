@@ -36,6 +36,8 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
   if (!device)
     return 1;
   grassland::rhix::DownloadToken last_frame;
+  grassland::rhix::DownloadToken last_depth;
+  ImageDesc last_depth_desc{};
   ImageDesc last_frame_desc{};
   ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
   float last_frame_white_scale = 1.0f;
@@ -242,6 +244,10 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
       last_frame = context.CmdDownloadImage(image);
       if (!last_frame)
         return 1;
+      last_depth = context.CmdDownloadImage(depth);
+      if (!last_depth)
+        return 1;
+      last_depth_desc = depth.GetDesc();
       last_frame_desc = image.GetDesc();
       last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
       last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
@@ -278,6 +284,12 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
     std::vector<uint8_t> pixels(last_frame.GetSize());
     if (!last_frame.CopyTo(pixels.data(), pixels.size()) ||
         !SaveImage(capture_directory, "cube", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
+      return 1;
+    if (!last_depth || !last_depth.WaitHost())
+      return 1;
+    pixels.resize(last_depth.GetSize());
+    if (!last_depth.CopyTo(pixels.data(), pixels.size()) ||
+        !SaveImage(capture_directory, "cube_depth", pixels, last_depth_desc, COLOR_SPACE_SRGB_NONLINEAR, 1.0f))
       return 1;
   }
   return 0;

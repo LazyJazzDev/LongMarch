@@ -79,7 +79,10 @@ left-to-right and top-to-bottom without row padding. Color values retain their n
 encoding, including BGRA channel order, packed 10-bit channels and half floats.
 Depth readback tests use D32 only. Stencil-bearing images are not read back by default;
 stencil rendering tests verify the color output instead. All demo depth attachments
-use pure D32 float depth.
+use pure D32 float depth. Cube capture downloads both color and D32 depth each frame,
+then saves the final matching pair at exit. `cube_depth.bin` retains float32 device
+depth; `cube_depth.png` is an 8-bit grayscale preview of depth 0–1, without gamma
+conversion or linearization.
 
 D32 returns float depth. D24S8 returns little-endian words with depth in bits 0-23 and
 stencil in bits 24-31; Metal's native D32S8 depth is quantized to that public layout.

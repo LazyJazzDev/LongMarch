@@ -36,6 +36,7 @@ bool SaveImage(const std::string &directory_name,
     std::cerr << error.message() << '\n';
     return false;
   }
+  const bool depth = desc.format == IMAGE_FORMAT_D32_FLOAT;
   const auto base = directory / name;
   // Preserve exact HDR/10-bit/half-float values alongside the SDR PNG preview.
   auto raw_path = base;
@@ -47,10 +48,13 @@ bool SaveImage(const std::string &directory_name,
   metadata_path += ".txt";
   std::ofstream metadata(metadata_path);
   metadata << "width=" << desc.width << "\nheight=" << desc.height << "\nformat=" << ImageFormatName(desc.format)
-           << "\ncolor_space=" << ColorSpaceName(space)
+           << "\ncolor_space=" << (depth ? "none (depth)" : ColorSpaceName(space))
            << "\nrow_pitch=" << uint64_t(desc.width) * ImageFormatSize(desc.format)
            << "\nreference_white_scale=" << white_scale
            << "\nlayout=top-to-bottom, tightly packed, native pixel encoding\n";
+  if (depth)
+    metadata << "depth_encoding=device depth in [0,1], not linear distance\n"
+             << "preview=clamped depth mapped directly to 8-bit grayscale, 0 black, 1 white\n";
   metadata.close();
   if (!raw || !metadata)
     return false;
@@ -59,7 +63,12 @@ bool SaveImage(const std::string &directory_name,
   for (size_t i = 0; i < size_t(desc.width) * desc.height; ++i) {
     const auto source = pixels.data() + i * stride;
     float c[4]{};
-    if (desc.format == IMAGE_FORMAT_RGBA16_FLOAT) {
+    if (depth) {
+      float value;
+      std::memcpy(&value, source, sizeof(value));
+      c[0] = c[1] = c[2] = value;
+      c[3] = 1.0f;
+    } else if (desc.format == IMAGE_FORMAT_RGBA16_FLOAT) {
       uint16_t halves[4];
       std::memcpy(halves, source, 8);
       for (int k = 0; k < 4; ++k)
@@ -78,7 +87,7 @@ bool SaveImage(const std::string &directory_name,
       if (desc.format == IMAGE_FORMAT_BGRA8_UNORM)
         std::swap(c[0], c[2]);
     }
-    if (space == COLOR_SPACE_HDR10_ST2084) {
+    if (!depth && space == COLOR_SPACE_HDR10_ST2084) {
 #if defined(_WIN32)
       const float white = 80.0f * white_scale;
 #elif defined(__APPLE__)
@@ -92,7 +101,7 @@ bool SaveImage(const std::string &directory_name,
       c[2] = -0.018151f * r - 0.100579f * g + 1.118730f * b;
       for (int k = 0; k < 3; ++k)
         c[k] = EncodeSRGB(std::max(c[k], 0.0f));
-    } else if (space != COLOR_SPACE_SRGB_NONLINEAR) {
+    } else if (!depth && space != COLOR_SPACE_SRGB_NONLINEAR) {
       for (int k = 0; k < 3; ++k)
         c[k] = EncodeSRGB(std::max(c[k] / white_scale, 0.0f));
     }
