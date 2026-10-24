@@ -69,7 +69,7 @@ their default depth clear value remains 1 and stencil remains 0.
 Vulkan passes the corresponding native clear member. Metal converts integer color
 components to its double-valued clear color without losing 32-bit integer precision.
 D3D12 uses integer UAV clears for integer targets and preserves descriptor bindings
-and resource ordering; integer formats without UAV support use an exact-byte upload.
+and resource ordering; integer targets without UAV support report an error and fail recording.
 Floating color and depth/stencil clears use their respective native clear commands.
 Integer values never pass through float. Tests read back extreme signed/unsigned
 32-bit values, 8-bit negative values, depth/stencil, and interleaved clear/dispatch

@@ -115,6 +115,11 @@ bool D3D12CommandContext::ClearColor(D3D12Image *image, const ClearColorValue &v
     list_->ClearRenderTargetView(image->AttachmentView(), value.float32.data(), 0, nullptr);
     return true;
   }
+  if (!image->SupportsStorage()) {
+    recording_failed_ = true;
+    ReportError(-1, "D3D12 integer image clears require UAV support.");
+    return false;
+  }
   const auto pixel_size = ImageFormatSize(format);
   const uint32_t component_size =
       pixel_size > 4 || format == IMAGE_FORMAT_R32_UINT || format == IMAGE_FORMAT_R32_INT ? 4 : 1;
@@ -125,20 +130,6 @@ bool D3D12CommandContext::ClearColor(D3D12Image *image, const ClearColorValue &v
     // unsigned clear operation for 8-bit signed views.
     if (component_size == 1)
       integers[i] &= 0xff;
-  }
-  if (!image->SupportsStorage()) {
-    // Renderable integer formats without typed UAV support still clear exactly
-    // through the normal upload path, without conversion through float.
-    const auto desc = image->GetDesc();
-    std::array<uint8_t, 16> pixel{};
-    for (uint32_t c = 0; c < pixel_size / component_size; ++c)
-      std::memcpy(pixel.data() + c * component_size, &integers[c], component_size);
-    std::vector<uint8_t> pixels(size_t(desc.width) * desc.height * pixel_size);
-    for (size_t offset = 0; offset < pixels.size(); offset += pixel_size)
-      std::memcpy(pixels.data() + offset, pixel.data(), pixel_size);
-    if (!CmdUploadImage(image, pixels.data(), uint64_t(desc.width) * pixel_size))
-      return false;
-    return TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState());
   }
   auto storage = device_->ResourceDescriptorStorage().Acquire(1);
   auto visible = device_->ResourceDescriptors().Acquire(1);
