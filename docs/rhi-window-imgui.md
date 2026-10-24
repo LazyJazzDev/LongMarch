@@ -156,3 +156,7 @@ Headless mode retains deterministic initialization, three in-flight frames and 6
 frames, with SDR encoding and no window or UI. Throughput is an estimate based on whole-frame
 time, not measured GPU FLOP/s. The reference's speed-distribution plot is not ported because
 RHI currently has no public buffer readback API. macOS/Linux runtime validation is separate.
+
+The nbody panel uses a font-relative fixed width, equal-width rounded Reset/Pause/Resume
+buttons, and aligned slider/color-space fields with a shared right-hand label column.
+Resume uses a distinct green button state; layout dimensions stay stable when toggling pause.
