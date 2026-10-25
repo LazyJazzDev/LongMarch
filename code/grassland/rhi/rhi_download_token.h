@@ -20,10 +20,7 @@ class IDownloadToken : public IObject {
   // Caller must first observe COMPLETED (or a successful WaitHost) and perform
   // copies on one thread. No internal status check or serialization is performed.
   // Returns false for a null destination or insufficient destination_size.
-  // Image rows are tightly packed in
-  // the source format, top to bottom, with no row padding. D24S8 uses
-  // a little-endian uint32: depth in bits 0..23, stencil in bits 24..31.
-  // Metal converts its native D32S8 depth to the requested D24 precision.
+  // Image rows are tightly packed in the source format, top to bottom, with no row padding.
   virtual bool CopyTo(void *destination, uint64_t destination_size) const = 0;
 
  protected:

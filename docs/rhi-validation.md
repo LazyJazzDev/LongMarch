@@ -129,8 +129,7 @@ then saves the final matching pair at exit. `cube_depth.bin` retains float32 dev
 depth; `cube_depth.png` is an 8-bit grayscale preview of depth 0–1, without gamma
 conversion or linearization.
 
-D32 returns float depth. D24S8 returns little-endian words with depth in bits 0-23 and
-stencil in bits 24-31; Metal's native D32S8 depth is quantized to that public layout.
+D16 returns uint16 normalized depth; D32 returns float depth. D24S8 readback is forbidden.
 D3D12 requires a full-subresource transfer for depth images; the token crops the
 requested rectangle while copying to CPU memory. Vulkan invalidates mapped memory
 before reading when required by the allocation's memory type.
@@ -228,3 +227,9 @@ or nearest filtering, not linear filtering.
 render-pass integer clears, D16 cropped readback, all 12 input types through real
 vertex fetch and rasterization, and integer storage writes/render-target output
 including full-width uint32 values. Stencil-bearing images are not downloaded.
+
+D24S8 must not be passed to `CmdDownloadImage`. All three backends reject it in
+Debug before encoding a copy, report the error, return no download token, and mark
+the context invalid for submission. Release retains the caller-contract policy;
+callers must not rely on a runtime check. The Debug rejection test never submits
+a native D24S8 readback.

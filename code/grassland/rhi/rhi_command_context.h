@@ -77,6 +77,8 @@ class ICommandContext : public IObject {
   // Upload, copy, standalone clear, Present and Submit require no active scope.
   // Begin consumes attachment operations; backend attachment leases remain automatic.
   virtual IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) = 0;
+  // D24_UNORM_S8_UINT readback is forbidden. Debug rejects it and invalidates
+  // recording; Release callers must obey this precondition.
   virtual IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) = 0;
   virtual bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) = 0;
   virtual bool CmdCopyBuffer(IBuffer *source,

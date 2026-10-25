@@ -680,6 +680,11 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
     recording_failed_ = true;
     return nullptr;
   }
+  if (native->GetDesc().format == IMAGE_FORMAT_D24_UNORM_S8_UINT) {
+    recording_failed_ = true;
+    ReportError(-1, "CmdDownloadImage does not support D24S8 readback; use a depth-only or color image.");
+    return nullptr;
+  }
 #else
   auto native = static_cast<MetalImage *>(image);
 #endif
