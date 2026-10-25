@@ -44,7 +44,7 @@ Callers release child handles before parent Device/Core handles, and release old
 
 ## Compute programs and nbody
 
-`nbody` is available on D3D12, Vulkan and Metal, through menu item 6, `--module nbody`, and `--all`. It follows `nbody_cs`: 65,536 particles, 128-thread shared-memory tiles, softened all-pairs gravity, velocity integration, position copy, and additive camera-facing particle quads. It uses ten initial galaxy clusters with seed 42, a fixed 0.03 simulation step, and the original gravity/radius/speed constants. There is no ImGui, HDR output or tone-mapping pass; particles render directly into SDR UNORM targets. Existing P/Escape/FPS/window handling and headless timing conventions apply. The nbody module creates all its own resources.
+`nbody` is available on D3D12, Vulkan and Metal, through menu item 6, `--module nbody`, and `--all`. It follows `nbody_cs`: 65,536 particles, 128-thread shared-memory tiles, softened all-pairs gravity, velocity integration, position copy, and additive camera-facing particle quads. It uses ten initial galaxy clusters with seed 42, a fixed 0.03 simulation step, and the original gravity/radius/speed constants. Particles and highlight processing use RGBA32F linear images. CmdDrawImGui composites controls into the linear frame, then CmdPresentImage converts it to the selected SDR/HDR SwapChain encoding. P toggles VSync, Space pauses, R resets, and Escape exits; headless captures preserve RGBA32F linear pixels. The nbody module creates all its own resources.
 
 ```text
 demo_rhi_hello --module nbody --backend vulkan

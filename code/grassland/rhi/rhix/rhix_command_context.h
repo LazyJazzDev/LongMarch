@@ -85,6 +85,8 @@ class CommandContext : public ObjectContainer {
                       int32_t vertex_offset = 0,
                       uint32_t first_instance = 0);
   bool CmdClearImage(const Image &image, const rhi::ClearValue &value);
+  bool CmdDrawImGui(const Window &window, const Image &target);
+  bool CmdPresentImage(const Window &window, const Image &frame_img, rhi::ColorSpace frame_color_space);
   bool CmdPresent(const Window &window);
 };
 

@@ -97,6 +97,25 @@ TEST_P(RhiDownload, AbandonedAndInvalidDownloads) {
   }
 }
 
+#if !defined(NDEBUG)
+TEST_P(RhiDownload, D24S8ReadbackIsRejectedBeforeSubmission) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IImage> image = device->CreateImage({8, 8, IMAGE_FORMAT_D24_UNORM_S8_UINT});
+  ASSERT_TRUE(image);
+  for (const auto &region : {ImageDownloadRegion{}, ImageDownloadRegion{1, 1, 2, 2}}) {
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), region);
+    EXPECT_FALSE(token);
+    ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
+    EXPECT_FALSE(done);
+  }
+}
+#endif
+
 TEST_P(RhiDownload, ImageSubrectangleIsTightlyPackedAndUnconverted) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);

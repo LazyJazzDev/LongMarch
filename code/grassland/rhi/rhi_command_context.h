@@ -77,6 +77,8 @@ class ICommandContext : public IObject {
   // Upload, copy, standalone clear, Present and Submit require no active scope.
   // Begin consumes attachment operations; backend attachment leases remain automatic.
   virtual IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) = 0;
+  // D24_UNORM_S8_UINT readback is forbidden. Debug rejects it and invalidates
+  // recording; Release callers must obey this precondition.
   virtual IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) = 0;
   virtual bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) = 0;
   virtual bool CmdCopyBuffer(IBuffer *source,
@@ -110,6 +112,13 @@ class ICommandContext : public IObject {
   virtual bool CmdClearImage(IImage *image, const ClearValue &value) = 0;
   // Presents the target window's next image fixed at this call. Multiple windows
   // may be presented by one context; a preceding clear is not required.
+  // Draw the latest UpdateImGui once onto a linear Rec.709 target (white = 1).
+  // Shares consumption with CmdPresent. Must be outside a rendering scope.
+  virtual bool CmdDrawImGui(IWindow *window, IImage *target) = 0;
+  // Input encoding excludes window white scaling; apply it only on output.
+  // Convert frame_img from its declared encoding to the window's encoding,
+  // then present. Any unconsumed ImGui is drawn by CmdPresent afterwards.
+  virtual bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) = 0;
   virtual bool CmdPresent(IWindow *window) = 0;
 
  protected:

@@ -181,7 +181,8 @@ struct DepthStencilDesc {
 };
 
 // Values written to a swapchain must use its declared encoding. No implicit
-// tonemapping or color conversion is performed by Present.
+// tonemapping or color conversion is performed by CmdPresent; CmdPresentImage
+// explicitly converts from the supplied source encoding.
 enum ColorSpace {
   COLOR_SPACE_SRGB_NONLINEAR,
   // Linear Rec.709/scRGB: 1.0 corresponds to 80 cd/m^2; values may exceed 1.

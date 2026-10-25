@@ -506,6 +506,7 @@ bool MetalCommandContext::CmdEndRendering() {
   encoder_.reset();
   render_target_ = nullptr;
   color_targets_.clear();
+  rendering_ = {};
   return true;
 }
 
@@ -677,6 +678,11 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
   auto native = dynamic_cast<MetalImage *>(image);
   if (sealed_ || render_target_ || !native || native->DeviceIdentity() != device_) {
     recording_failed_ = true;
+    return nullptr;
+  }
+  if (native->GetDesc().format == IMAGE_FORMAT_D24_UNORM_S8_UINT) {
+    recording_failed_ = true;
+    ReportError(-1, "CmdDownloadImage does not support D24S8 readback; use a depth-only or color image.");
     return nullptr;
   }
 #else

@@ -11,7 +11,6 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
-#include <map>
 #include <random>
 #include <string>
 #include <thread>
@@ -64,6 +63,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   bool cursor_initialized = false, dragging = false;
   std::string status;
   bool capture_keyboard = false, output_change_requested = false;
+  bool show_gui = true;
   ColorSpace requested_space = COLOR_SPACE_SRGB_NONLINEAR;
   std::vector<ColorSpace> spaces{COLOR_SPACE_SRGB_NONLINEAR};
   grassland::rhix::Window window;
@@ -85,7 +85,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   std::array<grassland::rhix::SubmissionToken, 3> pending;
   if (headless) {
     for (auto &target : targets) {
-      target = device.CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
+      target = device.CreateImage({1280, 720, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
       if (!target)
         return 1;
     }
@@ -106,11 +106,12 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   desc.vertex_bindings = {{sizeof(glm::vec3), true}};
   desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}};
   desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
-  desc.color_formats = {IMAGE_FORMAT_R16G16B16A16_SFLOAT};
+  desc.color_formats = {IMAGE_FORMAT_R32G32B32A32_SFLOAT};
   grassland::rhix::Program program = device.CreateProgram(desc);
   if (!program)
     return 1;
   grassland::rhix::Image radiance;
+  grassland::rhix::Image frame_image;
   const auto &output_embedded = shader_list.at("modules/nbody/shaders/present.slang");
   const std::string output_source(output_embedded.first, output_embedded.second);
   const BindingLayoutDesc output_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
@@ -119,7 +120,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   grassland::rhix::BindingGroup output_group = device.CreateBindingGroup(output_layout);
   if (!output_uniform || !output_group || !output_group.BindResource(0, output_uniform))
     return 1;
-  std::map<std::pair<ImageFormat, ColorSpace>, grassland::rhix::Program> output_programs;
+  grassland::rhix::Program output_program;
   const auto &compute_source = shader_list.at("modules/nbody/shaders/nbody.slang");
   grassland::rhix::Shader compute_shader = device.CreateShaderFromSource(
       std::string(compute_source.first, compute_source.second), "CSMain", SHADER_STAGE_COMPUTE);
@@ -198,6 +199,11 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     window.KeyEvent().RegisterCallback([&](int key, int, int action, int) {
       if (action != GLFW_PRESS)
         return;
+      if (key == GLFW_KEY_I) {
+        show_gui = !show_gui;
+        capture_keyboard = false;
+        return;
+      }
       if (capture_keyboard && key != GLFW_KEY_ESCAPE)
         return;
       if (key == GLFW_KEY_SPACE)
@@ -277,85 +283,89 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       if (window.ShouldClose())
         break;
       if (!window.UpdateImGui([&] {
-            ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
-            ImGui::SetNextWindowBgAlpha(0.3f);
-            ImGui::SetNextWindowSize({ImGui::GetFontSize() * 30.0f, 0}, ImGuiCond_Always);
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {8.0f, 6.0f});
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-            if (ImGui::Begin("NBody", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
-              ImGui::SeparatorText("Statistics");
-              ImGui::Text("Backend: %s", BackendAPIName(api).c_str());
-              ImGui::Text("Particles: %u", particle_count);
-              const double rate = fps.GetFPS();
-              ImGui::Text("FPS: %.1f", rate);
-              ImGui::Text("Frame Duration: %.3f ms", rate > 0 ? 1000.0 / rate : 0.0);
-              ImGui::Text("Estimated: %.2f TFLOP/s", running ? flops_per_frame * rate * 1e-12 : 0.0);
-              ImGui::SeparatorText("Control");
-              const auto &style = ImGui::GetStyle();
-              const float row_width = ImGui::GetContentRegionAvail().x;
-              const ImVec2 button_size{(row_width - style.ItemSpacing.x) * 0.5f, ImGui::GetFrameHeight() + 6.0f};
-              ImGui::PushStyleColor(ImGuiCol_Button, {0.20f, 0.25f, 0.32f, 1.0f});
-              ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0.28f, 0.35f, 0.44f, 1.0f});
-              ImGui::PushStyleColor(ImGuiCol_ButtonActive, {0.33f, 0.41f, 0.52f, 1.0f});
-              if (ImGui::Button("Reset", button_size))
-                reset_requested = true;
-              ImGui::PopStyleColor(3);
-              ImGui::SameLine();
-              ImGui::PushStyleColor(ImGuiCol_Button,
-                                    running ? ImVec4{0.16f, 0.34f, 0.52f, 1.0f} : ImVec4{0.14f, 0.38f, 0.28f, 1.0f});
-              ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                    running ? ImVec4{0.20f, 0.43f, 0.65f, 1.0f} : ImVec4{0.18f, 0.49f, 0.36f, 1.0f});
-              ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                    running ? ImVec4{0.13f, 0.28f, 0.43f, 1.0f} : ImVec4{0.10f, 0.30f, 0.21f, 1.0f});
-              if (ImGui::Button(running ? "Pause" : "Resume", button_size))
-                running = !running;
-              ImGui::PopStyleColor(3);
-              const float label_width =
-                  std::max(ImGui::CalcTextSize("Galaxy Number").x,
-                           ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize("VSync").x);
-              const float field_width = row_width - label_width - style.ItemSpacing.x;
-              ImGui::SetNextItemWidth(field_width);
-              ImGui::SliderFloat("##DeltaTime", &delta_t, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
-              ImGui::SameLine();
-              ImGui::TextUnformatted("Delta Time");
-              ImGui::SetNextItemWidth(field_width);
-              ImGui::SliderInt("##GalaxyNumber", &galaxy_count, 1, 20);
-              ImGui::SameLine();
-              ImGui::TextUnformatted("Galaxy Number");
-              ImGui::SeparatorText("ColorSpace");
-              ImGui::SetNextItemWidth(field_width);
-              if (ImGui::BeginCombo("##ColorSpace", ColorSpaceName(window.GetColorSpace()).c_str())) {
-                for (auto space : spaces) {
-                  if (ImGui::Selectable(ColorSpaceName(space).c_str(), space == window.GetColorSpace())) {
-                    requested_space = space;
-                    output_change_requested = true;
+            if (show_gui) {
+              ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+              ImGui::SetNextWindowBgAlpha(0.9f);
+              ImGui::SetNextWindowSize({ImGui::GetFontSize() * 30.0f, 0}, ImGuiCond_Always);
+              ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {8.0f, 6.0f});
+              ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+              if (ImGui::Begin(
+                      "NBody", nullptr,
+                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::SeparatorText("Statistics");
+                ImGui::Text("Backend: %s", BackendAPIName(api).c_str());
+                ImGui::Text("Particles: %u", particle_count);
+                const double rate = fps.GetFPS();
+                ImGui::Text("FPS: %.1f", rate);
+                ImGui::Text("Frame Duration: %.3f ms", rate > 0 ? 1000.0 / rate : 0.0);
+                ImGui::Text("Estimated: %.2f TFLOP/s", running ? flops_per_frame * rate * 1e-12 : 0.0);
+                ImGui::SeparatorText("Control");
+                const auto &style = ImGui::GetStyle();
+                const float row_width = ImGui::GetContentRegionAvail().x;
+                const ImVec2 button_size{(row_width - style.ItemSpacing.x) * 0.5f, ImGui::GetFrameHeight() + 6.0f};
+                ImGui::PushStyleColor(ImGuiCol_Button, {0.20f, 0.25f, 0.32f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0.28f, 0.35f, 0.44f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, {0.33f, 0.41f, 0.52f, 1.0f});
+                if (ImGui::Button("Reset", button_size))
+                  reset_requested = true;
+                ImGui::PopStyleColor(3);
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      running ? ImVec4{0.16f, 0.34f, 0.52f, 1.0f} : ImVec4{0.14f, 0.38f, 0.28f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      running ? ImVec4{0.20f, 0.43f, 0.65f, 1.0f} : ImVec4{0.18f, 0.49f, 0.36f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                      running ? ImVec4{0.13f, 0.28f, 0.43f, 1.0f} : ImVec4{0.10f, 0.30f, 0.21f, 1.0f});
+                if (ImGui::Button(running ? "Pause" : "Resume", button_size))
+                  running = !running;
+                ImGui::PopStyleColor(3);
+                const float label_width =
+                    std::max(ImGui::CalcTextSize("Galaxy Number").x,
+                             ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize("VSync").x);
+                const float field_width = row_width - label_width - style.ItemSpacing.x;
+                ImGui::SetNextItemWidth(field_width);
+                ImGui::SliderFloat("##DeltaTime", &delta_t, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Delta Time");
+                ImGui::SetNextItemWidth(field_width);
+                ImGui::SliderInt("##GalaxyNumber", &galaxy_count, 1, 20);
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Galaxy Number");
+                ImGui::SeparatorText("ColorSpace");
+                ImGui::SetNextItemWidth(field_width);
+                if (ImGui::BeginCombo("##ColorSpace", ColorSpaceName(window.GetColorSpace()).c_str())) {
+                  for (auto space : spaces) {
+                    if (ImGui::Selectable(ColorSpaceName(space).c_str(), space == window.GetColorSpace())) {
+                      requested_space = space;
+                      output_change_requested = true;
+                    }
                   }
+                  ImGui::EndCombo();
                 }
-                ImGui::EndCombo();
+                ImGui::SameLine();
+                bool vsync = requested == PRESENT_MODE_VSYNC;
+                if (ImGui::Checkbox("VSync", &vsync)) {
+                  requested = vsync ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
+                  present_mode_changed = true;
+                }
+                if (!status.empty())
+                  ImGui::TextUnformatted(status.c_str());
+                ImGui::SeparatorText("Speed Distribution");
+                if (speeds_ready) {
+                  ImGui::PlotLines("##Speeds", normalized_speeds.data(), int(normalized_speeds.size()), 0, nullptr, 0,
+                                   1, {ImGui::GetContentRegionAvail().x, 80});
+                  ImGui::Text("Speed: 0 - %.3f", maximum_speed);
+                } else
+                  ImGui::TextUnformatted("Waiting for GPU readback...");
+                ImGui::SeparatorText("Instructions");
+                ImGui::TextWrapped("Galaxy count applies on Reset. Drag outside UI to rotate.");
+                ImGui::TextWrapped("I: show/hide GUI; P: VSync; Space: pause/resume; R: reset; Escape: close");
               }
-              ImGui::SameLine();
-              bool vsync = requested == PRESENT_MODE_VSYNC;
-              if (ImGui::Checkbox("VSync", &vsync)) {
-                requested = vsync ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
-                present_mode_changed = true;
-              }
-              if (!status.empty())
-                ImGui::TextUnformatted(status.c_str());
-              ImGui::SeparatorText("Speed Distribution");
-              if (speeds_ready) {
-                ImGui::PlotLines("##Speeds", normalized_speeds.data(), int(normalized_speeds.size()), 0, nullptr, 0, 1,
-                                 {ImGui::GetContentRegionAvail().x, 80});
-                ImGui::Text("Speed: 0 - %.3f", maximum_speed);
-              } else
-                ImGui::TextUnformatted("Waiting for GPU readback...");
-              ImGui::SeparatorText("Instructions");
-              ImGui::TextWrapped("Galaxy count applies on Reset. Drag outside UI to rotate.");
-              ImGui::TextWrapped("P: VSync; Space: pause/resume; R: reset; Escape: close");
+              ImGui::End();
+              ImGui::PopStyleVar(2);
             }
-            ImGui::End();
-            ImGui::PopStyleVar(2);
-            capture_keyboard = ImGui::GetIO().WantCaptureKeyboard;
-            if (!ImGui::GetIO().WantCaptureMouse) {
+            capture_keyboard = show_gui && ImGui::GetIO().WantCaptureKeyboard;
+            if (!show_gui || !ImGui::GetIO().WantCaptureMouse) {
               rotation =
                   glm::rotate(glm::mat4{1}, glm::radians(float(rotation_delta.x)), glm::vec3{0, 1, 0}) * rotation;
               rotation =
@@ -419,14 +429,20 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     }
     auto extent = image.GetDesc();
     if (!radiance || radiance.GetDesc().width != extent.width || radiance.GetDesc().height != extent.height) {
-      radiance = device.CreateImage({extent.width, extent.height, IMAGE_FORMAT_R16G16B16A16_SFLOAT});
+      radiance = device.CreateImage({extent.width, extent.height, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
       if (!radiance || !output_group.BindResource(1, radiance))
         return 1;
     }
-    const auto space = headless ? COLOR_SPACE_SRGB_NONLINEAR : window.GetColorSpace();
-    auto &output_program = output_programs[{extent.format, space}];
+    if (headless)
+      frame_image = image;
+    else if (!frame_image || frame_image.GetDesc().width != extent.width ||
+             frame_image.GetDesc().height != extent.height) {
+      frame_image = device.CreateImage({extent.width, extent.height, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+      if (!frame_image)
+        return 1;
+    }
     if (!output_program) {
-      const auto code = "#define OUTPUT_COLOR_SPACE " + std::to_string(int(space)) + "\n" + output_source;
+      const auto &code = output_source;
       grassland::rhix::Shader vs = device.CreateShaderFromSource(code, "VSMain", SHADER_STAGE_VERTEX);
       grassland::rhix::Shader ps = device.CreateShaderFromSource(code, "PSMain", SHADER_STAGE_FRAGMENT);
       if (!vs || !ps)
@@ -434,7 +450,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       ProgramDesc output_desc;
       output_desc.vertex_shader = vs.Get();
       output_desc.fragment_shader = ps.Get();
-      output_desc.color_formats = {extent.format};
+      output_desc.color_formats = {IMAGE_FORMAT_R32G32B32A32_SFLOAT};
       output_desc.pipeline_layout.groups = {output_layout};
       output_program = device.CreateProgram(output_desc);
       if (!output_program)
@@ -477,17 +493,17 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       return 1;
     if (!context.CmdEndRendering())
       return 1;
-    const float display[4] = {headless ? 1.0f : window.GetHDRReferenceWhiteScale(),
-                              headless ? 1.0f : window.GetHDRHeadroom(), 0, 0};
+    const float display[4] = {headless ? 1.0f : window.GetHDRHeadroom(), 0, 0, 0};
     if (!context.CmdUploadBuffer(output_uniform, 0, display, sizeof(display)) ||
         !context.CmdBindProgram(output_program) || !context.CmdBindGroup(0, output_group) ||
-        !context.CmdBeginRendering(image, ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE) ||
+        !context.CmdBeginRendering(frame_image, ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE) ||
         !context.CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}) ||
         !context.CmdSetScissor({0, 0, extent.width, extent.height}) || !context.CmdDraw(3) ||
         !context.CmdEndRendering())
       return 1;
     if (!headless) {
-      if (!context.CmdPresent(window))
+      if (!context.CmdDrawImGui(window, frame_image) ||
+          !context.CmdPresentImage(window, frame_image, COLOR_SPACE_BT709_LINEAR))
         return 1;
     }
     if (!velocity_download) {
@@ -500,7 +516,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       if (!last_frame)
         return 1;
       last_frame_desc = image.GetDesc();
-      last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+      last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_BT709_LINEAR;
       last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     }
     grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));

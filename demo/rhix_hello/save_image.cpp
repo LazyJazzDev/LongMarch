@@ -68,6 +68,8 @@ bool SaveImage(const std::string &directory_name,
       std::memcpy(&value, source, sizeof(value));
       c[0] = c[1] = c[2] = value;
       c[3] = 1.0f;
+    } else if (desc.format == IMAGE_FORMAT_R32G32B32A32_SFLOAT) {
+      std::memcpy(c, source, sizeof(c));
     } else if (desc.format == IMAGE_FORMAT_R16G16B16A16_SFLOAT) {
       uint16_t halves[4];
       std::memcpy(halves, source, 8);

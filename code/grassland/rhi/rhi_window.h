@@ -42,8 +42,8 @@ class IWindow : public IObject {
   // Run after PollEvents, before acquiring images/recording scene commands.
   // Invokes callback synchronously without retaining it, so its feedback affects
   // this frame's rendering. An empty callback prepares an empty UI frame.
-  // Replaces any pending UI data; the next CmdPresent consumes it once. Without
-  // an update, CmdPresent draws no overlay. Disabled ImGui is a successful no-op.
+  // Replaces pending UI data; the next CmdDrawImGui or CmdPresent consumes it once.
+  // Without an update neither draws an overlay. Disabled ImGui is a successful no-op.
   virtual bool UpdateImGui(const std::function<void()> &callback) = 0;
 
   // Borrowed handle; Window owns it. Use GLFW operations on the main thread.

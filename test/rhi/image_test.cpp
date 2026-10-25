@@ -12,6 +12,7 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_image_presenter.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
 #include "grassland/rhi/rhi.h"
@@ -433,6 +434,201 @@ TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch)
       ReadPixel(device.Get(), image.Get(), GetParam(), x, y, pixel);
       EXPECT_EQ(pixel, (std::array<uint8_t, 4>{uint8_t(x * 70), uint8_t(y * 80), 37, 255}));
     }
+}
+
+TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  backend::ImagePresenter presenter(static_cast<backend::Device *>(device.Get()));
+  ObjPtr<IImage> input = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  ObjPtr<IImage> encoded = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  ObjPtr<IImage> converted = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  ObjPtr<IImage> decoded = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  ASSERT_TRUE(input && encoded && converted && decoded);
+  constexpr float white = 2.5f;
+  for (int from = 0; from <= 3; ++from) {
+    for (int to = 0; to <= 3; ++to) {
+      SCOPED_TRACE(std::to_string(from) + " -> " + std::to_string(to));
+      ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+      ASSERT_TRUE(commands->CmdClearImage(input.Get(), {0.1f, 0.3f, 0.7f, 0.6f}));
+      ASSERT_TRUE(presenter.Record(commands.Get(), input.Get(), encoded.Get(), COLOR_SPACE_BT709_LINEAR,
+                                   ColorSpace(from), 1.0f));
+      ASSERT_TRUE(
+          presenter.Record(commands.Get(), encoded.Get(), converted.Get(), ColorSpace(from), ColorSpace(to), white));
+      ASSERT_TRUE(presenter.Record(commands.Get(), converted.Get(), decoded.Get(), ColorSpace(to),
+                                   COLOR_SPACE_BT709_LINEAR, white));
+      auto result = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(decoded.Get(), {0, 0, 1, 1}));
+      auto done = ObjPtr<ISubmissionToken>(queue->Submit(commands.Get()));
+      ASSERT_TRUE(result && done && done->WaitHost());
+      std::array<float, 4> pixel{};
+      ASSERT_TRUE(result->CopyTo(pixel.data(), sizeof(pixel)));
+      // Inputs use the nominal encoding, independent of window white. Only
+      // scRGB/PQ output encoding scales RGB; decoding must not undo that scale.
+      const float scale = to == COLOR_SPACE_EXTENDED_SRGB_LINEAR || to == COLOR_SPACE_HDR10_ST2084 ? white : 1.0f;
+      const float expected[] = {0.1f * scale, 0.3f * scale, 0.7f * scale, 0.6f};
+      for (int c = 0; c < 4; ++c)
+        EXPECT_NEAR(pixel[c], expected[c], 0.0005f);
+    }
+  }
+  for (auto space : {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084,
+                     COLOR_SPACE_BT709_LINEAR}) {
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands->CmdClearImage(input.Get(), {4.0f, 2.0f, 1.0f, 1.0f}));
+    ASSERT_TRUE(presenter.Record(commands.Get(), input.Get(), encoded.Get(), COLOR_SPACE_BT709_LINEAR, space, white));
+    ASSERT_TRUE(presenter.Record(commands.Get(), encoded.Get(), decoded.Get(), space, COLOR_SPACE_BT709_LINEAR, white));
+    auto result = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(decoded.Get(), {0, 0, 1, 1}));
+    auto done = ObjPtr<ISubmissionToken>(queue->Submit(commands.Get()));
+    ASSERT_TRUE(result && done && done->WaitHost());
+    std::array<float, 4> pixel{};
+    ASSERT_TRUE(result->CopyTo(pixel.data(), sizeof(pixel)));
+    const float scale = space == COLOR_SPACE_EXTENDED_SRGB_LINEAR || space == COLOR_SPACE_HDR10_ST2084 ? white : 1.0f;
+    EXPECT_NEAR(pixel[0], space == COLOR_SPACE_SRGB_NONLINEAR ? 1.0f : 4.0f * scale, 0.004f);
+    EXPECT_NEAR(pixel[1], space == COLOR_SPACE_SRGB_NONLINEAR ? 1.0f : 2.0f * scale, 0.004f);
+  }
+}
+
+TEST_P(RhiImage, PresentImageUsesTheSelectedSwapChainEncoding) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Present image color spaces"});
+  ASSERT_TRUE(window);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> source = device->CreateImage({4, 4, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  ASSERT_TRUE(source);
+  for (auto space : {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084,
+                     COLOR_SPACE_BT709_LINEAR}) {
+    if (!window->SetColorSpace(space))
+      continue;
+    SCOPED_TRACE(ColorSpaceName(space));
+    ObjPtr<IImage> frame = window->GetNextImage();
+    ASSERT_TRUE(frame);
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands->CmdClearImage(source.Get(), {0.1f, 0.3f, 0.7f, 1.0f}));
+    ASSERT_TRUE(commands->CmdPresentImage(window.Get(), source.Get(), COLOR_SPACE_BT709_LINEAR));
+    auto result = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(frame.Get(), {10, 10, 1, 1}));
+    auto done = ObjPtr<ISubmissionToken>(queue->Submit(commands.Get()));
+    ASSERT_TRUE(result && done && done->WaitHost());
+    std::array<uint8_t, 16> bytes{};
+    ASSERT_TRUE(result->CopyTo(bytes.data(), bytes.size()));
+    std::array<float, 3> pixel{};
+    auto format = frame->GetDesc().format;
+    if (format == IMAGE_FORMAT_R16G16B16A16_SFLOAT) {
+      uint16_t half[4];
+      std::memcpy(half, bytes.data(), sizeof(half));
+      for (int c = 0; c < 3; ++c)
+        pixel[c] = glm::unpackHalf1x16(half[c]);
+    } else if (format == IMAGE_FORMAT_R10G10B10A2_UNORM || format == IMAGE_FORMAT_B10G10R10A2_UNORM) {
+      uint32_t packed;
+      std::memcpy(&packed, bytes.data(), sizeof(packed));
+      for (int c = 0; c < 3; ++c)
+        pixel[c] = float((packed >> (10 * c)) & 1023) / 1023;
+      if (format == IMAGE_FORMAT_B10G10R10A2_UNORM)
+        std::swap(pixel[0], pixel[2]);
+    } else {
+      for (int c = 0; c < 3; ++c)
+        pixel[c] = bytes[c] / 255.0f;
+      if (format == IMAGE_FORMAT_B8G8R8A8_UNORM)
+        std::swap(pixel[0], pixel[2]);
+    }
+    std::array<float, 3> expected{0.1f, 0.3f, 0.7f};
+    const float scale = window->GetHDRReferenceWhiteScale();
+    if (space == COLOR_SPACE_SRGB_NONLINEAR) {
+      for (auto &c : expected)
+        c = 1.055f * std::pow(c, 1.0f / 2.4f) - 0.055f;
+    } else if (space == COLOR_SPACE_EXTENDED_SRGB_LINEAR) {
+      for (auto &c : expected)
+        c *= scale;
+    } else if (space == COLOR_SPACE_HDR10_ST2084) {
+      expected = {0.627404f * 0.1f + 0.329283f * 0.3f + 0.043313f * 0.7f,
+                  0.069097f * 0.1f + 0.919540f * 0.3f + 0.011362f * 0.7f,
+                  0.016391f * 0.1f + 0.088013f * 0.3f + 0.895595f * 0.7f};
+#ifdef _WIN32
+      const float unit = 80;
+#elif defined(__APPLE__)
+      const float unit = 100;
+#else
+      const float unit = 203;
+#endif
+      for (auto &c : expected) {
+        const auto p = std::pow(c * scale * unit / 10000, 2610.0f / 16384);
+        c = std::pow((3424.0f / 4096 + (2413.0f / 128) * p) / (1 + (2392.0f / 128) * p), 2523.0f / 32);
+      }
+    }
+    for (int c = 0; c < 3; ++c)
+      EXPECT_NEAR(pixel[c], expected[c], 0.003f);
+  }
+}
+
+TEST_P(RhiImage, ExplicitImGuiAndPresentConsumeEachUpdateOnce) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Linear ImGui consumption"});
+  ASSERT_TRUE(window && window->EnableImGui());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> target = device->CreateImage({160, 120, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  ObjPtr<IImage> unused = device->CreateImage({160, 120, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  ASSERT_TRUE(target && unused);
+  auto update = [&] {
+    return window->UpdateImGui([] {
+      ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, ImGui::GetIO().DisplaySize, IM_COL32(128, 0, 0, 128));
+    });
+  };
+  ASSERT_TRUE(update());
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 0.25f, 1.0f}));
+  ASSERT_TRUE(commands->CmdClearImage(unused.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  ASSERT_TRUE(commands->CmdDrawImGui(window.Get(), target.Get()));
+  ASSERT_TRUE(commands->CmdDrawImGui(window.Get(), target.Get()));  // Does not blend twice.
+  ObjPtr<IImage> frame = window->GetNextImage();
+  ASSERT_TRUE(commands->CmdPresentImage(window.Get(), target.Get(), COLOR_SPACE_BT709_LINEAR));
+  ASSERT_TRUE(commands->CmdDrawImGui(window.Get(), unused.Get()));
+  auto linear = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(target.Get(), {10, 10, 1, 1}));
+  auto output = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(frame.Get(), {10, 10, 1, 1}));
+  auto blank = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(unused.Get(), {10, 10, 1, 1}));
+  auto done = ObjPtr<ISubmissionToken>(queue->Submit(commands.Get()));
+  ASSERT_TRUE(linear && output && blank && done && done->WaitHost());
+  std::array<float, 4> pixel{};
+  ASSERT_TRUE(linear->CopyTo(pixel.data(), sizeof(pixel)));
+  const float alpha = 128.0f / 255;
+  const float red = std::pow((128.0f / 255 + 0.055f) / 1.055f, 2.4f) * alpha;
+  EXPECT_NEAR(pixel[0], red, 0.0001f);
+  EXPECT_NEAR(pixel[2], 0.25f * (1 - alpha), 0.0001f);
+  std::array<uint8_t, 4> screen{};
+  ASSERT_TRUE(output->CopyTo(screen.data(), screen.size()));
+  if (frame->GetDesc().format == IMAGE_FORMAT_B8G8R8A8_UNORM)
+    std::swap(screen[0], screen[2]);
+  EXPECT_NEAR(screen[0], (1.055f * std::pow(red, 1.0f / 2.4f) - 0.055f) * 255, 1.0f);
+  ASSERT_TRUE(blank->CopyTo(pixel.data(), sizeof(pixel)));
+  EXPECT_EQ(pixel[0], 0.0f);
+  commands.Release();
+  frame.Release();
+  done.Release();
+  // Conversely, ordinary Present consumes the update before an explicit draw.
+  ASSERT_TRUE(update());
+  commands = device->CreateCommandContext();
+  frame = window->GetNextImage();
+  ASSERT_TRUE(frame && commands->CmdClearImage(frame.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  ASSERT_TRUE(commands->CmdPresent(window.Get()));
+  ASSERT_TRUE(commands->CmdDrawImGui(window.Get(), unused.Get()));
+  blank = commands->CmdDownloadImage(unused.Get(), {10, 10, 1, 1});
+  done = queue->Submit(commands.Get());
+  ASSERT_TRUE(blank && done && done->WaitHost());
+  ASSERT_TRUE(blank->CopyTo(pixel.data(), sizeof(pixel)));
+  EXPECT_EQ(pixel[0], 0.0f);
 }
 
 TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {

@@ -351,13 +351,14 @@ TEST_P(RhiFormats, IntegerStorageWritesAndRenderTargetsPreserveValues) {
   }
 }
 
-TEST_P(RhiFormats, ClearValueSelectsDepthAndStencilForStandaloneAndRendering) {
+TEST_P(RhiFormats, ClearValueSelectsDepthForStandaloneAndRendering) {
   ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  for (auto format : {IMAGE_FORMAT_D16_UNORM, IMAGE_FORMAT_D32_SFLOAT, IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
+  // Stencil rendering is tested through color output; do not read back stencil images.
+  for (auto format : {IMAGE_FORMAT_D16_UNORM, IMAGE_FORMAT_D32_SFLOAT}) {
     SCOPED_TRACE(to_string(format));
     ObjPtr<IImage> image = device->CreateImage({7, 5, format});
     ASSERT_TRUE(image);
@@ -370,7 +371,6 @@ TEST_P(RhiFormats, ClearValueSelectsDepthAndStencilForStandaloneAndRendering) {
         RenderingInfo info;
         info.depth_stencil.image = image.Get();
         info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-        info.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
         info.depth_stencil.clear_value = value.depth_stencil;
         ASSERT_TRUE(commands->CmdBeginRendering(info));
         ASSERT_TRUE(commands->CmdEndRendering());
@@ -387,15 +387,10 @@ TEST_P(RhiFormats, ClearValueSelectsDepthAndStencilForStandaloneAndRendering) {
           uint16_t depth;
           std::memcpy(&depth, pixels.data() + 2 * i, 2);
           EXPECT_NEAR(depth, 16384, 1);
-        } else if (format == IMAGE_FORMAT_D32_SFLOAT) {
+        } else {
           float depth;
           std::memcpy(&depth, pixels.data() + 4 * i, 4);
           EXPECT_FLOAT_EQ(depth, 0.25f);
-        } else {
-          uint32_t packed;
-          std::memcpy(&packed, pixels.data() + 4 * i, 4);
-          EXPECT_NEAR(packed & 0xffffff, 4194304, 1);
-          EXPECT_EQ(packed >> 24, 0xa5u);
         }
       }
     }

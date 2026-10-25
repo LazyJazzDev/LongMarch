@@ -10,6 +10,7 @@ struct ImGuiContext;
 namespace grassland::rhi::backend {
 
 class WindowImGui;
+class ImagePresenter;
 class Device;
 
 class Window : public Object<rhi::IWindow> {
@@ -19,6 +20,9 @@ class Window : public Object<rhi::IWindow> {
   bool UpdateImGui(const std::function<void()> &callback) override;
   ImGuiContext *GetImGuiContext() const;
   bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image);
+  bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image, ColorSpace color_space, float white_scale);
+  bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space);
+  const void *DeviceIdentity() const;
 
   EventManager<void(int, int)> &ResizeEvent() override {
     return resize_event_;
@@ -87,6 +91,7 @@ class Window : public Object<rhi::IWindow> {
  private:
   Device *device_{};
   std::unique_ptr<WindowImGui> imgui_;
+  std::unique_ptr<ImagePresenter> presenter_;
   bool processing_imgui_{};
   EventManager<void(int, int)> resize_event_;
   EventManager<void(int, int)> framebufferresize_event_;

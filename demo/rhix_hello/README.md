@@ -84,6 +84,8 @@ Pixel regressions cover MRT plus depth rejection, depth-only stencil writes pres
 
 Run `--module blend --backend d3d12` (or `vulkan`), or add `--headless --frames 100000` for offscreen throughput. Both `--list`, the interactive menu and `--all` include blend. Each module owns its device/window/resource setup independently.
 
+CmdDrawImGui and CmdPresentImage are also wrapped by rhix. The nbody module composites ImGui into an RGBA32F linear frame before converting to the selected SDR/HDR SwapChain encoding. Headless captures preserve RGBA32F linear pixels.
+
 ComputeProgram creation, CmdBindComputeProgram and CmdDispatch are also wrapped by rhix. Compute backends support D3D12/Vulkan/Metal. The nbody example uses rhix ComputeProgram, BindingGroup, CommandContext and SubmissionToken containers throughout; each module creates its own resources.
 
 
