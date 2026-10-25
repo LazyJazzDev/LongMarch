@@ -113,6 +113,7 @@ class ICommandContext : public IObject {
   // Draw the latest UpdateImGui once onto a linear Rec.709 target (white = 1).
   // Shares consumption with CmdPresent. Must be outside a rendering scope.
   virtual bool CmdDrawImGui(IWindow *window, IImage *target) = 0;
+  // Input encoding excludes window white scaling; apply it only on output.
   // Convert frame_img from its declared encoding to the window's encoding,
   // then present. Any unconsumed ImGui is drawn by CmdPresent afterwards.
   virtual bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) = 0;

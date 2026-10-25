@@ -456,7 +456,7 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       ASSERT_TRUE(commands->CmdClearImage(input.Get(), {0.1f, 0.3f, 0.7f, 0.6f}));
       ASSERT_TRUE(presenter.Record(commands.Get(), input.Get(), encoded.Get(), COLOR_SPACE_BT709_LINEAR,
-                                   ColorSpace(from), white));
+                                   ColorSpace(from), 1.0f));
       ASSERT_TRUE(
           presenter.Record(commands.Get(), encoded.Get(), converted.Get(), ColorSpace(from), ColorSpace(to), white));
       ASSERT_TRUE(presenter.Record(commands.Get(), converted.Get(), decoded.Get(), ColorSpace(to),
@@ -466,7 +466,10 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
       ASSERT_TRUE(result && done && done->WaitHost());
       std::array<float, 4> pixel{};
       ASSERT_TRUE(result->CopyTo(pixel.data(), sizeof(pixel)));
-      const float expected[] = {0.1f, 0.3f, 0.7f, 0.6f};
+      // Inputs use the nominal encoding, independent of window white. Only
+      // scRGB/PQ output encoding scales RGB; decoding must not undo that scale.
+      const float scale = to == COLOR_SPACE_EXTENDED_SRGB_LINEAR || to == COLOR_SPACE_HDR10_ST2084 ? white : 1.0f;
+      const float expected[] = {0.1f * scale, 0.3f * scale, 0.7f * scale, 0.6f};
       for (int c = 0; c < 4; ++c)
         EXPECT_NEAR(pixel[c], expected[c], 0.0005f);
     }
@@ -482,8 +485,9 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
     ASSERT_TRUE(result && done && done->WaitHost());
     std::array<float, 4> pixel{};
     ASSERT_TRUE(result->CopyTo(pixel.data(), sizeof(pixel)));
-    EXPECT_NEAR(pixel[0], space == COLOR_SPACE_SRGB_NONLINEAR ? 1.0f : 4.0f, 0.002f);
-    EXPECT_NEAR(pixel[1], space == COLOR_SPACE_SRGB_NONLINEAR ? 1.0f : 2.0f, 0.002f);
+    const float scale = space == COLOR_SPACE_EXTENDED_SRGB_LINEAR || space == COLOR_SPACE_HDR10_ST2084 ? white : 1.0f;
+    EXPECT_NEAR(pixel[0], space == COLOR_SPACE_SRGB_NONLINEAR ? 1.0f : 4.0f * scale, 0.004f);
+    EXPECT_NEAR(pixel[1], space == COLOR_SPACE_SRGB_NONLINEAR ? 1.0f : 2.0f * scale, 0.004f);
   }
 }
 

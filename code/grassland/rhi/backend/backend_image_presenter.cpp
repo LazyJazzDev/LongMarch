@@ -29,7 +29,7 @@ float3 Decode(float3 c) {
 #if SOURCE_COLOR_SPACE == 0
   return select(c <= 0.04045, c / 12.92, pow((max(c, 0) + 0.055) / 1.055, 2.4));
 #elif SOURCE_COLOR_SPACE == 1
-  return c / settings.white_scale;
+  return c;
 #elif SOURCE_COLOR_SPACE == 2
   float3 p = pow(saturate(c), 32.0 / 2523.0);
   float3 linear2020 = pow(max(p - 3424.0 / 4096.0, 0) /
@@ -37,7 +37,7 @@ float3 Decode(float3 c) {
   const float3x3 to709 = float3x3(1.660491, -0.587641, -0.072850,
                                 -0.124550, 1.132900, -0.008349,
                                 -0.018151, -0.100579, 1.118730);
-  return mul(to709, linear2020) * (10000.0 / (settings.white_scale * nits_per_unit));
+  return mul(to709, linear2020) * (10000.0 / nits_per_unit);
 #else
   return c;
 #endif
@@ -61,7 +61,7 @@ float3 Encode(float3 c) {
 }
 float4 PSMain(Varying input) : SV_Target0 {
   float4 c = source.Sample(sourceSampler, input.uv);
-#if SOURCE_COLOR_SPACE != TARGET_COLOR_SPACE
+#if SOURCE_COLOR_SPACE != TARGET_COLOR_SPACE || TARGET_COLOR_SPACE == 1 || TARGET_COLOR_SPACE == 2
   c.rgb = Encode(Decode(c.rgb));
 #endif
   return c;
@@ -84,9 +84,12 @@ bool ImagePresenter::Record(ICommandContext *commands,
   auto valid_format = [](ImageFormat format) {
     return IsColorFormat(format) && !IsSignedIntegerFormat(format) && !IsUnsignedIntegerFormat(format);
   };
+  const bool scales_white = white_scale != 1.0f && (target_space == COLOR_SPACE_EXTENDED_SRGB_LINEAR ||
+                                                    target_space == COLOR_SPACE_HDR10_ST2084);
   if (!commands || !source || !target || !valid_space(source_space) || !valid_space(target_space) ||
       !valid_format(source->GetDesc().format) || !valid_format(target->GetDesc().format) ||
-      !std::isfinite(white_scale) || white_scale <= 0 || (source == target && source_space != target_space)) {
+      !std::isfinite(white_scale) || white_scale <= 0 ||
+      (source == target && (source_space != target_space || scales_white))) {
     ReportError(-1, "Image presentation requires distinct non-integer color images and valid color spaces.");
     return false;
   }

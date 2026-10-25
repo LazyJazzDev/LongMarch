@@ -58,11 +58,13 @@ be a non-integer color image from the same device. The window must remain alive 
 presentation completes, following the existing `CmdPresent` lifetime contract.
 
 Supported encodings are sRGB, linear Rec.709, extended linear sRGB and Rec.2020 PQ.
-Linear Rec.709 uses relative white 1; conversion to/from extended linear sRGB uses
-the window reference-white scale. PQ conversion uses the existing platform luminance
-convention (Windows 80, macOS 100, Linux 203 nits per unit times that scale).
+Input signals use their nominal encoding without window reference-white compensation:
+Decode never divides by the window white scale. Linear Rec.709 uses relative white 1;
+PQ decoding uses the existing platform nominal luminance (Windows 80, macOS 100,
+Linux 203 nits per unit). Only scRGB/PQ output encoding applies the window white scale,
+including when input and output use the same color space.
 SDR output clamps to [0,1]; linear HDR retains values above 1. No scene tone mapping
-is added by this API. Source and destination may alias only if their color spaces match.
+is added by this API. Source and destination may alias only when no conversion or white scaling is required.
 
 The RHI/RHIX nbody demos perform particle accumulation and scene highlight processing
 in RGBA32 float, composite ImGui into their linear `frame_image`, and present through
