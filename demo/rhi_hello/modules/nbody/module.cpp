@@ -63,6 +63,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   bool cursor_initialized = false, dragging = false;
   std::string status;
   bool capture_keyboard = false, output_change_requested = false;
+  bool show_gui = true;
   ColorSpace requested_space = COLOR_SPACE_SRGB_NONLINEAR;
   std::vector<ColorSpace> spaces{COLOR_SPACE_SRGB_NONLINEAR};
   ObjPtr<IWindow> window;
@@ -198,6 +199,11 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
       if (action != GLFW_PRESS)
         return;
+      if (key == GLFW_KEY_I) {
+        show_gui = !show_gui;
+        capture_keyboard = false;
+        return;
+      }
       if (capture_keyboard && key != GLFW_KEY_ESCAPE)
         return;
       if (key == GLFW_KEY_SPACE)
@@ -277,85 +283,89 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       if (window->ShouldClose())
         break;
       if (!window->UpdateImGui([&] {
-            ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
-            ImGui::SetNextWindowBgAlpha(0.3f);
-            ImGui::SetNextWindowSize({ImGui::GetFontSize() * 30.0f, 0}, ImGuiCond_Always);
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {8.0f, 6.0f});
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-            if (ImGui::Begin("NBody", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
-              ImGui::SeparatorText("Statistics");
-              ImGui::Text("Backend: %s", BackendAPIName(api).c_str());
-              ImGui::Text("Particles: %u", particle_count);
-              const double rate = fps.GetFPS();
-              ImGui::Text("FPS: %.1f", rate);
-              ImGui::Text("Frame Duration: %.3f ms", rate > 0 ? 1000.0 / rate : 0.0);
-              ImGui::Text("Estimated: %.2f TFLOP/s", running ? flops_per_frame * rate * 1e-12 : 0.0);
-              ImGui::SeparatorText("Control");
-              const auto &style = ImGui::GetStyle();
-              const float row_width = ImGui::GetContentRegionAvail().x;
-              const ImVec2 button_size{(row_width - style.ItemSpacing.x) * 0.5f, ImGui::GetFrameHeight() + 6.0f};
-              ImGui::PushStyleColor(ImGuiCol_Button, {0.20f, 0.25f, 0.32f, 1.0f});
-              ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0.28f, 0.35f, 0.44f, 1.0f});
-              ImGui::PushStyleColor(ImGuiCol_ButtonActive, {0.33f, 0.41f, 0.52f, 1.0f});
-              if (ImGui::Button("Reset", button_size))
-                reset_requested = true;
-              ImGui::PopStyleColor(3);
-              ImGui::SameLine();
-              ImGui::PushStyleColor(ImGuiCol_Button,
-                                    running ? ImVec4{0.16f, 0.34f, 0.52f, 1.0f} : ImVec4{0.14f, 0.38f, 0.28f, 1.0f});
-              ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                    running ? ImVec4{0.20f, 0.43f, 0.65f, 1.0f} : ImVec4{0.18f, 0.49f, 0.36f, 1.0f});
-              ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                    running ? ImVec4{0.13f, 0.28f, 0.43f, 1.0f} : ImVec4{0.10f, 0.30f, 0.21f, 1.0f});
-              if (ImGui::Button(running ? "Pause" : "Resume", button_size))
-                running = !running;
-              ImGui::PopStyleColor(3);
-              const float label_width =
-                  std::max(ImGui::CalcTextSize("Galaxy Number").x,
-                           ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize("VSync").x);
-              const float field_width = row_width - label_width - style.ItemSpacing.x;
-              ImGui::SetNextItemWidth(field_width);
-              ImGui::SliderFloat("##DeltaTime", &delta_t, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
-              ImGui::SameLine();
-              ImGui::TextUnformatted("Delta Time");
-              ImGui::SetNextItemWidth(field_width);
-              ImGui::SliderInt("##GalaxyNumber", &galaxy_count, 1, 20);
-              ImGui::SameLine();
-              ImGui::TextUnformatted("Galaxy Number");
-              ImGui::SeparatorText("ColorSpace");
-              ImGui::SetNextItemWidth(field_width);
-              if (ImGui::BeginCombo("##ColorSpace", ColorSpaceName(window->GetColorSpace()).c_str())) {
-                for (auto space : spaces) {
-                  if (ImGui::Selectable(ColorSpaceName(space).c_str(), space == window->GetColorSpace())) {
-                    requested_space = space;
-                    output_change_requested = true;
+            if (show_gui) {
+              ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+              ImGui::SetNextWindowBgAlpha(0.9f);
+              ImGui::SetNextWindowSize({ImGui::GetFontSize() * 30.0f, 0}, ImGuiCond_Always);
+              ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {8.0f, 6.0f});
+              ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+              if (ImGui::Begin(
+                      "NBody", nullptr,
+                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::SeparatorText("Statistics");
+                ImGui::Text("Backend: %s", BackendAPIName(api).c_str());
+                ImGui::Text("Particles: %u", particle_count);
+                const double rate = fps.GetFPS();
+                ImGui::Text("FPS: %.1f", rate);
+                ImGui::Text("Frame Duration: %.3f ms", rate > 0 ? 1000.0 / rate : 0.0);
+                ImGui::Text("Estimated: %.2f TFLOP/s", running ? flops_per_frame * rate * 1e-12 : 0.0);
+                ImGui::SeparatorText("Control");
+                const auto &style = ImGui::GetStyle();
+                const float row_width = ImGui::GetContentRegionAvail().x;
+                const ImVec2 button_size{(row_width - style.ItemSpacing.x) * 0.5f, ImGui::GetFrameHeight() + 6.0f};
+                ImGui::PushStyleColor(ImGuiCol_Button, {0.20f, 0.25f, 0.32f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0.28f, 0.35f, 0.44f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, {0.33f, 0.41f, 0.52f, 1.0f});
+                if (ImGui::Button("Reset", button_size))
+                  reset_requested = true;
+                ImGui::PopStyleColor(3);
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      running ? ImVec4{0.16f, 0.34f, 0.52f, 1.0f} : ImVec4{0.14f, 0.38f, 0.28f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      running ? ImVec4{0.20f, 0.43f, 0.65f, 1.0f} : ImVec4{0.18f, 0.49f, 0.36f, 1.0f});
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                      running ? ImVec4{0.13f, 0.28f, 0.43f, 1.0f} : ImVec4{0.10f, 0.30f, 0.21f, 1.0f});
+                if (ImGui::Button(running ? "Pause" : "Resume", button_size))
+                  running = !running;
+                ImGui::PopStyleColor(3);
+                const float label_width =
+                    std::max(ImGui::CalcTextSize("Galaxy Number").x,
+                             ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize("VSync").x);
+                const float field_width = row_width - label_width - style.ItemSpacing.x;
+                ImGui::SetNextItemWidth(field_width);
+                ImGui::SliderFloat("##DeltaTime", &delta_t, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Delta Time");
+                ImGui::SetNextItemWidth(field_width);
+                ImGui::SliderInt("##GalaxyNumber", &galaxy_count, 1, 20);
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Galaxy Number");
+                ImGui::SeparatorText("ColorSpace");
+                ImGui::SetNextItemWidth(field_width);
+                if (ImGui::BeginCombo("##ColorSpace", ColorSpaceName(window->GetColorSpace()).c_str())) {
+                  for (auto space : spaces) {
+                    if (ImGui::Selectable(ColorSpaceName(space).c_str(), space == window->GetColorSpace())) {
+                      requested_space = space;
+                      output_change_requested = true;
+                    }
                   }
+                  ImGui::EndCombo();
                 }
-                ImGui::EndCombo();
+                ImGui::SameLine();
+                bool vsync = requested == PRESENT_MODE_VSYNC;
+                if (ImGui::Checkbox("VSync", &vsync)) {
+                  requested = vsync ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
+                  present_mode_changed = true;
+                }
+                if (!status.empty())
+                  ImGui::TextUnformatted(status.c_str());
+                ImGui::SeparatorText("Speed Distribution");
+                if (speeds_ready) {
+                  ImGui::PlotLines("##Speeds", normalized_speeds.data(), int(normalized_speeds.size()), 0, nullptr, 0,
+                                   1, {ImGui::GetContentRegionAvail().x, 80});
+                  ImGui::Text("Speed: 0 - %.3f", maximum_speed);
+                } else
+                  ImGui::TextUnformatted("Waiting for GPU readback...");
+                ImGui::SeparatorText("Instructions");
+                ImGui::TextWrapped("Galaxy count applies on Reset. Drag outside UI to rotate.");
+                ImGui::TextWrapped("I: show/hide GUI; P: VSync; Space: pause/resume; R: reset; Escape: close");
               }
-              ImGui::SameLine();
-              bool vsync = requested == PRESENT_MODE_VSYNC;
-              if (ImGui::Checkbox("VSync", &vsync)) {
-                requested = vsync ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
-                present_mode_changed = true;
-              }
-              if (!status.empty())
-                ImGui::TextUnformatted(status.c_str());
-              ImGui::SeparatorText("Speed Distribution");
-              if (speeds_ready) {
-                ImGui::PlotLines("##Speeds", normalized_speeds.data(), int(normalized_speeds.size()), 0, nullptr, 0, 1,
-                                 {ImGui::GetContentRegionAvail().x, 80});
-                ImGui::Text("Speed: 0 - %.3f", maximum_speed);
-              } else
-                ImGui::TextUnformatted("Waiting for GPU readback...");
-              ImGui::SeparatorText("Instructions");
-              ImGui::TextWrapped("Galaxy count applies on Reset. Drag outside UI to rotate.");
-              ImGui::TextWrapped("P: VSync; Space: pause/resume; R: reset; Escape: close");
+              ImGui::End();
+              ImGui::PopStyleVar(2);
             }
-            ImGui::End();
-            ImGui::PopStyleVar(2);
-            capture_keyboard = ImGui::GetIO().WantCaptureKeyboard;
-            if (!ImGui::GetIO().WantCaptureMouse) {
+            capture_keyboard = show_gui && ImGui::GetIO().WantCaptureKeyboard;
+            if (!show_gui || !ImGui::GetIO().WantCaptureMouse) {
               rotation =
                   glm::rotate(glm::mat4{1}, glm::radians(float(rotation_delta.x)), glm::vec3{0, 1, 0}) * rotation;
               rotation =

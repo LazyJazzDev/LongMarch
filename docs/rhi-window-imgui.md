@@ -185,7 +185,9 @@ live in the ImGui panel; shortcut, drag and reset hints have their own Instructi
 The native window title is fixed. UI updates finish
 before scene command recording, so pause, reset, time-step and output changes affect that frame.
 
-Shortcuts: P toggles VSync, Space pauses/resumes, R resets, Escape closes.
+The nbody panel has no title bar and uses 90% background opacity. I hides/shows
+the GUI without recreating its context; hidden frames prepare empty UI data.
+Shortcuts: I toggles GUI, P toggles VSync, Space pauses/resumes, R resets, Escape closes.
 Text input capture suppresses simulation shortcuts; dragging outside ImGui rotates the view.
 Headless mode retains deterministic initialization, three in-flight frames and 60 warmup
 frames, with linear RGBA32F output and no window or UI. Throughput is an estimate based on whole-frame
