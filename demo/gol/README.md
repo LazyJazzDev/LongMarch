@@ -15,9 +15,10 @@ build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/gosper-glider-gun.ce
 
 Click cells to toggle them. The buttons play/pause the simulation, cycle the
 speed (1x, 2x, 5x, lightning), clear the grid, and randomize it with the dice button.
-Lightning mode shows a warm yellow bolt and advances exactly one generation per
-frame while playing, without an additional iteration delay. Simulation speed
-therefore follows the frame rate, with input and rendering between generations.
+Lightning mode shows a warm yellow bolt and advances 60 generations per second
+while playing, at most one per rendered frame. On a 60 Hz display that is one
+generation per frame; faster displays do not speed up the simulation, and slow
+frames advance once instead of jumping several generations.
 The boundary button next to speed toggles between **periodic** (four open portals,
 the default) and **fixed/dead** (a solid enclosure). A five-cell glider rests in the lower-left corner of a 4x4 icon grid.
 Switching to periodic opens the wall, then plays 16 recorded Life generations
