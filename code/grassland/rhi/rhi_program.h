@@ -26,10 +26,12 @@ struct ProgramDesc {
   std::vector<BlendState> blend_states;
   DepthStencilDesc depth_stencil;
   PipelineLayoutDesc pipeline_layout;
+  PrimitiveTopology topology{PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
+  RasterizerDesc rasterizer;
 };
 
 // Immutable and ready to bind when creation succeeds; failure returns nullptr.
-// Current graphics programs use triangle-list topology and up to eight color attachments.
+// Graphics programs fix topology and rasterizer state and support up to eight color attachments.
 class IProgram : public IObject {
  public:
   virtual const ProgramDesc &GetDesc() const = 0;

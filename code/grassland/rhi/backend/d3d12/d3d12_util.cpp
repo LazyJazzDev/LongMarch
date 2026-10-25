@@ -3,6 +3,13 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 
 namespace grassland::rhi::backend::d3d12 {
+D3D12_PRIMITIVE_TOPOLOGY NativePrimitiveTopology(PrimitiveTopology topology) {
+  const D3D12_PRIMITIVE_TOPOLOGY types[] = {D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+                                            D3D_PRIMITIVE_TOPOLOGY_LINELIST, D3D_PRIMITIVE_TOPOLOGY_LINESTRIP,
+                                            D3D_PRIMITIVE_TOPOLOGY_POINTLIST};
+  return types[topology];
+}
+
 D3D12_BLEND NativeBlendFactor(BlendFactor factor, bool alpha) {
   // Alpha equations use the alpha component of color factors as well.
   if (alpha && factor >= BLEND_FACTOR_SRC_COLOR && factor <= BLEND_FACTOR_ONE_MINUS_DST_COLOR)

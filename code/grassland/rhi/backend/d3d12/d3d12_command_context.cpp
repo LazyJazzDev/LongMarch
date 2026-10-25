@@ -13,6 +13,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
 namespace grassland::rhi::backend::d3d12 {
@@ -423,7 +424,7 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
   list_->OMSetStencilRef(native->GetDesc().depth_stencil.stencil_reference);
   list_->SetPipelineState(native->NativePipeline());
   list_->SetGraphicsRootSignature(native->NativeRootSignature());
-  list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  list_->IASetPrimitiveTopology(NativePrimitiveTopology(native->GetDesc().topology));
   return true;
 }
 
@@ -550,7 +551,7 @@ bool D3D12CommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format
 
 bool D3D12CommandContext::CmdSetViewport(const Viewport &viewport) {
 #if !defined(NDEBUG)
-  if (sealed_ || !viewport.width || !viewport.height) {
+  if (sealed_ || viewport.width <= 0 || viewport.height <= 0) {
     recording_failed_ = true;
     return false;
   }

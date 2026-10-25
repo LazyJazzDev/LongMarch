@@ -144,6 +144,29 @@ union ClearValue {
   ClearValue(const ClearDepthStencilValue &value);
 };
 
+enum PrimitiveTopology {
+  PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+  PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+  PRIMITIVE_TOPOLOGY_LINE_LIST,
+  PRIMITIVE_TOPOLOGY_LINE_STRIP,
+  PRIMITIVE_TOPOLOGY_POINT_LIST,
+};
+
+enum CullMode { CULL_MODE_NONE, CULL_MODE_FRONT, CULL_MODE_BACK };
+
+// Winding in NDC (+X right, +Y up), before the viewport Y transform.
+// Matches graphics: Vulkan CCW + negative-height viewport; D3D12
+// FrontCounterClockwise=TRUE and Metal CCW + positive-height viewport.
+enum FrontFace { FRONT_FACE_COUNTER_CLOCKWISE, FRONT_FACE_CLOCKWISE };
+
+enum FillMode { FILL_MODE_SOLID, FILL_MODE_WIREFRAME };
+
+struct RasterizerDesc {
+  CullMode cull_mode{CULL_MODE_NONE};
+  FrontFace front_face{FRONT_FACE_COUNTER_CLOCKWISE};
+  FillMode fill_mode{FILL_MODE_SOLID};
+};
+
 enum CompareOp {
   COMPARE_NEVER,
   COMPARE_LESS,

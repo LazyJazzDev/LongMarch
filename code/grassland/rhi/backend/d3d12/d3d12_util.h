@@ -9,6 +9,8 @@
 #include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend::d3d12 {
+D3D12_PRIMITIVE_TOPOLOGY NativePrimitiveTopology(PrimitiveTopology topology);
+
 D3D12_BLEND NativeBlendFactor(BlendFactor factor, bool alpha = false);
 D3D12_BLEND_OP NativeBlendOp(BlendOp op);
 bool SupportsImageStorage(ID3D12Device *device, ImageFormat format);

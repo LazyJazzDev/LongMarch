@@ -83,13 +83,16 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
   input.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributes.size());
   input.pVertexAttributeDescriptions = attributes.data();
   VkPipelineInputAssemblyStateCreateInfo assembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-  assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  assembly.topology = NativePrimitiveTopology(desc.topology);
   VkPipelineViewportStateCreateInfo viewport{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
   viewport.viewportCount = viewport.scissorCount = 1;
   VkPipelineRasterizationStateCreateInfo raster{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
-  raster.polygonMode = VK_POLYGON_MODE_FILL;
-  raster.cullMode = VK_CULL_MODE_NONE;
-  raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  raster.polygonMode = desc.rasterizer.fill_mode == FILL_MODE_WIREFRAME ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
+  const VkCullModeFlags cull_modes[] = {VK_CULL_MODE_NONE, VK_CULL_MODE_FRONT_BIT, VK_CULL_MODE_BACK_BIT};
+  raster.cullMode = cull_modes[desc.rasterizer.cull_mode];
+  // Paired with the negative-height Vulkan viewport, as in graphics.
+  raster.frontFace = desc.rasterizer.front_face == FRONT_FACE_COUNTER_CLOCKWISE ? VK_FRONT_FACE_COUNTER_CLOCKWISE
+                                                                                : VK_FRONT_FACE_CLOCKWISE;
   raster.lineWidth = 1;
   VkPipelineMultisampleStateCreateInfo sample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
   sample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -109,6 +112,10 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
   }
   VkPhysicalDeviceFeatures features{};
   vkGetPhysicalDeviceFeatures(owner_device->NativePhysicalDevice(), &features);
+  if (desc.rasterizer.fill_mode == FILL_MODE_WIREFRAME && !features.fillModeNonSolid) {
+    ReportError(-1, "Wireframe rasterization is unsupported by this Vulkan device.");
+    return nullptr;
+  }
   if (!features.independentBlend && !blend_attachments.empty()) {
     const auto &first = blend_attachments.front();
     for (const auto &value : blend_attachments)
