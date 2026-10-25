@@ -12,6 +12,8 @@ namespace grassland::rhi::backend {
 
 class CommandContext : public Object<rhi::ICommandContext> {
  public:
+  bool CmdDrawImGui(IWindow *window, IImage *target) override;
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override;
   bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
   bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override;
   bool CmdBuildBottomLevelAccelerationStructure(

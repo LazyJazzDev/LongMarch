@@ -506,6 +506,7 @@ bool MetalCommandContext::CmdEndRendering() {
   encoder_.reset();
   render_target_ = nullptr;
   color_targets_.clear();
+  rendering_ = {};
   return true;
 }
 

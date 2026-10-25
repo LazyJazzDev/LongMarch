@@ -11,7 +11,6 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
-#include <map>
 #include <random>
 #include <string>
 #include <thread>
@@ -85,7 +84,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   std::array<ObjPtr<ISubmissionToken>, 3> pending;
   if (headless) {
     for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
+      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
       if (!target)
         return 1;
     }
@@ -106,11 +105,12 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   desc.vertex_bindings = {{sizeof(glm::vec3), true}};
   desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}};
   desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
-  desc.color_formats = {IMAGE_FORMAT_R16G16B16A16_SFLOAT};
+  desc.color_formats = {IMAGE_FORMAT_R32G32B32A32_SFLOAT};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   if (!program)
     return 1;
   ObjPtr<IImage> radiance;
+  ObjPtr<IImage> frame_image;
   const auto &output_embedded = shader_list.at("modules/nbody/shaders/present.slang");
   const std::string output_source(output_embedded.first, output_embedded.second);
   const BindingLayoutDesc output_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
@@ -119,7 +119,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   ObjPtr<IBindingGroup> output_group = device->CreateBindingGroup(output_layout);
   if (!output_uniform || !output_group || !output_group->BindResource(0, output_uniform.Get()))
     return 1;
-  std::map<std::pair<ImageFormat, ColorSpace>, ObjPtr<IProgram>> output_programs;
+  ObjPtr<IProgram> output_program;
   const auto &compute_source = shader_list.at("modules/nbody/shaders/nbody.slang");
   ObjPtr<IShader> compute_shader = device->CreateShaderFromSource(
       std::string(compute_source.first, compute_source.second), "CSMain", SHADER_STAGE_COMPUTE);
@@ -419,14 +419,20 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     }
     auto extent = image->GetDesc();
     if (!radiance || radiance->GetDesc().width != extent.width || radiance->GetDesc().height != extent.height) {
-      radiance = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_R16G16B16A16_SFLOAT});
+      radiance = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
       if (!radiance || !output_group->BindResource(1, radiance.Get()))
         return 1;
     }
-    const auto space = headless ? COLOR_SPACE_SRGB_NONLINEAR : window->GetColorSpace();
-    auto &output_program = output_programs[{extent.format, space}];
+    if (headless)
+      frame_image = image;
+    else if (!frame_image || frame_image->GetDesc().width != extent.width ||
+             frame_image->GetDesc().height != extent.height) {
+      frame_image = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+      if (!frame_image)
+        return 1;
+    }
     if (!output_program) {
-      const auto code = "#define OUTPUT_COLOR_SPACE " + std::to_string(int(space)) + "\n" + output_source;
+      const auto &code = output_source;
       ObjPtr<IShader> vs = device->CreateShaderFromSource(code, "VSMain", SHADER_STAGE_VERTEX);
       ObjPtr<IShader> ps = device->CreateShaderFromSource(code, "PSMain", SHADER_STAGE_FRAGMENT);
       if (!vs || !ps)
@@ -434,7 +440,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       ProgramDesc output_desc;
       output_desc.vertex_shader = vs.Get();
       output_desc.fragment_shader = ps.Get();
-      output_desc.color_formats = {extent.format};
+      output_desc.color_formats = {IMAGE_FORMAT_R32G32B32A32_SFLOAT};
       output_desc.pipeline_layout.groups = {output_layout};
       output_program = device->CreateProgram(output_desc);
       if (!output_program)
@@ -479,17 +485,17 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       return 1;
     if (!context->CmdEndRendering())
       return 1;
-    const float display[4] = {headless ? 1.0f : window->GetHDRReferenceWhiteScale(),
-                              headless ? 1.0f : window->GetHDRHeadroom(), 0, 0};
+    const float display[4] = {headless ? 1.0f : window->GetHDRHeadroom(), 0, 0, 0};
     if (!context->CmdUploadBuffer(output_uniform.Get(), 0, display, sizeof(display)) ||
         !context->CmdBindProgram(output_program.Get()) || !context->CmdBindGroup(0, output_group.Get()) ||
-        !context->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE}}}) ||
+        !context->CmdBeginRendering({{{frame_image.Get(), ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE}}}) ||
         !context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}) ||
         !context->CmdSetScissor({0, 0, extent.width, extent.height}) || !context->CmdDraw(3) ||
         !context->CmdEndRendering())
       return 1;
     if (!headless) {
-      if (!context->CmdPresent(window.Get()))
+      if (!context->CmdDrawImGui(window.Get(), frame_image.Get()) ||
+          !context->CmdPresentImage(window.Get(), frame_image.Get(), COLOR_SPACE_BT709_LINEAR))
         return 1;
     }
     if (!velocity_download) {
@@ -502,7 +508,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       if (!last_frame)
         return 1;
       last_frame_desc = image->GetDesc();
-      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_BT709_LINEAR;
       last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
     }
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());

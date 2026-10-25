@@ -1,9 +1,62 @@
 ﻿#include "grassland/rhi/backend/backend_command_context.h"
 
 #include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/rhi_program.h"
 
 namespace grassland::rhi::backend {
+bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<Window *>(window);
+  auto image = dynamic_cast<Image *>(target);
+  if (!native || !image || native->DeviceIdentity() != identity_ || image->DeviceIdentity() != identity_ ||
+      !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+    recording_failed_ = true;
+    ReportError(-1,
+                "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
+    return false;
+  }
+#else
+  auto native = static_cast<Window *>(window);
+#endif
+  const auto format = target->GetDesc().format;
+  if (!IsColorFormat(format) || IsSignedIntegerFormat(format) || IsUnsignedIntegerFormat(format)) {
+    recording_failed_ = true;
+    ReportError(-1, "CmdDrawImGui requires a non-integer color target.");
+    return false;
+  }
+  if (!RetainResource(target))
+    return false;
+  if (!native->RecordImGui(this, target, COLOR_SPACE_BT709_LINEAR, 1.0f)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return true;
+}
+
+bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<Window *>(window);
+  auto image = dynamic_cast<Image *>(frame_img);
+  if (!native || !image || native->DeviceIdentity() != identity_ || image->DeviceIdentity() != identity_ ||
+      !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+    recording_failed_ = true;
+    ReportError(-1,
+                "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");
+    return false;
+  }
+#else
+  auto native = static_cast<Window *>(window);
+#endif
+  if (!RetainResource(frame_img))
+    return false;
+  if (!native->RecordPresentImage(this, frame_img, frame_color_space)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return CmdPresent(window);
+}
+
 bool CommandContext::CmdBuildBottomLevelAccelerationStructure(IBottomLevelAccelerationStructure *,
                                                               const std::vector<AccelerationStructureGeometryBuffers> &,
                                                               AccelerationStructureBuildMode) {

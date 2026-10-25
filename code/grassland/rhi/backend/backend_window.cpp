@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdlib>
 
+#include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_image_presenter.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -55,7 +57,27 @@ bool Window::UpdateImGui(const std::function<void()> &callback) {
   return imgui_->Update(callback);
 }
 
+const void *Window::DeviceIdentity() const {
+  return device_ ? device_->NativeIdentity() : nullptr;
+}
+
+bool Window::RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) {
+  ObjPtr<IImage> frame = GetNextImage();
+  if (!frame)
+    return false;
+  if (!presenter_)
+    presenter_ = std::make_unique<ImagePresenter>(device_);
+  return presenter_->Record(commands, image, frame.Get(), color_space, GetColorSpace(), GetHDRReferenceWhiteScale());
+}
+
 bool Window::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
+  return RecordImGui(commands, image, GetColorSpace(), GetHDRReferenceWhiteScale());
+}
+
+bool Window::RecordImGui(rhi::ICommandContext *commands,
+                         rhi::IImage *image,
+                         ColorSpace color_space,
+                         float white_scale) {
   if (!imgui_)
     return true;
   if (!glfw::IsWindowThread() || processing_imgui_)
@@ -73,7 +95,7 @@ bool Window::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
     }
   } scope(processing_imgui_);
 
-  return imgui_->Record(commands, image, GetColorSpace(), GetHDRReferenceWhiteScale());
+  return imgui_->Record(commands, image, color_space, white_scale);
 }
 
 rhi::IImage *Window::GetNextImage() {

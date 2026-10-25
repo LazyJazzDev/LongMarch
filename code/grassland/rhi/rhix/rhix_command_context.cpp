@@ -31,6 +31,22 @@ bool CommandContext::CmdClearImage(const Image &image, const rhi::ClearValue &va
   return Get()->CmdClearImage(image.Get(), value);
 }
 
+bool CommandContext::CmdDrawImGui(const Window &window, const Image &target) {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->CmdDrawImGui(window.Get(), target.Get());
+}
+
+bool CommandContext::CmdPresentImage(const Window &window, const Image &frame_img, rhi::ColorSpace frame_color_space) {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->CmdPresentImage(window.Get(), frame_img.Get(), frame_color_space);
+}
+
 bool CommandContext::CmdPresent(const Window &window) {
 #if !defined(NDEBUG)
   if (!*this)

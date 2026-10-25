@@ -34,6 +34,41 @@ if (!commands->CmdPresent(window))
 // Submit as usual. UpdateImGui handles ImGui NewFrame/Render internally.
 ```
 
+For consistent UI blending across SDR and HDR, first render the scene into a
+`R32G32B32A32_SFLOAT` image in linear Rec.709 (reference white = 1), then:
+
+```cpp
+if (!commands->CmdDrawImGui(window, frame_image))
+  return false;
+if (!commands->CmdPresentImage(window, frame_image, COLOR_SPACE_BT709_LINEAR))
+  return false;
+```
+
+`CmdDrawImGui` records a load/store overlay onto the supplied linear color target,
+outside an active rendering scope. It consumes the most recent `UpdateImGui` exactly
+once, sharing the same pending state as `CmdPresent`: whichever records first consumes
+it, even if the recording is subsequently discarded. Further draws/presents without
+an update do not replay it. Both operations change graphics bindings.
+
+`CmdPresentImage` scales the source to the window extent and converts its declared
+color encoding to the current SwapChain encoding, then calls `CmdPresent`. Any UI
+that has not already been consumed is still drawn at that final stage. Use the two
+commands together to blend UI in linear space before the conversion. The source must
+be a non-integer color image from the same device. The window must remain alive until
+presentation completes, following the existing `CmdPresent` lifetime contract.
+
+Supported encodings are sRGB, linear Rec.709, extended linear sRGB and Rec.2020 PQ.
+Linear Rec.709 uses relative white 1; conversion to/from extended linear sRGB uses
+the window reference-white scale. PQ conversion uses the existing platform luminance
+convention (Windows 80, macOS 100, Linux 203 nits per unit times that scale).
+SDR output clamps to [0,1]; linear HDR retains values above 1. No scene tone mapping
+is added by this API. Source and destination may alias only if their color spaces match.
+
+The RHI/RHIX nbody demos perform particle accumulation and scene highlight processing
+in RGBA32 float, composite ImGui into their linear `frame_image`, and present through
+this conversion. Headless nbody captures now contain RGBA32 linear pixels; PNG previews
+are still encoded as sRGB. The independent graphics nbody demos are unchanged.
+
 The rhix equivalents use `window.EnableImGui()` and `window.UpdateImGui(callback)`.
 Initialization accepts a font file and pixel size:
 `window->EnableImGui(true, "fonts/MyFont.ttf", 24.0f)` (rhix uses `.`).
@@ -69,7 +104,7 @@ no-ops and do not invoke the callback. The callback executes synchronously and i
 not retained; captures only need to remain valid during the call. Keep persistent
 widget state outside a per-frame lambda and capture it by reference. Passing `{}`
 prepares an empty UI frame without invoking a callback. Do not recursively call
-UpdateImGui, CmdPresent or EnableImGui from the UI
+UpdateImGui, CmdDrawImGui, CmdPresentImage, CmdPresent or EnableImGui from the UI
 callback.
 
 `CmdPresent` only consumes prepared draw data and appends GPU overlay commands
@@ -136,10 +171,10 @@ depends on display calibration and system color management.
 ### N-body controls and HDR
 
 Both hello demos' `nbody` modules follow `nbody_cs`: particles accumulate linear radiance
-in a reusable RGBA16F image, dense highlights desaturate toward white, and a fullscreen
-pass encodes the result to SDR or the selected HDR output. HDR brightness is bounded by
-the window's reported headroom. ImGui then draws directly into the swapchain. The particle
-accumulation image is part of the scene renderer, not an intermediate ImGui composition image.
+in a reusable RGBA32F image. Dense highlights desaturate toward white in a second
+RGBA32F frame image, bounded by the window's reported headroom. CmdDrawImGui blends
+the UI into that linear frame, then CmdPresentImage converts the completed frame
+to the selected SwapChain encoding. UI blending is therefore independent of that encoding.
 
 The control panel uses `assets/fonts/simhei.ttf` at 20 pixels and shows backend, particle
 count, frame duration and estimated interaction throughput. Reset, pause/resume, logarithmic
@@ -153,9 +188,8 @@ before scene command recording, so pause, reset, time-step and output changes af
 Shortcuts: P toggles VSync, Space pauses/resumes, R resets, Escape closes.
 Text input capture suppresses simulation shortcuts; dragging outside ImGui rotates the view.
 Headless mode retains deterministic initialization, three in-flight frames and 60 warmup
-frames, with SDR encoding and no window or UI. Throughput is an estimate based on whole-frame
-time, not measured GPU FLOP/s. The reference's speed-distribution plot is not ported because
-RHI currently has no public buffer readback API. macOS/Linux runtime validation is separate.
+frames, with linear RGBA32F output and no window or UI. Throughput is an estimate based on whole-frame
+time, not measured GPU FLOP/s. The speed-distribution plot uses asynchronous particle-velocity buffer readback. macOS/Linux runtime validation is separate.
 
 The nbody panel uses a font-relative fixed width, equal-width rounded Reset/Pause/Resume
 buttons, and aligned slider/color-space fields with a shared right-hand label column.
