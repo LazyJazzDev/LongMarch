@@ -8,6 +8,8 @@
 #include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend::vulkan {
+VkPrimitiveTopology NativePrimitiveTopology(PrimitiveTopology topology);
+
 VkBlendFactor NativeBlendFactor(BlendFactor factor, bool alpha = false);
 VkBlendOp NativeBlendOp(BlendOp op);
 // Descriptor budget order: uniform buffer, storage buffer, sampled image, storage image, sampler.

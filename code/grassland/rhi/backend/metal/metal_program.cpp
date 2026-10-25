@@ -50,6 +50,11 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
   }
   auto descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
   descriptor->setVertexFunction(functions[0].get());
+  descriptor->setInputPrimitiveTopology(
+      desc.topology == PRIMITIVE_TOPOLOGY_POINT_LIST ? MTL::PrimitiveTopologyClassPoint
+      : (desc.topology == PRIMITIVE_TOPOLOGY_LINE_LIST || desc.topology == PRIMITIVE_TOPOLOGY_LINE_STRIP)
+          ? MTL::PrimitiveTopologyClassLine
+          : MTL::PrimitiveTopologyClassTriangle);
   descriptor->setFragmentFunction(functions[1].get());
   for (size_t i = 0; i < object->desc_.color_formats.size(); ++i) {
     auto attachment = descriptor->colorAttachments()->object(i);

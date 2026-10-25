@@ -233,3 +233,49 @@ Debug before encoding a copy, report the error, return no download token, and ma
 the context invalid for submission. Release retains the caller-contract policy;
 callers must not rely on a runtime check. The Debug rejection test never submits
 a native D24S8 readback.
+
+## Fixed topology and rasterizer state
+
+`ProgramDesc::topology` selects triangle list (default), triangle strip, line list,
+line strip, or point list. It controls both indexed and non-indexed draws. The
+primitive type is fixed by the Program, even where a native API sets it on an
+encoder/list. Primitive restart, adjacency and tessellation patches are outside
+this API; indexed strips must not rely on restart/cut index values. Point shaders
+should write `PSIZE` explicitly (for example 1).
+
+`ProgramDesc::rasterizer` contains only these settings:
+
+- `cull_mode`: NONE (default), FRONT or BACK.
+- `front_face`: COUNTER_CLOCKWISE (default) or CLOCKWISE.
+- `fill_mode`: SOLID (default) or WIREFRAME. Fill mode controls triangle interiors;
+  it does not turn triangle input into line topology. Wireframe requires native
+  support; Vulkan Program creation fails if `fillModeNonSolid` is unavailable.
+
+Front-face and viewport semantics follow the existing graphics implementation.
+After perspective division, counterclockwise winding in NDC (+X right, +Y up)
+means front-facing when `FRONT_FACE_COUNTER_CLOCKWISE` is selected. Viewport x/y
+identify the top-left framebuffer pixel and width/height must be positive; NDC
++Y maps towards the top of the viewport. The selected face controls culling,
+`SV_IsFrontFace` and front/back stencil operations together.
+
+| Backend | Native viewport | Public CCW maps to |
+|---|---|---|
+| Vulkan | x, y + height, width, -height | VK_FRONT_FACE_COUNTER_CLOCKWISE |
+| D3D12 | TopLeftX=x, TopLeftY=y, positive width/height | FrontCounterClockwise=TRUE |
+| Metal | originX=x, originY=y, positive width/height | MTL::WindingCounterClockwise |
+
+The public default is explicit and follows graphics, rather than inheriting
+D3D12/Metal's native clockwise default. Existing RHI programs keep no culling,
+solid fill and triangle-list assembly. Programs using `SV_IsFrontFace` or distinct
+front/back stencil state should use the documented winding convention.
+
+Vulkan fixes these states at pipeline creation, without requiring dynamic-state
+extensions. D3D12 stores rasterizer state and topology class in its PSO and applies
+the exact topology when binding. Metal applies cull, winding and fill state on
+Program binding and every new render encoder, and uses the selected primitive type
+for draws. No depth bias, multisampling or other rasterizer settings are added.
+
+`RhiRasterizer` pixel tests cover both windings and face settings, all cull modes,
+offset viewport placement and Y orientation, every topology with indexed/non-indexed
+draws, wireframe edges versus interiors, scope restarts and in-scope Program changes.
+Invalid enums are rejected; Debug also rejects zero/negative viewport extents.

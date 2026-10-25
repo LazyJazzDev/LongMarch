@@ -1,6 +1,13 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
+VkPrimitiveTopology NativePrimitiveTopology(PrimitiveTopology topology) {
+  const VkPrimitiveTopology types[] = {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+                                       VK_PRIMITIVE_TOPOLOGY_LINE_LIST, VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
+                                       VK_PRIMITIVE_TOPOLOGY_POINT_LIST};
+  return types[topology];
+}
+
 VkBlendFactor NativeBlendFactor(BlendFactor factor, bool alpha) {
   // Alpha equations use the alpha component of color factors as well.
   if (alpha && factor >= BLEND_FACTOR_SRC_COLOR && factor <= BLEND_FACTOR_ONE_MINUS_DST_COLOR)

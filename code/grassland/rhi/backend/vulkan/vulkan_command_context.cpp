@@ -588,7 +588,7 @@ bool VulkanCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat forma
 
 bool VulkanCommandContext::CmdSetViewport(const Viewport &viewport) {
 #if !defined(NDEBUG)
-  if (sealed_ || !viewport.width || !viewport.height) {
+  if (sealed_ || viewport.width <= 0 || viewport.height <= 0) {
     recording_failed_ = true;
     return false;
   }

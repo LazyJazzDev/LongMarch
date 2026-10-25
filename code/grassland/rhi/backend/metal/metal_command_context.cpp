@@ -7,6 +7,7 @@
 #include "grassland/rhi/backend/metal/metal_download_token.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
 
 namespace grassland::rhi::backend::metal {
@@ -378,6 +379,13 @@ bool MetalCommandContext::CmdBindProgram(IProgram *program) {
 void MetalCommandContext::ApplyBindings() {
   if (program_) {
     encoder_->setRenderPipelineState(program_->NativePipeline());
+    const auto &raster = program_->GetDesc().rasterizer;
+    const MTL::CullMode cull_modes[] = {MTL::CullModeNone, MTL::CullModeFront, MTL::CullModeBack};
+    encoder_->setCullMode(cull_modes[raster.cull_mode]);
+    encoder_->setFrontFacingWinding(raster.front_face == FRONT_FACE_COUNTER_CLOCKWISE ? MTL::WindingCounterClockwise
+                                                                                      : MTL::WindingClockwise);
+    encoder_->setTriangleFillMode(raster.fill_mode == FILL_MODE_WIREFRAME ? MTL::TriangleFillModeLines
+                                                                          : MTL::TriangleFillModeFill);
     encoder_->setDepthStencilState(program_->NativeDepthStencil());
     encoder_->setStencilReferenceValue(program_->GetDesc().depth_stencil.stencil_reference);
   }
@@ -632,7 +640,8 @@ bool MetalCommandContext::CmdDraw(uint32_t vertex_count,
                                   uint32_t first_instance) {
   if (!ValidateDraw(false))
     return false;
-  encoder_->drawPrimitives(MTL::PrimitiveTypeTriangle, first_vertex, vertex_count, instance_count, first_instance);
+  encoder_->drawPrimitives(NativePrimitiveTopology(program_->GetDesc().topology), first_vertex, vertex_count,
+                           instance_count, first_instance);
   return true;
 }
 
@@ -644,7 +653,7 @@ bool MetalCommandContext::CmdDrawIndexed(uint32_t index_count,
   if (!ValidateDraw(true))
     return false;
   encoder_->drawIndexedPrimitives(
-      MTL::PrimitiveTypeTriangle, index_count,
+      NativePrimitiveTopology(program_->GetDesc().topology), index_count,
       index_format_ == INDEX_FORMAT_UINT16 ? MTL::IndexTypeUInt16 : MTL::IndexTypeUInt32, index_->NativeBuffer(),
       index_offset_ + uint64_t(first_index) * (index_format_ == INDEX_FORMAT_UINT16 ? 2 : 4), instance_count,
       vertex_offset, first_instance);

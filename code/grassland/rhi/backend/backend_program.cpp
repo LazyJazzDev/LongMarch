@@ -23,6 +23,12 @@ Device *Program::Owner() const {
 }
 
 bool Program::ValidateLayout() const {
+  if (desc_.topology < PRIMITIVE_TOPOLOGY_TRIANGLE_LIST || desc_.topology > PRIMITIVE_TOPOLOGY_POINT_LIST ||
+      desc_.rasterizer.cull_mode < CULL_MODE_NONE || desc_.rasterizer.cull_mode > CULL_MODE_BACK ||
+      desc_.rasterizer.front_face < FRONT_FACE_COUNTER_CLOCKWISE ||
+      desc_.rasterizer.front_face > FRONT_FACE_CLOCKWISE || desc_.rasterizer.fill_mode < FILL_MODE_SOLID ||
+      desc_.rasterizer.fill_mode > FILL_MODE_WIREFRAME)
+    return false;
   if (desc_.pipeline_layout.groups.size() > 8)
     return false;
   for (const auto &group : desc_.pipeline_layout.groups)

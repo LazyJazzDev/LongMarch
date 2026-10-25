@@ -8,6 +8,12 @@
 #include <QuartzCore/QuartzCore.hpp>
 
 namespace grassland::rhi::backend::metal {
+MTL::PrimitiveType NativePrimitiveTopology(PrimitiveTopology topology) {
+  const MTL::PrimitiveType types[] = {MTL::PrimitiveTypeTriangle, MTL::PrimitiveTypeTriangleStrip,
+                                      MTL::PrimitiveTypeLine, MTL::PrimitiveTypeLineStrip, MTL::PrimitiveTypePoint};
+  return types[topology];
+}
+
 MTL::BlendFactor NativeBlendFactor(BlendFactor factor, bool alpha) {
   // Alpha equations use the alpha component of color factors as well.
   if (alpha && factor >= BLEND_FACTOR_SRC_COLOR && factor <= BLEND_FACTOR_ONE_MINUS_DST_COLOR)

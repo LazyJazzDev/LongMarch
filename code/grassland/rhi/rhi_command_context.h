@@ -35,6 +35,9 @@ struct RenderingInfo {
   DepthStencilAttachmentInfo depth_stencil;
 };
 
+// Top-left framebuffer origin, +X right and +Y down; width/height are positive.
+// NDC +Y maps upward: Vulkan uses (y + height, -height) internally, while
+// D3D12/Metal use their native positive-height viewport transform.
 struct Viewport {
   float x{}, y{}, width{}, height{}, min_depth{}, max_depth{1};
 };

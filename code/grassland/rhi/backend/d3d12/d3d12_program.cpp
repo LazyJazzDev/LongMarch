@@ -46,8 +46,11 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
   state.PS = {fragment.data(), fragment.size()};
   state.InputLayout = {inputs.data(), static_cast<UINT>(inputs.size())};
   state.SampleMask = UINT_MAX;
-  state.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-  state.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+  state.RasterizerState.FillMode =
+      desc.rasterizer.fill_mode == FILL_MODE_WIREFRAME ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
+  const D3D12_CULL_MODE cull_modes[] = {D3D12_CULL_MODE_NONE, D3D12_CULL_MODE_FRONT, D3D12_CULL_MODE_BACK};
+  state.RasterizerState.CullMode = cull_modes[desc.rasterizer.cull_mode];
+  state.RasterizerState.FrontCounterClockwise = desc.rasterizer.front_face == FRONT_FACE_COUNTER_CLOCKWISE;
   state.RasterizerState.DepthClipEnable = TRUE;
   state.BlendState.IndependentBlendEnable = TRUE;
   const auto &ds = object->desc_.depth_stencil;
@@ -68,7 +71,11 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
   state.DepthStencilState.FrontFace = face(ds.front);
   state.DepthStencilState.BackFace = face(ds.back);
   state.DSVFormat = NativeImageFormat(ds.format);
-  state.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+  state.PrimitiveTopologyType =
+      desc.topology == PRIMITIVE_TOPOLOGY_POINT_LIST ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT
+      : (desc.topology == PRIMITIVE_TOPOLOGY_LINE_LIST || desc.topology == PRIMITIVE_TOPOLOGY_LINE_STRIP)
+          ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE
+          : D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
   state.NumRenderTargets = static_cast<UINT>(object->desc_.color_formats.size());
   for (size_t i = 0; i < object->desc_.color_formats.size(); ++i) {
     state.RTVFormats[i] = NativeImageFormat(object->desc_.color_formats[i]);
