@@ -22,15 +22,14 @@ struct RegisteredTextures {
 MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
     : material_(material),
       Material(DedicatedCast(material.GetCore())) {
-  core_->GraphicsCore()->CreateBuffer(sizeof(Info) + sizeof(RegisteredTextures), graphics::BUFFER_TYPE_STATIC,
-                                      &material_buffer_);
+  material_buffer_ = core_->GetDevice()->CreateBuffer({sizeof(Info) + sizeof(RegisteredTextures)});
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/principled/sampler.slang");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/principled/evaluator.slang");
 }
 
-graphics::Buffer *MaterialPrincipled::Buffer() {
+rhi::IBuffer *MaterialPrincipled::Buffer() {
   SyncMaterialData();
-  return material_buffer_.get();
+  return material_buffer_.Get();
 }
 
 const CodeLines &MaterialPrincipled::SamplerImpl() const {
@@ -68,11 +67,12 @@ void MaterialPrincipled::Update(Scene *scene) {
   if (material_.textures.emission) {
     registered_textures.emission = scene->RegisterImage(material_.textures.emission);
   }
-  material_buffer_->UploadData(&registered_textures, sizeof(RegisteredTextures), sizeof(material_.info));
+  UploadBuffer(core_->GetDevice(), material_buffer_.Get(), &registered_textures, sizeof(RegisteredTextures),
+               sizeof(material_.info));
 }
 
 void MaterialPrincipled::SyncMaterialData() {
-  material_buffer_->UploadData(&material_.info, sizeof(material_.info));
+  UploadBuffer(core_->GetDevice(), material_buffer_.Get(), &material_.info, sizeof(material_.info));
 }
 
 }  // namespace sparkium::raytracing

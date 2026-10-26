@@ -7,21 +7,21 @@ class MaterialPrincipled : public Material {
  public:
   MaterialPrincipled(sparkium::MaterialPrincipled &material);
 
-  graphics::Shader *PixelShader() override;
+  rhi::IShader *PixelShader() override;
 
   void Sync() override;
 
   glm::vec3 Emission() const override;
 
-  void SetupProgram(graphics::Program *program) override;
+  void SetupProgram(rhi::ProgramDesc &program) override;
 
-  void BindMaterialResources(graphics::CommandContext *cmd_ctx) override;
+  void BindMaterialResources(rhi::IBindingGroup *group) override;
 
  private:
   sparkium::MaterialPrincipled &material_;
-  std::unique_ptr<graphics::Shader> pixel_shader_;
-  std::unique_ptr<graphics::Buffer> material_buffer_;
-  std::unique_ptr<graphics::Sampler> sampler_;
+  rhi::ObjPtr<rhi::IShader> pixel_shader_;
+  rhi::ObjPtr<rhi::IBuffer> material_buffer_;
+  rhi::ObjPtr<rhi::ISampler> sampler_;
 };
 
 }  // namespace sparkium::raster

@@ -15,13 +15,14 @@ Camera::Camera(Core *core, const std::string &shader_file, const std::string &en
       entry_point_(entry_point) {
 }
 
-graphics::Shader *Camera::Shader() {
-  if (!camera_shader_ && core_->GraphicsCore()->DeviceRayTracingSupport()) {
-    if (core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), shader_file_, entry_point_, "lib_6_5",
-                                            &camera_shader_))
+rhi::IShader *Camera::Shader() {
+  if (!camera_shader_ && core_->GetDevice()->SupportRayTracingPipeline()) {
+    camera_shader_ = core_->GetDevice()->CreateShader(shader_file_, entry_point_, rhi::SHADER_STAGE_CALLABLE,
+                                                      &core_->GetShadersVFS(), {"."}, {});
+    if (!camera_shader_)
       throw std::runtime_error("failed to compile camera shader");
   }
-  return camera_shader_.get();
+  return camera_shader_.Get();
 }
 
 const std::string &Camera::ShaderFile() const {

@@ -10,7 +10,7 @@ class MaterialPrincipled : public Material {
   using Info = sparkium::MaterialPrincipled::Info;
   using TextureInfo = sparkium::MaterialPrincipled::TextureInfo;
 
-  graphics::Buffer *Buffer() override;
+  rhi::IBuffer *Buffer() override;
   const CodeLines &SamplerImpl() const override;
   const CodeLines &EvaluatorImpl() const override;
   void Update(Scene *scene) override;
@@ -19,7 +19,7 @@ class MaterialPrincipled : public Material {
 
  private:
   sparkium::MaterialPrincipled &material_;
-  std::unique_ptr<graphics::Buffer> material_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> material_buffer_;
   CodeLines sampler_implementation_;
   CodeLines evaluator_implementation_;
 };

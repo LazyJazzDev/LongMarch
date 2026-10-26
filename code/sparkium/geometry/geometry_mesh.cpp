@@ -65,8 +65,8 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
 
   std::memcpy(data.data(), &header_, sizeof(header_));
 
-  core_->GraphicsCore()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
-  geometry_buffer_->UploadData(data.data(), data.size());
+  geometry_buffer_ = core_->GetDevice()->CreateBuffer({data.size()});
+  UploadBuffer(core_->GetDevice(), geometry_buffer_.Get(), data.data(), data.size());
   primitive_count_ = header_.num_indices / 3;
 }
 
@@ -76,7 +76,8 @@ void GeometryMesh::SetShadowTerminatorGeometryOffset(float cutoff) {
   if (cutoff == header_.shadow_terminator_geometry_offset)
     return;
   header_.shadow_terminator_geometry_offset = cutoff;
-  geometry_buffer_->UploadData(&cutoff, sizeof(cutoff), offsetof(Header, shadow_terminator_geometry_offset));
+  UploadBuffer(core_->GetDevice(), geometry_buffer_.Get(), &cutoff, sizeof(cutoff),
+               offsetof(Header, shadow_terminator_geometry_offset));
 }
 
 float GeometryMesh::GetShadowTerminatorGeometryOffset() const {
@@ -87,8 +88,8 @@ int GeometryMesh::PrimitiveCount() {
   return primitive_count_;
 }
 
-graphics::Buffer *GeometryMesh::GetBuffer() const {
-  return geometry_buffer_.get();
+rhi::IBuffer *GeometryMesh::GetBuffer() const {
+  return geometry_buffer_.Get();
 }
 
 const GeometryMesh::Header &GeometryMesh::GetHeader() const {

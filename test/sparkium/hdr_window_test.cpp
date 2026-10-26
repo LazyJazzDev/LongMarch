@@ -136,20 +136,18 @@ TEST(VulkanHDRRecoveryTest, RetiredSwapchainIsRecreatedOrPresentationStops) {
 TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
   if (!InteractiveHDRTests())
     GTEST_SKIP() << "Requires an interactive desktop session";
-  std::unique_ptr<graphics::Core> core;
-  ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_VULKAN, graphics::Core::Settings{2, true}, &core), 0);
-  ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
+  using namespace rhi;
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_VULKAN, {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  sparkium::Core scene_core(device.Get());
   for (bool hdr : {false, true}) {
-    auto window = std::unique_ptr<graphics::Window>{};
-    ASSERT_EQ(core->CreateWindowObject(1024, 1024, "Scene resize regression", &window), 0);
-    if (hdr && !HasHDRSurface(window.get()))
-      continue;  // X11 still exercises the complete SDR resize path.
-    ASSERT_EQ(window->SetHDR(hdr), 0);
-    window->InitImGui();
-    ImGui::GetIO().IniFilename = nullptr;
-    auto *native = dynamic_cast<graphics::backend::VulkanWindow *>(window.get());
-    ASSERT_NE(native, nullptr);
-    sparkium::Core scene_core(core.get());
+    ObjPtr<IWindow> window = device->CreateGLFWWindow({1024, 1024, "Scene resize regression"});
+    ASSERT_TRUE(window);
+    if (hdr && !window->SetColorSpace(COLOR_SPACE_EXTENDED_SRGB_LINEAR))
+      continue;
+    ASSERT_TRUE(window->EnableImGui());
     for (const char *scene_name : {"cornell_box", "texture", "cornell_box"}) {
       std::string error;
       auto loaded = sparkium::JsonScene::Load(
@@ -162,101 +160,62 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
       const auto aspect = camera->aspect;
       loaded->GetScene()->settings.samples_per_dispatch = 1;
       loaded->GetScene()->settings.max_bounces = 1;
-      scene_core.Render(loaded->GetScene(), camera, film, sparkium::RENDER_PIPELINE_AUTO);
+      scene_core.Render(loaded->GetScene(), camera, film);
       const auto samples = film->info.accumulated_samples;
       ASSERT_GT(samples, 0);
-      std::unique_ptr<graphics::Image> source;
-      ASSERT_EQ(core->CreateImage(
-                    size.x, size.y,
-                    hdr ? graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT : graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &source),
-                0);
-      film->Develop(source.get(), hdr);
-      window->Resize(size.x, size.y);
-      // X11 acknowledges asynchronously. Present through several event cycles
-      // to also cover Wayland fractional scaling and compositor configure events.
+      ObjPtr<IImage> source = device->CreateImage(
+          {uint32_t(size.x), uint32_t(size.y), hdr ? IMAGE_FORMAT_R32G32B32A32_SFLOAT : IMAGE_FORMAT_R8G8B8A8_UNORM});
+      ASSERT_TRUE(source);
+      film->Develop(source.Get(), hdr);
+      glfwSetWindowSize(window->GLFWWindow(), size.x, size.y);
       for (int frame = 0; frame < 6; ++frame) {
-        // Resize again without recreating the source image or touching Film.
         if (frame == 2)
-          window->Resize(size.x / 2, size.y / 2);
+          glfwSetWindowSize(window->GLFWWindow(), size.x / 2, size.y / 2);
         if (frame == 4)
-          window->Resize(size.x, size.y);
+          glfwSetWindowSize(window->GLFWWindow(), size.x, size.y);
         glfwWaitEventsTimeout(0.02);
-        auto fb = window->GetFramebufferSize();
-        auto extent = native->SwapChainExtent();
-        SCOPED_TRACE(testing::Message() << "hdr=" << hdr << " requested=" << size.x << "x" << size.y
-                                        << " framebuffer=" << fb.x << "x" << fb.y << " frame=" << frame);
-        ASSERT_EQ(extent.width, fb.x);
-        ASSERT_EQ(extent.height, fb.y);
-        window->BeginImGuiFrame();
-        ImGui::TextUnformatted("Scene resize regression");
-        window->EndImGuiFrame();
-        std::unique_ptr<graphics::CommandContext> commands;
-        ASSERT_EQ(core->CreateCommandContext(&commands), 0);
-        commands->CmdClearImage(source.get(), {{0.5f, 0.5f, 0.5f, 1.0f}});
-        commands->CmdPresent(window.get(), source.get());
-        ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
-        core->WaitGPU();
-        EXPECT_EQ(loaded->GetFilm(), film);
+        ASSERT_TRUE(rhi::PollEvents());
+        if (window->IsSwapChainInvalid())
+          ASSERT_TRUE(window->RebuildSwapChain());
+        ObjPtr<IImage> next = window->GetNextImage();
+        ASSERT_TRUE(next);
+        int width, height;
+        glfwGetFramebufferSize(window->GLFWWindow(), &width, &height);
+        EXPECT_EQ(next->GetDesc().width, uint32_t(width));
+        EXPECT_EQ(next->GetDesc().height, uint32_t(height));
+        ASSERT_TRUE(window->UpdateImGui([] { ImGui::TextUnformatted("Scene resize regression"); }));
+        ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+        ASSERT_TRUE(commands);
+        ASSERT_TRUE(commands->CmdClearImage(source.Get(), {0.5f, 0.5f, 0.5f, 1.0f}));
+        ASSERT_TRUE(commands->CmdPresentImage(window.Get(), source.Get(),
+                                              hdr ? COLOR_SPACE_BT709_LINEAR : COLOR_SPACE_SRGB_NONLINEAR));
+        std::array<ObjPtr<IDownloadToken>, 2> corners;
+        if (hdr) {
+          corners[0] = commands->CmdDownloadImage(next.Get(), {0, uint32_t(height - 1), 1, 1});
+          corners[1] = commands->CmdDownloadImage(next.Get(), {uint32_t(width - 1), uint32_t(height - 1), 1, 1});
+          ASSERT_TRUE(corners[0]);
+          ASSERT_TRUE(corners[1]);
+        }
+        ASSERT_TRUE(sparkium::Execute(device.Get(), commands.Get()));
+        if (hdr) {
+          ASSERT_EQ(next->GetDesc().format, IMAGE_FORMAT_R16G16B16A16_SFLOAT);
+          for (const auto &corner : corners) {
+            std::array<uint16_t, 4> pixel{};
+            ASSERT_TRUE(corner->CopyTo(pixel.data(), sizeof(pixel)));
+            for (int c = 0; c < 3; ++c)
+              EXPECT_NEAR(glm::unpackHalf1x16(pixel[c]), 0.5f * window->GetHDRReferenceWhiteScale(), 0.01f);
+          }
+        }
         EXPECT_EQ(film->GetWidth(), size.x);
         EXPECT_EQ(film->GetHeight(), size.y);
         EXPECT_EQ(film->info.accumulated_samples, samples);
         EXPECT_EQ(camera->view, view);
         EXPECT_EQ(camera->aspect, aspect);
-        EXPECT_EQ(source->Extent().width, size.x);
-        EXPECT_EQ(source->Extent().height, size.y);
-        if (hdr) {
-          std::unique_ptr<graphics::CommandContext> readback;
-          ASSERT_EQ(core->CreateCommandContext(&readback), 0);
-          auto *aligned = window->AlignHDRComposition(readback.get());
-          ASSERT_EQ(aligned->Extent().width, fb.x);
-          ASSERT_EQ(aligned->Extent().height, fb.y);
-          ASSERT_EQ(core->SubmitCommandContext(readback.get()), 0);
-          core->WaitGPU();
-          std::vector<uint16_t> pixels(size_t(fb.x) * fb.y * 4);
-          aligned->DownloadData(pixels.data());
-          // Check both bottom corners: a stale square target leaves a black
-          // border, crops the image or fails to write the newly exposed area.
-          for (int x : {0, fb.x - 1}) {
-            size_t offset = (size_t(fb.y - 1) * fb.x + x) * 4;
-            auto expected = ExpectedOutput(window.get(), glm::vec3{0.5f});
-            for (int c = 0; c < 3; ++c)
-              EXPECT_NEAR(glm::unpackHalf1x16(pixels[offset + c]), expected[c], 0.01f);
-          }
-        }
+        EXPECT_EQ(source->GetDesc().width, uint32_t(size.x));
+        EXPECT_EQ(source->GetDesc().height, uint32_t(size.y));
       }
     }
-    window->CloseWindow();
   }
-}
-
-TEST(HDRSurfaceFormatTest, PreferredFormatWinsRegardlessOfEnumerationOrder) {
-  const VkSurfaceFormatKHR hdr{VK_FORMAT_R16G16B16A16_SFLOAT, VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT};
-  const VkSurfaceFormatKHR sdr{VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
-  for (const auto &formats : {std::vector<VkSurfaceFormatKHR>{hdr, sdr}, std::vector<VkSurfaceFormatKHR>{sdr, hdr}}) {
-    auto selected = graphics::backend::vulkan::ChooseSwapSurfaceFormat(formats, hdr.format, hdr.colorSpace);
-    EXPECT_EQ(selected.format, hdr.format);
-    EXPECT_EQ(selected.colorSpace, hdr.colorSpace);
-    selected = graphics::backend::vulkan::ChooseSwapSurfaceFormat(formats, sdr.format, sdr.colorSpace);
-    EXPECT_EQ(selected.format, sdr.format);
-    EXPECT_EQ(selected.colorSpace, sdr.colorSpace);
-  }
-  EXPECT_THROW(graphics::backend::vulkan::ChooseSwapSurfaceFormat({}, hdr.format, hdr.colorSpace), std::runtime_error);
-}
-
-TEST(HDRSurfaceFormatTest, HDRNegotiationPreservesScRGBAndSupportsBothPQLayouts) {
-  using graphics::backend::VulkanWindow;
-  const VkSurfaceFormatKHR scrgb{VK_FORMAT_R16G16B16A16_SFLOAT, VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT};
-  const VkSurfaceFormatKHR pq{VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT};
-  const VkSurfaceFormatKHR pq_bgr{VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT};
-  const VkSurfaceFormatKHR sdr{VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
-  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({pq, sdr, scrgb})->format, scrgb.format);
-  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({sdr, pq_bgr, pq})->format, pq.format);
-  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({sdr, pq_bgr})->format, pq_bgr.format);
-  EXPECT_FALSE(VulkanWindow::ChooseHDRSurfaceFormat({sdr}));
-  EXPECT_FALSE(VulkanWindow::ChooseHDRSurfaceFormat({}));
-  // Float storage or 10-bit precision alone does not establish HDR encoding.
-  EXPECT_FALSE(VulkanWindow::ChooseHDRSurfaceFormat(
-      {{scrgb.format, VK_COLOR_SPACE_BT709_LINEAR_EXT}, {pq.format, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}}));
 }
 #endif
 

@@ -21,15 +21,15 @@ struct TextureInfo {
 MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
     : material_(material),
       Material(DedicatedCast(material.GetCore())) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.slang", "PSMain",
-                                      "ps_6_0", {"-I."}, &pixel_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(material_.info) + sizeof(TextureInfo), graphics::BUFFER_TYPE_STATIC,
-                                      &material_buffer_);
-  core_->GraphicsCore()->CreateSampler(graphics::SamplerInfo{}, &sampler_);
+  pixel_shader_ = core_->GetDevice()->CreateShader("material/principled/pixel_shader.slang", "PSMain",
+                                                   rhi::SHADER_STAGE_FRAGMENT, &core_->GetShadersVFS(), {"."}, {});
+  material_buffer_ =
+      core_->GetDevice()->CreateBuffer({(sizeof(material_.info) + sizeof(TextureInfo) + 255) & ~uint64_t(255)});
+  sampler_ = core_->GetDevice()->CreateSampler();
 }
 
-graphics::Shader *MaterialPrincipled::PixelShader() {
-  return pixel_shader_.get();
+rhi::IShader *MaterialPrincipled::PixelShader() {
+  return pixel_shader_.Get();
 }
 
 void MaterialPrincipled::Sync() {
@@ -41,22 +41,22 @@ void MaterialPrincipled::Sync() {
   info.use_metallic_texture = material_.textures.metallic ? 1 : 0;
   info.use_normal_texture = material_.textures.normal ? 1 : 0;
   info.use_emission_texture = material_.textures.emission ? 1 : 0;
-  material_buffer_->UploadData(&material_.info, sizeof(material_.info));
-  material_buffer_->UploadData(&info, sizeof(info), sizeof(material_.info));
+  UploadBuffer(core_->GetDevice(), material_buffer_.Get(), &material_.info, sizeof(material_.info));
+  UploadBuffer(core_->GetDevice(), material_buffer_.Get(), &info, sizeof(info), sizeof(material_.info));
 }
 
 glm::vec3 MaterialPrincipled::Emission() const {
   return material_.emission_color * material_.emission_strength;
 }
 
-void MaterialPrincipled::SetupProgram(graphics::Program *program) {
-  program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 6);    // Material textures
-  program->AddResourceBinding(graphics::RESOURCE_TYPE_SAMPLER, 1);  // Material Data
+void MaterialPrincipled::SetupProgram(rhi::ProgramDesc &program) {
+  program.pipeline_layout.groups[0].bindings.push_back({3, rhi::BINDING_TEXTURE2D, 6});  // Material textures
+  program.pipeline_layout.groups[0].bindings.push_back({4, rhi::BINDING_SAMPLER, 1});    // Material Data
 }
 
-void MaterialPrincipled::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
-  cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
-  std::vector<graphics::Image *> textures(6);
+void MaterialPrincipled::BindMaterialResources(rhi::IBindingGroup *group) {
+  group->BindResource(2, material_buffer_.Get());
+  std::vector<rhi::IImage *> textures(6);
   textures[0] = material_.textures.base_color;
   if (!textures[0])
     textures[0] = core_->GetImage("white");
@@ -76,8 +76,8 @@ void MaterialPrincipled::BindMaterialResources(graphics::CommandContext *cmd_ctx
   textures[5] = material_.textures.emission;
   if (!textures[5])
     textures[5] = core_->GetImage("white");
-  cmd_ctx->CmdBindResources(3, textures, graphics::BIND_POINT_GRAPHICS);
-  cmd_ctx->CmdBindResources(4, {sampler_.get()}, graphics::BIND_POINT_GRAPHICS);
+  group->BindResource(3, textures);
+  group->BindResource(4, sampler_.Get());
 }
 
 }  // namespace sparkium::raster

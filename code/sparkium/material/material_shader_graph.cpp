@@ -4,7 +4,7 @@ namespace sparkium {
 
 MaterialShaderGraph::MaterialShaderGraph(Core *core,
                                          const CodeLines &graph_code,
-                                         const std::vector<graphics::Image *> &textures,
+                                         const std::vector<rhi::IImage *> &textures,
                                          const glm::vec3 &emission_hint)
     : Material(core),
       graph_code(graph_code),

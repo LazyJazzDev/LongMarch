@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Profile compute tracing frames; GPU timestamps require Vulkan."""
+"""Profile compute tracing frames using RHI CPU timings."""
 import argparse
 import csv
 import json
@@ -23,7 +23,7 @@ def main():
     parser.add_argument('--frames', type=int, default=24)
     parser.add_argument('--warmup', type=int, default=4)
     parser.add_argument('--repeat', type=int, default=2)
-    parser.add_argument('--cpu-only', action='store_true', help='disable GPU timestamps to measure profiling overhead')
+    parser.add_argument('--cpu-only', action='store_true', help='compatibility flag; RHI profiling is currently CPU-only')
     args = parser.parse_args()
     if args.size < 0 or min(args.spp, args.bounces, args.repeat) <= 0 or not 0 <= args.warmup < args.frames:
         parser.error('invalid size/spp/bounces/repeat or warmup/frame count')
@@ -65,7 +65,7 @@ def main():
                     'min': min(values), 'max': max(values)}
         result = {'scene': name, 'size': args.size, 'width': scene['film']['width'], 'height': scene['film']['height'],
                   'backend': args.backend, 'pipeline': args.pipeline, 'spp': args.spp, 'bounces': args.bounces,
-                  'gpu_timestamps': not args.cpu_only, 'frames_per_run': args.frames, 'warmup_per_run': args.warmup, 'runs': args.repeat,
+                  'gpu_timestamps': False, 'frames_per_run': args.frames, 'warmup_per_run': args.warmup, 'runs': args.repeat,
                   'steady': {key: summarize(values) for key, values in samples.items()}, 'first_frames': cold}
         summaries.append(result)
         (args.output / 'summary.json').write_text(json.dumps(summaries, indent=2) + '\n')

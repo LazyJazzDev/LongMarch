@@ -1,10 +1,10 @@
 #include "tone_mapping_functions.slang"
 // readonly rgba32f accumulated_color image
-Texture2D<float4> accumulated_color : register(t0, space0);
+RHI_TEXTURE2D(0, 0, float4, accumulated_color);
 // readonly r32f accumulated_samples
-Texture2D<float> accumulated_samples : register(t0, space1);
+RHI_TEXTURE2D(0, 1, float, accumulated_samples);
 
-RWTexture2D<float4> output : register(u0, space2);
+RHI_RW_TEXTURE2D(0, 2, float4, output);
 
 // Compute shader convert accumulated color to image
 [numthreads(8, 8, 1)] void Main(uint3 dispatch_thread_id

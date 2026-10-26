@@ -5,8 +5,8 @@ namespace sparkium::raytracing {
 
 class Camera : public Object {
  public:
-  graphics::Shader *Shader();
-  virtual graphics::Buffer *Buffer() = 0;
+  rhi::IShader *Shader();
+  virtual rhi::IBuffer *Buffer() = 0;
   const std::string &ShaderFile() const;
   const std::string &EntryPoint() const;
 
@@ -17,7 +17,7 @@ class Camera : public Object {
   Core *core_;
   std::string shader_file_;
   std::string entry_point_;
-  std::unique_ptr<graphics::Shader> camera_shader_;
+  rhi::ObjPtr<rhi::IShader> camera_shader_;
 };
 
 Camera *DedicatedCast(sparkium::Camera *camera);

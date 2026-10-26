@@ -17,9 +17,9 @@ struct PSOutput {
   int stencil : SV_TARGET4;
 };
 
-ByteAddressBuffer material_data : register(t0, space2);
-Texture2D<float4> textures[] : register(t0, space3);
-SamplerState S : register(s0, space4);
+RHI_BYTE_ADDRESS_BUFFER(0, 2, material_data);
+RHI_TEXTURE2D_ARRAY(0, 3, float4, textures);
+RHI_SAMPLER(0, 4, S);
 
 PSOutput PSMain(PSInput input) {
   PSOutput output;

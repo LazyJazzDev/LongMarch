@@ -1,9 +1,9 @@
 #include "buffer_helper.slang"
 #include "common.slang"
 
-ByteAddressBuffer light_metadatas : register(t0, space0);
-RWByteAddressBuffer light_selector_data : register(u0, space1);
-ByteAddressBuffer data_buffers[] : register(t0, space2);
+RHI_BYTE_ADDRESS_BUFFER(0, 0, light_metadatas);
+RHI_RW_BYTE_ADDRESS_BUFFER(0, 1, light_selector_data);
+RHI_BYTE_ADDRESS_BUFFER_ARRAY(0, 2, data_buffers);
 
 #define GROUP_SIZE 64
 groupshared float group_element[GROUP_SIZE];
