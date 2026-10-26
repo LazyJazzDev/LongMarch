@@ -41,7 +41,7 @@ class IDevice : public IObject {
   IShader *CreateShader(const std::string &filename,
                         const std::string &entry_point,
                         ShaderStage stage,
-                        FileSystem *fs = nullptr,
+                        const FileSystem *fs = nullptr,
                         const std::vector<std::string> &include_paths = {},
                         const std::vector<std::pair<std::string, std::string>> &defines = {});
   IShader *CreateShaderFromSource(const std::string &source,

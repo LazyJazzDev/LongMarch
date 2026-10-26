@@ -2,7 +2,7 @@
 
 namespace practium {
 
-Core::Core(graphics::Core *core) : core_(core) {
+Core::Core(rhi::IDevice *core) : core_(core) {
   render_core_ = std::make_unique<sparkium::Core>(core_);
   physics_core_ = std::make_unique<contradium::Core>(core_);
 }

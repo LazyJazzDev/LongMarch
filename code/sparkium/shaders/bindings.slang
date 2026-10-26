@@ -2,37 +2,37 @@
 #include "common.slang"
 #include "buffer_helper.slang"
 
-RWTexture2D<float4> accumulated_color : register(u0, space0);
-RWTexture2D<float> accumulated_samples : register(u0, space1);
-ConstantBuffer<RenderSettings> render_settings : register(b0, space3);
+RHI_RW_TEXTURE2D(0, 0, float4, accumulated_color);
+RHI_RW_TEXTURE2D(0, 1, float, accumulated_samples);
+RHI_UNIFORM(0, 3, RenderSettings, render_settings);
 #define SOBOL_TABLE
 #ifdef SPARKIUM_SOFTWARE_RT
 #ifdef SPARKIUM_RAY_QUERY
-RaytracingAccelerationStructure query_scene : register(t0, space2);
+RHI_ACCELERATION_STRUCTURE(0, 2, query_scene);
 #else
-ByteAddressBuffer software_nodes : register(t0, space2);
+RHI_BYTE_ADDRESS_BUFFER(0, 2, software_nodes);
 #endif
-ByteAddressBuffer data_buffers[] : register(t0, space4);
+RHI_BYTE_ADDRESS_BUFFER_ARRAY(0, 4, data_buffers);
 #define sobol_table data_buffers[SOFTWARE_DATA_BUFFER_COUNT]
 #define camera_data data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 1]
 #define instance_metadatas data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 2]
 #define light_selector_data data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 3]
 #define light_metadatas data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 4]
 #define software_instances data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 5]
-Texture2D<float4> sdr_textures[] : register(t0, space5);
-Texture2D<float4> hdr_textures[] : register(t0, space6);
-SamplerState samplers[] : register(s0, space7);
+RHI_TEXTURE2D_ARRAY(0, 5, float4, sdr_textures);
+RHI_TEXTURE2D_ARRAY(0, 6, float4, hdr_textures);
+RHI_SAMPLER_ARRAY(0, 7, samplers);
 #else
-RaytracingAccelerationStructure as : register(t0, space2);
-ByteAddressBuffer sobol_table : register(t0, space4);
-ByteAddressBuffer camera_data : register(t0, space5);
-ByteAddressBuffer data_buffers[] : register(t0, space6);
-ByteAddressBuffer instance_metadatas : register(t0, space7);
-ByteAddressBuffer light_selector_data : register(t0, space8);
-ByteAddressBuffer light_metadatas : register(t0, space9);
-Texture2D<float4> sdr_textures[] : register(t0, space10);
-Texture2D<float4> hdr_textures[] : register(t0, space11);
-SamplerState samplers[] : register(s0, space12);
+RHI_ACCELERATION_STRUCTURE(0, 2, as);
+RHI_BYTE_ADDRESS_BUFFER(0, 4, sobol_table);
+RHI_BYTE_ADDRESS_BUFFER(0, 5, camera_data);
+RHI_BYTE_ADDRESS_BUFFER_ARRAY(0, 6, data_buffers);
+RHI_BYTE_ADDRESS_BUFFER(0, 7, instance_metadatas);
+RHI_BYTE_ADDRESS_BUFFER(0, 8, light_selector_data);
+RHI_BYTE_ADDRESS_BUFFER(0, 9, light_metadatas);
+RHI_TEXTURE2D_ARRAY(0, 10, float4, sdr_textures);
+RHI_TEXTURE2D_ARRAY(0, 11, float4, hdr_textures);
+RHI_SAMPLER_ARRAY(0, 12, samplers);
 #endif
 
 float4 SampleTexture(int texture_index, float2 uv) {

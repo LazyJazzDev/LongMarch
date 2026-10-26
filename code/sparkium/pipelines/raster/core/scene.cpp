@@ -10,25 +10,32 @@
 namespace sparkium::raster {
 
 Scene::Scene(sparkium::Scene &scene) : scene_(scene), core_(DedicatedCast(scene.GetCore())), settings(scene.settings) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.slang", "VSMain", "vs_6_0", {},
-                                      &ambient_light_vs_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.slang", "PSMain", "ps_6_0", {},
-                                      &ambient_light_ps_);
-  core_->GraphicsCore()->CreateProgram({graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, graphics::IMAGE_FORMAT_UNDEFINED,
-                                       &ambient_light_program_);
-  ambient_light_program_->BindShader(ambient_light_vs_.get(), graphics::SHADER_TYPE_VERTEX);
-  ambient_light_program_->BindShader(ambient_light_ps_.get(), graphics::SHADER_TYPE_PIXEL);
-  ambient_light_program_->SetBlendState(
-      0, graphics::BlendState{graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD,
-                              graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD});
-  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // AlbedoRoughness
-  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // PositionSpecular
-  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // NormalMetallic
-  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Camera Data
-  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Ambient Light Data
-  ambient_light_program_->Finalize();
+  ambient_light_vs_ = core_->GetDevice()->CreateShader("light/ambient/lighting.slang", "VSMain",
+                                                       rhi::SHADER_STAGE_VERTEX, &core_->GetShadersVFS(), {"."}, {});
+  ambient_light_ps_ = core_->GetDevice()->CreateShader("light/ambient/lighting.slang", "PSMain",
+                                                       rhi::SHADER_STAGE_FRAGMENT, &core_->GetShadersVFS(), {"."}, {});
+  rhi::ProgramDesc ambient_light_program_desc;
+  ambient_light_program_desc.color_formats = {rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT};
+  ambient_light_program_desc.pipeline_layout.groups.resize(1);
+  ambient_light_program_desc.vertex_shader = ambient_light_vs_.Get();
+  ambient_light_program_desc.fragment_shader = ambient_light_ps_.Get();
+  ambient_light_program_desc.blend_states = {rhi::BlendState{rhi::BLEND_FACTOR_ONE, rhi::BLEND_FACTOR_ONE,
+                                                             rhi::BLEND_OP_ADD, rhi::BLEND_FACTOR_ONE,
+                                                             rhi::BLEND_FACTOR_ONE, rhi::BLEND_OP_ADD}};
+  ambient_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
+      {0, rhi::BINDING_TEXTURE2D, 1});  // AlbedoRoughness
+  ambient_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
+      {1, rhi::BINDING_TEXTURE2D, 1});  // PositionSpecular
+  ambient_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
+      {2, rhi::BINDING_TEXTURE2D, 1});  // NormalMetallic
+  ambient_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
+      {3, rhi::BINDING_UNIFORM_BUFFER, 1});  // Camera Data
+  ambient_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
+      {4, rhi::BINDING_UNIFORM_BUFFER, 1});  // Ambient Light Data
+  ambient_light_program_ = core_->GetDevice()->CreateProgram(ambient_light_program_desc);
+  ambient_light_group_ = core_->GetDevice()->CreateBindingGroup(ambient_light_program_desc.pipeline_layout.groups[0]);
 
-  core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3), graphics::BUFFER_TYPE_DYNAMIC, &ambient_light_buffer_);
+  ambient_light_buffer_ = core_->GetDevice()->CreateBuffer({(sizeof(glm::vec3) + 255) & ~uint64_t(255)});
 }
 
 void Scene::Render(Camera *camera, Film *film) {
@@ -62,7 +69,7 @@ void Scene::Render(Camera *camera, Film *film) {
   shadow_map_callbacks_.clear();
   lighting_callbacks_.clear();
 
-  ambient_light_buffer_->UploadData(&settings.ambient_light, sizeof(glm::vec3));
+  UploadBuffer(core_->GetDevice(), ambient_light_buffer_.Get(), &settings.ambient_light, sizeof(glm::vec3));
 
   for (auto *entity : ordered_entities) {
     if (entities_.at(entity).active) {
@@ -74,24 +81,30 @@ void Scene::Render(Camera *camera, Film *film) {
 
   film->film_.Reset();
 
-  std::unique_ptr<graphics::CommandContext> cmd_context;
-  core_->GraphicsCore()->CreateCommandContext(&cmd_context);
+  rhi::ObjPtr<rhi::ICommandContext> cmd_context;
+  cmd_context = core_->GetDevice()->CreateCommandContext();
 
   // Render Pass
 
   cmd_context->CmdClearImage(
       film->film_.GetRawImage(),
       {scene_.settings.ambient_light.r, scene_.settings.ambient_light.g, scene_.settings.ambient_light.b, 0.0f});
-  cmd_context->CmdClearImage(film->film_.GetDepthImage(), {1.0f, 0.0f, 0.0f, 0.0f});
-  cmd_context->CmdBeginRendering(
-      {film->film_.GetRawImage(), film->albedo_roughness_buffer_.get(), film->position_specular_buffer_.get(),
-       film->normal_metallic_buffer_.get(), film->film_.GetStencilImage()},
-      film->film_.GetDepthImage());
-  cmd_context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  graphics::Scissor scissor;
-  scissor.offset = {0, 0};
-  scissor.extent = film->film_.GetExtent();
-  graphics::Viewport viewport;
+  cmd_context->CmdClearImage(film->film_.GetDepthImage(), rhi::ClearValue{rhi::ClearDepthStencilValue{1.0f, 0}});
+  cmd_context->CmdClearImage(film->albedo_roughness_buffer_.Get(), {});
+  cmd_context->CmdClearImage(film->position_specular_buffer_.Get(), {});
+  cmd_context->CmdClearImage(film->normal_metallic_buffer_.Get(), {});
+  cmd_context->CmdClearImage(film->film_.GetStencilImage(), rhi::ClearValue{0, 0, 0, 0});
+  rhi::RenderingInfo rendering;
+  rendering.color_attachments = {{film->film_.GetRawImage()},
+                                 {film->albedo_roughness_buffer_.Get()},
+                                 {film->position_specular_buffer_.Get()},
+                                 {film->normal_metallic_buffer_.Get()},
+                                 {film->film_.GetStencilImage()}};
+  rendering.depth_stencil.image = film->film_.GetDepthImage();
+  cmd_context->CmdBeginRendering(rendering);
+  rhi::Scissor scissor{0, 0, static_cast<uint32_t>(film->film_.GetWidth()),
+                       static_cast<uint32_t>(film->film_.GetHeight())};
+  rhi::Viewport viewport;
   viewport.x = 0.0f;
   viewport.y = 0.0f;
   viewport.min_depth = 0.0f;
@@ -101,57 +114,54 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdSetScissor(scissor);
   cmd_context->CmdSetViewport(viewport);
   for (auto &callback : render_callbacks_) {
-    callback(cmd_context.get(), camera->FarFieldBuffer());
+    callback(cmd_context.Get(), camera->FarFieldBuffer());
   }
   cmd_context->CmdEndRendering();
-  cmd_context->CmdClearImage(film->film_.GetDepthImage(),
-                             {1.0f, 0.0f, 0.0f, 0.0f});  // Clear depth to 1.0 for the near field rendering
-  cmd_context->CmdBeginRendering(
-      {film->film_.GetRawImage(), film->albedo_roughness_buffer_.get(), film->position_specular_buffer_.get(),
-       film->normal_metallic_buffer_.get(), film->film_.GetStencilImage()},
-      film->film_.GetDepthImage());
-  cmd_context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+  cmd_context->CmdClearImage(
+      film->film_.GetDepthImage(),
+      rhi::ClearValue{rhi::ClearDepthStencilValue{1.0f, 0}});  // Clear depth to 1.0 for the near field rendering
+  cmd_context->CmdBeginRendering(rendering);
   cmd_context->CmdSetScissor(scissor);
   cmd_context->CmdSetViewport(viewport);
   for (auto &callback : render_callbacks_) {
-    callback(cmd_context.get(), camera->NearFieldBuffer());
+    callback(cmd_context.Get(), camera->NearFieldBuffer());
   }
   cmd_context->CmdEndRendering();
 
   // Lighting Pass
-  cmd_context->CmdBeginRendering({film->film_.GetRawImage()}, nullptr);
-  cmd_context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+  rendering.color_attachments = {{film->film_.GetRawImage()}};
+  rendering.depth_stencil = {};
+  cmd_context->CmdBeginRendering(rendering);
   cmd_context->CmdSetScissor(scissor);
   cmd_context->CmdSetViewport(viewport);
-  cmd_context->CmdBindProgram(ambient_light_program_.get());
-  cmd_context->CmdBindResources(0, {film->GetAlbedoRoughnessBuffer()}, graphics::BIND_POINT_GRAPHICS);
-  cmd_context->CmdBindResources(1, {film->GetPositionSpecularBuffer()}, graphics::BIND_POINT_GRAPHICS);
-  cmd_context->CmdBindResources(2, {film->GetNormalMetallicBuffer()}, graphics::BIND_POINT_GRAPHICS);
-  cmd_context->CmdBindResources(3, {camera->NearFieldBuffer()}, graphics::BIND_POINT_GRAPHICS);
-  cmd_context->CmdBindResources(4, {ambient_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_context->CmdBindProgram(ambient_light_program_.Get());
+  ambient_light_group_->BindResource(0, film->GetAlbedoRoughnessBuffer());
+  ambient_light_group_->BindResource(1, film->GetPositionSpecularBuffer());
+  ambient_light_group_->BindResource(2, film->GetNormalMetallicBuffer());
+  ambient_light_group_->BindResource(3, camera->NearFieldBuffer());
+  ambient_light_group_->BindResource(4, ambient_light_buffer_.Get());
+  cmd_context->CmdBindGroup(0, ambient_light_group_.Get());
   cmd_context->CmdDraw(6, 1, 0, 0);
 
   for (auto &callback : lighting_callbacks_) {
-    callback(cmd_context.get(), camera, film);
+    callback(cmd_context.Get(), camera, film);
   }
 
   cmd_context->CmdEndRendering();
 
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
-  core_->GraphicsCore()->WaitGPU();
+  Execute(core_->GetDevice(), cmd_context.Get());
 }
 
-void Scene::RegisterRenderCallback(
-    const std::function<void(graphics::CommandContext *, graphics::Buffer *)> &callback) {
+void Scene::RegisterRenderCallback(const std::function<void(rhi::ICommandContext *, rhi::IBuffer *)> &callback) {
   render_callbacks_.push_back(callback);
 }
 
-void Scene::RegisterShadowMapCallback(const std::function<void(graphics::CommandContext *)> &callback) {
+void Scene::RegisterShadowMapCallback(const std::function<void(rhi::ICommandContext *)> &callback) {
   shadow_map_callbacks_.push_back(callback);
 }
 
 void Scene::RegisterLightingCallback(
-    const std::function<void(graphics::CommandContext *, Camera *camera, Film *film)> &callback) {
+    const std::function<void(rhi::ICommandContext *, Camera *camera, Film *film)> &callback) {
   lighting_callbacks_.push_back(callback);
 }
 

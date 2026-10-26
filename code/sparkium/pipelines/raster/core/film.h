@@ -7,9 +7,9 @@ class Film : public Object {
  public:
   Film(sparkium::Film &film);
 
-  graphics::Image *GetAlbedoRoughnessBuffer() const;
-  graphics::Image *GetPositionSpecularBuffer() const;
-  graphics::Image *GetNormalMetallicBuffer() const;
+  rhi::IImage *GetAlbedoRoughnessBuffer() const;
+  rhi::IImage *GetPositionSpecularBuffer() const;
+  rhi::IImage *GetNormalMetallicBuffer() const;
 
  private:
   friend Scene;
@@ -17,9 +17,9 @@ class Film : public Object {
   sparkium::Film &film_;
   Core *core_;
 
-  std::unique_ptr<graphics::Image> albedo_roughness_buffer_;
-  std::unique_ptr<graphics::Image> position_specular_buffer_;
-  std::unique_ptr<graphics::Image> normal_metallic_buffer_;
+  rhi::ObjPtr<rhi::IImage> albedo_roughness_buffer_;
+  rhi::ObjPtr<rhi::IImage> position_specular_buffer_;
+  rhi::ObjPtr<rhi::IImage> normal_metallic_buffer_;
 };
 
 Film *DedicatedCast(sparkium::Film *film);

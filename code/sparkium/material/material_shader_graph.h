@@ -10,11 +10,11 @@ class MaterialShaderGraph : public Material {
  public:
   MaterialShaderGraph(Core *core,
                       const CodeLines &graph_code,
-                      const std::vector<graphics::Image *> &textures,
+                      const std::vector<rhi::IImage *> &textures,
                       const glm::vec3 &emission_hint = {});
 
   CodeLines graph_code;
-  std::vector<graphics::Image *> textures;
+  std::vector<rhi::IImage *> textures;
   glm::vec3 emission_hint{};
 };
 

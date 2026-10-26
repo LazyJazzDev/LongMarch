@@ -15,4 +15,4 @@ set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 
 target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
-target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC ${MIKKTSPACE_LIB_NAME} ${TINYOBJLOADER_LIB_NAME} grassland_util)
+target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC ${MIKKTSPACE_LIB_NAME} ${TINYOBJLOADER_LIB_NAME} grassland_util grassland_physics_diff_kernel)

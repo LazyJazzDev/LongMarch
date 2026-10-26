@@ -36,15 +36,15 @@ class MaterialPrincipled : public Material {
   } info;
 
   struct TextureInfo {
-    graphics::Image *normal{nullptr};
+    rhi::IImage *normal{nullptr};
     bool normal_reverse_y{false};
-    graphics::Image *base_color{nullptr};
-    graphics::Image *metallic{nullptr};
-    graphics::Image *specular{nullptr};
-    graphics::Image *roughness{nullptr};
-    graphics::Image *anisotropic{nullptr};
-    graphics::Image *anisotropic_rotation{nullptr};
-    graphics::Image *emission{nullptr};
+    rhi::IImage *base_color{nullptr};
+    rhi::IImage *metallic{nullptr};
+    rhi::IImage *specular{nullptr};
+    rhi::IImage *roughness{nullptr};
+    rhi::IImage *anisotropic{nullptr};
+    rhi::IImage *anisotropic_rotation{nullptr};
+    rhi::IImage *emission{nullptr};
   } textures{};
 
   glm::vec3 &base_color{info.base_color};

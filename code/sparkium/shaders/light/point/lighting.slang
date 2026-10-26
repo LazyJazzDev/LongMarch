@@ -16,11 +16,11 @@ struct CameraInfo {
   float4x4 inv_view_proj;
 };
 
-Texture2D<float4> albedo_roughness_buffer : register(t0, space0);
-Texture2D<float4> position_specular_buffer : register(t0, space1);
-Texture2D<float4> normal_metallic_buffer : register(t0, space2);
-ConstantBuffer<CameraInfo> camera_data : register(b0, space3);
-ByteAddressBuffer settings : register(t0, space4);
+RHI_TEXTURE2D(0, 0, float4, albedo_roughness_buffer);
+RHI_TEXTURE2D(0, 1, float4, position_specular_buffer);
+RHI_TEXTURE2D(0, 2, float4, normal_metallic_buffer);
+RHI_UNIFORM(0, 3, CameraInfo, camera_data);
+RHI_BYTE_ADDRESS_BUFFER(0, 4, settings);
 
 struct VSOutput {
   float4 position : SV_POSITION;

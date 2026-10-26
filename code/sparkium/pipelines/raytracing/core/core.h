@@ -11,26 +11,26 @@ class Core : public Object {
 
   void PrepareBuiltinHitShaders();
 
-  graphics::Core *GraphicsCore() const;
+  rhi::IDevice *GetDevice() const;
 
   const VirtualFileSystem &GetShadersVFS() const;
 
-  graphics::Shader *GetShader(const std::string &name);
+  rhi::IShader *GetShader(const std::string &name);
 
-  graphics::ComputeProgram *GetComputeProgram(const std::string &name);
+  rhi::IComputeProgram *GetComputeProgram(const std::string &name);
 
-  graphics::ComputeProgram *GetGeometryLightPowerProgram(const CodeLines &geometry, const CodeLines &material);
+  rhi::IComputeProgram *GetGeometryLightPowerProgram(const CodeLines &geometry, const CodeLines &material);
 
-  graphics::Image *GetImage(const std::string &name);
+  rhi::IImage *GetImage(const std::string &name);
 
-  graphics::Buffer *GetBuffer(const std::string &name);
+  rhi::IBuffer *GetBuffer(const std::string &name);
 
  private:
   void LoadPublicShaders();
 
   struct GeometryLightResources {
-    std::unique_ptr<graphics::Shader> shader;
-    std::unique_ptr<graphics::ComputeProgram> program;
+    rhi::ObjPtr<rhi::IShader> shader;
+    rhi::ObjPtr<rhi::IComputeProgram> program;
   };
 
   std::map<std::pair<std::string, std::string>, GeometryLightResources> geometry_light_programs_;

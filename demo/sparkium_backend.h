@@ -1,10 +1,10 @@
 ﻿#pragma once
 #include <stdexcept>
 
-#include "grassland/graphics/graphics_util.h"
+#include "grassland/rhi/rhi_util.h"
 
-inline grassland::graphics::BackendAPI ParseSparkiumBackend(const std::string &name) {
-  using namespace grassland::graphics;
+inline grassland::rhi::BackendAPI ParseSparkiumBackend(const std::string &name) {
+  using namespace grassland::rhi;
   BackendAPI api;
   if (name == "auto")
     api = BACKEND_API_DEFAULT;
@@ -16,7 +16,5 @@ inline grassland::graphics::BackendAPI ParseSparkiumBackend(const std::string &n
     api = BACKEND_API_D3D12;
   else
     throw std::invalid_argument("unknown graphics backend: " + name);
-  if (!SupportBackendAPI(api))
-    throw std::runtime_error("graphics backend was not built: " + name);
   return api;
 }

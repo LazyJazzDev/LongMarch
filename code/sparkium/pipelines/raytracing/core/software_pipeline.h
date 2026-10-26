@@ -10,26 +10,30 @@ class SoftwarePipeline {
   explicit SoftwarePipeline(Core *core, bool ray_query = false);
   void ClearInstances();
   void AddInstance(Geometry *geometry, Material *material, const glm::mat4x3 &transform, uint32_t geometry_index);
-  void Update(graphics::CommandContext *commands,
-              const std::vector<graphics::Buffer *> &buffers,
+  void Update(rhi::ICommandContext *commands,
+              const std::vector<rhi::IBuffer *> &buffers,
               uint32_t sdr_count,
               uint32_t hdr_count,
               Camera *camera);
 
-  graphics::ComputeProgram *Program() const {
-    return render_program_.get();
+  rhi::IComputeProgram *Program() const {
+    return render_program_.Get();
   }
 
-  graphics::AccelerationStructure *AccelerationStructure() const {
-    return native_tlas_.get();
+  rhi::ITopLevelAccelerationStructure *AccelerationStructure() const {
+    return native_tlas_.Get();
   }
 
-  graphics::Buffer *Nodes() const {
-    return nodes_.get();
+  rhi::IBindingGroup *Bindings() const {
+    return render_group_.Get();
   }
 
-  graphics::Buffer *Instances() const {
-    return instances_buffer_.get();
+  rhi::IBuffer *Nodes() const {
+    return nodes_.Get();
+  }
+
+  rhi::IBuffer *Instances() const {
+    return instances_buffer_.Get();
   }
 
  private:
@@ -80,17 +84,18 @@ class SoftwarePipeline {
   Core *core_;
   bool ray_query_;
   std::string camera_file_, camera_entry_;
-  std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
+  rhi::ObjPtr<rhi::ITopLevelAccelerationStructure> native_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;
   uint32_t tlas_leaves_{};
   std::vector<MaterialCode> material_sources_;
   uint32_t buffer_count_{}, sdr_count_{}, hdr_count_{};
   uint32_t builder_buffer_count_{};
-  std::unique_ptr<graphics::Buffer> nodes_, keys_, instances_buffer_, parameters_buffer_;
-  std::vector<std::unique_ptr<graphics::Shader>> builder_shaders_;
-  std::vector<std::unique_ptr<graphics::ComputeProgram>> builders_;
-  std::unique_ptr<graphics::Shader> render_shader_;
-  std::unique_ptr<graphics::ComputeProgram> render_program_;
+  rhi::ObjPtr<rhi::IBuffer> nodes_, keys_, instances_buffer_, parameters_buffer_;
+  std::vector<rhi::ObjPtr<rhi::IShader>> builder_shaders_;
+  std::vector<rhi::ObjPtr<rhi::IComputeProgram>> builders_;
+  rhi::ObjPtr<rhi::IShader> render_shader_;
+  rhi::ObjPtr<rhi::IComputeProgram> render_program_;
+  rhi::ObjPtr<rhi::IBindingGroup> render_group_, build_group_;
 };
 }  // namespace sparkium::raytracing

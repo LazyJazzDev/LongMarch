@@ -17,8 +17,8 @@ class Film : public Object {
 
   friend Scene;
   friend Core;
-  std::unique_ptr<graphics::Image> accumulated_color_;
-  std::unique_ptr<graphics::Image> accumulated_samples_;
+  rhi::ObjPtr<rhi::IImage> accumulated_color_;
+  rhi::ObjPtr<rhi::IImage> accumulated_samples_;
 };
 
 Film *DedicatedCast(sparkium::Film *film);

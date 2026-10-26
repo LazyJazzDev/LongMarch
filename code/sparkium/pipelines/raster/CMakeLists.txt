@@ -10,4 +10,4 @@ foreach (subdir ${subdirs})
     endif ()
 endforeach ()
 
-target_link_libraries(sparkium_raster PUBLIC ${SPARKIUM_RASTER_LIBS} Grassland Snowberg)
+target_link_libraries(sparkium_raster PUBLIC ${SPARKIUM_RASTER_LIBS} grassland_rhi grassland_math grassland_util)

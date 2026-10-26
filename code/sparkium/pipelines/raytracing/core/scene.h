@@ -21,7 +21,7 @@ class Scene : public Object {
 
   int32_t RegisterLight(Light *light, int custom_index = -1);
 
-  int32_t RegisterInstance(graphics::AccelerationStructure *blas,
+  int32_t RegisterInstance(rhi::IBottomLevelAccelerationStructure *blas,
                            const glm::mat4x3 &transformation,
                            int32_t hit_group_index,
                            int32_t geometry_data_index,
@@ -34,14 +34,10 @@ class Scene : public Object {
 
   struct HitGroupComparator {
     bool operator()(const InstanceHitGroups &lhs, const InstanceHitGroups &rhs) const {
-      return std::tie(lhs.render_group.closest_hit_shader, lhs.render_group.any_hit_shader,
-                      lhs.render_group.intersection_shader, lhs.render_group.procedure,
-                      lhs.shadow_group.closest_hit_shader, lhs.shadow_group.any_hit_shader,
-                      lhs.shadow_group.intersection_shader, lhs.shadow_group.procedure) <
-             std::tie(rhs.render_group.closest_hit_shader, rhs.render_group.any_hit_shader,
-                      rhs.render_group.intersection_shader, rhs.render_group.procedure,
-                      rhs.shadow_group.closest_hit_shader, rhs.shadow_group.any_hit_shader,
-                      rhs.shadow_group.intersection_shader, rhs.shadow_group.procedure);
+      return std::tie(lhs.render_group.closest_hit, lhs.render_group.any_hit, lhs.render_group.intersection,
+                      lhs.shadow_group.closest_hit, lhs.shadow_group.any_hit, lhs.shadow_group.intersection) <
+             std::tie(rhs.render_group.closest_hit, rhs.render_group.any_hit, rhs.render_group.intersection,
+                      rhs.shadow_group.closest_hit, rhs.shadow_group.any_hit, rhs.shadow_group.intersection);
     }
   };
 
@@ -54,9 +50,9 @@ class Scene : public Object {
     int shader_version{0};
   };
 
-  int32_t RegisterCallableShader(graphics::Shader *callable_shader);
-  int32_t RegisterBuffer(graphics::Buffer *buffer);
-  int32_t RegisterImage(graphics::Image *image);
+  int32_t RegisterCallableShader(rhi::IShader *callable_shader);
+  int32_t RegisterBuffer(rhi::IBuffer *buffer);
+  int32_t RegisterImage(rhi::IImage *image);
   int32_t RegisterHitGroup(const InstanceHitGroups &hit_group);
 
  private:
@@ -68,58 +64,55 @@ class Scene : public Object {
   sparkium::Scene &scene_;
   Core *core_;
 
-  std::unique_ptr<graphics::Shader> raygen_shader_;
-  std::unique_ptr<graphics::Shader> default_miss_shader_;
-  std::unique_ptr<graphics::Shader> shadow_miss_shader_;
-  std::unique_ptr<graphics::RayTracingProgram> rt_program_;
-  std::unique_ptr<graphics::AccelerationStructure> tlas_;
-  std::unique_ptr<graphics::Buffer> scene_settings_buffer_;
+  rhi::ObjPtr<rhi::IShader> raygen_shader_;
+  rhi::ObjPtr<rhi::IShader> default_miss_shader_;
+  rhi::ObjPtr<rhi::IShader> shadow_miss_shader_;
+  rhi::ObjPtr<rhi::IRayTracingProgram> rt_program_;
+  rhi::ObjPtr<rhi::ITopLevelAccelerationStructure> tlas_;
+  rhi::ObjPtr<rhi::IBuffer> scene_settings_buffer_;
   std::map<Entity *, EntityStatus> entities_;
-
-  std::vector<int32_t> miss_shader_indices_;
-  std::vector<int32_t> hit_group_indices_;
-  std::vector<int32_t> callable_shader_indices_;
 
   std::vector<InstanceHitGroups> hit_groups_;
   std::map<InstanceHitGroups, int32_t, HitGroupComparator> hit_group_map_;
 
-  std::vector<graphics::Buffer *> buffers_;
-  std::map<graphics::Buffer *, int32_t> buffer_map_;
+  std::vector<rhi::IBuffer *> buffers_;
+  std::map<rhi::IBuffer *, int32_t> buffer_map_;
 
-  std::vector<graphics::Shader *> callable_shaders_;
-  std::map<graphics::Shader *, int32_t> callable_shader_map_;
+  std::vector<rhi::IShader *> callable_shaders_;
+  std::map<rhi::IShader *, int32_t> callable_shader_map_;
 
-  std::vector<graphics::Image *> sdr_images_;
-  std::map<graphics::Image *, int32_t> sdr_image_map_;
+  std::vector<rhi::IImage *> sdr_images_;
+  std::map<rhi::IImage *, int32_t> sdr_image_map_;
 
-  std::vector<graphics::Image *> hdr_images_;
-  std::map<graphics::Image *, int32_t> hdr_image_map_;
+  std::vector<rhi::IImage *> hdr_images_;
+  std::map<rhi::IImage *, int32_t> hdr_image_map_;
 
   bool pipeline_dirty_{true};
   int buffer_capacity_{0};
   int sdr_image_capacity_{0};
   int hdr_image_capacity_{0};
 
-  std::vector<graphics::RayTracingInstance> instances_;
+  std::vector<rhi::RayTracingInstance> instances_;
 
   std::vector<InstanceMetadata> instance_metadatas_;
-  std::unique_ptr<graphics::Buffer> instance_metadata_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> instance_metadata_buffer_;
 
-  std::unique_ptr<graphics::Buffer> light_selector_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> light_selector_buffer_;
 
   std::vector<LightMetadata> light_metadatas_;
-  std::unique_ptr<graphics::Buffer> light_metadatas_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> light_metadatas_buffer_;
 
   std::vector<BlellochScanMetadata> blelloch_metadatas_;
-  std::unique_ptr<graphics::Buffer> blelloch_metadata_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> blelloch_metadata_buffer_;
 
-  std::unique_ptr<graphics::Shader> gather_light_power_shader_;
-  std::unique_ptr<graphics::ComputeProgram> gather_light_power_program_;
+  rhi::ObjPtr<rhi::IShader> gather_light_power_shader_;
+  rhi::ObjPtr<rhi::IComputeProgram> gather_light_power_program_;
 
-  std::unique_ptr<graphics::CommandContext> preprocess_cmd_context_;
+  rhi::ObjPtr<rhi::ICommandContext> preprocess_cmd_context_;
 
-  std::unique_ptr<graphics::Sampler> linear_sampler_;
-  std::unique_ptr<graphics::Sampler> nearest_sampler_;
+  rhi::ObjPtr<rhi::ISampler> linear_sampler_;
+  rhi::ObjPtr<rhi::ISampler> nearest_sampler_;
+  rhi::ObjPtr<rhi::IBindingGroup> render_group_, resolve_group_, light_group_, scan_group_;
 };
 
 Scene *DedicatedCast(sparkium::Scene *scene);

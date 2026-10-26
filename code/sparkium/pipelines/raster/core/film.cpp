@@ -7,33 +7,33 @@ namespace sparkium::raster {
 
 Film::Film(sparkium::Film &film) : film_(film), core_(DedicatedCast(film.GetCore())) {
   auto extent = film_.GetExtent();
-  core_->GraphicsCore()->CreateImage(extent.width, extent.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                                     &albedo_roughness_buffer_);
-  core_->GraphicsCore()->CreateImage(extent.width, extent.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                                     &position_specular_buffer_);
-  core_->GraphicsCore()->CreateImage(extent.width, extent.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                                     &normal_metallic_buffer_);
+  albedo_roughness_buffer_ = core_->GetDevice()->CreateImage(
+      {static_cast<uint32_t>(extent.x), static_cast<uint32_t>(extent.y), rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  position_specular_buffer_ = core_->GetDevice()->CreateImage(
+      {static_cast<uint32_t>(extent.x), static_cast<uint32_t>(extent.y), rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  normal_metallic_buffer_ = core_->GetDevice()->CreateImage(
+      {static_cast<uint32_t>(extent.x), static_cast<uint32_t>(extent.y), rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT});
 
   film_.RegisterResetCallback([this]() {
-    std::unique_ptr<graphics::CommandContext> cmd_ctx;
-    core_->GraphicsCore()->CreateCommandContext(&cmd_ctx);
-    cmd_ctx->CmdClearImage(albedo_roughness_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
-    cmd_ctx->CmdClearImage(position_specular_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
-    cmd_ctx->CmdClearImage(normal_metallic_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
-    core_->GraphicsCore()->SubmitCommandContext(cmd_ctx.get());
+    rhi::ObjPtr<rhi::ICommandContext> cmd_ctx;
+    cmd_ctx = core_->GetDevice()->CreateCommandContext();
+    cmd_ctx->CmdClearImage(albedo_roughness_buffer_.Get(), {0.0f, 0.0f, 0.0f, 0.0f});
+    cmd_ctx->CmdClearImage(position_specular_buffer_.Get(), {0.0f, 0.0f, 0.0f, 0.0f});
+    cmd_ctx->CmdClearImage(normal_metallic_buffer_.Get(), {0.0f, 0.0f, 0.0f, 0.0f});
+    Execute(core_->GetDevice(), cmd_ctx.Get());
   });
 }
 
-graphics::Image *Film::GetAlbedoRoughnessBuffer() const {
-  return albedo_roughness_buffer_.get();
+rhi::IImage *Film::GetAlbedoRoughnessBuffer() const {
+  return albedo_roughness_buffer_.Get();
 }
 
-graphics::Image *Film::GetPositionSpecularBuffer() const {
-  return position_specular_buffer_.get();
+rhi::IImage *Film::GetPositionSpecularBuffer() const {
+  return position_specular_buffer_.Get();
 }
 
-graphics::Image *Film::GetNormalMetallicBuffer() const {
-  return normal_metallic_buffer_.get();
+rhi::IImage *Film::GetNormalMetallicBuffer() const {
+  return normal_metallic_buffer_.Get();
 }
 
 Film *DedicatedCast(sparkium::Film *film) {

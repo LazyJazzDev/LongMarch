@@ -1,4 +1,6 @@
-﻿#include <long_march.h>
+﻿#include <imgui.h>
+
+#include "sparkium/sparkium.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <random>
@@ -9,7 +11,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "stb_image_write.h"
 
-using namespace long_march;
+using namespace grassland;
 
 struct CombinedMesh {
   std::vector<std::unique_ptr<sparkium::GeometryMesh>> meshes;
@@ -199,11 +201,13 @@ int main() {
                               FindAssetFile("urdfs/franka_fr3/meshes/robot_ee/franka_hand_white/visual/finger.dae"),
                               FindAssetFile("urdfs/franka_fr3/meshes/robot_ee/franka_hand_white/visual/finger.dae")};
 
-  std::unique_ptr<graphics::Core> core_;
-
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
-  sparkium::Core sparkium_core(core_.get());
+  rhi::ObjPtr<rhi::ICore> native_core = rhi::CreateCore();
+  if (!native_core)
+    return 1;
+  rhi::ObjPtr<rhi::IDevice> core_ = native_core->CreateDeviceByAutoSelection();
+  if (!core_)
+    return 1;
+  sparkium::Core sparkium_core(core_.Get());
   sparkium_core.GetShadersVFS().Print();
 
   sparkium::Scene scene(&sparkium_core);
@@ -249,11 +253,16 @@ int main() {
     combined_mesh[i].PutInScene(&scene);
   }
 
-  std::unique_ptr<graphics::Image> srgb_image;
-  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
+  rhi::ObjPtr<rhi::IImage> srgb_image;
+  srgb_image = core_->CreateImage({static_cast<uint32_t>(film.GetWidth()), static_cast<uint32_t>(film.GetHeight()),
+                                   rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  if (!srgb_image)
+    return 1;
 
-  std::unique_ptr<graphics::Window> window;
-  core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparkium", &window);
+  rhi::ObjPtr<rhi::IWindow> window;
+  window = core_->CreateGLFWWindow({film.GetWidth(), film.GetHeight(), "Sparkium"});
+  if (!window)
+    return 1;
   FPSCounter fps_counter;
 
   JointInfo joints[] = {{-2.7437f, 2.7437f, 0.0f},      {-1.7837f, 1.7837f, 0.0f}, {-2.9007f, 2.9007f, 0.0f},
@@ -261,27 +270,30 @@ int main() {
                         {-3.0159f, 3.01599f, 0.0f},     {0.0f, 0.04f, 0.0f}};
 
   bool ray_tracing = true;
-  window->InitImGui(nullptr, 20.0f);
+  if (!window->EnableImGui(true, nullptr, 20.0f))
+    return 1;
   while (!window->ShouldClose()) {
-    window->BeginImGuiFrame();
-    if (ImGui::Begin("Franka Joint Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-      ImGui::Checkbox("Ray Tracing", &ray_tracing);
-      if (ray_tracing && !core_->DeviceRayTracingSupport()) {
-        ImGui::Text("Ray Tracing not supported on this device!");
-      }
-      ImGui::Separator();
-      if (ImGui::Button("Center")) {
-        for (auto &j : joints) {
-          j.value = (j.upper_bound + j.lower_bound) * 0.5f;
-        }
-      }
-      for (int i = 0; i < 8; i++) {
-        ImGui::SliderFloat(("Joint " + std::to_string(i + 1)).c_str(), &joints[i].value, joints[i].lower_bound,
-                           joints[i].upper_bound);
-      }
-    }
-    ImGui::End();
-    window->EndImGuiFrame();
+    rhi::PollEvents();
+    if (!window->UpdateImGui([&]() {
+          if (ImGui::Begin("Franka Joint Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Checkbox("Ray Tracing", &ray_tracing);
+            if (ray_tracing && !core_->SupportRayTracingPipeline()) {
+              ImGui::Text("Ray Tracing not supported on this device!");
+            }
+            ImGui::Separator();
+            if (ImGui::Button("Center")) {
+              for (auto &j : joints) {
+                j.value = (j.upper_bound + j.lower_bound) * 0.5f;
+              }
+            }
+            for (int i = 0; i < 8; i++) {
+              ImGui::SliderFloat(("Joint " + std::to_string(i + 1)).c_str(), &joints[i].value, joints[i].lower_bound,
+                                 joints[i].upper_bound);
+            }
+          }
+          ImGui::End();
+        }))
+      return 1;
     glm::mat4 combined_mat = glm::mat4(1.0f);
     combined_mesh[1].SetTransformation(combined_mat);
     combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.333f}, {});
@@ -323,12 +335,20 @@ int main() {
     // area_light.direction = -area_light.position;
     sparkium_core.Render(&scene, &camera, &film,
                          ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
-    film.Develop(srgb_image.get());
-    std::unique_ptr<graphics::CommandContext> cmd_context;
-    core_->CreateCommandContext(&cmd_context);
-    cmd_context->CmdPresent(window.get(), srgb_image.get());
-    core_->SubmitCommandContext(cmd_context.get());
-    grassland::graphics::Window::PollEvents();
+    film.Develop(srgb_image.Get());
+    if (window->IsSwapChainInvalid())
+      window->RebuildSwapChain();
+    rhi::ObjPtr<rhi::IImage> next_image = window->GetNextImage();
+    if (next_image) {
+      rhi::ObjPtr<rhi::ICommandContext> commands = core_->CreateCommandContext();
+      if (!commands)
+        return 1;
+      if (!commands->CmdPresentImage(window.Get(), srgb_image.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
+        return 1;
+      if (!sparkium::Execute(core_.Get(), commands.Get()))
+        return 1;
+    }
+
     float fps = fps_counter.TickFPS();
     char fps_buf[16];
     sprintf(fps_buf, "%.2f", fps);
@@ -342,8 +362,9 @@ int main() {
     cm.Clear();
   }
 
-  film.Develop(srgb_image.get());
+  film.Develop(srgb_image.Get());
   std::vector<uint8_t> image_data(film.GetWidth() * film.GetHeight() * 4);
-  srgb_image->DownloadData(image_data.data());
+  if (!sparkium::DownloadImage(core_.Get(), srgb_image.Get(), image_data.data()))
+    return 1;
   stbi_write_bmp("output.bmp", film.GetWidth(), film.GetHeight(), 4, image_data.data());
 }

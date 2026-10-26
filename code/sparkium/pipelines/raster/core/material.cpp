@@ -2,10 +2,10 @@
 
 namespace sparkium::raster {
 
-void Material::SetupProgram(graphics::Program *program) {
+void Material::SetupProgram(rhi::ProgramDesc &program) {
 }
 
-void Material::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
+void Material::BindMaterialResources(rhi::IBindingGroup *group) {
 }
 
 glm::vec3 Material::Emission() const {

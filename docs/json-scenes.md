@@ -3,6 +3,14 @@
 Sparkium loads version 1 `sparkium-scene` documents through `JsonScene::Load`.
 The CLI renders a document, and the GUI discovers, selects, and reloads scenes.
 
+Sparkium now uses `grassland::rhi` directly. Create an `rhi::ICore`, then an
+`rhi::IDevice`, and pass the device pointer to `sparkium::Core`. RHI resources
+use `rhi::ObjPtr`; destroy Sparkium scenes and its Core before releasing the
+device and native Core. Rendering uses explicit RHI command recording, binding
+groups, and BLAS/TLAS builds. GUI presentation uses `CmdPresentImage` and the
+window's ImGui integration. CPU profiling remains available; GPU timestamp
+profiling is temporarily disabled until RHI exposes timestamp queries.
+
 The GUI uses each scene's film dimensions to choose its initial window size.
 Window resizing and HiDPI scaling are handled by the presentation backend: it
 updates its swapchain and HDR composition targets, then fits the source image

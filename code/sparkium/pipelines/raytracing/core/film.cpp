@@ -8,19 +8,21 @@ namespace sparkium::raytracing {
 Film::Film(sparkium::Film &film) : film_(film) {
   core_ = DedicatedCast(film_.GetCore());
   film_.RegisterResetCallback([this]() { Reset(); });
-  core_->GraphicsCore()->CreateImage(film_.GetWidth(), film_.GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                                     &accumulated_color_);
-  core_->GraphicsCore()->CreateImage(film_.GetWidth(), film_.GetHeight(), graphics::IMAGE_FORMAT_R32_SFLOAT,
-                                     &accumulated_samples_);
-  Reset();
+  accumulated_color_ = core_->GetDevice()->CreateImage({static_cast<uint32_t>(film_.GetWidth()),
+                                                        static_cast<uint32_t>(film_.GetHeight()),
+                                                        rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  accumulated_samples_ =
+      core_->GetDevice()->CreateImage({static_cast<uint32_t>(film_.GetWidth()),
+                                       static_cast<uint32_t>(film_.GetHeight()), rhi::IMAGE_FORMAT_R32_SFLOAT});
+  film_.Reset();
 }
 
 void Film::Reset() {
-  std::unique_ptr<graphics::CommandContext> cmd_context;
-  core_->GraphicsCore()->CreateCommandContext(&cmd_context);
-  cmd_context->CmdClearImage(accumulated_color_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
-  cmd_context->CmdClearImage(accumulated_samples_.get(), {});
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+  rhi::ObjPtr<rhi::ICommandContext> cmd_context;
+  cmd_context = core_->GetDevice()->CreateCommandContext();
+  cmd_context->CmdClearImage(accumulated_color_.Get(), {0.0f, 0.0f, 0.0f, 0.0f});
+  cmd_context->CmdClearImage(accumulated_samples_.Get(), {});
+  Execute(core_->GetDevice(), cmd_context.Get());
   film_.info.accumulated_samples = 0;
 }
 

@@ -2,7 +2,7 @@
 
 namespace contradium {
 
-Core::Core(graphics::Core *core) : core_(core) {
+Core::Core(rhi::IDevice *core) : core_(core) {
 }
 
 }  // namespace contradium

@@ -18,11 +18,11 @@ struct CameraThinLensData {
 class CameraThinLens : public Camera {
  public:
   explicit CameraThinLens(sparkium::CameraThinLens &camera);
-  graphics::Buffer *Buffer() override;
+  rhi::IBuffer *Buffer() override;
 
  private:
   sparkium::CameraThinLens &camera_;
-  std::unique_ptr<graphics::Buffer> buffer_;
+  rhi::ObjPtr<rhi::IBuffer> buffer_;
 };
 
 }  // namespace sparkium::raytracing

@@ -54,12 +54,14 @@ class AreaLight {
 };
 
 int main() {
-  std::unique_ptr<graphics::Core> core_;
+  rhi::ObjPtr<rhi::ICore> native_core = rhi::CreateCore();
+  if (!native_core)
+    return 1;
+  rhi::ObjPtr<rhi::IDevice> core_ = native_core->CreateDeviceByAutoSelection();
+  if (!core_)
+    return 1;
 
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
-
-  practium::Core practium_core(core_.get());
+  practium::Core practium_core(core_.Get());
 
   practium::Scene scene(&practium_core);
 
@@ -131,20 +133,25 @@ int main() {
     sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
   }
 
-  graphics::Extent2D extent{640, 480};
+  glm::uvec2 extent{640, 480};
 
-  sparkium::Film film(practium_core.GetRenderCore(), extent.width, extent.height);
-  scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 32;
+  sparkium::Film film(practium_core.GetRenderCore(), extent.x, extent.y);
+  scene.GetRenderScene()->settings.samples_per_dispatch = 32;
   sparkium::CameraPinhole camera(
       practium_core.GetRenderCore(),
       glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
       glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  std::unique_ptr<graphics::Image> srgb_image;
-  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
+  rhi::ObjPtr<rhi::IImage> srgb_image;
+  srgb_image = core_->CreateImage({static_cast<uint32_t>(film.GetWidth()), static_cast<uint32_t>(film.GetHeight()),
+                                   rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  if (!srgb_image)
+    return 1;
 
-  std::unique_ptr<graphics::Window> window;
-  core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Practium Hello", &window);
+  rhi::ObjPtr<rhi::IWindow> window;
+  window = core_->CreateGLFWWindow({film.GetWidth(), film.GetHeight(), "Practium Hello"});
+  if (!window)
+    return 1;
 
   AreaLight area_light(practium_core.GetRenderCore(), glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
                        glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
@@ -154,7 +161,8 @@ int main() {
   bool ray_tracing = false;
   bool pause = true;
   bool day_light = true;
-  window->InitImGui(nullptr, 20.0f);
+  if (!window->EnableImGui(true, nullptr, 20.0f))
+    return 1;
 
   while (!window->ShouldClose()) {
     if (!pause) {
@@ -164,43 +172,51 @@ int main() {
       film.info.persistence = 1.0f;
     }
 
-    window->BeginImGuiFrame();
-    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
-    ImGui::SetNextWindowBgAlpha(0.3);
-    ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-    if (ImGui::Checkbox("Day Light", &day_light)) {
-      scene.GetRenderScene()->SetEntityActive(area_light, day_light);
-    }
-    ImGui::Checkbox("Pause", &pause);
-    ImGui::Checkbox("Ray Tracing", &ray_tracing);
-    if (ray_tracing && !core_->DeviceRayTracingSupport()) {
-      ImGui::Text("Ray Tracing not supported on this device!");
-    }
-    if (ImGui::Button("Reset")) {
-      for (int i = 0; i < num_spheres; i++) {
-        Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
-                                std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng)};
-        auto sphere_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(sphere_entities[i].get());
-        sphere_pbd_entity->SetPosition(position);
-        sphere_pbd_entity->SetVelocity({0.0f, 0.0f, 0.0f});
-        sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
-      }
-    }
-    ImGui::End();
-    window->EndImGuiFrame();
+    rhi::PollEvents();
+    if (!window->UpdateImGui([&]() {
+          ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+          ImGui::SetNextWindowBgAlpha(0.3);
+          ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+          if (ImGui::Checkbox("Day Light", &day_light)) {
+            scene.GetRenderScene()->SetEntityActive(area_light, day_light);
+          }
+          ImGui::Checkbox("Pause", &pause);
+          ImGui::Checkbox("Ray Tracing", &ray_tracing);
+          if (ray_tracing && !core_->SupportRayTracingPipeline()) {
+            ImGui::Text("Ray Tracing not supported on this device!");
+          }
+          if (ImGui::Button("Reset")) {
+            for (int i = 0; i < num_spheres; i++) {
+              Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
+                                      std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng)};
+              auto sphere_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(sphere_entities[i].get());
+              sphere_pbd_entity->SetPosition(position);
+              sphere_pbd_entity->SetVelocity({0.0f, 0.0f, 0.0f});
+              sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
+            }
+          }
+          ImGui::End();
+        }))
+      return 1;
 
     scene.SyncRenderState();
     practium_core.GetRenderCore()->Render(
         scene.GetRenderScene(), &camera, &film,
         ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
-    film.Develop(srgb_image.get());
+    film.Develop(srgb_image.Get());
 
-    std::unique_ptr<graphics::CommandContext> cmd_ctx;
-    core_->CreateCommandContext(&cmd_ctx);
-    cmd_ctx->CmdPresent(window.get(), srgb_image.get());
-    core_->SubmitCommandContext(cmd_ctx.get());
-
-    grassland::graphics::Window::PollEvents();
+    if (window->IsSwapChainInvalid())
+      window->RebuildSwapChain();
+    rhi::ObjPtr<rhi::IImage> next_image = window->GetNextImage();
+    if (next_image) {
+      rhi::ObjPtr<rhi::ICommandContext> commands = core_->CreateCommandContext();
+      if (!commands)
+        return 1;
+      if (!commands->CmdPresentImage(window.Get(), srgb_image.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
+        return 1;
+      if (!sparkium::Execute(core_.Get(), commands.Get()))
+        return 1;
+    }
   }
 
   return 0;

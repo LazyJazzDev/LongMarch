@@ -8,7 +8,7 @@ struct ShaderDesc {
   std::string entry_point;
   ShaderStage stage{SHADER_STAGE_VERTEX};
   // Borrowed only during CreateShader; never stored by Shader. nullptr uses disk.
-  FileSystem *file_system{};
+  const FileSystem *file_system{};
   std::vector<std::string> include_paths;
   std::vector<std::pair<std::string, std::string>> defines;
 };
