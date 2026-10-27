@@ -23,13 +23,17 @@ struct Vertex {
 };
 }  // namespace
 
-int RunTriangle(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
+int RunTriangle(grassland::rhi::BackendAPI api,
+                int32_t device_index,
+                int frames,
+                bool headless,
+                const std::string &capture_directory) {
   using namespace grassland::rhi;
 
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
     return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ObjPtr<IDevice> device = core->CreateDevice(device_index);
   if (!device)
     return 1;
   ObjPtr<IDownloadToken> last_frame;

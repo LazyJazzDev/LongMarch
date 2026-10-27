@@ -11,6 +11,7 @@
 #include "imgui.h"
 
 int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
+                        int32_t device_index,
                         int frames,
                         bool headless,
                         const char *font_file,
@@ -24,7 +25,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
     return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ObjPtr<IDevice> device = core->CreateDevice(device_index);
   if (!device)
     return 1;
   std::array<ObjPtr<IDownloadToken>, 2> last_frames;

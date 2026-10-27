@@ -154,7 +154,11 @@ int RunWindow(grassland::rhi::IDevice *device,
 }
 }  // namespace
 
-int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
+int RunWindow(grassland::rhi::BackendAPI api,
+              int32_t device_index,
+              int frames,
+              bool headless,
+              const std::string &capture_directory) {
   using namespace grassland::rhi;
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
@@ -163,7 +167,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
   std::cout << "Backend: " << BackendAPIName(api) << '\n' << std::boolalpha;
   for (size_t id = 0; id < devices.size(); ++id) {
     const auto &info = devices[id];
-    std::cout << '[' << id << "] " << info.name << " (" << PhysicalDeviceTypeName(info.type) << ")\n"
+    std::cout << '[' << id + 1 << "] " << info.name << " (" << PhysicalDeviceTypeName(info.type) << ")\n"
               << "  Dedicated: " << info.dedicated_memory / (1024 * 1024)
               << " MiB, shared/unified: " << info.unified_memory / (1024 * 1024) << " MiB\n"
               << "  Ray tracing pipeline: " << info.ray_tracing_pipeline_feature
@@ -171,10 +175,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
               << '\n';
   }
 
-  // Requirements only filter candidates. All supported RHI features are enabled.
-  DeviceFeatureRequirement requirements{};
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(requirements);
-  // For an explicit ID, use core->CreateDevice(id) instead.
+  ObjPtr<IDevice> device = core->CreateDevice(device_index);
   if (!device)
     return 1;
   std::cout << "Selected: " << device->Name() << '\n'

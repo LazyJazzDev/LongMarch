@@ -12,6 +12,7 @@
 #include "imgui.h"
 
 int RunImGui(grassland::rhi::BackendAPI api,
+             int32_t device_index,
              int frames,
              bool headless,
              const char *font_file,
@@ -25,7 +26,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
     return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ObjPtr<IDevice> device = core->CreateDevice(device_index);
   if (!device)
     return 1;
   ObjPtr<IDownloadToken> last_frame;

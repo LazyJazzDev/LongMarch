@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 
+#include "grassland/rhi/rhi.h"
 #include "module.h"
 #include "snowberg/tui/tui.h"
 
@@ -16,10 +17,24 @@ int main(int argc, char **argv) {
   bool headless = false;
   bool all = false;
   int frames = 0;
+  int device_number = 0;
   const char *font_file = nullptr;
   float font_size = 20.0f;
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
+    if (arg == "--device") {
+      if (i + 1 >= argc) {
+        std::cerr << "--device requires a positive device number (starting at 1)\n";
+        return 1;
+      }
+      const std::string value = argv[++i];
+      const auto parsed = std::from_chars(value.data(), value.data() + value.size(), device_number);
+      if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() || device_number <= 0) {
+        std::cerr << "--device requires a positive device number (starting at 1)\n";
+        return 1;
+      }
+      continue;
+    }
     if (arg == "--save-last-frame") {
       if (i + 1 >= argc || !argv[i + 1][0]) {
         std::cerr << "--save-last-frame requires an output directory\n";
@@ -47,7 +62,7 @@ int main(int argc, char **argv) {
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui|imgui_multi_window | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N] [--save-last-frame DIR] [--font PATH] [--font-size PIXELS]\n--save-last-frame enables per-frame GPU image readback and saves the final frame at exit as PNG, native .bin pixels and .txt metadata.\nFont options apply to ImGui modules; defaults: built-in font, 20 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui|imgui_multi_window | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--device N] [--headless] [--frames N] [--save-last-frame DIR] [--font PATH] [--font-size PIXELS]\n--save-last-frame enables per-frame GPU image readback and saves the final frame at exit as PNG, native .bin pixels and .txt metadata.\nFont options apply to ImGui modules; defaults: built-in font, 20 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend, device or module: select each missing option in the terminal menu; a sole backend or device is automatic. Device numbers start at 1, match the device menu, and are specific to the selected backend. --device N applies to all modules, including --all. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -154,6 +169,39 @@ int main(int argc, char **argv) {
       api = backends[*selected];
     }
   }
+  int32_t device_index = 0;
+  {
+    ObjPtr<ICore> core = CreateCore(api);
+    if (!core)
+      return 1;
+    const auto devices = core->GetPhysicalDevices();
+    if (devices.empty()) {
+      std::cerr << "No graphics device is available for " << BackendAPIName(api) << ".\n";
+      return 1;
+    }
+    std::vector<snowberg::tui::MenuOption> options;
+    for (const auto &device : devices) {
+      options.push_back({"[" + std::to_string(options.size() + 1) + "] " + device.name,
+                         PhysicalDeviceTypeName(device.type) +
+                             " | dedicated: " + std::to_string(device.dedicated_memory / (1024 * 1024)) +
+                             " MiB | shared: " + std::to_string(device.unified_memory / (1024 * 1024)) + " MiB"});
+    }
+    if (device_number > 0) {
+      if (static_cast<size_t>(device_number) > devices.size()) {
+        std::cerr << "Device number " << device_number << " is out of range; expected 1-" << devices.size() << ".\n";
+        return 1;
+      }
+      device_index = device_number - 1;
+    } else if (devices.size() > 1) {
+      snowberg::tui::Menu menu;
+      const auto selected = menu.Select("RHI Hello - Device Selection", options);
+      if (!selected)
+        return 0;
+      device_index = static_cast<int32_t>(*selected);
+    }
+    std::cout << "Selected device " << device_index + 1 << ": " << devices[device_index].name << " ("
+              << BackendAPIName(api) << ")\n";
+  }
   if (!frames) {
     if (headless)
       frames = 3000;
@@ -162,49 +210,49 @@ int main(int argc, char **argv) {
   }
   if (all) {
     int result = 0;
-    if (RunWindow(api, frames, headless, capture_directory) != 0) {
+    if (RunWindow(api, device_index, frames, headless, capture_directory) != 0) {
       std::cerr << "window: FAILED\n";
       result = 1;
     }
-    if (RunTriangle(api, frames, headless, capture_directory) != 0) {
+    if (RunTriangle(api, device_index, frames, headless, capture_directory) != 0) {
       std::cerr << "triangle: FAILED\n";
       result = 1;
     }
-    if (RunCube(api, frames, headless, capture_directory) != 0) {
+    if (RunCube(api, device_index, frames, headless, capture_directory) != 0) {
       std::cerr << "cube: FAILED\n";
       result = 1;
     }
-    if (RunTexture(api, frames, headless, capture_directory) != 0) {
+    if (RunTexture(api, device_index, frames, headless, capture_directory) != 0) {
       std::cerr << "texture: FAILED\n";
       result = 1;
     }
-    if (RunBlend(api, frames, headless, capture_directory) != 0) {
+    if (RunBlend(api, device_index, frames, headless, capture_directory) != 0) {
       std::cerr << "blend: FAILED\n";
       result = 1;
     }
-    if (RunNBody(api, frames, headless, capture_directory) != 0) {
+    if (RunNBody(api, device_index, frames, headless, capture_directory) != 0) {
       std::cerr << "nbody: FAILED\n";
       result = 1;
     }
-    if (RunRayTracing(api, frames, headless, capture_directory) != 0) {
+    if (RunRayTracing(api, device_index, frames, headless, capture_directory) != 0) {
       std::cerr << "raytracing: FAILED\n";
       result = 1;
     }
-    if (RunRayQuery(api, frames, headless, capture_directory) != 0) {
+    if (RunRayQuery(api, device_index, frames, headless, capture_directory) != 0) {
       std::cerr << "ray_query: FAILED\n";
       result = 1;
     }
     if (headless) {
       std::cout << "hdr: SKIPPED (requires a window)\n";
-    } else if (RunHDR(api, frames, capture_directory) != 0) {
+    } else if (RunHDR(api, device_index, frames, capture_directory) != 0) {
       std::cerr << "hdr: FAILED\n";
       result = 1;
     }
-    if (RunImGui(api, frames, headless, font_file, font_size, capture_directory) != 0) {
+    if (RunImGui(api, device_index, frames, headless, font_file, font_size, capture_directory) != 0) {
       std::cerr << "imgui: FAILED\n";
       result = 1;
     }
-    if (RunImGuiMultiWindow(api, frames, headless, font_file, font_size, capture_directory) != 0) {
+    if (RunImGuiMultiWindow(api, device_index, frames, headless, font_file, font_size, capture_directory) != 0) {
       std::cerr << "imgui_multi_window: FAILED\n";
       result = 1;
     }
@@ -231,31 +279,31 @@ int main(int argc, char **argv) {
     module = options[*selected].name;
   }
   if (module == "window")
-    return RunWindow(api, frames, headless, capture_directory);
+    return RunWindow(api, device_index, frames, headless, capture_directory);
   if (module == "triangle")
-    return RunTriangle(api, frames, headless, capture_directory);
+    return RunTriangle(api, device_index, frames, headless, capture_directory);
   if (module == "cube")
-    return RunCube(api, frames, headless, capture_directory);
+    return RunCube(api, device_index, frames, headless, capture_directory);
   if (module == "texture")
-    return RunTexture(api, frames, headless, capture_directory);
+    return RunTexture(api, device_index, frames, headless, capture_directory);
   if (module == "blend")
-    return RunBlend(api, frames, headless, capture_directory);
+    return RunBlend(api, device_index, frames, headless, capture_directory);
   if (module == "nbody")
-    return RunNBody(api, frames, headless, capture_directory);
+    return RunNBody(api, device_index, frames, headless, capture_directory);
   if (module == "raytracing")
-    return RunRayTracing(api, frames, headless, capture_directory);
+    return RunRayTracing(api, device_index, frames, headless, capture_directory);
   if (module == "ray_query")
-    return RunRayQuery(api, frames, headless, capture_directory);
+    return RunRayQuery(api, device_index, frames, headless, capture_directory);
   if (module == "imgui")
-    return RunImGui(api, frames, headless, font_file, font_size, capture_directory);
+    return RunImGui(api, device_index, frames, headless, font_file, font_size, capture_directory);
   if (module == "imgui_multi_window")
-    return RunImGuiMultiWindow(api, frames, headless, font_file, font_size, capture_directory);
+    return RunImGuiMultiWindow(api, device_index, frames, headless, font_file, font_size, capture_directory);
   if (module == "hdr") {
     if (headless) {
       std::cerr << "hdr requires a window; --headless is unsupported.\n";
       return 1;
     }
-    return RunHDR(api, frames, capture_directory);
+    return RunHDR(api, device_index, frames, capture_directory);
   }
   std::cerr << "Unknown module: " << module << '\n';
   return 1;

@@ -19,18 +19,22 @@ namespace {
 #include "built_in_shaders.inl"
 }
 
-int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
+int RunRayQuery(grassland::rhi::BackendAPI api,
+                int32_t device_index,
+                int frames,
+                bool headless,
+                const std::string &capture_directory) {
   using namespace grassland::rhi;
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
     return 1;
-  DeviceFeatureRequirement required;
-  required.ray_query = true;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
-  if (!device) {
-    std::cout << "ray_query: SKIPPED (ray tracing unavailable)\n";
+  if (!core->GetPhysicalDevices()[device_index].ray_query_feature) {
+    std::cout << "ray_query: SKIPPED (selected device does not support this feature)\n";
     return 0;
   }
+  ObjPtr<IDevice> device = core->CreateDevice(device_index);
+  if (!device)
+    return 1;
   ObjPtr<IDownloadToken> last_frame;
   ImageDesc last_frame_desc{};
   ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
