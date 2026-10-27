@@ -11,7 +11,21 @@ ModuleBase::ModuleBase(grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
 int ModuleBase::Run(const ModuleOptions &options) {
   if (!core_ || !device_)
     return 1;
-  return RunImpl(options);
+  should_close_ = false;
+  frame_index_ = 0;
+  int result = OnInit(options);
+  while (!result && !should_close_ && (!options.frames || frame_index_ < options.frames)) {
+    if (!options.headless && !grassland::rhi::PollEvents()) {
+      RequestClose();
+      break;
+    }
+    result = OnUpdate();
+    if (!result && !should_close_)
+      result = OnRender();
+  }
+  RequestClose();
+  const int termination_result = OnTerminate();
+  return result ? result : termination_result;
 }
 
 grassland::rhi::ICore *ModuleBase::GetCore() const {
@@ -26,30 +40,22 @@ grassland::rhi::BackendAPI ModuleBase::GetBackendAPI() const {
   return core_->GetBackendAPI();
 }
 
-std::unique_ptr<ModuleBase> CreateModule(std::string_view name,
-                                         const grassland::rhi::ObjPtr<grassland::rhi::ICore> &core,
-                                         const grassland::rhi::ObjPtr<grassland::rhi::IDevice> &device) {
-  if (name == "window")
-    return std::make_unique<WindowModule>(core, device);
-  if (name == "triangle")
-    return std::make_unique<TriangleModule>(core, device);
-  if (name == "cube")
-    return std::make_unique<CubeModule>(core, device);
-  if (name == "texture")
-    return std::make_unique<TextureModule>(core, device);
-  if (name == "blend")
-    return std::make_unique<BlendModule>(core, device);
-  if (name == "nbody")
-    return std::make_unique<NBodyModule>(core, device);
-  if (name == "raytracing")
-    return std::make_unique<RayTracingModule>(core, device);
-  if (name == "ray_query")
-    return std::make_unique<RayQueryModule>(core, device);
-  if (name == "hdr")
-    return std::make_unique<HDRModule>(core, device);
-  if (name == "imgui")
-    return std::make_unique<ImGuiModule>(core, device);
-  if (name == "imgui_multi_window")
-    return std::make_unique<ImGuiMultiWindowModule>(core, device);
-  return {};
+bool ModuleBase::ShouldClose() const {
+  return should_close_;
+}
+
+void ModuleBase::RequestClose() {
+  should_close_ = true;
+}
+
+int ModuleBase::GetFrameIndex() const {
+  return frame_index_;
+}
+
+void ModuleBase::CompleteFrame() {
+  ++frame_index_;
+}
+
+void ModuleBase::SetWarmupFrames(int frames) {
+  frame_index_ = -frames;
 }

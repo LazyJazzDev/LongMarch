@@ -1,4 +1,4 @@
-﻿#include "../../module.h"
+﻿#include "module.h"
 
 #include <fmt/format.h>
 
@@ -12,155 +12,43 @@
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 
-namespace {
-int RunWindow(grassland::rhi::IDevice *device,
-              grassland::rhi::IWindow *window,
-              grassland::rhi::IQueue *graphics,
-              int frames,
-              bool headless,
-              grassland::rhi::PresentMode &requested,
-              bool &present_mode_changed,
-              const std::string &capture_directory) {
-  using namespace grassland::rhi;
-  ObjPtr<IDownloadToken> last_frame;
+using namespace grassland::rhi;
+
+struct WindowModule::State {
+  bool initialized{};
+  bool headless{};
+  std::string capture_directory{};
+  grassland::rhi::IDevice *device{};
+  PresentMode requested{};
+  bool present_mode_changed{};
+  ObjPtr<IWindow> window{};
+  ObjPtr<IQueue> graphics{};
+  ObjPtr<IDownloadToken> last_frame{};
   ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  float last_frame_white_scale = 1.0f;
-  if (!headless) {
-    const auto options = window->GetSupportedPresentationOptions();
-    if (options.empty())
-      return 1;
-    std::cout << "Supported presentation combinations (SDR):\n";
-    for (const auto &option : options) {
-      std::cout << "  " << PresentModeName(option.present_mode) << " + " << ImageFormatName(option.format) << '\n';
-    }
-  }
-  std::array<ObjPtr<IImage>, 3> targets;
-  std::array<ObjPtr<ISubmissionToken>, 3> pending;
-  if (headless) {
-    for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
-      if (!target)
-        return 1;
-    }
-  }
-  grassland::FPSCounter fps_counter;
-  auto title_time = std::chrono::steady_clock::now();
-  // Warm up allocations and pipelines before measuring completed GPU work.
-  auto benchmark_start = std::chrono::steady_clock::now();
-  int rendered = headless ? -60 : 0;
-  while (!frames || rendered < frames) {
-    if (!headless) {
-      if (!PollEvents())
-        break;
-      if (window->ShouldClose())
-        break;
-      // Previous loop locals are gone; rebuild only before recording this frame.
-      if (window->IsSwapChainInvalid()) {
-        if (!window->RebuildSwapChain())
-          return 1;
-      }
-      if (present_mode_changed) {
-        present_mode_changed = false;
-        if (!window->SetPresentMode(requested))
-          return 1;
-        std::cout << "Present mode: " << PresentModeName(window->GetPresentMode()) << std::endl;
-      }
-    }
-    const size_t slot = (static_cast<int64_t>(rendered) + 60) % targets.size();
-    if (headless) {
-      if (rendered == 0) {
-        for (auto &token : pending) {
-          if (token) {
-            if (!token->WaitHost())
-              return 1;
-            token = {};
-          }
-        }
-        benchmark_start = std::chrono::steady_clock::now();
-      }
-      if (pending[slot]) {
-        if (!pending[slot]->WaitHost())
-          return 1;
-        pending[slot] = {};
-      }
-    }
-    ObjPtr<IImage> image;
-    if (headless)
-      image = targets[slot];
-    else
-      image = window->GetNextImage();
-    if (!image) {
-      if (headless)
-        return 1;
-      fps_counter.Reset();
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      continue;
-    }
-    ObjPtr<ICommandContext> context = device->CreateCommandContext();
-    if (!context)
-      return 1;
-    if (!context->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
-      return 1;
-    if (!headless) {
-      if (!context->CmdPresent(window))
-        return 1;
-    }
-    if (!capture_directory.empty()) {
-      last_frame = context->CmdDownloadImage(image.Get());
-      if (!last_frame)
-        return 1;
-      last_frame_desc = image->GetDesc();
-      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
-    }
-    // Submit ends recording and borrows the caller's context reference.
-    ObjPtr<ISubmissionToken> token = graphics->Submit(context.Get());
+  ColorSpace last_frame_space{};
+  float last_frame_white_scale{};
+  std::array<ObjPtr<IImage>, 3> targets{};
+  std::array<ObjPtr<ISubmissionToken>, 3> pending{};
+  grassland::FPSCounter fps_counter{};
+  std::chrono::steady_clock::time_point title_time{};
+  std::chrono::steady_clock::time_point benchmark_start{};
+};
 
-    if (!token)
-      return 1;
-    // Local containers release caller references; accepted work retains its resources.
-    if (headless)
-      pending[slot] = std::move(token);
-    ++rendered;
-    fps_counter.TickFrame();
-    const auto now = std::chrono::steady_clock::now();
-    if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window->SetTitle(fmt::format("LongMarch RHI - FPS: {:.1f} - P: toggle VSync", fps_counter.GetFPS())))
-        return 1;
-      title_time = now;
-    }
-  }
-  if (headless) {
-    for (const auto &token : pending) {
-      if (token) {
-        if (!token->WaitHost())
-          return 1;
-      }
-    }
-    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format("window: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
-                             rendered, seconds, rendered / seconds);
-  }
-  if (!capture_directory.empty()) {
-    if (!last_frame || !last_frame->WaitHost())
-      return 1;
-    std::vector<uint8_t> pixels(last_frame->GetSize());
-    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "window", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
-      return 1;
-  }
-  return 0;
+WindowModule::WindowModule(grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
+                           grassland::rhi::ObjPtr<grassland::rhi::IDevice> device)
+    : ModuleBase(std::move(core), std::move(device)) {
 }
-}  // namespace
 
-int WindowModule::RunImpl(const ModuleOptions &options) {
-  const int frames = options.frames;
-  const bool headless = options.headless;
-  const auto &capture_directory = options.capture_directory;
+WindowModule::~WindowModule() = default;
+
+int WindowModule::OnInit(const ModuleOptions &options) {
+  state_ = std::make_unique<State>();
+
+  state_->headless = options.headless;
+  state_->capture_directory = options.capture_directory;
   const auto api = GetBackendAPI();
   using namespace grassland::rhi;
-  auto *device = GetDevice();
+  state_->device = GetDevice();
   auto *core = GetCore();
   const auto devices = core->GetPhysicalDevices();
   std::cout << "Backend: " << BackendAPIName(api) << '\n' << std::boolalpha;
@@ -174,35 +62,186 @@ int WindowModule::RunImpl(const ModuleOptions &options) {
               << '\n';
   }
 
-  std::cout << "Selected: " << device->Name() << '\n'
-            << "Enabled: ray tracing pipeline=" << device->SupportRayTracingPipeline()
-            << ", ray query=" << device->SupportRayQuery() << ", geometry shader=" << device->SupportGeometryShader()
-            << '\n';
-  PresentMode requested = PRESENT_MODE_VSYNC;
-  bool present_mode_changed = false;
-  ObjPtr<IWindow> window;
-  if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
-    if (!window)
+  std::cout << "Selected: " << state_->device->Name() << '\n'
+            << "Enabled: ray tracing pipeline=" << state_->device->SupportRayTracingPipeline()
+            << ", ray query=" << state_->device->SupportRayQuery()
+            << ", geometry shader=" << state_->device->SupportGeometryShader() << '\n';
+  state_->requested = PRESENT_MODE_VSYNC;
+  state_->present_mode_changed = false;
+
+  if (!state_->headless) {
+    state_->window = state_->device->CreateGLFWWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
+    if (!state_->window)
       return 1;
   }
 
-  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  if (!graphics)
+  state_->graphics = state_->device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  if (!state_->graphics)
     return 1;
-  if (!headless) {
-    window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+  if (!state_->headless) {
+    state_->window->KeyEvent().RegisterCallback([this](int key, int, int action, int) {
       if (action != GLFW_PRESS)
         return;
       if (key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+        glfwSetWindowShouldClose(state_->window->GLFWWindow(), GLFW_TRUE);
       if (key == GLFW_KEY_P) {
-        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        present_mode_changed = true;
+        state_->requested = state_->requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+        state_->present_mode_changed = true;
       }
     });
   }
-  // Reverse declaration order releases children before their parents on every return.
-  return RunWindow(device, window.Get(), graphics.Get(), frames, headless, requested, present_mode_changed,
-                   capture_directory);
+  using namespace grassland::rhi;
+
+  state_->last_frame_desc = ImageDesc{};
+  state_->last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
+  state_->last_frame_white_scale = 1.0f;
+  if (!state_->headless) {
+    const auto options = state_->window->GetSupportedPresentationOptions();
+    if (options.empty())
+      return 1;
+    std::cout << "Supported presentation combinations (SDR):\n";
+    for (const auto &option : options) {
+      std::cout << "  " << PresentModeName(option.present_mode) << " + " << ImageFormatName(option.format) << '\n';
+    }
+  }
+
+  if (state_->headless) {
+    for (auto &target : state_->targets) {
+      target = state_->device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
+      if (!target)
+        return 1;
+    }
+  }
+
+  state_->title_time = std::chrono::steady_clock::now();
+  // Warm up allocations and pipelines before measuring completed GPU work.
+  state_->benchmark_start = std::chrono::steady_clock::now();
+  SetWarmupFrames(state_->headless ? 60 : 0);
+
+  state_->initialized = true;
+  return 0;
+}
+
+int WindowModule::OnUpdate() {
+  if (!state_->headless) {
+    if (state_->window->ShouldClose()) {
+      RequestClose();
+      return 0;
+    }
+    // Previous loop locals are gone; rebuild only before recording this frame.
+    if (state_->window->IsSwapChainInvalid()) {
+      if (!state_->window->RebuildSwapChain())
+        return 1;
+    }
+    if (state_->present_mode_changed) {
+      state_->present_mode_changed = false;
+      if (!state_->window->SetPresentMode(state_->requested))
+        return 1;
+      std::cout << "Present mode: " << PresentModeName(state_->window->GetPresentMode()) << std::endl;
+    }
+  }
+
+  return 0;
+}
+
+int WindowModule::OnRender() {
+  const size_t slot = (static_cast<int64_t>(GetFrameIndex()) + 60) % state_->targets.size();
+  if (state_->headless) {
+    if (GetFrameIndex() == 0) {
+      for (auto &token : state_->pending) {
+        if (token) {
+          if (!token->WaitHost())
+            return 1;
+          token = {};
+        }
+      }
+      state_->benchmark_start = std::chrono::steady_clock::now();
+    }
+    if (state_->pending[slot]) {
+      if (!state_->pending[slot]->WaitHost())
+        return 1;
+      state_->pending[slot] = {};
+    }
+  }
+  ObjPtr<IImage> image;
+  if (state_->headless)
+    image = state_->targets[slot];
+  else
+    image = state_->window->GetNextImage();
+  if (!image) {
+    if (state_->headless)
+      return 1;
+    state_->fps_counter.Reset();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    return 0;
+  }
+  ObjPtr<ICommandContext> context = state_->device->CreateCommandContext();
+  if (!context)
+    return 1;
+  if (!context->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
+    return 1;
+  if (!state_->headless) {
+    if (!context->CmdPresent(state_->window.Get()))
+      return 1;
+  }
+  if (!state_->capture_directory.empty()) {
+    state_->last_frame = context->CmdDownloadImage(image.Get());
+    if (!state_->last_frame)
+      return 1;
+    state_->last_frame_desc = image->GetDesc();
+    state_->last_frame_space = state_->window ? state_->window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+    state_->last_frame_white_scale = state_->window ? state_->window->GetHDRReferenceWhiteScale() : 1.0f;
+  }
+  // Submit ends recording and borrows the caller's context reference.
+  ObjPtr<ISubmissionToken> token = state_->graphics->Submit(context.Get());
+
+  if (!token)
+    return 1;
+  // Local containers release caller references; accepted work retains its resources.
+  if (state_->headless)
+    state_->pending[slot] = std::move(token);
+  CompleteFrame();
+  state_->fps_counter.TickFrame();
+  const auto now = std::chrono::steady_clock::now();
+  if (!state_->headless && now - state_->title_time >= std::chrono::milliseconds(250)) {
+    if (!state_->window->SetTitle(
+            fmt::format("LongMarch RHI - FPS: {:.1f} - P: toggle VSync", state_->fps_counter.GetFPS())))
+      return 1;
+    state_->title_time = now;
+  }
+
+  return 0;
+}
+
+int WindowModule::OnTerminate() {
+  int result = 0;
+  if (state_ && state_->initialized) {
+    result = [&]() -> int {
+      if (state_->headless) {
+        for (const auto &token : state_->pending) {
+          if (token) {
+            if (!token->WaitHost())
+              return 1;
+          }
+        }
+        const double seconds =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - state_->benchmark_start).count();
+        std::cout << fmt::format(
+            "window: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", GetFrameIndex(),
+            seconds, GetFrameIndex() / seconds);
+      }
+      if (!state_->capture_directory.empty()) {
+        if (!state_->last_frame || !state_->last_frame->WaitHost())
+          return 1;
+        std::vector<uint8_t> pixels(state_->last_frame->GetSize());
+        if (!state_->last_frame->CopyTo(pixels.data(), pixels.size()) ||
+            !SaveImage(state_->capture_directory, "window", pixels, state_->last_frame_desc, state_->last_frame_space,
+                       state_->last_frame_white_scale))
+          return 1;
+      }
+      return 0;
+    }();
+  }
+  state_.reset();
+  return result;
 }

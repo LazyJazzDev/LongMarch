@@ -1,4 +1,4 @@
-﻿#include "../../module.h"
+﻿#include "module.h"
 
 #include <fmt/format.h>
 
@@ -16,40 +16,86 @@
 #include "grassland/util/virtual_file_system.h"
 
 namespace {
+struct CameraInfo {
+  glm::mat4 screen_to_camera;
+  glm::mat4 camera_to_world;
+};
+
 #include "built_in_shaders.inl"
+}  // namespace
+
+using namespace grassland::rhi;
+using namespace grassland::rhix;
+
+struct RayTracingModule::State {
+  bool initialized{};
+  bool headless{};
+  std::string capture_directory{};
+  grassland::rhix::Device device{};
+  grassland::rhix::DownloadToken last_frame{};
+  ImageDesc last_frame_desc{};
+  ColorSpace last_frame_space{};
+  float last_frame_white_scale{};
+  PresentMode requested{};
+  bool present_mode_changed{};
+  Window window{};
+  Queue queue{};
+  std::array<Image, 3> targets{};
+  std::array<SubmissionToken, 3> pending{};
+  RayTracingProgram trace{};
+  Program program{};
+  TopLevelAccelerationStructure tlas{};
+  std::vector<grassland::rhix::RayTracingInstance> instances{};
+  Buffer camera_buffer{};
+  BindingGroup trace_group{};
+  BindingGroup display_group{};
+  Image output{};
+  grassland::FPSCounter fps{};
+  std::chrono::steady_clock::time_point title_time{};
+  std::chrono::steady_clock::time_point benchmark_start{};
+  std::chrono::steady_clock::time_point animation_start{};
+};
+
+RayTracingModule::RayTracingModule(grassland::rhix::Core core, grassland::rhix::Device device)
+    : ModuleBase(std::move(core), std::move(device)) {
 }
 
-int RayTracingModule::RunImpl(const ModuleOptions &options) {
-  const int frames = options.frames;
-  const bool headless = options.headless;
-  const auto &capture_directory = options.capture_directory;
+RayTracingModule::~RayTracingModule() = default;
+
+int RayTracingModule::OnInit(const ModuleOptions &options) {
+  state_ = std::make_unique<State>();
+
+  state_->headless = options.headless;
+  state_->capture_directory = options.capture_directory;
   using namespace grassland::rhi;
   using namespace grassland::rhix;
-  const auto &device = GetDevice();
-  if (!device.SupportRayTracingPipeline()) {
+  state_->device = GetDevice();
+  if (!state_->device.SupportRayTracingPipeline()) {
     std::cout << "raytracing: SKIPPED (selected device does not support this feature)\n";
-    return 0;
+    {
+      RequestClose();
+      return 0;
+    }
   }
-  grassland::rhix::DownloadToken last_frame;
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  float last_frame_white_scale = 1.0f;
-  PresentMode requested = PRESENT_MODE_VSYNC;
-  bool present_mode_changed = false;
-  Window window;
-  if (!headless) {
-    window = device.CreateGLFWWindow({1280, 720, "RHIX raytracing - P: toggle VSync"});
-    if (!window)
+
+  state_->last_frame_desc = ImageDesc{};
+  state_->last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
+  state_->last_frame_white_scale = 1.0f;
+  state_->requested = PRESENT_MODE_VSYNC;
+  state_->present_mode_changed = false;
+
+  if (!state_->headless) {
+    state_->window = state_->device.CreateGLFWWindow({1280, 720, "RHIX raytracing - P: toggle VSync"});
+    if (!state_->window)
       return 1;
   }
-  Queue queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
-  if (!queue)
+  state_->queue = state_->device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  if (!state_->queue)
     return 1;
-  std::array<Image, 3> targets;
-  std::array<SubmissionToken, 3> pending;
-  if (headless)
-    for (auto &target : targets) {
-      target = device.CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
+
+  if (state_->headless)
+    for (auto &target : state_->targets) {
+      target = state_->device.CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!target)
         return 1;
     }
@@ -58,22 +104,23 @@ int RayTracingModule::RunImpl(const ModuleOptions &options) {
   PipelineLayoutDesc trace_layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_RAY_GENERATION},
                                      {1, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_RAY_GENERATION},
                                      {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_RAY_GENERATION}}}}};
-  Shader raygen = device.CreateShaderFromSource(source, "RayGenMain", SHADER_STAGE_RAY_GENERATION);
+  Shader raygen = state_->device.CreateShaderFromSource(source, "RayGenMain", SHADER_STAGE_RAY_GENERATION);
   if (!raygen)
     return 1;
-  Shader miss = device.CreateShaderFromSource(source, "MissMain", SHADER_STAGE_MISS);
+  Shader miss = state_->device.CreateShaderFromSource(source, "MissMain", SHADER_STAGE_MISS);
   if (!miss)
     return 1;
-  Shader hit = device.CreateShaderFromSource(source, "ClosestHitMain", SHADER_STAGE_CLOSEST_HIT);
+  Shader hit = state_->device.CreateShaderFromSource(source, "ClosestHitMain", SHADER_STAGE_CLOSEST_HIT);
   if (!hit)
     return 1;
-  Shader sphere_hit = device.CreateShaderFromSource(source, "SphereClosestHitMain", SHADER_STAGE_CLOSEST_HIT);
+  Shader sphere_hit = state_->device.CreateShaderFromSource(source, "SphereClosestHitMain", SHADER_STAGE_CLOSEST_HIT);
   if (!sphere_hit)
     return 1;
-  Shader intersection = device.CreateShaderFromSource(source, "SphereIntersectionMain", SHADER_STAGE_INTERSECTION);
+  Shader intersection =
+      state_->device.CreateShaderFromSource(source, "SphereIntersectionMain", SHADER_STAGE_INTERSECTION);
   if (!intersection)
     return 1;
-  Shader callable = device.CreateShaderFromSource(source, "CallableMain", SHADER_STAGE_CALLABLE);
+  Shader callable = state_->device.CreateShaderFromSource(source, "CallableMain", SHADER_STAGE_CALLABLE);
   if (!callable)
     return 1;
   RayTracingProgramDesc desc;
@@ -84,16 +131,16 @@ int RayTracingModule::RunImpl(const ModuleOptions &options) {
   desc.callable_shaders = {callable.Get()};
   desc.max_payload_size = 32;
   desc.max_attribute_size = 12;
-  RayTracingProgram trace = device.CreateRayTracingProgram(desc);
-  if (!trace)
+  state_->trace = state_->device.CreateRayTracingProgram(desc);
+  if (!state_->trace)
     return 1;
 
   const auto &display_source = shader_list.at("modules/raytracing/shaders/display.slang");
   std::string display(display_source.first, display_source.second);
-  Shader vs = device.CreateShaderFromSource(display, "VSMain", SHADER_STAGE_VERTEX);
+  Shader vs = state_->device.CreateShaderFromSource(display, "VSMain", SHADER_STAGE_VERTEX);
   if (!vs)
     return 1;
-  Shader ps = device.CreateShaderFromSource(display, "PSMain", SHADER_STAGE_FRAGMENT);
+  Shader ps = state_->device.CreateShaderFromSource(display, "PSMain", SHADER_STAGE_FRAGMENT);
   if (!ps)
     return 1;
   ProgramDesc graphics;
@@ -102,41 +149,41 @@ int RayTracingModule::RunImpl(const ModuleOptions &options) {
   graphics.pipeline_layout.groups = {{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   {
     Image first;
-    if (headless)
-      first = targets[0];
+    if (state_->headless)
+      first = state_->targets[0];
     else
-      first = window.GetNextImage();
+      first = state_->window.GetNextImage();
     if (!first)
       return 1;
     graphics.color_formats = {first.GetDesc().format};
   }
-  Program program = device.CreateProgram(graphics);
-  if (!program)
+  state_->program = state_->device.CreateProgram(graphics);
+  if (!state_->program)
     return 1;
   BottomLevelAccelerationStructureDesc triangles;
   triangles.geometries = {{3, 12, 0}};
   triangles.allow_compaction = true;
   BottomLevelAccelerationStructureDesc boxes;
   boxes.aabbs = {{1, 24, true}};
-  BottomLevelAccelerationStructure triangle = device.CreateBottomLevelAccelerationStructure(triangles);
+  BottomLevelAccelerationStructure triangle = state_->device.CreateBottomLevelAccelerationStructure(triangles);
   if (!triangle)
     return 1;
-  BottomLevelAccelerationStructure sphere = device.CreateBottomLevelAccelerationStructure(boxes);
+  BottomLevelAccelerationStructure sphere = state_->device.CreateBottomLevelAccelerationStructure(boxes);
   if (!sphere)
     return 1;
-  TopLevelAccelerationStructure tlas = device.CreateTopLevelAccelerationStructure({2, true});
-  if (!tlas)
+  state_->tlas = state_->device.CreateTopLevelAccelerationStructure({2, true});
+  if (!state_->tlas)
     return 1;
   {
     const float vertices[] = {-1, -1, 0, 1, -1, 0, 0, 1, 0};
     const float bounds[] = {-1, -1, -1, 1, 1, 1};
-    Buffer vertex_buffer = device.CreateBuffer({sizeof(vertices)});
+    Buffer vertex_buffer = state_->device.CreateBuffer({sizeof(vertices)});
     if (!vertex_buffer)
       return 1;
-    Buffer aabb_buffer = device.CreateBuffer({sizeof(bounds)});
+    Buffer aabb_buffer = state_->device.CreateBuffer({sizeof(bounds)});
     if (!aabb_buffer)
       return 1;
-    CommandContext build = device.CreateCommandContext();
+    CommandContext build = state_->device.CreateCommandContext();
     if (!build)
       return 1;
     if (!build.CmdUploadBuffer(vertex_buffer, 0, vertices, sizeof(vertices)))
@@ -149,7 +196,7 @@ int RayTracingModule::RunImpl(const ModuleOptions &options) {
       return 1;
     if (!build.CmdQueryCompactedSize(triangle))
       return 1;
-    SubmissionToken token = queue.Submit(std::move(build));
+    SubmissionToken token = state_->queue.Submit(std::move(build));
     if (!token)
       return 1;
     if (!token.WaitHost())
@@ -157,217 +204,237 @@ int RayTracingModule::RunImpl(const ModuleOptions &options) {
     triangles.compacted_size = triangle.GetCompactedSize();
     if (!triangles.compacted_size)
       return 1;
-    BottomLevelAccelerationStructure compact = device.CreateBottomLevelAccelerationStructure(triangles);
+    BottomLevelAccelerationStructure compact = state_->device.CreateBottomLevelAccelerationStructure(triangles);
     if (!compact)
       return 1;
-    CommandContext copy = device.CreateCommandContext();
+    CommandContext copy = state_->device.CreateCommandContext();
     if (!copy)
       return 1;
     if (!copy.CmdCompactAccelerationStructure(triangle, compact))
       return 1;
-    token = queue.Submit(std::move(copy));
+    token = state_->queue.Submit(std::move(copy));
     if (!token)
       return 1;
     if (!token.WaitHost())
       return 1;
     triangle = std::move(compact);
   }
-  std::vector<grassland::rhix::RayTracingInstance> instances(2);
-  instances[0].blas = triangle;
-  instances[1].blas = sphere;
-  instances[1].transform[3] = 2.0f;
-  instances[1].hit_group_offset = 1;
+  state_->instances = std::vector<grassland::rhix::RayTracingInstance>(2);
+  state_->instances[0].blas = triangle;
+  state_->instances[1].blas = sphere;
+  state_->instances[1].transform[3] = 2.0f;
+  state_->instances[1].hit_group_offset = 1;
   {
-    CommandContext build = device.CreateCommandContext();
+    CommandContext build = state_->device.CreateCommandContext();
     if (!build)
       return 1;
-    if (!build.CmdBuildTopLevelAccelerationStructure(tlas, instances))
+    if (!build.CmdBuildTopLevelAccelerationStructure(state_->tlas, state_->instances))
       return 1;
-    SubmissionToken token = queue.Submit(std::move(build));
+    SubmissionToken token = state_->queue.Submit(std::move(build));
     if (!token)
       return 1;
     if (!token.WaitHost())
       return 1;
   }
 
-  struct CameraInfo {
-    glm::mat4 screen_to_camera;
-    glm::mat4 camera_to_world;
-  };
+  state_->camera_buffer = state_->device.CreateBuffer({256});
+  if (!state_->camera_buffer)
+    return 1;
+  state_->trace_group = state_->device.CreateBindingGroup(trace_layout.groups[0]);
+  if (!state_->trace_group)
+    return 1;
+  if (!state_->trace_group.BindResource(0, state_->tlas))
+    return 1;
+  state_->display_group = state_->device.CreateBindingGroup(graphics.pipeline_layout.groups[0]);
+  if (!state_->display_group)
+    return 1;
 
-  Buffer camera_buffer = device.CreateBuffer({256});
-  if (!camera_buffer)
+  if (!state_->trace_group.BindResource(2, state_->camera_buffer))
     return 1;
-  BindingGroup trace_group = device.CreateBindingGroup(trace_layout.groups[0]);
-  if (!trace_group)
-    return 1;
-  if (!trace_group.BindResource(0, tlas))
-    return 1;
-  BindingGroup display_group = device.CreateBindingGroup(graphics.pipeline_layout.groups[0]);
-  if (!display_group)
-    return 1;
-  Image output;
-  if (!trace_group.BindResource(2, camera_buffer))
-    return 1;
-  if (!headless) {
-    window.KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+  if (!state_->headless) {
+    state_->window.KeyEvent().RegisterCallback([this](int key, int, int action, int) {
       if (action != GLFW_PRESS)
         return;
       if (key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(window.GLFWWindow(), GLFW_TRUE);
+        glfwSetWindowShouldClose(state_->window.GLFWWindow(), GLFW_TRUE);
       if (key == GLFW_KEY_P) {
-        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        present_mode_changed = true;
+        state_->requested = state_->requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+        state_->present_mode_changed = true;
       }
     });
   }
-  grassland::FPSCounter fps;
-  auto title_time = std::chrono::steady_clock::now();
+
+  state_->title_time = std::chrono::steady_clock::now();
   // Warm up allocations and pipelines before measuring completed GPU work.
-  auto benchmark_start = std::chrono::steady_clock::now();
-  const auto animation_start = std::chrono::steady_clock::now();
-  int rendered = headless ? -60 : 0;
-  while (!frames || rendered < frames) {
-    if (!headless) {
-      if (!PollEvents())
-        break;
-      if (window.ShouldClose())
-        break;
-      if (window.IsSwapChainInvalid()) {
-        if (!window.RebuildSwapChain())
-          return 1;
-      }
-      if (present_mode_changed) {
-        present_mode_changed = false;
-        if (!window.SetPresentMode(requested))
-          return 1;
-      }
+  state_->benchmark_start = std::chrono::steady_clock::now();
+  state_->animation_start = std::chrono::steady_clock::now();
+  SetWarmupFrames(state_->headless ? 60 : 0);
+
+  state_->initialized = true;
+  return 0;
+}
+
+int RayTracingModule::OnUpdate() {
+  if (!state_->headless) {
+    if (state_->window.ShouldClose()) {
+      RequestClose();
+      return 0;
     }
-    const size_t slot = (static_cast<int64_t>(rendered) + 60) % targets.size();
-    if (headless) {
-      if (rendered == 0) {
-        for (auto &token : pending) {
+    if (state_->window.IsSwapChainInvalid()) {
+      if (!state_->window.RebuildSwapChain())
+        return 1;
+    }
+    if (state_->present_mode_changed) {
+      state_->present_mode_changed = false;
+      if (!state_->window.SetPresentMode(state_->requested))
+        return 1;
+    }
+  }
+
+  return 0;
+}
+
+int RayTracingModule::OnRender() {
+  const size_t slot = (static_cast<int64_t>(GetFrameIndex()) + 60) % state_->targets.size();
+  if (state_->headless) {
+    if (GetFrameIndex() == 0) {
+      for (auto &token : state_->pending) {
+        if (token) {
+          if (!token.WaitHost())
+            return 1;
+          token = {};
+        }
+      }
+      state_->benchmark_start = std::chrono::steady_clock::now();
+    }
+    if (state_->pending[slot]) {
+      if (!state_->pending[slot].WaitHost())
+        return 1;
+      state_->pending[slot] = {};
+    }
+  }
+  Image image;
+  if (state_->headless)
+    image = state_->targets[slot];
+  else
+    image = state_->window.GetNextImage();
+  if (!image) {
+    if (state_->headless)
+      return 1;
+    state_->fps.Reset();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    return 0;
+  }
+  auto extent = image.GetDesc();
+  CommandContext context = state_->device.CreateCommandContext();
+  if (!context)
+    return 1;
+  if (!state_->output || state_->output.GetDesc().width != extent.width ||
+      state_->output.GetDesc().height != extent.height) {
+    state_->output = state_->device.CreateImage({extent.width, extent.height, IMAGE_FORMAT_R8G8B8A8_UNORM});
+    if (!state_->output)
+      return 1;
+    if (!state_->trace_group.BindResource(1, state_->output))
+      return 1;
+    if (!state_->display_group.BindResource(0, state_->output))
+      return 1;
+    CameraInfo camera{
+        glm::inverse(glm::perspective(glm::radians(60.0f), float(extent.width) / float(extent.height), 0.1f, 10.0f)),
+        glm::inverse(glm::lookAt(glm::vec3{0, 0, 5}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0}))};
+    if (!context.CmdUploadBuffer(state_->camera_buffer, 0, &camera, sizeof(camera)))
+      return 1;
+  }
+  // Match graphics_hello: one Y-axis revolution every two seconds.
+  const float angle =
+      state_->headless
+          ? float(GetFrameIndex() + 60) * 0.01f
+          : std::chrono::duration<float>(std::chrono::steady_clock::now() - state_->animation_start).count() *
+                glm::pi<float>();
+  state_->instances[0].transform = {std::cos(angle),  0, std::sin(angle), -2, 0, 1, 0, 0,
+                                    -std::sin(angle), 0, std::cos(angle), 0};
+  state_->instances[1].transform = {std::cos(angle),  0, std::sin(angle) * 0.5f, 2, 0, 1, 0, 0,
+                                    -std::sin(angle), 0, std::cos(angle) * 0.5f, 0};
+  if (!context.CmdBuildTopLevelAccelerationStructure(state_->tlas, state_->instances, ACCELERATION_STRUCTURE_UPDATE))
+    return 1;
+  if (!context.CmdBindRayTracingProgram(state_->trace))
+    return 1;
+  if (!context.CmdBindGroup(0, state_->trace_group))
+    return 1;
+  if (!context.CmdDispatchRays(extent.width, extent.height))
+    return 1;
+  if (!context.CmdBindProgram(state_->program))
+    return 1;
+  if (!context.CmdBindGroup(0, state_->display_group))
+    return 1;
+  if (!context.CmdBeginRendering(image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}))
+    return 1;
+  if (!context.CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
+    return 1;
+  if (!context.CmdSetScissor({0, 0, extent.width, extent.height}))
+    return 1;
+  if (!context.CmdDraw(3))
+    return 1;
+  if (!context.CmdEndRendering())
+    return 1;
+  if (!state_->headless) {
+    if (!context.CmdPresent(state_->window))
+      return 1;
+  }
+  if (!state_->capture_directory.empty()) {
+    state_->last_frame = context.CmdDownloadImage(image);
+    if (!state_->last_frame)
+      return 1;
+    state_->last_frame_desc = image.GetDesc();
+    state_->last_frame_space = state_->window ? state_->window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+    state_->last_frame_white_scale = state_->window ? state_->window.GetHDRReferenceWhiteScale() : 1.0f;
+  }
+  SubmissionToken token = state_->queue.Submit(std::move(context));
+
+  if (!token)
+    return 1;
+  if (state_->headless)
+    state_->pending[slot] = std::move(token);
+  CompleteFrame();
+  state_->fps.TickFrame();
+  auto now = std::chrono::steady_clock::now();
+  if (!state_->headless && now - state_->title_time >= std::chrono::milliseconds(250)) {
+    if (!state_->window.SetTitle(fmt::format("RHIX raytracing - FPS: {:.1f} - P: toggle VSync", state_->fps.GetFPS())))
+      return 1;
+    state_->title_time = now;
+  }
+
+  return 0;
+}
+
+int RayTracingModule::OnTerminate() {
+  int result = 0;
+  if (state_ && state_->initialized) {
+    result = [&]() -> int {
+      if (state_->headless) {
+        for (const auto &token : state_->pending) {
           if (token) {
             if (!token.WaitHost())
               return 1;
-            token = {};
           }
         }
-        benchmark_start = std::chrono::steady_clock::now();
+        const double seconds =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - state_->benchmark_start).count();
+        std::cout << fmt::format(
+            "raytracing: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
+            GetFrameIndex(), seconds, GetFrameIndex() / seconds);
       }
-      if (pending[slot]) {
-        if (!pending[slot].WaitHost())
+      if (!state_->capture_directory.empty()) {
+        if (!state_->last_frame || !state_->last_frame.WaitHost())
           return 1;
-        pending[slot] = {};
-      }
-    }
-    Image image;
-    if (headless)
-      image = targets[slot];
-    else
-      image = window.GetNextImage();
-    if (!image) {
-      if (headless)
-        return 1;
-      fps.Reset();
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      continue;
-    }
-    auto extent = image.GetDesc();
-    CommandContext context = device.CreateCommandContext();
-    if (!context)
-      return 1;
-    if (!output || output.GetDesc().width != extent.width || output.GetDesc().height != extent.height) {
-      output = device.CreateImage({extent.width, extent.height, IMAGE_FORMAT_R8G8B8A8_UNORM});
-      if (!output)
-        return 1;
-      if (!trace_group.BindResource(1, output))
-        return 1;
-      if (!display_group.BindResource(0, output))
-        return 1;
-      CameraInfo camera{
-          glm::inverse(glm::perspective(glm::radians(60.0f), float(extent.width) / float(extent.height), 0.1f, 10.0f)),
-          glm::inverse(glm::lookAt(glm::vec3{0, 0, 5}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0}))};
-      if (!context.CmdUploadBuffer(camera_buffer, 0, &camera, sizeof(camera)))
-        return 1;
-    }
-    // Match graphics_hello: one Y-axis revolution every two seconds.
-    const float angle = headless
-                            ? float(rendered + 60) * 0.01f
-                            : std::chrono::duration<float>(std::chrono::steady_clock::now() - animation_start).count() *
-                                  glm::pi<float>();
-    instances[0].transform = {std::cos(angle),  0, std::sin(angle), -2, 0, 1, 0, 0,
-                              -std::sin(angle), 0, std::cos(angle), 0};
-    instances[1].transform = {std::cos(angle),  0, std::sin(angle) * 0.5f, 2, 0, 1, 0, 0,
-                              -std::sin(angle), 0, std::cos(angle) * 0.5f, 0};
-    if (!context.CmdBuildTopLevelAccelerationStructure(tlas, instances, ACCELERATION_STRUCTURE_UPDATE))
-      return 1;
-    if (!context.CmdBindRayTracingProgram(trace))
-      return 1;
-    if (!context.CmdBindGroup(0, trace_group))
-      return 1;
-    if (!context.CmdDispatchRays(extent.width, extent.height))
-      return 1;
-    if (!context.CmdBindProgram(program))
-      return 1;
-    if (!context.CmdBindGroup(0, display_group))
-      return 1;
-    if (!context.CmdBeginRendering(image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}))
-      return 1;
-    if (!context.CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
-      return 1;
-    if (!context.CmdSetScissor({0, 0, extent.width, extent.height}))
-      return 1;
-    if (!context.CmdDraw(3))
-      return 1;
-    if (!context.CmdEndRendering())
-      return 1;
-    if (!headless) {
-      if (!context.CmdPresent(window))
-        return 1;
-    }
-    if (!capture_directory.empty()) {
-      last_frame = context.CmdDownloadImage(image);
-      if (!last_frame)
-        return 1;
-      last_frame_desc = image.GetDesc();
-      last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-      last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
-    }
-    SubmissionToken token = queue.Submit(std::move(context));
-
-    if (!token)
-      return 1;
-    if (headless)
-      pending[slot] = std::move(token);
-    ++rendered;
-    fps.TickFrame();
-    auto now = std::chrono::steady_clock::now();
-    if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window.SetTitle(fmt::format("RHIX raytracing - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
-        return 1;
-      title_time = now;
-    }
-  }
-  if (headless) {
-    for (const auto &token : pending) {
-      if (token) {
-        if (!token.WaitHost())
+        std::vector<uint8_t> pixels(state_->last_frame.GetSize());
+        if (!state_->last_frame.CopyTo(pixels.data(), pixels.size()) ||
+            !SaveImage(state_->capture_directory, "raytracing", pixels, state_->last_frame_desc,
+                       state_->last_frame_space, state_->last_frame_white_scale))
           return 1;
       }
-    }
-    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format(
-        "raytracing: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered, seconds,
-        rendered / seconds);
+      return 0;
+    }();
   }
-  if (!capture_directory.empty()) {
-    if (!last_frame || !last_frame.WaitHost())
-      return 1;
-    std::vector<uint8_t> pixels(last_frame.GetSize());
-    if (!last_frame.CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "raytracing", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
-      return 1;
-  }
-  return 0;
+  state_.reset();
+  return result;
 }

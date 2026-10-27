@@ -21,106 +21,30 @@ class ModuleBase {
   ModuleBase &operator=(const ModuleBase &) = delete;
 
   int Run(const ModuleOptions &options);
+  bool ShouldClose() const;
 
  protected:
+  void RequestClose();
+  int GetFrameIndex() const;
+  void CompleteFrame();
+  void SetWarmupFrames(int frames);
+
   const grassland::rhix::Core &GetCore() const;
   const grassland::rhix::Device &GetDevice() const;
   grassland::rhi::BackendAPI GetBackendAPI() const;
 
  private:
-  virtual int RunImpl(const ModuleOptions &options) = 0;
+  virtual int OnInit(const ModuleOptions &options) = 0;
+  virtual int OnUpdate() = 0;
+  virtual int OnRender() = 0;
+  virtual int OnTerminate() = 0;
+
+  bool should_close_ = false;
+  int frame_index_ = 0;
 
   // Members are destroyed in reverse order: Device must be released before Core.
   grassland::rhix::Core core_;
   grassland::rhix::Device device_;
-};
-
-class WindowModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class TriangleModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class CubeModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class TextureModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class BlendModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class NBodyModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class RayTracingModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class RayQueryModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class HDRModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class ImGuiModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
-};
-
-class ImGuiMultiWindowModule final : public ModuleBase {
- public:
-  using ModuleBase::ModuleBase;
-
- private:
-  int RunImpl(const ModuleOptions &options) override;
 };
 
 std::unique_ptr<ModuleBase> CreateModule(std::string_view name,

@@ -1,6 +1,6 @@
 # rhi_hello
 
-Eleven modules derive from `ModuleBase` and use `rhi::ObjPtr<IXXX>` pointer APIs. Main creates one Core, selects and creates one Device, then passes both to `CreateModule`. `ModuleBase` retains these objects and exposes protected accessors to derived modules implementing `RunImpl`; it never creates Core or Device objects. Each module keeps its own Window, Queue and rendering resources, which are released before the base-held references. Main passes shared `ModuleOptions`; `--all` creates and destroys one module at a time while reusing the same Core and Device. Main releases Device before Core after the modules finish.
+Eleven modules derive from `ModuleBase` and use `rhi::ObjPtr<IXXX>` pointer APIs. Main creates one Core, selects and creates one Device, then passes both to `CreateModule`. `ModuleBase` retains these objects and exposes protected accessors to derived modules implementing `OnInit`, `OnUpdate`, `OnRender` and `OnTerminate`; it never creates Core or Device objects. Each module keeps its own Window, Queue and rendering resources, which are released before the base-held references. Main passes shared `ModuleOptions`; `--all` creates and destroys one module at a time while reusing the same Core and Device. Main releases Device before Core after the modules finish.
 
 ```text
 demo_rhi_hello --list
@@ -250,3 +250,20 @@ All modules, including `--all`, share the Core and Device created in main.
 `ModuleBase` retains these objects and obtains the backend from `ICore::GetBackendAPI()`
 (or the RHIX forwarding method), rather than storing a separate API value.
 The `imgui_multi_window` module demonstrates independent ImGui windows.
+
+
+## Module lifecycle
+
+Each module declares its class in `modules/<name>/module.h` and implements it in
+`module.cpp`. GPU resources and interaction state live in its private State.
+`ModuleBase::Run` calls `OnInit`, drives `OnUpdate` then `OnRender`, and always
+calls `OnTerminate` after initialization has been attempted, including failure
+and early-close paths. Hooks return zero on success; the first error is preserved.
+
+The base owns an independent `should_close_` flag. `RequestClose()` stops the
+module; a window close flag does not automatically stop other windows. The
+multi-window module keeps running until all its windows close. Event polling,
+frame limits and warmup indices belong to the base driver. `CompleteFrame()`
+advances the count only after a frame is submitted, so minimized/unavailable
+swapchain retries do not consume the frame budget. `OnTerminate` waits for pending
+work, saves requested captures and releases module state before Core/Device.

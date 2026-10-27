@@ -158,3 +158,20 @@ All modules, including `--all`, share the Core and Device created in main.
 `ModuleBase` retains these objects and obtains the backend from `ICore::GetBackendAPI()`
 (or the RHIX forwarding method), rather than storing a separate API value.
 The `imgui_multi_window` module demonstrates independent ImGui windows.
+
+
+## Module lifecycle
+
+Each module declares its class in `modules/<name>/module.h` and implements it in
+`module.cpp`. GPU resources and interaction state live in its private State.
+`ModuleBase::Run` calls `OnInit`, drives `OnUpdate` then `OnRender`, and always
+calls `OnTerminate` after initialization has been attempted, including failure
+and early-close paths. Hooks return zero on success; the first error is preserved.
+
+The base owns an independent `should_close_` flag. `RequestClose()` stops the
+module; a window close flag does not automatically stop other windows. The
+multi-window module keeps running until all its windows close. Event polling,
+frame limits and warmup indices belong to the base driver. `CompleteFrame()`
+advances the count only after a frame is submitted, so minimized/unavailable
+swapchain retries do not consume the frame budget. `OnTerminate` waits for pending
+work, saves requested captures and releases module state before Core/Device.
