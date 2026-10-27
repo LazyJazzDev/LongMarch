@@ -255,7 +255,7 @@ The `imgui_multi_window` module demonstrates independent ImGui windows.
 ## Module lifecycle
 
 Each module declares its class in `modules/<name>/module.h` and implements it in
-`module.cpp`. GPU resources and interaction state live in its private State.
+`module.cpp`. GPU resources and interaction state are direct private members of the module.
 `ModuleBase::Run` calls `OnInit`, drives `OnUpdate` then `OnRender`, and always
 calls `OnTerminate` after initialization has been attempted, including failure
 and early-close paths. Hooks return zero on success; the first error is preserved.
@@ -266,4 +266,4 @@ multi-window module keeps running until all its windows close. Event polling,
 frame limits and warmup indices belong to the base driver. `CompleteFrame()`
 advances the count only after a frame is submitted, so minimized/unavailable
 swapchain retries do not consume the frame budget. `OnTerminate` waits for pending
-work, saves requested captures and releases module state before Core/Device.
+work, saves requested captures and resets module members before Core/Device.

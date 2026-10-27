@@ -26,78 +26,41 @@ struct Vertex {
 
 using namespace grassland::rhi;
 
-struct CubeModule::State {
-  bool initialized{};
-  bool headless{};
-  std::string capture_directory{};
-  grassland::rhi::IDevice *device{};
-  ObjPtr<IDownloadToken> last_frame{};
-  ObjPtr<IDownloadToken> last_depth{};
-  ImageDesc last_depth_desc{};
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space{};
-  float last_frame_white_scale{};
-  PresentMode requested{};
-  bool present_mode_changed{};
-  ObjPtr<IWindow> window{};
-  ObjPtr<IQueue> queue{};
-  std::array<ObjPtr<IImage>, 3> targets{};
-  std::array<ObjPtr<ISubmissionToken>, 3> pending{};
-  ObjPtr<IProgram> program{};
-  ObjPtr<IBuffer> vertex_buffer{};
-  ObjPtr<IBuffer> index_buffer{};
-  ObjPtr<IBuffer> uniform{};
-  ObjPtr<IBindingGroup> group{};
-  ObjPtr<IImage> depth{};
-  grassland::FPSCounter fps{};
-  std::chrono::steady_clock::time_point title_time{};
-  std::chrono::steady_clock::time_point benchmark_start{};
-};
-
-CubeModule::CubeModule(grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
-                       grassland::rhi::ObjPtr<grassland::rhi::IDevice> device)
-    : ModuleBase(std::move(core), std::move(device)) {
-}
-
-CubeModule::~CubeModule() = default;
-
 int CubeModule::OnInit(const ModuleOptions &options) {
-  state_ = std::make_unique<State>();
-
-  state_->headless = options.headless;
-  state_->capture_directory = options.capture_directory;
+  headless_ = options.headless;
+  capture_directory_ = options.capture_directory;
   using namespace grassland::rhi;
-  state_->device = GetDevice();
+  device_ = GetDevice();
 
-  state_->last_depth_desc = ImageDesc{};
-  state_->last_frame_desc = ImageDesc{};
-  state_->last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  state_->last_frame_white_scale = 1.0f;
-  state_->requested = PRESENT_MODE_VSYNC;
-  state_->present_mode_changed = false;
+  last_depth_desc_ = ImageDesc{};
+  last_frame_desc_ = ImageDesc{};
+  last_frame_space_ = COLOR_SPACE_SRGB_NONLINEAR;
+  last_frame_white_scale_ = 1.0f;
+  requested_ = PRESENT_MODE_VSYNC;
+  present_mode_changed_ = false;
 
-  if (!state_->headless) {
-    state_->window = state_->device->CreateGLFWWindow({1280, 720, "RHI cube - P: toggle VSync"});
-    if (!state_->window)
+  if (!headless_) {
+    window_ = device_->CreateGLFWWindow({1280, 720, "RHI cube - P: toggle VSync"});
+    if (!window_)
       return 1;
   }
-  state_->queue = state_->device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  if (!state_->queue)
+  queue_ = device_->GetQueue(QUEUE_TYPE_GRAPHICS);
+  if (!queue_)
     return 1;
 
-  if (state_->headless) {
-    for (auto &target : state_->targets) {
-      target = state_->device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  if (headless_) {
+    for (auto &target : targets_) {
+      target = device_->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!target)
         return 1;
     }
   }
   const auto &embedded = shader_list.at("modules/cube/shaders/cube.slang");
   std::string source(embedded.first, embedded.second);
-  ObjPtr<IShader> vertex_shader = state_->device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> vertex_shader = device_->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   if (!vertex_shader)
     return 1;
-  ObjPtr<IShader> fragment_shader = state_->device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
+  ObjPtr<IShader> fragment_shader = device_->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   if (!fragment_shader)
     return 1;
   ProgramDesc desc;
@@ -107,10 +70,10 @@ int CubeModule::OnInit(const ModuleOptions &options) {
   desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}, {1, 0, INPUT_TYPE_FLOAT3, 12}};
   {
     ObjPtr<IImage> image;
-    if (state_->headless)
-      image = state_->targets[0];
+    if (headless_)
+      image = targets_[0];
     else
-      image = state_->window->GetNextImage();
+      image = window_->GetNextImage();
     if (!image)
       return 1;
     desc.color_formats = {image->GetDesc().format};
@@ -119,81 +82,81 @@ int CubeModule::OnInit(const ModuleOptions &options) {
   desc.depth_stencil.format = IMAGE_FORMAT_D32_SFLOAT;
   desc.depth_stencil.depth_test = true;
   desc.depth_stencil.depth_write = true;
-  state_->program = state_->device->CreateProgram(desc);
-  if (!state_->program)
+  program_ = device_->CreateProgram(desc);
+  if (!program_)
     return 1;
   const Vertex vertices[] = {{{-1, -1, 1}, {0, 0, 0}}, {{1, -1, 1}, {1, 0, 0}},   {{-1, 1, 1}, {0, 1, 0}},
                              {{1, 1, 1}, {1, 1, 0}},   {{-1, -1, -1}, {0, 0, 1}}, {{1, -1, -1}, {1, 0, 1}},
                              {{-1, 1, -1}, {0, 1, 1}}, {{1, 1, -1}, {1, 1, 1}}};
   const uint32_t indices[] = {0, 1, 2, 2, 1, 3, 2, 3, 6, 6, 3, 7, 6, 7, 4, 4, 7, 5,
                               4, 5, 0, 0, 5, 1, 1, 5, 3, 3, 5, 7, 0, 2, 4, 4, 2, 6};
-  state_->vertex_buffer = state_->device->CreateBuffer({sizeof(vertices)});
-  if (!state_->vertex_buffer)
+  vertex_buffer_ = device_->CreateBuffer({sizeof(vertices)});
+  if (!vertex_buffer_)
     return 1;
-  state_->index_buffer = state_->device->CreateBuffer({sizeof(indices)});
-  if (!state_->index_buffer)
+  index_buffer_ = device_->CreateBuffer({sizeof(indices)});
+  if (!index_buffer_)
     return 1;
-  state_->uniform = state_->device->CreateBuffer({256});
-  if (!state_->uniform)
+  uniform_ = device_->CreateBuffer({256});
+  if (!uniform_)
     return 1;
-  state_->group = state_->device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
-  if (!state_->group)
+  group_ = device_->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  if (!group_)
     return 1;
-  if (!state_->group->BindResource(0, state_->uniform.Get()))
+  if (!group_->BindResource(0, uniform_.Get()))
     return 1;
 
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
-    ObjPtr<ICommandContext> upload = state_->device->CreateCommandContext();
+    ObjPtr<ICommandContext> upload = device_->CreateCommandContext();
     if (!upload)
       return 1;
-    if (!upload->CmdUploadBuffer(state_->vertex_buffer.Get(), 0, vertices, sizeof(vertices)))
+    if (!upload->CmdUploadBuffer(vertex_buffer_.Get(), 0, vertices, sizeof(vertices)))
       return 1;
-    if (!upload->CmdUploadBuffer(state_->index_buffer.Get(), 0, indices, sizeof(indices)))
+    if (!upload->CmdUploadBuffer(index_buffer_.Get(), 0, indices, sizeof(indices)))
       return 1;
-    ObjPtr<ISubmissionToken> uploaded = state_->queue->Submit(upload.Get());
+    ObjPtr<ISubmissionToken> uploaded = queue_->Submit(upload.Get());
     if (!uploaded)
       return 1;
-    if (state_->headless) {
+    if (headless_) {
       if (!uploaded->WaitHost())
         return 1;
     }
   }
-  if (!state_->headless) {
-    state_->window->KeyEvent().RegisterCallback([this](int key, int, int action, int) {
+  if (!headless_) {
+    window_->KeyEvent().RegisterCallback([this](int key, int, int action, int) {
       if (action != GLFW_PRESS)
         return;
       if (key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(state_->window->GLFWWindow(), GLFW_TRUE);
+        glfwSetWindowShouldClose(window_->GLFWWindow(), GLFW_TRUE);
       if (key == GLFW_KEY_P) {
-        state_->requested = state_->requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        state_->present_mode_changed = true;
+        requested_ = requested_ == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+        present_mode_changed_ = true;
       }
     });
   }
 
-  state_->title_time = std::chrono::steady_clock::now();
+  title_time_ = std::chrono::steady_clock::now();
   // Warm up allocations and pipelines before measuring completed GPU work.
-  state_->benchmark_start = std::chrono::steady_clock::now();
-  SetWarmupFrames(state_->headless ? 60 : 0);
+  benchmark_start_ = std::chrono::steady_clock::now();
+  SetWarmupFrames(headless_ ? 60 : 0);
 
-  state_->initialized = true;
+  initialized_ = true;
   return 0;
 }
 
 int CubeModule::OnUpdate() {
-  if (!state_->headless) {
-    if (state_->window->ShouldClose()) {
+  if (!headless_) {
+    if (window_->ShouldClose()) {
       RequestClose();
       return 0;
     }
-    if (state_->window->IsSwapChainInvalid()) {
-      if (!state_->window->RebuildSwapChain())
+    if (window_->IsSwapChainInvalid()) {
+      if (!window_->RebuildSwapChain())
         return 1;
     }
-    if (state_->present_mode_changed) {
-      state_->present_mode_changed = false;
-      if (!state_->window->SetPresentMode(state_->requested))
+    if (present_mode_changed_) {
+      present_mode_changed_ = false;
+      if (!window_->SetPresentMode(requested_))
         return 1;
     }
   }
@@ -202,45 +165,44 @@ int CubeModule::OnUpdate() {
 }
 
 int CubeModule::OnRender() {
-  const size_t slot = (static_cast<int64_t>(GetFrameIndex()) + 60) % state_->targets.size();
-  if (state_->headless) {
+  const size_t slot = (static_cast<int64_t>(GetFrameIndex()) + 60) % targets_.size();
+  if (headless_) {
     if (GetFrameIndex() == 0) {
-      for (auto &token : state_->pending) {
+      for (auto &token : pending_) {
         if (token) {
           if (!token->WaitHost())
             return 1;
           token = {};
         }
       }
-      state_->benchmark_start = std::chrono::steady_clock::now();
+      benchmark_start_ = std::chrono::steady_clock::now();
     }
-    if (state_->pending[slot]) {
-      if (!state_->pending[slot]->WaitHost())
+    if (pending_[slot]) {
+      if (!pending_[slot]->WaitHost())
         return 1;
-      state_->pending[slot] = {};
+      pending_[slot] = {};
     }
   }
   ObjPtr<IImage> image;
-  if (state_->headless)
-    image = state_->targets[slot];
+  if (headless_)
+    image = targets_[slot];
   else
-    image = state_->window->GetNextImage();
+    image = window_->GetNextImage();
   if (!image) {
-    if (state_->headless)
+    if (headless_)
       return 1;
-    state_->fps.Reset();
+    fps_.Reset();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     return 0;
   }
   auto extent = image->GetDesc();
-  ObjPtr<ICommandContext> context = state_->device->CreateCommandContext();
+  ObjPtr<ICommandContext> context = device_->CreateCommandContext();
   if (!context)
     return 1;
   // GPU copies and draws are ordered on the same queue; the upload takes a CPU snapshot.
   const float angle =
-      state_->headless
-          ? float(GetFrameIndex() + 60) * .01f
-          : float(std::chrono::duration<double>(std::chrono::steady_clock::now() - state_->benchmark_start).count());
+      headless_ ? float(GetFrameIndex() + 60) * .01f
+                : float(std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start_).count());
 
   struct Uniform {
     glm::mat4 model, view, projection;
@@ -249,27 +211,26 @@ int CubeModule::OnRender() {
   ubo.model = glm::rotate(glm::mat4(1), angle, glm::vec3(0, 1, 0));
   ubo.view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0), glm::vec3(0, 1, 0));
   ubo.projection = glm::perspectiveZO(glm::radians(45.0f), float(extent.width) / extent.height, 3.5f, 6.5f);
-  if (!context->CmdUploadBuffer(state_->uniform.Get(), 0, &ubo, sizeof(ubo)))
+  if (!context->CmdUploadBuffer(uniform_.Get(), 0, &ubo, sizeof(ubo)))
     return 1;
-  if (!state_->depth || state_->depth->GetDesc().width != extent.width ||
-      state_->depth->GetDesc().height != extent.height) {
-    state_->depth = state_->device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_D32_SFLOAT});
-    if (!state_->depth)
+  if (!depth_ || depth_->GetDesc().width != extent.width || depth_->GetDesc().height != extent.height) {
+    depth_ = device_->CreateImage({extent.width, extent.height, IMAGE_FORMAT_D32_SFLOAT});
+    if (!depth_)
       return 1;
   }
-  if (!context->CmdBindProgram(state_->program.Get()))
+  if (!context->CmdBindProgram(program_.Get()))
     return 1;
-  if (!context->CmdBindGroup(0, state_->group.Get()))
+  if (!context->CmdBindGroup(0, group_.Get()))
     return 1;
   grassland::rhi::RenderingInfo render;
   render.color_attachments = {{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {.6f, .7f, .8f, 1}}};
-  render.depth_stencil.image = state_->depth.Get();
+  render.depth_stencil.image = depth_.Get();
   render.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
   if (!context->CmdBeginRendering(render))
     return 1;
-  if (!context->CmdBindVertexBuffer(0, state_->vertex_buffer.Get()))
+  if (!context->CmdBindVertexBuffer(0, vertex_buffer_.Get()))
     return 1;
-  if (!context->CmdBindIndexBuffer(state_->index_buffer.Get()))
+  if (!context->CmdBindIndexBuffer(index_buffer_.Get()))
     return 1;
   if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
     return 1;
@@ -279,35 +240,35 @@ int CubeModule::OnRender() {
     return 1;
   if (!context->CmdEndRendering())
     return 1;
-  if (!state_->headless) {
-    if (!context->CmdPresent(state_->window.Get()))
+  if (!headless_) {
+    if (!context->CmdPresent(window_.Get()))
       return 1;
   }
-  if (!state_->capture_directory.empty()) {
-    state_->last_frame = context->CmdDownloadImage(image.Get());
-    if (!state_->last_frame)
+  if (!capture_directory_.empty()) {
+    last_frame_ = context->CmdDownloadImage(image.Get());
+    if (!last_frame_)
       return 1;
-    state_->last_depth = context->CmdDownloadImage(state_->depth.Get());
-    if (!state_->last_depth)
+    last_depth_ = context->CmdDownloadImage(depth_.Get());
+    if (!last_depth_)
       return 1;
-    state_->last_depth_desc = state_->depth->GetDesc();
-    state_->last_frame_desc = image->GetDesc();
-    state_->last_frame_space = state_->window ? state_->window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-    state_->last_frame_white_scale = state_->window ? state_->window->GetHDRReferenceWhiteScale() : 1.0f;
+    last_depth_desc_ = depth_->GetDesc();
+    last_frame_desc_ = image->GetDesc();
+    last_frame_space_ = window_ ? window_->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+    last_frame_white_scale_ = window_ ? window_->GetHDRReferenceWhiteScale() : 1.0f;
   }
-  ObjPtr<ISubmissionToken> token = state_->queue->Submit(context.Get());
+  ObjPtr<ISubmissionToken> token = queue_->Submit(context.Get());
 
   if (!token)
     return 1;
-  if (state_->headless)
-    state_->pending[slot] = std::move(token);
+  if (headless_)
+    pending_[slot] = std::move(token);
   CompleteFrame();
-  state_->fps.TickFrame();
+  fps_.TickFrame();
   auto now = std::chrono::steady_clock::now();
-  if (!state_->headless && now - state_->title_time >= std::chrono::milliseconds(250)) {
-    if (!state_->window->SetTitle(fmt::format("RHI cube - FPS: {:.1f} - P: toggle VSync", state_->fps.GetFPS())))
+  if (!headless_ && now - title_time_ >= std::chrono::milliseconds(250)) {
+    if (!window_->SetTitle(fmt::format("RHI cube - FPS: {:.1f} - P: toggle VSync", fps_.GetFPS())))
       return 1;
-    state_->title_time = now;
+    title_time_ = now;
   }
 
   return 0;
@@ -315,39 +276,62 @@ int CubeModule::OnRender() {
 
 int CubeModule::OnTerminate() {
   int result = 0;
-  if (state_ && state_->initialized) {
+  if (initialized_) {
     result = [&]() -> int {
-      if (state_->headless) {
-        for (const auto &token : state_->pending) {
+      if (headless_) {
+        for (const auto &token : pending_) {
           if (token) {
             if (!token->WaitHost())
               return 1;
           }
         }
         const double seconds =
-            std::chrono::duration<double>(std::chrono::steady_clock::now() - state_->benchmark_start).count();
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start_).count();
         std::cout << fmt::format("cube: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
                                  GetFrameIndex(), seconds, GetFrameIndex() / seconds);
       }
-      if (!state_->capture_directory.empty()) {
-        if (!state_->last_frame || !state_->last_frame->WaitHost())
+      if (!capture_directory_.empty()) {
+        if (!last_frame_ || !last_frame_->WaitHost())
           return 1;
-        std::vector<uint8_t> pixels(state_->last_frame->GetSize());
-        if (!state_->last_frame->CopyTo(pixels.data(), pixels.size()) ||
-            !SaveImage(state_->capture_directory, "cube", pixels, state_->last_frame_desc, state_->last_frame_space,
-                       state_->last_frame_white_scale))
+        std::vector<uint8_t> pixels(last_frame_->GetSize());
+        if (!last_frame_->CopyTo(pixels.data(), pixels.size()) ||
+            !SaveImage(capture_directory_, "cube", pixels, last_frame_desc_, last_frame_space_,
+                       last_frame_white_scale_))
           return 1;
-        if (!state_->last_depth || !state_->last_depth->WaitHost())
+        if (!last_depth_ || !last_depth_->WaitHost())
           return 1;
-        pixels.resize(state_->last_depth->GetSize());
-        if (!state_->last_depth->CopyTo(pixels.data(), pixels.size()) ||
-            !SaveImage(state_->capture_directory, "cube_depth", pixels, state_->last_depth_desc,
-                       COLOR_SPACE_SRGB_NONLINEAR, 1.0f))
+        pixels.resize(last_depth_->GetSize());
+        if (!last_depth_->CopyTo(pixels.data(), pixels.size()) ||
+            !SaveImage(capture_directory_, "cube_depth", pixels, last_depth_desc_, COLOR_SPACE_SRGB_NONLINEAR, 1.0f))
           return 1;
       }
       return 0;
     }();
   }
-  state_.reset();
+  benchmark_start_ = {};
+  title_time_ = {};
+  fps_ = {};
+  depth_ = {};
+  group_ = {};
+  uniform_ = {};
+  index_buffer_ = {};
+  vertex_buffer_ = {};
+  program_ = {};
+  pending_ = {};
+  targets_ = {};
+  queue_ = {};
+  window_ = {};
+  present_mode_changed_ = {};
+  requested_ = {};
+  last_frame_white_scale_ = {};
+  last_frame_space_ = {};
+  last_frame_desc_ = {};
+  last_depth_desc_ = {};
+  last_depth_ = {};
+  last_frame_ = {};
+  device_ = {};
+  capture_directory_ = {};
+  headless_ = {};
+  initialized_ = {};
   return result;
 }

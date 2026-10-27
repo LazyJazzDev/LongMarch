@@ -14,43 +14,14 @@
 using namespace grassland::rhi;
 using namespace grassland::rhix;
 
-struct ImGuiMultiWindowModule::State {
-  bool initialized{};
-  std::string capture_directory{};
-  grassland::rhix::Device device{};
-  std::array<grassland::rhix::DownloadToken, 2> last_frames{};
-  std::array<ImageDesc, 2> last_frame_descs{};
-  std::array<ColorSpace, 2> last_frame_spaces{};
-  std::array<float, 2> last_frame_white_scales{};
-  grassland::rhix::Queue queue{};
-  std::array<bool, 2> visible{};
-  std::array<ClearValue, 2> colors{};
-  std::array<grassland::rhix::Window, 2> windows{};
-  std::array<grassland::rhix::SubmissionToken, 2> pending{};
-  int clicks{};
-  std::array<char, 128> text{};
-  float speed{};
-  float amplitude{};
-  float phase{};
-  bool paused{};
-};
-
-ImGuiMultiWindowModule::ImGuiMultiWindowModule(grassland::rhix::Core core, grassland::rhix::Device device)
-    : ModuleBase(std::move(core), std::move(device)) {
-}
-
-ImGuiMultiWindowModule::~ImGuiMultiWindowModule() = default;
-
 int ImGuiMultiWindowModule::OnInit(const ModuleOptions &options) {
-  state_ = std::make_unique<State>();
-
   const bool headless = options.headless;
-  state_->capture_directory = options.capture_directory;
+  capture_directory_ = options.capture_directory;
   const auto font_file = options.font_file;
   const auto font_size = options.font_size;
   using namespace grassland::rhi;
   using namespace grassland::rhix;
-  state_->device = GetDevice();
+  device_ = GetDevice();
   if (headless) {
     std::cout << "imgui_multi_window: skipped (requires desktop windows)\n";
     {
@@ -59,83 +30,83 @@ int ImGuiMultiWindowModule::OnInit(const ModuleOptions &options) {
     }
   }
 
-  state_->last_frame_descs = std::array<ImageDesc, 2>{};
-  state_->last_frame_spaces = std::array<ColorSpace, 2>{};
-  state_->last_frame_white_scales = std::array<float, 2>{};
-  state_->queue = state_->device.GetQueue(QUEUE_TYPE_GRAPHICS);
-  if (!state_->queue)
+  last_frame_descs_ = std::array<ImageDesc, 2>{};
+  last_frame_spaces_ = std::array<ColorSpace, 2>{};
+  last_frame_white_scales_ = std::array<float, 2>{};
+  queue_ = device_.GetQueue(QUEUE_TYPE_GRAPHICS);
+  if (!queue_)
     return 1;
 
-  state_->visible = std::array<bool, 2>{true, true};
-  state_->colors = std::array<ClearValue, 2>{{{0.6f, 0.7f, 0.8f, 1.0f}, {0.12f, 0.16f, 0.22f, 1.0f}}};
+  visible_ = std::array<bool, 2>{true, true};
+  colors_ = std::array<ClearValue, 2>{{{0.6f, 0.7f, 0.8f, 1.0f}, {0.12f, 0.16f, 0.22f, 1.0f}}};
 
   const char *titles[] = {"ImGui multi - Controls - I: UI; Esc: close", "ImGui multi - Plot - I: UI; Esc: close"};
-  for (size_t i = 0; i < state_->windows.size(); ++i) {
-    state_->windows[i] = state_->device.CreateGLFWWindow({600, 480, titles[i]});
-    if (!state_->windows[i])
+  for (size_t i = 0; i < windows_.size(); ++i) {
+    windows_[i] = device_.CreateGLFWWindow({600, 480, titles[i]});
+    if (!windows_[i])
       return 1;
-    glfwSetWindowPos(state_->windows[i].GLFWWindow(), 60 + int(i) * 620, 100);
-    if (!state_->windows[i].EnableImGui(true, font_file, font_size))
+    glfwSetWindowPos(windows_[i].GLFWWindow(), 60 + int(i) * 620, 100);
+    if (!windows_[i].EnableImGui(true, font_file, font_size))
       return 1;
-    state_->windows[i].KeyEvent().RegisterCallback([this, i](int key, int, int action, int) {
+    windows_[i].KeyEvent().RegisterCallback([this, i](int key, int, int action, int) {
       if (action != GLFW_PRESS)
         return;
       if (key == GLFW_KEY_I) {
-        state_->visible[i] = !state_->visible[i];
-        std::cout << "Window " << i + 1 << " UI: " << std::boolalpha << state_->visible[i] << '\n';
+        visible_[i] = !visible_[i];
+        std::cout << "Window " << i + 1 << " UI: " << std::boolalpha << visible_[i] << '\n';
       }
       if (key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(state_->windows[i].GLFWWindow(), GLFW_TRUE);
+        glfwSetWindowShouldClose(windows_[i].GLFWWindow(), GLFW_TRUE);
     });
   }
-  state_->clicks = 0;
-  state_->text = std::array<char, 128>{};
-  state_->speed = 1.0f;
-  state_->amplitude = 0.7f;
-  state_->phase = 0.0f;
-  state_->paused = false;
+  clicks_ = 0;
+  text_ = std::array<char, 128>{};
+  speed_ = 1.0f;
+  amplitude_ = 0.7f;
+  phase_ = 0.0f;
+  paused_ = false;
 
-  state_->initialized = true;
+  initialized_ = true;
   return 0;
 }
 
 int ImGuiMultiWindowModule::OnUpdate() {
   // Collect all UI feedback before recording any window's scene commands.
-  if (state_->windows[0] && !state_->windows[0].ShouldClose() && !state_->windows[0].UpdateImGui([&] {
-        if (!state_->visible[0])
+  if (windows_[0] && !windows_[0].ShouldClose() && !windows_[0].UpdateImGui([&] {
+        if (!visible_[0])
           return;
         ImGui::SetNextWindowPos({20, 20}, ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize({550, 400}, ImGuiCond_FirstUseEver);
         ImGui::Begin("Controls");
         ImGui::TextUnformatted("Window 1: independent controls and background");
         if (ImGui::Button("Click me"))
-          ++state_->clicks;
-        ImGui::Text("Local clicks: %d", state_->clicks);
-        ImGui::InputText("Local text", state_->text.data(), state_->text.size());
-        ImGui::ColorEdit3("Background", state_->colors[0].color.float32.data());
+          ++clicks_;
+        ImGui::Text("Local clicks: %d", clicks_);
+        ImGui::InputText("Local text", text_.data(), text_.size());
+        ImGui::ColorEdit3("Background", colors_[0].color.float32.data());
         ImGui::Separator();
         ImGui::TextWrapped(
             "I hides only this window's UI. Escape or the title-bar close button closes only this window.");
         ImGui::End();
       }))
     return 1;
-  if (state_->windows[1] && !state_->windows[1].ShouldClose() && !state_->windows[1].UpdateImGui([&] {
-        if (!state_->visible[1])
+  if (windows_[1] && !windows_[1].ShouldClose() && !windows_[1].UpdateImGui([&] {
+        if (!visible_[1])
           return;
-        if (!state_->paused)
-          state_->phase += ImGui::GetIO().DeltaTime * state_->speed;
+        if (!paused_)
+          phase_ += ImGui::GetIO().DeltaTime * speed_;
         std::array<float, 128> samples;
         for (size_t i = 0; i < samples.size(); ++i)
-          samples[i] = state_->amplitude * std::sin(state_->phase + float(i) * 0.1f);
+          samples[i] = amplitude_ * std::sin(phase_ + float(i) * 0.1f);
         ImGui::SetNextWindowPos({20, 20}, ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize({550, 400}, ImGuiCond_FirstUseEver);
         ImGui::Begin("Live plot");
         ImGui::TextUnformatted("Window 2: animated signal, separate ImGui context");
-        ImGui::SliderFloat("Speed", &state_->speed, 0.1f, 5.0f);
-        ImGui::SliderFloat("Amplitude", &state_->amplitude, 0.0f, 1.0f);
-        ImGui::Checkbox("Pause", &state_->paused);
+        ImGui::SliderFloat("Speed", &speed_, 0.1f, 5.0f);
+        ImGui::SliderFloat("Amplitude", &amplitude_, 0.0f, 1.0f);
+        ImGui::Checkbox("Pause", &paused_);
         ImGui::PlotLines("Signal", samples.data(), int(samples.size()), 0, nullptr, -1, 1, {0, 160});
-        ImGui::ColorEdit3("Background", state_->colors[1].color.float32.data());
+        ImGui::ColorEdit3("Background", colors_[1].color.float32.data());
         ImGui::TextUnformatted("I: toggle this UI; Escape: close this window");
         ImGui::End();
       }))
@@ -147,15 +118,15 @@ int ImGuiMultiWindowModule::OnUpdate() {
 int ImGuiMultiWindowModule::OnRender() {
   bool open = false;
   bool submitted = false;
-  for (size_t i = 0; i < state_->windows.size(); ++i) {
-    auto &window = state_->windows[i];
+  for (size_t i = 0; i < windows_.size(); ++i) {
+    auto &window = windows_[i];
     if (!window)
       continue;
     if (window.ShouldClose()) {
-      if (state_->pending[i]) {
-        if (!state_->pending[i].WaitHost())
+      if (pending_[i]) {
+        if (!pending_[i].WaitHost())
           return 1;
-        state_->pending[i].Release();
+        pending_[i].Release();
       }
       window.Release();
       continue;
@@ -168,24 +139,24 @@ int ImGuiMultiWindowModule::OnRender() {
     grassland::rhix::Image image = window.GetNextImage();
     if (!image)
       continue;
-    grassland::rhix::CommandContext commands = state_->device.CreateCommandContext();
+    grassland::rhix::CommandContext commands = device_.CreateCommandContext();
     if (!commands)
       return 1;
-    if (!commands.CmdClearImage(image, state_->colors[i]))
+    if (!commands.CmdClearImage(image, colors_[i]))
       return 1;
     if (!commands.CmdPresent(window))
       return 1;
-    if (!state_->capture_directory.empty()) {
-      state_->last_frames[i] = commands.CmdDownloadImage(image);
-      if (!state_->last_frames[i])
+    if (!capture_directory_.empty()) {
+      last_frames_[i] = commands.CmdDownloadImage(image);
+      if (!last_frames_[i])
         return 1;
-      state_->last_frame_descs[i] = image.GetDesc();
-      state_->last_frame_spaces[i] = window.GetColorSpace();
-      state_->last_frame_white_scales[i] = window.GetHDRReferenceWhiteScale();
+      last_frame_descs_[i] = image.GetDesc();
+      last_frame_spaces_[i] = window.GetColorSpace();
+      last_frame_white_scales_[i] = window.GetHDRReferenceWhiteScale();
     }
-    state_->pending[i] = state_->queue.Submit(std::move(commands));
+    pending_[i] = queue_.Submit(std::move(commands));
 
-    if (!state_->pending[i])
+    if (!pending_[i])
       return 1;
     submitted = true;
   }
@@ -203,29 +174,46 @@ int ImGuiMultiWindowModule::OnRender() {
 
 int ImGuiMultiWindowModule::OnTerminate() {
   int result = 0;
-  if (state_ && state_->initialized) {
+  if (initialized_) {
     result = [&]() -> int {
-      for (auto &token : state_->pending) {
+      for (auto &token : pending_) {
         if (token) {
           if (!token.WaitHost())
             return 1;
         }
       }
-      if (!state_->capture_directory.empty()) {
-        for (size_t i = 0; i < state_->last_frames.size(); ++i) {
-          auto &last_frame = state_->last_frames[i];
+      if (!capture_directory_.empty()) {
+        for (size_t i = 0; i < last_frames_.size(); ++i) {
+          auto &last_frame = last_frames_[i];
           if (!last_frame || !last_frame.WaitHost())
             return 1;
           std::vector<uint8_t> pixels(last_frame.GetSize());
           if (!last_frame.CopyTo(pixels.data(), pixels.size()) ||
-              !SaveImage(state_->capture_directory, "imgui_multi_window_" + std::to_string(i), pixels,
-                         state_->last_frame_descs[i], state_->last_frame_spaces[i], state_->last_frame_white_scales[i]))
+              !SaveImage(capture_directory_, "imgui_multi_window_" + std::to_string(i), pixels, last_frame_descs_[i],
+                         last_frame_spaces_[i], last_frame_white_scales_[i]))
             return 1;
         }
       }
       return 0;
     }();
   }
-  state_.reset();
+  paused_ = {};
+  phase_ = {};
+  amplitude_ = {};
+  speed_ = {};
+  text_ = {};
+  clicks_ = {};
+  pending_ = {};
+  windows_ = {};
+  colors_ = {};
+  visible_ = {};
+  queue_ = {};
+  last_frame_white_scales_ = {};
+  last_frame_spaces_ = {};
+  last_frame_descs_ = {};
+  last_frames_ = {};
+  device_ = {};
+  capture_directory_ = {};
+  initialized_ = {};
   return result;
 }

@@ -15,106 +15,79 @@
 using namespace grassland::rhi;
 using namespace grassland::rhix;
 
-struct ImGuiModule::State {
-  bool initialized{};
-  std::string capture_directory{};
-  grassland::rhix::Device device{};
-  grassland::rhix::DownloadToken last_frame{};
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space{};
-  float last_frame_white_scale{};
-  Queue queue{};
-  PresentMode requested{};
-  bool present_mode_changed{};
-  bool record_ui{};
-  Window window{};
-  int clicks{};
-  bool show_demo{};
-  grassland::FPSCounter fps{};
-  std::chrono::steady_clock::time_point title_time{};
-};
-
-ImGuiModule::ImGuiModule(grassland::rhix::Core core, grassland::rhix::Device device)
-    : ModuleBase(std::move(core), std::move(device)) {
-}
-
-ImGuiModule::~ImGuiModule() = default;
-
 int ImGuiModule::OnInit(const ModuleOptions &options) {
-  state_ = std::make_unique<State>();
-
   const bool headless = options.headless;
-  state_->capture_directory = options.capture_directory;
+  capture_directory_ = options.capture_directory;
   const auto font_file = options.font_file;
   const auto font_size = options.font_size;
   using namespace grassland::rhi;
   using namespace grassland::rhix;
-  state_->device = GetDevice();
+  device_ = GetDevice();
 
-  state_->last_frame_desc = ImageDesc{};
-  state_->last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  state_->last_frame_white_scale = 1.0f;
-  state_->queue = state_->device.GetQueue(QUEUE_TYPE_GRAPHICS);
-  if (!state_->queue)
+  last_frame_desc_ = ImageDesc{};
+  last_frame_space_ = COLOR_SPACE_SRGB_NONLINEAR;
+  last_frame_white_scale_ = 1.0f;
+  queue_ = device_.GetQueue(QUEUE_TYPE_GRAPHICS);
+  if (!queue_)
     return 1;
-  state_->requested = PRESENT_MODE_VSYNC;
-  state_->present_mode_changed = false;
-  state_->record_ui = true;
-  state_->window = state_->device.CreateGLFWWindow({1280, 720, "ImGui - I: toggle UI recording; P: VSync"});
-  if (!state_->window)
+  requested_ = PRESENT_MODE_VSYNC;
+  present_mode_changed_ = false;
+  record_ui_ = true;
+  window_ = device_.CreateGLFWWindow({1280, 720, "ImGui - I: toggle UI recording; P: VSync"});
+  if (!window_)
     return 1;
-  if (!state_->window.EnableImGui(true, font_file, font_size))
+  if (!window_.EnableImGui(true, font_file, font_size))
     return 1;
-  state_->window.KeyEvent().RegisterCallback([this](int key, int, int action, int) {
+  window_.KeyEvent().RegisterCallback([this](int key, int, int action, int) {
     if (action != GLFW_PRESS)
       return;
     if (key == GLFW_KEY_ESCAPE)
-      glfwSetWindowShouldClose(state_->window.GLFWWindow(), GLFW_TRUE);
+      glfwSetWindowShouldClose(window_.GLFWWindow(), GLFW_TRUE);
     if (key == GLFW_KEY_P) {
-      state_->requested = state_->requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-      state_->present_mode_changed = true;
+      requested_ = requested_ == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+      present_mode_changed_ = true;
     }
     if (key == GLFW_KEY_I) {
-      state_->record_ui = !state_->record_ui;
-      std::cout << "ImGui recording: " << std::boolalpha << state_->record_ui << '\n';
+      record_ui_ = !record_ui_;
+      std::cout << "ImGui recording: " << std::boolalpha << record_ui_ << '\n';
     }
   });
-  state_->clicks = 0;
-  state_->show_demo = true;
+  clicks_ = 0;
+  show_demo_ = true;
 
-  state_->title_time = std::chrono::steady_clock::now();
+  title_time_ = std::chrono::steady_clock::now();
 
-  state_->initialized = true;
+  initialized_ = true;
   return 0;
 }
 
 int ImGuiModule::OnUpdate() {
-  if (state_->window.ShouldClose()) {
+  if (window_.ShouldClose()) {
     RequestClose();
     return 0;
   }
-  if (!state_->window.UpdateImGui([&] {
+  if (!window_.UpdateImGui([&] {
         // Keep the context enabled: an empty frame must not replay previous UI.
-        if (!state_->record_ui)
+        if (!record_ui_)
           return;
         ImGui::Begin("ImGui recording");
         ImGui::TextUnformatted("I: toggle UI recording; P: VSync; Escape: close");
         if (ImGui::Button("Click me"))
-          ++state_->clicks;
-        ImGui::Text("Clicks: %d", state_->clicks);
-        ImGui::Checkbox("Show ImGui demo", &state_->show_demo);
+          ++clicks_;
+        ImGui::Text("Clicks: %d", clicks_);
+        ImGui::Checkbox("Show ImGui demo", &show_demo_);
         ImGui::End();
-        if (state_->show_demo)
-          ImGui::ShowDemoWindow(&state_->show_demo);
+        if (show_demo_)
+          ImGui::ShowDemoWindow(&show_demo_);
       }))
     return 1;
-  if (state_->window.IsSwapChainInvalid()) {
-    if (!state_->window.RebuildSwapChain())
+  if (window_.IsSwapChainInvalid()) {
+    if (!window_.RebuildSwapChain())
       return 1;
   }
-  if (state_->present_mode_changed) {
-    state_->present_mode_changed = false;
-    if (!state_->window.SetPresentMode(state_->requested))
+  if (present_mode_changed_) {
+    present_mode_changed_ = false;
+    if (!window_.SetPresentMode(requested_))
       return 1;
   }
 
@@ -122,38 +95,37 @@ int ImGuiModule::OnUpdate() {
 }
 
 int ImGuiModule::OnRender() {
-  auto image = state_->window.GetNextImage();
+  auto image = window_.GetNextImage();
   if (!image) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     return 0;
   }
-  auto commands = state_->device.CreateCommandContext();
+  auto commands = device_.CreateCommandContext();
   if (!commands)
     return 1;
   if (!commands.CmdClearImage(image, {0.6f, 0.7f, 0.8f, 1.0f}))
     return 1;
-  if (!commands.CmdPresent(state_->window))
+  if (!commands.CmdPresent(window_))
     return 1;
-  if (!state_->capture_directory.empty()) {
-    state_->last_frame = commands.CmdDownloadImage(image);
-    if (!state_->last_frame)
+  if (!capture_directory_.empty()) {
+    last_frame_ = commands.CmdDownloadImage(image);
+    if (!last_frame_)
       return 1;
-    state_->last_frame_desc = image.GetDesc();
-    state_->last_frame_space = state_->window ? state_->window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-    state_->last_frame_white_scale = state_->window ? state_->window.GetHDRReferenceWhiteScale() : 1.0f;
+    last_frame_desc_ = image.GetDesc();
+    last_frame_space_ = window_ ? window_.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+    last_frame_white_scale_ = window_ ? window_.GetHDRReferenceWhiteScale() : 1.0f;
   }
-  auto done = state_->queue.Submit(std::move(commands));
+  auto done = queue_.Submit(std::move(commands));
 
   if (!done)
     return 1;
   CompleteFrame();
-  state_->fps.TickFrame();
+  fps_.TickFrame();
   auto now = std::chrono::steady_clock::now();
-  if (now - state_->title_time >= std::chrono::milliseconds(250)) {
-    if (!state_->window.SetTitle(
-            fmt::format("ImGui - FPS: {:.1f} - UI recording: {} - I: toggle", state_->fps.GetFPS(), state_->record_ui)))
+  if (now - title_time_ >= std::chrono::milliseconds(250)) {
+    if (!window_.SetTitle(fmt::format("ImGui - FPS: {:.1f} - UI recording: {} - I: toggle", fps_.GetFPS(), record_ui_)))
       return 1;
-    state_->title_time = now;
+    title_time_ = now;
   }
 
   return 0;
@@ -161,20 +133,35 @@ int ImGuiModule::OnRender() {
 
 int ImGuiModule::OnTerminate() {
   int result = 0;
-  if (state_ && state_->initialized) {
+  if (initialized_) {
     result = [&]() -> int {
-      if (!state_->capture_directory.empty()) {
-        if (!state_->last_frame || !state_->last_frame.WaitHost())
+      if (!capture_directory_.empty()) {
+        if (!last_frame_ || !last_frame_.WaitHost())
           return 1;
-        std::vector<uint8_t> pixels(state_->last_frame.GetSize());
-        if (!state_->last_frame.CopyTo(pixels.data(), pixels.size()) ||
-            !SaveImage(state_->capture_directory, "imgui", pixels, state_->last_frame_desc, state_->last_frame_space,
-                       state_->last_frame_white_scale))
+        std::vector<uint8_t> pixels(last_frame_.GetSize());
+        if (!last_frame_.CopyTo(pixels.data(), pixels.size()) ||
+            !SaveImage(capture_directory_, "imgui", pixels, last_frame_desc_, last_frame_space_,
+                       last_frame_white_scale_))
           return 1;
       }
       return 0;
     }();
   }
-  state_.reset();
+  title_time_ = {};
+  fps_ = {};
+  show_demo_ = {};
+  clicks_ = {};
+  window_ = {};
+  record_ui_ = {};
+  present_mode_changed_ = {};
+  requested_ = {};
+  queue_ = {};
+  last_frame_white_scale_ = {};
+  last_frame_space_ = {};
+  last_frame_desc_ = {};
+  last_frame_ = {};
+  device_ = {};
+  capture_directory_ = {};
+  initialized_ = {};
   return result;
 }

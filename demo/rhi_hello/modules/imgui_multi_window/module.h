@@ -1,11 +1,11 @@
 #pragma once
+#include <array>
+
 #include "../../module.h"
 
 class ImGuiMultiWindowModule final : public ModuleBase {
  public:
-  ImGuiMultiWindowModule(grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
-                         grassland::rhi::ObjPtr<grassland::rhi::IDevice> device);
-  ~ImGuiMultiWindowModule() override;
+  using ModuleBase::ModuleBase;
 
  private:
   int OnInit(const ModuleOptions &options) override;
@@ -13,6 +13,22 @@ class ImGuiMultiWindowModule final : public ModuleBase {
   int OnRender() override;
   int OnTerminate() override;
 
-  struct State;
-  std::unique_ptr<State> state_;
+  bool initialized_{};
+  std::string capture_directory_{};
+  grassland::rhi::IDevice *device_{};
+  std::array<grassland::rhi::ObjPtr<grassland::rhi::IDownloadToken>, 2> last_frames_{};
+  std::array<grassland::rhi::ImageDesc, 2> last_frame_descs_{};
+  std::array<grassland::rhi::ColorSpace, 2> last_frame_spaces_{};
+  std::array<float, 2> last_frame_white_scales_{};
+  grassland::rhi::ObjPtr<grassland::rhi::IQueue> queue_{};
+  std::array<bool, 2> visible_{};
+  std::array<grassland::rhi::ClearValue, 2> colors_{};
+  std::array<grassland::rhi::ObjPtr<grassland::rhi::IWindow>, 2> windows_{};
+  std::array<grassland::rhi::ObjPtr<grassland::rhi::ISubmissionToken>, 2> pending_{};
+  int clicks_{};
+  std::array<char, 128> text_{};
+  float speed_{};
+  float amplitude_{};
+  float phase_{};
+  bool paused_{};
 };
