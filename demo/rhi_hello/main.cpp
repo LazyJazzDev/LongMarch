@@ -18,19 +18,25 @@ int main(int argc, char **argv) {
   bool all = false;
   int frames = 0;
   int device_number = 0;
+  bool auto_device = false;
   const char *font_file = nullptr;
   float font_size = 20.0f;
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--device") {
       if (i + 1 >= argc) {
-        std::cerr << "--device requires a positive device number (starting at 1)\n";
+        std::cerr << "--device requires auto or a positive device number (starting at 1)\n";
         return 1;
       }
       const std::string value = argv[++i];
+      if (value == "auto") {
+        auto_device = true;
+        continue;
+      }
+      auto_device = false;
       const auto parsed = std::from_chars(value.data(), value.data() + value.size(), device_number);
       if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() || device_number <= 0) {
-        std::cerr << "--device requires a positive device number (starting at 1)\n";
+        std::cerr << "--device requires auto or a positive device number (starting at 1)\n";
         return 1;
       }
       continue;
@@ -62,7 +68,7 @@ int main(int argc, char **argv) {
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui|imgui_multi_window | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--device N] [--headless] [--frames N] [--save-last-frame DIR] [--font PATH] [--font-size PIXELS]\n--save-last-frame enables per-frame GPU image readback and saves the final frame at exit as PNG, native .bin pixels and .txt metadata.\nFont options apply to ImGui modules; defaults: built-in font, 20 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend, device or module: select each missing option in the terminal menu; a sole backend or device is automatic. Device numbers start at 1, match the device menu, and are specific to the selected backend. --device N applies to all modules, including --all. --backend auto explicitly uses the default API.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui|imgui_multi_window | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--device auto|N] [--headless] [--frames N] [--save-last-frame DIR] [--font PATH] [--font-size PIXELS]\n--save-last-frame enables per-frame GPU image readback and saves the final frame at exit as PNG, native .bin pixels and .txt metadata.\nFont options apply to ImGui modules; defaults: built-in font, 20 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend, device or module: select each missing option in the terminal menu; a sole backend or device is automatic. Device numbers start at 1, match the device menu, and are specific to the selected backend. --device auto skips the menu and uses RHI automatic device selection. --device auto|N applies to all modules, including --all. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -173,6 +179,7 @@ int main(int argc, char **argv) {
   if (!core)
     return 1;
   int32_t device_index = 0;
+  ObjPtr<IDevice> device;
   {
     const auto devices = core->GetPhysicalDevices();
     if (devices.empty()) {
@@ -186,7 +193,11 @@ int main(int argc, char **argv) {
                              " | dedicated: " + std::to_string(device.dedicated_memory / (1024 * 1024)) +
                              " MiB | shared: " + std::to_string(device.unified_memory / (1024 * 1024)) + " MiB"});
     }
-    if (device_number > 0) {
+    if (auto_device) {
+      device = core->CreateDeviceByAutoSelection();
+      if (!device)
+        return 1;
+    } else if (device_number > 0) {
       if (static_cast<size_t>(device_number) > devices.size()) {
         std::cerr << "Device number " << device_number << " is out of range; expected 1-" << devices.size() << ".\n";
         return 1;
@@ -199,10 +210,14 @@ int main(int argc, char **argv) {
         return 0;
       device_index = static_cast<int32_t>(*selected);
     }
-    std::cout << "Selected device " << device_index + 1 << ": " << devices[device_index].name << " ("
-              << BackendAPIName(api) << ")\n";
+    if (auto_device)
+      std::cout << "Selected device (auto): " << device->Name() << " (" << BackendAPIName(api) << ")\n";
+    else
+      std::cout << "Selected device " << device_index + 1 << ": " << devices[device_index].name << " ("
+                << BackendAPIName(api) << ")\n";
   }
-  ObjPtr<IDevice> device = core->CreateDevice(device_index);
+  if (!device)
+    device = core->CreateDevice(device_index);
   if (!device)
     return 1;
   if (!frames) {

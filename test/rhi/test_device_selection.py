@@ -57,6 +57,24 @@ class DeviceSelection(unittest.TestCase):
             self.assertIn(f"Selected: {name}\n", result.stdout)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_auto_skips_menu_and_creates_selected_device(self):
+        result = run(["--device", "auto"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("Device Selection", result.stdout)
+        selected = re.search(r"^Selected: (.+)$", result.stdout, re.MULTILINE)
+        self.assertIsNotNone(selected, result.stdout)
+        name = selected.group(1)
+        self.assertIn(name, [name for _, name in self.devices])
+        self.assertIn(f"Selected device (auto): {name}", result.stdout)
+
+    def test_last_device_option_wins(self):
+        result = run(["--device", "auto", "--device", self.devices[-1][0]])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"Selected: {self.devices[-1][1]}\n", result.stdout)
+        result = run(["--device", self.devices[-1][0], "--device", "auto"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Selected device (auto):", result.stdout)
+
     def test_cancel_does_not_run_module(self):
         if not self.has_menu:
             self.skipTest("Single device is selected automatically")
