@@ -16,6 +16,10 @@ struct Counts {
 // This implementation uses only the public interface, not any backend helper.
 class PublicCore final : public rhi::ICore {
  public:
+  grassland::rhi::BackendAPI GetBackendAPI() const override {
+    return grassland::rhi::BACKEND_API_DEFAULT;
+  }
+
   explicit PublicCore(Counts &counts) : counts_(counts) {
   }
 

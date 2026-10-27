@@ -1,4 +1,4 @@
-﻿#include "../../module.h"
+﻿#include "module.h"
 
 #include <fmt/format.h>
 
@@ -11,125 +11,162 @@
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
 
-int RunImGui(grassland::rhi::BackendAPI api,
-             int frames,
-             bool headless,
-             const char *font_file,
-             float font_size,
-             const std::string &capture_directory) {
+using namespace grassland::rhi;
+
+int ImGuiModule::OnInit(const ModuleOptions &options) {
+  const bool headless = options.headless;
+  capture_directory_ = options.capture_directory;
+  const auto font_file = options.font_file;
+  const auto font_size = options.font_size;
   using namespace grassland::rhi;
+  device_ = GetDevice();
   if (headless) {
     std::cout << "imgui: skipped (requires a window for platform input)\n";
-    return 0;
+    {
+      RequestClose();
+      return 0;
+    }
   }
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
+
+  last_frame_desc_ = ImageDesc{};
+  last_frame_space_ = COLOR_SPACE_SRGB_NONLINEAR;
+  last_frame_white_scale_ = 1.0f;
+  queue_ = device_->GetQueue(QUEUE_TYPE_GRAPHICS);
+  if (!queue_)
     return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  if (!device)
+  requested_ = PRESENT_MODE_VSYNC;
+  present_mode_changed_ = false;
+  record_ui_ = true;
+  window_ = device_->CreateGLFWWindow({1280, 720, "ImGui - I: toggle UI recording; P: VSync"});
+  if (!window_)
     return 1;
-  ObjPtr<IDownloadToken> last_frame;
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  float last_frame_white_scale = 1.0f;
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  if (!queue)
+  if (!window_->EnableImGui(true, font_file, font_size))
     return 1;
-  PresentMode requested = PRESENT_MODE_VSYNC;
-  bool present_mode_changed = false;
-  bool record_ui = true;
-  ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "ImGui - I: toggle UI recording; P: VSync"});
-  if (!window)
-    return 1;
-  if (!window->EnableImGui(true, font_file, font_size))
-    return 1;
-  window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+  window_->KeyEvent().RegisterCallback([this](int key, int, int action, int) {
     if (action != GLFW_PRESS)
       return;
     if (key == GLFW_KEY_ESCAPE)
-      glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+      glfwSetWindowShouldClose(window_->GLFWWindow(), GLFW_TRUE);
     if (key == GLFW_KEY_P) {
-      requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-      present_mode_changed = true;
+      requested_ = requested_ == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+      present_mode_changed_ = true;
     }
     if (key == GLFW_KEY_I) {
-      record_ui = !record_ui;
-      std::cout << "ImGui recording: " << std::boolalpha << record_ui << '\n';
+      record_ui_ = !record_ui_;
+      std::cout << "ImGui recording: " << std::boolalpha << record_ui_ << '\n';
     }
   });
-  int clicks = 0;
-  bool show_demo = true;
-  grassland::FPSCounter fps;
-  auto title_time = std::chrono::steady_clock::now();
-  for (int rendered = 0; !frames || rendered < frames;) {
-    if (!PollEvents())
-      return 1;
-    if (window->ShouldClose())
-      break;
-    if (!window->UpdateImGui([&] {
-          // Keep the context enabled: an empty frame must not replay previous UI.
-          if (!record_ui)
-            return;
-          ImGui::Begin("ImGui recording");
-          ImGui::TextUnformatted("I: toggle UI recording; P: VSync; Escape: close");
-          if (ImGui::Button("Click me"))
-            ++clicks;
-          ImGui::Text("Clicks: %d", clicks);
-          ImGui::Checkbox("Show ImGui demo", &show_demo);
-          ImGui::End();
-          if (show_demo)
-            ImGui::ShowDemoWindow(&show_demo);
-        }))
-      return 1;
-    if (window->IsSwapChainInvalid()) {
-      if (!window->RebuildSwapChain())
-        return 1;
-    }
-    if (present_mode_changed) {
-      present_mode_changed = false;
-      if (!window->SetPresentMode(requested))
-        return 1;
-    }
-    ObjPtr<IImage> image = window->GetNextImage();
-    if (!image) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      continue;
-    }
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
-    if (!commands)
-      return 1;
-    if (!commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
-      return 1;
-    if (!commands->CmdPresent(window.Get()))
-      return 1;
-    if (!capture_directory.empty()) {
-      last_frame = commands->CmdDownloadImage(image.Get());
-      if (!last_frame)
-        return 1;
-      last_frame_desc = image->GetDesc();
-      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
-    }
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  clicks_ = 0;
+  show_demo_ = true;
 
-    if (!done)
-      return 1;
-    ++rendered;
-    fps.TickFrame();
-    auto now = std::chrono::steady_clock::now();
-    if (now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window->SetTitle(fmt::format("ImGui - FPS: {:.1f} - UI recording: {} - I: toggle", fps.GetFPS(), record_ui)))
-        return 1;
-      title_time = now;
-    }
-  }
-  if (!capture_directory.empty()) {
-    if (!last_frame || !last_frame->WaitHost())
-      return 1;
-    std::vector<uint8_t> pixels(last_frame->GetSize());
-    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "imgui", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
-      return 1;
-  }
+  title_time_ = std::chrono::steady_clock::now();
+
+  initialized_ = true;
   return 0;
+}
+
+int ImGuiModule::OnUpdate() {
+  if (window_->ShouldClose()) {
+    RequestClose();
+    return 0;
+  }
+  if (!window_->UpdateImGui([&] {
+        // Keep the context enabled: an empty frame must not replay previous UI.
+        if (!record_ui_)
+          return;
+        ImGui::Begin("ImGui recording");
+        ImGui::TextUnformatted("I: toggle UI recording; P: VSync; Escape: close");
+        if (ImGui::Button("Click me"))
+          ++clicks_;
+        ImGui::Text("Clicks: %d", clicks_);
+        ImGui::Checkbox("Show ImGui demo", &show_demo_);
+        ImGui::End();
+        if (show_demo_)
+          ImGui::ShowDemoWindow(&show_demo_);
+      }))
+    return 1;
+  if (window_->IsSwapChainInvalid()) {
+    if (!window_->RebuildSwapChain())
+      return 1;
+  }
+  if (present_mode_changed_) {
+    present_mode_changed_ = false;
+    if (!window_->SetPresentMode(requested_))
+      return 1;
+  }
+
+  return 0;
+}
+
+int ImGuiModule::OnRender() {
+  ObjPtr<IImage> image = window_->GetNextImage();
+  if (!image) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    return 0;
+  }
+  ObjPtr<ICommandContext> commands = device_->CreateCommandContext();
+  if (!commands)
+    return 1;
+  if (!commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
+    return 1;
+  if (!commands->CmdPresent(window_.Get()))
+    return 1;
+  if (!capture_directory_.empty()) {
+    last_frame_ = commands->CmdDownloadImage(image.Get());
+    if (!last_frame_)
+      return 1;
+    last_frame_desc_ = image->GetDesc();
+    last_frame_space_ = window_ ? window_->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+    last_frame_white_scale_ = window_ ? window_->GetHDRReferenceWhiteScale() : 1.0f;
+  }
+  ObjPtr<ISubmissionToken> done = queue_->Submit(commands.Get());
+
+  if (!done)
+    return 1;
+  CompleteFrame();
+  fps_.TickFrame();
+  auto now = std::chrono::steady_clock::now();
+  if (now - title_time_ >= std::chrono::milliseconds(250)) {
+    if (!window_->SetTitle(
+            fmt::format("ImGui - FPS: {:.1f} - UI recording: {} - I: toggle", fps_.GetFPS(), record_ui_)))
+      return 1;
+    title_time_ = now;
+  }
+
+  return 0;
+}
+
+int ImGuiModule::OnTerminate() {
+  int result = 0;
+  if (initialized_) {
+    result = [&]() -> int {
+      if (!capture_directory_.empty()) {
+        if (!last_frame_ || !last_frame_->WaitHost())
+          return 1;
+        std::vector<uint8_t> pixels(last_frame_->GetSize());
+        if (!last_frame_->CopyTo(pixels.data(), pixels.size()) ||
+            !SaveImage(capture_directory_, "imgui", pixels, last_frame_desc_, last_frame_space_,
+                       last_frame_white_scale_))
+          return 1;
+      }
+      return 0;
+    }();
+  }
+  title_time_ = {};
+  fps_ = {};
+  show_demo_ = {};
+  clicks_ = {};
+  window_ = {};
+  record_ui_ = {};
+  present_mode_changed_ = {};
+  requested_ = {};
+  queue_ = {};
+  last_frame_white_scale_ = {};
+  last_frame_space_ = {};
+  last_frame_desc_ = {};
+  last_frame_ = {};
+  device_ = {};
+  capture_directory_ = {};
+  initialized_ = {};
+  return result;
 }

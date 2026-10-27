@@ -61,8 +61,10 @@ def check_path(executable, mode, directory, headless=False):
     env["VK_LAYER_SETTINGS_PATH"] = str(directory)
     scenes = subprocess.check_output([str(executable), "--list"], text=True).splitlines()
     triangle = next(scene for scene in scenes if scene.endswith("triangle"))
+    device_args = (["--device", "1"] if "--device" in subprocess.check_output(
+        [str(executable), "--help"], text=True, encoding="utf-8") else [])
     result = subprocess.run(
-        [str(executable), "--backend", "vulkan", "--frames", "3"]
+        [str(executable), "--backend", "vulkan", "--frames", "3", *device_args]
         + (["--headless", "--all"] if headless else ["--module", triangle]),
         env=env, capture_output=True, timeout=60,
     )

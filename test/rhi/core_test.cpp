@@ -11,6 +11,25 @@
 #endif
 
 namespace grassland::rhi {
+TEST(RhiCoreSettings, ReportsBackendThroughRawAndWrapperInterfaces) {
+  std::vector<BackendAPI> apis{BACKEND_API_DEFAULT};
+#if defined(LONGMARCH_METAL_ENABLED)
+  apis.push_back(BACKEND_API_METAL);
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  apis.push_back(BACKEND_API_VULKAN);
+#endif
+#if defined(LONGMARCH_D3D12_ENABLED)
+  apis.push_back(BACKEND_API_D3D12);
+#endif
+  for (auto api : apis) {
+    auto core = rhix::CreateCore(api);
+    ASSERT_TRUE(core);
+    EXPECT_EQ(core.GetBackendAPI(), api);
+    EXPECT_EQ(core.Get()->GetBackendAPI(), api);
+  }
+}
+
 TEST(RhiCoreSettings, DefaultFollowsBuildConfiguration) {
 #if !defined(NDEBUG)
   EXPECT_TRUE(CoreDesc{}.enable_debug);

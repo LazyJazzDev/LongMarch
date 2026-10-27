@@ -49,6 +49,9 @@ class IDevice : public IObject {
                                   ShaderStage stage,
                                   const std::vector<std::string> &include_paths = {},
                                   const std::vector<std::pair<std::string, std::string>> &defines = {});
+  // No native window or input/UI callbacks. All frames share one image.
+  // GetNextImage waits when three frame leases are still held by callers or commands.
+  virtual IWindow *CreateHeadlessWindow(const WindowDesc &desc = {}) = 0;
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   virtual IQueue *GetQueue(QueueType type) = 0;
   virtual ICommandContext *CreateCommandContext() = 0;

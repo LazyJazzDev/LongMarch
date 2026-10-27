@@ -35,6 +35,7 @@ class Device : public Object<rhi::IDevice> {
   rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;
+  rhi::IWindow *CreateHeadlessWindow(const WindowDesc &desc = {}) override;
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::IQueue *GetQueue(QueueType type) override;
   rhi::ICommandContext *CreateCommandContext() override;

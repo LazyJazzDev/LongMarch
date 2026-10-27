@@ -1,12 +1,26 @@
 # rhi_hello
 
-Nine independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
+Eleven modules derive from `ModuleBase` and use `rhi::ObjPtr<IXXX>` pointer APIs. Main creates one Core, selects and creates one Device, then passes both to `CreateModule`. `ModuleBase` retains these objects and exposes protected accessors to derived modules implementing `OnInit`, `OnUpdate`, `OnRender` and `OnTerminate`; it never creates Core or Device objects. Each module keeps its own Window, Queue and rendering resources, which are released before the base-held references. Main passes shared `ModuleOptions`; `--all` creates and destroys one module at a time while reusing the same Core and Device. Main releases Device before Core after the modules finish.
 
 ```text
 demo_rhi_hello --list
 demo_rhi_hello --module window --backend vulkan
 demo_rhi_hello --module triangle --backend d3d12 --frames 120
+demo_rhi_hello --backend vulkan --device 2 --module nbody
+demo_rhi_hello --backend d3d12 --device auto --module nbody
 ```
+
+After choosing a backend, select a physical device in the shared terminal menu.
+If that backend exposes only one device, it is selected automatically without a
+device menu. `--device N` skips the menu and selects its **1-based** device number;
+the numbers match the menu and are specific to the backend. `--device auto` skips
+the menu and uses RHI automatic selection (dedicated GPUs are preferred over
+integrated GPUs). Omitting `--device` keeps the interactive selection behavior. The menu shows device
+names, types and memory, and startup prints the selected device. Invalid numbers
+fail with an error. `--all` uses the same selected device for every module; ray
+tracing modules skip when that device lacks the required feature, without switching
+to another GPU. For unattended runs, specify `--backend`, `--device` and `--module`
+(or `--all`).
 
 The positional backend argument remains supported. Without `--module`, the shared `snowberg::tui` menu opens (also available with `--tui`). Up/Down selects, Enter confirms, and Esc exits. Click selects and double-click confirms; the mouse wheel moves selection. Rows never wrap: long selected rows scroll horizontally after a pause. Redirected input or unsupported terminals retain the number/name prompt (`q`, `quit`, or EOF exits). `--tui` and `--module` are mutually exclusive; `--backend auto` uses the default backend. Specify `--module` for unattended runs; omit `--frames` to run until the window closes. P switches requested VSync mode, Escape exits, and the title displays `grassland::FPSCounter` statistics.
 
@@ -227,3 +241,29 @@ Call `UpdateImGui` before scene recording to apply UI feedback in the same frame
 Present records the prepared overlay. `window` remains a clear/present example.
 See [Window callbacks and ImGui](../../docs/rhi-window-imgui.md) for input and lifetime rules.
 The `imgui_multi_window` module demonstrates independent UI contexts in two windows.
+
+### Shared device selection
+
+`--device N` selects a backend-specific device numbered from 1; `--device auto`
+uses automatic selection. Without this option, multiple devices produce a menu.
+All modules, including `--all`, share the Core and Device created in main.
+`ModuleBase` retains these objects and obtains the backend from `ICore::GetBackendAPI()`
+(or the RHIX forwarding method), rather than storing a separate API value.
+The `imgui_multi_window` module demonstrates independent ImGui windows.
+
+
+## Module lifecycle
+
+Each module declares its class in `modules/<name>/module.h` and implements it in
+`module.cpp`. GPU resources and interaction state are direct private members of the module.
+`ModuleBase::Run` calls `OnInit`, drives `OnUpdate` then `OnRender`, and always
+calls `OnTerminate` after initialization has been attempted, including failure
+and early-close paths. Hooks return zero on success; the first error is preserved.
+
+The base owns an independent `should_close_` flag. `RequestClose()` stops the
+module; a window close flag does not automatically stop other windows. The
+multi-window module keeps running until all its windows close. Event polling,
+frame limits and warmup indices belong to the base driver. `CompleteFrame()`
+advances the count only after a frame is submitted, so minimized/unavailable
+swapchain retries do not consume the frame budget. `OnTerminate` waits for pending
+work, saves requested captures and resets module members before Core/Device.

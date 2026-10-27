@@ -52,6 +52,10 @@ class TestDevice final : public backend::Device {
 
 class TestCore final : public backend::Core {
  public:
+  grassland::rhi::BackendAPI GetBackendAPI() const override {
+    return grassland::rhi::BACKEND_API_DEFAULT;
+  }
+
   TestCore(std::vector<PhysicalDevice> devices, Calls &calls, bool fail = false)
       : devices_(std::move(devices)),
         calls_(calls),

@@ -1,7 +1,8 @@
-﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
+#include "grassland/rhi/backend/metal/metal_command_context.h"
 
 #include <cstring>
 
+#include "grassland/rhi/backend/backend_headless_window.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_download_token.h"
@@ -100,6 +101,13 @@ bool MetalCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
 }
 
 bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
+  if (auto headless = dynamic_cast<HeadlessWindow *>(window)) {
+    if (render_target_) {
+      recording_failed_ = true;
+      return false;
+    }
+    return RecordHeadlessPresent(headless);
+  }
 #if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;

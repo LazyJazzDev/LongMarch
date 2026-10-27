@@ -1,30 +1,53 @@
 #pragma once
+#include <memory>
 #include <string>
+#include <string_view>
 
-#include "grassland/rhi/rhi_util.h"
-int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory = {});
-int RunTriangle(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory = {});
+#include "grassland/rhi/rhi.h"
 
-int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory = {});
-int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory = {});
-int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory = {});
+struct ModuleOptions {
+  int frames = 0;
+  bool headless = false;
+  std::string capture_directory;
+  const char *font_file = nullptr;
+  float font_size = 20.0f;
+};
 
-int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory = {});
+class ModuleBase {
+ public:
+  ModuleBase(grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
+             grassland::rhi::ObjPtr<grassland::rhi::IDevice> device);
+  virtual ~ModuleBase() = default;
+  ModuleBase(const ModuleBase &) = delete;
+  ModuleBase &operator=(const ModuleBase &) = delete;
 
-int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory = {});
-int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory = {});
+  int Run(const ModuleOptions &options);
+  bool ShouldClose() const;
 
-int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &capture_directory = {});
+ protected:
+  void RequestClose();
+  int GetFrameIndex() const;
+  void CompleteFrame();
+  void SetWarmupFrames(int frames);
 
-int RunImGui(grassland::rhi::BackendAPI api,
-             int frames,
-             bool headless,
-             const char *font_file,
-             float font_size,
-             const std::string &capture_directory = {});
-int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
-                        int frames,
-                        bool headless,
-                        const char *font_file,
-                        float font_size,
-                        const std::string &capture_directory = {});
+  grassland::rhi::ICore *GetCore() const;
+  grassland::rhi::IDevice *GetDevice() const;
+  grassland::rhi::BackendAPI GetBackendAPI() const;
+
+ private:
+  virtual int OnInit(const ModuleOptions &options) = 0;
+  virtual int OnUpdate() = 0;
+  virtual int OnRender() = 0;
+  virtual int OnTerminate() = 0;
+
+  bool should_close_ = false;
+  int frame_index_ = 0;
+
+  // Members are destroyed in reverse order: Device must be released before Core.
+  grassland::rhi::ObjPtr<grassland::rhi::ICore> core_;
+  grassland::rhi::ObjPtr<grassland::rhi::IDevice> device_;
+};
+
+std::unique_ptr<ModuleBase> CreateModule(std::string_view name,
+                                         const grassland::rhi::ObjPtr<grassland::rhi::ICore> &core,
+                                         const grassland::rhi::ObjPtr<grassland::rhi::IDevice> &device);

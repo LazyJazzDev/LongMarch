@@ -1,4 +1,4 @@
-﻿#include "../../module.h"
+﻿#include "module.h"
 
 #include <fmt/format.h>
 
@@ -23,45 +23,42 @@ struct Vertex {
 };
 }  // namespace
 
-int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
-  using namespace grassland::rhi;
+using namespace grassland::rhi;
 
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
-    return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
-  ObjPtr<IDownloadToken> last_frame;
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  float last_frame_white_scale = 1.0f;
-  PresentMode requested = PRESENT_MODE_VSYNC;
-  bool present_mode_changed = false;
-  ObjPtr<IWindow> window;
-  if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI blend - P: toggle VSync"});
-    if (!window)
+int BlendModule::OnInit(const ModuleOptions &options) {
+  headless_ = options.headless;
+  capture_directory_ = options.capture_directory;
+  using namespace grassland::rhi;
+  device_ = GetDevice();
+
+  last_frame_desc_ = ImageDesc{};
+  last_frame_space_ = COLOR_SPACE_SRGB_NONLINEAR;
+  last_frame_white_scale_ = 1.0f;
+  requested_ = PRESENT_MODE_VSYNC;
+  present_mode_changed_ = false;
+
+  if (!headless_) {
+    window_ = device_->CreateGLFWWindow({1280, 720, "RHI blend - P: toggle VSync"});
+    if (!window_)
       return 1;
   }
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  if (!queue)
+  queue_ = device_->GetQueue(QUEUE_TYPE_GRAPHICS);
+  if (!queue_)
     return 1;
-  std::array<ObjPtr<IImage>, 3> targets;
-  std::array<ObjPtr<ISubmissionToken>, 3> pending;
-  if (headless) {
-    for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
+
+  if (headless_) {
+    for (auto &target : targets_) {
+      target = device_->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!target)
         return 1;
     }
   }
   const auto &embedded = shader_list.at("modules/blend/shaders/blend.slang");
   std::string source(embedded.first, embedded.second);
-  ObjPtr<IShader> vertex_shader = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> vertex_shader = device_->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   if (!vertex_shader)
     return 1;
-  ObjPtr<IShader> fragment_shader = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
+  ObjPtr<IShader> fragment_shader = device_->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   if (!fragment_shader)
     return 1;
   ProgramDesc desc;
@@ -72,16 +69,16 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}, {1, 0, INPUT_TYPE_FLOAT4, 12}};
   {
     ObjPtr<IImage> image;
-    if (headless)
-      image = targets[0];
+    if (headless_)
+      image = targets_[0];
     else
-      image = window->GetNextImage();
+      image = window_->GetNextImage();
     if (!image)
       return 1;
     desc.color_formats = {image->GetDesc().format};
   }
-  ObjPtr<IProgram> program = device->CreateProgram(desc);
-  if (!program)
+  program_ = device_->CreateProgram(desc);
+  if (!program_)
     return 1;
   // Match graphics_hello/blend: opaque inner triangle, then translucent outer triangle.
   const Vertex vertices[] = {
@@ -90,160 +87,202 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       {{-0.3f, -0.35f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, {{0.3f, -0.35f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
   };
   const uint32_t indices[] = {0, 1, 2};
-  ObjPtr<IBuffer> vertex_buffer = device->CreateBuffer({sizeof(vertices)});
-  if (!vertex_buffer)
+  vertex_buffer_ = device_->CreateBuffer({sizeof(vertices)});
+  if (!vertex_buffer_)
     return 1;
-  ObjPtr<IBuffer> index_buffer = device->CreateBuffer({sizeof(indices)});
-  if (!index_buffer)
+  index_buffer_ = device_->CreateBuffer({sizeof(indices)});
+  if (!index_buffer_)
     return 1;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
-    ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+    ObjPtr<ICommandContext> upload = device_->CreateCommandContext();
     if (!upload)
       return 1;
-    if (!upload->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)))
+    if (!upload->CmdUploadBuffer(vertex_buffer_.Get(), 0, vertices, sizeof(vertices)))
       return 1;
-    if (!upload->CmdUploadBuffer(index_buffer.Get(), 0, indices, sizeof(indices)))
+    if (!upload->CmdUploadBuffer(index_buffer_.Get(), 0, indices, sizeof(indices)))
       return 1;
-    ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
+    ObjPtr<ISubmissionToken> uploaded = queue_->Submit(upload.Get());
     if (!uploaded)
       return 1;
-    if (headless) {
+    if (headless_) {
       if (!uploaded->WaitHost())
         return 1;
     }
   }
-  if (!headless) {
-    window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+  if (!headless_) {
+    window_->KeyEvent().RegisterCallback([this](int key, int, int action, int) {
       if (action != GLFW_PRESS)
         return;
       if (key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+        glfwSetWindowShouldClose(window_->GLFWWindow(), GLFW_TRUE);
       if (key == GLFW_KEY_P) {
-        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        present_mode_changed = true;
+        requested_ = requested_ == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+        present_mode_changed_ = true;
       }
     });
   }
-  grassland::FPSCounter fps;
-  auto title_time = std::chrono::steady_clock::now();
+
+  title_time_ = std::chrono::steady_clock::now();
   // Warm up allocations and pipelines before measuring completed GPU work.
-  auto benchmark_start = std::chrono::steady_clock::now();
-  int rendered = headless ? -60 : 0;
-  while (!frames || rendered < frames) {
-    if (!headless) {
-      if (!PollEvents())
-        break;
-      if (window->ShouldClose())
-        break;
-      if (window->IsSwapChainInvalid()) {
-        if (!window->RebuildSwapChain())
-          return 1;
-      }
-      if (present_mode_changed) {
-        present_mode_changed = false;
-        if (!window->SetPresentMode(requested))
-          return 1;
-      }
+  benchmark_start_ = std::chrono::steady_clock::now();
+  SetWarmupFrames(headless_ ? 60 : 0);
+
+  initialized_ = true;
+  return 0;
+}
+
+int BlendModule::OnUpdate() {
+  if (!headless_) {
+    if (window_->ShouldClose()) {
+      RequestClose();
+      return 0;
     }
-    const size_t slot = (static_cast<int64_t>(rendered) + 60) % targets.size();
-    if (headless) {
-      if (rendered == 0) {
-        for (auto &token : pending) {
+    if (window_->IsSwapChainInvalid()) {
+      if (!window_->RebuildSwapChain())
+        return 1;
+    }
+    if (present_mode_changed_) {
+      present_mode_changed_ = false;
+      if (!window_->SetPresentMode(requested_))
+        return 1;
+    }
+  }
+
+  return 0;
+}
+
+int BlendModule::OnRender() {
+  const size_t slot = (static_cast<int64_t>(GetFrameIndex()) + 60) % targets_.size();
+  if (headless_) {
+    if (GetFrameIndex() == 0) {
+      for (auto &token : pending_) {
+        if (token) {
+          if (!token->WaitHost())
+            return 1;
+          token = {};
+        }
+      }
+      benchmark_start_ = std::chrono::steady_clock::now();
+    }
+    if (pending_[slot]) {
+      if (!pending_[slot]->WaitHost())
+        return 1;
+      pending_[slot] = {};
+    }
+  }
+  ObjPtr<IImage> image;
+  if (headless_)
+    image = targets_[slot];
+  else
+    image = window_->GetNextImage();
+  if (!image) {
+    if (headless_)
+      return 1;
+    fps_.Reset();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    return 0;
+  }
+  auto extent = image->GetDesc();
+  ObjPtr<ICommandContext> context = device_->CreateCommandContext();
+  if (!context)
+    return 1;
+  if (!context->CmdBindProgram(program_.Get()))
+    return 1;
+  if (!context->CmdBeginRendering(
+          {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}}}))
+    return 1;
+  if (!context->CmdBindVertexBuffer(0, vertex_buffer_.Get()))
+    return 1;
+  if (!context->CmdBindIndexBuffer(index_buffer_.Get()))
+    return 1;
+  if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
+    return 1;
+  if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
+    return 1;
+  if (!context->CmdDrawIndexed(3, 1, 0, 3))
+    return 1;
+  if (!context->CmdDrawIndexed(3))
+    return 1;
+  if (!context->CmdEndRendering())
+    return 1;
+  if (!headless_) {
+    if (!context->CmdPresent(window_.Get()))
+      return 1;
+  }
+  if (!capture_directory_.empty()) {
+    last_frame_ = context->CmdDownloadImage(image.Get());
+    if (!last_frame_)
+      return 1;
+    last_frame_desc_ = image->GetDesc();
+    last_frame_space_ = window_ ? window_->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
+    last_frame_white_scale_ = window_ ? window_->GetHDRReferenceWhiteScale() : 1.0f;
+  }
+  ObjPtr<ISubmissionToken> token = queue_->Submit(context.Get());
+
+  if (!token)
+    return 1;
+  if (headless_)
+    pending_[slot] = std::move(token);
+  CompleteFrame();
+  fps_.TickFrame();
+  auto now = std::chrono::steady_clock::now();
+  if (!headless_ && now - title_time_ >= std::chrono::milliseconds(250)) {
+    if (!window_->SetTitle(fmt::format("RHI blend - FPS: {:.1f} - P: toggle VSync", fps_.GetFPS())))
+      return 1;
+    title_time_ = now;
+  }
+
+  return 0;
+}
+
+int BlendModule::OnTerminate() {
+  int result = 0;
+  if (initialized_) {
+    result = [&]() -> int {
+      if (headless_) {
+        for (const auto &token : pending_) {
           if (token) {
             if (!token->WaitHost())
               return 1;
-            token = {};
           }
         }
-        benchmark_start = std::chrono::steady_clock::now();
+        const double seconds =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start_).count();
+        std::cout << fmt::format("blend: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
+                                 GetFrameIndex(), seconds, GetFrameIndex() / seconds);
       }
-      if (pending[slot]) {
-        if (!pending[slot]->WaitHost())
+      if (!capture_directory_.empty()) {
+        if (!last_frame_ || !last_frame_->WaitHost())
           return 1;
-        pending[slot] = {};
-      }
-    }
-    ObjPtr<IImage> image;
-    if (headless)
-      image = targets[slot];
-    else
-      image = window->GetNextImage();
-    if (!image) {
-      if (headless)
-        return 1;
-      fps.Reset();
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      continue;
-    }
-    auto extent = image->GetDesc();
-    ObjPtr<ICommandContext> context = device->CreateCommandContext();
-    if (!context)
-      return 1;
-    if (!context->CmdBindProgram(program.Get()))
-      return 1;
-    if (!context->CmdBeginRendering(
-            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}}}))
-      return 1;
-    if (!context->CmdBindVertexBuffer(0, vertex_buffer.Get()))
-      return 1;
-    if (!context->CmdBindIndexBuffer(index_buffer.Get()))
-      return 1;
-    if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
-      return 1;
-    if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
-      return 1;
-    if (!context->CmdDrawIndexed(3, 1, 0, 3))
-      return 1;
-    if (!context->CmdDrawIndexed(3))
-      return 1;
-    if (!context->CmdEndRendering())
-      return 1;
-    if (!headless) {
-      if (!context->CmdPresent(window.Get()))
-        return 1;
-    }
-    if (!capture_directory.empty()) {
-      last_frame = context->CmdDownloadImage(image.Get());
-      if (!last_frame)
-        return 1;
-      last_frame_desc = image->GetDesc();
-      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
-    }
-    ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
-
-    if (!token)
-      return 1;
-    if (headless)
-      pending[slot] = std::move(token);
-    ++rendered;
-    fps.TickFrame();
-    auto now = std::chrono::steady_clock::now();
-    if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window->SetTitle(fmt::format("RHI blend - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
-        return 1;
-      title_time = now;
-    }
-  }
-  if (headless) {
-    for (const auto &token : pending) {
-      if (token) {
-        if (!token->WaitHost())
+        std::vector<uint8_t> pixels(last_frame_->GetSize());
+        if (!last_frame_->CopyTo(pixels.data(), pixels.size()) ||
+            !SaveImage(capture_directory_, "blend", pixels, last_frame_desc_, last_frame_space_,
+                       last_frame_white_scale_))
           return 1;
       }
-    }
-    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format("blend: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
-                             rendered, seconds, rendered / seconds);
+      return 0;
+    }();
   }
-  if (!capture_directory.empty()) {
-    if (!last_frame || !last_frame->WaitHost())
-      return 1;
-    std::vector<uint8_t> pixels(last_frame->GetSize());
-    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "blend", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
-      return 1;
-  }
-  return 0;
+  benchmark_start_ = {};
+  title_time_ = {};
+  fps_ = {};
+  index_buffer_ = {};
+  vertex_buffer_ = {};
+  program_ = {};
+  pending_ = {};
+  targets_ = {};
+  queue_ = {};
+  window_ = {};
+  present_mode_changed_ = {};
+  requested_ = {};
+  last_frame_white_scale_ = {};
+  last_frame_space_ = {};
+  last_frame_desc_ = {};
+  last_frame_ = {};
+  device_ = {};
+  capture_directory_ = {};
+  headless_ = {};
+  initialized_ = {};
+  return result;
 }

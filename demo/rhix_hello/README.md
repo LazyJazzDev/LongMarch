@@ -1,6 +1,6 @@
 # rhix_hello
 
-Nine independent modules use `rhix` typed containers. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
+Eleven modules use `rhix` typed containers and inherit `ModuleBase`. Main selects the backend and device once, then passes shared Core/Device handles into each module. Modules create their own rendering resources and queues; `--all` reuses the same selected device.
 
 ```text
 demo_rhix_hello --list
@@ -8,7 +8,7 @@ demo_rhix_hello --module window --backend vulkan
 demo_rhix_hello --module triangle --backend d3d12 --frames 120
 ```
 
-The positional backend argument remains supported. Without `--module`, the shared `snowberg::tui` menu opens (also available with `--tui`). Up/Down selects, Enter confirms, and Esc exits. Click selects and double-click confirms; the mouse wheel moves selection. Rows never wrap: long selected rows scroll horizontally after a pause. Redirected input or unsupported terminals retain the number/name prompt (`q`, `quit`, or EOF exits). `--tui` and `--module` are mutually exclusive; `--backend auto` uses the default backend. Specify `--module` for unattended runs; omit `--frames` to run until the window closes. P switches requested VSync mode, Escape exits, and the title displays `grassland::FPSCounter` statistics.
+The positional backend argument remains supported. Without `--module`, the shared `snowberg::tui` menu opens (also available with `--tui`). Up/Down selects, Enter confirms, and Esc exits. Click selects and double-click confirms; the mouse wheel moves selection. Rows never wrap: long selected rows scroll horizontally after a pause. Redirected input or unsupported terminals retain the number/name prompt (`q`, `quit`, or EOF exits). `--tui` and `--module` are mutually exclusive; `--backend auto` uses the default backend. Specify `--module`, `--backend` and `--device auto` for unattended runs; omit `--frames` to run until the window closes. P switches requested VSync mode, Escape exits, and the title displays `grassland::FPSCounter` statistics.
 
 - `window`: original RGB (0.6, 0.7, 0.8) clear/presentation and supported presentation-combination output. D3D12, Vulkan and the existing Metal backend are supported.
 - `triangle`: D3D12/Vulkan/Metal colored indexed triangle on that background. The module creates independent GPU-only vertex/index Buffers, uploads once through CommandContext, creates a Slang Program, then records bindings, viewport/scissor and DrawIndexed. Resize/minimize/restore and P-mode changes are supported.
@@ -149,3 +149,29 @@ The `imgui` module enables an interactive ImGui overlay through Window callbacks
 Call `UpdateImGui` before scene recording to apply UI feedback in the same frame;
 Present records the prepared overlay. `window` remains a clear/present example.
 See [Window callbacks and ImGui](../../docs/rhi-window-imgui.md) for input and lifetime rules.
+
+### Shared device selection
+
+`--device N` selects a backend-specific device numbered from 1; `--device auto`
+uses automatic selection. Without this option, multiple devices produce a menu.
+All modules, including `--all`, share the Core and Device created in main.
+`ModuleBase` retains these objects and obtains the backend from `ICore::GetBackendAPI()`
+(or the RHIX forwarding method), rather than storing a separate API value.
+The `imgui_multi_window` module demonstrates independent ImGui windows.
+
+
+## Module lifecycle
+
+Each module declares its class in `modules/<name>/module.h` and implements it in
+`module.cpp`. GPU resources and interaction state are direct private members of the module.
+`ModuleBase::Run` calls `OnInit`, drives `OnUpdate` then `OnRender`, and always
+calls `OnTerminate` after initialization has been attempted, including failure
+and early-close paths. Hooks return zero on success; the first error is preserved.
+
+The base owns an independent `should_close_` flag. `RequestClose()` stops the
+module; a window close flag does not automatically stop other windows. The
+multi-window module keeps running until all its windows close. Event polling,
+frame limits and warmup indices belong to the base driver. `CompleteFrame()`
+advances the count only after a frame is submitted, so minimized/unavailable
+swapchain retries do not consume the frame budget. `OnTerminate` waits for pending
+work, saves requested captures and resets module members before Core/Device.

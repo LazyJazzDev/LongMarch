@@ -1,16 +1,37 @@
 ﻿#include "grassland/rhi/backend/backend_command_context.h"
 
+#include "grassland/rhi/backend/backend_headless_window.h"
 #include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/rhi_program.h"
 
 namespace grassland::rhi::backend {
+bool CommandContext::RecordHeadlessPresent(HeadlessWindow *window) {
+  if (sealed_ || window->DeviceIdentity() != DeviceIdentity()) {
+    recording_failed_ = true;
+    return false;
+  }
+  for (const auto &present : headless_presents_) {
+    if (present.Get() == window) {
+      recording_failed_ = true;
+      return false;
+    }
+  }
+  auto frame = ObjectPtr<IImage>::Adopt(window->GetNextImage());
+  if (!frame || !RetainResource(frame.Get()))
+    return false;
+  headless_presents_.push_back(ObjectPtr<HeadlessWindow>::Retain(window));
+  window->AdvanceFrame();
+  return true;
+}
+
 bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
 #if !defined(NDEBUG)
   auto native = dynamic_cast<Window *>(window);
   auto image = dynamic_cast<Image *>(target);
   if (!native || !image || native->DeviceIdentity() != identity_ || image->DeviceIdentity() != identity_ ||
-      !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+      (!dynamic_cast<HeadlessWindow *>(native) && !glfw::IsWindowThread()) || sealed_ ||
+      !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
     recording_failed_ = true;
     ReportError(-1,
                 "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
@@ -39,7 +60,8 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
   auto native = dynamic_cast<Window *>(window);
   auto image = dynamic_cast<Image *>(frame_img);
   if (!native || !image || native->DeviceIdentity() != identity_ || image->DeviceIdentity() != identity_ ||
-      !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+      (!dynamic_cast<HeadlessWindow *>(native) && !glfw::IsWindowThread()) || sealed_ ||
+      !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
     recording_failed_ = true;
     ReportError(-1,
                 "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");

@@ -42,6 +42,14 @@ bool Device::SupportGeometryShader() const {
   return Get()->SupportGeometryShader();
 }
 
+Window Device::CreateHeadlessWindow(const rhi::WindowDesc &desc) const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return nullptr;
+#endif
+  return Get()->CreateHeadlessWindow(desc);
+}
+
 Window Device::CreateGLFWWindow(const rhi::WindowDesc &desc) const {
 #if !defined(NDEBUG)
   if (!*this)
