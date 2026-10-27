@@ -18,15 +18,12 @@ namespace {
 #include "built_in_shaders.inl"
 }
 
-int RunHDR(grassland::rhi::BackendAPI api, int32_t device_index, int frames, const std::string &capture_directory) {
+int HDRModule::RunImpl(const ModuleOptions &options) {
+  const int frames = options.frames;
+  const auto &capture_directory = options.capture_directory;
   using namespace grassland::rhi;
+  auto *device = GetDevice();
 
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
-    return 1;
-  ObjPtr<IDevice> device = core->CreateDevice(device_index);
-  if (!device)
-    return 1;
   ObjPtr<IDownloadToken> last_frame;
   ImageDesc last_frame_desc{};
   ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;

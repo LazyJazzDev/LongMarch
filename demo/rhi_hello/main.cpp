@@ -208,103 +208,52 @@ int main(int argc, char **argv) {
     else if (all)
       frames = 300;
   }
+  const ModuleOptions options{frames, headless, capture_directory, font_file, font_size};
+  const std::vector<snowberg::tui::MenuOption> module_options{
+      {"window", "Clear and present a window"},
+      {"triangle", "Colored indexed triangle"},
+      {"cube", "Rotating cube with depth and uniform binding"},
+      {"texture", "Sampled XOR texture triangle"},
+      {"blend", "Source-alpha blended triangles"},
+      {"nbody", "Compute simulation and particle rendering"},
+      {"raytracing", "Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)"},
+      {"ray_query", "Inline ray queries"},
+      {"hdr", "HDR presentation (window only)"},
+      {"imgui", "Interactive ImGui overlay"},
+      {"imgui_multi_window", "Independent ImGui windows"},
+  };
+  auto run_module = [&](const std::string &name) {
+    auto instance = CreateModule(name);
+    if (!instance) {
+      std::cerr << "Unknown module: " << name << '\n';
+      return 1;
+    }
+    if (name == "hdr" && headless) {
+      std::cerr << "hdr requires a window; --headless is unsupported.\n";
+      return 1;
+    }
+    return instance->Run(api, device_index, options);
+  };
   if (all) {
     int result = 0;
-    if (RunWindow(api, device_index, frames, headless, capture_directory) != 0) {
-      std::cerr << "window: FAILED\n";
-      result = 1;
-    }
-    if (RunTriangle(api, device_index, frames, headless, capture_directory) != 0) {
-      std::cerr << "triangle: FAILED\n";
-      result = 1;
-    }
-    if (RunCube(api, device_index, frames, headless, capture_directory) != 0) {
-      std::cerr << "cube: FAILED\n";
-      result = 1;
-    }
-    if (RunTexture(api, device_index, frames, headless, capture_directory) != 0) {
-      std::cerr << "texture: FAILED\n";
-      result = 1;
-    }
-    if (RunBlend(api, device_index, frames, headless, capture_directory) != 0) {
-      std::cerr << "blend: FAILED\n";
-      result = 1;
-    }
-    if (RunNBody(api, device_index, frames, headless, capture_directory) != 0) {
-      std::cerr << "nbody: FAILED\n";
-      result = 1;
-    }
-    if (RunRayTracing(api, device_index, frames, headless, capture_directory) != 0) {
-      std::cerr << "raytracing: FAILED\n";
-      result = 1;
-    }
-    if (RunRayQuery(api, device_index, frames, headless, capture_directory) != 0) {
-      std::cerr << "ray_query: FAILED\n";
-      result = 1;
-    }
-    if (headless) {
-      std::cout << "hdr: SKIPPED (requires a window)\n";
-    } else if (RunHDR(api, device_index, frames, capture_directory) != 0) {
-      std::cerr << "hdr: FAILED\n";
-      result = 1;
-    }
-    if (RunImGui(api, device_index, frames, headless, font_file, font_size, capture_directory) != 0) {
-      std::cerr << "imgui: FAILED\n";
-      result = 1;
-    }
-    if (RunImGuiMultiWindow(api, device_index, frames, headless, font_file, font_size, capture_directory) != 0) {
-      std::cerr << "imgui_multi_window: FAILED\n";
-      result = 1;
+    for (const auto &entry : module_options) {
+      if (entry.name == "hdr" && headless) {
+        std::cout << "hdr: SKIPPED (requires a window)\n";
+        continue;
+      }
+      if (run_module(entry.name) != 0) {
+        std::cerr << entry.name << ": FAILED\n";
+        result = 1;
+      }
     }
     return result;
   }
   if (module.empty()) {
-    const std::vector<snowberg::tui::MenuOption> options{
-        {"window", "Clear and present a window"},
-        {"triangle", "Colored indexed triangle"},
-        {"cube", "Rotating cube with depth and uniform binding"},
-        {"texture", "Sampled XOR texture triangle"},
-        {"blend", "Source-alpha blended triangles"},
-        {"nbody", "Compute simulation and particle rendering"},
-        {"raytracing", "Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)"},
-        {"ray_query", "Inline ray queries"},
-        {"hdr", "HDR presentation (window only)"},
-        {"imgui", "Interactive ImGui overlay"},
-        {"imgui_multi_window", "Independent ImGui windows"},
-    };
     snowberg::tui::Menu menu;
-    const auto selected = menu.Select("RHI Hello - Module Selection", options);
+    const auto selected = menu.Select("RHI Hello - Module Selection", module_options);
     if (!selected)
       return 0;
-    module = options[*selected].name;
+    module = module_options[*selected].name;
   }
-  if (module == "window")
-    return RunWindow(api, device_index, frames, headless, capture_directory);
-  if (module == "triangle")
-    return RunTriangle(api, device_index, frames, headless, capture_directory);
-  if (module == "cube")
-    return RunCube(api, device_index, frames, headless, capture_directory);
-  if (module == "texture")
-    return RunTexture(api, device_index, frames, headless, capture_directory);
-  if (module == "blend")
-    return RunBlend(api, device_index, frames, headless, capture_directory);
-  if (module == "nbody")
-    return RunNBody(api, device_index, frames, headless, capture_directory);
-  if (module == "raytracing")
-    return RunRayTracing(api, device_index, frames, headless, capture_directory);
-  if (module == "ray_query")
-    return RunRayQuery(api, device_index, frames, headless, capture_directory);
-  if (module == "imgui")
-    return RunImGui(api, device_index, frames, headless, font_file, font_size, capture_directory);
-  if (module == "imgui_multi_window")
-    return RunImGuiMultiWindow(api, device_index, frames, headless, font_file, font_size, capture_directory);
-  if (module == "hdr") {
-    if (headless) {
-      std::cerr << "hdr requires a window; --headless is unsupported.\n";
-      return 1;
-    }
-    return RunHDR(api, device_index, frames, capture_directory);
-  }
-  std::cerr << "Unknown module: " << module << '\n';
-  return 1;
+  return run_module(module);
 }

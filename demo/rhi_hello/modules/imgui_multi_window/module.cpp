@@ -10,24 +10,18 @@
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
 
-int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
-                        int32_t device_index,
-                        int frames,
-                        bool headless,
-                        const char *font_file,
-                        float font_size,
-                        const std::string &capture_directory) {
+int ImGuiMultiWindowModule::RunImpl(const ModuleOptions &options) {
+  const int frames = options.frames;
+  const bool headless = options.headless;
+  const auto &capture_directory = options.capture_directory;
+  const auto font_file = options.font_file;
+  const auto font_size = options.font_size;
   using namespace grassland::rhi;
+  auto *device = GetDevice();
   if (headless) {
     std::cout << "imgui_multi_window: skipped (requires desktop windows)\n";
     return 0;
   }
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
-    return 1;
-  ObjPtr<IDevice> device = core->CreateDevice(device_index);
-  if (!device)
-    return 1;
   std::array<ObjPtr<IDownloadToken>, 2> last_frames;
   std::array<ImageDesc, 2> last_frame_descs{};
   std::array<ColorSpace, 2> last_frame_spaces{};

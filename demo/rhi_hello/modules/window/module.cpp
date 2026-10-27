@@ -154,15 +154,14 @@ int RunWindow(grassland::rhi::IDevice *device,
 }
 }  // namespace
 
-int RunWindow(grassland::rhi::BackendAPI api,
-              int32_t device_index,
-              int frames,
-              bool headless,
-              const std::string &capture_directory) {
+int WindowModule::RunImpl(const ModuleOptions &options) {
+  const int frames = options.frames;
+  const bool headless = options.headless;
+  const auto &capture_directory = options.capture_directory;
+  const auto api = GetBackendAPI();
   using namespace grassland::rhi;
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
-    return 1;
+  auto *device = GetDevice();
+  auto *core = GetCore();
   const auto devices = core->GetPhysicalDevices();
   std::cout << "Backend: " << BackendAPIName(api) << '\n' << std::boolalpha;
   for (size_t id = 0; id < devices.size(); ++id) {
@@ -175,9 +174,6 @@ int RunWindow(grassland::rhi::BackendAPI api,
               << '\n';
   }
 
-  ObjPtr<IDevice> device = core->CreateDevice(device_index);
-  if (!device)
-    return 1;
   std::cout << "Selected: " << device->Name() << '\n'
             << "Enabled: ray tracing pipeline=" << device->SupportRayTracingPipeline()
             << ", ray query=" << device->SupportRayQuery() << ", geometry shader=" << device->SupportGeometryShader()
@@ -207,6 +203,6 @@ int RunWindow(grassland::rhi::BackendAPI api,
     });
   }
   // Reverse declaration order releases children before their parents on every return.
-  return RunWindow(device.Get(), window.Get(), graphics.Get(), frames, headless, requested, present_mode_changed,
+  return RunWindow(device, window.Get(), graphics.Get(), frames, headless, requested, present_mode_changed,
                    capture_directory);
 }

@@ -1,64 +1,94 @@
 #pragma once
+#include <memory>
 #include <string>
+#include <string_view>
 
-#include "grassland/rhi/rhi_util.h"
-int RunWindow(grassland::rhi::BackendAPI api,
-              int32_t device_index,
-              int frames,
-              bool headless,
-              const std::string &capture_directory = {});
-int RunTriangle(grassland::rhi::BackendAPI api,
-                int32_t device_index,
-                int frames,
-                bool headless,
-                const std::string &capture_directory = {});
+#include "grassland/rhi/rhi.h"
 
-int RunCube(grassland::rhi::BackendAPI api,
-            int32_t device_index,
-            int frames,
-            bool headless,
-            const std::string &capture_directory = {});
-int RunTexture(grassland::rhi::BackendAPI api,
-               int32_t device_index,
-               int frames,
-               bool headless,
-               const std::string &capture_directory = {});
-int RunBlend(grassland::rhi::BackendAPI api,
-             int32_t device_index,
-             int frames,
-             bool headless,
-             const std::string &capture_directory = {});
+struct ModuleOptions {
+  int frames = 0;
+  bool headless = false;
+  std::string capture_directory;
+  const char *font_file = nullptr;
+  float font_size = 20.0f;
+};
 
-int RunNBody(grassland::rhi::BackendAPI api,
-             int32_t device_index,
-             int frames,
-             bool headless,
-             const std::string &capture_directory = {});
+class ModuleBase {
+ public:
+  ModuleBase() = default;
+  virtual ~ModuleBase() = default;
+  ModuleBase(const ModuleBase &) = delete;
+  ModuleBase &operator=(const ModuleBase &) = delete;
 
-int RunRayTracing(grassland::rhi::BackendAPI api,
-                  int32_t device_index,
-                  int frames,
-                  bool headless,
-                  const std::string &capture_directory = {});
-int RunRayQuery(grassland::rhi::BackendAPI api,
-                int32_t device_index,
-                int frames,
-                bool headless,
-                const std::string &capture_directory = {});
+  int Run(grassland::rhi::BackendAPI api, int32_t device_index, const ModuleOptions &options);
 
-int RunHDR(grassland::rhi::BackendAPI api, int32_t device_index, int frames, const std::string &capture_directory = {});
+ protected:
+  grassland::rhi::ICore *GetCore() const;
+  grassland::rhi::IDevice *GetDevice() const;
+  grassland::rhi::BackendAPI GetBackendAPI() const;
 
-int RunImGui(grassland::rhi::BackendAPI api,
-             int32_t device_index,
-             int frames,
-             bool headless,
-             const char *font_file,
-             float font_size,
-             const std::string &capture_directory = {});
-int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
-                        int32_t device_index,
-                        int frames,
-                        bool headless,
-                        const char *font_file,
-                        float font_size,
-                        const std::string &capture_directory = {});
+ private:
+  virtual int RunImpl(const ModuleOptions &options) = 0;
+
+  grassland::rhi::BackendAPI api_ = grassland::rhi::BACKEND_API_DEFAULT;
+  // Members are destroyed in reverse order: Device must be released before Core.
+  grassland::rhi::ObjPtr<grassland::rhi::ICore> core_;
+  grassland::rhi::ObjPtr<grassland::rhi::IDevice> device_;
+};
+
+class WindowModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class TriangleModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class CubeModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class TextureModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class BlendModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class NBodyModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class RayTracingModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class RayQueryModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class HDRModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class ImGuiModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+class ImGuiMultiWindowModule final : public ModuleBase {
+ private:
+  int RunImpl(const ModuleOptions &options) override;
+};
+
+std::unique_ptr<ModuleBase> CreateModule(std::string_view name);

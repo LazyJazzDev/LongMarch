@@ -1,6 +1,6 @@
 # rhi_hello
 
-Nine independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
+Eleven modules derive from `ModuleBase` and use `rhi::ObjPtr<IXXX>` pointer APIs. `ModuleBase::Run` creates and owns the Core and selected Device; derived modules implement `RunImpl` and borrow them through protected accessors. Each module keeps its own Window, Queue and rendering resources, which are released before the base-owned Device and Core. Main creates modules through `CreateModule` and passes shared `ModuleOptions`; `--all` creates and destroys one module at a time, so Core instances never overlap.
 
 ```text
 demo_rhi_hello --list
