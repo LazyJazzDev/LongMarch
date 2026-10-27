@@ -241,3 +241,12 @@ Call `UpdateImGui` before scene recording to apply UI feedback in the same frame
 Present records the prepared overlay. `window` remains a clear/present example.
 See [Window callbacks and ImGui](../../docs/rhi-window-imgui.md) for input and lifetime rules.
 The `imgui_multi_window` module demonstrates independent UI contexts in two windows.
+
+### Shared device selection
+
+`--device N` selects a backend-specific device numbered from 1; `--device auto`
+uses automatic selection. Without this option, multiple devices produce a menu.
+All modules, including `--all`, share the Core and Device created in main.
+`ModuleBase` retains these objects and obtains the backend from `ICore::GetBackendAPI()`
+(or the RHIX forwarding method), rather than storing a separate API value.
+The `imgui_multi_window` module demonstrates independent ImGui windows.

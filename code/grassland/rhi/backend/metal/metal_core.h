@@ -8,6 +8,10 @@ namespace grassland::rhi::backend::metal {
 
 class MetalCore final : public Core {
  public:
+  BackendAPI GetBackendAPI() const override {
+    return BACKEND_API_METAL;
+  }
+
   static MetalCore *CreateMetalCore(const CoreDesc &desc);
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
   rhi::IDevice *CreateDevice(int32_t device_idx) override;

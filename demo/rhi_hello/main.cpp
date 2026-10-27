@@ -178,6 +178,7 @@ int main(int argc, char **argv) {
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
     return 1;
+  api = core->GetBackendAPI();
   int32_t device_index = 0;
   ObjPtr<IDevice> device;
   {
@@ -241,7 +242,7 @@ int main(int argc, char **argv) {
       {"imgui_multi_window", "Independent ImGui windows"},
   };
   auto run_module = [&](const std::string &name) {
-    auto instance = CreateModule(name, api, core, device);
+    auto instance = CreateModule(name, core, device);
     if (!instance) {
       std::cerr << "Unknown module: " << name << '\n';
       return 1;

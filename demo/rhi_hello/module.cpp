@@ -2,11 +2,9 @@
 
 #include <utility>
 
-ModuleBase::ModuleBase(grassland::rhi::BackendAPI api,
-                       grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
+ModuleBase::ModuleBase(grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
                        grassland::rhi::ObjPtr<grassland::rhi::IDevice> device)
-    : api_(api),
-      core_(std::move(core)),
+    : core_(std::move(core)),
       device_(std::move(device)) {
 }
 
@@ -25,34 +23,33 @@ grassland::rhi::IDevice *ModuleBase::GetDevice() const {
 }
 
 grassland::rhi::BackendAPI ModuleBase::GetBackendAPI() const {
-  return api_;
+  return core_->GetBackendAPI();
 }
 
 std::unique_ptr<ModuleBase> CreateModule(std::string_view name,
-                                         grassland::rhi::BackendAPI api,
                                          const grassland::rhi::ObjPtr<grassland::rhi::ICore> &core,
                                          const grassland::rhi::ObjPtr<grassland::rhi::IDevice> &device) {
   if (name == "window")
-    return std::make_unique<WindowModule>(api, core, device);
+    return std::make_unique<WindowModule>(core, device);
   if (name == "triangle")
-    return std::make_unique<TriangleModule>(api, core, device);
+    return std::make_unique<TriangleModule>(core, device);
   if (name == "cube")
-    return std::make_unique<CubeModule>(api, core, device);
+    return std::make_unique<CubeModule>(core, device);
   if (name == "texture")
-    return std::make_unique<TextureModule>(api, core, device);
+    return std::make_unique<TextureModule>(core, device);
   if (name == "blend")
-    return std::make_unique<BlendModule>(api, core, device);
+    return std::make_unique<BlendModule>(core, device);
   if (name == "nbody")
-    return std::make_unique<NBodyModule>(api, core, device);
+    return std::make_unique<NBodyModule>(core, device);
   if (name == "raytracing")
-    return std::make_unique<RayTracingModule>(api, core, device);
+    return std::make_unique<RayTracingModule>(core, device);
   if (name == "ray_query")
-    return std::make_unique<RayQueryModule>(api, core, device);
+    return std::make_unique<RayQueryModule>(core, device);
   if (name == "hdr")
-    return std::make_unique<HDRModule>(api, core, device);
+    return std::make_unique<HDRModule>(core, device);
   if (name == "imgui")
-    return std::make_unique<ImGuiModule>(api, core, device);
+    return std::make_unique<ImGuiModule>(core, device);
   if (name == "imgui_multi_window")
-    return std::make_unique<ImGuiMultiWindowModule>(api, core, device);
+    return std::make_unique<ImGuiMultiWindowModule>(core, device);
   return {};
 }

@@ -15,8 +15,7 @@ struct ModuleOptions {
 
 class ModuleBase {
  public:
-  ModuleBase(grassland::rhi::BackendAPI api,
-             grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
+  ModuleBase(grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
              grassland::rhi::ObjPtr<grassland::rhi::IDevice> device);
   virtual ~ModuleBase() = default;
   ModuleBase(const ModuleBase &) = delete;
@@ -32,7 +31,6 @@ class ModuleBase {
  private:
   virtual int RunImpl(const ModuleOptions &options) = 0;
 
-  grassland::rhi::BackendAPI api_ = grassland::rhi::BACKEND_API_DEFAULT;
   // Members are destroyed in reverse order: Device must be released before Core.
   grassland::rhi::ObjPtr<grassland::rhi::ICore> core_;
   grassland::rhi::ObjPtr<grassland::rhi::IDevice> device_;
@@ -127,6 +125,5 @@ class ImGuiMultiWindowModule final : public ModuleBase {
 };
 
 std::unique_ptr<ModuleBase> CreateModule(std::string_view name,
-                                         grassland::rhi::BackendAPI api,
                                          const grassland::rhi::ObjPtr<grassland::rhi::ICore> &core,
                                          const grassland::rhi::ObjPtr<grassland::rhi::IDevice> &device);

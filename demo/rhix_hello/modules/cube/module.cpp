@@ -25,16 +25,14 @@ struct Vertex {
 };
 }  // namespace
 
-int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
+int CubeModule::RunImpl(const ModuleOptions &options) {
+  const int frames = options.frames;
+  const bool headless = options.headless;
+  const auto &capture_directory = options.capture_directory;
   using namespace grassland::rhi;
   using namespace grassland::rhix;
+  const auto &device = GetDevice();
 
-  auto core = grassland::rhix::CreateCore(api);
-  if (!core)
-    return 1;
-  grassland::rhix::Device device = core.CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
   grassland::rhix::DownloadToken last_frame;
   grassland::rhix::DownloadToken last_depth;
   ImageDesc last_depth_desc{};

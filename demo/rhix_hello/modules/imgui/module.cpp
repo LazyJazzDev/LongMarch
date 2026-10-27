@@ -12,23 +12,16 @@
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
 
-int RunImGui(grassland::rhi::BackendAPI api,
-             int frames,
-             bool headless,
-             const char *font_file,
-             float font_size,
-             const std::string &capture_directory) {
+int ImGuiModule::RunImpl(const ModuleOptions &options) {
+  const int frames = options.frames;
+  const bool headless = options.headless;
+  const auto &capture_directory = options.capture_directory;
+  const auto font_file = options.font_file;
+  const auto font_size = options.font_size;
   using namespace grassland::rhi;
-  if (headless) {
-    std::cout << "imgui: skipped (requires a window for platform input)\n";
-    return 0;
-  }
-  auto core = grassland::rhix::CreateCore(api);
-  if (!core)
-    return 1;
-  auto device = core.CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
+  using namespace grassland::rhix;
+  const auto &device = GetDevice();
+
   grassland::rhix::DownloadToken last_frame;
   ImageDesc last_frame_desc{};
   ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;

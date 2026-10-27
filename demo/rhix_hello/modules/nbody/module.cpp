@@ -40,15 +40,15 @@ struct Camera {
 };
 }  // namespace
 
-int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
+int NBodyModule::RunImpl(const ModuleOptions &options) {
+  const int frames = options.frames;
+  const bool headless = options.headless;
+  const auto &capture_directory = options.capture_directory;
+  const auto api = GetBackendAPI();
   using namespace grassland::rhi;
+  using namespace grassland::rhix;
+  const auto &device = GetDevice();
 
-  grassland::rhix::Core core = grassland::rhix::CreateCore(api);
-  if (!core)
-    return 1;
-  grassland::rhix::Device device = core.CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
   grassland::rhix::DownloadToken last_frame;
   ImageDesc last_frame_desc{};
   ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;

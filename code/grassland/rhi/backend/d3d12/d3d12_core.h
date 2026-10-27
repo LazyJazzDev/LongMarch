@@ -8,6 +8,10 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12Core final : public Core {
  public:
+  BackendAPI GetBackendAPI() const override {
+    return BACKEND_API_D3D12;
+  }
+
   static D3D12Core *CreateD3D12Core(const CoreDesc &desc);
   ~D3D12Core() override;
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;

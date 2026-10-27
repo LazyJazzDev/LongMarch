@@ -21,6 +21,8 @@ struct DeviceFeatureRequirement {
 
 class ICore : public IObject {
  public:
+  // The concrete backend used by this Core.
+  virtual BackendAPI GetBackendAPI() const = 0;
   virtual std::vector<PhysicalDevice> GetPhysicalDevices() const = 0;
   virtual IDevice *CreateDevice(int32_t device_idx) = 0;
   virtual IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) = 0;

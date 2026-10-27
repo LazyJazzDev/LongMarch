@@ -13,17 +13,20 @@
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 
-int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
+int WindowModule::RunImpl(const ModuleOptions &options) {
+  const int frames = options.frames;
+  const bool headless = options.headless;
+  const auto &capture_directory = options.capture_directory;
+  const auto api = GetBackendAPI();
   using namespace grassland::rhi;
   using namespace grassland::rhix;
-  auto core = grassland::rhix::CreateCore(api);
-  if (!core)
-    return 1;
+  const auto &device = GetDevice();
+  const auto &core = GetCore();
   const auto devices = core.GetPhysicalDevices();
   std::cout << "Backend: " << BackendAPIName(api) << '\n' << std::boolalpha;
   for (size_t id = 0; id < devices.size(); ++id) {
     const auto &info = devices[id];
-    std::cout << '[' << id << "] " << info.name << " (" << PhysicalDeviceTypeName(info.type) << ")\n"
+    std::cout << '[' << id + 1 << "] " << info.name << " (" << PhysicalDeviceTypeName(info.type) << ")\n"
               << "  Dedicated: " << info.dedicated_memory / (1024 * 1024)
               << " MiB, shared/unified: " << info.unified_memory / (1024 * 1024) << " MiB\n"
               << "  Ray tracing pipeline: " << info.ray_tracing_pipeline_feature
@@ -31,12 +34,6 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
               << '\n';
   }
 
-  // Requirements only filter candidates. All supported RHI features are enabled.
-  DeviceFeatureRequirement requirements{};
-  auto device = core.CreateDeviceByAutoSelection(requirements);
-  // For an explicit ID, use core.CreateDevice(id) instead.
-  if (!device)
-    return 1;
   grassland::rhix::DownloadToken last_frame;
   ImageDesc last_frame_desc{};
   ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
