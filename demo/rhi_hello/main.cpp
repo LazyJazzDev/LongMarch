@@ -169,11 +169,11 @@ int main(int argc, char **argv) {
       api = backends[*selected];
     }
   }
+  ObjPtr<ICore> core = CreateCore(api);
+  if (!core)
+    return 1;
   int32_t device_index = 0;
   {
-    ObjPtr<ICore> core = CreateCore(api);
-    if (!core)
-      return 1;
     const auto devices = core->GetPhysicalDevices();
     if (devices.empty()) {
       std::cerr << "No graphics device is available for " << BackendAPIName(api) << ".\n";
@@ -202,6 +202,9 @@ int main(int argc, char **argv) {
     std::cout << "Selected device " << device_index + 1 << ": " << devices[device_index].name << " ("
               << BackendAPIName(api) << ")\n";
   }
+  ObjPtr<IDevice> device = core->CreateDevice(device_index);
+  if (!device)
+    return 1;
   if (!frames) {
     if (headless)
       frames = 3000;
@@ -223,7 +226,7 @@ int main(int argc, char **argv) {
       {"imgui_multi_window", "Independent ImGui windows"},
   };
   auto run_module = [&](const std::string &name) {
-    auto instance = CreateModule(name);
+    auto instance = CreateModule(name, api, core, device);
     if (!instance) {
       std::cerr << "Unknown module: " << name << '\n';
       return 1;
@@ -232,7 +235,7 @@ int main(int argc, char **argv) {
       std::cerr << "hdr requires a window; --headless is unsupported.\n";
       return 1;
     }
-    return instance->Run(api, device_index, options);
+    return instance->Run(options);
   };
   if (all) {
     int result = 0;

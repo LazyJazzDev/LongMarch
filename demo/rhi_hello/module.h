@@ -15,12 +15,14 @@ struct ModuleOptions {
 
 class ModuleBase {
  public:
-  ModuleBase() = default;
+  ModuleBase(grassland::rhi::BackendAPI api,
+             grassland::rhi::ObjPtr<grassland::rhi::ICore> core,
+             grassland::rhi::ObjPtr<grassland::rhi::IDevice> device);
   virtual ~ModuleBase() = default;
   ModuleBase(const ModuleBase &) = delete;
   ModuleBase &operator=(const ModuleBase &) = delete;
 
-  int Run(grassland::rhi::BackendAPI api, int32_t device_index, const ModuleOptions &options);
+  int Run(const ModuleOptions &options);
 
  protected:
   grassland::rhi::ICore *GetCore() const;
@@ -37,58 +39,94 @@ class ModuleBase {
 };
 
 class WindowModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class TriangleModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class CubeModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class TextureModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class BlendModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class NBodyModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class RayTracingModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class RayQueryModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class HDRModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class ImGuiModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
 class ImGuiMultiWindowModule final : public ModuleBase {
+ public:
+  using ModuleBase::ModuleBase;
+
  private:
   int RunImpl(const ModuleOptions &options) override;
 };
 
-std::unique_ptr<ModuleBase> CreateModule(std::string_view name);
+std::unique_ptr<ModuleBase> CreateModule(std::string_view name,
+                                         grassland::rhi::BackendAPI api,
+                                         const grassland::rhi::ObjPtr<grassland::rhi::ICore> &core,
+                                         const grassland::rhi::ObjPtr<grassland::rhi::IDevice> &device);

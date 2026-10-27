@@ -1,6 +1,6 @@
 # rhi_hello
 
-Eleven modules derive from `ModuleBase` and use `rhi::ObjPtr<IXXX>` pointer APIs. `ModuleBase::Run` creates and owns the Core and selected Device; derived modules implement `RunImpl` and borrow them through protected accessors. Each module keeps its own Window, Queue and rendering resources, which are released before the base-owned Device and Core. Main creates modules through `CreateModule` and passes shared `ModuleOptions`; `--all` creates and destroys one module at a time, so Core instances never overlap.
+Eleven modules derive from `ModuleBase` and use `rhi::ObjPtr<IXXX>` pointer APIs. Main creates one Core, selects and creates one Device, then passes both to `CreateModule`. `ModuleBase` retains these objects and exposes protected accessors to derived modules implementing `RunImpl`; it never creates Core or Device objects. Each module keeps its own Window, Queue and rendering resources, which are released before the base-held references. Main passes shared `ModuleOptions`; `--all` creates and destroys one module at a time while reusing the same Core and Device. Main releases Device before Core after the modules finish.
 
 ```text
 demo_rhi_hello --list
