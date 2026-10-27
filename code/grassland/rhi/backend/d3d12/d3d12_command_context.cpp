@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -6,6 +6,7 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_glfw_helper.h"
+#include "grassland/rhi/backend/backend_headless_window.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
@@ -169,6 +170,13 @@ bool D3D12CommandContext::ClearColor(D3D12Image *image, const ClearColorValue &v
 }
 
 bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
+  if (auto headless = dynamic_cast<HeadlessWindow *>(window)) {
+    if (rendering_active_) {
+      recording_failed_ = true;
+      return false;
+    }
+    return RecordHeadlessPresent(headless);
+  }
 #if !defined(NDEBUG)
   if (rendering_active_) {
     recording_failed_ = true;

@@ -25,6 +25,11 @@ class VulkanImage : public Image {
     VkImageView attachment_{}, binding_{};
   };
 
+  // Aliasing frame leases share one layout/access state during recording.
+  virtual VulkanImage *StateIdentity() {
+    return this;
+  }
+
   virtual VkImageView AttachmentView() const = 0;
   virtual VkImageView BindingView() const = 0;
   const void *DeviceIdentity() const override;

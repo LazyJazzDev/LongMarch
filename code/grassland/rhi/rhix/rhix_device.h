@@ -47,6 +47,7 @@ class Device : public ObjectContainer {
   Program CreateProgram(const rhi::ProgramDesc &desc) const;
   Image CreateImage(const rhi::ImageDesc &desc) const;
   Buffer CreateBuffer(const rhi::BufferDesc &desc) const;
+  Window CreateHeadlessWindow(const rhi::WindowDesc &desc = {}) const;
   Window CreateGLFWWindow(const rhi::WindowDesc &desc = {}) const;
   Queue GetQueue(rhi::QueueType type) const;
   CommandContext CreateCommandContext() const;

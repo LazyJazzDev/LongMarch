@@ -279,3 +279,42 @@ for draws. No depth bias, multisampling or other rasterizer settings are added.
 offset viewport placement and Y orientation, every topology with indexed/non-indexed
 draws, wireframe edges versus interiors, scope restarts and in-scope Program changes.
 Invalid enums are rejected; Debug also rejects zero/negative viewport extents.
+
+
+## Headless windows
+
+`IDevice::CreateHeadlessWindow(WindowDesc)` and the RHIX equivalent return the same
+`IWindow`/`Window` interface without creating a GLFW window or native swapchain.
+The backend implementation is independent of the GLFW window implementations.
+`GLFWWindow()` is null; event registries accept registrations but the implementation
+never dispatches them. ImGui enable/update and title changes are successful no-ops;
+the ImGui update callback is not invoked. `ShouldClose()` and `IsKeyDown()` are false.
+The application/module controls termination. `RebuildSwapChain()` is a successful
+no-op, and present mode is ignored (`GetPresentMode()` reports Continuous).
+
+There is exactly one allocated frame image. Color space determines its format:
+
+| Color space | Format |
+|---|---|
+| sRGB nonlinear | R8G8B8A8_UNORM |
+| extended sRGB linear / BT709 linear | R16G16B16A16_SFLOAT |
+| HDR10 ST2084 | R10G10B10A2_UNORM |
+
+These formats specify encoding/storage, not measured display capabilities. There
+is no reference-white query; white scale is 1 and headroom uses the existing fallback
+10. `SetColorSpace()` replaces the image only when no caller/recording owns a frame
+lease; failure leaves the previous image and color space unchanged.
+
+`GetNextImage()` returns an owned image lease, cached until `CmdPresent()` is recorded.
+Present retains that lease in the command context and advances the window to its next
+logical frame, without a native present operation. At most three distinct leases
+may exist; acquiring a fourth waits for a lease to be destroyed. Recorded commands
+retain exact leases until the GPU completes (or longer if callers retain the context).
+Release caller-held images and contexts promptly. Holding three leases in unsubmitted
+recordings and then requesting a fourth on the same thread cannot make progress.
+
+All leases alias the same physical image: they are a submission backpressure mechanism,
+not a triple-buffered image history. Use one ordered queue, submit each frame before
+recording the next, and record readback in the corresponding frame when a snapshot is
+needed. Distinct Vulkan leases share layout/access state within a command context.
+Window operations are externally serialized; lease destruction is thread-safe.

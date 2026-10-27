@@ -1,10 +1,11 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
+#include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
+#include "grassland/rhi/backend/backend_headless_window.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
@@ -58,6 +59,7 @@ bool VulkanCommandContext::TransitionImage(VulkanImage *image,
                                            VkImageLayout layout,
                                            VkPipelineStageFlags stages,
                                            VkAccessFlags access) {
+  image = image->StateIdentity();
   const auto default_access = image->DefaultLayout() == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
                                   ? VkAccessFlags{0}
                                   : VkAccessFlags{VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
@@ -124,6 +126,13 @@ bool VulkanCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &v
 }
 
 bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
+  if (auto headless = dynamic_cast<HeadlessWindow *>(window)) {
+    if (render_target_) {
+      recording_failed_ = true;
+      return false;
+    }
+    return RecordHeadlessPresent(headless);
+  }
 #if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
@@ -801,13 +810,14 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
       if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
         auto image = static_cast<VulkanImage *>(native->GetReferences()[binding_index][i].Get());
         if (render_target_) {
-          auto known = image_states_.find(image);
+          auto known = image_states_.find(image->StateIdentity());
           if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||
               image->DefaultLayout() != VK_IMAGE_LAYOUT_GENERAL) {
             recording_failed_ = true;
             return false;
           }
-          auto &state = image_states_.try_emplace(image, ImageState{VK_IMAGE_LAYOUT_GENERAL, 0, 0}).first->second;
+          auto &state = image_states_.try_emplace(image->StateIdentity(), ImageState{VK_IMAGE_LAYOUT_GENERAL, 0, 0})
+                            .first->second;
           state.stages |= stages;
           state.access |= access;
         } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, stages, access))

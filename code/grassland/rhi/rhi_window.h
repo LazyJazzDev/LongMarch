@@ -12,7 +12,9 @@
 namespace grassland::rhi {
 class IImage;
 class ICommandContext;
-// Window operations and presentation run on the main thread.
+// Native window operations and presentation run on the main thread.
+// Headless windows have no GLFW handle or input/ImGui callbacks. Their operations
+// are externally serialized; lease references may be released by any thread.
 bool PollEvents();
 
 class IWindow : public IObject {
@@ -56,6 +58,10 @@ class IWindow : public IObject {
   // This getter never acquires a native image or rebuilds the swapchain.
   // Release caller-held frames and recordings before swapchain replacement or
   // Window destruction. Window waits for GPU use; it is not retained by Device.
+  // Headless: caches one lease until CmdPresent is recorded, then advances.
+  // Blocks when three distinct leases remain alive. Release caller images and
+  // command contexts promptly; unsubmitted recordings also occupy lease slots.
+  // All leases alias ONE physical image, not independent frame snapshots.
   virtual IImage *GetNextImage() = 0;
   // Known swapchain invalidation, not a native surface probe. OUT_OF_DATE
   // marks this state without rebuilding during command submission.

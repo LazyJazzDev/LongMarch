@@ -3,6 +3,7 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_headless_window.h"
 #include "grassland/rhi/backend/backend_shader.h"
 
 namespace grassland::rhi::backend {
@@ -80,6 +81,10 @@ bool Device::SupportRayQuery() const {
 
 bool Device::SupportGeometryShader() const {
   return info_.geometry_shader_feature;
+}
+
+rhi::IWindow *Device::CreateHeadlessWindow(const WindowDesc &desc) {
+  return HeadlessWindow::Create(this, api_, desc);
 }
 
 rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &) {
