@@ -31,6 +31,10 @@ class VulkanCommandContext final : public CommandContext {
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   ~VulkanCommandContext() override;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  bool CmdReleaseCUDABuffer(ICUDABuffer *buffer) override;
+  bool CmdAcquireCUDABuffer(ICUDABuffer *buffer) override;
+#endif
   static VulkanCommandContext *Create(VulkanDevice *device);
   IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
   IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;

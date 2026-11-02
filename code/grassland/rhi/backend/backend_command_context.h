@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_queue.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend {
@@ -69,6 +70,11 @@ class CommandContext : public Object<rhi::ICommandContext> {
   void BindDownloads(SubmissionToken *submission);
   void ReleaseDownloads();
   bool Seal();
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  bool SetCUDAInterop(const SubmitInfo &info, Device *device);
+  bool CmdReleaseCUDABuffer(ICUDABuffer *buffer) override;
+  bool CmdAcquireCUDABuffer(ICUDABuffer *buffer) override;
+#endif
   const void *DeviceIdentity() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
@@ -83,6 +89,9 @@ class CommandContext : public Object<rhi::ICommandContext> {
   bool PrepareRendering(const RenderingInfo &info);
   bool RenderingMatches(const IProgram *program) const;
   RenderingInfo rendering_;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  std::vector<CUDAInteropPoint> cuda_waits_, cuda_signals_;
+#endif
   bool recording_failed_{};
   bool sealed_{};
 

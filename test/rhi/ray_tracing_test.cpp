@@ -36,7 +36,7 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     std::lock_guard<std::mutex> lock(owner->QueueMutex());
     auto commands = NS::RetainPtr(owner->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
-    blit->copyFromBuffer(static_cast<MetalBuffer *>(buffer)->NativeBuffer(), 0, readback.get(), 0, sizeof(output));
+    blit->copyFromBuffer(dynamic_cast<MetalBuffer *>(buffer)->NativeBuffer(), 0, readback.get(), 0, sizeof(output));
     blit->endEncoding();
     commands->commit();
     commands->waitUntilCompleted();
@@ -50,7 +50,7 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
     auto owner = static_cast<D3D12Device *>(device);
-    auto source = static_cast<D3D12Buffer *>(buffer)->NativeBuffer();
+    auto source = dynamic_cast<D3D12Buffer *>(buffer)->NativeBuffer();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_READBACK;
@@ -101,7 +101,7 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     using namespace backend::vulkan;
     auto owner = static_cast<VulkanDevice *>(device);
     auto native = owner->NativeDevice();
-    auto source = static_cast<VulkanBuffer *>(buffer)->NativeBuffer();
+    auto source = dynamic_cast<VulkanBuffer *>(buffer)->NativeBuffer();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     desc.size = sizeof(output);
     desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;

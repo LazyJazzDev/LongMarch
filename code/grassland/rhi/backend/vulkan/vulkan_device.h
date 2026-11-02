@@ -43,6 +43,10 @@ class VulkanDevice final : public Device {
   VkResult Wait(uint64_t value, uint64_t timeout = UINT64_MAX) const;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) override;
+  ICUDAInteropTimeline *CreateCUDAInteropTimeline() override;
+#endif
   VulkanTemporalBufferPool &UploadPool();
 
   VulkanTemporalBufferPool &DownloadPool();

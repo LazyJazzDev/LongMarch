@@ -38,6 +38,12 @@ SubmissionToken Queue::Submit(CommandContext &&commands, const SubmitInfo &info)
   native_info.waits.reserve(info.waits.size());
   for (const auto &token : info.waits)
     native_info.waits.push_back(token.Get());
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  for (const auto &point : info.cuda_waits)
+    native_info.cuda_waits.push_back({point.timeline.Get(), point.value});
+  for (const auto &point : info.cuda_signals)
+    native_info.cuda_signals.push_back({point.timeline.Get(), point.value});
+#endif
   return Get()->Submit(consumed.Get(), native_info);
 }
 }  // namespace grassland::rhix

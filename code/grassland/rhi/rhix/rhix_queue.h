@@ -1,10 +1,15 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi_queue.h"
+#include "grassland/rhi/rhix/rhix_cuda_interop.h"
 #include "grassland/rhi/rhix/rhix_submission_token.h"
 
 namespace grassland::rhix {
 struct SubmitInfo {
   std::vector<SubmissionToken> waits;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  std::vector<CUDAInteropPoint> cuda_waits;
+  std::vector<CUDAInteropPoint> cuda_signals;
+#endif
 };
 
 class CommandContext;

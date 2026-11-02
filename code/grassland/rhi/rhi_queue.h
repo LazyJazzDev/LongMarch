@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_cuda_interop.h"
 #include "grassland/rhi/rhi_submission_token.h"
 
 namespace grassland::rhi {
@@ -7,6 +8,11 @@ class ICommandContext;
 struct SubmitInfo {
   // Borrowed for the duration of Submit.
   std::vector<ISubmissionToken *> waits;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  // Borrowed during Submit; accepted work retains timelines until completion.
+  std::vector<CUDAInteropPoint> cuda_waits;
+  std::vector<CUDAInteropPoint> cuda_signals;
+#endif
 };
 
 class IQueue : public IObject {

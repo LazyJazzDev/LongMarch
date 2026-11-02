@@ -42,6 +42,10 @@ class D3D12Device final : public Device {
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) override;
+  ICUDAInteropTimeline *CreateCUDAInteropTimeline() override;
+#endif
   D3D12TemporalBufferPool &UploadPool();
 
   D3D12TemporalBufferPool &DownloadPool();

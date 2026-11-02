@@ -228,3 +228,15 @@ DownloadToken CommandContext::CmdDownloadImage(const Image &image, const rhi::Im
 }
 
 }  // namespace grassland::rhix
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+namespace grassland::rhix {
+bool CommandContext::CmdAcquireCUDABuffer(const CUDABuffer &buffer) {
+  return Get() && Get()->CmdAcquireCUDABuffer(buffer.Get());
+}
+
+bool CommandContext::CmdReleaseCUDABuffer(const CUDABuffer &buffer) {
+  return Get() && Get()->CmdReleaseCUDABuffer(buffer.Get());
+}
+}  // namespace grassland::rhix
+#endif

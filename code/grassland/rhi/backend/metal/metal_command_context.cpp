@@ -207,7 +207,7 @@ bool MetalCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, cons
     return false;
   }
 #else
-  auto native = static_cast<MetalBuffer *>(buffer);
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
   if (!data || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;
@@ -234,8 +234,8 @@ bool MetalCommandContext::CmdCopyBuffer(IBuffer *source,
     return false;
   }
 #else
-  auto src = static_cast<MetalBuffer *>(source);
-  auto dst = static_cast<MetalBuffer *>(destination);
+  auto src = dynamic_cast<MetalBuffer *>(source);
+  auto dst = dynamic_cast<MetalBuffer *>(destination);
 #endif
   if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
       destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
@@ -526,7 +526,7 @@ bool MetalCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer,
     return false;
   }
 #else
-  auto native = static_cast<MetalBuffer *>(buffer);
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
   if (!RetainResource(native))
     return false;
@@ -548,7 +548,7 @@ bool MetalCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format
     return false;
   }
 #else
-  auto native = static_cast<MetalBuffer *>(buffer);
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
   if (!RetainResource(native))
     return false;
@@ -668,7 +668,7 @@ IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
     return nullptr;
   }
 #else
-  auto native = static_cast<MetalBuffer *>(buffer);
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
   if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;

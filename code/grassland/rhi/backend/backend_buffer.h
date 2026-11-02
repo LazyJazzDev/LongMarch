@@ -5,7 +5,14 @@
 namespace grassland::rhi::backend {
 class Device;
 
-class Buffer : public Object<IBuffer> {
+// Share one IBuffer interface with the optional CUDA specialization.
+#if defined(LONGMARCH_CUDA_RUNTIME)
+class BufferInterface : public virtual IBuffer {};
+#else
+using BufferInterface = IBuffer;
+#endif
+
+class Buffer : public Object<BufferInterface> {
  public:
   BufferDesc GetDesc() const override;
   Device *Owner() const;

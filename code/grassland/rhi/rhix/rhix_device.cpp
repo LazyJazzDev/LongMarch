@@ -125,3 +125,18 @@ Shader Device::CreateShaderFromSource(const std::string &source,
   return Get()->CreateShaderFromSource(source, entry_point, stage, include_paths, defines);
 }
 }  // namespace grassland::rhix
+
+namespace grassland::rhix {
+rhi::DeviceProperties Device::GetProperties() const {
+  return Get() ? Get()->GetProperties() : rhi::DeviceProperties{};
+}
+#if defined(LONGMARCH_CUDA_RUNTIME)
+CUDABuffer Device::CreateCUDABuffer(const rhi::BufferDesc &desc) const {
+  return Get() ? Get()->CreateCUDABuffer(desc) : nullptr;
+}
+
+CUDAInteropTimeline Device::CreateCUDAInteropTimeline() const {
+  return Get() ? Get()->CreateCUDAInteropTimeline() : nullptr;
+}
+#endif
+}  // namespace grassland::rhix

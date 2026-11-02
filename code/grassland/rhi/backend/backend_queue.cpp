@@ -33,6 +33,10 @@ rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::
   const auto impl = static_cast<CommandContext *>(commands);
 #endif
   try {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+    if (!impl->SetCUDAInterop(info, Owner()))
+      return nullptr;
+#endif
     std::vector<ObjectPtr<SubmissionToken>> waits;
     waits.reserve(info.waits.size());
     for (auto token : info.waits) {

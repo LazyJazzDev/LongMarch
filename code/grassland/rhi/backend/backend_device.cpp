@@ -70,6 +70,22 @@ std::string Device::Name() const {
   return info_.name;
 }
 
+DeviceProperties Device::GetProperties() const {
+  return info_;
+}
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+ICUDABuffer *Device::CreateCUDABuffer(const BufferDesc &) {
+  ReportError(-1, "CUDA buffer interoperability is unavailable for this device.");
+  return nullptr;
+}
+
+ICUDAInteropTimeline *Device::CreateCUDAInteropTimeline() {
+  ReportError(-1, "CUDA timeline interoperability is unavailable for this device.");
+  return nullptr;
+}
+#endif
+
 bool Device::SupportRayTracingPipeline() const {
   return info_.ray_tracing_pipeline_feature;
 }

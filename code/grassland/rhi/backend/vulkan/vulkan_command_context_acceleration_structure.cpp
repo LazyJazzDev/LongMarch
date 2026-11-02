@@ -62,7 +62,7 @@ bool VulkanCommandContext::CmdBuildBottomLevelAccelerationStructure(
     for (const auto &view : {geometry.data, geometry.indices}) {
       if (!view.buffer)
         continue;
-      auto buffer = static_cast<VulkanBuffer *>(view.buffer);
+      auto buffer = dynamic_cast<VulkanBuffer *>(view.buffer);
       if (!RetainResource(buffer))
         return false;
       if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_ACCESS_SHADER_READ_BIT))

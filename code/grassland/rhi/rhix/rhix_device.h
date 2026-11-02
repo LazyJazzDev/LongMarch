@@ -6,6 +6,7 @@
 #include "grassland/rhi/rhix/rhix_buffer.h"
 #include "grassland/rhi/rhix/rhix_command_context.h"
 #include "grassland/rhi/rhix/rhix_compute_program.h"
+#include "grassland/rhi/rhix/rhix_cuda_interop.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
 #include "grassland/rhi/rhix/rhix_program.h"
 #include "grassland/rhi/rhix/rhix_queue.h"
@@ -21,6 +22,11 @@ class Device : public ObjectContainer {
   rhi::IDevice *Get() const noexcept;
   Device() noexcept;
   std::string Name() const;
+  rhi::DeviceProperties GetProperties() const;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  CUDABuffer CreateCUDABuffer(const rhi::BufferDesc &desc) const;
+  CUDAInteropTimeline CreateCUDAInteropTimeline() const;
+#endif
   bool SupportRayTracingPipeline() const;
   bool SupportRayQuery() const;
   bool SupportGeometryShader() const;

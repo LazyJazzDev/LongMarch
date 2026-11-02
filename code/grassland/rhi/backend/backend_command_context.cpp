@@ -1,5 +1,7 @@
 ﻿#include "grassland/rhi/backend/backend_command_context.h"
 
+#include <algorithm>
+
 #include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/rhi_program.h"
@@ -311,3 +313,52 @@ bool CommandContext::CmdCompactAccelerationStructure(IAccelerationStructure *, I
   return false;
 }
 }  // namespace grassland::rhi::backend
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+#include "grassland/rhi/backend/backend_cuda_interop.h"
+
+namespace grassland::rhi::backend {
+bool CommandContext::SetCUDAInterop(const SubmitInfo &info, Device *device) {
+  if (sealed_)
+    return false;
+  for (const auto *points : {&info.cuda_waits, &info.cuda_signals}) {
+    for (const auto &point : *points) {
+      const auto duplicate = std::count_if(points->begin(), points->end(),
+                                           [&](const auto &other) { return other.timeline == point.timeline; });
+      if (duplicate != 1 || (points == &info.cuda_signals && point.value == 0)) {
+        ReportError(-1, "CUDA timeline points must be unique, and signal values must be positive.");
+        return false;
+      }
+      if (points == &info.cuda_signals) {
+        for (const auto &wait : info.cuda_waits) {
+          if (wait.timeline == point.timeline && point.value <= wait.value) {
+            ReportError(-1, "A timeline signal must exceed its wait value in the same submission.");
+            return false;
+          }
+        }
+      }
+      auto timeline = dynamic_cast<CUDAInteropTimeline *>(point.timeline);
+      if (!timeline || timeline->Owner() != device || !RetainResource(timeline)) {
+        ReportError(-1, "CUDA timeline must belong to the submitting device.");
+        return false;
+      }
+    }
+  }
+  cuda_waits_ = info.cuda_waits;
+  cuda_signals_ = info.cuda_signals;
+  return true;
+}
+
+bool CommandContext::CmdReleaseCUDABuffer(ICUDABuffer *) {
+  recording_failed_ = true;
+  ReportError(-1, "CUDA buffer handoff is unavailable for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdAcquireCUDABuffer(ICUDABuffer *) {
+  recording_failed_ = true;
+  ReportError(-1, "CUDA buffer handoff is unavailable for this backend.");
+  return false;
+}
+}  // namespace grassland::rhi::backend
+#endif
