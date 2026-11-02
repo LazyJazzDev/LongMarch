@@ -25,7 +25,7 @@ demo_rhi_hello --backend vulkan --module cube --device 1
 | imgui | 事件、ImGui 更新和自动呈现 |
 | imgui_multi_window | 两个独立窗口和 ImGui context |
 
-光追示例检查所选设备的能力，不支持时输出原因并退出。
+光追示例检查所选设备的能力，不支持时输出原因，等待任意键后返回菜单。非终端输入环境提示按 Enter，输入 EOF 时不阻塞。
 
 每个 `modules/<name>/module.cpp` 自行创建资源、注册事件、执行循环并释放资源，只依赖库接口和本目录 shader。没有 ModuleBase、生命周期回调框架或父目录工具依赖。`module.h` 仅为 main 提供函数声明，示例自身不包含它。Shader 在构建时分别嵌入各模块，不依赖运行目录，也不共享全 demo shader 注册表。
 

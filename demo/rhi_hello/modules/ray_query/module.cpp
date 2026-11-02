@@ -2,10 +2,21 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <string>
 #include <thread>
+
+#if defined(_WIN32)
+#include <conio.h>
+#include <io.h>
+#else
+#include <termios.h>
+#include <unistd.h>
+
+#include <cerrno>
+#endif
 
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
@@ -20,12 +31,47 @@
 namespace {
 #include "shaders/display.slang.h"
 #include "shaders/trace.slang.h"
+
+void WaitForContinue() {
+#if defined(_WIN32)
+  if (_isatty(_fileno(stdin))) {
+    std::cout << "Press any key to continue..." << std::flush;
+    const int key = _getch();
+    if (key == 0 || key == 224)
+      _getch();  // Consume the second byte of a function/arrow key.
+    std::cout << '\n';
+    return;
+  }
+#else
+  termios original{};
+  if (isatty(STDIN_FILENO) && tcgetattr(STDIN_FILENO, &original) == 0) {
+    auto input = original;
+    input.c_lflag &= ~(ICANON | ECHO | ISIG | IEXTEN);
+    input.c_cc[VMIN] = 1;
+    input.c_cc[VTIME] = 0;
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &input) == 0) {
+      std::cout << "Press any key to continue..." << std::flush;
+      char key;
+      while (read(STDIN_FILENO, &key, 1) < 0 && errno == EINTR) {
+      }
+      // Discard the rest of a terminal key sequence before returning to the menu.
+      tcsetattr(STDIN_FILENO, TCSAFLUSH, &original);
+      std::cout << '\n';
+      return;
+    }
+  }
+#endif
+  std::cout << "Press Enter to continue..." << std::flush;
+  std::string line;
+  std::getline(std::cin, line);  // EOF also allows redirected/noninteractive runs to finish.
+}
 }  // namespace
 
 int RunRayQuery(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
   if (!device->SupportRayQuery()) {
-    std::cout << "ray_query: SKIPPED (ray tracing unavailable)\n";
+    std::cout << "ray_query: SKIPPED (ray query unavailable)\n";
+    WaitForContinue();
     return 0;
   }
   PresentMode requested = PRESENT_MODE_VSYNC;
