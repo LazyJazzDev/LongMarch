@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
     if (arg == "--help") {
       std::cout << "[--backend auto|d3d12|vulkan|metal] [--module NAME] [--device auto|N] [--list]\n"
                    "Select missing choices from the terminal menu. Device numbers start at 1.\n"
-                   "Each demo runs until its windows are closed.\n";
+                   "Closing a demo returns to the selection menu; cancel the menu to exit.\n";
       return 0;
     }
     if (arg == "--list") {
@@ -95,12 +95,12 @@ int main(int argc, char **argv) {
     std::cerr << "Unknown backend: " << backend << '\n';
     return 1;
   }
+  std::vector<snowberg::tui::MenuOption> demo_options;
+  for (const auto &demo : demos)
+    demo_options.push_back(demo.option);
   size_t demo_index = demos.size();
   if (module.empty()) {
-    std::vector<snowberg::tui::MenuOption> options;
-    for (const auto &demo : demos)
-      options.push_back(demo.option);
-    const auto selected = menu.Select("RHI Hello - Module Selection", options);
+    const auto selected = menu.Select("RHI Hello - Module Selection", demo_options);
     if (!selected)
       return 0;
     demo_index = *selected;
@@ -152,8 +152,16 @@ int main(int argc, char **argv) {
     std::cerr << "Could not create the selected device.\n";
     return 1;
   }
-  std::cout << "Backend: " << BackendAPIName(api) << "\nDevice: " << device->Name()
-            << "\nDemo: " << demos[demo_index].option.name << '\n';
-  // The selected device outlives all local resources owned by the demo function.
-  return demos[demo_index].run(device.Get());
+  std::cout << "Backend: " << BackendAPIName(api) << "\nDevice: " << device->Name() << '\n';
+  while (true) {
+    std::cout << "Demo: " << demos[demo_index].option.name << '\n';
+    // Each demo releases its local resources before the next selection; Core/Device stay alive.
+    const int result = demos[demo_index].run(device.Get());
+    if (result != 0)
+      return result;
+    const auto selected = menu.Select("RHI Hello - Module Selection", demo_options, demo_index);
+    if (!selected)
+      return 0;
+    demo_index = *selected;
+  }
 }

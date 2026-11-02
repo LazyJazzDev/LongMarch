@@ -9,7 +9,7 @@ demo_rhi_hello --backend metal --module triangle --device auto
 demo_rhi_hello --backend vulkan --module cube --device 1
 ```
 
-设备编号从 1 开始，与设备菜单一致；`auto` 使用 RHI 的自动选卡策略。每次启动只运行一个 demo，关闭窗口或按 Escape 退出。多窗口 demo 关闭一个窗口后继续运行，所有窗口关闭后退出。
+设备编号从 1 开始，与设备菜单一致；`auto` 使用 RHI 的自动选卡策略。关闭窗口或按 Escape 结束当前 demo。正常返回后重新选择下一个 demo，复用已选后端和设备；非零返回值直接作为进程退出码。取消 demo 菜单退出程序，`--module` 只指定首次运行的 demo。多窗口 demo 关闭一个窗口后继续运行，所有窗口关闭后返回菜单。
 
 | Demo | 学习内容 |
 | --- | --- |
