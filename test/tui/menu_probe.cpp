@@ -2,6 +2,7 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#undef MessageBox
 #endif
 
 int main(int argc, char **argv) {

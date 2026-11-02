@@ -250,7 +250,7 @@ class NativeMenuTests(unittest.TestCase):
                 with Console(executable, ("--module", "window"), "API Selection") as terminal:
                     terminal.key(0x1B)
                     terminal.finish(0)
-                with Console(executable, ("--backend", "d3d12")) as terminal:
+                with Console(executable, ("--backend", "d3d12", *device_args)) as terminal:
                     terminal.key(0x1B)
                     terminal.finish(0)
 
