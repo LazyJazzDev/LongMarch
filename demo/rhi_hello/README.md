@@ -1,6 +1,6 @@
 # RHI Hello
 
-用于学习 RHI 的独立示例。统一入口选择 API、demo 和设备，创建一次 Core/Device，然后调用对应的 `RunXxx(IDevice *)`。不带参数启动时使用终端菜单（非终端环境退化为编号/名称输入）；仅有一个后端或设备时自动选择。
+用于学习 RHI 的独立示例。统一入口先选择 API 和设备，再选择 demo，创建一次 Core/Device，然后调用对应的 `RunXxx(IDevice *)`。不带参数启动时使用终端菜单（非终端环境退化为编号/名称输入）；仅有一个后端或设备时自动选择。
 
 ```sh
 demo_rhi_hello

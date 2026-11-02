@@ -49,11 +49,11 @@ class LauncherTests(unittest.TestCase):
                 self.assertIn("Device must be auto or a number", output)
 
     def test_module_menu_cancel_and_invalid_choice(self):
-        output = self.run_demo("--backend", args.backend, input="not_a_demo\n")
+        output = self.run_demo("--backend", args.backend, "--device", "auto", input="not_a_demo\n")
         self.assertIn("Invalid selection", output)
         self.assertIn("Module Selection", output)
         self.assertNotIn("\x1b", output)
-        self.run_demo("--backend", args.backend)
+        self.run_demo("--backend", args.backend, "--device", "auto")
 
 
 if __name__ == "__main__":

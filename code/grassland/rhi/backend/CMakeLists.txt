@@ -16,5 +16,5 @@ endif ()
 
 if (APPLE)
     target_sources(grassland_rhi PRIVATE backend_window_cocoa.mm)
-    target_link_libraries(grassland_rhi PRIVATE "-framework Cocoa")
+    target_link_libraries(grassland_rhi PRIVATE "-framework Cocoa" "-framework QuartzCore")
 endif ()

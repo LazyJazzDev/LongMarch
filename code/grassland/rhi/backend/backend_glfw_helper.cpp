@@ -222,7 +222,7 @@ bool PollEvents() {
     destroyed.swap(Get().destroyed);
   }
   for (auto window : destroyed)
-    glfwDestroyWindow(window);
+    DestroyWindow(window);
   glfwPollEvents();
   std::lock_guard<std::mutex> lock(Get().mutex);
   return !Get().resize_failed;
@@ -267,9 +267,13 @@ bool SetWindowTitle(GLFWwindow *window, const char *title) {
 void DestroyWindow(GLFWwindow *window) {
   if (!window)
     return;
-  if (IsWindowThread())
+  if (IsWindowThread()) {
+#if defined(__APPLE__)
+    DestroyCocoaWindow(window);
+#else
     glfwDestroyWindow(window);
-  else {
+#endif
+  } else {
     std::lock_guard<std::mutex> lock(Get().mutex);
     Get().destroyed.push_back(window);
   }

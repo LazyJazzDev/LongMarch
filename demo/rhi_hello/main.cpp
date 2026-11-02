@@ -99,12 +99,7 @@ int main(int argc, char **argv) {
   for (const auto &demo : demos)
     demo_options.push_back(demo.option);
   size_t demo_index = demos.size();
-  if (module.empty()) {
-    const auto selected = menu.Select("RHI Hello - Module Selection", demo_options);
-    if (!selected)
-      return 0;
-    demo_index = *selected;
-  } else {
+  if (!module.empty()) {
     for (size_t i = 0; i < demos.size(); ++i)
       if (demos[i].option.name == module)
         demo_index = i;
@@ -154,14 +149,18 @@ int main(int argc, char **argv) {
   }
   std::cout << "Backend: " << BackendAPIName(api) << "\nDevice: " << device->Name() << '\n';
   while (true) {
+    if (module.empty()) {
+      const auto selected =
+          menu.Select("RHI Hello - Module Selection", demo_options, demo_index < demos.size() ? demo_index : 0);
+      if (!selected)
+        return 0;
+      demo_index = *selected;
+    }
+    module.clear();
     std::cout << "Demo: " << demos[demo_index].option.name << '\n';
     // Each demo releases its local resources before the next selection; Core/Device stay alive.
     const int result = demos[demo_index].run(device.Get());
     if (result != 0)
       return result;
-    const auto selected = menu.Select("RHI Hello - Module Selection", demo_options, demo_index);
-    if (!selected)
-      return 0;
-    demo_index = *selected;
   }
 }

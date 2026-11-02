@@ -240,7 +240,9 @@ class NativeMenuTests(unittest.TestCase):
     def test_demo_default_and_explicit_selection_menus(self):
         for executable in DEMOS:
             with self.subTest(executable=executable):
-                with Console(executable, initial_title="API Selection") as terminal:
+                help_text = subprocess.check_output([executable, "--help"], text=True)
+                device_args = ("--device", "auto") if "--device" in help_text else ()
+                with Console(executable, device_args, initial_title="API Selection") as terminal:
                     terminal.key(0x0D)
                     terminal.wait_text("Module Selection")
                     terminal.key(0x1B)
