@@ -1,4 +1,4 @@
-"""Run headless scene/CLI regressions. Usage: python test_headless_demos.py <demo> [<demo> ...]"""
+"""Run headless scene/CLI regressions. Usage: python test_headless_demos.py <rhix_hello>"""
 import argparse
 from pathlib import Path
 import re
@@ -17,6 +17,10 @@ def run(executable, args, success=True):
 
 
 def check(executable, backend):
+    help_text = subprocess.check_output([str(executable), "--help"], text=True)
+    if "--frames" not in help_text:
+        raise RuntimeError("This regression needs a bounded benchmark demo (e.g. rhix_hello); "
+                           "rhi_hello is interactive and has no frame-limit or headless mode.")
     scenes = run(executable, ["--list"]).splitlines()
     expected_scenes = ["window", "triangle", "cube", "texture", "blend", "nbody", "raytracing", "ray_query", "hdr"]
     if scenes != expected_scenes:

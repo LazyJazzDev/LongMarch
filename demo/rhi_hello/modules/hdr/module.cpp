@@ -1,36 +1,23 @@
-#include "../../module.h"
-
 #include <fmt/format.h>
 
 #include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <map>
+#include <string>
 #include <thread>
 
-#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
-#include "grassland/util/virtual_file_system.h"
 #include "imgui.h"
 
 namespace {
-#include "built_in_shaders.inl"
+#include "shaders/hdr.slang.h"
 }
 
-int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &capture_directory) {
+int RunHDR(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
 
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
-    return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
-  ObjPtr<IDownloadToken> last_frame;
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  float last_frame_white_scale = 1.0f;
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
@@ -58,8 +45,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &captur
   size_t selected = pq != spaces.end() ? static_cast<size_t>(pq - spaces.begin()) : (spaces.size() > 1 ? 1 : 0);
   if (!window->SetColorSpace(spaces[selected]))
     return 1;
-  const auto &embedded = shader_list.at("modules/hdr/shaders/hdr.slang");
-  const std::string shader(embedded.first, embedded.second);
+  const std::string shader(reinterpret_cast<const char *>(shaders_hdr_slang), shaders_hdr_slang_len);
   std::map<std::pair<ImageFormat, ColorSpace>, ObjPtr<IProgram>> programs;
   const BindingLayoutDesc settings_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}};
   ObjPtr<IBuffer> settings_buffer = device->CreateBuffer({256});
@@ -83,17 +69,15 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &captur
   bool title_dirty = true;
   grassland::FPSCounter fps;
   auto title_time = std::chrono::steady_clock::now();
-  int rendered = 0;
-  while (!frames || rendered < frames) {
-    if (!PollEvents() || window->ShouldClose())
+  while (true) {
+    if (!PollEvents())
+      return 1;
+    if (window->ShouldClose())
       break;
     if (window->IsSwapChainInvalid() && !window->RebuildSwapChain())
       return 1;
-    // Bounded runs exercise all available color spaces automatically.
-    const bool cycle = frames >= 3 * static_cast<int>(spaces.size()) && rendered > 0 &&
-                       rendered % std::max(1, frames / static_cast<int>(spaces.size())) == 0;
-    if (color_space_changes || cycle) {
-      selected = (selected + (color_space_changes ? color_space_changes : 1)) % spaces.size();
+    if (color_space_changes) {
+      selected = (selected + color_space_changes) % spaces.size();
       color_space_changes = 0;
       if (!window->SetColorSpace(spaces[selected]))
         return 1;
@@ -168,14 +152,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &captur
       return 1;
     if (!context->CmdPresent(window.Get()))
       return 1;
-    if (!capture_directory.empty()) {
-      last_frame = context->CmdDownloadImage(image.Get());
-      if (!last_frame)
-        return 1;
-      last_frame_desc = image->GetDesc();
-      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
-    }
+
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
     if (!token || !token->WaitHost())
@@ -192,16 +169,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &captur
       title_time = now;
       title_dirty = false;
     }
-    ++rendered;
   }
-  std::cout << "hdr: completed " << rendered << " frames (window presentation).\n";
-  if (!capture_directory.empty()) {
-    if (!last_frame || !last_frame->WaitHost())
-      return 1;
-    std::vector<uint8_t> pixels(last_frame->GetSize());
-    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "hdr", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
-      return 1;
-  }
+
   return 0;
 }

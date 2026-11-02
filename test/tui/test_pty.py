@@ -1,7 +1,7 @@
 """POSIX PTY integration checks: test_pty.py <probe> [demo ...].
 
 Runs isolated pseudo-terminals; does not change the user's terminal. Optional
-hello demos must support --backend metal --frames 1 (macOS smoke tests).
+hello demos use Metal menu selection and the unsupported ray-pipeline path on macOS.
 """
 import fcntl
 import os
@@ -278,10 +278,10 @@ class PtyMenuTest(unittest.TestCase):
     @unittest.skipUnless(DEMOS, "Pass demo executables for macOS Metal launch checks")
     def test_demo_redirected_number_and_name_selection(self):
         for demo in DEMOS:
-            for choice in ("1\n", "triangle\n"):
+            for choice in ("7\n", "raytracing\n"):
                 with self.subTest(demo=demo, choice=choice), tempfile.TemporaryDirectory(prefix="longmarch-tui-") as directory:
                     result = subprocess.run(
-                        [demo, "--backend", "metal", "--frames", "1"], input=choice,
+                        [demo, "--backend", "metal"], input=choice,
                         text=True, capture_output=True, timeout=30, cwd=directory,
                     )
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -291,9 +291,9 @@ class PtyMenuTest(unittest.TestCase):
     @unittest.skipUnless(DEMOS, "Pass demo executables for macOS Metal launch checks")
     def test_demo_default_menu_launch(self):
         for demo in DEMOS:
-            with self.subTest(demo=demo), Terminal([demo, "--backend", "metal", "--frames", "1"]) as terminal:
+            with self.subTest(demo=demo), Terminal([demo, "--backend", "metal"]) as terminal:
                 terminal.until(lambda: b"\x1b[7m" in terminal.output)
-                terminal.send(b"\r")
+                terminal.send(b"\x1b")
                 terminal.finish(0)
 
 

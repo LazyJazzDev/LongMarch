@@ -237,7 +237,7 @@ class NativeMenuTests(unittest.TestCase):
             terminal.key(0x0D)
             terminal.finish(22)
 
-    def test_demo_default_menu_and_one_frame(self):
+    def test_demo_default_and_explicit_selection_menus(self):
         for executable in DEMOS:
             with self.subTest(executable=executable):
                 with Console(executable, initial_title="API Selection") as terminal:
@@ -245,16 +245,13 @@ class NativeMenuTests(unittest.TestCase):
                     terminal.wait_text("Module Selection")
                     terminal.key(0x1B)
                     terminal.finish(0)
-                with Console(executable, ("--module", "window", "--frames", "1"), "API Selection") as terminal:
-                    terminal.key(0x0D)
-                    terminal.finish(0)
-                with Console(executable, ("--all", "--headless"), "API Selection") as terminal:
+                with Console(executable, ("--module", "window"), "API Selection") as terminal:
                     terminal.key(0x1B)
                     terminal.finish(0)
-                # Select the first module through the real menu, then render one frame.
-                with Console(executable, ("--backend", "d3d12", "--frames", "1")) as terminal:
-                    terminal.key(0x0D)
+                with Console(executable, ("--backend", "d3d12")) as terminal:
+                    terminal.key(0x1B)
                     terminal.finish(0)
+
 
 
 if __name__ == "__main__":

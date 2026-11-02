@@ -1,21 +1,11 @@
-﻿#include "../../module.h"
-
-#include <fmt/format.h>
-
-#include <array>
 #include <chrono>
-#include <iostream>
-#include <map>
 #include <string>
 #include <thread>
 
-#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
-#include "grassland/util/fps_counter.h"
-#include "grassland/util/virtual_file_system.h"
 
 namespace {
-#include "built_in_shaders.inl"
+#include "shaders/blend.slang.h"
 
 struct Vertex {
   float position[3];
@@ -23,41 +13,18 @@ struct Vertex {
 };
 }  // namespace
 
-int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
+int RunBlend(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
 
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "RHI blend - Escape: close"});
+  if (!window)
     return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
-  ObjPtr<IDownloadToken> last_frame;
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  float last_frame_white_scale = 1.0f;
-  PresentMode requested = PRESENT_MODE_VSYNC;
-  bool present_mode_changed = false;
-  ObjPtr<IWindow> window;
-  if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI blend - P: toggle VSync"});
-    if (!window)
-      return 1;
-  }
+
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
-  std::array<ObjPtr<IImage>, 3> targets;
-  std::array<ObjPtr<ISubmissionToken>, 3> pending;
-  if (headless) {
-    for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
-      if (!target)
-        return 1;
-    }
-  }
-  const auto &embedded = shader_list.at("modules/blend/shaders/blend.slang");
-  std::string source(embedded.first, embedded.second);
+
+  std::string source(reinterpret_cast<const char *>(shaders_blend_slang), shaders_blend_slang_len);
   ObjPtr<IShader> vertex_shader = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   if (!vertex_shader)
     return 1;
@@ -71,11 +38,7 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   desc.vertex_bindings = {{sizeof(Vertex), false}};
   desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}, {1, 0, INPUT_TYPE_FLOAT4, 12}};
   {
-    ObjPtr<IImage> image;
-    if (headless)
-      image = targets[0];
-    else
-      image = window->GetNextImage();
+    ObjPtr<IImage> image = window->GetNextImage();
     if (!image)
       return 1;
     desc.color_formats = {image->GetDesc().format};
@@ -108,71 +71,27 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
     if (!uploaded)
       return 1;
-    if (headless) {
-      if (!uploaded->WaitHost())
+  }
+
+  window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+    if (action != GLFW_PRESS)
+      return;
+    if (key == GLFW_KEY_ESCAPE)
+      glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+  });
+
+  while (true) {
+    if (!PollEvents())
+      return 1;
+    if (window->ShouldClose())
+      break;
+    if (window->IsSwapChainInvalid()) {
+      if (!window->RebuildSwapChain())
         return 1;
     }
-  }
-  if (!headless) {
-    window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
-      if (action != GLFW_PRESS)
-        return;
-      if (key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
-      if (key == GLFW_KEY_P) {
-        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        present_mode_changed = true;
-      }
-    });
-  }
-  grassland::FPSCounter fps;
-  auto title_time = std::chrono::steady_clock::now();
-  // Warm up allocations and pipelines before measuring completed GPU work.
-  auto benchmark_start = std::chrono::steady_clock::now();
-  int rendered = headless ? -60 : 0;
-  while (!frames || rendered < frames) {
-    if (!headless) {
-      if (!PollEvents())
-        break;
-      if (window->ShouldClose())
-        break;
-      if (window->IsSwapChainInvalid()) {
-        if (!window->RebuildSwapChain())
-          return 1;
-      }
-      if (present_mode_changed) {
-        present_mode_changed = false;
-        if (!window->SetPresentMode(requested))
-          return 1;
-      }
-    }
-    const size_t slot = (static_cast<int64_t>(rendered) + 60) % targets.size();
-    if (headless) {
-      if (rendered == 0) {
-        for (auto &token : pending) {
-          if (token) {
-            if (!token->WaitHost())
-              return 1;
-            token = {};
-          }
-        }
-        benchmark_start = std::chrono::steady_clock::now();
-      }
-      if (pending[slot]) {
-        if (!pending[slot]->WaitHost())
-          return 1;
-        pending[slot] = {};
-      }
-    }
-    ObjPtr<IImage> image;
-    if (headless)
-      image = targets[slot];
-    else
-      image = window->GetNextImage();
+
+    ObjPtr<IImage> image = window->GetNextImage();
     if (!image) {
-      if (headless)
-        return 1;
-      fps.Reset();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
@@ -199,51 +118,15 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       return 1;
     if (!context->CmdEndRendering())
       return 1;
-    if (!headless) {
-      if (!context->CmdPresent(window.Get()))
-        return 1;
-    }
-    if (!capture_directory.empty()) {
-      last_frame = context->CmdDownloadImage(image.Get());
-      if (!last_frame)
-        return 1;
-      last_frame_desc = image->GetDesc();
-      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
-    }
+
+    if (!context->CmdPresent(window.Get()))
+      return 1;
+
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
     if (!token)
       return 1;
-    if (headless)
-      pending[slot] = std::move(token);
-    ++rendered;
-    fps.TickFrame();
-    auto now = std::chrono::steady_clock::now();
-    if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window->SetTitle(fmt::format("RHI blend - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
-        return 1;
-      title_time = now;
-    }
   }
-  if (headless) {
-    for (const auto &token : pending) {
-      if (token) {
-        if (!token->WaitHost())
-          return 1;
-      }
-    }
-    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format("blend: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
-                             rendered, seconds, rendered / seconds);
-  }
-  if (!capture_directory.empty()) {
-    if (!last_frame || !last_frame->WaitHost())
-      return 1;
-    std::vector<uint8_t> pixels(last_frame->GetSize());
-    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "blend", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
-      return 1;
-  }
+
   return 0;
 }
