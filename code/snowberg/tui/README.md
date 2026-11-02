@@ -174,7 +174,9 @@ snowberg::tui::MessageBox message;
 message.Show("Unsupported feature", "The selected device does not support ray queries.");
 ```
 
-`Show(title, message)` blocks until Enter, Escape or Space. Messages wrap to the
+`Show(title, message)` draws a centered character frame, an inverse-color title strip,
+padded message text and a centered `[ OK ]` button, without an operation-hint footer.
+Enter, Escape, Space or clicking OK closes the dialog. Messages wrap to the
 terminal width; Up/Down, PageUp/PageDown and the mouse wheel scroll long messages.
 Terminal resize updates the layout. The same object can show successive messages.
 A non-terminal console prints an ASCII-framed title/message (wrapped to 72 columns)

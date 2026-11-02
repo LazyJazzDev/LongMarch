@@ -68,8 +68,19 @@ bool MessageBox::Show(const std::string &title, const std::string &message) {
 }
 
 void MessageBox::OnResize(int columns, int rows) {
-  lines_ = WrapLines(message_, std::max(1, columns - 1));
-  visible_ = std::max(0, rows - (rows > 2 ? 2 : 1));
+  width_ = std::min(72, columns >= 16 ? columns - 4 : columns);
+  left_ = (columns - width_) / 2;
+  text_column_ = left_ + (width_ >= 10 ? 3 : 1);
+  const int text_width = std::max(1, width_ - 2 * (text_column_ - left_));
+  lines_ = WrapLines(message_, text_width);
+  const int available_height = rows >= 10 ? rows - 2 : rows;
+  height_ = std::min(available_height, std::max(1, int(lines_.size())) + 7);
+  upper_ = (rows - height_) / 2;
+  const bool spacious = height_ >= 8;
+  text_row_ = upper_ + (spacious ? 3 : 1);
+  visible_ = std::max(0, height_ - (spacious ? 7 : 3));
+  button_row_ = upper_ + height_ - (spacious ? 3 : 2);
+  button_column_ = left_ + std::max(0, (width_ - 6) / 2);
   top_ = std::min(top_, std::max(0, int(lines_.size()) - visible_));
   dirty_ = true;
 }
@@ -97,8 +108,14 @@ void MessageBox::OnKey(const KeyEvent &event) {
 }
 
 void MessageBox::OnMouse(const MouseEvent &event) {
-  if (event.action == MouseAction::Scroll)
+  if (event.action == MouseAction::Scroll) {
     Scroll(-event.scroll_y);
+  } else if (height_ >= 3 && width_ >= 8 && event.action == MouseAction::Press && event.button == MouseButton::Left &&
+             event.row == button_row_ && event.column >= button_column_ && event.column < button_column_ + 6 &&
+             event.column < left_ + width_ - 1) {
+    acknowledged_ = true;
+    Terminate();
+  }
 }
 
 void MessageBox::OnUpdate() {
@@ -107,16 +124,26 @@ void MessageBox::OnUpdate() {
   dirty_ = false;
   for (int row = 0; row < Rows(); ++row)
     ClearRow(row);
-  const int first_row = Rows() > 2 ? 1 : 0;
-  if (first_row) {
+  const int inside = std::max(0, width_ - 2);
+  const std::string border = "+" + std::string(inside, '-') + "+";
+  UpdateRow(upper_, left_, border);
+  for (int row = 1; row < height_ - 1; ++row)
+    UpdateRow(upper_ + row, left_, "|" + std::string(inside, ' ') + "|");
+  if (height_ > 1)
+    UpdateRow(upper_ + height_ - 1, left_, border);
+
+  // A full title strip and whitespace surround the body and the confirmation button.
+  const auto title = detail::FitRow(" " + title_, inside).text;
+  SetInverse(true);
+  UpdateRow(upper_ + (height_ >= 8 ? 1 : 0), left_ + 1,
+            title + std::string(std::max(0, inside - detail::TextWidth(title)), ' '));
+  SetInverse(false);
+  for (int row = 0; row < visible_ && top_ + row < int(lines_.size()); ++row)
+    UpdateRow(text_row_ + row, text_column_, lines_[top_ + row]);
+  if (height_ >= 3 && width_ >= 8) {
     SetInverse(true);
-    UpdateRow(0, 0, title_);
+    UpdateRow(button_row_, button_column_, "[ OK ]");
     SetInverse(false);
   }
-  for (int row = 0; row < visible_ && top_ + row < int(lines_.size()); ++row)
-    UpdateRow(row + first_row, 0, lines_[top_ + row]);
-  SetForegroundColor(235, 215, 140);
-  UpdateRow(Rows() - 1, 0, "Enter / Esc / Space: continue | Up / Down: scroll");
-  ResetColors();
 }
 }  // namespace snowberg::tui

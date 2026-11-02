@@ -93,16 +93,21 @@ class PtyMenuTest(unittest.TestCase):
     def test_message_box_blocks_scrolls_resizes_and_reuses(self):
         with Terminal([PROBE, "--message-box"], columns=32, rows=8) as terminal:
             terminal.until(lambda: b"First message line" in terminal.output)
+            terminal.until(lambda: b"[ OK ]" in terminal.output)
+            self.assertIn(b"+" + b"-" * 26 + b"+", terminal.output)
+            self.assertNotIn(b"continue |", terminal.output)
             terminal.read(0.15)
             self.assertIsNone(terminal.process.poll())
             terminal.output = b""
-            terminal.send(b"\x1b[6~" * 30)
+            terminal.send(b"\x1b[6~" * 100)
             terminal.until(lambda: b"END_OF_MESSAGE" in terminal.output)
             terminal.resize(60, 12)
             terminal.until(lambda: b"\x1b[12;1H" in terminal.output)
             terminal.send(b"\r")
             terminal.until(lambda: b"Second message" in terminal.output)
-            terminal.send(b" ")
+            # At 60x12 the short second dialog is centered: OK is row 8, columns 28-33.
+            terminal.until(lambda: b"[ OK ]" in terminal.output)
+            terminal.send(b"\x1b[<0;29;8M\x1b[<0;29;8m")
             terminal.finish(20)
 
     def test_message_box_console_and_eof(self):
