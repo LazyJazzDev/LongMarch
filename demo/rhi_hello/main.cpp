@@ -1,262 +1,166 @@
 #include <charconv>
-#include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 
+#include "grassland/rhi/rhi.h"
 #include "module.h"
 #include "snowberg/tui/tui.h"
 
 int main(int argc, char **argv) {
   using namespace grassland::rhi;
-  BackendAPI api = BACKEND_API_DEFAULT;
-  std::string module;
-  std::string capture_directory;
-  bool backend_specified = false;
-  bool tui = false;
-  bool headless = false;
-  bool all = false;
-  int frames = 0;
-  const char *font_file = nullptr;
-  float font_size = 20.0f;
+
+  struct Demo {
+    snowberg::tui::MenuOption option;
+    int (*run)(IDevice *);
+  };
+
+  const std::vector<Demo> demos{
+      {{"window", "Clear and present a window"}, RunWindow},
+      {{"triangle", "Colored indexed triangle"}, RunTriangle},
+      {{"cube", "Rotating cube with depth and uniform binding"}, RunCube},
+      {{"texture", "Sampled XOR texture triangle"}, RunTexture},
+      {{"blend", "Source-alpha blended triangles"}, RunBlend},
+      {{"nbody", "Compute simulation and particle rendering"}, RunNBody},
+      {{"raytracing", "Ray tracing pipeline (requires device support)"}, RunRayTracing},
+      {{"ray_query", "Inline ray queries (requires device support)"}, RunRayQuery},
+      {{"hdr", "HDR color spaces and reference white"}, RunHDR},
+      {{"imgui", "Interactive ImGui overlay"}, RunImGui},
+      {{"imgui_multi_window", "Independent ImGui windows"}, RunImGuiMultiWindow},
+  };
+  std::string backend, module, device_option;
   for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[i];
-    if (arg == "--save-last-frame") {
-      if (i + 1 >= argc || !argv[i + 1][0]) {
-        std::cerr << "--save-last-frame requires an output directory\n";
-        return 1;
-      }
-      capture_directory = argv[++i];
-      continue;
-    }
-    if (arg == "--headless") {
-      headless = true;
-      continue;
-    }
-    if (arg == "--all") {
-      all = true;
-      continue;
-    }
-    if (arg == "--tui") {
-      tui = true;
-      continue;
+    const std::string arg = argv[i];
+    if (arg == "--help") {
+      std::cout << "[--backend auto|d3d12|vulkan|metal] [--module NAME] [--device auto|N] [--list]\n"
+                   "Select missing choices from the terminal menu. Device numbers start at 1.\n"
+                   "Closing a demo returns to the selection menu; cancel the menu to exit.\n";
+      return 0;
     }
     if (arg == "--list") {
-      std::cout
-          << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\nhdr\nimgui\nimgui_multi_window\n";
+      for (const auto &demo : demos)
+        std::cout << demo.option.name << '\n';
       return 0;
     }
-    if (arg == "--help") {
-      std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr|imgui|imgui_multi_window | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N] [--save-last-frame DIR] [--font PATH] [--font-size PIXELS]\n--save-last-frame enables per-frame GPU image readback and saves the final frame at exit as PNG, native .bin pixels and .txt metadata.\nFont options apply to ImGui modules; defaults: built-in font, 20 pixels.\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
-      return 0;
-    }
-    if (arg == "--module" && i + 1 < argc) {
-      module = argv[++i];
-      continue;
-    }
-    if (arg == "--font") {
-      if (i + 1 >= argc || !argv[i + 1][0]) {
-        std::cerr << "--font requires a font file path\n";
-        return 1;
-      }
-      font_file = argv[++i];
-      continue;
-    }
-    if (arg == "--font-size") {
-      if (i + 1 >= argc) {
-        std::cerr << "--font-size requires a positive pixel size\n";
-        return 1;
-      }
-      std::string value = argv[++i];
-      auto result = std::from_chars(value.data(), value.data() + value.size(), font_size);
-      if (result.ec != std::errc{} || result.ptr != value.data() + value.size() || !std::isfinite(font_size) ||
-          font_size <= 0) {
-        std::cerr << "--font-size requires a finite positive pixel size\n";
-        return 1;
-      }
-      continue;
-    }
-    if (arg == "--frames" && i + 1 < argc) {
-      std::string value = argv[++i];
-      auto result = std::from_chars(value.data(), value.data() + value.size(), frames);
-      if (result.ec != std::errc{} || result.ptr != value.data() + value.size() || frames < 0)
-        return 1;
-      continue;
-    }
-    if (arg == "--backend" && i + 1 < argc)
-      arg = argv[++i];
-    if (arg == "auto")
-      api = BACKEND_API_DEFAULT;
-    else if (arg == "d3d12")
-      api = BACKEND_API_D3D12;
-    else if (arg == "vulkan")
-      api = BACKEND_API_VULKAN;
-    else if (arg == "metal")
-      api = BACKEND_API_METAL;
-    else {
-      std::cerr << "Unknown option: " << arg << '\n';
+    if ((arg == "--backend" || arg == "--module" || arg == "--device") && i + 1 < argc && argv[i + 1][0]) {
+      auto &value = arg == "--backend" ? backend : arg == "--module" ? module : device_option;
+      value = argv[++i];
+    } else {
+      std::cerr << "Unknown option or missing value: " << arg << '\n';
       return 1;
     }
-    backend_specified = true;
   }
-  if (all && (tui || !module.empty())) {
-    std::cerr << "Use --all without --module or --tui\n";
-    return 1;
-  }
-  if (tui && !module.empty()) {
-    std::cerr << "Use either --module or --tui, not both\n";
-    return 1;
-  }
-  if (!backend_specified) {
-    const std::vector<BackendAPI> backends{
+  const std::vector<BackendAPI> backends{
 #if defined(LONGMARCH_D3D12_ENABLED)
-        BACKEND_API_D3D12,
+      BACKEND_API_D3D12,
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
-        BACKEND_API_VULKAN,
+      BACKEND_API_VULKAN,
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
-        BACKEND_API_METAL,
+      BACKEND_API_METAL,
 #endif
-    };
-    std::vector<snowberg::tui::MenuOption> options;
-    for (const auto backend : backends) {
-      switch (backend) {
-        case BACKEND_API_D3D12:
-          options.push_back({BackendAPIName(backend), "Microsoft | Windows"});
-          break;
-        case BACKEND_API_VULKAN:
-          options.push_back({BackendAPIName(backend), "Khronos Group | Windows, Linux, macOS"});
-          break;
-        case BACKEND_API_METAL:
-          options.push_back({BackendAPIName(backend), "Apple | macOS"});
-          break;
-      }
-    }
-    if (backends.empty()) {
-      std::cerr << "No graphics backend is enabled in this build.\n";
-      return 1;
-    }
+  };
+  if (backends.empty()) {
+    std::cerr << "No graphics backend is enabled in this build.\n";
+    return 1;
+  }
+  BackendAPI api = BACKEND_API_DEFAULT;
+  snowberg::tui::Menu menu;
+  if (backend.empty()) {
     if (backends.size() == 1) {
       api = backends.front();
     } else {
-      size_t initial_selection = 0;
+      std::vector<snowberg::tui::MenuOption> options;
+      size_t initial = 0;
       for (size_t i = 0; i < backends.size(); ++i) {
-        if (backends[i] == BACKEND_API_DEFAULT) {
-          initial_selection = i;
-          break;
-        }
+        options.push_back({BackendAPIName(backends[i]), "Graphics API"});
+        if (backends[i] == BACKEND_API_DEFAULT)
+          initial = i;
       }
-      snowberg::tui::Menu menu;
-      const auto selected = menu.Select("RHI Hello - API Selection", options, initial_selection);
+      const auto selected = menu.Select("RHI Hello - API Selection", options, initial);
       if (!selected)
         return 0;
       api = backends[*selected];
     }
+  } else if (backend == "auto") {
+    api = BACKEND_API_DEFAULT;
+  } else if (backend == "d3d12") {
+    api = BACKEND_API_D3D12;
+  } else if (backend == "vulkan") {
+    api = BACKEND_API_VULKAN;
+  } else if (backend == "metal") {
+    api = BACKEND_API_METAL;
+  } else {
+    std::cerr << "Unknown backend: " << backend << '\n';
+    return 1;
   }
-  if (!frames) {
-    if (headless)
-      frames = 3000;
-    else if (all)
-      frames = 300;
-  }
-  if (all) {
-    int result = 0;
-    if (RunWindow(api, frames, headless, capture_directory) != 0) {
-      std::cerr << "window: FAILED\n";
-      result = 1;
-    }
-    if (RunTriangle(api, frames, headless, capture_directory) != 0) {
-      std::cerr << "triangle: FAILED\n";
-      result = 1;
-    }
-    if (RunCube(api, frames, headless, capture_directory) != 0) {
-      std::cerr << "cube: FAILED\n";
-      result = 1;
-    }
-    if (RunTexture(api, frames, headless, capture_directory) != 0) {
-      std::cerr << "texture: FAILED\n";
-      result = 1;
-    }
-    if (RunBlend(api, frames, headless, capture_directory) != 0) {
-      std::cerr << "blend: FAILED\n";
-      result = 1;
-    }
-    if (RunNBody(api, frames, headless, capture_directory) != 0) {
-      std::cerr << "nbody: FAILED\n";
-      result = 1;
-    }
-    if (RunRayTracing(api, frames, headless, capture_directory) != 0) {
-      std::cerr << "raytracing: FAILED\n";
-      result = 1;
-    }
-    if (RunRayQuery(api, frames, headless, capture_directory) != 0) {
-      std::cerr << "ray_query: FAILED\n";
-      result = 1;
-    }
-    if (headless) {
-      std::cout << "hdr: SKIPPED (requires a window)\n";
-    } else if (RunHDR(api, frames, capture_directory) != 0) {
-      std::cerr << "hdr: FAILED\n";
-      result = 1;
-    }
-    if (RunImGui(api, frames, headless, font_file, font_size, capture_directory) != 0) {
-      std::cerr << "imgui: FAILED\n";
-      result = 1;
-    }
-    if (RunImGuiMultiWindow(api, frames, headless, font_file, font_size, capture_directory) != 0) {
-      std::cerr << "imgui_multi_window: FAILED\n";
-      result = 1;
-    }
-    return result;
-  }
-  if (module.empty()) {
-    const std::vector<snowberg::tui::MenuOption> options{
-        {"window", "Clear and present a window"},
-        {"triangle", "Colored indexed triangle"},
-        {"cube", "Rotating cube with depth and uniform binding"},
-        {"texture", "Sampled XOR texture triangle"},
-        {"blend", "Source-alpha blended triangles"},
-        {"nbody", "Compute simulation and particle rendering"},
-        {"raytracing", "Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)"},
-        {"ray_query", "Inline ray queries"},
-        {"hdr", "HDR presentation (window only)"},
-        {"imgui", "Interactive ImGui overlay"},
-        {"imgui_multi_window", "Independent ImGui windows"},
-    };
-    snowberg::tui::Menu menu;
-    const auto selected = menu.Select("RHI Hello - Module Selection", options);
-    if (!selected)
-      return 0;
-    module = options[*selected].name;
-  }
-  if (module == "window")
-    return RunWindow(api, frames, headless, capture_directory);
-  if (module == "triangle")
-    return RunTriangle(api, frames, headless, capture_directory);
-  if (module == "cube")
-    return RunCube(api, frames, headless, capture_directory);
-  if (module == "texture")
-    return RunTexture(api, frames, headless, capture_directory);
-  if (module == "blend")
-    return RunBlend(api, frames, headless, capture_directory);
-  if (module == "nbody")
-    return RunNBody(api, frames, headless, capture_directory);
-  if (module == "raytracing")
-    return RunRayTracing(api, frames, headless, capture_directory);
-  if (module == "ray_query")
-    return RunRayQuery(api, frames, headless, capture_directory);
-  if (module == "imgui")
-    return RunImGui(api, frames, headless, font_file, font_size, capture_directory);
-  if (module == "imgui_multi_window")
-    return RunImGuiMultiWindow(api, frames, headless, font_file, font_size, capture_directory);
-  if (module == "hdr") {
-    if (headless) {
-      std::cerr << "hdr requires a window; --headless is unsupported.\n";
+  std::vector<snowberg::tui::MenuOption> demo_options;
+  for (const auto &demo : demos)
+    demo_options.push_back(demo.option);
+  size_t demo_index = demos.size();
+  if (!module.empty()) {
+    for (size_t i = 0; i < demos.size(); ++i)
+      if (demos[i].option.name == module)
+        demo_index = i;
+    if (demo_index == demos.size()) {
+      std::cerr << "Unknown module: " << module << '\n';
       return 1;
     }
-    return RunHDR(api, frames, capture_directory);
   }
-  std::cerr << "Unknown module: " << module << '\n';
-  return 1;
+  ObjPtr<ICore> core = CreateCore(api);
+  if (!core) {
+    std::cerr << "Could not create backend: " << BackendAPIName(api) << '\n';
+    return 1;
+  }
+  ObjPtr<IDevice> device;
+  if (device_option == "auto") {
+    device = core->CreateDeviceByAutoSelection();
+  } else {
+    const auto devices = core->GetPhysicalDevices();
+    if (devices.empty()) {
+      std::cerr << "No physical devices available.\n";
+      return 1;
+    }
+    size_t selected = 0;
+    if (!device_option.empty()) {
+      size_t number = 0;
+      const auto result = std::from_chars(device_option.data(), device_option.data() + device_option.size(), number);
+      if (result.ec != std::errc{} || result.ptr != device_option.data() + device_option.size() || number == 0 ||
+          number > devices.size()) {
+        std::cerr << "Device must be auto or a number from 1 to " << devices.size() << ".\n";
+        return 1;
+      }
+      selected = number - 1;
+    } else if (devices.size() > 1) {
+      std::vector<snowberg::tui::MenuOption> options;
+      for (const auto &info : devices)
+        options.push_back({info.name, PhysicalDeviceTypeName(info.type)});
+      const auto choice = menu.Select("RHI Hello - Device Selection", options);
+      if (!choice)
+        return 0;
+      selected = *choice;
+    }
+    device = core->CreateDevice(static_cast<int32_t>(selected));
+  }
+  if (!device) {
+    std::cerr << "Could not create the selected device.\n";
+    return 1;
+  }
+  std::cout << "Backend: " << BackendAPIName(api) << "\nDevice: " << device->Name() << '\n';
+  while (true) {
+    if (module.empty()) {
+      const auto selected =
+          menu.Select("RHI Hello - Module Selection", demo_options, demo_index < demos.size() ? demo_index : 0);
+      if (!selected)
+        return 0;
+      demo_index = *selected;
+    }
+    module.clear();
+    std::cout << "Demo: " << demos[demo_index].option.name << '\n';
+    // Each demo releases its local resources before the next selection; Core/Device stay alive.
+    const int result = demos[demo_index].run(device.Get());
+    if (result != 0)
+      return result;
+  }
 }

@@ -4,8 +4,19 @@
 #define GLFW_EXPOSE_NATIVE_COCOA
 #import <Cocoa/Cocoa.h>
 #include <GLFW/glfw3native.h>
+#import <QuartzCore/QuartzCore.h>
 
 namespace grassland::rhi::backend {
+
+void glfw::DestroyCocoaWindow(GLFWwindow *window) {
+  @autoreleasepool {
+    // Closing must not leave an animated window onscreen when the caller stops pumping events.
+    [glfwGetCocoaWindow(window) setAnimationBehavior:NSWindowAnimationBehaviorNone];
+    glfwDestroyWindow(window);
+    [NSApp updateWindows];
+    [CATransaction flush];
+  }
+}
 
 float Window::GetHDRHeadroom() const {
   if (!glfw::IsWindowThread())

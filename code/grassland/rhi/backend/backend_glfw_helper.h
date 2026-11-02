@@ -13,6 +13,9 @@ bool PollEvents();
 bool IsWindowThread();
 GLFWwindow *CreateGLFWWindow(int width, int height, const char *title);
 void DestroyWindow(GLFWwindow *window);
+#if defined(__APPLE__)
+void DestroyCocoaWindow(GLFWwindow *window);
+#endif
 bool SetWindowTitle(GLFWwindow *window, const char *title);
 }  // namespace glfw
 

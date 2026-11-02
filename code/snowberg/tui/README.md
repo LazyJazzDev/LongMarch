@@ -32,6 +32,7 @@ const auto status = app.Run();
   are not fully normalized across terminals.
 - `tui_menu.h/cpp`: the public `Menu` application derived from `Core`, with `Menu::Select` for the
   three hello demos, plus its plain-text fallback.
+- `tui_message_box.h/cpp`: reusable blocking messages with a framed plain-text fallback.
 
 `Run()` checks the environment and enables terminal modes. It calls `OnStart`,
 `OnResize(columns, rows)`, then `OnUpdate`. Each iteration reads a bounded input
@@ -165,3 +166,21 @@ Shift+Enter host compatibility. `EnableEnhancedInput()` opts into CSI-u / xterm
 modified keys and bracketed paste; paste is delivered as one `OnPaste` event so
 embedded newlines cannot accidentally submit messages. This is opt-in; Menu
 does not enable the extra terminal modes.
+
+## MessageBox
+
+```cpp
+snowberg::tui::MessageBox message;
+message.Show("Unsupported feature", "The selected device does not support ray queries.");
+```
+
+`Show(title, message)` draws a centered character frame, an inverse-color title centered in the top border,
+padded message text and a centered `[ OK ]` button, without an operation-hint footer.
+Enter, Escape, Space or clicking OK closes the dialog. Messages wrap to the
+terminal width; Up/Down, PageUp/PageDown and the mouse wheel scroll long messages.
+Terminal resize updates the layout. The same object can show successive messages.
+A non-terminal console prints an ASCII-framed title/message (wrapped to 72 columns)
+and waits for Enter using standard
+input, without platform-specific application code. EOF or I/O failure returns
+false; acknowledgement returns true. All terminal setup, input draining and
+restoration reuse `Core`, just like `Menu`.

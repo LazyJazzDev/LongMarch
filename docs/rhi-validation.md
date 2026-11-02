@@ -124,7 +124,7 @@ left-to-right and top-to-bottom without row padding. Color values retain their n
 encoding, including BGRA channel order, packed 10-bit channels and half floats.
 Depth readback tests use D32 only. Stencil-bearing images are not read back by default;
 stencil rendering tests verify the color output instead. All demo depth attachments
-use pure D32 float depth. Cube capture downloads both color and D32 depth each frame,
+use pure D32 float depth. RHIX cube capture downloads both color and D32 depth each frame,
 then saves the final matching pair at exit. `cube_depth.bin` retains float32 device
 depth; `cube_depth.png` is an 8-bit grayscale preview of depth 0–1, without gamma
 conversion or linearization.
@@ -147,10 +147,13 @@ does not publish a second completion state to each DownloadToken.
 
 ## Demo readback checks
 
-All modules of `demo_rhi_hello` and `demo_rhix_hello` accept `--save-last-frame DIR`:
+`demo_rhi_hello` is an interactive learning demo: it no longer accepts frame limits,
+headless mode or capture options. Its launcher selects one backend, demo and device;
+each module owns its window loop. Use the RHI download tests for readback validation.
+
+`demo_rhix_hello` retains `--save-last-frame DIR`:
 
 ```text
-demo_rhi_hello --backend vulkan --all --frames 30 --save-last-frame out/readback/vulkan
 demo_rhix_hello --backend d3d12 --all --headless --frames 30 --save-last-frame out/readback/d3d12
 ```
 
@@ -158,9 +161,8 @@ Each rendered module saves `<module>.png`, `<module>.bin` and `<module>.txt` at 
 exit. The binary file contains the exact compact pixels; the text file records extent,
 format, color space, row pitch and reference-white scale. PNG is an SDR preview:
 HDR is decoded relative to the window's reference white, converted to sRGB and clipped
-to its range. Use the binary file to inspect unclipped HDR values. Multi-window ImGui
-saves separate numbered files. Modules skipped for unavailable features or headless
-window requirements produce no capture. Different invocations should use separate
+to its range. Use the binary file to inspect unclipped HDR values. Modules skipped
+for unavailable features or headless window requirements produce no capture. Different invocations should use separate
 directories to preserve previous results.
 
 With --save-last-frame, every module records an image download after CmdPresent on
@@ -174,7 +176,7 @@ save_image only encodes already downloaded CPU pixels.
 Both nbody modules download GPU velocities asynchronously and plot a 100-bin speed
 histogram using the same binning and peak normalization as `nbody_cs`. Only one
 velocity download is pending at a time. Zero maximum speed is handled explicitly;
-non-finite velocities fail the demo. With frame capture enabled, `nbody_speeds.csv`
+non-finite velocities fail the demo. In RHIX, with frame capture enabled, `nbody_speeds.csv`
 contains the latest completed histogram, including bin edges, particle counts and
 normalized values. The curve can lag rendering by a frame or more while the GPU is
 busy. `*RhiDownload*` tests cover byte ranges, color/depth/stencil rectangles, compact

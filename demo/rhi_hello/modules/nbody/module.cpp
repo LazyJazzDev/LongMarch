@@ -1,13 +1,9 @@
-﻿#include "../../module.h"
-
 #include <fmt/format.h>
 
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
-#include <filesystem>
-#include <fstream>
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
@@ -15,14 +11,21 @@
 #include <string>
 #include <thread>
 
-#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
-#include "grassland/util/virtual_file_system.h"
 #include "imgui.h"
 
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
 namespace {
-#include "built_in_shaders.inl"
+#include "shaders/nbody.slang.h"
+#include "shaders/particle.slang.h"
+#include "shaders/present.slang.h"
 
 constexpr uint32_t particle_count = 65536;
 // Same algorithmic estimate as nbody_cs: 20 FLOP per particle interaction.
@@ -40,19 +43,9 @@ struct Camera {
 };
 }  // namespace
 
-int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
+int RunNBody(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
 
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
-    return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
-  ObjPtr<IDownloadToken> last_frame;
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  float last_frame_white_scale = 1.0f;
   PresentMode requested = PRESENT_MODE_VSYNC;
   bool present_mode_changed = false;
   bool running = true, reset_requested = true;
@@ -66,32 +59,21 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   bool show_gui = true;
   ColorSpace requested_space = COLOR_SPACE_SRGB_NONLINEAR;
   std::vector<ColorSpace> spaces{COLOR_SPACE_SRGB_NONLINEAR};
-  ObjPtr<IWindow> window;
-  if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI nbody"});
-    if (!window)
-      return 1;
-    if (!window->EnableImGui(true, LONGMARCH_ASSETS_DIR "fonts/simhei.ttf", 20.0f))
-      return 1;
-    for (const auto &option : window->GetSupportedPresentationOptions()) {
-      if (std::find(spaces.begin(), spaces.end(), option.color_space) == spaces.end())
-        spaces.push_back(option.color_space);
-    }
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "RHI nbody"});
+  if (!window)
+    return 1;
+  if (!window->EnableImGui(true, LONGMARCH_ASSETS_DIR "fonts/simhei.ttf", 20.0f))
+    return 1;
+  for (const auto &option : window->GetSupportedPresentationOptions()) {
+    if (std::find(spaces.begin(), spaces.end(), option.color_space) == spaces.end())
+      spaces.push_back(option.color_space);
   }
+
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
-  std::array<ObjPtr<IImage>, 3> targets;
-  std::array<ObjPtr<ISubmissionToken>, 3> pending;
-  if (headless) {
-    for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
-      if (!target)
-        return 1;
-    }
-  }
-  const auto &embedded = shader_list.at("modules/nbody/shaders/particle.slang");
-  std::string source(embedded.first, embedded.second);
+
+  std::string source(reinterpret_cast<const char *>(shaders_particle_slang), shaders_particle_slang_len);
   ObjPtr<IShader> vertex_shader = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   if (!vertex_shader)
     return 1;
@@ -112,8 +94,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     return 1;
   ObjPtr<IImage> radiance;
   ObjPtr<IImage> frame_image;
-  const auto &output_embedded = shader_list.at("modules/nbody/shaders/present.slang");
-  const std::string output_source(output_embedded.first, output_embedded.second);
+  const std::string output_source(reinterpret_cast<const char *>(shaders_present_slang), shaders_present_slang_len);
   const BindingLayoutDesc output_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
                                          {1, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}};
   ObjPtr<IBuffer> output_uniform = device->CreateBuffer({256});
@@ -121,9 +102,9 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   if (!output_uniform || !output_group || !output_group->BindResource(0, output_uniform.Get()))
     return 1;
   ObjPtr<IProgram> output_program;
-  const auto &compute_source = shader_list.at("modules/nbody/shaders/nbody.slang");
   ObjPtr<IShader> compute_shader = device->CreateShaderFromSource(
-      std::string(compute_source.first, compute_source.second), "CSMain", SHADER_STAGE_COMPUTE);
+      std::string(reinterpret_cast<const char *>(shaders_nbody_slang), shaders_nbody_slang_len), "CSMain",
+      SHADER_STAGE_COMPUTE);
   if (!compute_shader)
     return 1;
   ComputeProgramDesc compute_desc;
@@ -195,29 +176,29 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     return upload->CmdUploadBuffer(positions.Get(), 0, initial_positions.data(), bytes) &&
            upload->CmdUploadBuffer(velocities.Get(), 0, initial_velocities.data(), bytes);
   };
-  if (!headless) {
-    window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
-      if (action != GLFW_PRESS)
-        return;
-      if (key == GLFW_KEY_I) {
-        show_gui = !show_gui;
-        capture_keyboard = false;
-        return;
-      }
-      if (capture_keyboard && key != GLFW_KEY_ESCAPE)
-        return;
-      if (key == GLFW_KEY_SPACE)
-        running = !running;
-      if (key == GLFW_KEY_R)
-        reset_requested = true;
-      if (key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
-      if (key == GLFW_KEY_P) {
-        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        present_mode_changed = true;
-      }
-    });
-  }
+
+  window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+    if (action != GLFW_PRESS)
+      return;
+    if (key == GLFW_KEY_I) {
+      show_gui = !show_gui;
+      capture_keyboard = false;
+      return;
+    }
+    if (capture_keyboard && key != GLFW_KEY_ESCAPE)
+      return;
+    if (key == GLFW_KEY_SPACE)
+      running = !running;
+    if (key == GLFW_KEY_R)
+      reset_requested = true;
+    if (key == GLFW_KEY_ESCAPE)
+      glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+    if (key == GLFW_KEY_P) {
+      requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+      present_mode_changed = true;
+    }
+  });
+
   if (window) {
     window->MouseButtonEvent().RegisterCallback([&](int button, int action, int, double, double) {
       if (button == GLFW_MOUSE_BUTTON_LEFT)
@@ -271,158 +252,128 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     return true;
   };
   grassland::FPSCounter fps;
-  // Warm up allocations and pipelines before measuring completed GPU work.
-  auto benchmark_start = std::chrono::steady_clock::now();
-  int rendered = headless ? -60 : 0;
-  while (!frames || rendered < frames) {
+  while (true) {
     if (!update_speeds())
       return 1;
-    if (!headless) {
-      if (!PollEvents())
-        break;
-      if (window->ShouldClose())
-        break;
-      if (!window->UpdateImGui([&] {
-            if (show_gui) {
-              ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
-              ImGui::SetNextWindowBgAlpha(0.9f);
-              ImGui::SetNextWindowSize({ImGui::GetFontSize() * 30.0f, 0}, ImGuiCond_Always);
-              ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {8.0f, 6.0f});
-              ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-              if (ImGui::Begin(
-                      "NBody", nullptr,
-                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize)) {
-                ImGui::SeparatorText("Statistics");
-                ImGui::Text("Backend: %s", BackendAPIName(api).c_str());
-                ImGui::Text("Particles: %u", particle_count);
-                const double rate = fps.GetFPS();
-                ImGui::Text("FPS: %.1f", rate);
-                ImGui::Text("Frame Duration: %.3f ms", rate > 0 ? 1000.0 / rate : 0.0);
-                ImGui::Text("Estimated: %.2f TFLOP/s", running ? flops_per_frame * rate * 1e-12 : 0.0);
-                ImGui::SeparatorText("Control");
-                const auto &style = ImGui::GetStyle();
-                const float row_width = ImGui::GetContentRegionAvail().x;
-                const ImVec2 button_size{(row_width - style.ItemSpacing.x) * 0.5f, ImGui::GetFrameHeight() + 6.0f};
-                ImGui::PushStyleColor(ImGuiCol_Button, {0.20f, 0.25f, 0.32f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0.28f, 0.35f, 0.44f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, {0.33f, 0.41f, 0.52f, 1.0f});
-                if (ImGui::Button("Reset", button_size))
-                  reset_requested = true;
-                ImGui::PopStyleColor(3);
-                ImGui::SameLine();
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      running ? ImVec4{0.16f, 0.34f, 0.52f, 1.0f} : ImVec4{0.14f, 0.38f, 0.28f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                      running ? ImVec4{0.20f, 0.43f, 0.65f, 1.0f} : ImVec4{0.18f, 0.49f, 0.36f, 1.0f});
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                                      running ? ImVec4{0.13f, 0.28f, 0.43f, 1.0f} : ImVec4{0.10f, 0.30f, 0.21f, 1.0f});
-                if (ImGui::Button(running ? "Pause" : "Resume", button_size))
-                  running = !running;
-                ImGui::PopStyleColor(3);
-                const float label_width =
-                    std::max(ImGui::CalcTextSize("Galaxy Number").x,
-                             ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize("VSync").x);
-                const float field_width = row_width - label_width - style.ItemSpacing.x;
-                ImGui::SetNextItemWidth(field_width);
-                ImGui::SliderFloat("##DeltaTime", &delta_t, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Delta Time");
-                ImGui::SetNextItemWidth(field_width);
-                ImGui::SliderInt("##GalaxyNumber", &galaxy_count, 1, 20);
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Galaxy Number");
-                ImGui::SeparatorText("ColorSpace");
-                ImGui::SetNextItemWidth(field_width);
-                if (ImGui::BeginCombo("##ColorSpace", ColorSpaceName(window->GetColorSpace()).c_str())) {
-                  for (auto space : spaces) {
-                    if (ImGui::Selectable(ColorSpaceName(space).c_str(), space == window->GetColorSpace())) {
-                      requested_space = space;
-                      output_change_requested = true;
-                    }
+
+    if (!PollEvents())
+      return 1;
+    if (window->ShouldClose())
+      break;
+    if (!window->UpdateImGui([&] {
+          if (show_gui) {
+            ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+            ImGui::SetNextWindowBgAlpha(0.9f);
+            ImGui::SetNextWindowSize({ImGui::GetFontSize() * 30.0f, 0}, ImGuiCond_Always);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {8.0f, 6.0f});
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+            if (ImGui::Begin(
+                    "NBody", nullptr,
+                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize)) {
+              ImGui::SeparatorText("Statistics");
+              ImGui::Text("Particles: %u", particle_count);
+              const double rate = fps.GetFPS();
+              ImGui::Text("FPS: %.1f", rate);
+              ImGui::Text("Frame Duration: %.3f ms", rate > 0 ? 1000.0 / rate : 0.0);
+              ImGui::Text("Estimated: %.2f TFLOP/s", running ? flops_per_frame * rate * 1e-12 : 0.0);
+              ImGui::SeparatorText("Control");
+              const auto &style = ImGui::GetStyle();
+              const float row_width = ImGui::GetContentRegionAvail().x;
+              const ImVec2 button_size{(row_width - style.ItemSpacing.x) * 0.5f, ImGui::GetFrameHeight() + 6.0f};
+              ImGui::PushStyleColor(ImGuiCol_Button, {0.20f, 0.25f, 0.32f, 1.0f});
+              ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0.28f, 0.35f, 0.44f, 1.0f});
+              ImGui::PushStyleColor(ImGuiCol_ButtonActive, {0.33f, 0.41f, 0.52f, 1.0f});
+              if (ImGui::Button("Reset", button_size))
+                reset_requested = true;
+              ImGui::PopStyleColor(3);
+              ImGui::SameLine();
+              ImGui::PushStyleColor(ImGuiCol_Button,
+                                    running ? ImVec4{0.16f, 0.34f, 0.52f, 1.0f} : ImVec4{0.14f, 0.38f, 0.28f, 1.0f});
+              ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                    running ? ImVec4{0.20f, 0.43f, 0.65f, 1.0f} : ImVec4{0.18f, 0.49f, 0.36f, 1.0f});
+              ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                    running ? ImVec4{0.13f, 0.28f, 0.43f, 1.0f} : ImVec4{0.10f, 0.30f, 0.21f, 1.0f});
+              if (ImGui::Button(running ? "Pause" : "Resume", button_size))
+                running = !running;
+              ImGui::PopStyleColor(3);
+              const float label_width =
+                  std::max(ImGui::CalcTextSize("Galaxy Number").x,
+                           ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize("VSync").x);
+              const float field_width = row_width - label_width - style.ItemSpacing.x;
+              ImGui::SetNextItemWidth(field_width);
+              ImGui::SliderFloat("##DeltaTime", &delta_t, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
+              ImGui::SameLine();
+              ImGui::TextUnformatted("Delta Time");
+              ImGui::SetNextItemWidth(field_width);
+              ImGui::SliderInt("##GalaxyNumber", &galaxy_count, 1, 20);
+              ImGui::SameLine();
+              ImGui::TextUnformatted("Galaxy Number");
+              ImGui::SeparatorText("ColorSpace");
+              ImGui::SetNextItemWidth(field_width);
+              if (ImGui::BeginCombo("##ColorSpace", ColorSpaceName(window->GetColorSpace()).c_str())) {
+                for (auto space : spaces) {
+                  if (ImGui::Selectable(ColorSpaceName(space).c_str(), space == window->GetColorSpace())) {
+                    requested_space = space;
+                    output_change_requested = true;
                   }
-                  ImGui::EndCombo();
                 }
-                ImGui::SameLine();
-                bool vsync = requested == PRESENT_MODE_VSYNC;
-                if (ImGui::Checkbox("VSync", &vsync)) {
-                  requested = vsync ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
-                  present_mode_changed = true;
-                }
-                if (!status.empty())
-                  ImGui::TextUnformatted(status.c_str());
-                ImGui::SeparatorText("Speed Distribution");
-                if (speeds_ready) {
-                  ImGui::PlotLines("##Speeds", normalized_speeds.data(), int(normalized_speeds.size()), 0, nullptr, 0,
-                                   1, {ImGui::GetContentRegionAvail().x, 80});
-                  ImGui::Text("Speed: 0 - %.3f", maximum_speed);
-                } else
-                  ImGui::TextUnformatted("Waiting for GPU readback...");
-                ImGui::SeparatorText("Instructions");
-                ImGui::TextWrapped("Galaxy count applies on Reset. Drag outside UI to rotate.");
-                ImGui::TextWrapped("I: show/hide GUI; P: VSync; Space: pause/resume; R: reset; Escape: close");
+                ImGui::EndCombo();
               }
-              ImGui::End();
-              ImGui::PopStyleVar(2);
+              ImGui::SameLine();
+              bool vsync = requested == PRESENT_MODE_VSYNC;
+              if (ImGui::Checkbox("VSync", &vsync)) {
+                requested = vsync ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
+                present_mode_changed = true;
+              }
+              if (!status.empty())
+                ImGui::TextUnformatted(status.c_str());
+              ImGui::SeparatorText("Speed Distribution");
+              if (speeds_ready) {
+                ImGui::PlotLines("##Speeds", normalized_speeds.data(), int(normalized_speeds.size()), 0, nullptr, 0, 1,
+                                 {ImGui::GetContentRegionAvail().x, 80});
+                ImGui::Text("Speed: 0 - %.3f", maximum_speed);
+              } else
+                ImGui::TextUnformatted("Waiting for GPU readback...");
+              ImGui::SeparatorText("Instructions");
+              ImGui::TextWrapped("Galaxy count applies on Reset. Drag outside UI to rotate.");
+              ImGui::TextWrapped("I: show/hide GUI; P: VSync; Space: pause/resume; R: reset; Escape: close");
             }
-            capture_keyboard = show_gui && ImGui::GetIO().WantCaptureKeyboard;
-            if (!show_gui || !ImGui::GetIO().WantCaptureMouse) {
-              rotation =
-                  glm::rotate(glm::mat4{1}, glm::radians(float(rotation_delta.x)), glm::vec3{0, 1, 0}) * rotation;
-              rotation =
-                  glm::rotate(glm::mat4{1}, glm::radians(float(rotation_delta.y)), glm::vec3{1, 0, 0}) * rotation;
-            }
-            rotation_delta = {};
-          }))
-        return 1;
-      if (output_change_requested) {
-        const auto next = requested_space;
-        output_change_requested = false;
-        if (next == window->GetColorSpace())
-          status.clear();
-        else if (!window->SetColorSpace(next))
-          status = "HDR mode unavailable; keeping the current output.";
-        else {
-          status.clear();
-          fps.Reset();
-          std::cout << "nbody: output " << ColorSpaceName(next) << '\n';
-        }
-      }
-      if (window->IsSwapChainInvalid()) {
-        if (!window->RebuildSwapChain())
-          return 1;
-      }
-      if (present_mode_changed) {
-        present_mode_changed = false;
-        if (!window->SetPresentMode(requested))
-          return 1;
-      }
-    }
-    const size_t slot = (static_cast<int64_t>(rendered) + 60) % targets.size();
-    if (headless) {
-      if (rendered == 0) {
-        for (auto &token : pending) {
-          if (token) {
-            if (!token->WaitHost())
-              return 1;
-            token = {};
+            ImGui::End();
+            ImGui::PopStyleVar(2);
           }
-        }
-        benchmark_start = std::chrono::steady_clock::now();
-      }
-      if (pending[slot]) {
-        if (!pending[slot]->WaitHost())
-          return 1;
-        pending[slot] = {};
+          capture_keyboard = show_gui && ImGui::GetIO().WantCaptureKeyboard;
+          if (!show_gui || !ImGui::GetIO().WantCaptureMouse) {
+            rotation = glm::rotate(glm::mat4{1}, glm::radians(float(rotation_delta.x)), glm::vec3{0, 1, 0}) * rotation;
+            rotation = glm::rotate(glm::mat4{1}, glm::radians(float(rotation_delta.y)), glm::vec3{1, 0, 0}) * rotation;
+          }
+          rotation_delta = {};
+        }))
+      return 1;
+    if (output_change_requested) {
+      const auto next = requested_space;
+      output_change_requested = false;
+      if (next == window->GetColorSpace())
+        status.clear();
+      else if (!window->SetColorSpace(next))
+        status = "HDR mode unavailable; keeping the current output.";
+      else {
+        status.clear();
+        fps.Reset();
+        std::cout << "nbody: output " << ColorSpaceName(next) << '\n';
       }
     }
-    ObjPtr<IImage> image;
-    if (headless)
-      image = targets[slot];
-    else
-      image = window->GetNextImage();
-    if (!image) {
-      if (headless)
+    if (window->IsSwapChainInvalid()) {
+      if (!window->RebuildSwapChain())
         return 1;
+    }
+    if (present_mode_changed) {
+      present_mode_changed = false;
+      if (!window->SetPresentMode(requested))
+        return 1;
+    }
+
+    ObjPtr<IImage> image = window->GetNextImage();
+    if (!image) {
       fps.Reset();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
@@ -433,10 +384,8 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       if (!radiance || !output_group->BindResource(1, radiance.Get()))
         return 1;
     }
-    if (headless)
-      frame_image = image;
-    else if (!frame_image || frame_image->GetDesc().width != extent.width ||
-             frame_image->GetDesc().height != extent.height) {
+    if (!frame_image || frame_image->GetDesc().width != extent.width ||
+        frame_image->GetDesc().height != extent.height) {
       frame_image = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
       if (!frame_image)
         return 1;
@@ -462,8 +411,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     const auto view = glm::lookAt(glm::vec3(10, 20, 30), glm::vec3(0), glm::vec3(0, 1, 0)) * rotation;
     Camera camera{glm::perspective(glm::radians(60.0f), float(extent.width) / extent.height, 0.1f, 100.0f) * view,
                   glm::inverse(view), 0.07f};
-    if (!context->CmdUploadBuffer(camera_uniform.Get(), 0, &camera, sizeof(camera)))
-      return 1;
+    RETURN_IF_FAIL(context->CmdUploadBuffer(camera_uniform.Get(), 0, &camera, sizeof(camera)));
     if (reset_requested) {
       if (!reset_particles(context.Get()))
         return 1;
@@ -472,78 +420,50 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
     }
     if (running) {
       const Simulation settings{particle_count, delta_t, 100.0f / particle_count};
-      if (!context->CmdUploadBuffer(simulation_uniform.Get(), 0, &settings, sizeof(settings)) ||
-          !context->CmdBindComputeProgram(compute.Get()) || !context->CmdBindGroup(0, simulation_group.Get()) ||
-          !context->CmdDispatch(particle_count / 128) ||
-          !context->CmdCopyBuffer(next_positions.Get(), 0, positions.Get(), 0, bytes))
-        return 1;
+      RETURN_IF_FAIL(context->CmdUploadBuffer(simulation_uniform.Get(), 0, &settings, sizeof(settings)));
+      RETURN_IF_FAIL(context->CmdBindComputeProgram(compute.Get()));
+      RETURN_IF_FAIL(context->CmdBindGroup(0, simulation_group.Get()));
+      RETURN_IF_FAIL(context->CmdDispatch(particle_count / 128));
+      RETURN_IF_FAIL(context->CmdCopyBuffer(next_positions.Get(), 0, positions.Get(), 0, bytes));
     }
-    if (!context->CmdBindProgram(program.Get()))
-      return 1;
-    if (!context->CmdBindGroup(0, camera_group.Get()))
-      return 1;
-    if (!context->CmdBeginRendering(
-            {{{radiance.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}))
-      return 1;
-    if (!context->CmdBindVertexBuffer(0, positions.Get()))
-      return 1;
-    if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
-      return 1;
-    if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
-      return 1;
-    if (!context->CmdDraw(6, particle_count))
-      return 1;
-    if (!context->CmdEndRendering())
-      return 1;
-    const float display[4] = {headless ? 1.0f : window->GetHDRHeadroom(), 0, 0, 0};
-    if (!context->CmdUploadBuffer(output_uniform.Get(), 0, display, sizeof(display)) ||
-        !context->CmdBindProgram(output_program.Get()) || !context->CmdBindGroup(0, output_group.Get()) ||
-        !context->CmdBeginRendering({{{frame_image.Get(), ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE}}}) ||
-        !context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}) ||
-        !context->CmdSetScissor({0, 0, extent.width, extent.height}) || !context->CmdDraw(3) ||
-        !context->CmdEndRendering())
-      return 1;
-    if (!headless) {
-      if (!context->CmdDrawImGui(window.Get(), frame_image.Get()) ||
-          !context->CmdPresentImage(window.Get(), frame_image.Get(), COLOR_SPACE_BT709_LINEAR))
-        return 1;
-    }
+    RETURN_IF_FAIL(context->CmdBindProgram(program.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, camera_group.Get()));
+    RETURN_IF_FAIL(context->CmdBeginRendering(
+        {{{radiance.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+    RETURN_IF_FAIL(context->CmdBindVertexBuffer(0, positions.Get()));
+    RETURN_IF_FAIL(
+        context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}));
+    RETURN_IF_FAIL(context->CmdSetScissor({0, 0, extent.width, extent.height}));
+    RETURN_IF_FAIL(context->CmdDraw(6, particle_count));
+    RETURN_IF_FAIL(context->CmdEndRendering());
+    const float display[4] = {window->GetHDRHeadroom(), 0, 0, 0};
+    RETURN_IF_FAIL(context->CmdUploadBuffer(output_uniform.Get(), 0, display, sizeof(display)));
+    RETURN_IF_FAIL(context->CmdBindProgram(output_program.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, output_group.Get()));
+    RETURN_IF_FAIL(
+        context->CmdBeginRendering({{{frame_image.Get(), ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE}}}));
+    RETURN_IF_FAIL(context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}));
+    RETURN_IF_FAIL(context->CmdSetScissor({0, 0, extent.width, extent.height}));
+    RETURN_IF_FAIL(context->CmdDraw(3));
+    RETURN_IF_FAIL(context->CmdEndRendering());
+
+    RETURN_IF_FAIL(context->CmdDrawImGui(window.Get(), frame_image.Get()));
+    RETURN_IF_FAIL(context->CmdPresentImage(window.Get(), frame_image.Get(), COLOR_SPACE_BT709_LINEAR));
+
     if (!velocity_download) {
       velocity_download = context->CmdDownloadBuffer(velocities.Get(), 0, particle_count * sizeof(glm::vec3));
       if (!velocity_download)
         return 1;
     }
-    if (!capture_directory.empty()) {
-      last_frame = context->CmdDownloadImage(image.Get());
-      if (!last_frame)
-        return 1;
-      last_frame_desc = image->GetDesc();
-      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_BT709_LINEAR;
-      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
-    }
+
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
     if (!token)
       return 1;
-    if (headless)
-      pending[slot] = std::move(token);
-    ++rendered;
+
     fps.TickFrame();
   }
-  if (headless) {
-    for (const auto &token : pending) {
-      if (token) {
-        if (!token->WaitHost())
-          return 1;
-      }
-    }
-    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format("nbody: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
-                             rendered, seconds, rendered / seconds);
-    std::cout << fmt::format(
-        "nbody: {} particles, {} FLOP/frame, estimated {:.3f} TFLOP/s (20 FLOP/interaction, whole-frame time)\n",
-        particle_count, flops_per_frame, flops_per_frame * (rendered / seconds) * 1e-12);
-  }
+
   if (velocity_download && !velocity_download->WaitHost())
     return 1;
   if (!update_speeds())
@@ -551,29 +471,9 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
   if (speeds_ready) {
     std::cout << "nbody: downloaded " << particle_count << " particle velocities, max speed " << maximum_speed
               << ", 100 histogram bins\n";
-    if (!capture_directory.empty()) {
-      std::error_code error;
-      const auto path = std::filesystem::u8path(capture_directory);
-      std::filesystem::create_directories(path, error);
-      if (error)
-        return 1;
-      std::ofstream file(path / "nbody_speeds.csv");
-      file << "speed_min,speed_max,count,normalized\n";
-      for (size_t i = 0; i < speed_counts.size(); ++i)
-        file << maximum_speed * i / speed_counts.size() << ',' << maximum_speed * (i + 1) / speed_counts.size() << ','
-             << speed_counts[i] << ',' << normalized_speeds[i] << '\n';
-      file.close();
-      if (!file)
-        return 1;
-    }
   }
-  if (!capture_directory.empty()) {
-    if (!last_frame || !last_frame->WaitHost())
-      return 1;
-    std::vector<uint8_t> pixels(last_frame->GetSize());
-    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "nbody", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
-      return 1;
-  }
+
   return 0;
 }
+
+#undef RETURN_IF_FAIL

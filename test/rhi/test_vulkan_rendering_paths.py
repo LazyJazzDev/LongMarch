@@ -2,7 +2,7 @@
 
 Requires the Vulkan SDK API-dump, validation and Profiles layers.
 A desktop is only required without --headless.
-Usage: python test_vulkan_rendering_paths.py <rhi_hello> [<rhix_hello>] [--headless]
+Usage: python test_vulkan_rendering_paths.py <rhix_hello> [--headless]
 Profiles only constrain capabilities; the real driver still executes the commands.
 """
 
@@ -16,6 +16,10 @@ import tempfile
 
 
 def check_path(executable, mode, directory, headless=False):
+    help_text = subprocess.check_output([str(executable), "--help"], text=True)
+    if "--frames" not in help_text:
+        raise RuntimeError("This regression needs a bounded benchmark demo (e.g. rhix_hello); "
+                           "rhi_hello is interactive and has no frame-limit or headless mode.")
     settings = [
         "khronos_validation.validate_sync = true",
         "khronos_validation.debug_action = VK_DBG_LAYER_ACTION_LOG_MSG",
