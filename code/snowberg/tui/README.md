@@ -174,7 +174,7 @@ snowberg::tui::MessageBox message;
 message.Show("Unsupported feature", "The selected device does not support ray queries.");
 ```
 
-`Show(title, message)` draws a centered character frame, an inverse-color title strip,
+`Show(title, message)` draws a centered character frame, an inverse-color title centered in the top border,
 padded message text and a centered `[ OK ]` button, without an operation-hint footer.
 Enter, Escape, Space or clicking OK closes the dialog. Messages wrap to the
 terminal width; Up/Down, PageUp/PageDown and the mouse wheel scroll long messages.

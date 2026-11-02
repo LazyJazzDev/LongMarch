@@ -132,11 +132,10 @@ void MessageBox::OnUpdate() {
   if (height_ > 1)
     UpdateRow(upper_ + height_ - 1, left_, border);
 
-  // A full title strip and whitespace surround the body and the confirmation button.
-  const auto title = detail::FitRow(" " + title_, inside).text;
+  // Center the inverse title within the top border, measured in terminal cells.
+  const auto title = detail::FitRow(" " + title_ + " ", inside).text;
   SetInverse(true);
-  UpdateRow(upper_ + (height_ >= 8 ? 1 : 0), left_ + 1,
-            title + std::string(std::max(0, inside - detail::TextWidth(title)), ' '));
+  UpdateRow(upper_, left_ + (width_ - detail::TextWidth(title)) / 2, title);
   SetInverse(false);
   for (int row = 0; row < visible_ && top_ + row < int(lines_.size()); ++row)
     UpdateRow(text_row_ + row, text_column_, lines_[top_ + row]);
