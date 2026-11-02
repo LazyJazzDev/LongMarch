@@ -3,6 +3,13 @@
 
 #include "grassland/rhi/rhi.h"
 
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
 int RunWindow(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
   ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "RHI window - Escape: close"});
@@ -26,9 +33,9 @@ int RunWindow(grassland::rhi::IDevice *device) {
       continue;
     }
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
-    if (!commands || !commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}) ||
-        !commands->CmdPresent(window.Get()))
-      return 1;
+    RETURN_IF_FAIL(commands);
+    RETURN_IF_FAIL(commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}));
+    RETURN_IF_FAIL(commands->CmdPresent(window.Get()));
     // Submit borrows commands; accepted GPU work retains its resources until completion.
     ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
     if (!done)
@@ -36,3 +43,5 @@ int RunWindow(grassland::rhi::IDevice *device) {
   }
   return 0;
 }
+
+#undef RETURN_IF_FAIL

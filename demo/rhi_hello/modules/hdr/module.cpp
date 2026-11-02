@@ -11,6 +11,13 @@
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
 
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
 namespace {
 #include "shaders/hdr.slang.h"
 }
@@ -142,16 +149,17 @@ int RunHDR(grassland::rhi::IDevice *device) {
       std::cout << "Rendering " << ColorSpaceName(color_space) << " / " << ImageFormatName(extent.format) << '\n';
     }
     ObjPtr<ICommandContext> context = device->CreateCommandContext();
-    if (!context || !context->CmdUploadBuffer(settings_buffer.Get(), 0, settings, sizeof(settings)) ||
-        !context->CmdBindProgram(program.Get()) || !context->CmdBindGroup(0, settings_group.Get()) ||
-        !context->CmdBeginRendering(
-            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}) ||
-        !context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}) ||
-        !context->CmdSetScissor({0, 0, extent.width, extent.height}) || !context->CmdDraw(3) ||
-        !context->CmdEndRendering())
-      return 1;
-    if (!context->CmdPresent(window.Get()))
-      return 1;
+    RETURN_IF_FAIL(context);
+    RETURN_IF_FAIL(context->CmdUploadBuffer(settings_buffer.Get(), 0, settings, sizeof(settings)));
+    RETURN_IF_FAIL(context->CmdBindProgram(program.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, settings_group.Get()));
+    RETURN_IF_FAIL(context->CmdBeginRendering(
+        {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+    RETURN_IF_FAIL(context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}));
+    RETURN_IF_FAIL(context->CmdSetScissor({0, 0, extent.width, extent.height}));
+    RETURN_IF_FAIL(context->CmdDraw(3));
+    RETURN_IF_FAIL(context->CmdEndRendering());
+    RETURN_IF_FAIL(context->CmdPresent(window.Get()));
 
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
@@ -173,3 +181,5 @@ int RunHDR(grassland::rhi::IDevice *device) {
 
   return 0;
 }
+
+#undef RETURN_IF_FAIL

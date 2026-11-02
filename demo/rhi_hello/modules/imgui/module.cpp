@@ -8,6 +8,13 @@
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
 
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
 int RunImGui(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
 
@@ -77,10 +84,8 @@ int RunImGui(grassland::rhi::IDevice *device) {
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     if (!commands)
       return 1;
-    if (!commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
-      return 1;
-    if (!commands->CmdPresent(window.Get()))
-      return 1;
+    RETURN_IF_FAIL(commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}));
+    RETURN_IF_FAIL(commands->CmdPresent(window.Get()));
 
     ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
 
@@ -97,3 +102,5 @@ int RunImGui(grassland::rhi::IDevice *device) {
 
   return 0;
 }
+
+#undef RETURN_IF_FAIL

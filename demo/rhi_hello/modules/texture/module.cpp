@@ -5,6 +5,13 @@
 
 #include "grassland/rhi/rhi.h"
 
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
 namespace {
 #include "shaders/texture.slang.h"
 
@@ -72,18 +79,15 @@ int RunTexture(grassland::rhi::IDevice *device) {
     ObjPtr<ICommandContext> upload = device->CreateCommandContext();
     if (!upload)
       return 1;
-    if (!upload->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)))
-      return 1;
-    if (!upload->CmdUploadBuffer(index_buffer.Get(), 0, indices, sizeof(indices)))
-      return 1;
+    RETURN_IF_FAIL(upload->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)));
+    RETURN_IF_FAIL(upload->CmdUploadBuffer(index_buffer.Get(), 0, indices, sizeof(indices)));
     std::array<uint32_t, 256 * 256> pixels;
     for (uint32_t y = 0; y < 256; ++y)
       for (uint32_t x = 0; x < 256; ++x) {
         uint32_t v = x ^ y;
         pixels[y * 256 + x] = v | (v << 8) | (v << 16) | 0xff000000;
       }
-    if (!upload->CmdUploadImage(texture.Get(), pixels.data(), 256 * 4))
-      return 1;
+    RETURN_IF_FAIL(upload->CmdUploadImage(texture.Get(), pixels.data(), 256 * 4));
     ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
     if (!uploaded)
       return 1;
@@ -115,28 +119,19 @@ int RunTexture(grassland::rhi::IDevice *device) {
     ObjPtr<ICommandContext> context = device->CreateCommandContext();
     if (!context)
       return 1;
-    if (!context->CmdBindProgram(program.Get()))
-      return 1;
-    if (!context->CmdBindGroup(0, group.Get()))
-      return 1;
-    if (!context->CmdBeginRendering(
-            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}}}))
-      return 1;
-    if (!context->CmdBindVertexBuffer(0, vertex_buffer.Get()))
-      return 1;
-    if (!context->CmdBindIndexBuffer(index_buffer.Get()))
-      return 1;
-    if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
-      return 1;
-    if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
-      return 1;
-    if (!context->CmdDrawIndexed(3))
-      return 1;
-    if (!context->CmdEndRendering())
-      return 1;
+    RETURN_IF_FAIL(context->CmdBindProgram(program.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, group.Get()));
+    RETURN_IF_FAIL(context->CmdBeginRendering(
+        {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}}}));
+    RETURN_IF_FAIL(context->CmdBindVertexBuffer(0, vertex_buffer.Get()));
+    RETURN_IF_FAIL(context->CmdBindIndexBuffer(index_buffer.Get()));
+    RETURN_IF_FAIL(
+        context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}));
+    RETURN_IF_FAIL(context->CmdSetScissor({0, 0, extent.width, extent.height}));
+    RETURN_IF_FAIL(context->CmdDrawIndexed(3));
+    RETURN_IF_FAIL(context->CmdEndRendering());
 
-    if (!context->CmdPresent(window.Get()))
-      return 1;
+    RETURN_IF_FAIL(context->CmdPresent(window.Get()));
 
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
@@ -146,3 +141,5 @@ int RunTexture(grassland::rhi::IDevice *device) {
 
   return 0;
 }
+
+#undef RETURN_IF_FAIL

@@ -7,6 +7,13 @@
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
 
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
 int RunImGuiMultiWindow(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
 
@@ -111,10 +118,8 @@ int RunImGuiMultiWindow(grassland::rhi::IDevice *device) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       if (!commands)
         return 1;
-      if (!commands->CmdClearImage(image.Get(), colors[i]))
-        return 1;
-      if (!commands->CmdPresent(window.Get()))
-        return 1;
+      RETURN_IF_FAIL(commands->CmdClearImage(image.Get(), colors[i]));
+      RETURN_IF_FAIL(commands->CmdPresent(window.Get()));
 
       pending[i] = queue->Submit(commands.Get());
 
@@ -137,3 +142,5 @@ int RunImGuiMultiWindow(grassland::rhi::IDevice *device) {
 
   return 0;
 }
+
+#undef RETURN_IF_FAIL

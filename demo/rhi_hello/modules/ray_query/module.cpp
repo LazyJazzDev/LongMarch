@@ -10,6 +10,13 @@
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
 namespace {
 #include "shaders/display.slang.h"
 #include "shaders/trace.slang.h"
@@ -88,16 +95,11 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
     ObjPtr<ICommandContext> build = device->CreateCommandContext();
     if (!build)
       return 1;
-    if (!build->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)))
-      return 1;
-    if (!build->CmdUploadBuffer(aabb_buffer.Get(), 0, bounds, sizeof(bounds)))
-      return 1;
-    if (!build->CmdBuildBottomLevelAccelerationStructure(triangle.Get(), {{{vertex_buffer.Get()}, {}}}))
-      return 1;
-    if (!build->CmdBuildBottomLevelAccelerationStructure(sphere.Get(), {{{aabb_buffer.Get()}, {}}}))
-      return 1;
-    if (!build->CmdQueryCompactedSize(triangle.Get()))
-      return 1;
+    RETURN_IF_FAIL(build->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)));
+    RETURN_IF_FAIL(build->CmdUploadBuffer(aabb_buffer.Get(), 0, bounds, sizeof(bounds)));
+    RETURN_IF_FAIL(build->CmdBuildBottomLevelAccelerationStructure(triangle.Get(), {{{vertex_buffer.Get()}, {}}}));
+    RETURN_IF_FAIL(build->CmdBuildBottomLevelAccelerationStructure(sphere.Get(), {{{aabb_buffer.Get()}, {}}}));
+    RETURN_IF_FAIL(build->CmdQueryCompactedSize(triangle.Get()));
     ObjPtr<ISubmissionToken> token = queue->Submit(build.Get());
     if (!token)
       return 1;
@@ -112,8 +114,7 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
     ObjPtr<ICommandContext> copy = device->CreateCommandContext();
     if (!copy)
       return 1;
-    if (!copy->CmdCompactAccelerationStructure(triangle.Get(), compact.Get()))
-      return 1;
+    RETURN_IF_FAIL(copy->CmdCompactAccelerationStructure(triangle.Get(), compact.Get()));
     token = queue->Submit(copy.Get());
     if (!token)
       return 1;
@@ -130,8 +131,7 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
     ObjPtr<ICommandContext> build = device->CreateCommandContext();
     if (!build)
       return 1;
-    if (!build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances))
-      return 1;
+    RETURN_IF_FAIL(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances));
     ObjPtr<ISubmissionToken> token = queue->Submit(build.Get());
     if (!token)
       return 1;
@@ -209,8 +209,7 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
       CameraInfo camera{
           glm::inverse(glm::perspective(glm::radians(60.0f), float(extent.width) / float(extent.height), 0.1f, 10.0f)),
           glm::inverse(glm::lookAt(glm::vec3{0, 0, 5}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0}))};
-      if (!context->CmdUploadBuffer(camera_buffer.Get(), 0, &camera, sizeof(camera)))
-        return 1;
+      RETURN_IF_FAIL(context->CmdUploadBuffer(camera_buffer.Get(), 0, &camera, sizeof(camera)));
     }
     // Match graphics_hello: one Y-axis revolution every two seconds.
     const float angle =
@@ -219,32 +218,22 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
                               -std::sin(angle), 0, std::cos(angle), 0};
     instances[1].transform = {std::cos(angle),  0, std::sin(angle) * 0.5f, 2, 0, 1, 0, 0,
                               -std::sin(angle), 0, std::cos(angle) * 0.5f, 0};
-    if (!context->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances, ACCELERATION_STRUCTURE_UPDATE))
-      return 1;
-    if (!context->CmdBindComputeProgram(trace.Get()))
-      return 1;
-    if (!context->CmdBindGroup(0, trace_group.Get()))
-      return 1;
-    if (!context->CmdDispatch((extent.width + 7) / 8, (extent.height + 7) / 8))
-      return 1;
-    if (!context->CmdBindProgram(program.Get()))
-      return 1;
-    if (!context->CmdBindGroup(0, display_group.Get()))
-      return 1;
-    if (!context->CmdBeginRendering(
-            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}))
-      return 1;
-    if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
-      return 1;
-    if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
-      return 1;
-    if (!context->CmdDraw(3))
-      return 1;
-    if (!context->CmdEndRendering())
-      return 1;
+    RETURN_IF_FAIL(
+        context->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances, ACCELERATION_STRUCTURE_UPDATE));
+    RETURN_IF_FAIL(context->CmdBindComputeProgram(trace.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, trace_group.Get()));
+    RETURN_IF_FAIL(context->CmdDispatch((extent.width + 7) / 8, (extent.height + 7) / 8));
+    RETURN_IF_FAIL(context->CmdBindProgram(program.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, display_group.Get()));
+    RETURN_IF_FAIL(context->CmdBeginRendering(
+        {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+    RETURN_IF_FAIL(
+        context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}));
+    RETURN_IF_FAIL(context->CmdSetScissor({0, 0, extent.width, extent.height}));
+    RETURN_IF_FAIL(context->CmdDraw(3));
+    RETURN_IF_FAIL(context->CmdEndRendering());
 
-    if (!context->CmdPresent(window.Get()))
-      return 1;
+    RETURN_IF_FAIL(context->CmdPresent(window.Get()));
 
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
@@ -262,3 +251,5 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
 
   return 0;
 }
+
+#undef RETURN_IF_FAIL

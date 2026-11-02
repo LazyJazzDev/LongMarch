@@ -5,6 +5,13 @@
 
 #include "grassland/rhi/rhi.h"
 
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
 namespace {
 #include "shaders/cube.slang.h"
 
@@ -75,10 +82,8 @@ int RunCube(grassland::rhi::IDevice *device) {
     ObjPtr<ICommandContext> upload = device->CreateCommandContext();
     if (!upload)
       return 1;
-    if (!upload->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)))
-      return 1;
-    if (!upload->CmdUploadBuffer(index_buffer.Get(), 0, indices, sizeof(indices)))
-      return 1;
+    RETURN_IF_FAIL(upload->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)));
+    RETURN_IF_FAIL(upload->CmdUploadBuffer(index_buffer.Get(), 0, indices, sizeof(indices)));
     ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
     if (!uploaded)
       return 1;
@@ -122,38 +127,28 @@ int RunCube(grassland::rhi::IDevice *device) {
     ubo.model = glm::rotate(glm::mat4(1), angle, glm::vec3(0, 1, 0));
     ubo.view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0), glm::vec3(0, 1, 0));
     ubo.projection = glm::perspectiveZO(glm::radians(45.0f), float(extent.width) / extent.height, 3.5f, 6.5f);
-    if (!context->CmdUploadBuffer(uniform.Get(), 0, &ubo, sizeof(ubo)))
-      return 1;
+    RETURN_IF_FAIL(context->CmdUploadBuffer(uniform.Get(), 0, &ubo, sizeof(ubo)));
     if (!depth || depth->GetDesc().width != extent.width || depth->GetDesc().height != extent.height) {
       depth = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_D32_SFLOAT});
       if (!depth)
         return 1;
     }
-    if (!context->CmdBindProgram(program.Get()))
-      return 1;
-    if (!context->CmdBindGroup(0, group.Get()))
-      return 1;
+    RETURN_IF_FAIL(context->CmdBindProgram(program.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, group.Get()));
     grassland::rhi::RenderingInfo render;
     render.color_attachments = {{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {.6f, .7f, .8f, 1}}};
     render.depth_stencil.image = depth.Get();
     render.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-    if (!context->CmdBeginRendering(render))
-      return 1;
-    if (!context->CmdBindVertexBuffer(0, vertex_buffer.Get()))
-      return 1;
-    if (!context->CmdBindIndexBuffer(index_buffer.Get()))
-      return 1;
-    if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
-      return 1;
-    if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
-      return 1;
-    if (!context->CmdDrawIndexed(36))
-      return 1;
-    if (!context->CmdEndRendering())
-      return 1;
+    RETURN_IF_FAIL(context->CmdBeginRendering(render));
+    RETURN_IF_FAIL(context->CmdBindVertexBuffer(0, vertex_buffer.Get()));
+    RETURN_IF_FAIL(context->CmdBindIndexBuffer(index_buffer.Get()));
+    RETURN_IF_FAIL(
+        context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}));
+    RETURN_IF_FAIL(context->CmdSetScissor({0, 0, extent.width, extent.height}));
+    RETURN_IF_FAIL(context->CmdDrawIndexed(36));
+    RETURN_IF_FAIL(context->CmdEndRendering());
 
-    if (!context->CmdPresent(window.Get()))
-      return 1;
+    RETURN_IF_FAIL(context->CmdPresent(window.Get()));
 
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
@@ -163,3 +158,5 @@ int RunCube(grassland::rhi::IDevice *device) {
 
   return 0;
 }
+
+#undef RETURN_IF_FAIL

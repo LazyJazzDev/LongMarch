@@ -15,6 +15,13 @@
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
 
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
 namespace {
 #include "shaders/nbody.slang.h"
 #include "shaders/particle.slang.h"
@@ -404,8 +411,7 @@ int RunNBody(grassland::rhi::IDevice *device) {
     const auto view = glm::lookAt(glm::vec3(10, 20, 30), glm::vec3(0), glm::vec3(0, 1, 0)) * rotation;
     Camera camera{glm::perspective(glm::radians(60.0f), float(extent.width) / extent.height, 0.1f, 100.0f) * view,
                   glm::inverse(view), 0.07f};
-    if (!context->CmdUploadBuffer(camera_uniform.Get(), 0, &camera, sizeof(camera)))
-      return 1;
+    RETURN_IF_FAIL(context->CmdUploadBuffer(camera_uniform.Get(), 0, &camera, sizeof(camera)));
     if (reset_requested) {
       if (!reset_particles(context.Get()))
         return 1;
@@ -414,41 +420,35 @@ int RunNBody(grassland::rhi::IDevice *device) {
     }
     if (running) {
       const Simulation settings{particle_count, delta_t, 100.0f / particle_count};
-      if (!context->CmdUploadBuffer(simulation_uniform.Get(), 0, &settings, sizeof(settings)) ||
-          !context->CmdBindComputeProgram(compute.Get()) || !context->CmdBindGroup(0, simulation_group.Get()) ||
-          !context->CmdDispatch(particle_count / 128) ||
-          !context->CmdCopyBuffer(next_positions.Get(), 0, positions.Get(), 0, bytes))
-        return 1;
+      RETURN_IF_FAIL(context->CmdUploadBuffer(simulation_uniform.Get(), 0, &settings, sizeof(settings)));
+      RETURN_IF_FAIL(context->CmdBindComputeProgram(compute.Get()));
+      RETURN_IF_FAIL(context->CmdBindGroup(0, simulation_group.Get()));
+      RETURN_IF_FAIL(context->CmdDispatch(particle_count / 128));
+      RETURN_IF_FAIL(context->CmdCopyBuffer(next_positions.Get(), 0, positions.Get(), 0, bytes));
     }
-    if (!context->CmdBindProgram(program.Get()))
-      return 1;
-    if (!context->CmdBindGroup(0, camera_group.Get()))
-      return 1;
-    if (!context->CmdBeginRendering(
-            {{{radiance.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}))
-      return 1;
-    if (!context->CmdBindVertexBuffer(0, positions.Get()))
-      return 1;
-    if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
-      return 1;
-    if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
-      return 1;
-    if (!context->CmdDraw(6, particle_count))
-      return 1;
-    if (!context->CmdEndRendering())
-      return 1;
+    RETURN_IF_FAIL(context->CmdBindProgram(program.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, camera_group.Get()));
+    RETURN_IF_FAIL(context->CmdBeginRendering(
+        {{{radiance.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+    RETURN_IF_FAIL(context->CmdBindVertexBuffer(0, positions.Get()));
+    RETURN_IF_FAIL(
+        context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}));
+    RETURN_IF_FAIL(context->CmdSetScissor({0, 0, extent.width, extent.height}));
+    RETURN_IF_FAIL(context->CmdDraw(6, particle_count));
+    RETURN_IF_FAIL(context->CmdEndRendering());
     const float display[4] = {window->GetHDRHeadroom(), 0, 0, 0};
-    if (!context->CmdUploadBuffer(output_uniform.Get(), 0, display, sizeof(display)) ||
-        !context->CmdBindProgram(output_program.Get()) || !context->CmdBindGroup(0, output_group.Get()) ||
-        !context->CmdBeginRendering({{{frame_image.Get(), ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE}}}) ||
-        !context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}) ||
-        !context->CmdSetScissor({0, 0, extent.width, extent.height}) || !context->CmdDraw(3) ||
-        !context->CmdEndRendering())
-      return 1;
+    RETURN_IF_FAIL(context->CmdUploadBuffer(output_uniform.Get(), 0, display, sizeof(display)));
+    RETURN_IF_FAIL(context->CmdBindProgram(output_program.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, output_group.Get()));
+    RETURN_IF_FAIL(
+        context->CmdBeginRendering({{{frame_image.Get(), ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE}}}));
+    RETURN_IF_FAIL(context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}));
+    RETURN_IF_FAIL(context->CmdSetScissor({0, 0, extent.width, extent.height}));
+    RETURN_IF_FAIL(context->CmdDraw(3));
+    RETURN_IF_FAIL(context->CmdEndRendering());
 
-    if (!context->CmdDrawImGui(window.Get(), frame_image.Get()) ||
-        !context->CmdPresentImage(window.Get(), frame_image.Get(), COLOR_SPACE_BT709_LINEAR))
-      return 1;
+    RETURN_IF_FAIL(context->CmdDrawImGui(window.Get(), frame_image.Get()));
+    RETURN_IF_FAIL(context->CmdPresentImage(window.Get(), frame_image.Get(), COLOR_SPACE_BT709_LINEAR));
 
     if (!velocity_download) {
       velocity_download = context->CmdDownloadBuffer(velocities.Get(), 0, particle_count * sizeof(glm::vec3));
@@ -475,3 +475,5 @@ int RunNBody(grassland::rhi::IDevice *device) {
 
   return 0;
 }
+
+#undef RETURN_IF_FAIL
