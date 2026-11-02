@@ -18,6 +18,16 @@ int main(int argc, char **argv) {
   cursor.bVisible = FALSE;
   SetConsoleCursorInfo(output, &cursor);
 #endif
+  if (argc > 1 && std::string(argv[1]) == "--message-box") {
+    snowberg::tui::MessageBox message;
+    std::string content = "First message line\n";
+    for (int i = 0; i < 30; ++i)
+      content += "Line " + std::to_string(i) + " with text that wraps in narrow terminals.\n";
+    content += "END_OF_MESSAGE";
+    if (!message.Show("Message box probe", content))
+      return 0;
+    return message.Show("Second message", "Reusable message box") ? 20 : 0;
+  }
   std::vector<snowberg::tui::MenuOption> options;
   for (int i = 0; i < 20; ++i)
     options.push_back({"item" + std::to_string(i), "A long description that eventually reveals END_OF_DESCRIPTION"});

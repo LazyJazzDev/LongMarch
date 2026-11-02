@@ -90,6 +90,33 @@ class Terminal:
 
 
 class PtyMenuTest(unittest.TestCase):
+    def test_message_box_blocks_scrolls_resizes_and_reuses(self):
+        with Terminal([PROBE, "--message-box"], columns=32, rows=8) as terminal:
+            terminal.until(lambda: b"First message line" in terminal.output)
+            terminal.read(0.15)
+            self.assertIsNone(terminal.process.poll())
+            terminal.output = b""
+            terminal.send(b"\x1b[6~" * 30)
+            terminal.until(lambda: b"END_OF_MESSAGE" in terminal.output)
+            terminal.resize(60, 12)
+            terminal.until(lambda: b"\x1b[12;1H" in terminal.output)
+            terminal.send(b"\r")
+            terminal.until(lambda: b"Second message" in terminal.output)
+            terminal.send(b" ")
+            terminal.finish(20)
+
+    def test_message_box_console_and_eof(self):
+        for text, expected in (("\n\n", 20), ("", 0)):
+            result = subprocess.run([PROBE, "--message-box"], input=text, text=True,
+                                    capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+            self.assertIn("Press Enter to continue", result.stdout)
+            self.assertIn("+" + "-" * 74 + "+", result.stdout)
+            self.assertIn("| Message box probe", result.stdout)
+            self.assertIn("| First message line", result.stdout)
+            self.assertNotIn("\x1b", result.stdout)
+
+
     def test_core_callbacks_colors_clipping_and_queue(self):
         core = str(pathlib.Path(PROBE).with_name("tui_core_probe"))
         with Terminal([core], columns=20, rows=6) as terminal:
