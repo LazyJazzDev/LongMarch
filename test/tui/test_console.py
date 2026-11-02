@@ -164,6 +164,19 @@ class Console:
 
 
 class NativeMenuTests(unittest.TestCase):
+    def test_message_box_scroll_resize_and_reuse(self):
+        with Console(PROBE, ("--message-box",), "Message box probe") as terminal:
+            terminal.wait_text("[ OK ]")
+            terminal.key(0x22, repeat=6)
+            terminal.wait_text("END_OF_MESSAGE")
+            terminal.resize(60, 18)
+            terminal.wait_text("[ OK ]")
+            terminal.key(0x0D)
+            terminal.wait_text("Second message")
+            terminal.wait_text("Reusable message box")
+            terminal.key(0x1B)
+            terminal.finish(20)
+
     def test_keyboard_selection_and_restore(self):
         with Console() as terminal:
             terminal.key(0x28)
