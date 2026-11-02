@@ -6,10 +6,6 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanCore final : public Core {
  public:
-  BackendAPI GetBackendAPI() const override {
-    return BACKEND_API_VULKAN;
-  }
-
   static VulkanCore *CreateVulkanCore(const CoreDesc &desc);
   ~VulkanCore() override;
   VkInstance Instance() const;

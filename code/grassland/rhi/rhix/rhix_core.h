@@ -11,7 +11,6 @@ class Core : public ObjectContainer {
   Core(rhi::ICore *object) noexcept;
   rhi::ICore *Get() const noexcept;
   Core() noexcept;
-  rhi::BackendAPI GetBackendAPI() const;
   // Vector indices are stable device IDs for the lifetime of this Core.
   [[nodiscard]] std::vector<rhi::PhysicalDevice> GetPhysicalDevices() const;
   Device CreateDevice(int32_t device_idx) const;

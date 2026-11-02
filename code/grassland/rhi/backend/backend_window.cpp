@@ -18,8 +18,7 @@
 
 namespace grassland::rhi::backend {
 
-Window::Window(Device *device) : device_(device) {
-}
+Window::Window() = default;
 
 bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_size) {
   if (!glfw::IsWindowThread() || processing_imgui_)

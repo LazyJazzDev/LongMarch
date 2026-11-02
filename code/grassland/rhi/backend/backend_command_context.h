@@ -10,8 +10,6 @@
 
 namespace grassland::rhi::backend {
 
-class HeadlessWindow;
-
 class CommandContext : public Object<rhi::ICommandContext> {
  public:
   bool CmdDrawImGui(IWindow *window, IImage *target) override;
@@ -78,7 +76,6 @@ class CommandContext : public Object<rhi::ICommandContext> {
   virtual SubmissionStatus WaitForProgress() = 0;
 
  protected:
-  bool RecordHeadlessPresent(HeadlessWindow *window);
   // Call before encoding each resource use. Retains each exact object once.
   IDownloadToken *RegisterDownload(ObjectPtr<DownloadToken> token);
   bool RetainResource(rhi::IObject *resource);
@@ -93,7 +90,6 @@ class CommandContext : public Object<rhi::ICommandContext> {
   const void *identity_;
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_;
   bool submitted_{};
-  std::vector<ObjectPtr<HeadlessWindow>> headless_presents_;
   std::vector<ObjectPtr<DownloadToken>> downloads_;
 };
 

@@ -15,7 +15,7 @@ class Device;
 
 class Window : public Object<rhi::IWindow> {
  public:
-  explicit Window(Device *device = nullptr);
+  Window();
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
   bool UpdateImGui(const std::function<void()> &callback) override;
   ImGuiContext *GetImGuiContext() const;

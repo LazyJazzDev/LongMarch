@@ -10,10 +10,6 @@ rhi::ICore *Core::Get() const noexcept {
   return static_cast<rhi::ICore *>(GetObject());
 }
 
-rhi::BackendAPI Core::GetBackendAPI() const {
-  return Get()->GetBackendAPI();
-}
-
 Core CreateCore(rhi::BackendAPI api, const rhi::CoreDesc &desc) {
   return rhi::CreateCore(api, desc);
 }

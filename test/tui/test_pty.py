@@ -278,12 +278,10 @@ class PtyMenuTest(unittest.TestCase):
     @unittest.skipUnless(DEMOS, "Pass demo executables for macOS Metal launch checks")
     def test_demo_redirected_number_and_name_selection(self):
         for demo in DEMOS:
-            device_args = (["--device", "1"] if "--device" in subprocess.check_output(
-                [demo, "--help"], text=True, encoding="utf-8") else [])
             for choice in ("1\n", "triangle\n"):
                 with self.subTest(demo=demo, choice=choice), tempfile.TemporaryDirectory(prefix="longmarch-tui-") as directory:
                     result = subprocess.run(
-                        [demo, "--backend", "metal", "--frames", "1", *device_args], input=choice,
+                        [demo, "--backend", "metal", "--frames", "1"], input=choice,
                         text=True, capture_output=True, timeout=30, cwd=directory,
                     )
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -293,9 +291,7 @@ class PtyMenuTest(unittest.TestCase):
     @unittest.skipUnless(DEMOS, "Pass demo executables for macOS Metal launch checks")
     def test_demo_default_menu_launch(self):
         for demo in DEMOS:
-            device_args = (["--device", "1"] if "--device" in subprocess.check_output(
-                [demo, "--help"], text=True, encoding="utf-8") else [])
-            with self.subTest(demo=demo), Terminal([demo, "--backend", "metal", "--frames", "1", *device_args]) as terminal:
+            with self.subTest(demo=demo), Terminal([demo, "--backend", "metal", "--frames", "1"]) as terminal:
                 terminal.until(lambda: b"\x1b[7m" in terminal.output)
                 terminal.send(b"\r")
                 terminal.finish(0)
