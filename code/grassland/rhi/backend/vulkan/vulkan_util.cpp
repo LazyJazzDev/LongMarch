@@ -140,12 +140,12 @@ DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
   };
 #if defined(LONGMARCH_CUDA_RUNTIME)
 #if defined(_WIN32)
-  for (const char *name : {"VK_KHR_external_memory_win32", "VK_KHR_external_semaphore_win32"})
+  const char *external_memory = "VK_KHR_external_memory_win32";
 #else
-  for (const char *name : {"VK_KHR_external_memory_fd", "VK_KHR_external_semaphore_fd"})
+  const char *external_memory = "VK_KHR_external_memory_fd";
 #endif
-    if (has(name))
-      extensions_.push_back(name);
+  if (has(external_memory))
+    extensions_.push_back(external_memory);
 #endif
   features_.pNext = &v11_;
   if (has(VK_KHR_SWAPCHAIN_EXTENSION_NAME))

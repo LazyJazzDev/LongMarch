@@ -189,11 +189,11 @@ std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> NativeGeometries(
                                                               : DXGI_FORMAT_R32_UINT;
     if (!buffers.empty()) {
       tri.VertexBuffer.StartAddress =
-          dynamic_cast<D3D12Buffer *>(buffers[i].data.buffer)->NativeBuffer()->GetGPUVirtualAddress() +
+          static_cast<D3D12Buffer *>(buffers[i].data.buffer)->NativeBuffer()->GetGPUVirtualAddress() +
           buffers[i].data.offset;
       if (g.index_count)
         tri.IndexBuffer =
-            dynamic_cast<D3D12Buffer *>(buffers[i].indices.buffer)->NativeBuffer()->GetGPUVirtualAddress() +
+            static_cast<D3D12Buffer *>(buffers[i].indices.buffer)->NativeBuffer()->GetGPUVirtualAddress() +
             buffers[i].indices.offset;
     }
     result.push_back(native);
@@ -207,7 +207,7 @@ std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> NativeGeometries(
     native.AABBs.AABBs.StrideInBytes = g.stride;
     if (!buffers.empty())
       native.AABBs.AABBs.StartAddress =
-          dynamic_cast<D3D12Buffer *>(buffers[i].data.buffer)->NativeBuffer()->GetGPUVirtualAddress() +
+          static_cast<D3D12Buffer *>(buffers[i].data.buffer)->NativeBuffer()->GetGPUVirtualAddress() +
           buffers[i].data.offset;
     result.push_back(native);
   }

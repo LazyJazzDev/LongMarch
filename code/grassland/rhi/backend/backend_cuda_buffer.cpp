@@ -1,5 +1,7 @@
-#include "grassland/rhi/backend/backend_cuda_interop.h"
+#include "grassland/rhi/backend/backend_cuda_buffer.h"
 #if defined(LONGMARCH_CUDA_RUNTIME)
+#include <cstring>
+
 namespace grassland::rhi::backend {
 bool CheckCUDA(cudaError_t error, const char *operation) {
   if (error == cudaSuccess)
@@ -32,6 +34,8 @@ CUDAMapping::~CUDAMapping() {
 }
 
 void CUDAMapping::Reset() {
+  if (!pointer_ && !memory_)
+    return;
   CUDADeviceScope scope(device_);
   if (!scope)
     return;
@@ -60,41 +64,31 @@ bool CUDAMapping::HasMemory() const {
   return memory_ != nullptr;
 }
 
-CUDAInteropTimeline::CUDAInteropTimeline(Device *device) : device_(device) {
+int FindCUDADeviceByUUID(const void *uuid) {
+  int count{};
+  if (cudaGetDeviceCount(&count) != cudaSuccess)
+    return -1;
+  for (int i = 0; i < count; ++i) {
+    cudaDeviceProp properties{};
+    if (cudaGetDeviceProperties(&properties, i) == cudaSuccess &&
+        std::memcmp(properties.uuid.bytes, uuid, sizeof(properties.uuid.bytes)) == 0)
+      return i;
+  }
+  return -1;
 }
-
-CUDAInteropTimeline::~CUDAInteropTimeline() {
-  Reset();
+#if defined(_WIN32)
+int FindCUDADeviceByLUID(const void *luid) {
+  int count{};
+  if (cudaGetDeviceCount(&count) != cudaSuccess)
+    return -1;
+  for (int i = 0; i < count; ++i) {
+    cudaDeviceProp properties{};
+    if (cudaGetDeviceProperties(&properties, i) == cudaSuccess && properties.luidDeviceNodeMask == 1 &&
+        std::memcmp(properties.luid, luid, sizeof(properties.luid)) == 0)
+      return i;
+  }
+  return -1;
 }
-
-void CUDAInteropTimeline::Reset() {
-  CUDADeviceScope scope(device_->GetPhysicalDevice().cuda_device);
-  if (scope && semaphore_)
-    CheckCUDA(cudaDestroyExternalSemaphore(semaphore_), "Destroy CUDA external semaphore");
-  semaphore_ = nullptr;
-}
-
-Device *CUDAInteropTimeline::Owner() const {
-  return device_;
-}
-
-bool CUDAInteropTimeline::Import(const cudaExternalSemaphoreHandleDesc &desc) {
-  CUDADeviceScope scope(device_->GetPhysicalDevice().cuda_device);
-  return scope && CheckCUDA(cudaImportExternalSemaphore(&semaphore_, &desc), "Import CUDA semaphore");
-}
-
-bool CUDAInteropTimeline::SignalCUDA(cudaStream_t stream, uint64_t value) {
-  CUDADeviceScope scope(device_->GetPhysicalDevice().cuda_device);
-  cudaExternalSemaphoreSignalParams params{};
-  params.params.fence.value = value;
-  return scope && CheckCUDA(cudaSignalExternalSemaphoresAsync(&semaphore_, &params, 1, stream), "CUDA signal");
-}
-
-bool CUDAInteropTimeline::WaitCUDA(cudaStream_t stream, uint64_t value) {
-  CUDADeviceScope scope(device_->GetPhysicalDevice().cuda_device);
-  cudaExternalSemaphoreWaitParams params{};
-  params.params.fence.value = value;
-  return scope && CheckCUDA(cudaWaitExternalSemaphoresAsync(&semaphore_, &params, 1, stream), "CUDA wait");
-}
+#endif
 }  // namespace grassland::rhi::backend
 #endif

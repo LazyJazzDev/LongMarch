@@ -33,10 +33,6 @@ class D3D12CommandContext final : public CommandContext {
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   ~D3D12CommandContext() override;
-#if defined(LONGMARCH_CUDA_RUNTIME)
-  bool CmdReleaseCUDABuffer(ICUDABuffer *buffer) override;
-  bool CmdAcquireCUDABuffer(ICUDABuffer *buffer) override;
-#endif
   static D3D12CommandContext *Create(D3D12Device *device);
   IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
   IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;

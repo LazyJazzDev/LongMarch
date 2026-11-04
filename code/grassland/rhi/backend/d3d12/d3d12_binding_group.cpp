@@ -95,7 +95,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
     case BINDING_UNIFORM_BUFFER:
       for (size_t i = 0; i < buffers.size(); ++i) {
         const auto &view = buffers[i];
-        auto buffer = dynamic_cast<D3D12Buffer *>(view.buffer);
+        auto buffer = static_cast<D3D12Buffer *>(view.buffer);
         D3D12_CONSTANT_BUFFER_VIEW_DESC desc{buffer->NativeBuffer()->GetGPUVirtualAddress() + view.offset,
                                              UINT((view.size + 255) & ~uint64_t(255))};
         native->CreateConstantBufferView(&desc, resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
@@ -118,7 +118,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
         desc.Buffer.NumElements = UINT(view.size / stride);
         desc.Buffer.StructureByteStride = raw ? 0 : stride;
         desc.Buffer.Flags = raw ? D3D12_BUFFER_SRV_FLAG_RAW : D3D12_BUFFER_SRV_FLAG_NONE;
-        native->CreateShaderResourceView(dynamic_cast<D3D12Buffer *>(view.buffer)->NativeBuffer(), &desc,
+        native->CreateShaderResourceView(static_cast<D3D12Buffer *>(view.buffer)->NativeBuffer(), &desc,
                                          resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
       }
       break;
@@ -139,7 +139,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
         desc.Buffer.NumElements = UINT(view.size / stride);
         desc.Buffer.StructureByteStride = raw ? 0 : stride;
         desc.Buffer.Flags = raw ? D3D12_BUFFER_UAV_FLAG_RAW : D3D12_BUFFER_UAV_FLAG_NONE;
-        native->CreateUnorderedAccessView(dynamic_cast<D3D12Buffer *>(view.buffer)->NativeBuffer(), nullptr, &desc,
+        native->CreateUnorderedAccessView(static_cast<D3D12Buffer *>(view.buffer)->NativeBuffer(), nullptr, &desc,
                                           resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
       }
       break;

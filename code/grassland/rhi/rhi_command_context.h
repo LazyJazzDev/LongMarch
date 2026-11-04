@@ -48,16 +48,8 @@ struct Scissor {
 };
 class IWindow;
 
-class ICUDABuffer;
-
 class ICommandContext : public IObject {
  public:
-#if defined(LONGMARCH_CUDA_RUNTIME)
-  // Ownership/state handoff; pair with a timeline dependency. No rendering scope.
-  // Newly created CUDA buffers start on the RHI side.
-  virtual bool CmdReleaseCUDABuffer(ICUDABuffer *buffer) = 0;
-  virtual bool CmdAcquireCUDABuffer(ICUDABuffer *buffer) = 0;
-#endif
   // AS build/copy/query and DispatchRays require no active rendering scope.
   // Modifying contexts for one AS must be submitted before recording later uses
   // in another context; Build/Update retain inputs and rent scratch automatically.

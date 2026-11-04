@@ -8,6 +8,9 @@
 namespace grassland::rhi {
 class IImage;
 class IBuffer;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+class ICUDABuffer;
+#endif
 struct BufferDesc;
 class IComputeProgram;
 struct ComputeProgramDesc;
@@ -18,10 +21,6 @@ struct ShaderDesc;
 class IWindow;
 class IQueue;
 class ICommandContext;
-#if defined(LONGMARCH_CUDA_RUNTIME)
-class ICUDABuffer;
-class ICUDAInteropTimeline;
-#endif
 
 class IDevice : public IObject {
  public:
@@ -31,11 +30,6 @@ class IDevice : public IObject {
       const TopLevelAccelerationStructureDesc &desc) = 0;
   virtual IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) = 0;
   virtual std::string Name() const = 0;
-  virtual DeviceProperties GetProperties() const = 0;
-#if defined(LONGMARCH_CUDA_RUNTIME)
-  virtual ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) = 0;
-  virtual ICUDAInteropTimeline *CreateCUDAInteropTimeline() = 0;
-#endif
   virtual bool SupportRayTracingPipeline() const = 0;
   virtual bool SupportRayQuery() const = 0;
   virtual bool SupportGeometryShader() const = 0;
@@ -44,6 +38,9 @@ class IDevice : public IObject {
   virtual ISampler *CreateSampler(const SamplerDesc &desc = {}) = 0;
   virtual IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) = 0;
   virtual IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  virtual ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) = 0;
+#endif
   virtual IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;
   virtual IProgram *CreateProgram(const ProgramDesc &desc) = 0;
   virtual IShader *CreateShader(const ShaderDesc &desc) = 0;

@@ -1,12 +1,7 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_core.h"
 
-#include <cstring>
-
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/util/string_convert.h"
-#if defined(LONGMARCH_CUDA_RUNTIME)
-#include <cuda_runtime_api.h>
-#endif
 
 namespace grassland::rhi::backend::d3d12 {
 
@@ -22,20 +17,6 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice
   }
   info = {};
   info.name = WStringToString(desc.Description);
-#if defined(LONGMARCH_CUDA_RUNTIME)
-  int count{};
-  if (device->GetNodeCount() == 1 && cudaGetDeviceCount(&count) == cudaSuccess) {
-    for (int i = 0; i < count; ++i) {
-      cudaDeviceProp properties{};
-      if (cudaGetDeviceProperties(&properties, i) == cudaSuccess &&
-          std::memcmp(properties.luid, &desc.AdapterLuid, sizeof(desc.AdapterLuid)) == 0 &&
-          properties.luidDeviceNodeMask == 1) {
-        info.cuda_device = i;
-        break;
-      }
-    }
-  }
-#endif
   info.dedicated_memory = desc.DedicatedVideoMemory;
   info.unified_memory = desc.SharedSystemMemory;
   D3D12_FEATURE_DATA_ARCHITECTURE architecture{};

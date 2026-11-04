@@ -9,7 +9,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
-#include "grassland/rhi/backend/d3d12/d3d12_cuda_interop.h"
 #include "grassland/rhi/backend/d3d12/d3d12_download_token.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
@@ -238,13 +237,6 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
   {
     std::lock_guard<std::mutex> lock(device_->QueueMutex());
     submission_failed_ = true;
-#if defined(LONGMARCH_CUDA_RUNTIME)
-    for (const auto &point : cuda_waits_)
-      if (!Check(device_->NativeQueue()->Wait(static_cast<D3D12CUDAInteropTimeline *>(point.timeline)->NativeFence(),
-                                              point.value),
-                 "Queue CUDA wait"))
-        return SUBMIT_RESULT_REJECTED;
-#endif
     ID3D12CommandList *lists[] = {list_.Get()};
     device_->NativeQueue()->ExecuteCommandLists(1, lists);
     MarkSubmitted();
@@ -256,17 +248,8 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
       if (!Check(present.second->Present(), "Swapchain::Present"))
         presented = false;
     }
-    submission_failed_ = false;
-#if defined(LONGMARCH_CUDA_RUNTIME)
-    for (const auto &point : cuda_signals_)
-      if (!Check(device_->NativeQueue()->Signal(static_cast<D3D12CUDAInteropTimeline *>(point.timeline)->NativeFence(),
-                                                point.value),
-                 "Queue CUDA signal"))
-        submission_failed_ = true;
-#endif
     value_ = device_->NextSerial();
-    if (!Check(device_->NativeQueue()->Signal(device_->Fence(), value_), "Queue::Signal"))
-      submission_failed_ = true;
+    submission_failed_ = !Check(device_->NativeQueue()->Signal(device_->Fence(), value_), "Queue::Signal");
     if (!presented)
       submission_failed_ = true;
   }
@@ -309,7 +292,7 @@ bool D3D12CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, cons
     return false;
   }
 #else
-  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  auto native = static_cast<D3D12Buffer *>(buffer);
 #endif
   if (!RetainResource(native))
     return false;
@@ -353,8 +336,8 @@ bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
     return false;
   }
 #else
-  auto src = dynamic_cast<D3D12Buffer *>(source);
-  auto dst = dynamic_cast<D3D12Buffer *>(destination);
+  auto src = static_cast<D3D12Buffer *>(source);
+  auto dst = static_cast<D3D12Buffer *>(destination);
 #endif
   if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
       destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
@@ -507,7 +490,7 @@ bool D3D12CommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer,
     return false;
   }
 #else
-  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  auto native = static_cast<D3D12Buffer *>(buffer);
 #endif
   if (!RetainResource(native))
     return false;
@@ -538,7 +521,7 @@ bool D3D12CommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format
     return false;
   }
 #else
-  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  auto native = static_cast<D3D12Buffer *>(buffer);
 #endif
   if (!RetainResource(native))
     return false;
@@ -729,7 +712,7 @@ bool D3D12CommandContext::PrepareGroups() {
               return false;
         }
         if (type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
-          auto buffer = dynamic_cast<D3D12Buffer *>(version->GetReferences()[binding_index][j].Get());
+          auto buffer = static_cast<D3D12Buffer *>(version->GetReferences()[binding_index][j].Get());
           resource = buffer->NativeBuffer();
           if (!TransitionResource(resource,
                                   (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER)
@@ -949,7 +932,7 @@ IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
     return nullptr;
   }
 #else
-  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  auto native = static_cast<D3D12Buffer *>(buffer);
 #endif
   if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;
@@ -1056,20 +1039,3 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
       new D3D12DownloadToken(std::move(lease), DownloadLayout{0, pitch, packed, height})));
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-#if defined(LONGMARCH_CUDA_RUNTIME)
-namespace grassland::rhi::backend::d3d12 {
-bool D3D12CommandContext::CmdReleaseCUDABuffer(ICUDABuffer *buffer) {
-  auto native = dynamic_cast<D3D12CUDABuffer *>(buffer);
-  if (!native || native->Owner() != device_ || sealed_ || rendering_active_ || !RetainResource(native)) {
-    recording_failed_ = true;
-    return false;
-  }
-  return TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_COMMON, native->DefaultState());
-}
-
-bool D3D12CommandContext::CmdAcquireCUDABuffer(ICUDABuffer *buffer) {
-  return CmdReleaseCUDABuffer(buffer);
-}
-}  // namespace grassland::rhi::backend::d3d12
-#endif

@@ -6,7 +6,6 @@
 #include "grassland/rhi/rhix/rhix_binding_group.h"
 #include "grassland/rhi/rhix/rhix_buffer.h"
 #include "grassland/rhi/rhix/rhix_compute_program.h"
-#include "grassland/rhi/rhix/rhix_cuda_interop.h"
 #include "grassland/rhi/rhix/rhix_download_token.h"
 #include "grassland/rhi/rhix/rhix_image.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
@@ -31,10 +30,6 @@ struct RenderingInfo {
 
 class CommandContext : public ObjectContainer {
  public:
-#if defined(LONGMARCH_CUDA_RUNTIME)
-  bool CmdAcquireCUDABuffer(const CUDABuffer &buffer);
-  bool CmdReleaseCUDABuffer(const CUDABuffer &buffer);
-#endif
   CommandContext(rhi::ICommandContext *object) noexcept;
   rhi::ICommandContext *Get() const noexcept;
   CommandContext();

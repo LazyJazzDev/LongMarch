@@ -1,4 +1,4 @@
-#include "grassland/rhi/backend/vulkan/vulkan_cuda_interop.h"
+#include "grassland/rhi/backend/vulkan/vulkan_cuda_buffer.h"
 #if defined(LONGMARCH_CUDA_RUNTIME)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #if defined(_WIN32)
@@ -13,29 +13,28 @@ namespace grassland::rhi::backend::vulkan {
 namespace {
 #if defined(_WIN32)
 constexpr auto memory_handle = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-constexpr auto semaphore_handle = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else
 constexpr auto memory_handle = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-constexpr auto semaphore_handle = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
 }  // namespace
 
-VulkanCUDABuffer::VulkanCUDABuffer(VulkanDevice *device, const BufferDesc &desc)
-    : VulkanBuffer(device, desc),
-      mapping_(device->GetPhysicalDevice().cuda_device) {
+VulkanCUDABuffer::VulkanCUDABuffer(VulkanDevice *device, const BufferDesc &desc, int cuda_device)
+    : desc_(desc),
+      device_(device),
+      mapping_(cuda_device) {
 }
 
 VulkanCUDABuffer::~VulkanCUDABuffer() {
   mapping_.Reset();
-  auto device = static_cast<VulkanDevice *>(device_)->NativeDevice();
+  auto device = device_->NativeDevice();
   if (buffer_)
     vkDestroyBuffer(device, buffer_, nullptr);
   if (memory_)
     vkFreeMemory(device, memory_, nullptr);
 }
 
-VkBuffer VulkanCUDABuffer::NativeBuffer() const {
-  return buffer_;
+BufferDesc VulkanCUDABuffer::GetDesc() const {
+  return desc_;
 }
 
 void *VulkanCUDABuffer::GetDevicePointer() const {
@@ -43,8 +42,17 @@ void *VulkanCUDABuffer::GetDevicePointer() const {
 }
 
 VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDesc &desc) {
-  if (!desc.size || device->GetPhysicalDevice().cuda_device < 0)
+  if (!desc.size)
     return nullptr;
+  VkPhysicalDeviceIDProperties id{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES};
+  VkPhysicalDeviceProperties2 identity{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+  identity.pNext = &id;
+  vkGetPhysicalDeviceProperties2(device->NativePhysicalDevice(), &identity);
+  const int ordinal = FindCUDADeviceByUUID(id.deviceUUID);
+  if (ordinal < 0) {
+    ReportError(-1, "No CUDA device matches this Vulkan adapter.");
+    return nullptr;
+  }
 #if defined(_WIN32)
   if (!vkGetDeviceProcAddr(device->NativeDevice(), "vkGetMemoryWin32HandleKHR"))
     return nullptr;
@@ -57,13 +65,6 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
   buffer.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-  const bool addressable = device->SupportRayTracingPipeline() || device->SupportRayQuery();
-  if (addressable) {
-    buffer.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-                    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-    if (device->SupportRayTracingPipeline())
-      buffer.usage |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
-  }
   VkPhysicalDeviceExternalBufferInfo query{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO};
   query.usage = buffer.usage;
   query.handleType = memory_handle;
@@ -73,7 +74,7 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
     ReportError(-1, "CUDA buffer allocation is not exportable.");
     return nullptr;
   }
-  auto object = std::unique_ptr<VulkanCUDABuffer>(new VulkanCUDABuffer(device, desc));
+  auto object = std::unique_ptr<VulkanCUDABuffer>(new VulkanCUDABuffer(device, desc, ordinal));
   VkExternalMemoryBufferCreateInfo external{VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO};
   external.handleTypes = memory_handle;
   buffer.pNext = &external;
@@ -96,10 +97,7 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
   dedicated.buffer = object->buffer_;
   VkExportMemoryAllocateInfo export_info{VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO};
   export_info.handleTypes = memory_handle;
-  VkMemoryAllocateFlagsInfo flags{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
-  flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-  flags.pNext = &dedicated;
-  export_info.pNext = addressable ? static_cast<void *>(&flags) : static_cast<void *>(&dedicated);
+  export_info.pNext = &dedicated;
   VkMemoryAllocateInfo allocation{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
   allocation.pNext = &export_info;
   allocation.allocationSize = requirements.size;
@@ -141,84 +139,8 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
   return imported ? object.release() : nullptr;
 }
 
-VulkanCUDAInteropTimeline::VulkanCUDAInteropTimeline(VulkanDevice *device) : CUDAInteropTimeline(device) {
-}
-
-VulkanCUDAInteropTimeline::~VulkanCUDAInteropTimeline() {
-  Reset();
-  if (semaphore_)
-    vkDestroySemaphore(static_cast<VulkanDevice *>(Owner())->NativeDevice(), semaphore_, nullptr);
-}
-
-VkSemaphore VulkanCUDAInteropTimeline::NativeSemaphore() const {
-  return semaphore_;
-}
-
-VulkanCUDAInteropTimeline *VulkanCUDAInteropTimeline::Create(VulkanDevice *device) {
-  if (device->GetPhysicalDevice().cuda_device < 0)
-    return nullptr;
-#if defined(_WIN32)
-  if (!vkGetDeviceProcAddr(device->NativeDevice(), "vkGetSemaphoreWin32HandleKHR"))
-    return nullptr;
-#else
-  if (!vkGetDeviceProcAddr(device->NativeDevice(), "vkGetSemaphoreFdKHR"))
-    return nullptr;
-#endif
-  VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
-  type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-  VkPhysicalDeviceExternalSemaphoreInfo query{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO};
-  query.pNext = &type;
-  query.handleType = semaphore_handle;
-  VkExternalSemaphoreProperties properties{VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES};
-  vkGetPhysicalDeviceExternalSemaphoreProperties(device->NativePhysicalDevice(), &query, &properties);
-  if (!(properties.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT))
-    return nullptr;
-  auto object = std::unique_ptr<VulkanCUDAInteropTimeline>(new VulkanCUDAInteropTimeline(device));
-  VkExportSemaphoreCreateInfo export_info{VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO};
-  export_info.handleTypes = semaphore_handle;
-  export_info.pNext = &type;
-  VkSemaphoreCreateInfo create{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-  create.pNext = &export_info;
-  if (!Check(vkCreateSemaphore(device->NativeDevice(), &create, nullptr, &object->semaphore_), "Create CUDA timeline"))
-    return nullptr;
-  cudaExternalSemaphoreHandleDesc desc{};
-#if defined(_WIN32)
-  VkSemaphoreGetWin32HandleInfoKHR info{VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR};
-  info.semaphore = object->semaphore_;
-  info.handleType = semaphore_handle;
-  auto get = reinterpret_cast<PFN_vkGetSemaphoreWin32HandleKHR>(
-      vkGetDeviceProcAddr(device->NativeDevice(), "vkGetSemaphoreWin32HandleKHR"));
-  HANDLE handle{};
-  if (!Check(get(device->NativeDevice(), &info, &handle), "Export CUDA timeline"))
-    return nullptr;
-  desc.type = cudaExternalSemaphoreHandleTypeTimelineSemaphoreWin32;
-  desc.handle.win32.handle = handle;
-  const bool imported = object->Import(desc);
-  CloseHandle(handle);
-#else
-  VkSemaphoreGetFdInfoKHR info{VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR};
-  info.semaphore = object->semaphore_;
-  info.handleType = semaphore_handle;
-  auto get =
-      reinterpret_cast<PFN_vkGetSemaphoreFdKHR>(vkGetDeviceProcAddr(device->NativeDevice(), "vkGetSemaphoreFdKHR"));
-  int fd = -1;
-  if (!Check(get(device->NativeDevice(), &info, &fd), "Export CUDA timeline"))
-    return nullptr;
-  desc.type = cudaExternalSemaphoreHandleTypeTimelineSemaphoreFd;
-  desc.handle.fd = fd;
-  const bool imported = object->Import(desc);
-  if (!imported)
-    close(fd);
-#endif
-  return imported ? object.release() : nullptr;
-}
-
 ICUDABuffer *VulkanDevice::CreateCUDABuffer(const BufferDesc &desc) {
   return VulkanCUDABuffer::Create(this, desc);
-}
-
-ICUDAInteropTimeline *VulkanDevice::CreateCUDAInteropTimeline() {
-  return VulkanCUDAInteropTimeline::Create(this);
 }
 }  // namespace grassland::rhi::backend::vulkan
 #endif

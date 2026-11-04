@@ -1,7 +1,9 @@
 #pragma once
-#include "grassland/rhi/rhi_cuda_interop.h"
+#include "grassland/rhi/rhi_cuda_buffer.h"
 #if defined(LONGMARCH_CUDA_RUNTIME)
-#include "grassland/rhi/backend/backend_device.h"
+#include <cuda_runtime_api.h>
+
+#include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
 bool CheckCUDA(cudaError_t error, const char *operation);
@@ -37,21 +39,10 @@ class CUDAMapping {
   void *pointer_{};
 };
 
-class CUDAInteropTimeline : public Object<ICUDAInteropTimeline> {
- public:
-  bool SignalCUDA(cudaStream_t stream, uint64_t value) override;
-  bool WaitCUDA(cudaStream_t stream, uint64_t value) override;
-  Device *Owner() const;
-
- protected:
-  explicit CUDAInteropTimeline(Device *device);
-  ~CUDAInteropTimeline() override;
-  bool Import(const cudaExternalSemaphoreHandleDesc &desc);
-  void Reset();
-
- private:
-  Device *device_;
-  cudaExternalSemaphore_t semaphore_{};
-};
+// Match a CUDA Runtime UUID or Windows adapter LUID without changing current device.
+int FindCUDADeviceByUUID(const void *uuid);
+#if defined(_WIN32)
+int FindCUDADeviceByLUID(const void *luid);
+#endif
 }  // namespace grassland::rhi::backend
 #endif

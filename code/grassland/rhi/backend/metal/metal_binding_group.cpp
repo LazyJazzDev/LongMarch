@@ -109,7 +109,7 @@ bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, cons
   for (size_t i = 0; i < values.size(); ++i) {
     auto v = values[i];
     uint32_t index = offsets_[b] + first + i;
-    encoder_->setBuffer(dynamic_cast<MetalBuffer *>(v.buffer)->NativeBuffer(), v.offset, index);
+    encoder_->setBuffer(static_cast<MetalBuffer *>(v.buffer)->NativeBuffer(), v.offset, index);
     static_cast<uint32_t *>(sizes_->contents())[index] = uint32_t(v.size);
     initialized_[b][first + i] = true;
   }
@@ -173,7 +173,7 @@ void MetalBindingGroup::Version::Bind(MTL::RenderCommandEncoder *encoder, uint32
               ? static_cast<MTL::Resource *>(
                     static_cast<MetalTopLevelAccelerationStructure *>(resource.Get())->NativeStructure())
           : desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
-              ? static_cast<MTL::Resource *>(dynamic_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
+              ? static_cast<MTL::Resource *>(static_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
               : static_cast<MTL::Resource *>(static_cast<MetalImage *>(resource.Get())->NativeImage());
       encoder->useResource(native, usage, stages);
     }
@@ -199,7 +199,7 @@ void MetalBindingGroup::Version::Bind(MTL::ComputeCommandEncoder *encoder, uint3
               ? static_cast<MTL::Resource *>(
                     static_cast<MetalTopLevelAccelerationStructure *>(resource.Get())->NativeStructure())
           : desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
-              ? static_cast<MTL::Resource *>(dynamic_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
+              ? static_cast<MTL::Resource *>(static_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
               : static_cast<MTL::Resource *>(static_cast<MetalImage *>(resource.Get())->NativeImage());
       encoder->useResource(native, usage);
     }

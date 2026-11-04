@@ -36,7 +36,7 @@ typedef enum {
 std::string to_string(PhysicalDeviceType type);
 std::string PhysicalDeviceTypeName(PhysicalDeviceType type);
 
-struct DeviceProperties {
+struct PhysicalDevice {
   std::string name;
   // Bytes of host/shared memory accessible to the GPU (not additional VRAM).
   uint64_t unified_memory{};
@@ -45,11 +45,7 @@ struct DeviceProperties {
   bool ray_tracing_pipeline_feature{};
   bool ray_query_feature{};
   bool geometry_shader_feature{};
-  // Process-local CUDA Runtime ordinal, or -1 when unavailable/unmatched.
-  int cuda_device{-1};
 };
-
-using PhysicalDevice = DeviceProperties;
 
 typedef enum {
   PRESENT_MODE_VSYNC,
