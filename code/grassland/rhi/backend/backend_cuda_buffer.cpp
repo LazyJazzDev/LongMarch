@@ -2,13 +2,6 @@
 #if defined(LONGMARCH_CUDA_RUNTIME)
 
 namespace grassland::rhi::backend {
-bool CheckCUDA(cudaError_t error, const char *operation) {
-  if (error == cudaSuccess)
-    return true;
-  ReportError(static_cast<int32_t>(error), std::string(operation) + ": " + cudaGetErrorString(error));
-  return false;
-}
-
 CUDADeviceScope::CUDADeviceScope(int device) {
   if (device < 0 || !CheckCUDA(cudaGetDevice(&previous_), "Get CUDA device"))
     return;

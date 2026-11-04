@@ -2,8 +2,6 @@
 
 #include "grassland/util/log.h"
 #if defined(LONGMARCH_CUDA_RUNTIME)
-#include <cuda_runtime_api.h>
-
 #include <cstring>
 #endif
 
@@ -12,6 +10,13 @@ void ReportError(int32_t error_code, const std::string &error_message) {
   LogError("Error {}: {}", error_code, error_message);
 }
 #if defined(LONGMARCH_CUDA_RUNTIME)
+bool CheckCUDA(cudaError_t error, const char *operation) {
+  if (error == cudaSuccess)
+    return true;
+  ReportError(static_cast<int32_t>(error), std::string(operation) + ": " + cudaGetErrorString(error));
+  return false;
+}
+
 int FindCUDADeviceByUUID(const void *uuid) {
   int count{};
   if (cudaGetDeviceCount(&count) != cudaSuccess)

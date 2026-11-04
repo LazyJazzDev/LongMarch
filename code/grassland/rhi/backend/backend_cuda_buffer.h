@@ -6,8 +6,6 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
-bool CheckCUDA(cudaError_t error, const char *operation);
-
 class CUDADeviceScope {
  public:
   explicit CUDADeviceScope(int device);
