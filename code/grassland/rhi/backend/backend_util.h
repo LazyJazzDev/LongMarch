@@ -9,6 +9,14 @@
 namespace grassland::rhi::backend {
 void ReportError(int32_t error_code, const std::string &error_message);
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+// Match a CUDA Runtime UUID or Windows adapter LUID without changing current device.
+int FindCUDADeviceByUUID(const void *uuid);
+#if defined(_WIN32)
+int FindCUDADeviceByLUID(const void *luid);
+#endif
+#endif
+
 // One intrusive counter per native implementation, with no public state layout.
 template <typename Interface>
 class Object : public Interface {

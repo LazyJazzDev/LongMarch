@@ -1,6 +1,5 @@
 #include "grassland/rhi/backend/backend_cuda_buffer.h"
 #if defined(LONGMARCH_CUDA_RUNTIME)
-#include <cstring>
 
 namespace grassland::rhi::backend {
 bool CheckCUDA(cudaError_t error, const char *operation) {
@@ -64,31 +63,5 @@ bool CUDAMapping::HasMemory() const {
   return memory_ != nullptr;
 }
 
-int FindCUDADeviceByUUID(const void *uuid) {
-  int count{};
-  if (cudaGetDeviceCount(&count) != cudaSuccess)
-    return -1;
-  for (int i = 0; i < count; ++i) {
-    cudaDeviceProp properties{};
-    if (cudaGetDeviceProperties(&properties, i) == cudaSuccess &&
-        std::memcmp(properties.uuid.bytes, uuid, sizeof(properties.uuid.bytes)) == 0)
-      return i;
-  }
-  return -1;
-}
-#if defined(_WIN32)
-int FindCUDADeviceByLUID(const void *luid) {
-  int count{};
-  if (cudaGetDeviceCount(&count) != cudaSuccess)
-    return -1;
-  for (int i = 0; i < count; ++i) {
-    cudaDeviceProp properties{};
-    if (cudaGetDeviceProperties(&properties, i) == cudaSuccess && properties.luidDeviceNodeMask == 1 &&
-        std::memcmp(properties.luid, luid, sizeof(properties.luid)) == 0)
-      return i;
-  }
-  return -1;
-}
-#endif
 }  // namespace grassland::rhi::backend
 #endif

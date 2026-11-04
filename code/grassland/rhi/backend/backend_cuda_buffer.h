@@ -39,10 +39,5 @@ class CUDAMapping {
   void *pointer_{};
 };
 
-// Match a CUDA Runtime UUID or Windows adapter LUID without changing current device.
-int FindCUDADeviceByUUID(const void *uuid);
-#if defined(_WIN32)
-int FindCUDADeviceByLUID(const void *luid);
-#endif
 }  // namespace grassland::rhi::backend
 #endif
