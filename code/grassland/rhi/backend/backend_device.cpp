@@ -77,10 +77,6 @@ std::string Device::Name() const {
   return info_.name;
 }
 
-PhysicalDevice Device::GetProperties() const {
-  return info_;
-}
-
 bool Device::SupportRayTracingPipeline() const {
   return info_.ray_tracing_pipeline_feature;
 }
