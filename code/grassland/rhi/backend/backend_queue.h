@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/rhi_queue.h"
@@ -11,6 +11,7 @@ class Queue : public Object<rhi::IQueue> {
   ~Queue() override;
   Device *Owner() const;
   QueueType GetType() const override;
+  ICommandContext *CreateCommandContext() override;
   bool SharesPhysicalQueue(const rhi::IQueue *other) const override;
   rhi::ISubmissionToken *Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info = {}) override;
 

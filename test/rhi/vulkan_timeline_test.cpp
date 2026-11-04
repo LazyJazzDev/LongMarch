@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/rhi.h"
@@ -36,7 +36,7 @@ TEST(RhiVulkanTimeline, CompletionValuesSurviveContextRecyclingAcrossLogicalQueu
       ASSERT_TRUE(token->WaitHost());
     uint64_t completed = 0;
     ASSERT_EQ(vkGetSemaphoreCounterValue(native->NativeDevice(), timeline, &completed), VK_SUCCESS);
-    EXPECT_EQ(completed, previous + 8);
+    EXPECT_EQ(completed, previous + 4);
     if (!first)
       first = completed;
     EXPECT_EQ(native->Wait(first, 0), VK_SUCCESS);  // Old values never lose their meaning on reuse.

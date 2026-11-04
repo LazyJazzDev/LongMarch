@@ -16,6 +16,10 @@ D3D12SwapChainImage::D3D12SwapChainImage(ImageDesc desc,
 
 D3D12SwapChainImage::~D3D12SwapChainImage() = default;
 
+bool D3D12SwapChainImage::SupportsQueue(QueueType type) const {
+  return type == QUEUE_TYPE_GRAPHICS;
+}
+
 bool D3D12SwapChainImage::IsValid() const {
 #if !defined(NDEBUG)
   if (present_requested_)

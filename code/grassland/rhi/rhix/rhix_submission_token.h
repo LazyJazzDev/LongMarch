@@ -1,5 +1,6 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/rhi_submission_token.h"
+#include "grassland/rhi/rhix/rhix_event.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
 
 namespace grassland::rhix {
@@ -11,6 +12,7 @@ class SubmissionToken : public ObjectContainer {
   SubmissionToken() noexcept;
   rhi::SubmissionStatus GetStatus() const;
   bool WaitHost() const;
+  Event GetEvent() const;
 };
 
 }  // namespace grassland::rhix

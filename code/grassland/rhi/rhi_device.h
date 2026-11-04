@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_object.h"
@@ -6,6 +6,7 @@
 #include "grassland/util/file_system.h"
 
 namespace grassland::rhi {
+class IEvent;
 class IImage;
 class IBuffer;
 struct BufferDesc;
@@ -52,6 +53,8 @@ class IDevice : public IObject {
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   virtual IQueue *GetQueue(QueueType type) = 0;
   virtual ICommandContext *CreateCommandContext() = 0;
+  // All events must belong to this device. Empty lists are rejected.
+  virtual bool WaitEvents(const std::vector<IEvent *> &events, bool wait_all = true) const = 0;
 
  protected:
   ~IDevice() override;

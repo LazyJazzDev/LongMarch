@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <unordered_map>
 
 #include "grassland/rhi/backend/backend_command_context.h"
@@ -17,8 +17,13 @@ class MetalSwapChainImage;
 
 class MetalCommandContext final : public CommandContext {
  public:
-  static MetalCommandContext *Create(MetalDevice *device);
+  static MetalCommandContext *Create(MetalDevice *device, QueueType type = QUEUE_TYPE_GRAPHICS);
   ~MetalCommandContext() override;
+
+  bool SupportsQueue(QueueType type) const override {
+    return type == recording_queue_ && CommandContext::SupportsQueue(type);
+  }
+
   bool CmdBuildBottomLevelAccelerationStructure(
       IBottomLevelAccelerationStructure *destination,
       const std::vector<AccelerationStructureGeometryBuffers> &geometries,
@@ -63,7 +68,7 @@ class MetalCommandContext final : public CommandContext {
   SubmissionStatus WaitForProgress() override;
 
  private:
-  MetalCommandContext(MetalDevice *device);
+  MetalCommandContext(MetalDevice *device, QueueType type);
 
   bool EndRecording() override;
   std::vector<MTL::Resource *> AccelerationResources();
@@ -90,6 +95,7 @@ class MetalCommandContext final : public CommandContext {
   bool viewport_set_{}, scissor_set_{};
 
   MetalDevice *device_;
+  QueueType recording_queue_;
   NS::SharedPtr<MTL::CommandBuffer> commands_;
   std::vector<std::pair<MetalWindow *, MetalSwapChainImage *>> presents_;
   bool submission_failed_{};
