@@ -5,7 +5,8 @@
 #include <mutex>
 #include <thread>
 
-#include "grassland/rhi/backend/backend_submission_token.h"
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_submission.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_device.h"
@@ -38,32 +39,26 @@ class Device : public Object<rhi::IDevice> {
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::IQueue *GetQueue(QueueType type) override;
-  rhi::ICommandContext *CreateCommandContext() override;
   virtual const void *NativeIdentity() const;
-  virtual ICommandContext *CreateContextForQueue(QueueType type);
-  virtual bool SharesNativeQueue(QueueType a, QueueType b) const;
+  Queue *QueueState(QueueType type) const;
   bool WaitEvents(const std::vector<IEvent *> &events, bool wait_all = true) const override;
   SubmissionStatus QueryEvent(TimelinePoint point) const;
-  virtual bool HasNativeTimelines() const;
-  virtual bool QueryTimeline(QueueType type, uint64_t &value) const;
+  bool HasNativeTimelines() const;
+  bool QueryTimeline(QueueType type, uint64_t &value) const;
   virtual bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const;
   virtual void WakeCollector();
 
   ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands,
                                     const std::vector<ObjectPtr<Event>> &waits,
-                                    QueueType queue);
+                                    Queue *queue);
 
  protected:
   void ShutdownQueues();
+  void InitializeQueue(ObjectPtr<Queue> queue);
+  void ReleaseQueues();
   Core *OwnerCore() const;
 
  private:
-  struct Submission {
-    ObjectPtr<CommandContext> commands;
-    ObjectPtr<SubmissionToken> completion;
-    TimelinePoint point;
-  };
-
   void Collect();
   void CollectTimelines();
   BackendAPI api_;
@@ -71,10 +66,9 @@ class Device : public Object<rhi::IDevice> {
   PhysicalDevice info_;
   mutable std::mutex mutex_;
   mutable std::condition_variable changed_;
-  std::array<uint64_t, 2> submitted_{};
-  std::array<uint64_t, 2> completed_{};
+  std::array<ObjectPtr<Queue>, 2> queues_;
   std::list<Submission> pending_;
-  std::vector<TimelinePoint> collector_points_{{QUEUE_TYPE_GRAPHICS, 1}, {QUEUE_TYPE_TRANSFER, 1}};
+  std::vector<TimelinePoint> collector_points_;
   std::thread collector_;
   bool stopping_{};
 };

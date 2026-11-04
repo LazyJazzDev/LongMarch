@@ -1,6 +1,8 @@
 #include "grassland/rhi/backend/backend_command_context.h"
 
+#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/rhi_program.h"
 
@@ -9,8 +11,9 @@ bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
 #if !defined(NDEBUG)
   auto native = dynamic_cast<Window *>(window);
   auto image = dynamic_cast<Image *>(target);
-  if (!native || !image || native->DeviceIdentity() != identity_ || image->DeviceIdentity() != identity_ ||
-      !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+  if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
+      image->DeviceIdentity() != DeviceIdentity() || !glfw::IsWindowThread() || sealed_ ||
+      !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
     recording_failed_ = true;
     ReportError(-1,
                 "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
@@ -38,8 +41,9 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
 #if !defined(NDEBUG)
   auto native = dynamic_cast<Window *>(window);
   auto image = dynamic_cast<Image *>(frame_img);
-  if (!native || !image || native->DeviceIdentity() != identity_ || image->DeviceIdentity() != identity_ ||
-      !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+  if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
+      image->DeviceIdentity() != DeviceIdentity() || !glfw::IsWindowThread() || sealed_ ||
+      !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
     recording_failed_ = true;
     ReportError(-1,
                 "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");
@@ -150,12 +154,13 @@ bool CommandContext::RenderingMatches(const IProgram *program) const {
          (rendering_.depth_stencil.image ? rendering_.depth_stencil.image->GetDesc().format : IMAGE_FORMAT_UNKNOWN);
 }
 
-CommandContext::CommandContext(const void *identity) : identity_(identity) {
+CommandContext::CommandContext(Queue *queue) : queue_(queue) {
 }
 
 CommandContext::~CommandContext() = default;
 
-bool CommandContext::SupportsQueue(QueueType type) const {
+bool CommandContext::SupportsQueue() const {
+  const auto type = queue_->GetType();
   if (type == QUEUE_TYPE_GRAPHICS)
     return true;
   for (const auto &entry : resources_) {
@@ -166,10 +171,12 @@ bool CommandContext::SupportsQueue(QueueType type) const {
   return true;
 }
 
-void CommandContext::ConfigureSubmission(QueueType queue, uint64_t value, std::vector<ObjectPtr<Event>> waits) {
-  submission_queue_ = queue;
-  submission_value_ = value;
-  submission_waits_ = std::move(waits);
+ISubmissionToken *CommandContext::Submit(const SubmitInfo &info) {
+  return queue_->Submit(this, info);
+}
+
+Queue *CommandContext::OwnerQueue() const noexcept {
+  return queue_;
 }
 
 void CommandContext::BindDownloads(SubmissionToken *submission) {
@@ -228,7 +235,7 @@ bool CommandContext::Seal() {
 }
 
 const void *CommandContext::DeviceIdentity() const {
-  return identity_;
+  return queue_->Owner()->NativeIdentity();
 }
 
 void CommandContext::MarkSubmitted() {

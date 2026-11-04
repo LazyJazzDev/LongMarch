@@ -32,13 +32,7 @@ class D3D12Device final : public Device {
   ID3D12CommandQueue *NativeQueue(QueueType type = QUEUE_TYPE_GRAPHICS) const;
   ID3D12Fence *Fence(QueueType type = QUEUE_TYPE_GRAPHICS) const;
   bool SupportsTearing() const;
-  bool SharesNativeQueue(QueueType a, QueueType b) const override;
 
-  bool HasNativeTimelines() const override {
-    return true;
-  }
-
-  bool QueryTimeline(QueueType type, uint64_t &value) const override;
   bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const override;
   void WakeCollector() override;
   std::mutex &QueueMutex(QueueType type = QUEUE_TYPE_GRAPHICS);
@@ -57,8 +51,6 @@ class D3D12Device final : public Device {
 
   D3D12ScratchPool &ScratchPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
-  rhi::ICommandContext *CreateCommandContext() override;
-  rhi::IQueue *GetQueue(QueueType type) override;
 
   // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
   // The pool grows on demand, independently of swapchain image count.
@@ -86,15 +78,7 @@ class D3D12Device final : public Device {
   D3D12TransientDescriptorPool resource_descriptors_, sampler_descriptors_;
   D3D12DescriptorPool resource_descriptor_storage_, sampler_descriptor_storage_;
   ComPtr<IDXGIFactory4> factory_;
-  ComPtr<ID3D12CommandQueue> queue_;
-  ComPtr<ID3D12Fence> fence_;
-  ComPtr<ID3D12CommandQueue> transfer_queue_;
-  ComPtr<ID3D12Fence> transfer_fence_;
   ComPtr<ID3D12Device1> device1_;
-  std::mutex transfer_mutex_;
-  uint64_t transfer_serial_{};
-  std::mutex mutex_;
-  uint64_t serial_{};
   bool tearing_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

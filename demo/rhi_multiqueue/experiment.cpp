@@ -54,7 +54,7 @@ Result Run(BackendAPI api, bool synchronize, bool validation, uint32_t frames, u
     if (!init || !init->CmdUploadBuffer(vertices.Get(), 0, data.data(), sizeof(data)) ||
         !init->CmdUploadBuffer(scratch_a.Get(), 0, zero.data(), zero.size()))
       return result;
-    ObjPtr<ISubmissionToken> done = graphics->Submit(init.Get());
+    ObjPtr<ISubmissionToken> done = init->Submit();
     if (!done || !done->WaitHost())
       return result;
   }
@@ -74,7 +74,7 @@ Result Run(BackendAPI api, bool synchronize, bool validation, uint32_t frames, u
     }
     if (!update->CmdUploadBuffer(vertices.Get(), 0, data.data(), sizeof(data)))
       return result;
-    ObjPtr<ISubmissionToken> updated = transfer->Submit(update.Get());
+    ObjPtr<ISubmissionToken> updated = update->Submit();
     if (!updated)
       return result;
     update.Release();
@@ -96,7 +96,7 @@ Result Run(BackendAPI api, bool synchronize, bool validation, uint32_t frames, u
     SubmitInfo submit;
     if (synchronize)
       submit.waits = {ready.Get()};
-    ObjPtr<ISubmissionToken> rendered = graphics->Submit(render.Get(), submit);
+    ObjPtr<ISubmissionToken> rendered = render->Submit(submit);
     render.Release();
     const bool rendered_ok = rendered && rendered->WaitHost();
     // Always join both queues before reusing data or destroying this frame's resources.

@@ -81,20 +81,15 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
       LogWarning(
           "D3D12 debug message callbacks are unavailable; validation messages remain in the native debug output.");
   }
-  D3D12_COMMAND_QUEUE_DESC desc{};
-  desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-  if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2"))
+  if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2") ||
+      !Check(object->device_.As(&object->device1_), "Query ID3D12Device1"))
     return nullptr;
-  if (!Check(object->device_->CreateCommandQueue(&desc, IID_PPV_ARGS(&object->queue_)), "CreateCommandQueue"))
-    return nullptr;
-  if (!Check(object->device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&object->fence_)), "CreateFence"))
-    return nullptr;
-  if (!Check(object->device_.As(&object->device1_), "Query ID3D12Device1") ||
-      !Check(object->device_->CreateCommandQueue(&desc, IID_PPV_ARGS(&object->transfer_queue_)),
-             "Create transfer queue") ||
-      !Check(object->device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&object->transfer_fence_)),
-             "Create transfer timeline"))
-    return nullptr;
+  for (auto type : {QUEUE_TYPE_GRAPHICS, QUEUE_TYPE_TRANSFER}) {
+    auto queue = ObjectPtr<D3D12Queue>::Adopt(D3D12Queue::Create(object.get(), type));
+    if (!queue)
+      return nullptr;
+    object->InitializeQueue(std::move(queue));
+  }
   ComPtr<IDXGIAdapter> adapter;
   if (!Check(object->factory_->EnumAdapterByLuid(object->device_->GetAdapterLuid(), IID_PPV_ARGS(&adapter)),
              "Find allocation adapter"))
@@ -149,11 +144,11 @@ IDXGIFactory4 *D3D12Device::Factory() const {
 }
 
 ID3D12CommandQueue *D3D12Device::NativeQueue(QueueType type) const {
-  return type == QUEUE_TYPE_TRANSFER ? transfer_queue_.Get() : queue_.Get();
+  return static_cast<D3D12Queue *>(QueueState(type))->Native();
 }
 
 ID3D12Fence *D3D12Device::Fence(QueueType type) const {
-  return type == QUEUE_TYPE_TRANSFER ? transfer_fence_.Get() : fence_.Get();
+  return static_cast<D3D12Queue *>(QueueState(type))->Timeline();
 }
 
 bool D3D12Device::SupportsTearing() const {
@@ -161,34 +156,19 @@ bool D3D12Device::SupportsTearing() const {
 }
 
 std::mutex &D3D12Device::QueueMutex(QueueType type) {
-  return type == QUEUE_TYPE_TRANSFER ? transfer_mutex_ : mutex_;
+  return QueueState(type)->Mutex();
 }
 
 uint64_t D3D12Device::NextSerial(QueueType type) {
-  return type == QUEUE_TYPE_TRANSFER ? ++transfer_serial_ : ++serial_;
+  return QueueState(type)->NextSerial();
 }
 
 bool D3D12Device::Wait(uint64_t value, HANDLE event, QueueType type) const {
-  auto fence = Fence(type);
-  if (fence->GetCompletedValue() == UINT64_MAX)
-    return false;
-  if (fence->GetCompletedValue() >= value)
-    return true;
-  if (!Check(fence->SetEventOnCompletion(value, event), "SetEventOnCompletion"))
-    return false;
-  DWORD result;
-  do {
-    result = WaitForSingleObject(event, 50);
-    if (FAILED(device_->GetDeviceRemovedReason()))
-      return false;
-  } while (result == WAIT_TIMEOUT);
-  return result == WAIT_OBJECT_0 && fence->GetCompletedValue() != UINT64_MAX;
+  return static_cast<D3D12Queue *>(QueueState(type))->Wait(value, event);
 }
 
 bool D3D12Device::WaitIdle(QueueType type) {
-  auto value = NextSerial(type);
-  return Check(NativeQueue(type)->Signal(Fence(type), value), "Signal idle fence") &&
-         WaitTimelines({{type, value}}, true);
+  return static_cast<D3D12Queue *>(QueueState(type))->WaitIdle();
 }
 
 D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
@@ -207,6 +187,7 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
 
 D3D12Device::~D3D12Device() {
   ShutdownQueues();
+  ReleaseQueues();
   upload_pool_.Clear();
   download_pool_.Clear();
   scratch_pool_.Clear();
@@ -239,16 +220,6 @@ rhi::IBuffer *D3D12Device::CreateBuffer(const BufferDesc &desc) {
 
 rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {
   return D3D12Window::Create(this, desc);
-}
-
-rhi::ICommandContext *D3D12Device::CreateCommandContext() {
-  return D3D12CommandContext::Create(this);
-}
-
-rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
-  if (type != QUEUE_TYPE_GRAPHICS && type != QUEUE_TYPE_TRANSFER)
-    return nullptr;
-  return new D3D12Queue(this, type);
 }
 
 ISampler *D3D12Device::CreateSampler(const SamplerDesc &desc) {
@@ -290,24 +261,17 @@ D3D12TemporalBufferPool &D3D12Device::DownloadPool() {
 }  // namespace grassland::rhi::backend::d3d12
 
 namespace grassland::rhi::backend::d3d12 {
-bool D3D12Device::SharesNativeQueue(QueueType a, QueueType b) const {
-  return a == b;
-}
-
-bool D3D12Device::QueryTimeline(QueueType type, uint64_t &value) const {
-  value = Fence(type)->GetCompletedValue();
-  return value != UINT64_MAX;
-}
 
 bool D3D12Device::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const {
   std::array<uint64_t, 2> targets{};
   std::array<bool, 2> present{};
   for (auto p : points) {
-    if (!present[p.queue])
-      targets[p.queue] = p.value;
+    if (!present[p.queue->GetType()])
+      targets[p.queue->GetType()] = p.value;
     else
-      targets[p.queue] = wait_all ? std::max(targets[p.queue], p.value) : std::min(targets[p.queue], p.value);
-    present[p.queue] = true;
+      targets[p.queue->GetType()] =
+          wait_all ? std::max(targets[p.queue->GetType()], p.value) : std::min(targets[p.queue->GetType()], p.value);
+    present[p.queue->GetType()] = true;
   }
   std::array<ID3D12Fence *, 2> fences{};
   std::array<uint64_t, 2> values{};
@@ -330,10 +294,11 @@ void D3D12Device::WakeCollector() {
     if (NativeQueue(type) && Fence(type)) {
       auto value = NextSerial(type);
       if (Check(NativeQueue(type)->Signal(Fence(type), value), "Signal collector shutdown"))
-        wake.push_back({type, value});
+        wake.push_back({QueueState(type), value});
     }
   }
   if (!wake.empty())
     WaitTimelines(wake, true);
 }
+
 }  // namespace grassland::rhi::backend::d3d12

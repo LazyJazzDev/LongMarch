@@ -52,7 +52,6 @@ class IDevice : public IObject {
                                   const std::vector<std::pair<std::string, std::string>> &defines = {});
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   virtual IQueue *GetQueue(QueueType type) = 0;
-  virtual ICommandContext *CreateCommandContext() = 0;
   // All events must belong to this device. Empty lists are rejected.
   virtual bool WaitEvents(const std::vector<IEvent *> &events, bool wait_all = true) const = 0;
 

@@ -4,24 +4,22 @@
 
 namespace grassland::rhi::backend {
 class Device;
+class Queue;
 
 struct TimelinePoint {
-  QueueType queue;
+  Queue *queue;
   uint64_t value;
 };
 
 class Event final : public Object<IEvent> {
  public:
-  Event(Device *device, QueueType queue);
+  Event(Queue *queue, uint64_t value);
   SubmissionStatus GetStatus() const override;
   bool WaitHost() const override;
   Device *Owner() const;
   TimelinePoint Point() const;
-  // Bind exactly once, before publishing the accepted submission.
-  void BindSignalValue(uint64_t value);
 
  private:
-  Device *device_;
-  TimelinePoint point_;
+  const TimelinePoint point_;
 };
 }  // namespace grassland::rhi::backend

@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include "grassland/rhi/rhix/rhix.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
@@ -30,10 +30,10 @@ TEST(RhiCoreSettings, D3D12OverridesDefaultAcrossSequentialCores) {
     backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
     EXPECT_EQ(SUCCEEDED(native->QueryInterface(IID_PPV_ARGS(&messages))), enabled);
     ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     ASSERT_TRUE(queue);
     ASSERT_TRUE(commands);
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     ASSERT_TRUE(done->WaitHost());
   }

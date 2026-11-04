@@ -4,6 +4,7 @@
 #include <future>
 
 #include "../../demo/rhi_multiqueue/experiment.h"
+#include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_event.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
@@ -129,6 +130,32 @@ class Gate {
 
 class RhiMultiQueue : public testing::TestWithParam<BackendAPI> {};
 
+TEST_P(RhiMultiQueue, ContextKeepsItsPersistentQueueBindingAfterCallerHandlesAreReleased) {
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  for (auto type : {QUEUE_TYPE_GRAPHICS, QUEUE_TYPE_TRANSFER}) {
+    ObjPtr<IQueue> first = device->GetQueue(type);
+    ObjPtr<IQueue> second = device->GetQueue(type);
+    ASSERT_TRUE(first && second);
+    EXPECT_EQ(first.Get(), second.Get());
+    auto identity = first.Get();
+    ObjPtr<ICommandContext> context = first->CreateCommandContext();
+    ASSERT_TRUE(context);
+    EXPECT_EQ(static_cast<backend::CommandContext *>(context.Get())->OwnerQueue(), identity);
+    first.Release();
+    second.Release();
+    ObjPtr<ISubmissionToken> done = context->Submit();
+    ASSERT_TRUE(done);
+    context.Release();
+    ASSERT_TRUE(done->WaitHost());
+    ObjPtr<IQueue> again = device->GetQueue(type);
+    EXPECT_EQ(again.Get(), identity);
+    EXPECT_EQ(done->GetStatus(), SUBMISSION_STATUS_COMPLETED);
+  }
+}
+
 TEST_P(RhiMultiQueue, IndependentQueueCompletesAndRetiresWhileTransferIsBlocked) {
   ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
@@ -145,8 +172,8 @@ TEST_P(RhiMultiQueue, IndependentQueueCompletesAndRetiresWhileTransferIsBlocked)
   ObjPtr<ICommandContext> slow = transfer->CreateCommandContext();
   ObjPtr<ICommandContext> fast = graphics->CreateCommandContext();
   ASSERT_TRUE(slow && fast);
-  ObjPtr<ISubmissionToken> blocked = transfer->Submit(slow.Get());
-  ObjPtr<ISubmissionToken> done = graphics->Submit(fast.Get());
+  ObjPtr<ISubmissionToken> blocked = slow->Submit();
+  ObjPtr<ISubmissionToken> done = fast->Submit();
   ASSERT_TRUE(blocked && done);
   slow.Release();
   fast.Release();
@@ -166,7 +193,7 @@ TEST_P(RhiMultiQueue, IndependentQueueCompletesAndRetiresWhileTransferIsBlocked)
   }
   SubmitInfo dependencies;
   dependencies.waits = {a.Get(), a.Get(), b.Get()};
-  ObjPtr<ISubmissionToken> dependent = graphics->Submit(dependent_context.Get(), dependencies);
+  ObjPtr<ISubmissionToken> dependent = dependent_context->Submit(dependencies);
   if (!dependent) {
     gate.Release();
     FAIL() << "Could not submit dependent context";

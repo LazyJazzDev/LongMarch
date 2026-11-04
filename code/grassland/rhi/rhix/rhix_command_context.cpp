@@ -1,8 +1,18 @@
-﻿#include "grassland/rhi/rhix/rhix_command_context.h"
+#include "grassland/rhi/rhix/rhix_command_context.h"
 
 #include "grassland/rhi/rhix/rhix_window.h"
 
 namespace grassland::rhix {
+SubmissionToken CommandContext::Submit(const SubmitInfo &info) {
+  CommandContext consumed = std::move(*this);
+  if (!consumed)
+    return {};
+  rhi::SubmitInfo native;
+  for (const auto &event : info.waits)
+    native.waits.push_back(event.Get());
+  return consumed.Get()->Submit(native);
+}
+
 bool CommandContext::CmdBeginRendering(const RenderingInfo &info) {
   rhi::RenderingInfo native;
   for (const auto &color : info.colors)

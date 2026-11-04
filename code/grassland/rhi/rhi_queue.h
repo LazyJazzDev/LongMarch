@@ -1,21 +1,11 @@
 #pragma once
-#include "grassland/rhi/rhi_event.h"
-#include "grassland/rhi/rhi_submission_token.h"
+#include "grassland/rhi/rhi_object.h"
 
 namespace grassland::rhi {
 class ICommandContext;
 
-struct SubmitInfo {
-  // Borrowed for the duration of Submit.
-  std::vector<IEvent *> waits;
-};
-
 class IQueue : public IObject {
  public:
-  // Borrows the context and ends recording. Accepted work retains its resources
-  // until GPU completion. Submitted contexts cannot record or submit again.
-  // Returns an owned completion token, or nullptr on failure.
-  virtual ISubmissionToken *Submit(ICommandContext *commands, const SubmitInfo &info = {}) = 0;
   virtual QueueType GetType() const = 0;
   // Use this factory for contexts intended for this queue (required by Metal).
   virtual ICommandContext *CreateCommandContext() = 0;

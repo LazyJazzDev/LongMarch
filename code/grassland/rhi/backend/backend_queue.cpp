@@ -2,8 +2,9 @@
 
 #include <system_error>
 
-namespace grassland::rhi::backend {
+#include "grassland/rhi/backend/backend_device.h"
 
+namespace grassland::rhi::backend {
 Queue::Queue(Device *device, QueueType type) : device_(device), type_(type) {
 }
 
@@ -17,41 +18,51 @@ QueueType Queue::GetType() const {
   return type_;
 }
 
-bool Queue::SharesPhysicalQueue(const rhi::IQueue *other) const {
+const void *Queue::NativeIdentity() const {
+  return device_;
+}
+
+std::mutex &Queue::Mutex() {
+  return mutex_;
+}
+
+uint64_t Queue::NextSerial() {
+  return ++serial_;
+}
+
+bool Queue::HasNativeTimeline() const {
+  return false;
+}
+
+bool Queue::QueryTimeline(uint64_t &value) const {
+  value = completed_.load();
+  return true;
+}
+
+void Queue::RecordCompletion(uint64_t value) {
+  completed_.store(value);
+}
+
+bool Queue::SharesPhysicalQueue(const IQueue *other) const {
   const auto queue = dynamic_cast<const Queue *>(other);
-  return queue && Owner() == queue->Owner() && Owner()->SharesNativeQueue(type_, queue->type_);
+  return queue && Owner() == queue->Owner() && NativeIdentity() == queue->NativeIdentity();
 }
 
-ICommandContext *Queue::CreateCommandContext() {
-  return Owner()->CreateContextForQueue(type_);
-}
-
-rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info) {
-#if !defined(NDEBUG)
-  const auto impl = dynamic_cast<CommandContext *>(commands);
-  if (!impl || impl->DeviceIdentity() != Owner()->NativeIdentity()) {
-    ReportError(-1, "Commands must be submitted to a queue from their device.");
+ISubmissionToken *Queue::Submit(CommandContext *commands, const SubmitInfo &info) {
+  if (commands->OwnerQueue() != this)
     return nullptr;
-  }
-#else
-  const auto impl = static_cast<CommandContext *>(commands);
-#endif
   try {
     std::vector<ObjectPtr<Event>> waits;
-    waits.reserve(info.waits.size());
-    for (auto token : info.waits) {
-#if !defined(NDEBUG)
-      auto state = dynamic_cast<Event *>(token);
-#else
-      auto state = static_cast<Event *>(token);
-#endif
-      waits.push_back(ObjectPtr<Event>::Retain(state));
+    for (auto event : info.waits) {
+      auto native = dynamic_cast<Event *>(event);
+      if (!native || native->Owner() != Owner())
+        return nullptr;
+      waits.push_back(ObjectPtr<Event>::Retain(native));
     }
-    return Owner()->Submit(ObjectPtr<CommandContext>::Retain(impl), waits, type_).Detach();
+    return Owner()->Submit(ObjectPtr<CommandContext>::Retain(commands), waits, this).Detach();
   } catch (const std::system_error &error) {
     ReportError(error.code().value(), error.what());
   }
   return nullptr;
 }
-
 }  // namespace grassland::rhi::backend

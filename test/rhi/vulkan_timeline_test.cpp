@@ -25,10 +25,10 @@ TEST(RhiVulkanTimeline, CompletionValuesSurviveContextRecyclingAcrossLogicalQueu
   for (int batch = 0; batch < 8; ++batch) {
     std::vector<ObjPtr<ISubmissionToken>> tokens;
     for (int i = 0; i < 8; ++i) {
-      ObjPtr<ICommandContext> context = device->CreateCommandContext();
-      ASSERT_TRUE(context);
       auto queue = i % 2 ? graphics.Get() : transfer.Get();
-      ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+      ObjPtr<ICommandContext> context = queue->CreateCommandContext();
+      ASSERT_TRUE(context);
+      ObjPtr<ISubmissionToken> token = context->Submit();
       ASSERT_TRUE(token);
       tokens.push_back(std::move(token));
     }  // Caller references are gone; Device retires and recycles native commands.

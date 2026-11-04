@@ -18,26 +18,28 @@ The normal mode enables backend validation and waits for the update event on the
 ```cpp
 ObjPtr<ICommandContext> upload = transfer->CreateCommandContext();
 // Record updates...
-ObjPtr<ISubmissionToken> updated = transfer->Submit(upload.Get());
+ObjPtr<ISubmissionToken> updated = upload->Submit();
 ObjPtr<IEvent> ready = updated->GetEvent();
 
 SubmitInfo info;
 info.waits = {ready.Get()};
-ObjPtr<ISubmissionToken> rendered = graphics->Submit(render.Get(), info);
+ObjPtr<ICommandContext> render = graphics->CreateCommandContext();
+// Record rendering...
+ObjPtr<ISubmissionToken> rendered = render->Submit(info);
 rendered->WaitHost();
 ```
 
 - `IEvent` is an immutable timeline point. `GetEvent()` returns one owned reference. It retains no command context or submitted resource payload.
 - `IEvent::WaitHost()` waits for GPU synchronization progress. `ISubmissionToken::WaitHost()` additionally waits for Collector retirement and result publication. A signaled event alone does not prove that a submission succeeded or that a download token is ready.
 - `IDevice::WaitEvents(events, true)` waits for All; `false` waits for Any. The list must be nonempty and belong to one Device. Query individual events to identify completed points after Any returns. RHIX supplies the corresponding wrappers.
-- Use `IQueue::CreateCommandContext()` to create a context for its intended queue. Metal command buffers are bound to their creation queue. The existing Device factory creates Graphics contexts.
+- Only `IQueue::CreateCommandContext()` creates contexts. Each context is permanently bound to that Queue and submits through `ICommandContext::Submit(info)`; no queue argument is needed. Device caches one persistent Queue object per role, so releasing caller Queue handles does not change the binding.
 - As with other RHI children, release events and queues before their Device.
 
 ## Fixed queues and retirement
 
-Graphics and Transfer roles are established at Device creation. Their native timelines have independent monotonically increasing values. Cross-queue waits are encoded on the GPU; Submit does not wait on the CPU for its dependencies.
+Graphics and Transfer roles are established at Device creation. Each Queue owns its native queue, timeline, submission mutex, and serial allocator. Their native timelines have independent monotonically increasing values. Cross-queue waits are encoded on the GPU; Submit does not wait on the CPU for its dependencies.
 
-One Collector thread waits for Any of the fixed queues' current completed values plus one, even if the next Submit does not exist yet. It queries progress and retires all eligible records, so a blocked queue does not hold back another queue's completed records. Retirement records are allocated before native submission and published under the submission lock. The Collector releases its payload reference before publishing a Token result. Native GPU completion wakes it; ordinary Submit does not notify it. Shutdown submits and drains empty timeline signals to wake an otherwise idle Collector.
+One Collector thread waits for Any of the fixed queues' current completed values plus one, even if the next Submit does not exist yet. It queries progress and retires all eligible records, so a blocked queue does not hold back another queue's completed records. Retirement records own the submission waits, timeline point, and failure state; command contexts retain only their Queue binding. The Queue allocates a serial before native submission, creating an immutable Event. Retirement records are allocated before native submission and published under the submission lock. The Collector releases its payload reference before publishing a Token result. Native GPU completion wakes it; ordinary Submit does not notify it. Shutdown submits and drains empty timeline signals to wake an otherwise idle Collector.
 
 - D3D12 creates two distinct DIRECT queues and two fences. Transfer is a role, not a promise to use a dedicated DMA engine. Existing general command lists and COMMON resource boundaries remain compatible. Swapchain images must stay on Graphics; a Transfer submission that directly references one is rejected before native execution. CPU batch waits use `ID3D12Device1::SetEventOnMultipleFenceCompletion`.
 - Vulkan uses two queue indices in one Graphics/Compute family, avoiding cross-family ownership transfers. Each has its own Timeline Semaphore; waits use `vkWaitSemaphores`. If that family exposes only one queue, the roles alias and `SharesPhysicalQueue()` reports it. The demo rejects this configuration rather than claiming a multiqueue result.

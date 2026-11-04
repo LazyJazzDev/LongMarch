@@ -2,10 +2,12 @@
 
 #include <cstring>
 
+#include "grassland/rhi/backend/backend_submission.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_download_token.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
@@ -27,18 +29,17 @@ MTL::ClearColor NativeClearColor(ImageFormat format, const ClearColorValue &valu
 }
 }  // namespace
 
-MetalCommandContext::MetalCommandContext(MetalDevice *device, QueueType type)
-    : CommandContext(device),
-      device_(device),
-      recording_queue_(type) {
+MetalCommandContext::MetalCommandContext(MetalQueue *queue)
+    : CommandContext(queue),
+      device_(static_cast<MetalDevice *>(queue->Owner())) {
 }
 
-MetalCommandContext *MetalCommandContext::Create(MetalDevice *device, QueueType type) {
-  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(device, type));
+MetalCommandContext *MetalCommandContext::Create(MetalQueue *queue) {
+  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(queue));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   // Metal command buffers are single-use. The persistent native queue manages
   // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
-  object->commands_ = object->device_->CreateCommandBuffer(type);
+  object->commands_ = queue->CreateCommandBuffer();
   if (!object->commands_) {
     ReportError(-1, "Metal command buffer creation failed.");
     return nullptr;
@@ -150,8 +151,9 @@ bool MetalCommandContext::EndRecording() {
   return true;
 }
 
-CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
-  if (submission_queue_ != QUEUE_TYPE_GRAPHICS && !presents_.empty())
+CommandContext::SubmitResult MetalCommandContext::SubmitNative(Submission &submission) {
+  auto queue = static_cast<MetalQueue *>(OwnerQueue());
+  if (queue->GetType() != QUEUE_TYPE_GRAPHICS && !presents_.empty())
     return SUBMIT_RESULT_REJECTED;
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
@@ -165,21 +167,19 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
 #endif
   {
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    std::lock_guard<std::mutex> lock(device_->QueueMutex(submission_queue_));
-    if (!submission_waits_.empty()) {
-      auto dependency = device_->CreateCommandBuffer(submission_queue_);
+    if (!submission.waits.empty()) {
+      auto dependency = queue->CreateCommandBuffer();
       if (!dependency)
         return SUBMIT_RESULT_REJECTED;
-      for (const auto &event : submission_waits_) {
+      for (const auto &event : submission.waits) {
         auto p = event->Point();
-        if (p.queue != submission_queue_)
-          dependency->encodeWait(device_->Timeline(p.queue), p.value);
+        if (p.queue != queue)
+          dependency->encodeWait(static_cast<MetalQueue *>(p.queue)->Timeline(), p.value);
       }
       dependency->commit();
     }
-    submission_value_ = device_->NextSerial(submission_queue_);
-    commands_->encodeSignalEvent(device_->Timeline(submission_queue_), submission_value_);
-    device_->TrackCompletion(commands_.get(), submission_queue_);
+    commands_->encodeSignalEvent(queue->Timeline(), submission.point.value);
+    device_->TrackCompletion(commands_.get(), queue);
     for (const auto &present : presents_)
       commands_->presentDrawable(present.second->NativeDrawable());
     commands_->commit();
@@ -190,9 +190,13 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
     for (const auto &present : presents_)
       present.second->DidPresent();
   }
+  return SUBMIT_RESULT_SUBMITTED;
+}
+
+CommandContext::SubmitResult MetalCommandContext::FinishSubmitNative(Submission &submission) {
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
-      submission_failed_ = true;
+      submission.failed = true;
       ReportError(-1, "Failed to prepare the next Metal drawable after submission.");
       return SUBMIT_RESULT_FAILED_IN_FLIGHT;
     }
@@ -200,7 +204,7 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-SubmissionStatus MetalCommandContext::WaitForProgress() {
+SubmissionStatus MetalCommandContext::WaitForProgress(Submission &submission) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   commands_->waitUntilCompleted();
   if (commands_->status() == MTL::CommandBufferStatusError) {
@@ -210,7 +214,7 @@ SubmissionStatus MetalCommandContext::WaitForProgress() {
   }
   if (commands_->status() != MTL::CommandBufferStatusCompleted)
     return SUBMISSION_STATUS_PENDING;
-  return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
+  return submission.failed ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
 }
 
 MetalCommandContext::~MetalCommandContext() {

@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <cstdlib>
 
@@ -323,7 +323,7 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
     ASSERT_TRUE(PollEvents());
     ObjPtr<IImage> image = window->GetNextImage();
     ASSERT_TRUE(image);
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
     ASSERT_TRUE(commands->CmdBindVertexBuffer(0, geometry.Get()));
@@ -350,7 +350,7 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
       geometry.Release();
       image.Release();
     }
-    done = queue->Submit(commands.Get());
+    done = commands->Submit();
     ASSERT_TRUE(done);
   }
   ASSERT_TRUE(done->WaitHost());
@@ -382,7 +382,7 @@ TEST_P(RhiProgram, ExplicitRenderingSupportsEmptyScopesAndAttachmentOperations) 
   ASSERT_TRUE(queue);
   ObjPtr<IImage> image = window->GetNextImage();
   ASSERT_TRUE(image);
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
   ASSERT_TRUE(commands);
   for (auto load : {ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_LOAD_OP_DISCARD}) {
     for (auto store : {ATTACHMENT_STORE_OP_STORE, ATTACHMENT_STORE_OP_DISCARD}) {
@@ -396,7 +396,7 @@ TEST_P(RhiProgram, ExplicitRenderingSupportsEmptyScopesAndAttachmentOperations) 
       {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}}}));
   ASSERT_TRUE(commands->CmdEndRendering());
   ASSERT_TRUE(commands->CmdPresent(window.Get()));
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   ASSERT_TRUE(done->WaitHost());
 }
@@ -418,7 +418,7 @@ TEST_P(RhiProgram, ExplicitRenderingRejectsUnbalancedScopesAndOutsideCommands) {
   ObjPtr<IBuffer> buffer = device->CreateBuffer({16});
   ASSERT_TRUE(buffer);
   for (int operation = 0; operation < 7; ++operation) {
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     ASSERT_TRUE(commands);
     if (operation == 0) {
       EXPECT_FALSE(commands->CmdEndRendering());
@@ -445,7 +445,7 @@ TEST_P(RhiProgram, ExplicitRenderingRejectsUnbalancedScopesAndOutsideCommands) {
           break;  // Submission must not implicitly end an open scope.
       }
     }
-    ObjPtr<ISubmissionToken> rejected = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> rejected = commands->Submit();
     EXPECT_FALSE(rejected);
   }
 }
@@ -754,7 +754,8 @@ TEST_P(RhiProgram, StructuredLayoutStrideControlsCompatibilityAndRanges) {
   group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, buffer.Get()));
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<IQueue> commands_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<ICommandContext> commands = commands_queue->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
   EXPECT_FALSE(commands->CmdBindGroup(0, group.Get()));
@@ -803,8 +804,10 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   EXPECT_EQ(a->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
   EXPECT_EQ(version->SamplerDescriptors()->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
   auto sampler = version->SamplerDescriptors()->CPU().ptr;
-  ObjPtr<ICommandContext> first = device->CreateCommandContext();
-  ObjPtr<ICommandContext> second = device->CreateCommandContext();
+  ObjPtr<IQueue> first_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<ICommandContext> first = first_queue->CreateCommandContext();
+  ObjPtr<IQueue> second_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<ICommandContext> second = second_queue->CreateCommandContext();
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
   ASSERT_TRUE(first->CmdBindProgram(wide.Get()));
@@ -820,7 +823,8 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   EXPECT_NE(replacement, version);
   EXPECT_NE(replacement->SamplerDescriptors()->CPU().ptr, sampler);
   EXPECT_EQ(version->ResourceDescriptors(), a);
-  ObjPtr<ICommandContext> rejected = device->CreateCommandContext();
+  ObjPtr<IQueue> rejected_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<ICommandContext> rejected = rejected_queue->CreateCommandContext();
   ASSERT_TRUE(rejected);
   ASSERT_TRUE(rejected->CmdBindProgram(narrow.Get()));
   EXPECT_FALSE(rejected->CmdBindGroup(0, group.Get()));

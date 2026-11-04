@@ -1,31 +1,26 @@
 #include "grassland/rhi/backend/backend_event.h"
 
-#include <cassert>
-
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_queue.h"
 
 namespace grassland::rhi::backend {
-Event::Event(Device *device, QueueType queue) : device_(device), point_{queue, 0} {
+Event::Event(Queue *queue, uint64_t value) : point_{queue, value} {
 }
 
 SubmissionStatus Event::GetStatus() const {
-  return device_->QueryEvent(point_);
+  return Owner()->QueryEvent(point_);
 }
 
 bool Event::WaitHost() const {
-  return device_->WaitTimelines({point_}, true);
+  return Owner()->WaitTimelines({point_}, true);
 }
 
 Device *Event::Owner() const {
-  return device_;
+  return point_.queue->Owner();
 }
 
 TimelinePoint Event::Point() const {
   return point_;
 }
 
-void Event::BindSignalValue(uint64_t value) {
-  assert(point_.value == 0 && value != 0);
-  point_.value = value;
-}
 }  // namespace grassland::rhi::backend

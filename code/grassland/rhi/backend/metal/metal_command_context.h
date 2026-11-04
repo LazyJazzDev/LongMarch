@@ -7,6 +7,7 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
+class MetalQueue;
 class MetalProgram;
 class MetalComputeProgram;
 class MetalProgramBase;
@@ -17,12 +18,8 @@ class MetalSwapChainImage;
 
 class MetalCommandContext final : public CommandContext {
  public:
-  static MetalCommandContext *Create(MetalDevice *device, QueueType type = QUEUE_TYPE_GRAPHICS);
+  static MetalCommandContext *Create(MetalQueue *queue);
   ~MetalCommandContext() override;
-
-  bool SupportsQueue(QueueType type) const override {
-    return type == recording_queue_ && CommandContext::SupportsQueue(type);
-  }
 
   bool CmdBuildBottomLevelAccelerationStructure(
       IBottomLevelAccelerationStructure *destination,
@@ -64,11 +61,12 @@ class MetalCommandContext final : public CommandContext {
                       uint32_t first_instance = 0) override;
   bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
   bool CmdPresent(rhi::IWindow *window) override;
-  SubmitResult SubmitNative() override;
-  SubmissionStatus WaitForProgress() override;
+  SubmitResult SubmitNative(Submission &submission) override;
+  SubmitResult FinishSubmitNative(Submission &submission) override;
+  SubmissionStatus WaitForProgress(Submission &submission) override;
 
  private:
-  MetalCommandContext(MetalDevice *device, QueueType type);
+  MetalCommandContext(MetalQueue *queue);
 
   bool EndRecording() override;
   std::vector<MTL::Resource *> AccelerationResources();
@@ -95,10 +93,8 @@ class MetalCommandContext final : public CommandContext {
   bool viewport_set_{}, scissor_set_{};
 
   MetalDevice *device_;
-  QueueType recording_queue_;
   NS::SharedPtr<MTL::CommandBuffer> commands_;
   std::vector<std::pair<MetalWindow *, MetalSwapChainImage *>> presents_;
-  bool submission_failed_{};
 };
 
 }  // namespace grassland::rhi::backend::metal

@@ -6,11 +6,13 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_glfw_helper.h"
+#include "grassland/rhi/backend/backend_submission.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_download_token.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
@@ -18,7 +20,9 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(device), device_(device) {
+D3D12CommandContext::D3D12CommandContext(D3D12Queue *queue)
+    : CommandContext(queue),
+      device_(static_cast<D3D12Device *>(queue->Owner())) {
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
@@ -34,12 +38,12 @@ D3D12CommandContext::~D3D12CommandContext() {
     CloseHandle(event_);
 }
 
-D3D12CommandContext *D3D12CommandContext::Create(D3D12Device *device) {
-  auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(device));
+D3D12CommandContext *D3D12CommandContext::Create(D3D12Queue *queue) {
+  auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(queue));
   object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_, object->event_);
   if (!object->reusable_)
     return nullptr;
-  if (device->SupportRayTracingPipeline() || device->SupportRayQuery()) {
+  if (object->device_->SupportRayTracingPipeline() || object->device_->SupportRayQuery()) {
     if (FAILED(object->list_.As(&object->ray_list_)))
       return nullptr;
   }
@@ -223,8 +227,9 @@ bool D3D12CommandContext::EndRecording() {
   return closed_;
 }
 
-CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
-  if (submission_queue_ != QUEUE_TYPE_GRAPHICS && !presents_.empty())
+CommandContext::SubmitResult D3D12CommandContext::SubmitNative(Submission &submission) {
+  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
+  if (queue->GetType() != QUEUE_TYPE_GRAPHICS && !presents_.empty())
     return SUBMIT_RESULT_REJECTED;
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
@@ -237,18 +242,15 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
   }
 #endif
   {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex(submission_queue_));
-    for (const auto &wait : submission_waits_) {
+    for (const auto &wait : submission.waits) {
       const auto p = wait->Point();
-      if (p.queue != submission_queue_ &&
-          !Check(device_->NativeQueue(submission_queue_)->Wait(device_->Fence(p.queue), p.value), "Queue::Wait"))
+      if (p.queue != queue &&
+          !Check(queue->Native()->Wait(static_cast<D3D12Queue *>(p.queue)->Timeline(), p.value), "Queue::Wait"))
         return SUBMIT_RESULT_REJECTED;
     }
-    submission_failed_ = true;
-    value_ = device_->NextSerial(submission_queue_);
-    submission_value_ = value_;
+    submission.failed = true;
     ID3D12CommandList *lists[] = {list_.Get()};
-    device_->NativeQueue(submission_queue_)->ExecuteCommandLists(1, lists);
+    queue->Native()->ExecuteCommandLists(1, lists);
     MarkSubmitted();
     for (auto &entry : as_dependencies_)
       entry.first->CommitDependencies(std::move(entry.second));
@@ -258,34 +260,39 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
       if (!Check(present.second->Present(), "Swapchain::Present"))
         presented = false;
     }
-    submission_failed_ = !Check(
-        device_->NativeQueue(submission_queue_)->Signal(device_->Fence(submission_queue_), value_), "Queue::Signal");
+    submission.failed = !Check(queue->Native()->Signal(queue->Timeline(), submission.point.value), "Queue::Signal");
     if (!presented)
-      submission_failed_ = true;
+      submission.failed = true;
   }
-  if (submission_failed_)
+  if (submission.failed)
     return SUBMIT_RESULT_FAILED_IN_FLIGHT;
+  return SUBMIT_RESULT_SUBMITTED;
+}
+
+CommandContext::SubmitResult D3D12CommandContext::FinishSubmitNative(Submission &submission) {
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next swapchain image after submission.");
-      std::abort();
+      submission.failed = true;
+      return SUBMIT_RESULT_FAILED_IN_FLIGHT;
     }
   }
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-SubmissionStatus D3D12CommandContext::WaitForProgress() {
-  if (submission_failed_) {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex(submission_queue_));
-    if (device_->WaitIdle(submission_queue_) || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
+SubmissionStatus D3D12CommandContext::WaitForProgress(Submission &submission) {
+  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
+  if (submission.failed) {
+    std::lock_guard<std::mutex> lock(queue->Mutex());
+    if (queue->WaitIdle() || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
       return SUBMISSION_STATUS_FAILED;
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     return SUBMISSION_STATUS_PENDING;
   }
-  if (device_->Wait(value_, event_, submission_queue_))
+  if (queue->Wait(submission.point.value, event_))
     return SUBMISSION_STATUS_COMPLETED;
   // A failed host wait does not prove that GPU resource use has ended.
-  submission_failed_ = true;
+  submission.failed = true;
   return SUBMISSION_STATUS_PENDING;
 }
 

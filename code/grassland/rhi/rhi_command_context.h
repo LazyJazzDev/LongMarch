@@ -1,13 +1,19 @@
-﻿#pragma once
+#pragma once
 #include <array>
 
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_download_token.h"
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
+#include "grassland/rhi/rhi_submission_token.h"
 #include "grassland/rhi/rhi_util.h"
 
 namespace grassland::rhi {
+struct SubmitInfo {
+  // Borrowed during Submit; the accepted submission retains its dependencies.
+  std::vector<IEvent *> waits;
+};
+
 class IBuffer;
 class IProgram;
 class IComputeProgram;
@@ -50,6 +56,9 @@ class IWindow;
 
 class ICommandContext : public IObject {
  public:
+  // Ends recording and submits to the queue that created this context.
+  // Returns an owned token. A context can be submitted only once.
+  virtual ISubmissionToken *Submit(const SubmitInfo &info = {}) = 0;
   // AS build/copy/query and DispatchRays require no active rendering scope.
   // Modifying contexts for one AS must be submitted before recording later uses
   // in another context; Build/Update retain inputs and rent scratch automatically.

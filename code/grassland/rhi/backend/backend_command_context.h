@@ -3,13 +3,14 @@
 #include <unordered_map>
 
 #include "grassland/rhi/backend/backend_download_token.h"
-#include "grassland/rhi/backend/backend_event.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_command_context.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend {
+class Queue;
+struct Submission;
 
 class CommandContext : public Object<rhi::ICommandContext> {
  public:
@@ -37,7 +38,9 @@ class CommandContext : public Object<rhi::ICommandContext> {
     SUBMIT_RESULT_FAILED_IN_FLIGHT,
   } SubmitResult;
 
-  CommandContext(const void *identity);
+  explicit CommandContext(Queue *queue);
+  ISubmissionToken *Submit(const SubmitInfo &info = {}) override;
+  Queue *OwnerQueue() const noexcept;
   ~CommandContext() override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
   bool CmdCopyBuffer(IBuffer *source,
@@ -74,14 +77,16 @@ class CommandContext : public Object<rhi::ICommandContext> {
   void MarkSubmitted();
   bool WasSubmitted() const;
 
-  uint64_t SubmissionValue() const {
-    return submission_value_;
+  bool SupportsQueue() const;
+  // The queue mutex is held and the immutable signal value has been allocated.
+  virtual SubmitResult SubmitNative(Submission &submission) = 0;
+
+  // Runs outside the queue mutex (e.g. acquiring the next swapchain image).
+  virtual SubmitResult FinishSubmitNative(Submission &) {
+    return SUBMIT_RESULT_SUBMITTED;
   }
 
-  virtual bool SupportsQueue(QueueType type) const;
-  void ConfigureSubmission(QueueType queue, uint64_t value, std::vector<ObjectPtr<Event>> waits);
-  virtual SubmitResult SubmitNative() = 0;
-  virtual SubmissionStatus WaitForProgress() = 0;
+  virtual SubmissionStatus WaitForProgress(Submission &submission) = 0;
 
  protected:
   // Call before encoding each resource use. Retains each exact object once.
@@ -90,15 +95,12 @@ class CommandContext : public Object<rhi::ICommandContext> {
   virtual bool EndRecording() = 0;
   bool PrepareRendering(const RenderingInfo &info);
   bool RenderingMatches(const IProgram *program) const;
-  QueueType submission_queue_{QUEUE_TYPE_GRAPHICS};
-  uint64_t submission_value_{};
-  std::vector<ObjectPtr<Event>> submission_waits_;
   RenderingInfo rendering_;
   bool recording_failed_{};
   bool sealed_{};
 
  private:
-  const void *identity_;
+  Queue *queue_;
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_;
   bool submitted_{};
   std::vector<ObjectPtr<DownloadToken>> downloads_;

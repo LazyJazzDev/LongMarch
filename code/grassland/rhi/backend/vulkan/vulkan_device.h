@@ -36,13 +36,7 @@ class VulkanDevice final : public Device {
   VkQueue NativeQueue(QueueType type = QUEUE_TYPE_GRAPHICS) const;
   uint32_t QueueFamily() const;
   bool SupportsSwapchain() const;
-  bool SharesNativeQueue(QueueType a, QueueType b) const override;
 
-  bool HasNativeTimelines() const override {
-    return true;
-  }
-
-  bool QueryTimeline(QueueType type, uint64_t &value) const override;
   bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const override;
   void WakeCollector() override;
   std::mutex &QueueMutex(QueueType type = QUEUE_TYPE_GRAPHICS);
@@ -58,8 +52,6 @@ class VulkanDevice final : public Device {
 
   VulkanScratchPool &ScratchPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
-  rhi::ICommandContext *CreateCommandContext() override;
-  rhi::IQueue *GetQueue(QueueType type) override;
 
   // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
   // The pool grows on demand, independently of swapchain image count.
@@ -79,15 +71,7 @@ class VulkanDevice final : public Device {
   VkDevice device_{VK_NULL_HANDLE};
   DeviceProcedures procedures_;
   VkPhysicalDevice physical_{};
-  VkQueue queue_{};
-  VkSemaphore timeline_{};
-  VkQueue transfer_queue_{};
-  VkSemaphore transfer_timeline_{};
-  uint64_t transfer_serial_{};
-  std::mutex transfer_mutex_;
-  uint64_t next_serial_{};
   uint32_t graphics_queue_family_index_{};
   bool swapchain_enabled_{};
-  std::mutex mutex_;
 };
 }  // namespace grassland::rhi::backend::vulkan

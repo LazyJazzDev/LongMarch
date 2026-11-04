@@ -67,14 +67,6 @@ Queue Device::GetQueue(rhi::QueueType type) const {
   return Get()->GetQueue(type);
 }
 
-CommandContext Device::CreateCommandContext() const {
-#if !defined(NDEBUG)
-  if (!*this)
-    return nullptr;
-#endif
-  return Get()->CreateCommandContext();
-}
-
 Shader Device::CreateShader(const rhi::ShaderDesc &desc) const {
   return Get()->CreateShader(desc);
 }

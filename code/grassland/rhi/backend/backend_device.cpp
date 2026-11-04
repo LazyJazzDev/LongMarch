@@ -1,5 +1,7 @@
 #include "grassland/rhi/backend/backend_device.h"
 
+#include <cassert>
+
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
@@ -23,6 +25,7 @@ IRayTracingProgram *Device::CreateRayTracingProgram(const RayTracingProgramDesc 
 }
 
 Device::Device(PhysicalDevice info, Core *core, BackendAPI api) : api_(api), core_(core), info_(std::move(info)) {
+  collector_points_ = {{nullptr, 1}, {nullptr, 1}};
 }
 
 rhi::IImage *Device::CreateImage(const ImageDesc &) {
@@ -87,12 +90,10 @@ rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &) {
   return nullptr;
 }
 
-rhi::IQueue *Device::GetQueue(QueueType) {
-  return nullptr;
-}
-
-rhi::ICommandContext *Device::CreateCommandContext() {
-  return nullptr;
+rhi::IQueue *Device::GetQueue(QueueType type) {
+  if (type != QUEUE_TYPE_GRAPHICS && type != QUEUE_TYPE_TRANSFER)
+    return nullptr;
+  return ObjectPtr<Queue>::Retain(queues_[type].Get()).Detach();
 }
 
 const PhysicalDevice &Device::GetPhysicalDevice() const noexcept {
@@ -109,8 +110,8 @@ const void *Device::NativeIdentity() const {
 
 ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands,
                                           const std::vector<ObjectPtr<Event>> &waits,
-                                          QueueType queue) {
-  if (!commands->SupportsQueue(queue)) {
+                                          Queue *queue) {
+  if (!commands->SupportsQueue()) {
     ReportError(-1, "The command context or one of its images requires a different queue.");
     return {};
   }
@@ -138,24 +139,28 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopping_)
     return {};
-  const TimelinePoint point{queue, ++submitted_[queue]};
-  auto event = ObjectPtr<Event>::Adopt(new Event(this, queue));
+  std::unique_lock<std::mutex> queue_lock(queue->Mutex());
+  const TimelinePoint point{queue, queue->NextSerial()};
+  auto event = ObjectPtr<Event>::Adopt(new Event(queue, point.value));
   auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(this, event));
-  commands->ConfigureSubmission(queue, point.value, waits);
   if (!collector_.joinable())
     collector_ = std::thread([this] { Collect(); });
   // Allocate the retirement record before submitting any GPU work.
-  pending_.push_back({{}, completion, point});
+  pending_.push_back({{}, completion, point, waits});
+  auto &submission = pending_.back();
   commands->BindDownloads(completion.Get());
   CommandContext::SubmitResult result;
   try {
-    result = commands->SubmitNative();
+    result = commands->SubmitNative(submission);
+    queue_lock.unlock();
+    if (result == CommandContext::SUBMIT_RESULT_SUBMITTED)
+      result = commands->FinishSubmitNative(submission);
   } catch (...) {
+    if (queue_lock.owns_lock())
+      queue_lock.unlock();
     // Even error reporting can allocate after a native submit. Keep already
     // submitted work alive before propagating to the public allocation boundary.
     if (commands->WasSubmitted()) {
-      event->BindSignalValue(commands->SubmissionValue());
-      pending_.back().point.value = commands->SubmissionValue();
       pending_.back().commands = commands;
       if (HasNativeTimelines())
         WakeCollector();
@@ -175,8 +180,6 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
     return {};
   }
   commands->MarkSubmitted();
-  event->BindSignalValue(commands->SubmissionValue());
-  pending_.back().point.value = commands->SubmissionValue();
   pending_.back().commands = commands;
   if (!HasNativeTimelines())
     changed_.notify_one();
@@ -202,14 +205,15 @@ void Device::Collect() {
     }
     SubmissionStatus status;
     do {
-      status = pending.commands->WaitForProgress();
+      status = pending.commands->WaitForProgress(pending);
     } while (status == SUBMISSION_STATUS_PENDING);
     // Release payload before publishing completion; tokens never keep it alive.
     pending.commands->ReleaseDownloads();
     pending.commands.Reset();
+    pending.waits.clear();
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      completed_[pending.point.queue] = pending.point.value;
+      pending.point.queue->RecordCompletion(pending.point.value);
     }
     changed_.notify_all();
     pending.completion->Complete(status);
@@ -228,22 +232,12 @@ void Device::ShutdownQueues() {
     collector_.join();
 }
 
-ICommandContext *Device::CreateContextForQueue(QueueType) {
-  return CreateCommandContext();
-}
-
-bool Device::SharesNativeQueue(QueueType, QueueType) const {
-  return true;
-}
-
 bool Device::HasNativeTimelines() const {
-  return false;
+  return queues_[0] && queues_[0]->HasNativeTimeline();
 }
 
 bool Device::QueryTimeline(QueueType type, uint64_t &value) const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  value = completed_[type];
-  return true;
+  return queues_[type] && queues_[type]->QueryTimeline(value);
 }
 
 bool Device::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const {
@@ -251,7 +245,11 @@ bool Device::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_a
   changed_.wait(lock, [&] {
     bool all = true, any = false;
     for (auto p : points) {
-      bool done = completed_[p.queue] >= p.value;
+      bool done = [&] {
+        uint64_t value{};
+        p.queue->QueryTimeline(value);
+        return value >= p.value;
+      }();
       all &= done;
       any |= done;
     }
@@ -265,7 +263,7 @@ void Device::WakeCollector() {
 
 SubmissionStatus Device::QueryEvent(TimelinePoint point) const {
   uint64_t value{};
-  if (!QueryTimeline(point.queue, value))
+  if (!point.queue->QueryTimeline(value))
     return SUBMISSION_STATUS_FAILED;
   return value >= point.value ? SUBMISSION_STATUS_COMPLETED : SUBMISSION_STATUS_PENDING;
 }
@@ -293,7 +291,7 @@ void Device::CollectTimelines() {
     {
       std::lock_guard<std::mutex> lock(mutex_);
       for (auto it = pending_.begin(); it != pending_.end();) {
-        if (!valid || values[it->point.queue] >= it->point.value) {
+        if (!valid || values[it->point.queue->GetType()] >= it->point.value) {
           auto completed = it++;
           ready.splice(ready.end(), pending_, completed);
         } else
@@ -303,11 +301,12 @@ void Device::CollectTimelines() {
         return;
     }
     for (auto &entry : ready) {
-      auto status = entry.commands->WaitForProgress();
+      auto status = entry.commands->WaitForProgress(entry);
       while (status == SUBMISSION_STATUS_PENDING)
-        status = entry.commands->WaitForProgress();
+        status = entry.commands->WaitForProgress(entry);
       entry.commands->ReleaseDownloads();
       entry.commands.Reset();
+      entry.waits.clear();
       entry.completion->Complete(status);
     }
     if (!ready.empty())
@@ -325,4 +324,20 @@ void Device::CollectTimelines() {
   }
 }
 
+Queue *Device::QueueState(QueueType type) const {
+  return queues_[type].Get();
+}
+
+void Device::InitializeQueue(ObjectPtr<Queue> queue) {
+  assert(queue && queue->Owner() == this && !collector_.joinable() && pending_.empty());
+  const auto type = queue->GetType();
+  assert(!queues_[type]);
+  queues_[type] = std::move(queue);
+  collector_points_[type].queue = queues_[type].Get();
+}
+
+void Device::ReleaseQueues() {
+  for (auto &queue : queues_)
+    queue.Reset();
+}
 }  // namespace grassland::rhi::backend

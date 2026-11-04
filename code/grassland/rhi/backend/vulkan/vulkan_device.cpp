@@ -71,12 +71,9 @@ VulkanDevice::~VulkanDevice() {
   for (const auto &entry : command_pool_) {
     vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
   }
-  if (transfer_timeline_)
-    vkDestroySemaphore(device_, transfer_timeline_, nullptr);
-  if (timeline_)
-    vkDestroySemaphore(device_, timeline_, nullptr);
   if (allocator_)
     vmaDestroyAllocator(allocator_);
+  ReleaseQueues();
   if (device_)
     vkDestroyDevice(device_, nullptr);
 }
@@ -133,15 +130,6 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   }
   if (!device->procedures_.Load(device->device_, api_version, enabled))
     return {};
-  VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
-  type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-  VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-  semaphore.pNext = &type;
-  if (!Check(vkCreateSemaphore(device->device_, &semaphore, nullptr, &device->timeline_), "Create submission timeline"))
-    return {};
-  if (!Check(vkCreateSemaphore(device->device_, &semaphore, nullptr, &device->transfer_timeline_),
-             "Create transfer timeline"))
-    return {};
   const bool swapchain = std::any_of(enabled.Extensions().begin(), enabled.Extensions().end(), [](const char *name) {
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
   });
@@ -160,27 +148,32 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   device->physical_ = physical_device;
   device->graphics_queue_family_index_ = graphics_family;
   device->swapchain_enabled_ = swapchain;
-  vkGetDeviceQueue(device->device_, graphics_family, 0, &device->queue_);
-  vkGetDeviceQueue(device->device_, graphics_family, families[graphics_family].queueCount > 1 ? 1 : 0,
-                   &device->transfer_queue_);
+  VkQueue graphics{}, transfer{};
+  vkGetDeviceQueue(device->device_, graphics_family, 0, &graphics);
+  vkGetDeviceQueue(device->device_, graphics_family, families[graphics_family].queueCount > 1 ? 1 : 0, &transfer);
+  auto graphics_queue = ObjectPtr<VulkanQueue>::Adopt(VulkanQueue::Create(device.get(), QUEUE_TYPE_GRAPHICS, graphics));
+  if (!graphics_queue)
+    return {};
+  auto physical_owner = graphics == transfer ? graphics_queue.Get() : nullptr;
+  device->InitializeQueue(std::move(graphics_queue));
+  auto transfer_queue =
+      ObjectPtr<VulkanQueue>::Adopt(VulkanQueue::Create(device.get(), QUEUE_TYPE_TRANSFER, transfer, physical_owner));
+  if (!transfer_queue)
+    return {};
+  device->InitializeQueue(std::move(transfer_queue));
   return device.release();
 }
 
 VkSemaphore VulkanDevice::Timeline(QueueType type) const {
-  return type == QUEUE_TYPE_TRANSFER ? transfer_timeline_ : timeline_;
+  return static_cast<VulkanQueue *>(QueueState(type))->Timeline();
 }
 
 uint64_t VulkanDevice::NextSerial(QueueType type) {
-  return type == QUEUE_TYPE_TRANSFER ? ++transfer_serial_ : ++next_serial_;
+  return QueueState(type)->NextSerial();
 }
 
 VkResult VulkanDevice::Wait(uint64_t value, uint64_t timeout, QueueType type) const {
-  auto semaphore = Timeline(type);
-  VkSemaphoreWaitInfo wait{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
-  wait.semaphoreCount = 1;
-  wait.pSemaphores = &semaphore;
-  wait.pValues = &value;
-  return vkWaitSemaphores(device_, &wait, timeout);
+  return static_cast<VulkanQueue *>(QueueState(type))->Wait(value, timeout);
 }
 
 const DeviceProcedures &VulkanDevice::Procedures() const {
@@ -220,7 +213,7 @@ VkInstance VulkanDevice::Instance() const {
 }
 
 VkQueue VulkanDevice::NativeQueue(QueueType type) const {
-  return type == QUEUE_TYPE_TRANSFER ? transfer_queue_ : queue_;
+  return static_cast<VulkanQueue *>(QueueState(type))->Native();
 }
 
 uint32_t VulkanDevice::QueueFamily() const {
@@ -232,7 +225,7 @@ bool VulkanDevice::SupportsSwapchain() const {
 }
 
 std::mutex &VulkanDevice::QueueMutex(QueueType type) {
-  return type == QUEUE_TYPE_TRANSFER && transfer_queue_ != queue_ ? transfer_mutex_ : mutex_;
+  return QueueState(type)->Mutex();
 }
 
 VulkanTemporalBufferPool &VulkanDevice::UploadPool() {
@@ -257,16 +250,6 @@ rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
 
 rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
   return VulkanWindow::Create(this, desc);
-}
-
-rhi::ICommandContext *VulkanDevice::CreateCommandContext() {
-  return VulkanCommandContext::Create(this);
-}
-
-rhi::IQueue *VulkanDevice::GetQueue(QueueType type) {
-  if (type != QUEUE_TYPE_GRAPHICS && type != QUEUE_TYPE_TRANSFER)
-    return nullptr;
-  return new VulkanQueue(this, type);
 }
 
 }  // namespace grassland::rhi::backend::vulkan
@@ -300,24 +283,18 @@ VulkanTemporalBufferPool &VulkanDevice::DownloadPool() {
 }  // namespace grassland::rhi::backend::vulkan
 
 namespace grassland::rhi::backend::vulkan {
-bool VulkanDevice::SharesNativeQueue(QueueType a, QueueType b) const {
-  return NativeQueue(a) == NativeQueue(b);
-}
-
-bool VulkanDevice::QueryTimeline(QueueType type, uint64_t &value) const {
-  return vkGetSemaphoreCounterValue(device_, Timeline(type), &value) == VK_SUCCESS;
-}
 
 bool VulkanDevice::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const {
   // Coalesce duplicate timeline objects: max for All, min for Any.
   std::array<uint64_t, 2> values{};
   std::array<bool, 2> present{};
   for (auto p : points) {
-    if (!present[p.queue])
-      values[p.queue] = p.value;
+    if (!present[p.queue->GetType()])
+      values[p.queue->GetType()] = p.value;
     else
-      values[p.queue] = wait_all ? std::max(values[p.queue], p.value) : std::min(values[p.queue], p.value);
-    present[p.queue] = true;
+      values[p.queue->GetType()] =
+          wait_all ? std::max(values[p.queue->GetType()], p.value) : std::min(values[p.queue->GetType()], p.value);
+    present[p.queue->GetType()] = true;
   }
   std::array<VkSemaphore, 2> semaphores{};
   std::array<uint64_t, 2> targets{};
@@ -351,9 +328,10 @@ void VulkanDevice::WakeCollector() {
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &semaphore;
     if (Check(vkQueueSubmit(NativeQueue(queue), 1, &submit, VK_NULL_HANDLE), "Signal collector shutdown"))
-      wake.push_back({queue, value});
+      wake.push_back({QueueState(queue), value});
   }
   if (!wake.empty())
     WaitTimelines(wake, true);
 }
+
 }  // namespace grassland::rhi::backend::vulkan
