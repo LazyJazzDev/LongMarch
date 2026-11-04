@@ -77,7 +77,7 @@ std::string Device::Name() const {
   return info_.name;
 }
 
-DeviceProperties Device::GetProperties() const {
+PhysicalDevice Device::GetProperties() const {
   return info_;
 }
 

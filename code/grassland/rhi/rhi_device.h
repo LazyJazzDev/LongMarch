@@ -30,7 +30,7 @@ class IDevice : public IObject {
       const TopLevelAccelerationStructureDesc &desc) = 0;
   virtual IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) = 0;
   virtual std::string Name() const = 0;
-  virtual DeviceProperties GetProperties() const = 0;
+  virtual PhysicalDevice GetProperties() const = 0;
   virtual bool SupportRayTracingPipeline() const = 0;
   virtual bool SupportRayQuery() const = 0;
   virtual bool SupportGeometryShader() const = 0;
