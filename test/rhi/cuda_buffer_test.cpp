@@ -78,8 +78,8 @@ TEST_P(RhiCUDADevice, CUDADevicesExposeOrdinalBeforeBufferCreation) {
     ASSERT_EQ(cudaGetDeviceProperties(&cuda_properties, properties.cuda_device), cudaSuccess);
     ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(i));
     ASSERT_TRUE(device);
-    EXPECT_EQ(device->GetPhysicalDevice().name, properties.name);
-    ASSERT_EQ(device->GetPhysicalDevice().cuda_device, properties.cuda_device);
+    EXPECT_EQ(device->Name(), properties.name);
+    ASSERT_EQ(device->GetCUDADeviceIndex(), properties.cuda_device);
     ExpectCUDAProceduresLoaded(device.Get(), GetParam());
     int previous = -1;
     ASSERT_EQ(cudaGetDevice(&previous), cudaSuccess);
@@ -110,7 +110,7 @@ TEST_P(RhiCUDADevice, NonCUDADevicesRejectCUDABufferCreation) {
     EXPECT_EQ(adapters[i].cuda_device, -1);
     ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(i));
     ASSERT_TRUE(device);
-    EXPECT_EQ(device->GetPhysicalDevice().cuda_device, -1);
+    EXPECT_EQ(device->GetCUDADeviceIndex(), -1);
     ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({4096});
     EXPECT_FALSE(buffer);
   }
@@ -134,7 +134,7 @@ class RhiCUDABuffer : public testing::TestWithParam<BackendAPI> {
         continue;
       device_ = core_->CreateDevice(static_cast<int32_t>(i));
       ASSERT_TRUE(device_);
-      ASSERT_EQ(device_->GetPhysicalDevice().cuda_device, adapters[i].cuda_device);
+      ASSERT_EQ(device_->GetCUDADeviceIndex(), adapters[i].cuda_device);
       buffer_ = device_->CreateCUDABuffer({65561});
       ASSERT_TRUE(buffer_);
       return;
@@ -156,7 +156,7 @@ TEST_P(RhiCUDABuffer, CUDAOnlyCopiesAndOrdinaryInterfaceLifetime) {
   cudaPointerAttributes attributes{};
   ASSERT_EQ(cudaPointerGetAttributes(&attributes, pointer), cudaSuccess);
   EXPECT_EQ(attributes.type, cudaMemoryTypeDevice);
-  EXPECT_EQ(attributes.device, device_->GetPhysicalDevice().cuda_device);
+  EXPECT_EQ(attributes.device, device_->GetCUDADeviceIndex());
   ASSERT_EQ(cudaSetDevice(attributes.device), cudaSuccess);
   std::vector<uint8_t> input(65561), output(input.size());
   for (size_t i = 0; i < input.size(); ++i)

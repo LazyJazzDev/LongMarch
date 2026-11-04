@@ -18,9 +18,8 @@ std::string Device::Name() const {
   return Get()->Name();
 }
 
-const rhi::PhysicalDevice &Device::GetPhysicalDevice() const noexcept {
-  static const rhi::PhysicalDevice empty;
-  return Get() ? Get()->GetPhysicalDevice() : empty;
+int Device::GetCUDADeviceIndex() const noexcept {
+  return Get() ? Get()->GetCUDADeviceIndex() : -1;
 }
 
 bool Device::SupportRayTracingPipeline() const {

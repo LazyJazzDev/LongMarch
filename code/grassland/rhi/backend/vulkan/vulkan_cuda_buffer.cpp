@@ -39,7 +39,7 @@ void *VulkanCUDABuffer::GetDevicePointer() const {
 VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDesc &desc) {
   if (!desc.size)
     return nullptr;
-  const int ordinal = device->GetPhysicalDevice().cuda_device;
+  const int ordinal = device->GetCUDADeviceIndex();
   if (ordinal < 0) {
     ReportError(-1, "No CUDA device matches this Vulkan adapter.");
     return nullptr;

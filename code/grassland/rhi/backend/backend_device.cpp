@@ -102,6 +102,10 @@ rhi::ICommandContext *Device::CreateCommandContext() {
   return nullptr;
 }
 
+int Device::GetCUDADeviceIndex() const noexcept {
+  return info_.cuda_device;
+}
+
 const PhysicalDevice &Device::GetPhysicalDevice() const noexcept {
   return info_;
 }

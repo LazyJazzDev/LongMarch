@@ -23,7 +23,8 @@ class Device : public Object<rhi::IDevice> {
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
   Device(PhysicalDevice info, Core *core, BackendAPI api = BACKEND_API_DEFAULT);
   ~Device() override;
-  const PhysicalDevice &GetPhysicalDevice() const noexcept override;
+  const PhysicalDevice &GetPhysicalDevice() const noexcept;
+  int GetCUDADeviceIndex() const noexcept override;
   std::string Name() const override;
   bool SupportRayTracingPipeline() const override;
   bool SupportRayQuery() const override;
