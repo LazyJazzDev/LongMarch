@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_core.h"
 
+#include "grassland/rhi/backend/backend_cuda_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/util/string_convert.h"
 
@@ -17,6 +18,10 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice
   }
   info = {};
   info.name = WStringToString(desc.Description);
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (device->GetNodeCount() == 1)
+    info.cuda_device = FindCUDADeviceByLUID(&desc.AdapterLuid);
+#endif
   info.dedicated_memory = desc.DedicatedVideoMemory;
   info.unified_memory = desc.SharedSystemMemory;
   D3D12_FEATURE_DATA_ARCHITECTURE architecture{};
@@ -100,11 +105,8 @@ rhi::IDevice *D3D12Core::CreateDevice(int32_t device_idx) {
     ReportError(result, "D3D12CreateDevice failed.");
     return {};
   }
-  // D3D12 exposes supported capabilities automatically; there is no Vulkan-style feature mask.
-  PhysicalDevice info{};
-  if (!DescribeDevice(adapter.native.Get(), device.Get(), info))
-    return {};
-  return D3D12Device::Create(std::move(info), this, std::move(device));
+  // Supported capabilities and CUDA identity were already detected during enumeration.
+  return D3D12Device::Create(adapter.info, this, std::move(device));
 }
 
 }  // namespace grassland::rhi::backend::d3d12

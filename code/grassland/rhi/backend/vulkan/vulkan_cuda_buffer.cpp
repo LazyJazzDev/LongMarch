@@ -1,12 +1,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_cuda_buffer.h"
 #if defined(LONGMARCH_CUDA_RUNTIME)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
-#if defined(_WIN32)
-#include <windows.h>
-
-// Vulkan's Win32 declarations require the Windows handle types above.
-#include <vulkan/vulkan_win32.h>
-#else
+#if !defined(_WIN32)
 #include <unistd.h>
 #endif
 namespace grassland::rhi::backend::vulkan {
@@ -44,20 +39,16 @@ void *VulkanCUDABuffer::GetDevicePointer() const {
 VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDesc &desc) {
   if (!desc.size)
     return nullptr;
-  VkPhysicalDeviceIDProperties id{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES};
-  VkPhysicalDeviceProperties2 identity{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
-  identity.pNext = &id;
-  vkGetPhysicalDeviceProperties2(device->NativePhysicalDevice(), &identity);
-  const int ordinal = FindCUDADeviceByUUID(id.deviceUUID);
+  const int ordinal = device->GetPhysicalDevice().cuda_device;
   if (ordinal < 0) {
     ReportError(-1, "No CUDA device matches this Vulkan adapter.");
     return nullptr;
   }
 #if defined(_WIN32)
-  if (!vkGetDeviceProcAddr(device->NativeDevice(), "vkGetMemoryWin32HandleKHR"))
+  if (!device->Procedures().GetMemoryWin32HandleKHR)
     return nullptr;
 #else
-  if (!vkGetDeviceProcAddr(device->NativeDevice(), "vkGetMemoryFdKHR"))
+  if (!device->Procedures().GetMemoryFdKHR)
     return nullptr;
 #endif
   VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -113,8 +104,7 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
   VkMemoryGetWin32HandleInfoKHR info{VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR};
   info.memory = object->memory_;
   info.handleType = memory_handle;
-  auto get = reinterpret_cast<PFN_vkGetMemoryWin32HandleKHR>(
-      vkGetDeviceProcAddr(device->NativeDevice(), "vkGetMemoryWin32HandleKHR"));
+  auto get = device->Procedures().GetMemoryWin32HandleKHR;
   HANDLE handle{};
   if (!Check(get(device->NativeDevice(), &info, &handle), "Export CUDA memory"))
     return nullptr;
@@ -126,7 +116,7 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
   VkMemoryGetFdInfoKHR info{VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR};
   info.memory = object->memory_;
   info.handleType = memory_handle;
-  auto get = reinterpret_cast<PFN_vkGetMemoryFdKHR>(vkGetDeviceProcAddr(device->NativeDevice(), "vkGetMemoryFdKHR"));
+  auto get = device->Procedures().GetMemoryFdKHR;
   int fd = -1;
   if (!Check(get(device->NativeDevice(), &info, &fd), "Export CUDA memory"))
     return nullptr;

@@ -9,6 +9,9 @@
 #include "grassland/rhi/rhi_cuda_buffer.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_obj_ptr.h"
+#if defined(LONGMARCH_VULKAN_ENABLED)
+#include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#endif
 
 #if defined(LONGMARCH_CUDA_ENABLED)
 cudaError_t TransformCUDABuffer(void *, uint32_t, cudaStream_t);
@@ -44,6 +47,78 @@ struct Stream {
   }
 };
 
+class RhiCUDADevice : public testing::TestWithParam<BackendAPI> {};
+
+void ExpectCUDAProceduresLoaded(IDevice *device, BackendAPI api) {
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (api == BACKEND_API_VULKAN) {
+    const auto native = static_cast<backend::vulkan::VulkanDevice *>(device);
+#if defined(_WIN32)
+    EXPECT_NE(native->Procedures().GetMemoryWin32HandleKHR, nullptr);
+#else
+    EXPECT_NE(native->Procedures().GetMemoryFdKHR, nullptr);
+#endif
+  }
+#endif
+}
+
+TEST_P(RhiCUDADevice, CUDADevicesExposeOrdinalBeforeBufferCreation) {
+  RestoreDevice restore;
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  const auto adapters = core->GetPhysicalDevices();
+  int matches = 0;
+  for (size_t i = 0; i < adapters.size(); ++i) {
+    const auto &properties = adapters[i];
+    if (properties.cuda_device < 0)
+      continue;
+    SCOPED_TRACE(properties.name);
+    ++matches;
+    cudaDeviceProp cuda_properties{};
+    ASSERT_EQ(cudaGetDeviceProperties(&cuda_properties, properties.cuda_device), cudaSuccess);
+    ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(i));
+    ASSERT_TRUE(device);
+    EXPECT_EQ(device->GetProperties().name, properties.name);
+    ASSERT_EQ(device->GetProperties().cuda_device, properties.cuda_device);
+    ExpectCUDAProceduresLoaded(device.Get(), GetParam());
+    int previous = -1;
+    ASSERT_EQ(cudaGetDevice(&previous), cudaSuccess);
+    ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({4096});
+    ASSERT_TRUE(buffer);
+    int current = -1;
+    ASSERT_EQ(cudaGetDevice(&current), cudaSuccess);
+    EXPECT_EQ(current, previous);
+    cudaPointerAttributes attributes{};
+    ASSERT_EQ(cudaPointerGetAttributes(&attributes, buffer->GetDevicePointer()), cudaSuccess);
+    EXPECT_EQ(attributes.device, properties.cuda_device);
+  }
+  if (!matches)
+    GTEST_SKIP() << "No CUDA graphics adapter is available";
+  RecordProperty("cuda_adapters_tested", matches);
+}
+
+TEST_P(RhiCUDADevice, NonCUDADevicesRejectCUDABufferCreation) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  const auto adapters = core->GetPhysicalDevices();
+  int matches = 0;
+  for (size_t i = 0; i < adapters.size(); ++i) {
+    if (adapters[i].cuda_device >= 0)
+      continue;
+    SCOPED_TRACE(adapters[i].name);
+    ++matches;
+    EXPECT_EQ(adapters[i].cuda_device, -1);
+    ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(i));
+    ASSERT_TRUE(device);
+    EXPECT_EQ(device->GetProperties().cuda_device, -1);
+    ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({4096});
+    EXPECT_FALSE(buffer);
+  }
+  if (!matches)
+    GTEST_SKIP() << "No non-CUDA graphics adapter is available";
+  RecordProperty("non_cuda_adapters_tested", matches);
+}
+
 class RhiCUDABuffer : public testing::TestWithParam<BackendAPI> {
  protected:
   void SetUp() override {
@@ -52,20 +127,19 @@ class RhiCUDABuffer : public testing::TestWithParam<BackendAPI> {
       GTEST_SKIP() << "CUDA device unavailable";
     core_ = CreateCore(GetParam());
     ASSERT_TRUE(core_);
-    // Select an adapter for which the RHI can allocate an imported CUDA buffer.
+    // Select from cached device properties before creating any CUDA buffer.
     const auto adapters = core_->GetPhysicalDevices();
     for (size_t i = 0; i < adapters.size(); ++i) {
-      ObjPtr<IDevice> candidate = core_->CreateDevice(static_cast<int32_t>(i));
-      if (!candidate)
+      if (adapters[i].cuda_device < 0)
         continue;
-      ObjPtr<ICUDABuffer> allocation = candidate->CreateCUDABuffer({65561});
-      if (allocation) {
-        device_ = std::move(candidate);
-        buffer_ = std::move(allocation);
-        return;
-      }
+      device_ = core_->CreateDevice(static_cast<int32_t>(i));
+      ASSERT_TRUE(device_);
+      ASSERT_EQ(device_->GetProperties().cuda_device, adapters[i].cuda_device);
+      buffer_ = device_->CreateCUDABuffer({65561});
+      ASSERT_TRUE(buffer_);
+      return;
     }
-    FAIL() << "No enumerated graphics adapter supports CUDA buffer allocation";
+    GTEST_SKIP() << "No CUDA graphics adapter is available";
   }
 
   RestoreDevice restore_;
@@ -82,6 +156,7 @@ TEST_P(RhiCUDABuffer, CUDAOnlyCopiesAndOrdinaryInterfaceLifetime) {
   cudaPointerAttributes attributes{};
   ASSERT_EQ(cudaPointerGetAttributes(&attributes, pointer), cudaSuccess);
   EXPECT_EQ(attributes.type, cudaMemoryTypeDevice);
+  EXPECT_EQ(attributes.device, device_->GetProperties().cuda_device);
   ASSERT_EQ(cudaSetDevice(attributes.device), cudaSuccess);
   std::vector<uint8_t> input(65561), output(input.size());
   for (size_t i = 0; i < input.size(); ++i)
@@ -147,5 +222,6 @@ std::vector<BackendAPI> Backends() {
 }
 
 INSTANTIATE_TEST_SUITE_P(Backends, RhiCUDABuffer, testing::ValuesIn(Backends()));
+INSTANTIATE_TEST_SUITE_P(Backends, RhiCUDADevice, testing::ValuesIn(Backends()));
 }  // namespace
 }  // namespace grassland::rhi

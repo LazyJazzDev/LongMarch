@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_core.h"
 
+#include "grassland/rhi/backend/backend_cuda_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/util/log.h"
 
@@ -120,6 +121,13 @@ VulkanCore *VulkanCore::CreateVulkanCore(const CoreDesc &desc) {
       continue;
     PhysicalDevice info{};
     info.name = properties.deviceName;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+    VkPhysicalDeviceIDProperties id{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES};
+    VkPhysicalDeviceProperties2 identity{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+    identity.pNext = &id;
+    vkGetPhysicalDeviceProperties2(device, &identity);
+    info.cuda_device = FindCUDADeviceByUUID(id.deviceUUID);
+#endif
     switch (properties.deviceType) {
       case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
         info.type = PHYSICAL_DEVICE_TYPE_DEDICATED;

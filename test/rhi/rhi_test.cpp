@@ -221,6 +221,10 @@ TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinati
     auto device = core.CreateDevice(static_cast<int32_t>(id));
     ASSERT_TRUE(device) << devices[id].name;
     EXPECT_EQ(device.Name(), devices[id].name);
+    EXPECT_EQ(device.GetProperties().cuda_device, devices[id].cuda_device);
+#if !defined(LONGMARCH_CUDA_RUNTIME)
+    EXPECT_EQ(device.GetProperties().cuda_device, -1);
+#endif
     EXPECT_EQ(device.SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
     EXPECT_EQ(device.SupportRayQuery(), devices[id].ray_query_feature);
     EXPECT_EQ(device.SupportGeometryShader(), devices[id].geometry_shader_feature);
@@ -232,6 +236,10 @@ TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinati
     ASSERT_EQ(static_cast<bool>(device), id >= 0);
     if (id >= 0) {
       EXPECT_EQ(device.Name(), devices[id].name);
+      EXPECT_EQ(device.GetProperties().cuda_device, devices[id].cuda_device);
+#if !defined(LONGMARCH_CUDA_RUNTIME)
+      EXPECT_EQ(device.GetProperties().cuda_device, -1);
+#endif
       EXPECT_EQ(device.SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
       EXPECT_EQ(device.SupportRayQuery(), devices[id].ray_query_feature);
       EXPECT_EQ(device.SupportGeometryShader(), devices[id].geometry_shader_feature);

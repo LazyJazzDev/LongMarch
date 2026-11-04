@@ -18,6 +18,10 @@ std::string Device::Name() const {
   return Get()->Name();
 }
 
+rhi::DeviceProperties Device::GetProperties() const {
+  return Get() ? Get()->GetProperties() : rhi::DeviceProperties{};
+}
+
 bool Device::SupportRayTracingPipeline() const {
 #if !defined(NDEBUG)
   if (!*this)

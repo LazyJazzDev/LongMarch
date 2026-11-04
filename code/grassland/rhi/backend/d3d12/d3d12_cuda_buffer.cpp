@@ -17,8 +17,7 @@ void *D3D12CUDABuffer::GetDevicePointer() const {
 D3D12CUDABuffer *D3D12CUDABuffer::Create(D3D12Device *device, const BufferDesc &desc) {
   if (!desc.size)
     return nullptr;
-  const auto luid = device->NativeDevice()->GetAdapterLuid();
-  const int ordinal = device->NativeDevice()->GetNodeCount() == 1 ? FindCUDADeviceByLUID(&luid) : -1;
+  const int ordinal = device->GetPhysicalDevice().cuda_device;
   if (ordinal < 0) {
     ReportError(-1, "No CUDA device matches this D3D12 adapter.");
     return nullptr;

@@ -21,6 +21,7 @@ class Device : public ObjectContainer {
   rhi::IDevice *Get() const noexcept;
   Device() noexcept;
   std::string Name() const;
+  rhi::DeviceProperties GetProperties() const;
   bool SupportRayTracingPipeline() const;
   bool SupportRayQuery() const;
   bool SupportGeometryShader() const;
