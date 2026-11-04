@@ -144,8 +144,10 @@ DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
 #else
   const char *external_memory = "VK_KHR_external_memory_fd";
 #endif
-  if (has(external_memory))
+  if (has(external_memory)) {
     extensions_.push_back(external_memory);
+    external_memory_ = true;
+  }
 #endif
   features_.pNext = &v11_;
   if (has(VK_KHR_SWAPCHAIN_EXTENSION_NAME))
@@ -232,6 +234,10 @@ bool DeviceFeatures::ScalarBlockLayout() const {
 
 bool DeviceFeatures::TimelineSemaphore() const {
   return v12_.timelineSemaphore == VK_TRUE;
+}
+
+bool DeviceFeatures::ExternalMemory() const {
+  return external_memory_;
 }
 
 bool DeviceFeatures::DynamicRendering() const {
