@@ -1,4 +1,14 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_util.h"
+#if defined(LONGMARCH_CUDA_RUNTIME) && defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
+#include "grassland/rhi/backend/vulkan/vulkan_util.h"
+#if defined(LONGMARCH_CUDA_RUNTIME) && defined(_WIN32)
+#include <vulkan/vulkan_win32.h>
+#endif
 
 namespace grassland::rhi::backend::vulkan {
 VkPrimitiveTopology NativePrimitiveTopology(PrimitiveTopology topology) {
@@ -138,6 +148,17 @@ DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
     return std::any_of(available.begin(), available.end(),
                        [&](const auto &entry) { return std::strcmp(entry.extensionName, name) == 0; });
   };
+#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(_WIN32)
+  const char *external_memory = VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
+#else
+  const char *external_memory = VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
+#endif
+  if (has(external_memory)) {
+    extensions_.push_back(external_memory);
+    external_memory_ = true;
+  }
+#endif
   features_.pNext = &v11_;
   if (has(VK_KHR_SWAPCHAIN_EXTENSION_NAME))
     extensions_.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -223,6 +244,10 @@ bool DeviceFeatures::ScalarBlockLayout() const {
 
 bool DeviceFeatures::TimelineSemaphore() const {
   return v12_.timelineSemaphore == VK_TRUE;
+}
+
+bool DeviceFeatures::ExternalMemory() const {
+  return external_memory_;
 }
 
 bool DeviceFeatures::DynamicRendering() const {

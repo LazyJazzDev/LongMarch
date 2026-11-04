@@ -35,6 +35,13 @@ rhi::IBuffer *Device::CreateBuffer(const BufferDesc &) {
   return nullptr;
 }
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+ICUDABuffer *Device::CreateCUDABuffer(const BufferDesc &) {
+  ReportError(-1, "CUDA buffer allocation is unavailable for this backend.");
+  return nullptr;
+}
+#endif
+
 rhi::IComputeProgram *Device::CreateComputeProgram(const ComputeProgramDesc &) {
   ReportError(-1, "Compute programs are not implemented for this backend.");
   return nullptr;
@@ -93,6 +100,10 @@ rhi::IQueue *Device::GetQueue(QueueType) {
 
 rhi::ICommandContext *Device::CreateCommandContext() {
   return nullptr;
+}
+
+int Device::GetCUDADeviceIndex() const noexcept {
+  return info_.cuda_device;
 }
 
 const PhysicalDevice &Device::GetPhysicalDevice() const noexcept {

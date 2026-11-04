@@ -7,6 +7,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
+#include "grassland/rhi/backend/vulkan/vulkan_cuda_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
@@ -238,6 +239,12 @@ rhi::IImage *VulkanDevice::CreateImage(const ImageDesc &desc) {
 rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
   return VulkanAllocatedBuffer::Create(this, desc);
 }
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+ICUDABuffer *VulkanDevice::CreateCUDABuffer(const BufferDesc &desc) {
+  return VulkanCUDABuffer::Create(this, desc);
+}
+#endif
 
 rhi::IComputeProgram *VulkanDevice::CreateComputeProgram(const ComputeProgramDesc &desc) {
   return VulkanComputeProgram::Create(this, desc);

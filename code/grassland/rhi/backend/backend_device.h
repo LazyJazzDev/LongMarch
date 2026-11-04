@@ -24,6 +24,7 @@ class Device : public Object<rhi::IDevice> {
   Device(PhysicalDevice info, Core *core, BackendAPI api = BACKEND_API_DEFAULT);
   ~Device() override;
   const PhysicalDevice &GetPhysicalDevice() const noexcept;
+  int GetCUDADeviceIndex() const noexcept override;
   std::string Name() const override;
   bool SupportRayTracingPipeline() const override;
   bool SupportRayQuery() const override;
@@ -32,6 +33,9 @@ class Device : public Object<rhi::IDevice> {
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) override;
+#endif
   rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;

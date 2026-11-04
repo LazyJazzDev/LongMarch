@@ -5,9 +5,22 @@
 #include <utility>
 
 #include "grassland/rhi/rhi_object.h"
+#if defined(LONGMARCH_CUDA_RUNTIME)
+#include <cuda_runtime_api.h>
+#endif
 
 namespace grassland::rhi::backend {
 void ReportError(int32_t error_code, const std::string &error_message);
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+bool CheckCUDA(cudaError_t error, const char *operation);
+
+// Match a CUDA Runtime UUID or Windows adapter LUID without changing current device.
+int FindCUDADeviceByUUID(const void *uuid);
+#if defined(_WIN32)
+int FindCUDADeviceByLUID(const void *luid);
+#endif
+#endif
 
 // One intrusive counter per native implementation, with no public state layout.
 template <typename Interface>
