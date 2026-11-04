@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_device.h"
 
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
@@ -25,6 +25,13 @@ MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<
   object->queue_ = NS::TransferPtr(object->device_->newCommandQueue());
   if (!object->queue_) {
     ReportError(-1, "Metal command queue creation failed.");
+    return nullptr;
+  }
+  object->transfer_queue_ = NS::TransferPtr(object->device_->newCommandQueue());
+  for (auto &event : object->timelines_)
+    event = NS::TransferPtr(object->device_->newSharedEvent());
+  if (!object->transfer_queue_ || !object->timelines_[0] || !object->timelines_[1]) {
+    ReportError(-1, "Metal requires two queues and shared timeline events.");
     return nullptr;
   }
   return object.release();
@@ -60,16 +67,16 @@ MTL::Device *MetalDevice::NativeDevice() const noexcept {
   return device_.get();
 }
 
-MTL::CommandQueue *MetalDevice::NativeQueue() const {
-  return queue_.get();
+MTL::CommandQueue *MetalDevice::NativeQueue(QueueType type) const {
+  return type == QUEUE_TYPE_TRANSFER ? transfer_queue_.get() : queue_.get();
 }
 
-std::mutex &MetalDevice::QueueMutex() {
-  return queue_mutex_;
+std::mutex &MetalDevice::QueueMutex(QueueType type) {
+  return type == QUEUE_TYPE_TRANSFER ? transfer_mutex_ : queue_mutex_;
 }
 
-NS::SharedPtr<MTL::CommandBuffer> MetalDevice::CreateCommandBuffer() {
-  return NS::RetainPtr(queue_->commandBuffer(command_buffer_descriptor_.get()));
+NS::SharedPtr<MTL::CommandBuffer> MetalDevice::CreateCommandBuffer(QueueType type) {
+  return NS::RetainPtr(NativeQueue(type)->commandBuffer(command_buffer_descriptor_.get()));
 }
 
 bool MetalDevice::WaitIdle() {
@@ -99,6 +106,8 @@ rhi::ICommandContext *MetalDevice::CreateCommandContext() {
 }
 
 rhi::IQueue *MetalDevice::GetQueue(QueueType type) {
+  if (type != QUEUE_TYPE_GRAPHICS && type != QUEUE_TYPE_TRANSFER)
+    return nullptr;
   return new MetalQueue(this, type);
 }
 
@@ -132,5 +141,63 @@ MetalTemporalBufferPool &MetalDevice::UploadPool() {
 
 MetalTemporalBufferPool &MetalDevice::DownloadPool() {
   return temporal_buffers_;
+}
+}  // namespace grassland::rhi::backend::metal
+
+namespace grassland::rhi::backend::metal {
+ICommandContext *MetalDevice::CreateContextForQueue(QueueType type) {
+  return MetalCommandContext::Create(this, type);
+}
+
+bool MetalDevice::SharesNativeQueue(QueueType a, QueueType b) const {
+  return a == b;
+}
+
+MTL::SharedEvent *MetalDevice::Timeline(QueueType type) const {
+  return timelines_[type].get();
+}
+
+uint64_t MetalDevice::NextSerial(QueueType type) {
+  return ++serials_[type];
+}
+
+bool MetalDevice::QueryTimeline(QueueType type, uint64_t &value) const {
+  std::lock_guard<std::mutex> lock(progress_mutex_);
+  value = Timeline(type)->signaledValue();
+  return !failed_[type];
+}
+
+bool MetalDevice::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const {
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  std::unique_lock<std::mutex> lock(progress_mutex_);
+  bool valid = true;
+  progress_changed_.wait(lock, [&] {
+    bool all = true, any = false;
+    for (auto p : points) {
+      valid &= !failed_[p.queue];
+      bool done = Timeline(p.queue)->signaledValue() >= p.value;
+      all &= done;
+      any |= done;
+    }
+    return !valid || (wait_all ? all : any);
+  });
+  return valid;
+}
+
+void MetalDevice::WakeCollector() {
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  std::vector<NS::SharedPtr<MTL::CommandBuffer>> markers;
+  for (auto type : {QUEUE_TYPE_GRAPHICS, QUEUE_TYPE_TRANSFER}) {
+    std::lock_guard<std::mutex> lock(QueueMutex(type));
+    auto marker = CreateCommandBuffer(type);
+    if (!marker)
+      continue;
+    marker->encodeSignalEvent(Timeline(type), NextSerial(type));
+    TrackCompletion(marker.get(), type);
+    marker->commit();
+    markers.push_back(std::move(marker));
+  }
+  for (const auto &marker : markers)
+    marker->waitUntilCompleted();
 }
 }  // namespace grassland::rhi::backend::metal

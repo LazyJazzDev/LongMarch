@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/rhix/rhix_queue.h"
+#include "grassland/rhi/rhix/rhix_queue.h"
 
 #include "grassland/rhi/rhix/rhix_command_context.h"
 
@@ -10,6 +10,10 @@ Queue::Queue(rhi::IQueue *object) noexcept : ObjectContainer(object) {
 
 rhi::IQueue *Queue::Get() const noexcept {
   return static_cast<rhi::IQueue *>(GetObject());
+}
+
+CommandContext Queue::CreateCommandContext() const {
+  return Get() ? CommandContext(Get()->CreateCommandContext()) : CommandContext{};
 }
 
 rhi::QueueType Queue::GetType() const {

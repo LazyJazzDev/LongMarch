@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <d3d12sdklayers.h>
 
 #include <tuple>
@@ -29,13 +29,22 @@ class D3D12Device final : public Device {
   D3D12DescriptorPool &ResourceDescriptorStorage();
   D3D12DescriptorPool &SamplerDescriptorStorage();
   IDXGIFactory4 *Factory() const;
-  ID3D12CommandQueue *NativeQueue() const;
-  ID3D12Fence *Fence() const;
+  ID3D12CommandQueue *NativeQueue(QueueType type = QUEUE_TYPE_GRAPHICS) const;
+  ID3D12Fence *Fence(QueueType type = QUEUE_TYPE_GRAPHICS) const;
   bool SupportsTearing() const;
-  std::mutex &QueueMutex();
-  uint64_t NextSerial();
-  bool Wait(uint64_t value, HANDLE event) const;
-  bool WaitIdle();
+  bool SharesNativeQueue(QueueType a, QueueType b) const override;
+
+  bool HasNativeTimelines() const override {
+    return true;
+  }
+
+  bool QueryTimeline(QueueType type, uint64_t &value) const override;
+  bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const override;
+  void WakeCollector() override;
+  std::mutex &QueueMutex(QueueType type = QUEUE_TYPE_GRAPHICS);
+  uint64_t NextSerial(QueueType type = QUEUE_TYPE_GRAPHICS);
+  bool Wait(uint64_t value, HANDLE event, QueueType type = QUEUE_TYPE_GRAPHICS) const;
+  bool WaitIdle(QueueType type = QUEUE_TYPE_GRAPHICS);
   rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
@@ -79,9 +88,13 @@ class D3D12Device final : public Device {
   ComPtr<IDXGIFactory4> factory_;
   ComPtr<ID3D12CommandQueue> queue_;
   ComPtr<ID3D12Fence> fence_;
+  ComPtr<ID3D12CommandQueue> transfer_queue_;
+  ComPtr<ID3D12Fence> transfer_fence_;
+  ComPtr<ID3D12Device1> device1_;
+  std::mutex transfer_mutex_;
+  uint64_t transfer_serial_{};
   std::mutex mutex_;
   uint64_t serial_{};
-  HANDLE idle_event_{};
   bool tearing_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

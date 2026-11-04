@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -224,6 +224,8 @@ bool D3D12CommandContext::EndRecording() {
 }
 
 CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
+  if (submission_queue_ != QUEUE_TYPE_GRAPHICS && !presents_.empty())
+    return SUBMIT_RESULT_REJECTED;
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -235,10 +237,18 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
   }
 #endif
   {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
+    std::lock_guard<std::mutex> lock(device_->QueueMutex(submission_queue_));
+    for (const auto &wait : submission_waits_) {
+      const auto p = wait->Point();
+      if (p.queue != submission_queue_ &&
+          !Check(device_->NativeQueue(submission_queue_)->Wait(device_->Fence(p.queue), p.value), "Queue::Wait"))
+        return SUBMIT_RESULT_REJECTED;
+    }
     submission_failed_ = true;
+    value_ = device_->NextSerial(submission_queue_);
+    submission_value_ = value_;
     ID3D12CommandList *lists[] = {list_.Get()};
-    device_->NativeQueue()->ExecuteCommandLists(1, lists);
+    device_->NativeQueue(submission_queue_)->ExecuteCommandLists(1, lists);
     MarkSubmitted();
     for (auto &entry : as_dependencies_)
       entry.first->CommitDependencies(std::move(entry.second));
@@ -248,8 +258,8 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
       if (!Check(present.second->Present(), "Swapchain::Present"))
         presented = false;
     }
-    value_ = device_->NextSerial();
-    submission_failed_ = !Check(device_->NativeQueue()->Signal(device_->Fence(), value_), "Queue::Signal");
+    submission_failed_ = !Check(
+        device_->NativeQueue(submission_queue_)->Signal(device_->Fence(submission_queue_), value_), "Queue::Signal");
     if (!presented)
       submission_failed_ = true;
   }
@@ -266,13 +276,13 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
 
 SubmissionStatus D3D12CommandContext::WaitForProgress() {
   if (submission_failed_) {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
-    if (device_->WaitIdle() || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
+    std::lock_guard<std::mutex> lock(device_->QueueMutex(submission_queue_));
+    if (device_->WaitIdle(submission_queue_) || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
       return SUBMISSION_STATUS_FAILED;
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     return SUBMISSION_STATUS_PENDING;
   }
-  if (device_->Wait(value_, event_))
+  if (device_->Wait(value_, event_, submission_queue_))
     return SUBMISSION_STATUS_COMPLETED;
   // A failed host wait does not prove that GPU resource use has ended.
   submission_failed_ = true;

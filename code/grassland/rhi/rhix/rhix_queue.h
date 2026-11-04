@@ -1,10 +1,10 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/rhi_queue.h"
 #include "grassland/rhi/rhix/rhix_submission_token.h"
 
 namespace grassland::rhix {
 struct SubmitInfo {
-  std::vector<SubmissionToken> waits;
+  std::vector<Event> waits;
 };
 
 class CommandContext;
@@ -18,6 +18,7 @@ class Queue : public ObjectContainer {
   // An empty token reports submission failure.
   SubmissionToken Submit(CommandContext &&commands, const SubmitInfo &info = {}) const;
   rhi::QueueType GetType() const;
+  CommandContext CreateCommandContext() const;
   bool SharesPhysicalQueue(const Queue &other) const;
 };
 

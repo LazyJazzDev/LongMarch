@@ -1,4 +1,4 @@
-﻿#include <cmath>
+#include <cmath>
 #include <cstring>
 #include <unordered_set>
 
@@ -33,7 +33,8 @@ bool MetalCommandContext::CmdBuildBottomLevelAccelerationStructure(
     return false;
   }
   // Buffers and AS use tracked storage. Serial encoders declare all scratch and
-  // AS accesses so hazards are ordered on the device's single physical queue.
+  // AS accesses so hazards are ordered within this queue. Cross-queue use
+  // requires an explicit submission event dependency.
   encoder->useResource(scratch->NativeBuffer(), MTL::ResourceUsageRead | MTL::ResourceUsageWrite);
   if (mode == ACCELERATION_STRUCTURE_UPDATE)
     encoder->refitAccelerationStructure(target->NativeStructure(), descriptor, target->NativeStructure(),

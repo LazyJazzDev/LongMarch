@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <tuple>
 
 #include "grassland/rhi/backend/backend_device.h"
@@ -33,14 +33,23 @@ class VulkanDevice final : public Device {
   VmaAllocator Allocator() const;
   VkPhysicalDevice NativePhysicalDevice() const;
   VkInstance Instance() const;
-  VkQueue NativeQueue() const;
+  VkQueue NativeQueue(QueueType type = QUEUE_TYPE_GRAPHICS) const;
   uint32_t QueueFamily() const;
   bool SupportsSwapchain() const;
-  std::mutex &QueueMutex();
-  VkSemaphore Timeline() const;
+  bool SharesNativeQueue(QueueType a, QueueType b) const override;
+
+  bool HasNativeTimelines() const override {
+    return true;
+  }
+
+  bool QueryTimeline(QueueType type, uint64_t &value) const override;
+  bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const override;
+  void WakeCollector() override;
+  std::mutex &QueueMutex(QueueType type = QUEUE_TYPE_GRAPHICS);
+  VkSemaphore Timeline(QueueType type = QUEUE_TYPE_GRAPHICS) const;
   // Allocate and submit serials while holding QueueMutex, preserving signal order.
-  uint64_t NextSerial();
-  VkResult Wait(uint64_t value, uint64_t timeout = UINT64_MAX) const;
+  uint64_t NextSerial(QueueType type = QUEUE_TYPE_GRAPHICS);
+  VkResult Wait(uint64_t value, uint64_t timeout = UINT64_MAX, QueueType type = QUEUE_TYPE_GRAPHICS) const;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   VulkanTemporalBufferPool &UploadPool();
@@ -72,6 +81,10 @@ class VulkanDevice final : public Device {
   VkPhysicalDevice physical_{};
   VkQueue queue_{};
   VkSemaphore timeline_{};
+  VkQueue transfer_queue_{};
+  VkSemaphore transfer_timeline_{};
+  uint64_t transfer_serial_{};
+  std::mutex transfer_mutex_;
   uint64_t next_serial_{};
   uint32_t graphics_queue_family_index_{};
   bool swapchain_enabled_{};

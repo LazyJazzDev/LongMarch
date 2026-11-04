@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/rhi.h"
 #include "grassland/rhi/rhi_util.h"
 #include "grassland/rhi/rhix/rhix_acceleration_structure.h"
@@ -50,6 +50,7 @@ class Device : public ObjectContainer {
   Window CreateGLFWWindow(const rhi::WindowDesc &desc = {}) const;
   Queue GetQueue(rhi::QueueType type) const;
   CommandContext CreateCommandContext() const;
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const;
 };
 
 }  // namespace grassland::rhix

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_image.h"
 
@@ -9,6 +9,7 @@ class Image : public Object<rhi::IImage> {
   explicit Image(ImageDesc desc);
   const ImageDesc &GetDesc() const override;
   virtual bool SupportsStorage() const;
+  virtual bool SupportsQueue(QueueType type) const;
   virtual const void *DeviceIdentity() const = 0;
 
  private:

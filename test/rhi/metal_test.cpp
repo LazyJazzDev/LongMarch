@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -150,12 +150,13 @@ TEST(RhiMetal, CompletionTokensSurviveBatchesAndParentRelease) {
           rhi::ObjPtr<rhi::ICommandContext> abandoned = device->CreateCommandContext();
           ASSERT_TRUE(abandoned);
         }
-        rhi::ObjPtr<rhi::ICommandContext> context = device->CreateCommandContext();
-        ASSERT_TRUE(context);
         auto queue = i % 2 ? graphics.Get() : transfer.Get();
+        rhi::ObjPtr<rhi::ICommandContext> context = queue->CreateCommandContext();
+        ASSERT_TRUE(context);
+        rhi::ObjPtr<rhi::IEvent> event = tokens.empty() ? nullptr : tokens.back()->GetEvent();
         rhi::SubmitInfo desc;
         if (!tokens.empty())
-          desc.waits.push_back(tokens.back().Get());
+          desc.waits.push_back(event.Get());
         rhi::ObjPtr<rhi::ISubmissionToken> token = queue->Submit(context.Get(), desc);
         ASSERT_TRUE(token);
         tokens.push_back(std::move(token));

@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
@@ -187,7 +187,7 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ASSERT_TRUE(source);
   ObjPtr<IBuffer> target = device->CreateBuffer({sizeof(expected)});
   ASSERT_TRUE(target);
-  ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+  ObjPtr<ICommandContext> upload = transfer->CreateCommandContext();
   ASSERT_TRUE(upload);
   auto bytes = expected;
   ASSERT_TRUE(upload->CmdUploadBuffer(source.Get(), 0, bytes.data(), sizeof(bytes)));
@@ -200,7 +200,8 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ASSERT_TRUE(copy->CmdCopyBuffer(source.Get(), 0, target.Get(), 0, sizeof(expected)));
   source.Release();
   SubmitInfo info;
-  info.waits = {ready.Get()};
+  ObjPtr<IEvent> dependency = ready->GetEvent();
+  info.waits = {dependency.Get()};
   ObjPtr<ISubmissionToken> done = graphics->Submit(copy.Get(), info);
   ASSERT_TRUE(done);
   copy.Release();

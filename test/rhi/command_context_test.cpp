@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <chrono>
 #include <condition_variable>
@@ -396,7 +396,7 @@ TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
   auto upload = transfer.Submit(std::move(context));
   ASSERT_TRUE(upload);
   context = CommandContext(new TestCommandContext(gate));
-  auto done = graphics.Submit(std::move(context), {{upload}});
+  auto done = graphics.Submit(std::move(context), {{upload.GetEvent()}});
   ASSERT_TRUE(done);
   EXPECT_EQ(done.GetStatus(), SUBMISSION_STATUS_PENDING);
   {

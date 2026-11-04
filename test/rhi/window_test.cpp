@@ -446,7 +446,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto transfer = device.GetQueue(QUEUE_TYPE_TRANSFER);
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
-  EXPECT_TRUE(graphics.SharesPhysicalQueue(transfer));
+  EXPECT_TRUE(graphics.SharesPhysicalQueue(graphics));
   EXPECT_FALSE(device.CreateGLFWWindow({0, 240, "Invalid window"}));
   auto first = device.CreateGLFWWindow({320, 240, "RHI window test A"});
   auto second = device.CreateGLFWWindow({320, 240, "RHI window test B"});
@@ -516,10 +516,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
       auto before_submit = window.GetNextImage();
       EXPECT_EQ(frame.Get(), before_submit.Get());
       frame = {};  // Recording already owns the exact frame.
-      if (window.Get() == first.Get())
-        last = transfer.Submit(std::move(context));
-      else
-        last = graphics.Submit(std::move(context));
+      // Present belongs to the graphics queue; transfer is now an independent native queue.
+      last = graphics.Submit(std::move(context));
       ASSERT_TRUE(last);
       auto after_submit = window.GetNextImage();
       ASSERT_TRUE(after_submit);
@@ -556,7 +554,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
     ASSERT_TRUE(restored);
   }
 #endif
-  auto upload = device.CreateCommandContext();
+  auto upload = transfer.CreateCommandContext();
   auto ready = transfer.Submit(std::move(upload));
   ASSERT_TRUE(ready);
   auto frame = second.GetNextImage();
@@ -571,7 +569,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   const auto second_hwnd = FindWindowA(nullptr, "RHI window test B");
   ASSERT_NE(second_hwnd, nullptr);
 #endif
-  last = graphics.Submit(std::move(context), {{ready}});
+  last = graphics.Submit(std::move(context), {{ready.GetEvent()}});
   ASSERT_TRUE(last);
   second.Release();  // Destruction waits for native GPU use; Device does not retain Window.
 #ifdef _WIN32
@@ -616,11 +614,18 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
     ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
     ASSERT_TRUE(abandoned.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   }  // Recording alone must not change the next context's initial resource state.
-  auto clear = device.CreateCommandContext();
+  auto transfer = device.GetQueue(QUEUE_TYPE_TRANSFER);
+  auto clear_queue = GetParam() == BACKEND_API_D3D12 ? queue : transfer;
+  if (GetParam() == BACKEND_API_D3D12) {
+    auto rejected = transfer.CreateCommandContext();
+    ASSERT_TRUE(rejected.CmdClearImage(a, {1, 0, 0, 1}));
+    EXPECT_FALSE(transfer.Submit(std::move(rejected)));
+  }
+  auto clear = clear_queue.CreateCommandContext();
   ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(a, {0.0f, 0.0f, 1.0f, 1.0f}));
-  auto cleared = queue.Submit(std::move(clear));
+  auto cleared = clear_queue.Submit(std::move(clear));
   ASSERT_TRUE(cleared);
   ASSERT_TRUE(cleared.WaitHost());
   EXPECT_EQ(a.Get(), first.GetNextImage().Get());
@@ -628,12 +633,12 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
   auto reclear = device.CreateCommandContext();
   ASSERT_TRUE(reclear.CmdClearImage(b, {0.6f, 0.7f, 0.8f, 1.0f}));
   ASSERT_TRUE(reclear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1.0f}));
-  auto ready = queue.Submit(std::move(reclear), {{cleared}});
+  auto ready = queue.Submit(std::move(reclear), {{cleared.GetEvent()}});
   ASSERT_TRUE(ready);
   auto present = device.CreateCommandContext();
   ASSERT_TRUE(present.CmdPresent(second));
   ASSERT_TRUE(present.CmdPresent(first));
-  auto done = queue.Submit(std::move(present), {{ready}});
+  auto done = queue.Submit(std::move(present), {{ready.GetEvent()}});
   ASSERT_TRUE(done);
   ASSERT_TRUE(done.WaitHost());
   EXPECT_NE(a.Get(), first.GetNextImage().Get());

@@ -1,8 +1,9 @@
-﻿#pragma once
+#pragma once
 #include <array>
 #include <unordered_map>
 
 #include "grassland/rhi/backend/backend_download_token.h"
+#include "grassland/rhi/backend/backend_event.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_command_context.h"
@@ -72,6 +73,13 @@ class CommandContext : public Object<rhi::ICommandContext> {
   const void *DeviceIdentity() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
+
+  uint64_t SubmissionValue() const {
+    return submission_value_;
+  }
+
+  virtual bool SupportsQueue(QueueType type) const;
+  void ConfigureSubmission(QueueType queue, uint64_t value, std::vector<ObjectPtr<Event>> waits);
   virtual SubmitResult SubmitNative() = 0;
   virtual SubmissionStatus WaitForProgress() = 0;
 
@@ -82,6 +90,9 @@ class CommandContext : public Object<rhi::ICommandContext> {
   virtual bool EndRecording() = 0;
   bool PrepareRendering(const RenderingInfo &info);
   bool RenderingMatches(const IProgram *program) const;
+  QueueType submission_queue_{QUEUE_TYPE_GRAPHICS};
+  uint64_t submission_value_{};
+  std::vector<ObjectPtr<Event>> submission_waits_;
   RenderingInfo rendering_;
   bool recording_failed_{};
   bool sealed_{};

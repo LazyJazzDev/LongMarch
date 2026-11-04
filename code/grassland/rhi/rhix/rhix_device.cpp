@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/rhix/rhix_device.h"
+#include "grassland/rhi/rhix/rhix_device.h"
 
 namespace grassland::rhix {
 Device::Device() noexcept = default;
@@ -8,6 +8,15 @@ Device::Device(rhi::IDevice *object) noexcept : ObjectContainer(object) {
 
 rhi::IDevice *Device::Get() const noexcept {
   return static_cast<rhi::IDevice *>(GetObject());
+}
+
+bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
+  if (!Get())
+    return false;
+  std::vector<rhi::IEvent *> native;
+  for (const auto &event : events)
+    native.push_back(event.Get());
+  return Get()->WaitEvents(native, wait_all);
 }
 
 std::string Device::Name() const {

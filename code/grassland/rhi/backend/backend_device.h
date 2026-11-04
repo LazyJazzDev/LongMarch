@@ -1,6 +1,7 @@
-﻿#pragma once
+#pragma once
+#include <array>
 #include <condition_variable>
-#include <deque>
+#include <list>
 #include <mutex>
 #include <thread>
 
@@ -39,9 +40,18 @@ class Device : public Object<rhi::IDevice> {
   rhi::IQueue *GetQueue(QueueType type) override;
   rhi::ICommandContext *CreateCommandContext() override;
   virtual const void *NativeIdentity() const;
+  virtual ICommandContext *CreateContextForQueue(QueueType type);
+  virtual bool SharesNativeQueue(QueueType a, QueueType b) const;
+  bool WaitEvents(const std::vector<IEvent *> &events, bool wait_all = true) const override;
+  SubmissionStatus QueryEvent(TimelinePoint point) const;
+  virtual bool HasNativeTimelines() const;
+  virtual bool QueryTimeline(QueueType type, uint64_t &value) const;
+  virtual bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const;
+  virtual void WakeCollector();
 
   ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands,
-                                    const std::vector<ObjectPtr<SubmissionToken>> &waits);
+                                    const std::vector<ObjectPtr<Event>> &waits,
+                                    QueueType queue);
 
  protected:
   void ShutdownQueues();
@@ -51,15 +61,20 @@ class Device : public Object<rhi::IDevice> {
   struct Submission {
     ObjectPtr<CommandContext> commands;
     ObjectPtr<SubmissionToken> completion;
+    TimelinePoint point;
   };
 
   void Collect();
+  void CollectTimelines();
   BackendAPI api_;
   Core *core_;
   PhysicalDevice info_;
-  std::mutex mutex_;
-  std::condition_variable changed_;
-  std::deque<Submission> pending_;
+  mutable std::mutex mutex_;
+  mutable std::condition_variable changed_;
+  std::array<uint64_t, 2> submitted_{};
+  std::array<uint64_t, 2> completed_{};
+  std::list<Submission> pending_;
+  std::vector<TimelinePoint> collector_points_{{QUEUE_TYPE_GRAPHICS, 1}, {QUEUE_TYPE_TRANSFER, 1}};
   std::thread collector_;
   bool stopping_{};
 };

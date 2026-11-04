@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/backend_command_context.h"
+#include "grassland/rhi/backend/backend_command_context.h"
 
 #include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/backend_window.h"
@@ -154,6 +154,23 @@ CommandContext::CommandContext(const void *identity) : identity_(identity) {
 }
 
 CommandContext::~CommandContext() = default;
+
+bool CommandContext::SupportsQueue(QueueType type) const {
+  if (type == QUEUE_TYPE_GRAPHICS)
+    return true;
+  for (const auto &entry : resources_) {
+    if (auto image = dynamic_cast<Image *>(entry.first))
+      if (!image->SupportsQueue(type))
+        return false;
+  }
+  return true;
+}
+
+void CommandContext::ConfigureSubmission(QueueType queue, uint64_t value, std::vector<ObjectPtr<Event>> waits) {
+  submission_queue_ = queue;
+  submission_value_ = value;
+  submission_waits_ = std::move(waits);
+}
 
 void CommandContext::BindDownloads(SubmissionToken *submission) {
   for (const auto &token : downloads_)

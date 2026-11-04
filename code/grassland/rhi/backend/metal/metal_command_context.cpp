@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
+#include "grassland/rhi/backend/metal/metal_command_context.h"
 
 #include <cstring>
 
@@ -27,15 +27,18 @@ MTL::ClearColor NativeClearColor(ImageFormat format, const ClearColorValue &valu
 }
 }  // namespace
 
-MetalCommandContext::MetalCommandContext(MetalDevice *device) : CommandContext(device), device_(device) {
+MetalCommandContext::MetalCommandContext(MetalDevice *device, QueueType type)
+    : CommandContext(device),
+      device_(device),
+      recording_queue_(type) {
 }
 
-MetalCommandContext *MetalCommandContext::Create(MetalDevice *device) {
-  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(device));
+MetalCommandContext *MetalCommandContext::Create(MetalDevice *device, QueueType type) {
+  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(device, type));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   // Metal command buffers are single-use. The persistent native queue manages
   // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
-  object->commands_ = object->device_->CreateCommandBuffer();
+  object->commands_ = object->device_->CreateCommandBuffer(type);
   if (!object->commands_) {
     ReportError(-1, "Metal command buffer creation failed.");
     return nullptr;
@@ -148,6 +151,8 @@ bool MetalCommandContext::EndRecording() {
 }
 
 CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
+  if (submission_queue_ != QUEUE_TYPE_GRAPHICS && !presents_.empty())
+    return SUBMIT_RESULT_REJECTED;
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -160,7 +165,21 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
 #endif
   {
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
+    std::lock_guard<std::mutex> lock(device_->QueueMutex(submission_queue_));
+    if (!submission_waits_.empty()) {
+      auto dependency = device_->CreateCommandBuffer(submission_queue_);
+      if (!dependency)
+        return SUBMIT_RESULT_REJECTED;
+      for (const auto &event : submission_waits_) {
+        auto p = event->Point();
+        if (p.queue != submission_queue_)
+          dependency->encodeWait(device_->Timeline(p.queue), p.value);
+      }
+      dependency->commit();
+    }
+    submission_value_ = device_->NextSerial(submission_queue_);
+    commands_->encodeSignalEvent(device_->Timeline(submission_queue_), submission_value_);
+    device_->TrackCompletion(commands_.get(), submission_queue_);
     for (const auto &present : presents_)
       commands_->presentDrawable(present.second->NativeDrawable());
     commands_->commit();

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
@@ -14,7 +14,7 @@ class VulkanWindow final : public Window {
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   const void *DeviceIdentity() const;
   VkSemaphore AcquireSemaphore() const;
-  void MarkAcquireWaitSubmitted(uint64_t value);
+  void MarkAcquireWaitSubmitted(uint64_t value, QueueType queue);
   VkSemaphore RenderSemaphore() const;
   VkResult PresentFrame();
 
@@ -33,6 +33,7 @@ class VulkanWindow final : public Window {
     bool acquired{};
     // Timeline value of the submission consuming this acquire semaphore.
     uint64_t submission_value{};
+    QueueType submission_queue{QUEUE_TYPE_GRAPHICS};
   };
 
   std::vector<AcquireSync> acquire_sync_;

@@ -1,4 +1,4 @@
-﻿// Include Vulkan before GLFW declares its surface functions.
+// Include Vulkan before GLFW declares its surface functions.
 #define GLFW_INCLUDE_VULKAN
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
@@ -87,7 +87,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   auto &sync = acquire_sync_[current_sync_];
   const auto native = device_->NativeDevice();
   if (sync.submission_value) {
-    const auto status = device_->Wait(sync.submission_value);
+    const auto status = device_->Wait(sync.submission_value, UINT64_MAX, sync.submission_queue);
     if (!Check(status, "Acquire frame synchronization"))
       return {};
     sync.submission_value = 0;
@@ -189,8 +189,9 @@ VkSemaphore VulkanWindow::AcquireSemaphore() const {
   return sync.submission_value ? VK_NULL_HANDLE : sync.semaphore;
 }
 
-void VulkanWindow::MarkAcquireWaitSubmitted(uint64_t value) {
+void VulkanWindow::MarkAcquireWaitSubmitted(uint64_t value, QueueType queue) {
   acquire_sync_[current_sync_].submission_value = value;
+  acquire_sync_[current_sync_].submission_queue = queue;
 }
 
 VkSemaphore VulkanWindow::RenderSemaphore() const {
