@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_cuda_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
@@ -235,6 +236,12 @@ rhi::IImage *D3D12Device::CreateImage(const ImageDesc &desc) {
 rhi::IBuffer *D3D12Device::CreateBuffer(const BufferDesc &desc) {
   return D3D12AllocatedBuffer::Create(this, desc);
 }
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+ICUDABuffer *D3D12Device::CreateCUDABuffer(const BufferDesc &desc) {
+  return D3D12CUDABuffer::Create(this, desc);
+}
+#endif
 
 rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {
   return D3D12Window::Create(this, desc);

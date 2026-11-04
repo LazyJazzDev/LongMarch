@@ -53,8 +53,5 @@ D3D12CUDABuffer *D3D12CUDABuffer::Create(D3D12Device *device, const BufferDesc &
   return imported ? object.release() : nullptr;
 }
 
-ICUDABuffer *D3D12Device::CreateCUDABuffer(const BufferDesc &desc) {
-  return D3D12CUDABuffer::Create(this, desc);
-}
 }  // namespace grassland::rhi::backend::d3d12
 #endif

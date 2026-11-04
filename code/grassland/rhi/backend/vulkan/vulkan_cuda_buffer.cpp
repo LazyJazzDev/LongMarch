@@ -129,8 +129,5 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
   return imported ? object.release() : nullptr;
 }
 
-ICUDABuffer *VulkanDevice::CreateCUDABuffer(const BufferDesc &desc) {
-  return VulkanCUDABuffer::Create(this, desc);
-}
 }  // namespace grassland::rhi::backend::vulkan
 #endif
