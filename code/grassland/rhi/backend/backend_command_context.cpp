@@ -28,7 +28,7 @@ bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
     ReportError(-1, "CmdDrawImGui requires a non-integer color target.");
     return false;
   }
-  if (!RetainResource(target))
+  if (!RetainImage(static_cast<Image *>(target)))
     return false;
   if (!native->RecordImGui(this, target, COLOR_SPACE_BT709_LINEAR, 1.0f)) {
     recording_failed_ = true;
@@ -52,7 +52,7 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
 #else
   auto native = static_cast<Window *>(window);
 #endif
-  if (!RetainResource(frame_img))
+  if (!RetainImage(static_cast<Image *>(frame_img)))
     return false;
   if (!native->RecordPresentImage(this, frame_img, frame_color_space)) {
     recording_failed_ = true;
@@ -123,7 +123,7 @@ bool CommandContext::PrepareRendering(const RenderingInfo &info) {
           previous->GetDesc().height != image->GetDesc().height)
         return false;
     images.push_back(image);
-    return RetainResource(image);
+    return RetainImage(native);
   };
   for (auto color : next.color_attachments)
     if (!validate(color.color_attachment, false, color.load_op, color.store_op)) {
@@ -159,18 +159,6 @@ CommandContext::CommandContext(Queue *queue) : queue_(queue) {
 
 CommandContext::~CommandContext() = default;
 
-bool CommandContext::SupportsQueue() const {
-  const auto type = queue_->GetType();
-  if (type == QUEUE_TYPE_GRAPHICS)
-    return true;
-  for (const auto &entry : resources_) {
-    if (auto image = dynamic_cast<Image *>(entry.first))
-      if (!image->SupportsQueue(type))
-        return false;
-  }
-  return true;
-}
-
 ISubmissionToken *CommandContext::Submit(const SubmitInfo &info) {
   return queue_->Submit(this, info);
 }
@@ -201,6 +189,19 @@ IDownloadToken *CommandContext::CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t)
 IDownloadToken *CommandContext::CmdDownloadImage(IImage *, const ImageDownloadRegion &) {
   recording_failed_ = true;
   return nullptr;
+}
+
+bool CommandContext::ValidateImageQueue(const Image *image) {
+  if (!image->SupportsQueue(queue_)) {
+    recording_failed_ = true;
+    ReportError(-1, "The image cannot be used on this command context's queue.");
+    return false;
+  }
+  return true;
+}
+
+bool CommandContext::RetainImage(Image *image) {
+  return ValidateImageQueue(image) && RetainResource(image);
 }
 
 bool CommandContext::RetainResource(rhi::IObject *resource) {

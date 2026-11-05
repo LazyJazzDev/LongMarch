@@ -20,6 +20,7 @@
 #include <d3d12sdklayers.h>
 
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #endif
 
 namespace grassland::rhix {
@@ -616,11 +617,37 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
   }  // Recording alone must not change the next context's initial resource state.
   auto transfer = device.GetQueue(QUEUE_TYPE_TRANSFER);
   auto clear_queue = GetParam() == BACKEND_API_D3D12 ? queue : transfer;
+#if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
-    auto rejected = transfer.CreateCommandContext();
-    ASSERT_TRUE(rejected.CmdClearImage(a, {1, 0, 0, 1}));
-    EXPECT_FALSE(rejected.Submit());
+    // A second DIRECT queue with the same role is still not the swapchain's queue.
+    Queue another_graphics(backend::d3d12::D3D12Queue::Create(static_cast<backend::d3d12::D3D12Device *>(device.Get()),
+                                                              QUEUE_TYPE_GRAPHICS));
+    ASSERT_TRUE(another_graphics);
+    EXPECT_EQ(another_graphics.GetType(), queue.GetType());
+    EXPECT_FALSE(another_graphics.SharesPhysicalQueue(queue));
+    const auto desc = a.GetDesc();
+    std::vector<uint8_t> pixels(size_t(desc.width) * desc.height * 4);
+    for (const auto &wrong_queue : {transfer, another_graphics}) {
+      auto rejected = wrong_queue.CreateCommandContext();
+      EXPECT_FALSE(rejected.CmdClearImage(a, {1, 0, 0, 1}));
+      EXPECT_FALSE(rejected.Submit());
+      rejected = wrong_queue.CreateCommandContext();
+      EXPECT_FALSE(rejected.CmdUploadImage(a, pixels.data(), uint64_t(desc.width) * 4));
+      EXPECT_FALSE(rejected.Submit());
+      rejected = wrong_queue.CreateCommandContext();
+      RenderingInfo rendering;
+      rendering.colors.push_back({a});
+      EXPECT_FALSE(rejected.CmdBeginRendering(rendering));
+      EXPECT_FALSE(rejected.Submit());
+      rejected = wrong_queue.CreateCommandContext();
+      EXPECT_FALSE(rejected.CmdDrawImGui(first, a));
+      EXPECT_FALSE(rejected.Submit());
+      rejected = wrong_queue.CreateCommandContext();
+      EXPECT_FALSE(rejected.CmdPresent(first));
+      EXPECT_FALSE(rejected.Submit());
+    }
   }
+#endif
   auto clear = clear_queue.CreateCommandContext();
   ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));

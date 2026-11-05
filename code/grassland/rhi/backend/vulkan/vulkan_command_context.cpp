@@ -107,7 +107,7 @@ bool VulkanCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &v
 #else
   const auto native = static_cast<VulkanImage *>(image);
 #endif
-  if (!RetainResource(native))
+  if (!RetainImage(native))
     return false;
   if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
                        VK_ACCESS_TRANSFER_WRITE_BIT))
@@ -153,7 +153,7 @@ bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
   auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(static_cast<VulkanSwapChainImage *>(target->GetNextImage()));
   if (!frame)
     return false;
-  if (!RetainResource(frame.Get()))
+  if (!RetainImage(frame.Get()))
     return false;
   if (!target->RecordImGui(this, frame.Get())) {
     recording_failed_ = true;
@@ -767,7 +767,7 @@ bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint6
     std::memcpy(pixels.data() + y * packed, static_cast<const uint8_t *>(data) + y * row_pitch, packed);
   auto upload = device_->UploadPool().Acquire(pixels.size());
   if (!upload || !upload->Write(pixels.data(), pixels.size()) || !RetainResource(upload.Get()) ||
-      !RetainResource(native)) {
+      !RetainImage(native)) {
     recording_failed_ = true;
     return false;
   }
@@ -997,7 +997,7 @@ IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const Imag
   const uint64_t pitch = packed;
   const bool stencil = HasStencil(desc.format);
   auto lease = device_->DownloadPool().Acquire(pitch * height + (stencil ? uint64_t(width) * height : 0));
-  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
+  if (!lease || !RetainImage(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
   }

@@ -5,7 +5,7 @@ namespace grassland::rhi::backend {
 Image::Image(ImageDesc desc) : desc_(desc) {
 }
 
-bool Image::SupportsQueue(QueueType) const {
+bool Image::SupportsQueue(const Queue *) const {
   return true;
 }
 

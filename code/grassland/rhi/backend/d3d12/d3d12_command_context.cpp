@@ -95,7 +95,7 @@ bool D3D12CommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
 #else
   const auto native = static_cast<D3D12Image *>(image);
 #endif
-  if (!RetainResource(native))
+  if (!RetainImage(native))
     return false;
   const auto format = native->GetDesc().format;
   if (IsDepthFormat(format)) {
@@ -198,7 +198,7 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
   auto frame = ObjectPtr<D3D12SwapChainImage>::Adopt(static_cast<D3D12SwapChainImage *>(target->GetNextImage()));
   if (!frame)
     return false;
-  if (!RetainResource(frame.Get()))
+  if (!RetainImage(frame.Get()))
     return false;
   if (!target->RecordImGui(this, frame.Get())) {
     recording_failed_ = true;
@@ -739,6 +739,8 @@ bool D3D12CommandContext::PrepareGroups() {
             return false;
         } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
           auto image = static_cast<D3D12Image *>(version->GetReferences()[binding_index][j].Get());
+          if (!ValidateImageQueue(image))
+            return false;
           resource = image->NativeImage();
           for (auto color : rendering_.color_attachments)
             if (color.color_attachment == image) {
@@ -857,7 +859,7 @@ bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64
   UINT64 bytes{}, total{};
   device_->NativeDevice()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &rows, &bytes, &total);
   auto upload = device_->UploadPool().Acquire(total);
-  if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
+  if (!upload || !RetainResource(upload.Get()) || !RetainImage(native)) {
     recording_failed_ = true;
     return false;
   }
@@ -1002,7 +1004,7 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
     const UINT planes = HasStencil(desc.format) ? 2 : 1;
     device_->NativeDevice()->GetCopyableFootprints(&native_desc, 0, planes, 0, footprints, rows, row_bytes, &total);
     auto lease = device_->DownloadPool().Acquire(total);
-    if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
+    if (!lease || !RetainImage(native) || !RetainResource(lease.Get())) {
       recording_failed_ = true;
       return nullptr;
     }
@@ -1038,7 +1040,7 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
     return nullptr;
   }
   auto lease = device_->DownloadPool().Acquire(pitch * height);
-  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
+  if (!lease || !RetainImage(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
   }

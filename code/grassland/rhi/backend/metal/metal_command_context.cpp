@@ -63,7 +63,7 @@ bool MetalCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
 #else
   const auto native = static_cast<MetalImage *>(image);
 #endif
-  if (!RetainResource(native))
+  if (!RetainImage(native))
     return false;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto pass = MTL::RenderPassDescriptor::renderPassDescriptor();
@@ -127,7 +127,7 @@ bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
   const auto target = static_cast<MetalWindow *>(window);
 #endif
   auto frame = ObjectPtr<MetalSwapChainImage>::Adopt(static_cast<MetalSwapChainImage *>(target->GetNextImage()));
-  if (!frame || !RetainResource(frame.Get()))
+  if (!frame || !RetainImage(frame.Get()))
     return false;
 
   if (!target->RecordImGui(this, frame.Get())) {
@@ -291,7 +291,7 @@ bool MetalCommandContext::CmdUploadImage(IImage *image, const void *data, uint64
   const auto desc = native->GetDesc();
   const uint64_t size = pitch * desc.height;
   auto upload = device_->UploadPool().Acquire(size);
-  if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
+  if (!upload || !RetainResource(upload.Get()) || !RetainImage(native)) {
     recording_failed_ = true;
     return false;
   }
@@ -457,7 +457,7 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
       return nullptr;
     width = desc.width;
     height = desc.height;
-    return RetainResource(value) ? value : nullptr;
+    return RetainImage(value) ? value : nullptr;
   };
   const MTL::LoadAction loads[] = {MTL::LoadActionLoad, MTL::LoadActionClear, MTL::LoadActionDontCare};
   auto store = [](AttachmentStoreOp op) {
@@ -739,7 +739,7 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
   const uint64_t pitch = packed;
   const bool stencil = HasStencil(desc.format);
   auto lease = device_->DownloadPool().Acquire(pitch * height + (stencil ? uint64_t(width) * height : 0));
-  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
+  if (!lease || !RetainImage(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
   }

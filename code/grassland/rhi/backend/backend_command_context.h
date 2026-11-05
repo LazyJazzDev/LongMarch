@@ -10,6 +10,7 @@
 
 namespace grassland::rhi::backend {
 class Queue;
+class Image;
 struct Submission;
 
 class CommandContext : public Object<rhi::ICommandContext> {
@@ -77,7 +78,6 @@ class CommandContext : public Object<rhi::ICommandContext> {
   void MarkSubmitted();
   bool WasSubmitted() const;
 
-  bool SupportsQueue() const;
   // The queue mutex is held and the immutable signal value has been allocated.
   virtual SubmitResult SubmitNative(Submission &submission) = 0;
 
@@ -92,6 +92,9 @@ class CommandContext : public Object<rhi::ICommandContext> {
   // Call before encoding each resource use. Retains each exact object once.
   IDownloadToken *RegisterDownload(ObjectPtr<DownloadToken> token);
   bool RetainResource(rhi::IObject *resource);
+  // Validate the actual queue before retaining or encoding an image operation.
+  bool RetainImage(Image *image);
+  bool ValidateImageQueue(const Image *image);
   virtual bool EndRecording() = 0;
   bool PrepareRendering(const RenderingInfo &info);
   bool RenderingMatches(const IProgram *program) const;

@@ -111,10 +111,6 @@ const void *Device::NativeIdentity() const {
 ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands,
                                           const std::vector<ObjectPtr<Event>> &waits,
                                           Queue *queue) {
-  if (!commands->SupportsQueue()) {
-    ReportError(-1, "The command context or one of its images requires a different queue.");
-    return {};
-  }
   if (!commands->Seal())
     return {};
 #if !defined(NDEBUG)
