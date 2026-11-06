@@ -6,7 +6,7 @@
 #include "grassland/util/file_system.h"
 
 namespace grassland::rhi {
-class IEvent;
+struct Event;
 class IImage;
 class IBuffer;
 struct BufferDesc;
@@ -53,7 +53,7 @@ class IDevice : public IObject {
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   virtual IQueue *GetQueue(QueueType type) = 0;
   // All events must belong to this device. Empty lists are rejected.
-  virtual bool WaitEvents(const std::vector<IEvent *> &events, bool wait_all = true) const = 0;
+  virtual bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const = 0;
 
  protected:
   ~IDevice() override;

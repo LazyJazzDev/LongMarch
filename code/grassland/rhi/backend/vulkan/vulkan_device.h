@@ -37,7 +37,7 @@ class VulkanDevice final : public Device {
   uint32_t QueueFamily() const;
   bool SupportsSwapchain() const;
 
-  bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const override;
+  bool WaitTimelines(const std::vector<Event> &points, bool wait_all) const override;
   void WakeCollector() override;
   std::mutex &QueueMutex(QueueType type = QUEUE_TYPE_GRAPHICS);
   VkSemaphore Timeline(QueueType type = QUEUE_TYPE_GRAPHICS) const;

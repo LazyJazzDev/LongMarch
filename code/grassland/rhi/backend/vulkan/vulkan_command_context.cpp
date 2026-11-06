@@ -190,7 +190,8 @@ bool VulkanCommandContext::EndRecording() {
   return Check(vkEndCommandBuffer(command_), "End command buffer");
 }
 
-CommandContext::SubmitResult VulkanCommandContext::SubmitNative(Submission &submission) {
+CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const std::vector<Event> &waits,
+                                                                Submission &submission) {
   auto queue = static_cast<VulkanQueue *>(OwnerQueue());
   if (queue->GetType() != QUEUE_TYPE_GRAPHICS && !presents_.empty())
     return SUBMIT_RESULT_REJECTED;
@@ -210,22 +211,11 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(Submission &subm
     rendered.push_back(present->RenderSemaphore());
   rendered.push_back(queue->Timeline());
   std::vector<uint64_t> wait_values;
-  std::array<uint64_t, 2> dependencies{};
-  std::array<VulkanQueue *, 2> sources{};
-  for (const auto &event : submission.waits) {
-    auto point = event->Point();
-    if (point.queue != queue) {
-      const auto index = point.queue->GetType();
-      sources[index] = static_cast<VulkanQueue *>(point.queue);
-      dependencies[index] = std::max(dependencies[index], point.value);
-    }
+  for (auto event : CoalesceEvents(waits, true)) {
+    wait_semaphores.push_back(static_cast<VulkanTimeline *>(event.timeline)->Native());
+    stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    wait_values.push_back(event.value);
   }
-  for (int i = 0; i < 2; ++i)
-    if (dependencies[i]) {
-      wait_semaphores.push_back(sources[i]->Timeline());
-      stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-      wait_values.push_back(dependencies[i]);
-    }
   std::vector<uint64_t> signal_values(rendered.size(), 0);
   VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
   timeline.waitSemaphoreValueCount = static_cast<uint32_t>(wait_values.size());
@@ -242,7 +232,7 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(Submission &subm
   submit.signalSemaphoreCount = static_cast<uint32_t>(rendered.size());
   submit.pSignalSemaphores = rendered.data();
   {
-    signal_values.back() = submission.point.value;
+    signal_values.back() = submission.completion->GetEvent().value;
     if (!Check(vkQueueSubmit(queue->Native(), 1, &submit, VK_NULL_HANDLE), "vkQueueSubmit"))
       return SUBMIT_RESULT_REJECTED;
     MarkSubmitted();
@@ -281,7 +271,7 @@ CommandContext::SubmitResult VulkanCommandContext::FinishSubmitNative(Submission
 
 SubmissionStatus VulkanCommandContext::WaitForProgress(Submission &submission) {
   auto queue = static_cast<VulkanQueue *>(OwnerQueue());
-  const auto result = queue->Wait(submission.point.value, 50000000);
+  const auto result = queue->Wait(submission.completion->GetEvent().value, 50000000);
   if (result == VK_TIMEOUT)
     return SUBMISSION_STATUS_PENDING;
   if (result == VK_ERROR_DEVICE_LOST)

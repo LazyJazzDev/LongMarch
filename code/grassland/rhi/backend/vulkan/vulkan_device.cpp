@@ -284,36 +284,25 @@ VulkanTemporalBufferPool &VulkanDevice::DownloadPool() {
 
 namespace grassland::rhi::backend::vulkan {
 
-bool VulkanDevice::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const {
+bool VulkanDevice::WaitTimelines(const std::vector<Event> &points, bool wait_all) const {
   // Coalesce duplicate timeline objects: max for All, min for Any.
-  std::array<uint64_t, 2> values{};
-  std::array<bool, 2> present{};
-  for (auto p : points) {
-    if (!present[p.queue->GetType()])
-      values[p.queue->GetType()] = p.value;
-    else
-      values[p.queue->GetType()] =
-          wait_all ? std::max(values[p.queue->GetType()], p.value) : std::min(values[p.queue->GetType()], p.value);
-    present[p.queue->GetType()] = true;
+  const auto unique = CoalesceEvents(points, wait_all);
+  std::vector<VkSemaphore> semaphores;
+  std::vector<uint64_t> values;
+  for (auto event : unique) {
+    semaphores.push_back(static_cast<VulkanTimeline *>(event.timeline)->Native());
+    values.push_back(event.value);
   }
-  std::array<VkSemaphore, 2> semaphores{};
-  std::array<uint64_t, 2> targets{};
-  uint32_t count = 0;
-  for (int i = 0; i < 2; ++i)
-    if (present[i]) {
-      semaphores[count] = Timeline(static_cast<QueueType>(i));
-      targets[count++] = values[i];
-    }
   VkSemaphoreWaitInfo wait{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
   wait.flags = wait_all ? 0 : VK_SEMAPHORE_WAIT_ANY_BIT;
-  wait.semaphoreCount = count;
+  wait.semaphoreCount = static_cast<uint32_t>(semaphores.size());
   wait.pSemaphores = semaphores.data();
-  wait.pValues = targets.data();
+  wait.pValues = values.data();
   return vkWaitSemaphores(device_, &wait, UINT64_MAX) == VK_SUCCESS;
 }
 
 void VulkanDevice::WakeCollector() {
-  std::vector<TimelinePoint> wake;
+  std::vector<Event> wake;
   for (auto queue : {QUEUE_TYPE_GRAPHICS, QUEUE_TYPE_TRANSFER}) {
     if (!NativeQueue(queue) || !Timeline(queue))
       continue;
@@ -328,7 +317,7 @@ void VulkanDevice::WakeCollector() {
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &semaphore;
     if (Check(vkQueueSubmit(NativeQueue(queue), 1, &submit, VK_NULL_HANDLE), "Signal collector shutdown"))
-      wake.push_back({QueueState(queue), value});
+      wake.push_back({QueueState(queue)->TimelineState(), value});
   }
   if (!wake.empty())
     WaitTimelines(wake, true);

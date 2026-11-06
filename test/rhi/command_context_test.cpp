@@ -151,7 +151,7 @@ class TestCommandContext final : public backend::CommandContext {
     return true;
   }
 
-  SubmitResult SubmitNative(backend::Submission &) override {
+  SubmitResult SubmitNative(const std::vector<rhi::Event> &, backend::Submission &) override {
     EXPECT_EQ(ended, 1);
     if (fail_after_submit_) {
       MarkSubmitted();

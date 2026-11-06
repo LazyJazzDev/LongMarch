@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/d3d12/d3d12_timeline.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
@@ -15,15 +16,8 @@ class D3D12Queue final : public Queue {
   bool WaitIdle();
   const void *NativeIdentity() const override;
 
-  bool HasNativeTimeline() const override {
-    return true;
-  }
-
-  bool QueryTimeline(uint64_t &value) const override;
-
  private:
-  D3D12Queue(D3D12Device *device, QueueType type);
+  D3D12Queue(D3D12Device *device, QueueType type, ObjectPtr<D3D12Timeline> timeline);
   ComPtr<ID3D12CommandQueue> queue_;
-  ComPtr<ID3D12Fence> timeline_;
 };
 }  // namespace grassland::rhi::backend::d3d12

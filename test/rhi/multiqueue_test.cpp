@@ -2,18 +2,23 @@
 
 #include <chrono>
 #include <future>
+#include <type_traits>
 
 #include "../../demo/rhi_multiqueue/experiment.h"
 #include "grassland/rhi/backend/backend_command_context.h"
-#include "grassland/rhi/backend/backend_event.h"
+#include "grassland/rhi/backend/backend_timeline.h"
+#include "grassland/rhi/rhix/rhix_event.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_timeline.h"
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_timeline.h"
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_timeline.h"
 #endif
 namespace grassland::rhi {
 namespace {
@@ -130,6 +135,84 @@ class Gate {
 
 class RhiMultiQueue : public testing::TestWithParam<BackendAPI> {};
 
+TEST_P(RhiMultiQueue, ValueEventsUseTimelinesIndependentOfQueues) {
+  static_assert(std::is_trivially_copyable_v<Event>);
+  static_assert(std::is_same_v<Event, rhix::Event>);
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto create = [&]() -> backend::ObjectPtr<backend::Timeline> {
+#if defined(LONGMARCH_D3D12_ENABLED)
+    if (GetParam() == BACKEND_API_D3D12)
+      return backend::ObjectPtr<backend::Timeline>::Adopt(
+          backend::d3d12::D3D12Timeline::Create(static_cast<backend::d3d12::D3D12Device *>(device.Get())));
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+    if (GetParam() == BACKEND_API_VULKAN)
+      return backend::ObjectPtr<backend::Timeline>::Adopt(
+          backend::vulkan::VulkanTimeline::Create(static_cast<backend::vulkan::VulkanDevice *>(device.Get())));
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+    if (GetParam() == BACKEND_API_METAL)
+      return backend::ObjectPtr<backend::Timeline>::Adopt(
+          backend::metal::MetalTimeline::Create(static_cast<backend::metal::MetalDevice *>(device.Get())));
+#endif
+    return {};
+  };
+  auto signal = [&](ITimeline *timeline, uint64_t value) -> bool {
+#if defined(LONGMARCH_D3D12_ENABLED)
+    if (GetParam() == BACKEND_API_D3D12)
+      return SUCCEEDED(static_cast<backend::d3d12::D3D12Timeline *>(timeline)->Native()->Signal(value));
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+    if (GetParam() == BACKEND_API_VULKAN) {
+      VkSemaphoreSignalInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO};
+      info.semaphore = static_cast<backend::vulkan::VulkanTimeline *>(timeline)->Native();
+      info.value = value;
+      return vkSignalSemaphore(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->NativeDevice(), &info) ==
+             VK_SUCCESS;
+    }
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+    if (GetParam() == BACKEND_API_METAL) {
+      static_cast<backend::metal::MetalTimeline *>(timeline)->Native()->setSignaledValue(value);
+      return true;
+    }
+#endif
+    return false;
+  };
+  auto first = create(), second = create(), third = create();
+  ASSERT_TRUE(first && second && third);
+  Event a{first.Get(), 2}, b{second.Get(), 4}, c{third.Get(), 6};
+  Event copy = a;
+  EXPECT_TRUE(first->IsUniquelyOwned());  // Copying Event never retains its timeline.
+  EXPECT_EQ(copy.GetStatus(), SUBMISSION_STATUS_PENDING);
+  ASSERT_TRUE(signal(a.timeline, a.value));
+  ASSERT_TRUE(device->WaitEvents({a, b, c, {a.timeline, 100}}, false));
+  ASSERT_TRUE(signal(b.timeline, b.value));
+  ASSERT_TRUE(signal(c.timeline, c.value));
+  ASSERT_TRUE(device->WaitEvents({a, b, c, {c.timeline, 1}}, true));
+  uint64_t completed{};
+  ASSERT_TRUE(a.timeline->GetCompletedValue(completed));
+  EXPECT_EQ(completed, 2);
+  EXPECT_TRUE(copy.WaitHost());
+  EXPECT_FALSE(device->WaitEvents({{nullptr, 1}}));
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  SubmitInfo info{{{a.timeline, 3}, b, c}};
+  ObjPtr<ISubmissionToken> done = commands->Submit(info);
+  ASSERT_TRUE(done);
+  info.waits.clear();  // Native submission has consumed this storage and its values.
+  a = {};
+  ASSERT_TRUE(signal(first.Get(), 3));
+  ASSERT_TRUE(done->WaitHost());
+  Event finished = done->GetEvent();
+  done.Release();
+  EXPECT_TRUE(finished.WaitHost());
+}
+
 TEST_P(RhiMultiQueue, ContextKeepsItsPersistentQueueBindingAfterCallerHandlesAreReleased) {
   ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
@@ -177,14 +260,14 @@ TEST_P(RhiMultiQueue, IndependentQueueCompletesAndRetiresWhileTransferIsBlocked)
   ASSERT_TRUE(blocked && done);
   slow.Release();
   fast.Release();
-  ObjPtr<IEvent> a = blocked->GetEvent();
-  ObjPtr<IEvent> b = done->GetEvent();
+  rhi::Event a = blocked->GetEvent();
+  rhi::Event b = done->GetEvent();
   auto waiter = std::async(std::launch::async, [done] { return done->WaitHost(); });
   const bool retired_independently = waiter.wait_for(std::chrono::seconds(3)) == std::future_status::ready;
   const auto blocked_status = blocked->GetStatus();
   if (retired_independently) {
-    EXPECT_TRUE(device->WaitEvents({a.Get(), b.Get()}, false));
-    EXPECT_EQ(a->GetStatus(), SUBMISSION_STATUS_PENDING);
+    EXPECT_TRUE(device->WaitEvents({a, b}, false));
+    EXPECT_EQ(a.GetStatus(), SUBMISSION_STATUS_PENDING);
   }
   ObjPtr<ICommandContext> dependent_context = graphics->CreateCommandContext();
   if (!dependent_context) {
@@ -192,7 +275,7 @@ TEST_P(RhiMultiQueue, IndependentQueueCompletesAndRetiresWhileTransferIsBlocked)
     FAIL() << "Could not create dependent context";
   }
   SubmitInfo dependencies;
-  dependencies.waits = {a.Get(), a.Get(), b.Get()};
+  dependencies.waits = {a, a, b};
   ObjPtr<ISubmissionToken> dependent = dependent_context->Submit(dependencies);
   if (!dependent) {
     gate.Release();
@@ -209,11 +292,11 @@ TEST_P(RhiMultiQueue, IndependentQueueCompletesAndRetiresWhileTransferIsBlocked)
   EXPECT_TRUE(gpu_dependency_blocks);
   EXPECT_TRUE(retired_independently);
   EXPECT_EQ(blocked_status, SUBMISSION_STATUS_PENDING);
-  EXPECT_TRUE(device->WaitEvents({a.Get(), b.Get(), b.Get()}, true));
+  EXPECT_TRUE(device->WaitEvents({a, b, b}, true));
   done.Release();
   blocked.Release();
-  EXPECT_TRUE(b->WaitHost());  // Immutable event outlives its SubmissionToken.
-  EXPECT_EQ(a->GetStatus(), SUBMISSION_STATUS_COMPLETED);
+  EXPECT_TRUE(b.WaitHost());  // Immutable event outlives its SubmissionToken.
+  EXPECT_EQ(a.GetStatus(), SUBMISSION_STATUS_COMPLETED);
 }
 
 TEST_P(RhiMultiQueue, EventDependencyMakesTransferredVertexColorsRenderCorrectly) {

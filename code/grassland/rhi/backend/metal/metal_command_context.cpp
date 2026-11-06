@@ -151,7 +151,8 @@ bool MetalCommandContext::EndRecording() {
   return true;
 }
 
-CommandContext::SubmitResult MetalCommandContext::SubmitNative(Submission &submission) {
+CommandContext::SubmitResult MetalCommandContext::SubmitNative(const std::vector<Event> &waits,
+                                                               Submission &submission) {
   auto queue = static_cast<MetalQueue *>(OwnerQueue());
   if (queue->GetType() != QUEUE_TYPE_GRAPHICS && !presents_.empty())
     return SUBMIT_RESULT_REJECTED;
@@ -167,19 +168,16 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative(Submission &submi
 #endif
   {
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    if (!submission.waits.empty()) {
+    if (!waits.empty()) {
       auto dependency = queue->CreateCommandBuffer();
       if (!dependency)
         return SUBMIT_RESULT_REJECTED;
-      for (const auto &event : submission.waits) {
-        auto p = event->Point();
-        if (p.queue != queue)
-          dependency->encodeWait(static_cast<MetalQueue *>(p.queue)->Timeline(), p.value);
-      }
+      for (auto event : waits)
+        dependency->encodeWait(static_cast<MetalTimeline *>(event.timeline)->Native(), event.value);
       dependency->commit();
     }
-    commands_->encodeSignalEvent(queue->Timeline(), submission.point.value);
-    device_->TrackCompletion(commands_.get(), queue);
+    commands_->encodeSignalEvent(queue->Timeline(), submission.completion->GetEvent().value);
+    device_->TrackCompletion(commands_.get(), queue->TimelineState());
     for (const auto &present : presents_)
       commands_->presentDrawable(present.second->NativeDrawable());
     commands_->commit();

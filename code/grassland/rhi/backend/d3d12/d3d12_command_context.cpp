@@ -227,7 +227,8 @@ bool D3D12CommandContext::EndRecording() {
   return closed_;
 }
 
-CommandContext::SubmitResult D3D12CommandContext::SubmitNative(Submission &submission) {
+CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const std::vector<Event> &waits,
+                                                               Submission &submission) {
   auto queue = static_cast<D3D12Queue *>(OwnerQueue());
   if (queue->GetType() != QUEUE_TYPE_GRAPHICS && !presents_.empty())
     return SUBMIT_RESULT_REJECTED;
@@ -242,10 +243,9 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative(Submission &submi
   }
 #endif
   {
-    for (const auto &wait : submission.waits) {
-      const auto p = wait->Point();
-      if (p.queue != queue &&
-          !Check(queue->Native()->Wait(static_cast<D3D12Queue *>(p.queue)->Timeline(), p.value), "Queue::Wait"))
+    for (auto event : waits) {
+      auto timeline = static_cast<D3D12Timeline *>(event.timeline);
+      if (!Check(queue->Native()->Wait(timeline->Native(), event.value), "Queue::Wait"))
         return SUBMIT_RESULT_REJECTED;
     }
     submission.failed = true;
@@ -260,7 +260,8 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative(Submission &submi
       if (!Check(present.second->Present(), "Swapchain::Present"))
         presented = false;
     }
-    submission.failed = !Check(queue->Native()->Signal(queue->Timeline(), submission.point.value), "Queue::Signal");
+    submission.failed =
+        !Check(queue->Native()->Signal(queue->Timeline(), submission.completion->GetEvent().value), "Queue::Signal");
     if (!presented)
       submission.failed = true;
   }
@@ -289,7 +290,7 @@ SubmissionStatus D3D12CommandContext::WaitForProgress(Submission &submission) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     return SUBMISSION_STATUS_PENDING;
   }
-  if (queue->Wait(submission.point.value, event_))
+  if (queue->Wait(submission.completion->GetEvent().value, event_))
     return SUBMISSION_STATUS_COMPLETED;
   // A failed host wait does not prove that GPU resource use has ended.
   submission.failed = true;

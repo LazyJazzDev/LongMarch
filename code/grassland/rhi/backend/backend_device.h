@@ -41,15 +41,13 @@ class Device : public Object<rhi::IDevice> {
   rhi::IQueue *GetQueue(QueueType type) override;
   virtual const void *NativeIdentity() const;
   Queue *QueueState(QueueType type) const;
-  bool WaitEvents(const std::vector<IEvent *> &events, bool wait_all = true) const override;
-  SubmissionStatus QueryEvent(TimelinePoint point) const;
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override;
   bool HasNativeTimelines() const;
-  bool QueryTimeline(QueueType type, uint64_t &value) const;
-  virtual bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const;
+  virtual bool WaitTimelines(const std::vector<Event> &points, bool wait_all) const;
   virtual void WakeCollector();
 
   ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands,
-                                    const std::vector<ObjectPtr<Event>> &waits,
+                                    const std::vector<Event> &waits,
                                     Queue *queue);
 
  protected:
@@ -68,7 +66,7 @@ class Device : public Object<rhi::IDevice> {
   mutable std::condition_variable changed_;
   std::array<ObjectPtr<Queue>, 2> queues_;
   std::list<Submission> pending_;
-  std::vector<TimelinePoint> collector_points_;
+  std::vector<Event> collector_points_;
   std::thread collector_;
   bool stopping_{};
 };

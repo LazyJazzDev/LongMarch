@@ -5,7 +5,10 @@
 #include "grassland/rhi/backend/backend_device.h"
 
 namespace grassland::rhi::backend {
-Queue::Queue(Device *device, QueueType type) : device_(device), type_(type) {
+Queue::Queue(Device *device, QueueType type, ObjectPtr<backend::Timeline> timeline)
+    : device_(device),
+      type_(type),
+      timeline_(timeline ? std::move(timeline) : ObjectPtr<backend::Timeline>::Adopt(new backend::Timeline(device))) {
 }
 
 Queue::~Queue() = default;
@@ -30,17 +33,8 @@ uint64_t Queue::NextSerial() {
   return ++serial_;
 }
 
-bool Queue::HasNativeTimeline() const {
-  return false;
-}
-
-bool Queue::QueryTimeline(uint64_t &value) const {
-  value = completed_.load();
-  return true;
-}
-
-void Queue::RecordCompletion(uint64_t value) {
-  completed_.store(value);
+backend::Timeline *Queue::TimelineState() const {
+  return timeline_.Get();
 }
 
 bool Queue::SharesPhysicalQueue(const IQueue *other) const {
@@ -52,14 +46,7 @@ ISubmissionToken *Queue::Submit(CommandContext *commands, const SubmitInfo &info
   if (commands->OwnerQueue() != this)
     return nullptr;
   try {
-    std::vector<ObjectPtr<Event>> waits;
-    for (auto event : info.waits) {
-      auto native = dynamic_cast<Event *>(event);
-      if (!native || native->Owner() != Owner())
-        return nullptr;
-      waits.push_back(ObjectPtr<Event>::Retain(native));
-    }
-    return Owner()->Submit(ObjectPtr<CommandContext>::Retain(commands), waits, this).Detach();
+    return Owner()->Submit(ObjectPtr<CommandContext>::Retain(commands), info.waits, this).Detach();
   } catch (const std::system_error &error) {
     ReportError(error.code().value(), error.what());
   }

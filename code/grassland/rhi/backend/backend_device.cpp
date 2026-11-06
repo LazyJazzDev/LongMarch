@@ -109,7 +109,7 @@ const void *Device::NativeIdentity() const {
 }
 
 ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands,
-                                          const std::vector<ObjectPtr<Event>> &waits,
+                                          const std::vector<Event> &waits,
                                           Queue *queue) {
   if (!commands->Seal())
     return {};
@@ -120,13 +120,12 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   }
 #endif
   for (const auto &wait : waits) {
-#if !defined(NDEBUG)
-    if (!wait || wait->Owner() != this) {
+    const auto timeline = dynamic_cast<Timeline *>(wait.timeline);
+    if (!timeline || timeline->Owner() != this) {
       ReportError(-1, "Submission dependency is empty or belongs to another device.");
       return {};
     }
-#endif
-    const auto status = wait->GetStatus();
+    const auto status = wait.GetStatus();
     if (status == SUBMISSION_STATUS_FAILED || status == SUBMISSION_STATUS_CANCELED) {
       ReportError(-1, "Submission dependency failed or was canceled.");
       return {};
@@ -136,18 +135,17 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   if (stopping_)
     return {};
   std::unique_lock<std::mutex> queue_lock(queue->Mutex());
-  const TimelinePoint point{queue, queue->NextSerial()};
-  auto event = ObjectPtr<Event>::Adopt(new Event(queue, point.value));
+  const Event event{queue->TimelineState(), queue->NextSerial()};
   auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(this, event));
   if (!collector_.joinable())
     collector_ = std::thread([this] { Collect(); });
   // Allocate the retirement record before submitting any GPU work.
-  pending_.push_back({{}, completion, point, waits});
+  pending_.push_back({{}, completion});
   auto &submission = pending_.back();
   commands->BindDownloads(completion.Get());
   CommandContext::SubmitResult result;
   try {
-    result = commands->SubmitNative(submission);
+    result = commands->SubmitNative(waits, submission);
     queue_lock.unlock();
     if (result == CommandContext::SUBMIT_RESULT_SUBMITTED)
       result = commands->FinishSubmitNative(submission);
@@ -206,10 +204,10 @@ void Device::Collect() {
     // Release payload before publishing completion; tokens never keep it alive.
     pending.commands->ReleaseDownloads();
     pending.commands.Reset();
-    pending.waits.clear();
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      pending.point.queue->RecordCompletion(pending.point.value);
+      auto event = pending.completion->GetEvent();
+      static_cast<Timeline *>(event.timeline)->RecordCompletion(event.value);
     }
     changed_.notify_all();
     pending.completion->Complete(status);
@@ -229,21 +227,17 @@ void Device::ShutdownQueues() {
 }
 
 bool Device::HasNativeTimelines() const {
-  return queues_[0] && queues_[0]->HasNativeTimeline();
+  return queues_[0] && queues_[0]->TimelineState()->IsNative();
 }
 
-bool Device::QueryTimeline(QueueType type, uint64_t &value) const {
-  return queues_[type] && queues_[type]->QueryTimeline(value);
-}
-
-bool Device::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const {
+bool Device::WaitTimelines(const std::vector<Event> &points, bool wait_all) const {
   std::unique_lock<std::mutex> lock(mutex_);
   changed_.wait(lock, [&] {
     bool all = true, any = false;
     for (auto p : points) {
       bool done = [&] {
         uint64_t value{};
-        p.queue->QueryTimeline(value);
+        p.timeline->GetCompletedValue(value);
         return value >= p.value;
       }();
       all &= done;
@@ -257,24 +251,15 @@ bool Device::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_a
 void Device::WakeCollector() {
 }
 
-SubmissionStatus Device::QueryEvent(TimelinePoint point) const {
-  uint64_t value{};
-  if (!point.queue->QueryTimeline(value))
-    return SUBMISSION_STATUS_FAILED;
-  return value >= point.value ? SUBMISSION_STATUS_COMPLETED : SUBMISSION_STATUS_PENDING;
-}
-
-bool Device::WaitEvents(const std::vector<IEvent *> &events, bool wait_all) const {
+bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
   if (events.empty())
     return false;
-  std::vector<TimelinePoint> points;
   for (auto event : events) {
-    auto native = dynamic_cast<Event *>(event);
-    if (!native || native->Owner() != this)
+    auto timeline = dynamic_cast<Timeline *>(event.timeline);
+    if (!timeline || timeline->Owner() != this)
       return false;
-    points.push_back(native->Point());
   }
-  return WaitTimelines(points, wait_all);
+  return WaitTimelines(events, wait_all);
 }
 
 void Device::CollectTimelines() {
@@ -282,12 +267,17 @@ void Device::CollectTimelines() {
     std::array<uint64_t, 2> values{};
     bool valid = true;
     for (int i = 0; i < 2; ++i)
-      valid &= QueryTimeline(static_cast<QueueType>(i), values[i]);
+      valid &= collector_points_[i].timeline->GetCompletedValue(values[i]);
     std::list<Submission> ready;
     {
       std::lock_guard<std::mutex> lock(mutex_);
       for (auto it = pending_.begin(); it != pending_.end();) {
-        if (!valid || values[it->point.queue->GetType()] >= it->point.value) {
+        const auto event = it->completion->GetEvent();
+        bool completed = !valid;
+        for (size_t i = 0; i < collector_points_.size(); ++i)
+          if (event.timeline == collector_points_[i].timeline)
+            completed |= values[i] >= event.value;
+        if (completed) {
           auto completed = it++;
           ready.splice(ready.end(), pending_, completed);
         } else
@@ -302,7 +292,6 @@ void Device::CollectTimelines() {
         status = entry.commands->WaitForProgress(entry);
       entry.commands->ReleaseDownloads();
       entry.commands.Reset();
-      entry.waits.clear();
       entry.completion->Complete(status);
     }
     if (!ready.empty())
@@ -329,7 +318,7 @@ void Device::InitializeQueue(ObjectPtr<Queue> queue) {
   const auto type = queue->GetType();
   assert(!queues_[type]);
   queues_[type] = std::move(queue);
-  collector_points_[type].queue = queues_[type].Get();
+  collector_points_[type].timeline = queues_[type]->TimelineState();
 }
 
 void Device::ReleaseQueues() {

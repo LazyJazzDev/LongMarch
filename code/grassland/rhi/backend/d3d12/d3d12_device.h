@@ -33,7 +33,7 @@ class D3D12Device final : public Device {
   ID3D12Fence *Fence(QueueType type = QUEUE_TYPE_GRAPHICS) const;
   bool SupportsTearing() const;
 
-  bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const override;
+  bool WaitTimelines(const std::vector<Event> &points, bool wait_all) const override;
   void WakeCollector() override;
   std::mutex &QueueMutex(QueueType type = QUEUE_TYPE_GRAPHICS);
   uint64_t NextSerial(QueueType type = QUEUE_TYPE_GRAPHICS);

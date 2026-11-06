@@ -2,11 +2,11 @@
 
 namespace grassland::rhi::backend {
 
-SubmissionToken::SubmissionToken(Device *device, ObjectPtr<Event> event) : device_(device), event_(std::move(event)) {
+SubmissionToken::SubmissionToken(Device *device, Event event) : device_(device), event_(std::move(event)) {
 }
 
-IEvent *SubmissionToken::GetEvent() const {
-  return ObjectPtr<Event>::Retain(event_.Get()).Detach();
+Event SubmissionToken::GetEvent() const {
+  return event_;
 }
 
 Device *SubmissionToken::Owner() const {

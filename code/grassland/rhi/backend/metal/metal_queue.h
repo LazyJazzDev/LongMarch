@@ -2,6 +2,7 @@
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/metal/metal_timeline.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalDevice;
@@ -15,17 +16,8 @@ class MetalQueue final : public Queue {
   NS::SharedPtr<MTL::CommandBuffer> CreateCommandBuffer();
   const void *NativeIdentity() const override;
 
-  bool HasNativeTimeline() const override {
-    return true;
-  }
-
-  bool QueryTimeline(uint64_t &value) const override;
-  void RecordFailure();
-
  private:
-  MetalQueue(MetalDevice *device, QueueType type);
+  MetalQueue(MetalDevice *device, QueueType type, ObjectPtr<MetalTimeline> timeline);
   NS::SharedPtr<MTL::CommandQueue> queue_;
-  NS::SharedPtr<MTL::SharedEvent> timeline_;
-  std::atomic<bool> failed_{};
 };
 }  // namespace grassland::rhi::backend::metal

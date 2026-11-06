@@ -7,10 +7,7 @@ SubmissionToken CommandContext::Submit(const SubmitInfo &info) {
   CommandContext consumed = std::move(*this);
   if (!consumed)
     return {};
-  rhi::SubmitInfo native;
-  for (const auto &event : info.waits)
-    native.waits.push_back(event.Get());
-  return consumed.Get()->Submit(native);
+  return consumed.Get()->Submit(info);
 }
 
 bool CommandContext::CmdBeginRendering(const RenderingInfo &info) {

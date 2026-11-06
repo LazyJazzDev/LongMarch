@@ -200,8 +200,8 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ASSERT_TRUE(copy->CmdCopyBuffer(source.Get(), 0, target.Get(), 0, sizeof(expected)));
   source.Release();
   SubmitInfo info;
-  ObjPtr<IEvent> dependency = ready->GetEvent();
-  info.waits = {dependency.Get()};
+  rhi::Event dependency = ready->GetEvent();
+  info.waits = {dependency};
   ObjPtr<ISubmissionToken> done = copy->Submit(info);
   ASSERT_TRUE(done);
   copy.Release();

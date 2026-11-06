@@ -10,8 +10,8 @@ class ISubmissionToken : public IObject {
   virtual SubmissionStatus GetStatus() const = 0;
   // Also waits for collector retirement and result publication.
   virtual bool WaitHost() const = 0;
-  // Returns one owned reference to the immutable GPU completion point.
-  virtual IEvent *GetEvent() const = 0;
+  // Returns a borrowed timeline and target value by value.
+  virtual Event GetEvent() const = 0;
 
  protected:
   ~ISubmissionToken() override;

@@ -143,7 +143,7 @@ uint64_t MetalDevice::NextSerial(QueueType type) {
   return QueueState(type)->NextSerial();
 }
 
-bool MetalDevice::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const {
+bool MetalDevice::WaitTimelines(const std::vector<Event> &points, bool wait_all) const {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   std::unique_lock<std::mutex> lock(progress_mutex_);
   bool valid = true;
@@ -151,7 +151,7 @@ bool MetalDevice::WaitTimelines(const std::vector<TimelinePoint> &points, bool w
     bool all = true, any = false;
     for (auto p : points) {
       uint64_t value{};
-      valid &= p.queue->QueryTimeline(value);
+      valid &= p.timeline->GetCompletedValue(value);
       bool done = value >= p.value;
       all &= done;
       any |= done;
@@ -170,7 +170,7 @@ void MetalDevice::WakeCollector() {
     if (!marker)
       continue;
     marker->encodeSignalEvent(Timeline(type), NextSerial(type));
-    TrackCompletion(marker.get(), QueueState(type));
+    TrackCompletion(marker.get(), QueueState(type)->TimelineState());
     marker->commit();
     markers.push_back(std::move(marker));
   }

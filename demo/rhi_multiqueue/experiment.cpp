@@ -78,7 +78,7 @@ Result Run(BackendAPI api, bool synchronize, bool validation, uint32_t frames, u
     if (!updated)
       return result;
     update.Release();
-    ObjPtr<IEvent> ready = updated->GetEvent();
+    Event ready = updated->GetEvent();
     ObjPtr<ICommandContext> render = graphics->CreateCommandContext();
     if (!render || !render->CmdBindProgram(program.Get()) || !render->CmdBindVertexBuffer(0, vertices.Get()) ||
         !render->CmdSetViewport({0, 0, 64, 64, 0, 1}) || !render->CmdSetScissor({0, 0, 64, 64}) ||
@@ -95,7 +95,7 @@ Result Run(BackendAPI api, bool synchronize, bool validation, uint32_t frames, u
     }
     SubmitInfo submit;
     if (synchronize)
-      submit.waits = {ready.Get()};
+      submit.waits = {ready};
     ObjPtr<ISubmissionToken> rendered = render->Submit(submit);
     render.Release();
     const bool rendered_ok = rendered && rendered->WaitHost();

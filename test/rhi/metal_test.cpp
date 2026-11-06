@@ -154,10 +154,10 @@ TEST(RhiMetal, CompletionTokensSurviveBatchesAndParentRelease) {
         auto queue = i % 2 ? graphics.Get() : transfer.Get();
         rhi::ObjPtr<rhi::ICommandContext> context = queue->CreateCommandContext();
         ASSERT_TRUE(context);
-        rhi::ObjPtr<rhi::IEvent> event = tokens.empty() ? nullptr : tokens.back()->GetEvent();
+        rhi::Event event = tokens.empty() ? rhi::Event{} : tokens.back()->GetEvent();
         rhi::SubmitInfo desc;
         if (!tokens.empty())
-          desc.waits.push_back(event.Get());
+          desc.waits.push_back(event);
         rhi::ObjPtr<rhi::ISubmissionToken> token = context->Submit(desc);
         ASSERT_TRUE(token);
         tokens.push_back(std::move(token));

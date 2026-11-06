@@ -2,7 +2,7 @@
 #include <condition_variable>
 #include <mutex>
 
-#include "grassland/rhi/backend/backend_event.h"
+#include "grassland/rhi/backend/backend_timeline.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_submission_token.h"
 
@@ -13,8 +13,8 @@ class Device;
 // Completion state borrows its device; it owns no native resources or commands.
 class SubmissionToken final : public Object<rhi::ISubmissionToken> {
  public:
-  explicit SubmissionToken(Device *device, ObjectPtr<Event> event = {});
-  IEvent *GetEvent() const override;
+  explicit SubmissionToken(Device *device, Event event = {});
+  Event GetEvent() const override;
   SubmissionStatus GetStatus() const override;
   bool WaitHost() const override;
   void Complete(SubmissionStatus status);
@@ -25,7 +25,7 @@ class SubmissionToken final : public Object<rhi::ISubmissionToken> {
   mutable std::condition_variable changed_;
   SubmissionStatus status_{SUBMISSION_STATUS_PENDING};
   Device *device_;
-  ObjectPtr<Event> event_;
+  const Event event_;
 };
 
 }  // namespace grassland::rhi::backend

@@ -13,10 +13,7 @@ rhi::IDevice *Device::Get() const noexcept {
 bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
   if (!Get())
     return false;
-  std::vector<rhi::IEvent *> native;
-  for (const auto &event : events)
-    native.push_back(event.Get());
-  return Get()->WaitEvents(native, wait_all);
+  return Get()->WaitEvents(events, wait_all);
 }
 
 std::string Device::Name() const {

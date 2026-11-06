@@ -262,39 +262,28 @@ D3D12TemporalBufferPool &D3D12Device::DownloadPool() {
 
 namespace grassland::rhi::backend::d3d12 {
 
-bool D3D12Device::WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const {
-  std::array<uint64_t, 2> targets{};
-  std::array<bool, 2> present{};
-  for (auto p : points) {
-    if (!present[p.queue->GetType()])
-      targets[p.queue->GetType()] = p.value;
-    else
-      targets[p.queue->GetType()] =
-          wait_all ? std::max(targets[p.queue->GetType()], p.value) : std::min(targets[p.queue->GetType()], p.value);
-    present[p.queue->GetType()] = true;
+bool D3D12Device::WaitTimelines(const std::vector<Event> &points, bool wait_all) const {
+  const auto unique = CoalesceEvents(points, wait_all);
+  std::vector<ID3D12Fence *> fences;
+  std::vector<uint64_t> values;
+  for (auto event : unique) {
+    fences.push_back(static_cast<D3D12Timeline *>(event.timeline)->Native());
+    values.push_back(event.value);
   }
-  std::array<ID3D12Fence *, 2> fences{};
-  std::array<uint64_t, 2> values{};
-  UINT count = 0;
-  for (int i = 0; i < 2; ++i)
-    if (present[i]) {
-      fences[count] = Fence(static_cast<QueueType>(i));
-      values[count++] = targets[i];
-    }
   return SUCCEEDED(device1_->SetEventOnMultipleFenceCompletion(
-             fences.data(), values.data(), count,
+             fences.data(), values.data(), static_cast<UINT>(fences.size()),
              wait_all ? D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL : D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, nullptr)) &&
          SUCCEEDED(device_->GetDeviceRemovedReason());
 }
 
 void D3D12Device::WakeCollector() {
-  std::vector<TimelinePoint> wake;
+  std::vector<Event> wake;
   for (auto type : {QUEUE_TYPE_GRAPHICS, QUEUE_TYPE_TRANSFER}) {
     std::lock_guard<std::mutex> lock(QueueMutex(type));
     if (NativeQueue(type) && Fence(type)) {
       auto value = NextSerial(type);
       if (Check(NativeQueue(type)->Signal(Fence(type), value), "Signal collector shutdown"))
-        wake.push_back({QueueState(type), value});
+        wake.push_back({QueueState(type)->TimelineState(), value});
     }
   }
   if (!wake.empty())

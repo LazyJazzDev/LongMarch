@@ -34,11 +34,11 @@ class MetalDevice final : public Device {
   std::mutex &QueueMutex(QueueType type = QUEUE_TYPE_GRAPHICS);
   bool WaitIdle();
 
-  bool WaitTimelines(const std::vector<TimelinePoint> &points, bool wait_all) const override;
+  bool WaitTimelines(const std::vector<Event> &points, bool wait_all) const override;
   void WakeCollector() override;
   MTL::SharedEvent *Timeline(QueueType type) const;
   uint64_t NextSerial(QueueType type);
-  void TrackCompletion(MTL::CommandBuffer *buffer, Queue *queue);
+  void TrackCompletion(MTL::CommandBuffer *buffer, backend::Timeline *timeline);
 
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
 

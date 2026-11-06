@@ -79,7 +79,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
   bool WasSubmitted() const;
 
   // The queue mutex is held and the immutable signal value has been allocated.
-  virtual SubmitResult SubmitNative(Submission &submission) = 0;
+  virtual SubmitResult SubmitNative(const std::vector<Event> &waits, Submission &submission) = 0;
 
   // Runs outside the queue mutex (e.g. acquiring the next swapchain image).
   virtual SubmitResult FinishSubmitNative(Submission &) {

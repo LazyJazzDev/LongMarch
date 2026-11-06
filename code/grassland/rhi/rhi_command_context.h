@@ -10,8 +10,9 @@
 
 namespace grassland::rhi {
 struct SubmitInfo {
-  // Borrowed during Submit; the accepted submission retains its dependencies.
-  std::vector<IEvent *> waits;
+  // Values are consumed during Submit; no Event or dependency list is retained.
+  // Referenced timelines must remain valid until the GPU wait finishes.
+  std::vector<Event> waits;
 };
 
 class IBuffer;
