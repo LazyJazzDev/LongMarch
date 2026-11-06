@@ -204,24 +204,12 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(Submission &subm
       return SUBMIT_RESULT_REJECTED;
   }
 #endif
-  std::vector<VkSemaphore> acquired, rendered;
+  std::vector<VkSemaphore> wait_semaphores, rendered;
   std::vector<VkPipelineStageFlags> stages;
-  std::vector<VulkanWindow *> acquired_windows;
-  for (const auto &entry : image_states_) {
-    // Swapchain acquisition synchronization is distinct from ordinary image barriers.
-    if (auto frame = dynamic_cast<VulkanSwapChainImage *>(entry.first)) {
-      auto window = frame->Owner();
-      if (auto semaphore = window->AcquireSemaphore()) {
-        acquired.push_back(semaphore);
-        stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-        acquired_windows.push_back(window);
-      }
-    }
-  }
   for (const auto &present : presents_)
     rendered.push_back(present->RenderSemaphore());
   rendered.push_back(queue->Timeline());
-  std::vector<uint64_t> wait_values(acquired.size(), 0);
+  std::vector<uint64_t> wait_values;
   std::array<uint64_t, 2> dependencies{};
   std::array<VulkanQueue *, 2> sources{};
   for (const auto &event : submission.waits) {
@@ -234,7 +222,7 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(Submission &subm
   }
   for (int i = 0; i < 2; ++i)
     if (dependencies[i]) {
-      acquired.push_back(sources[i]->Timeline());
+      wait_semaphores.push_back(sources[i]->Timeline());
       stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
       wait_values.push_back(dependencies[i]);
     }
@@ -248,8 +236,8 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(Submission &subm
   submit.pNext = &timeline;
   submit.commandBufferCount = 1;
   submit.pCommandBuffers = &command_;
-  submit.waitSemaphoreCount = static_cast<uint32_t>(acquired.size());
-  submit.pWaitSemaphores = acquired.data();
+  submit.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size());
+  submit.pWaitSemaphores = wait_semaphores.data();
   submit.pWaitDstStageMask = stages.data();
   submit.signalSemaphoreCount = static_cast<uint32_t>(rendered.size());
   submit.pSignalSemaphores = rendered.data();
@@ -261,8 +249,6 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(Submission &subm
     for (auto &entry : as_dependencies_)
       entry.first->CommitDependencies(std::move(entry.second));
     as_dependencies_.clear();
-    for (auto window : acquired_windows)
-      window->MarkAcquireWaitSubmitted(submission.point.value, queue->GetType());
     submission.failed = true;
     bool presented = true;
     for (const auto &present : presents_) {
@@ -826,6 +812,8 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
       }
       if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
         auto image = static_cast<VulkanImage *>(native->GetReferences()[binding_index][i].Get());
+        if (!ValidateImageQueue(image))
+          return false;
         if (render_target_) {
           auto known = image_states_.find(image);
           if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||

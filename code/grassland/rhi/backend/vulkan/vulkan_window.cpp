@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <optional>
 
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -34,7 +35,9 @@ std::optional<WindowPresentationOption> PresentationFormat(VkSurfaceFormatKHR na
 }
 }  // namespace
 
-VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
+VulkanWindow::VulkanWindow(VulkanDevice *device)
+    : device_(device),
+      queue_(static_cast<VulkanQueue *>(device->QueueState(QUEUE_TYPE_GRAPHICS))) {
 }
 
 VulkanWindow::~VulkanWindow() {
@@ -87,7 +90,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   auto &sync = acquire_sync_[current_sync_];
   const auto native = device_->NativeDevice();
   if (sync.submission_value) {
-    const auto status = device_->Wait(sync.submission_value, UINT64_MAX, sync.submission_queue);
+    const auto status = queue_->Wait(sync.submission_value);
     if (!Check(status, "Acquire frame synchronization"))
       return {};
     sync.submission_value = 0;
@@ -107,6 +110,33 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       vkAcquireNextImageKHR(device_->NativeDevice(), swapchain_, UINT64_MAX, semaphore, fence, &current_image_);
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
     sync.acquired = true;
+    // Consume WSI acquisition on the fixed presentation queue before exposing
+    // the image. ALL_COMMANDS covers subsequent clears, copies and rendering.
+    // No command buffer or CPU wait is needed for this queue-side dependency.
+    {
+      std::lock_guard<std::mutex> lock(queue_->Mutex());
+      const uint64_t wait_value = 0;
+      const auto value = queue_->NextSerial();
+      const auto timeline_semaphore = queue_->Timeline();
+      const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+      VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
+      timeline.waitSemaphoreValueCount = 1;
+      timeline.pWaitSemaphoreValues = &wait_value;
+      timeline.signalSemaphoreValueCount = 1;
+      timeline.pSignalSemaphoreValues = &value;
+      VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+      submit.pNext = &timeline;
+      submit.waitSemaphoreCount = 1;
+      submit.pWaitSemaphores = &semaphore;
+      submit.pWaitDstStageMask = &stage;
+      submit.signalSemaphoreCount = 1;
+      submit.pSignalSemaphores = &timeline_semaphore;
+      if (!Check(vkQueueSubmit(queue_->Native(), 1, &submit, VK_NULL_HANDLE), "Submit swapchain acquire wait")) {
+        invalid_ = true;
+        return {};
+      }
+      sync.submission_value = value;
+    }
     const auto image = images_[current_image_];
     if (!initialized_images_[current_image_]) {
       // Establish the fixed default layout before exposing this image to recording.
@@ -184,14 +214,8 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       new VulkanSwapChainImage(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
 }
 
-VkSemaphore VulkanWindow::AcquireSemaphore() const {
-  const auto &sync = acquire_sync_[current_sync_];
-  return sync.submission_value ? VK_NULL_HANDLE : sync.semaphore;
-}
-
-void VulkanWindow::MarkAcquireWaitSubmitted(uint64_t value, QueueType queue) {
-  acquire_sync_[current_sync_].submission_value = value;
-  acquire_sync_[current_sync_].submission_queue = queue;
+VulkanQueue *VulkanWindow::PresentationQueue() const {
+  return queue_;
 }
 
 VkSemaphore VulkanWindow::RenderSemaphore() const {
@@ -206,7 +230,7 @@ VkResult VulkanWindow::PresentFrame() {
   present.swapchainCount = 1;
   present.pSwapchains = &swapchain_;
   present.pImageIndices = &current_image_;
-  const auto result = vkQueuePresentKHR(device_->NativeQueue(), &present);
+  const auto result = vkQueuePresentKHR(queue_->Native(), &present);
   // The prepared frame has been presented; this slot is reused only after
   // its acquire fence and consuming submission have completed.
   current_sync_ = (current_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());

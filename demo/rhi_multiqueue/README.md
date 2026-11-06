@@ -45,6 +45,8 @@ One Collector thread waits for Any of the fixed queues' current completed values
 - Vulkan uses two queue indices in one Graphics/Compute family, avoiding cross-family ownership transfers. Each has its own Timeline Semaphore; waits use `vkWaitSemaphores`. If that family exposes only one queue, the roles alias and `SharesPhysicalQueue()` reports it. The demo rejects this configuration rather than claiming a multiqueue result.
 - Metal creates two command queues and two SharedEvents. GPU dependencies use Event waits/signals; completion handlers notify one shared CPU wait service and propagate command-buffer errors. Metal runtime validation requires a Mac.
 
+Vulkan swapchain images can only be used on their associated Graphics Queue. Acquisition submits a semaphore-only wait at ALL_COMMANDS on that queue before returning the image; subsequent contexts inherit this dependency. Each acquire slot records the bridge submission value for safe semaphore reuse. Context submission does not scan image states to discover acquire waits. This costs one additional native submission per successful acquisition.
+
 All internal Vulkan queue dependencies use Timeline Semaphores. Binary Semaphores remain only at the swapchain acquire/present boundary because Vulkan WSI requires them; they are not exposed as `IEvent`.
 
 CUDA interoperability is intentionally outside this PR, which starts from main independently of the CUDA Buffer PR.

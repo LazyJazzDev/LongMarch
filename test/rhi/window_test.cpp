@@ -616,7 +616,14 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
     ASSERT_TRUE(abandoned.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   }  // Recording alone must not change the next context's initial resource state.
   auto transfer = device.GetQueue(QUEUE_TYPE_TRANSFER);
-  auto clear_queue = GetParam() == BACKEND_API_D3D12 ? queue : transfer;
+  if (GetParam() == BACKEND_API_VULKAN) {
+    auto rejected = transfer.CreateCommandContext();
+    EXPECT_FALSE(rejected.CmdClearImage(a, {1, 0, 0, 1}));
+    EXPECT_FALSE(rejected.Submit());
+    rejected = transfer.CreateCommandContext();
+    EXPECT_FALSE(rejected.CmdPresent(first));
+    EXPECT_FALSE(rejected.Submit());
+  }
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
     // A second DIRECT queue with the same role is still not the swapchain's queue.
@@ -648,7 +655,7 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
     }
   }
 #endif
-  auto clear = clear_queue.CreateCommandContext();
+  auto clear = queue.CreateCommandContext();
   ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(a, {0.0f, 0.0f, 1.0f, 1.0f}));

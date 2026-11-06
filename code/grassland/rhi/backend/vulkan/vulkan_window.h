@@ -4,6 +4,8 @@
 
 namespace grassland::rhi::backend::vulkan {
 
+class VulkanQueue;
+
 class VulkanWindow final : public Window {
  public:
   ~VulkanWindow() override;
@@ -13,8 +15,7 @@ class VulkanWindow final : public Window {
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   const void *DeviceIdentity() const;
-  VkSemaphore AcquireSemaphore() const;
-  void MarkAcquireWaitSubmitted(uint64_t value, QueueType queue);
+  VulkanQueue *PresentationQueue() const;
   VkSemaphore RenderSemaphore() const;
   VkResult PresentFrame();
 
@@ -23,6 +24,7 @@ class VulkanWindow final : public Window {
 
   void DestroySwapchain();
   VulkanDevice *device_;
+  VulkanQueue *queue_;
   VkSurfaceKHR surface_{};
   VkSwapchainKHR swapchain_{};
 
@@ -33,7 +35,6 @@ class VulkanWindow final : public Window {
     bool acquired{};
     // Timeline value of the submission consuming this acquire semaphore.
     uint64_t submission_value{};
-    QueueType submission_queue{QUEUE_TYPE_GRAPHICS};
   };
 
   std::vector<AcquireSync> acquire_sync_;
