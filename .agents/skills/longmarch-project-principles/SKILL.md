@@ -13,12 +13,6 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 - 不以公开字段、可变内部引用或无约束的 setter 代替友元。由拥有状态的类维护不变量；查询只暴露必要信息，修改通过语义明确的操作完成。
 - 确需友元时，将授权缩到必要的成员函数，避免授予整个类访问权限，并说明保留原因。
 
-## RHI backend 公共层职责
-
-- 除通用 `Object<Interface>` 模板外，backend 公共层对象不得实现或 override 接口类的函数；接口函数统一由 Vulkan、D3D12、Metal 等底层 API 的最终实现类负责实现。
-- `Object<Interface>` 的通用对象生命周期管理属于明确例外，`AddRef/Release` 应在该模板中统一实现并复用，不在各 API 类中重复展开。该原则用于明确 API 行为的实现归属，不应机械拆散通用引用计数逻辑。
-- 其余 backend 公共层只能提供供底层 API 最终实现使用的辅助成员函数和成员变量。共享逻辑通过辅助成员函数复用，不以接口函数的默认实现、兜底实现或模板方法覆盖来承载；省略 `override` 关键字也不构成例外。
-
 ## 错误处理与异常
 
 - 可预期的运行失败优先通过返回值表达，不以抛异常作为常规控制流；创建失败返回空句柄/容器，句柄转换为 `bool` 应为 `false`，调用者判空后处理。
