@@ -16,32 +16,19 @@ class CommandContext;
 
 class Device : public Object<rhi::IDevice> {
  public:
-  IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
-      const BottomLevelAccelerationStructureDesc &desc) override;
-  ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
-      const TopLevelAccelerationStructureDesc &desc) override;
-  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
-  Device(PhysicalDevice info, Core *core, BackendAPI api = BACKEND_API_DEFAULT);
+  Device(PhysicalDevice info, Core *core);
   ~Device() override;
   const PhysicalDevice &GetPhysicalDevice() const noexcept;
-  std::string Name() const override;
-  bool SupportRayTracingPipeline() const override;
-  bool SupportRayQuery() const override;
-  bool SupportGeometryShader() const override;
-  rhi::IImage *CreateImage(const ImageDesc &desc) override;
-  ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
-  rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
-  rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
-  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
-  rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
-  rhi::IShader *CreateShader(const ShaderDesc &desc) override;
-  rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
-  rhi::IQueue *GetQueue(QueueType type) override;
-  rhi::ICommandContext *CreateCommandContext() override;
+  std::string DeviceName() const;
+  bool HasRayTracingPipeline() const;
+  bool HasRayQuery() const;
+  bool HasGeometryShader() const;
+
   virtual const void *NativeIdentity() const;
 
   ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands,
-                                    const std::vector<ObjectPtr<SubmissionToken>> &waits);
+                                    const std::vector<ObjectPtr<SubmissionToken>> &waits,
+                                    ObjectPtr<SubmissionToken> completion);
 
  protected:
   void ShutdownQueues();
@@ -54,7 +41,6 @@ class Device : public Object<rhi::IDevice> {
   };
 
   void Collect();
-  BackendAPI api_;
   Core *core_;
   PhysicalDevice info_;
   std::mutex mutex_;

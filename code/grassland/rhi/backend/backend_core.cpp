@@ -15,7 +15,7 @@
 
 namespace grassland::rhi::backend {
 
-rhi::IDevice *Core::CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement) {
+rhi::IDevice *Core::SelectAndCreateDevice(DeviceFeatureRequirement requirement) {
   const auto id = SelectPhysicalDevice(GetPhysicalDevices(), requirement);
   if (id < 0) {
     ReportError(-1, "No physical device satisfies the requested RHI features.");

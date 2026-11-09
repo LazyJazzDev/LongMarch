@@ -9,7 +9,7 @@ bool Image::SupportsStorage() const {
   return false;
 }
 
-const ImageDesc &Image::GetDesc() const {
+const ImageDesc &Image::Description() const {
   return desc_;
 }
 

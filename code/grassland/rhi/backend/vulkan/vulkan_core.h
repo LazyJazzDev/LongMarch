@@ -6,6 +6,19 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanCore final : public Core {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
+    return SelectAndCreateDevice(requirement);
+  }
+
   static VulkanCore *CreateVulkanCore(const CoreDesc &desc);
   ~VulkanCore() override;
   VkInstance Instance() const;

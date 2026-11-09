@@ -14,6 +14,15 @@ class D3D12TransientDescriptorPool {
  public:
   class Lease final : public Object<IObject> {
    public:
+    void AddRef() noexcept override {
+      RetainReference();
+    }
+
+    void Release() noexcept override {
+      if (ReleaseReference())
+        delete this;
+    }
+
     Lease(D3D12TransientDescriptorPool *pool, ID3D12DescriptorHeap *heap, size_t level);
     ~Lease() override;
     ID3D12DescriptorHeap *Heap() const;

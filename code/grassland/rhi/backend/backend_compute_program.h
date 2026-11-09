@@ -8,7 +8,7 @@ class Device;
 class ComputeProgram : public Object<IComputeProgram> {
  public:
   ComputeProgram(Device *device, const ComputeProgramDesc &desc);
-  const ComputeProgramDesc &GetDesc() const override;
+  const ComputeProgramDesc &Description() const;
   Device *Owner() const;
 
  protected:

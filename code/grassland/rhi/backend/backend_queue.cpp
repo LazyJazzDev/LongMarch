@@ -13,16 +13,18 @@ Device *Queue::Owner() const {
   return device_;
 }
 
-QueueType Queue::GetType() const {
+QueueType Queue::QueueRole() const {
   return type_;
 }
 
-bool Queue::SharesPhysicalQueue(const rhi::IQueue *other) const {
+bool Queue::UsesSameDeviceQueue(const rhi::IQueue *other) const {
   const auto queue = dynamic_cast<const Queue *>(other);
   return queue && Owner() == queue->Owner();
 }
 
-rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info) {
+rhi::ISubmissionToken *Queue::SubmitCommands(rhi::ICommandContext *commands,
+                                             const rhi::SubmitInfo &info,
+                                             ObjectPtr<SubmissionToken> completion) {
 #if !defined(NDEBUG)
   const auto impl = dynamic_cast<CommandContext *>(commands);
   if (!impl || impl->DeviceIdentity() != Owner()->NativeIdentity()) {
@@ -43,7 +45,7 @@ rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::
 #endif
       waits.push_back(ObjectPtr<SubmissionToken>::Retain(state));
     }
-    return Owner()->Submit(ObjectPtr<CommandContext>::Retain(impl), waits).Detach();
+    return Owner()->Submit(ObjectPtr<CommandContext>::Retain(impl), waits, std::move(completion)).Detach();
   } catch (const std::system_error &error) {
     ReportError(error.code().value(), error.what());
   }

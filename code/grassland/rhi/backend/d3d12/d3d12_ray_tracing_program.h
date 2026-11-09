@@ -9,6 +9,19 @@ class D3D12Device;
 
 class D3D12RayTracingProgram final : public RayTracingProgram, public D3D12ProgramBase {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  const RayTracingProgramDesc &GetDesc() const override {
+    return Description();
+  }
+
   static D3D12RayTracingProgram *Create(D3D12Device *device, const RayTracingProgramDesc &desc);
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
   const ShaderBindingTable *DefaultShaderBindingTable() const;

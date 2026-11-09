@@ -8,6 +8,19 @@ namespace grassland::rhi::backend::metal {
 
 class MetalCore final : public Core {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
+    return SelectAndCreateDevice(requirement);
+  }
+
   static MetalCore *CreateMetalCore(const CoreDesc &desc);
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
   rhi::IDevice *CreateDevice(int32_t device_idx) override;

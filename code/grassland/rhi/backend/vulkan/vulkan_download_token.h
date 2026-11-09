@@ -5,6 +5,31 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanDownloadToken final : public DownloadToken {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  SubmissionStatus GetStatus() const override {
+    return DownloadStatus();
+  }
+
+  bool WaitHost() const override {
+    return WaitForDownload();
+  }
+
+  uint64_t GetSize() const override {
+    return DownloadSize();
+  }
+
+  bool CopyTo(void *destination, uint64_t size) const override {
+    return CopyDownload(destination, size);
+  }
+
   VulkanDownloadToken(ObjectPtr<VulkanTemporalBufferLease> lease, uint64_t size);
   VulkanDownloadToken(ObjectPtr<VulkanTemporalBufferLease> lease, const DownloadLayout &layout);
   ~VulkanDownloadToken() override;

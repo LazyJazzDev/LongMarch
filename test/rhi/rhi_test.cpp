@@ -36,6 +36,85 @@ struct Calls {
 
 class TestDevice final : public backend::Device {
  public:
+  ISampler *CreateSampler(const SamplerDesc & = {}) override {
+    return nullptr;
+  }
+
+  rhi::IWindow *CreateGLFWWindow(const WindowDesc & = {}) override {
+    return nullptr;
+  }
+
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
+      const BottomLevelAccelerationStructureDesc &desc) override {
+    return nullptr;
+  }
+
+  ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
+      const TopLevelAccelerationStructureDesc &desc) override {
+    return nullptr;
+  }
+
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override {
+    return nullptr;
+  }
+
+  std::string Name() const override {
+    return DeviceName();
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return HasRayTracingPipeline();
+  }
+
+  bool SupportRayQuery() const override {
+    return HasRayQuery();
+  }
+
+  bool SupportGeometryShader() const override {
+    return HasGeometryShader();
+  }
+
+  rhi::IImage *CreateImage(const ImageDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override {
+    return nullptr;
+  }
+
+  rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IProgram *CreateProgram(const ProgramDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IQueue *GetQueue(QueueType type) override {
+    return nullptr;
+  }
+
+  rhi::ICommandContext *CreateCommandContext() override {
+    return nullptr;
+  }
+
   TestDevice(PhysicalDevice info, backend::Core *core, Calls &calls)
       : backend::Device(std::move(info), core),
         calls_(calls) {
@@ -52,6 +131,19 @@ class TestDevice final : public backend::Device {
 
 class TestCore final : public backend::Core {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
+    return SelectAndCreateDevice(requirement);
+  }
+
   TestCore(std::vector<PhysicalDevice> devices, Calls &calls, bool fail = false)
       : devices_(std::move(devices)),
         calls_(calls),

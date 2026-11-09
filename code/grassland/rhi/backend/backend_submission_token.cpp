@@ -9,12 +9,12 @@ Device *SubmissionToken::Owner() const {
   return device_;
 }
 
-SubmissionStatus SubmissionToken::GetStatus() const {
+SubmissionStatus SubmissionToken::CompletionStatus() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return status_;
 }
 
-bool SubmissionToken::WaitHost() const {
+bool SubmissionToken::WaitForCompletion() const {
   std::unique_lock<std::mutex> lock(mutex_);
   changed_.wait(lock, [&] { return status_ != SUBMISSION_STATUS_PENDING; });
   return status_ == SUBMISSION_STATUS_COMPLETED;

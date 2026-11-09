@@ -8,7 +8,7 @@ class Sampler : public Object<ISampler> {
   Sampler(const SamplerDesc &desc, const void *device) : desc_(desc), device_(device) {
   }
 
-  const SamplerDesc &GetDesc() const override {
+  const SamplerDesc &Description() const {
     return desc_;
   }
 

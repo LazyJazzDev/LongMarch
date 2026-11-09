@@ -16,10 +16,10 @@ class DownloadToken : public Object<IDownloadToken> {
  public:
   explicit DownloadToken(uint64_t size);
   ~DownloadToken() override;
-  SubmissionStatus GetStatus() const override;
-  bool WaitHost() const override;
-  uint64_t GetSize() const override;
-  bool CopyTo(void *destination, uint64_t size) const override;
+  SubmissionStatus DownloadStatus() const;
+  bool WaitForDownload() const;
+  uint64_t DownloadSize() const;
+  bool CopyDownload(void *destination, uint64_t size) const;
   void BindSubmission(SubmissionToken *submission);
 
  protected:

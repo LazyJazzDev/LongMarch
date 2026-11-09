@@ -8,6 +8,19 @@ class MetalDevice;
 
 class MetalSampler final : public Sampler {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  const SamplerDesc &GetDesc() const override {
+    return Description();
+  }
+
   static MetalSampler *Create(MetalDevice *device, const SamplerDesc &desc);
   MTL::SamplerState *NativeSampler() const;
 

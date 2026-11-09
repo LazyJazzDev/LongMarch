@@ -7,7 +7,7 @@ class Device;
 
 class Buffer : public Object<IBuffer> {
  public:
-  BufferDesc GetDesc() const override;
+  BufferDesc Description() const;
   Device *Owner() const;
 
  protected:

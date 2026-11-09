@@ -11,6 +11,19 @@ class VulkanDevice;
 
 class VulkanRayTracingProgram final : public RayTracingProgram, public VulkanProgramBase {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  const RayTracingProgramDesc &GetDesc() const override {
+    return Description();
+  }
+
   static VulkanRayTracingProgram *Create(VulkanDevice *device, const RayTracingProgramDesc &desc);
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
   const ShaderBindingTable *DefaultShaderBindingTable() const;

@@ -11,6 +11,15 @@ namespace {
 
 class TextObject final : public Object<IObject> {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
   explicit TextObject(std::atomic<int> &destructions) : destructions_(destructions) {
   }
 

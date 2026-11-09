@@ -4,7 +4,7 @@ namespace grassland::rhi::backend {
 Buffer::Buffer(Device *device, const BufferDesc &desc) : device_(device), desc_(desc) {
 }
 
-BufferDesc Buffer::GetDesc() const {
+BufferDesc Buffer::Description() const {
   return desc_;
 }
 

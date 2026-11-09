@@ -31,7 +31,7 @@ MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<
 }
 
 MetalDevice::MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device)
-    : Device(std::move(info), core, BACKEND_API_METAL),
+    : Device(std::move(info), core),
       device_(std::move(device)),
       temporal_buffers_(this, TEMPORAL_BUFFER_UPLOAD) {
 }

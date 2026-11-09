@@ -1,9 +1,10 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
+#include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 
 #include <cstring>
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_shader_binding_table.h"
 
 namespace grassland::rhi::backend::vulkan {
 VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanDevice *device, const RayTracingProgramDesc &desc)
@@ -182,7 +183,7 @@ ShaderBindingTable *VulkanRayTracingProgram::BuildShaderBindingTable(const Shade
   }
   if (!buffer->Write(data.data(), data.size()))
     return nullptr;
-  return new ShaderBindingTable(this, desc, std::move(buffer), regions);
+  return new VulkanShaderBindingTable(this, desc, std::move(buffer), regions);
 }
 
 }  // namespace grassland::rhi::backend::vulkan

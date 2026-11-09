@@ -7,6 +7,19 @@ class VulkanDevice;
 
 class VulkanProgram final : public Program, public VulkanProgramBase {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  const ProgramDesc &GetDesc() const override {
+    return Description();
+  }
+
   static VulkanProgram *Create(VulkanDevice *device, const ProgramDesc &desc);
   ~VulkanProgram() override;
   VkPipeline NativePipeline() const;

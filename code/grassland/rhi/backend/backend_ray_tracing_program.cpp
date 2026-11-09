@@ -20,7 +20,7 @@ RayTracingProgram::RayTracingProgram(Device *device, const RayTracingProgramDesc
     retain(shader);
 }
 
-const RayTracingProgramDesc &RayTracingProgram::GetDesc() const {
+const RayTracingProgramDesc &RayTracingProgram::Description() const {
   return desc_;
 }
 

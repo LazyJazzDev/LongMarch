@@ -42,14 +42,13 @@ class BindingGroup : public Object<IBindingGroup> {
   };
 
   BindingGroup(Device *device, ObjectPtr<Version> version);
-  using IBindingGroup::BindResource;
-  bool BindResource(uint32_t binding,
-                    const std::vector<ITopLevelAccelerationStructure *> &structures,
-                    uint32_t first_element = 0) override;
-  const BindingLayoutDesc &GetLayout() const override;
-  bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override;
-  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override;
-  bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override;
+  bool WriteResources(uint32_t binding,
+                      const std::vector<ITopLevelAccelerationStructure *> &structures,
+                      uint32_t first_element = 0);
+  const BindingLayoutDesc &BindingLayout() const;
+  bool WriteResources(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0);
+  bool WriteResources(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0);
+  bool WriteResources(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0);
   Device *Owner() const;
   // Borrowed until the next mutation; the context retains it before recording use.
   Version *CurrentVersion() const;

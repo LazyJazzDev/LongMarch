@@ -9,7 +9,7 @@ ComputeProgram::ComputeProgram(Device *device, const ComputeProgramDesc &desc)
       shader_(ObjectPtr<IShader>::Retain(desc.compute_shader)) {
 }
 
-const ComputeProgramDesc &ComputeProgram::GetDesc() const {
+const ComputeProgramDesc &ComputeProgram::Description() const {
   return desc_;
 }
 

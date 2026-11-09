@@ -18,7 +18,7 @@ void glfw::DestroyCocoaWindow(GLFWwindow *window) {
   }
 }
 
-float Window::GetHDRHeadroom() const {
+float Window::HDRHeadroom() const {
   if (!glfw::IsWindowThread())
     return 10.0f;
   @autoreleasepool {

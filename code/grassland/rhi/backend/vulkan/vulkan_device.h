@@ -6,12 +6,42 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device_procedures.h"
 #include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_scratch_pool.h"
+#include "grassland/rhi/backend/vulkan/vulkan_shader.h"
 #include "grassland/rhi/backend/vulkan/vulkan_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanDevice final : public Device {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  std::string Name() const override {
+    return DeviceName();
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return HasRayTracingPipeline();
+  }
+
+  bool SupportRayQuery() const override {
+    return HasRayQuery();
+  }
+
+  bool SupportGeometryShader() const override {
+    return HasGeometryShader();
+  }
+
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
+    return VulkanShader::Create(desc);
+  }
+
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override;

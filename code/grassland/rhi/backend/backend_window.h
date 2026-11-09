@@ -16,70 +16,70 @@ class Device;
 class Window : public Object<rhi::IWindow> {
  public:
   Window();
-  bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
-  bool UpdateImGui(const std::function<void()> &callback) override;
+  bool ConfigureImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f);
+  bool RunImGuiFrame(const std::function<void()> &callback);
   ImGuiContext *GetImGuiContext() const;
   bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image);
   bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image, ColorSpace color_space, float white_scale);
   bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space);
   const void *DeviceIdentity() const;
 
-  EventManager<void(int, int)> &ResizeEvent() override {
+  EventManager<void(int, int)> &ResizeCallbacks() {
     return resize_event_;
   }
 
-  EventManager<void(int, int)> &FramebufferResizeEvent() override {
+  EventManager<void(int, int)> &FramebufferResizeCallbacks() {
     return framebufferresize_event_;
   }
 
-  EventManager<void(bool)> &CursorEnterEvent() override {
+  EventManager<void(bool)> &CursorEnterCallbacks() {
     return cursorenter_event_;
   }
 
-  EventManager<void(bool)> &FocusEvent() override {
+  EventManager<void(bool)> &FocusCallbacks() {
     return focus_event_;
   }
 
-  EventManager<void(double, double)> &MouseMoveEvent() override {
+  EventManager<void(double, double)> &MouseMoveCallbacks() {
     return mousemove_event_;
   }
 
-  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override {
+  EventManager<void(int, int, int, double, double)> &MouseButtonCallbacks() {
     return mousebutton_event_;
   }
 
-  EventManager<void(double, double)> &ScrollEvent() override {
+  EventManager<void(double, double)> &ScrollCallbacks() {
     return scroll_event_;
   }
 
-  EventManager<void(int, int, int, int)> &KeyEvent() override {
+  EventManager<void(int, int, int, int)> &KeyCallbacks() {
     return key_event_;
   }
 
-  EventManager<void(uint32_t)> &CharEvent() override {
+  EventManager<void(uint32_t)> &CharCallbacks() {
     return char_event_;
   }
 
-  EventManager<void(int, const char **)> &DropEvent() override {
+  EventManager<void(int, const char **)> &DropCallbacks() {
     return drop_event_;
   }
 
   ~Window() override;
-  rhi::IImage *GetNextImage() override;
-  bool IsSwapChainInvalid() const override;
-  bool RebuildSwapChain() override;
+  rhi::IImage *PreparedImage();
+  bool SwapChainNeedsRebuild() const;
+  bool RecreateSwapChain();
   virtual bool UpdateNextImage();
   void ReleaseNextImage();
-  bool SetPresentMode(PresentMode mode) override;
-  bool SetColorSpace(ColorSpace color_space) override;
-  ColorSpace GetColorSpace() const override;
-  bool GetHDRReferenceWhiteNits(float &nits) const override;
-  float GetHDRReferenceWhiteScale() const override;
-  float GetHDRHeadroom() const override;
-  GLFWwindow *GLFWWindow() const override;
-  bool ShouldClose() const override;
-  bool IsKeyDown(int key) const override;
-  bool SetTitle(const std::string &title) override;
+  bool ChangePresentMode(PresentMode mode);
+  bool ChangeColorSpace(ColorSpace color_space);
+  ColorSpace ActiveColorSpace() const;
+  bool QueryHDRReferenceWhiteNits(float &nits) const;
+  float HDRReferenceWhiteScale() const;
+  float HDRHeadroom() const;
+  GLFWwindow *NativeWindow() const;
+  bool WindowShouldClose() const;
+  bool KeyPressed(int key) const;
+  bool ChangeTitle(const std::string &title);
   virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
   virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
 

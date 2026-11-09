@@ -7,7 +7,7 @@ namespace grassland::rhi::backend {
 class Image : public Object<rhi::IImage> {
  public:
   explicit Image(ImageDesc desc);
-  const ImageDesc &GetDesc() const override;
+  const ImageDesc &Description() const;
   virtual bool SupportsStorage() const;
   virtual const void *DeviceIdentity() const = 0;
 

@@ -1,9 +1,10 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 
 #include <cstring>
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_shader_binding_table.h"
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Device *device, const RayTracingProgramDesc &desc)
@@ -146,7 +147,7 @@ ShaderBindingTable *D3D12RayTracingProgram::BuildShaderBindingTable(const Shader
   for (auto &region : regions)
     if (region.size)
       region.address += address;
-  return new ShaderBindingTable(this, desc, std::move(buffer), regions);
+  return new D3D12ShaderBindingTable(this, desc, std::move(buffer), regions);
 }
 
 }  // namespace grassland::rhi::backend::d3d12

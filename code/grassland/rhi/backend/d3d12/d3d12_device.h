@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_scratch_pool.h"
+#include "grassland/rhi/backend/d3d12/d3d12_shader.h"
 #include "grassland/rhi/backend/d3d12/d3d12_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_transient_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
@@ -13,6 +14,35 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Device final : public Device {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  std::string Name() const override {
+    return DeviceName();
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return HasRayTracingPipeline();
+  }
+
+  bool SupportRayQuery() const override {
+    return HasRayQuery();
+  }
+
+  bool SupportGeometryShader() const override {
+    return HasGeometryShader();
+  }
+
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
+    return D3D12Shader::Create(desc);
+  }
+
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override;

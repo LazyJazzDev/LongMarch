@@ -28,6 +28,115 @@ struct Gate {
 
 class TestWindow final : public backend::Window {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override {
+    return ConfigureImGui(enabled, font_file_path, font_size);
+  }
+
+  bool UpdateImGui(const std::function<void()> &callback) override {
+    return RunImGuiFrame(callback);
+  }
+
+  EventManager<void(int, int)> &ResizeEvent() override {
+    return ResizeCallbacks();
+  }
+
+  EventManager<void(int, int)> &FramebufferResizeEvent() override {
+    return FramebufferResizeCallbacks();
+  }
+
+  EventManager<void(bool)> &CursorEnterEvent() override {
+    return CursorEnterCallbacks();
+  }
+
+  EventManager<void(bool)> &FocusEvent() override {
+    return FocusCallbacks();
+  }
+
+  EventManager<void(double, double)> &MouseMoveEvent() override {
+    return MouseMoveCallbacks();
+  }
+
+  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override {
+    return MouseButtonCallbacks();
+  }
+
+  EventManager<void(double, double)> &ScrollEvent() override {
+    return ScrollCallbacks();
+  }
+
+  EventManager<void(int, int, int, int)> &KeyEvent() override {
+    return KeyCallbacks();
+  }
+
+  EventManager<void(uint32_t)> &CharEvent() override {
+    return CharCallbacks();
+  }
+
+  EventManager<void(int, const char **)> &DropEvent() override {
+    return DropCallbacks();
+  }
+
+  rhi::IImage *GetNextImage() override {
+    return PreparedImage();
+  }
+
+  bool IsSwapChainInvalid() const override {
+    return SwapChainNeedsRebuild();
+  }
+
+  bool RebuildSwapChain() override {
+    return RecreateSwapChain();
+  }
+
+  bool SetPresentMode(PresentMode mode) override {
+    return ChangePresentMode(mode);
+  }
+
+  bool SetColorSpace(ColorSpace color_space) override {
+    return ChangeColorSpace(color_space);
+  }
+
+  ColorSpace GetColorSpace() const override {
+    return ActiveColorSpace();
+  }
+
+  bool GetHDRReferenceWhiteNits(float &nits) const override {
+    return QueryHDRReferenceWhiteNits(nits);
+  }
+
+  float GetHDRReferenceWhiteScale() const override {
+    return HDRReferenceWhiteScale();
+  }
+
+  float GetHDRHeadroom() const override {
+    return HDRHeadroom();
+  }
+
+  GLFWwindow *GLFWWindow() const override {
+    return NativeWindow();
+  }
+
+  bool ShouldClose() const override {
+    return WindowShouldClose();
+  }
+
+  bool IsKeyDown(int key) const override {
+    return KeyPressed(key);
+  }
+
+  bool SetTitle(const std::string &title) override {
+    return ChangeTitle(title);
+  }
+
   explicit TestWindow(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
   }
 
@@ -63,6 +172,19 @@ class TestWindow final : public backend::Window {
 
 class TestImage final : public backend::Image {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  const ImageDesc &GetDesc() const override {
+    return Description();
+  }
+
   explicit TestImage(std::shared_ptr<Gate> gate, backend::Window *window = nullptr)
       : backend::Image({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM}),
         gate_(std::move(gate)),
@@ -94,6 +216,15 @@ class TestImage final : public backend::Image {
 
 class TestResource final : public backend::Object<rhi::IObject> {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
   explicit TestResource(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
   }
 
@@ -108,6 +239,158 @@ class TestResource final : public backend::Object<rhi::IObject> {
 
 class TestCommandContext final : public backend::CommandContext {
  public:
+  IDownloadToken *CmdDownloadImage(IImage *, const ImageDownloadRegion & = {}) override {
+    recording_failed_ = true;
+    return nullptr;
+  }
+
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  bool CmdDrawImGui(IWindow *window, IImage *target) override {
+    return RecordWindowImGui(window, target);
+  }
+
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override {
+    return RecordWindowPresentation(window, frame_img, frame_color_space);
+  }
+
+  bool CmdQueryCompactedSize(IAccelerationStructure *structure) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdBuildBottomLevelAccelerationStructure(
+      IBottomLevelAccelerationStructure *destination,
+      const std::vector<rhi::AccelerationStructureGeometryBuffers> &geometries,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdBuildTopLevelAccelerationStructure(
+      ITopLevelAccelerationStructure *destination,
+      const std::vector<rhi::RayTracingInstance> &instances,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdDispatchRays(uint32_t width,
+                       uint32_t height,
+                       uint32_t depth = 1,
+                       IShaderBindingTable *sbt = nullptr) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdCopyBuffer(IBuffer *source,
+                     uint64_t source_offset,
+                     IBuffer *destination,
+                     uint64_t destination_offset,
+                     uint64_t size) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdBindGroup(uint32_t index, IBindingGroup *group) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdBindComputeProgram(IComputeProgram *program) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdBindProgram(IProgram *program) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdBeginRendering(const rhi::RenderingInfo &info) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdEndRendering() override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdSetViewport(const Viewport &viewport) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdSetScissor(const Scissor &scissor) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdDraw(uint32_t vertex_count,
+               uint32_t instance_count = 1,
+               uint32_t first_vertex = 0,
+               uint32_t first_instance = 0) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdDrawIndexed(uint32_t index_count,
+                      uint32_t instance_count = 1,
+                      uint32_t first_index = 0,
+                      int32_t vertex_offset = 0,
+                      uint32_t first_instance = 0) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  IDownloadToken *CmdDownloadBuffer(IBuffer *arg0, uint64_t arg1, uint64_t arg2) override {
+    recording_failed_ = true;
+    return nullptr;
+  }
+
   TestCommandContext(std::shared_ptr<Gate> gate, bool fail_after_submit = false)
       : backend::CommandContext(gate.get()),
         gate_(std::move(gate)),
@@ -173,6 +456,85 @@ class TestCommandContext final : public backend::CommandContext {
 
 class TestDevice final : public backend::Device {
  public:
+  ISampler *CreateSampler(const SamplerDesc & = {}) override {
+    return nullptr;
+  }
+
+  rhi::IWindow *CreateGLFWWindow(const WindowDesc & = {}) override {
+    return nullptr;
+  }
+
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
+      const BottomLevelAccelerationStructureDesc &desc) override {
+    return nullptr;
+  }
+
+  ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
+      const TopLevelAccelerationStructureDesc &desc) override {
+    return nullptr;
+  }
+
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override {
+    return nullptr;
+  }
+
+  std::string Name() const override {
+    return DeviceName();
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return HasRayTracingPipeline();
+  }
+
+  bool SupportRayQuery() const override {
+    return HasRayQuery();
+  }
+
+  bool SupportGeometryShader() const override {
+    return HasGeometryShader();
+  }
+
+  rhi::IImage *CreateImage(const ImageDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override {
+    return nullptr;
+  }
+
+  rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IProgram *CreateProgram(const ProgramDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
+    return nullptr;
+  }
+
+  rhi::IQueue *GetQueue(QueueType type) override {
+    return nullptr;
+  }
+
+  rhi::ICommandContext *CreateCommandContext() override {
+    return nullptr;
+  }
+
   explicit TestDevice(std::shared_ptr<Gate> gate) : backend::Device({}, {}), gate_(std::move(gate)) {
   }
 
@@ -194,8 +556,51 @@ class TestDevice final : public backend::Device {
   std::shared_ptr<Gate> gate_;
 };
 
+class TestSubmissionToken final : public backend::SubmissionToken {
+ public:
+  using backend::SubmissionToken::SubmissionToken;
+
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  SubmissionStatus GetStatus() const override {
+    return CompletionStatus();
+  }
+
+  bool WaitHost() const override {
+    return WaitForCompletion();
+  }
+};
+
 class TestQueue final : public backend::Queue {
  public:
+  rhi::ISubmissionToken *Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info = {}) override {
+    return SubmitCommands(commands, info, ObjectPtr<backend::SubmissionToken>::Adopt(new TestSubmissionToken(Owner())));
+  }
+
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  QueueType GetType() const override {
+    return QueueRole();
+  }
+
+  bool SharesPhysicalQueue(const rhi::IQueue *other) const override {
+    return UsesSameDeviceQueue(other);
+  }
+
   TestQueue(const ObjectPtr<TestDevice> &device, QueueType type) : backend::Queue(device.Get(), type) {
   }
 };

@@ -21,6 +21,15 @@ class D3D12DescriptorPool {
  public:
   class Lease final : public Object<IObject> {
    public:
+    void AddRef() noexcept override {
+      RetainReference();
+    }
+
+    void Release() noexcept override {
+      if (ReleaseReference())
+        delete this;
+    }
+
     Lease(D3D12DescriptorPool *pool, Page *page, uint32_t offset, uint32_t count);
     ~Lease() override;
     ID3D12DescriptorHeap *Heap() const;

@@ -10,11 +10,11 @@ namespace grassland::rhi::backend {
 class Device;
 
 // Completion state borrows its device; it owns no native resources or commands.
-class SubmissionToken final : public Object<rhi::ISubmissionToken> {
+class SubmissionToken : public Object<rhi::ISubmissionToken> {
  public:
   explicit SubmissionToken(Device *device);
-  SubmissionStatus GetStatus() const override;
-  bool WaitHost() const override;
+  SubmissionStatus CompletionStatus() const;
+  bool WaitForCompletion() const;
   void Complete(SubmissionStatus status);
   Device *Owner() const;
 

@@ -3,12 +3,47 @@
 
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/metal/metal_scratch_pool.h"
+#include "grassland/rhi/backend/metal/metal_shader.h"
 #include "grassland/rhi/backend/metal/metal_temporal_buffer_pool.h"
 
 namespace grassland::rhi::backend::metal {
 
 class MetalDevice final : public Device {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &) override {
+    ReportError(-1, "Ray tracing pipelines are unavailable for Metal.");
+    return nullptr;
+  }
+
+  std::string Name() const override {
+    return DeviceName();
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return HasRayTracingPipeline();
+  }
+
+  bool SupportRayQuery() const override {
+    return HasRayQuery();
+  }
+
+  bool SupportGeometryShader() const override {
+    return HasGeometryShader();
+  }
+
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
+    return MetalShader::Create(desc);
+  }
+
   static MetalDevice *Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
   ~MetalDevice() override;
 

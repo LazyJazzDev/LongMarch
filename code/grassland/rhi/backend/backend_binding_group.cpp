@@ -126,7 +126,7 @@ BindingGroup::BindingGroup(Device *device, ObjectPtr<Version> version)
       version_(std::move(version)) {
 }
 
-const BindingLayoutDesc &BindingGroup::GetLayout() const {
+const BindingLayoutDesc &BindingGroup::BindingLayout() const {
   return layout_;
 }
 
@@ -153,7 +153,7 @@ const BindingDesc *BindingGroup::FindBinding(uint32_t binding,
   return nullptr;
 }
 
-bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element) {
+bool BindingGroup::WriteResources(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element) {
   size_t binding_index;
   const auto *desc = FindBinding(binding, first_element, buffers.size(), binding_index);
   if (!desc)
@@ -186,7 +186,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
   return true;
 }
 
-bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element) {
+bool BindingGroup::WriteResources(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element) {
   size_t binding_index;
   const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
   if (!desc)
@@ -210,7 +210,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &i
   return true;
 }
 
-bool BindingGroup::BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element) {
+bool BindingGroup::WriteResources(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element) {
   size_t binding_index;
   const auto *desc = FindBinding(binding, first_element, samplers.size(), binding_index);
   if (!desc)
@@ -249,9 +249,9 @@ bool BindingGroup::Version::WriteDescriptors(size_t, uint32_t, const std::vector
   return false;
 }
 
-bool BindingGroup::BindResource(uint32_t binding,
-                                const std::vector<ITopLevelAccelerationStructure *> &structures,
-                                uint32_t first_element) {
+bool BindingGroup::WriteResources(uint32_t binding,
+                                  const std::vector<ITopLevelAccelerationStructure *> &structures,
+                                  uint32_t first_element) {
   size_t binding_index;
   auto desc = FindBinding(binding, first_element, structures.size(), binding_index);
   if (!desc || desc->type != BINDING_ACCELERATION_STRUCTURE)

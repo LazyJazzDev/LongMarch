@@ -7,10 +7,52 @@ class D3D12Device;
 
 class D3D12BindingGroup final : public BindingGroup {
  public:
+  using IBindingGroup::BindResource;
+
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  bool BindResource(uint32_t binding,
+                    const std::vector<ITopLevelAccelerationStructure *> &structures,
+                    uint32_t first_element = 0) override {
+    return WriteResources(binding, structures, first_element);
+  }
+
+  const BindingLayoutDesc &GetLayout() const override {
+    return BindingLayout();
+  }
+
+  bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override {
+    return WriteResources(binding, buffers, first_element);
+  }
+
+  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override {
+    return WriteResources(binding, images, first_element);
+  }
+
+  bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override {
+    return WriteResources(binding, samplers, first_element);
+  }
+
   static D3D12BindingGroup *Create(D3D12Device *device, const BindingLayoutDesc &layout);
 
   class Version final : public BindingGroup::Version {
    public:
+    void AddRef() noexcept override {
+      RetainReference();
+    }
+
+    void Release() noexcept override {
+      if (ReleaseReference())
+        delete this;
+    }
+
     static Version *Create(D3D12Device *device, const BindingLayoutDesc &layout);
     ObjectPtr<BindingGroup::Version> Clone() const override;
     bool IsInitialized(size_t binding_index, uint32_t element) const override;

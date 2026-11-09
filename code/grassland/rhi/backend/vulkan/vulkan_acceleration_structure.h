@@ -40,6 +40,15 @@ class VulkanAccelerationStructure {
 class VulkanBottomLevelAccelerationStructure final : public Object<IBottomLevelAccelerationStructure>,
                                                      public VulkanAccelerationStructure {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
   static VulkanBottomLevelAccelerationStructure *Create(VulkanDevice *device,
                                                         const BottomLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
@@ -54,6 +63,15 @@ class VulkanBottomLevelAccelerationStructure final : public Object<IBottomLevelA
 class VulkanTopLevelAccelerationStructure final : public Object<ITopLevelAccelerationStructure>,
                                                   public VulkanAccelerationStructure {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
   static VulkanTopLevelAccelerationStructure *Create(VulkanDevice *device,
                                                      const TopLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;

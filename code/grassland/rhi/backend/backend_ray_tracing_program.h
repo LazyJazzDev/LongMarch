@@ -8,7 +8,7 @@ class Device;
 class RayTracingProgram : public Object<IRayTracingProgram> {
  public:
   RayTracingProgram(Device *device, const RayTracingProgramDesc &desc);
-  const RayTracingProgramDesc &GetDesc() const override;
+  const RayTracingProgramDesc &Description() const;
   Device *Owner() const;
 
  protected:

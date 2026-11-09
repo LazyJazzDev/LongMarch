@@ -6,7 +6,7 @@
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend {
-class ShaderBindingTable final : public Object<IShaderBindingTable> {
+class ShaderBindingTable : public Object<IShaderBindingTable> {
  public:
   struct Region {
     uint64_t address{}, size{}, stride{};
@@ -22,11 +22,11 @@ class ShaderBindingTable final : public Object<IShaderBindingTable> {
         regions_(regions) {
   }
 
-  const ShaderBindingTableDesc &GetDesc() const override {
+  const ShaderBindingTableDesc &TableDescription() const {
     return desc_;
   }
 
-  IRayTracingProgram *GetProgram() const override {
+  IRayTracingProgram *SourceProgram() const {
     return program_;
   }
 

@@ -36,6 +36,15 @@ class D3D12AccelerationStructure {
 class D3D12BottomLevelAccelerationStructure final : public Object<IBottomLevelAccelerationStructure>,
                                                     public D3D12AccelerationStructure {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
   static D3D12BottomLevelAccelerationStructure *Create(D3D12Device *device,
                                                        const BottomLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
@@ -50,6 +59,15 @@ class D3D12BottomLevelAccelerationStructure final : public Object<IBottomLevelAc
 class D3D12TopLevelAccelerationStructure final : public Object<ITopLevelAccelerationStructure>,
                                                  public D3D12AccelerationStructure {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
   static D3D12TopLevelAccelerationStructure *Create(D3D12Device *device, const TopLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
   uint64_t GetCompactedSize() const override;

@@ -8,6 +8,19 @@ class D3D12Device;
 // Resource access only. Derived classes define allocation ownership (standalone or future pool leases).
 class D3D12Buffer : public Buffer {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  BufferDesc GetDesc() const override {
+    return Description();
+  }
+
   virtual ID3D12Resource *NativeBuffer() const = 0;
   virtual D3D12_RESOURCE_STATES DefaultState() const = 0;
 

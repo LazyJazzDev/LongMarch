@@ -1,98 +1,30 @@
 ﻿#include "grassland/rhi/backend/backend_device.h"
 
-#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_shader.h"
 
 namespace grassland::rhi::backend {
-IBottomLevelAccelerationStructure *Device::CreateBottomLevelAccelerationStructure(
-    const BottomLevelAccelerationStructureDesc &) {
-  ReportError(-1, "Acceleration structures are unavailable for this backend.");
-  return nullptr;
-}
-
-ITopLevelAccelerationStructure *Device::CreateTopLevelAccelerationStructure(const TopLevelAccelerationStructureDesc &) {
-  ReportError(-1, "Acceleration structures are unavailable for this backend.");
-  return nullptr;
-}
-
-IRayTracingProgram *Device::CreateRayTracingProgram(const RayTracingProgramDesc &) {
-  ReportError(-1, "Ray tracing pipelines are unavailable for this backend.");
-  return nullptr;
-}
-
-Device::Device(PhysicalDevice info, Core *core, BackendAPI api) : api_(api), core_(core), info_(std::move(info)) {
-}
-
-rhi::IImage *Device::CreateImage(const ImageDesc &) {
-  ReportError(-1, "Independent images are not implemented for this backend.");
-  return nullptr;
-}
-
-rhi::IBuffer *Device::CreateBuffer(const BufferDesc &) {
-  ReportError(-1, "Buffers are not implemented for this backend.");
-  return nullptr;
-}
-
-rhi::IComputeProgram *Device::CreateComputeProgram(const ComputeProgramDesc &) {
-  ReportError(-1, "Compute programs are not implemented for this backend.");
-  return nullptr;
-}
-
-rhi::IProgram *Device::CreateProgram(const ProgramDesc &) {
-  ReportError(-1, "Graphics programs are not implemented for this backend.");
-  return nullptr;
-}
-
-rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
-  if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
-      desc.stage > SHADER_STAGE_CALLABLE)
-    return nullptr;
-  return Shader::Create(desc, api_);
-}
-
-ISampler *Device::CreateSampler(const SamplerDesc &) {
-  ReportError(-1, "Samplers are not implemented for this backend.");
-  return nullptr;
-}
-
-IBindingGroup *Device::CreateBindingGroup(const BindingLayoutDesc &) {
-  ReportError(-1, "Binding groups are not implemented for this backend.");
-  return nullptr;
+Device::Device(PhysicalDevice info, Core *core) : core_(core), info_(std::move(info)) {
 }
 
 Device::~Device() {
   ShutdownQueues();
 }
 
-std::string Device::Name() const {
+std::string Device::DeviceName() const {
   return info_.name;
 }
 
-bool Device::SupportRayTracingPipeline() const {
+bool Device::HasRayTracingPipeline() const {
   return info_.ray_tracing_pipeline_feature;
 }
 
-bool Device::SupportRayQuery() const {
+bool Device::HasRayQuery() const {
   return info_.ray_query_feature;
 }
 
-bool Device::SupportGeometryShader() const {
+bool Device::HasGeometryShader() const {
   return info_.geometry_shader_feature;
-}
-
-rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &) {
-  ReportError(-1, "Window creation is unavailable.");
-  return nullptr;
-}
-
-rhi::IQueue *Device::GetQueue(QueueType) {
-  return nullptr;
-}
-
-rhi::ICommandContext *Device::CreateCommandContext() {
-  return nullptr;
 }
 
 const PhysicalDevice &Device::GetPhysicalDevice() const noexcept {
@@ -108,7 +40,8 @@ const void *Device::NativeIdentity() const {
 }
 
 ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands,
-                                          const std::vector<ObjectPtr<SubmissionToken>> &waits) {
+                                          const std::vector<ObjectPtr<SubmissionToken>> &waits,
+                                          ObjectPtr<SubmissionToken> completion) {
   if (!commands->Seal())
     return {};
 #if !defined(NDEBUG)
@@ -131,7 +64,6 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   }
   // Both logical roles share one physical queue. Its ordering already supplies
   // these GPU dependencies; no host wait or additional native wait is required.
-  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(this));
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopping_)
     return {};

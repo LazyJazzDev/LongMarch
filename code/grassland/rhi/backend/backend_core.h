@@ -6,7 +6,7 @@ namespace grassland::rhi::backend {
 
 class Core : public Object<rhi::ICore> {
  public:
-  rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override;
+  rhi::IDevice *SelectAndCreateDevice(DeviceFeatureRequirement requirement = {});
 };
 
 Core *CreateCore(BackendAPI api, const CoreDesc &desc);

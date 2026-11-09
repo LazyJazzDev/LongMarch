@@ -14,7 +14,7 @@ Program::Program(Device *device, const ProgramDesc &desc)
 
 Program::~Program() = default;
 
-const ProgramDesc &Program::GetDesc() const {
+const ProgramDesc &Program::Description() const {
   return desc_;
 }
 

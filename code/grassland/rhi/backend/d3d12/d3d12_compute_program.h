@@ -7,6 +7,19 @@ class D3D12Device;
 
 class D3D12ComputeProgram final : public ComputeProgram, public D3D12ProgramBase {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  const ComputeProgramDesc &GetDesc() const override {
+    return Description();
+  }
+
   static D3D12ComputeProgram *Create(D3D12Device *device, const ComputeProgramDesc &desc);
   ID3D12PipelineState *NativePipeline() const;
 

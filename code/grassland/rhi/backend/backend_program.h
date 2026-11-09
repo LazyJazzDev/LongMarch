@@ -10,7 +10,7 @@ class Program : public Object<IProgram> {
  public:
   Program(Device *device, const ProgramDesc &desc);
   ~Program() override;
-  const ProgramDesc &GetDesc() const override;
+  const ProgramDesc &Description() const;
   Device *Owner() const;
 
  protected:

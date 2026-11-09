@@ -17,6 +17,23 @@ class D3D12SwapChainImage;
 
 class D3D12CommandContext final : public CommandContext {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  bool CmdDrawImGui(IWindow *window, IImage *target) override {
+    return RecordWindowImGui(window, target);
+  }
+
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override {
+    return RecordWindowPresentation(window, frame_img, frame_color_space);
+  }
+
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,

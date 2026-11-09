@@ -20,7 +20,7 @@ namespace grassland::rhi::backend {
 
 Window::Window() = default;
 
-bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_size) {
+bool Window::ConfigureImGui(bool enabled, const char *font_file_path, float font_size) {
   if (!glfw::IsWindowThread() || processing_imgui_)
     return false;
   if (!enabled) {
@@ -36,7 +36,7 @@ ImGuiContext *Window::GetImGuiContext() const {
   return imgui_ ? imgui_->Context() : nullptr;
 }
 
-bool Window::UpdateImGui(const std::function<void()> &callback) {
+bool Window::RunImGuiFrame(const std::function<void()> &callback) {
   if (!imgui_)
     return true;
   if (!glfw::IsWindowThread() || processing_imgui_)
@@ -98,7 +98,7 @@ bool Window::RecordImGui(rhi::ICommandContext *commands,
   return imgui_->Record(commands, image, color_space, white_scale);
 }
 
-rhi::IImage *Window::GetNextImage() {
+rhi::IImage *Window::PreparedImage() {
 #if !defined(NDEBUG)
   if (!glfw::IsWindowThread()) {
     ReportError(-1, "GetNextImage must run on the window thread.");
@@ -141,11 +141,11 @@ void Window::ReleaseNextImage() {
   next_image_.Reset();
 }
 
-bool Window::IsSwapChainInvalid() const {
+bool Window::SwapChainNeedsRebuild() const {
   return invalid_;
 }
 
-bool Window::RebuildSwapChain() {
+bool Window::RecreateSwapChain() {
 #if !defined(NDEBUG)
   if (!glfw::IsWindowThread())
     return false;
@@ -172,7 +172,7 @@ bool Window::RebuildSwapChain() {
   return false;
 }
 
-bool Window::SetPresentMode(PresentMode mode) {
+bool Window::ChangePresentMode(PresentMode mode) {
 #if !defined(NDEBUG)
   if (!glfw::IsWindowThread())
     return false;
@@ -181,7 +181,7 @@ bool Window::SetPresentMode(PresentMode mode) {
   return RebuildSwapChain();
 }
 
-bool Window::SetColorSpace(ColorSpace color_space) {
+bool Window::ChangeColorSpace(ColorSpace color_space) {
 #if !defined(NDEBUG)
   if (!glfw::IsWindowThread())
     return false;
@@ -198,11 +198,11 @@ bool Window::SetColorSpace(ColorSpace color_space) {
   return false;
 }
 
-ColorSpace Window::GetColorSpace() const {
+ColorSpace Window::ActiveColorSpace() const {
   return color_space_;
 }
 
-float Window::GetHDRReferenceWhiteScale() const {
+float Window::HDRReferenceWhiteScale() const {
 #ifdef _WIN32
   float nits;
   return GetHDRReferenceWhiteNits(nits) ? nits / 80.0f : 1.0f;
@@ -213,7 +213,7 @@ float Window::GetHDRReferenceWhiteScale() const {
 }
 
 #ifndef __APPLE__
-float Window::GetHDRHeadroom() const {
+float Window::HDRHeadroom() const {
 #ifdef _WIN32
   float white;
   if (!GetHDRReferenceWhiteNits(white))
@@ -244,7 +244,7 @@ float Window::GetHDRHeadroom() const {
 
 #endif
 
-bool Window::GetHDRReferenceWhiteNits(float &nits) const {
+bool Window::QueryHDRReferenceWhiteNits(float &nits) const {
   if (!glfw::IsWindowThread())
     return false;
 #ifdef _WIN32
@@ -306,11 +306,11 @@ bool Window::InitializeWindow(Device *device, const WindowDesc &desc) {
   return true;
 }
 
-GLFWwindow *Window::GLFWWindow() const {
+GLFWwindow *Window::NativeWindow() const {
   return window_;
 }
 
-bool Window::ShouldClose() const {
+bool Window::WindowShouldClose() const {
 #if !defined(NDEBUG)
   if (!glfw::IsWindowThread())
     return true;
@@ -318,7 +318,7 @@ bool Window::ShouldClose() const {
   return glfwWindowShouldClose(window_);
 }
 
-bool Window::IsKeyDown(int key) const {
+bool Window::KeyPressed(int key) const {
 #if !defined(NDEBUG)
   if (!glfw::IsWindowThread())
     return false;
@@ -326,7 +326,7 @@ bool Window::IsKeyDown(int key) const {
   return glfwGetKey(window_, key) == GLFW_PRESS;
 }
 
-bool Window::SetTitle(const std::string &title) {
+bool Window::ChangeTitle(const std::string &title) {
   return glfw::SetWindowTitle(window_, title.c_str());
 }
 

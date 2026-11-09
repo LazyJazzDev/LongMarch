@@ -6,19 +6,19 @@ DownloadToken::DownloadToken(uint64_t size) : size_(size) {
 
 DownloadToken::~DownloadToken() = default;
 
-SubmissionStatus DownloadToken::GetStatus() const {
+SubmissionStatus DownloadToken::DownloadStatus() const {
   return submission_ ? submission_->GetStatus() : SUBMISSION_STATUS_PENDING;
 }
 
-bool DownloadToken::WaitHost() const {
+bool DownloadToken::WaitForDownload() const {
   return submission_ && submission_->WaitHost();
 }
 
-uint64_t DownloadToken::GetSize() const {
+uint64_t DownloadToken::DownloadSize() const {
   return size_;
 }
 
-bool DownloadToken::CopyTo(void *destination, uint64_t size) const {
+bool DownloadToken::CopyDownload(void *destination, uint64_t size) const {
   if (!destination || size < size_)
     return false;
   return CopyData(destination);

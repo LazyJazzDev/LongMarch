@@ -5,6 +5,31 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12DownloadToken final : public DownloadToken {
  public:
+  void AddRef() noexcept override {
+    RetainReference();
+  }
+
+  void Release() noexcept override {
+    if (ReleaseReference())
+      delete this;
+  }
+
+  SubmissionStatus GetStatus() const override {
+    return DownloadStatus();
+  }
+
+  bool WaitHost() const override {
+    return WaitForDownload();
+  }
+
+  uint64_t GetSize() const override {
+    return DownloadSize();
+  }
+
+  bool CopyTo(void *destination, uint64_t size) const override {
+    return CopyDownload(destination, size);
+  }
+
   D3D12DownloadToken(ObjectPtr<D3D12TemporalBufferLease> lease, uint64_t size);
   D3D12DownloadToken(ObjectPtr<D3D12TemporalBufferLease> lease, const DownloadLayout &layout);
   ~D3D12DownloadToken() override;
