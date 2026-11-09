@@ -12,15 +12,6 @@ class D3D12Queue final : public Queue {
                           ObjectPtr<backend::SubmissionToken>::Adopt(new D3D12SubmissionToken(Owner())));
   }
 
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   QueueType GetType() const override {
     return QueueRole();
   }

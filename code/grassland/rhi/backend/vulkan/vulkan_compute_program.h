@@ -7,15 +7,6 @@ class VulkanDevice;
 
 class VulkanComputeProgram final : public ComputeProgram, public VulkanProgramBase {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   const ComputeProgramDesc &GetDesc() const override {
     return Description();
   }

@@ -7,15 +7,6 @@ class D3D12Device;
 
 class D3D12ComputeProgram final : public ComputeProgram, public D3D12ProgramBase {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   const ComputeProgramDesc &GetDesc() const override {
     return Description();
   }

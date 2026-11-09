@@ -8,15 +8,6 @@ namespace grassland::rhi::backend::metal {
 // Native texture is borrowed. Concrete image classes own its backing storage.
 class MetalImage : public Image {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   const ImageDesc &GetDesc() const override {
     return Description();
   }

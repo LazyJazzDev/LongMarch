@@ -4,15 +4,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalShader final : public Shader {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   ShaderStage GetStage() const override {
     return ShaderStageValue();
   }

@@ -12,16 +12,16 @@ void ReportError(int32_t error_code, const std::string &error_message);
 // One intrusive counter per native implementation, with no public state layout.
 template <typename Interface>
 class Object : public Interface {
- protected:
-  void RetainReference() noexcept {
+ public:
+  void AddRef() noexcept final {
     references_.fetch_add(1, std::memory_order_relaxed);
   }
 
-  bool ReleaseReference() noexcept {
-    return references_.fetch_sub(1, std::memory_order_acq_rel) == 1;
+  void Release() noexcept final {
+    if (references_.fetch_sub(1, std::memory_order_acq_rel) == 1)
+      delete this;
   }
 
- public:
   bool IsUniquelyOwned() const noexcept {
     return references_.load(std::memory_order_acquire) == 1;
   }

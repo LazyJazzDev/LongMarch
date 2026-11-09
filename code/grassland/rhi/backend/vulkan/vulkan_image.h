@@ -7,15 +7,6 @@ namespace grassland::rhi::backend::vulkan {
 // Common resource access; derived classes define ownership and validity.
 class VulkanImage : public Image {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   const ImageDesc &GetDesc() const override {
     return Description();
   }

@@ -11,15 +11,6 @@ class VulkanDevice;
 
 class VulkanRayTracingProgram final : public RayTracingProgram, public VulkanProgramBase {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   const RayTracingProgramDesc &GetDesc() const override {
     return Description();
   }

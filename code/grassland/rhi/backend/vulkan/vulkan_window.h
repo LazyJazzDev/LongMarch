@@ -6,15 +6,6 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanWindow final : public Window {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override {
     return ConfigureImGui(enabled, font_file_path, font_size);
   }

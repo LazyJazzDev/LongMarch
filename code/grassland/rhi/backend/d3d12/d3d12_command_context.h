@@ -17,15 +17,6 @@ class D3D12SwapChainImage;
 
 class D3D12CommandContext final : public CommandContext {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   bool CmdDrawImGui(IWindow *window, IImage *target) override {
     return RecordWindowImGui(window, target);
   }

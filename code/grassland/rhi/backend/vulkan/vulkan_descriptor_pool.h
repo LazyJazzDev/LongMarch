@@ -26,15 +26,6 @@ class VulkanDescriptorPool {
  public:
   class Lease final : public Object<IObject> {
    public:
-    void AddRef() noexcept override {
-      RetainReference();
-    }
-
-    void Release() noexcept override {
-      if (ReleaseReference())
-        delete this;
-    }
-
     Lease(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set);
     ~Lease() override;
     VkDescriptorSet Set() const;

@@ -4,15 +4,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12ShaderBindingTable final : public ShaderBindingTable {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   const ShaderBindingTableDesc &GetDesc() const override {
     return TableDescription();
   }

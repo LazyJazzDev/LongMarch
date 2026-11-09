@@ -5,15 +5,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12DownloadToken final : public DownloadToken {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   SubmissionStatus GetStatus() const override {
     return DownloadStatus();
   }

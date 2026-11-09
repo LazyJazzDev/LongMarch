@@ -12,15 +12,6 @@ class VulkanQueue final : public Queue {
                           ObjectPtr<backend::SubmissionToken>::Adopt(new VulkanSubmissionToken(Owner())));
   }
 
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   QueueType GetType() const override {
     return QueueRole();
   }

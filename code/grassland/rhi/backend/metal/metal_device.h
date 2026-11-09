@@ -10,15 +10,6 @@ namespace grassland::rhi::backend::metal {
 
 class MetalDevice final : public Device {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &) override {
     ReportError(-1, "Ray tracing pipelines are unavailable for Metal.");
     return nullptr;

@@ -5,15 +5,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalDownloadToken final : public DownloadToken {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   SubmissionStatus GetStatus() const override {
     return DownloadStatus();
   }

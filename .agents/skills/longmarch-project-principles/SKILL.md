@@ -15,8 +15,9 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 
 ## RHI backend 公共层职责
 
-- 所有 backend 公共层对象都不得实现或 override 接口类的函数；接口函数统一由 Vulkan、D3D12、Metal 等底层 API 的最终实现类负责实现。
-- backend 公共层只能提供供底层 API 最终实现使用的辅助成员函数和成员变量。共享逻辑通过辅助成员函数复用，不以接口函数的默认实现、兜底实现或模板方法覆盖来承载；省略 `override` 关键字也不构成例外。
+- 除通用 `Object<Interface>` 模板外，backend 公共层对象不得实现或 override 接口类的函数；接口函数统一由 Vulkan、D3D12、Metal 等底层 API 的最终实现类负责实现。
+- `Object<Interface>` 的通用对象生命周期管理属于明确例外，`AddRef/Release` 应在该模板中统一实现并复用，不在各 API 类中重复展开。该原则用于明确 API 行为的实现归属，不应机械拆散通用引用计数逻辑。
+- 其余 backend 公共层只能提供供底层 API 最终实现使用的辅助成员函数和成员变量。共享逻辑通过辅助成员函数复用，不以接口函数的默认实现、兜底实现或模板方法覆盖来承载；省略 `override` 关键字也不构成例外。
 
 ## 错误处理与异常
 

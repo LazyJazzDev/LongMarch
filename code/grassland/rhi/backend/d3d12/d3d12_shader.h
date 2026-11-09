@@ -4,15 +4,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Shader final : public Shader {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   ShaderStage GetStage() const override {
     return ShaderStageValue();
   }

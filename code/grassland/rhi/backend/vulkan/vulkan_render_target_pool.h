@@ -17,15 +17,6 @@ class VulkanRenderTargetPool {
  public:
   class Lease final : public Object<IObject> {
    public:
-    void AddRef() noexcept override {
-      RetainReference();
-    }
-
-    void Release() noexcept override {
-      if (ReleaseReference())
-        delete this;
-    }
-
     Lease(VulkanRenderTargetPool *pool, Entry *entry, const std::vector<VulkanImage *> &images);
     ~Lease() override;
     const std::vector<VkImageView> &Views() const;

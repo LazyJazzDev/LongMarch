@@ -35,15 +35,6 @@ class MetalAccelerationStructure {
 class MetalBottomLevelAccelerationStructure final : public Object<IBottomLevelAccelerationStructure>,
                                                     public MetalAccelerationStructure {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   static MetalBottomLevelAccelerationStructure *Create(MetalDevice *device,
                                                        const BottomLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
@@ -58,15 +49,6 @@ class MetalBottomLevelAccelerationStructure final : public Object<IBottomLevelAc
 class MetalTopLevelAccelerationStructure final : public Object<ITopLevelAccelerationStructure>,
                                                  public MetalAccelerationStructure {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   static MetalTopLevelAccelerationStructure *Create(MetalDevice *device, const TopLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
   uint64_t GetCompactedSize() const override;

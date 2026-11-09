@@ -28,15 +28,6 @@ struct Gate {
 
 class TestWindow final : public backend::Window {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override {
     return ConfigureImGui(enabled, font_file_path, font_size);
   }
@@ -172,15 +163,6 @@ class TestWindow final : public backend::Window {
 
 class TestImage final : public backend::Image {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   const ImageDesc &GetDesc() const override {
     return Description();
   }
@@ -216,15 +198,6 @@ class TestImage final : public backend::Image {
 
 class TestResource final : public backend::Object<rhi::IObject> {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   explicit TestResource(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
   }
 
@@ -242,15 +215,6 @@ class TestCommandContext final : public backend::CommandContext {
   IDownloadToken *CmdDownloadImage(IImage *, const ImageDownloadRegion & = {}) override {
     recording_failed_ = true;
     return nullptr;
-  }
-
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
   }
 
   bool CmdDrawImGui(IWindow *window, IImage *target) override {
@@ -464,15 +428,6 @@ class TestDevice final : public backend::Device {
     return nullptr;
   }
 
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override {
     return nullptr;
@@ -560,15 +515,6 @@ class TestSubmissionToken final : public backend::SubmissionToken {
  public:
   using backend::SubmissionToken::SubmissionToken;
 
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   SubmissionStatus GetStatus() const override {
     return CompletionStatus();
   }
@@ -582,15 +528,6 @@ class TestQueue final : public backend::Queue {
  public:
   rhi::ISubmissionToken *Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info = {}) override {
     return SubmitCommands(commands, info, ObjectPtr<backend::SubmissionToken>::Adopt(new TestSubmissionToken(Owner())));
-  }
-
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
   }
 
   QueueType GetType() const override {

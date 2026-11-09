@@ -44,15 +44,6 @@ class TestDevice final : public backend::Device {
     return nullptr;
   }
 
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override {
     return nullptr;
@@ -131,15 +122,6 @@ class TestDevice final : public backend::Device {
 
 class TestCore final : public backend::Core {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
     return SelectAndCreateDevice(requirement);
   }

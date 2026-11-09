@@ -7,15 +7,6 @@ class D3D12Device;
 
 class D3D12Sampler final : public Sampler {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   const SamplerDesc &GetDesc() const override {
     return Description();
   }

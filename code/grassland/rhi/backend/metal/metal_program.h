@@ -9,15 +9,6 @@ class MetalDevice;
 
 class MetalProgram final : public Program, public MetalProgramBase {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   const ProgramDesc &GetDesc() const override {
     return Description();
   }

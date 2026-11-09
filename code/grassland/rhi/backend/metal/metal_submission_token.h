@@ -4,15 +4,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalSubmissionToken final : public SubmissionToken {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   SubmissionStatus GetStatus() const override {
     return CompletionStatus();
   }

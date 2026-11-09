@@ -8,15 +8,6 @@ class MetalDevice;
 
 class MetalBuffer : public Buffer {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   BufferDesc GetDesc() const override {
     return Description();
   }

@@ -14,15 +14,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Device final : public Device {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   std::string Name() const override {
     return DeviceName();
   }

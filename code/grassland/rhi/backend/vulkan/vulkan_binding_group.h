@@ -12,15 +12,6 @@ class VulkanBindingGroup final : public BindingGroup {
  public:
   using IBindingGroup::BindResource;
 
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   bool BindResource(uint32_t binding,
                     const std::vector<ITopLevelAccelerationStructure *> &structures,
                     uint32_t first_element = 0) override {
@@ -45,15 +36,6 @@ class VulkanBindingGroup final : public BindingGroup {
 
   class Version final : public BindingGroup::Version {
    public:
-    void AddRef() noexcept override {
-      RetainReference();
-    }
-
-    void Release() noexcept override {
-      if (ReleaseReference())
-        delete this;
-    }
-
     static Version *Create(VulkanDevice *device, const BindingLayoutDesc &layout);
     ObjectPtr<BindingGroup::Version> Clone() const override;
     bool IsInitialized(size_t binding_index, uint32_t element) const override;

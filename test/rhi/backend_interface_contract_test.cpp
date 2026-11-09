@@ -19,22 +19,16 @@
 
 namespace grassland::rhi::backend {
 namespace {
-// A shared class must inherit each RHI entry point unchanged. Comparing member
+// Apart from Object lifetime management, shared classes inherit RHI entry points unchanged. Comparing member
 // pointer types also catches overrides that omit the override keyword.
 
 static_assert(std::is_abstract_v<BindingGroup>);
-static_assert(std::is_same_v<decltype(&BindingGroup::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&BindingGroup::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&BindingGroup::GetLayout), decltype(&IBindingGroup::GetLayout)>);
 
 static_assert(std::is_abstract_v<Buffer>);
-static_assert(std::is_same_v<decltype(&Buffer::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&Buffer::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&Buffer::GetDesc), decltype(&IBuffer::GetDesc)>);
 
 static_assert(std::is_abstract_v<CommandContext>);
-static_assert(std::is_same_v<decltype(&CommandContext::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&CommandContext::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&CommandContext::CmdQueryCompactedSize),
                              decltype(&ICommandContext::CmdQueryCompactedSize)>);
 static_assert(std::is_same_v<decltype(&CommandContext::CmdCompactAccelerationStructure),
@@ -75,21 +69,15 @@ static_assert(std::is_same_v<decltype(&CommandContext::CmdPresentImage), decltyp
 static_assert(std::is_same_v<decltype(&CommandContext::CmdPresent), decltype(&ICommandContext::CmdPresent)>);
 
 static_assert(std::is_abstract_v<ComputeProgram>);
-static_assert(std::is_same_v<decltype(&ComputeProgram::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&ComputeProgram::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&ComputeProgram::GetDesc), decltype(&IComputeProgram::GetDesc)>);
 
 static_assert(std::is_abstract_v<Core>);
-static_assert(std::is_same_v<decltype(&Core::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&Core::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&Core::GetPhysicalDevices), decltype(&ICore::GetPhysicalDevices)>);
 static_assert(std::is_same_v<decltype(&Core::CreateDevice), decltype(&ICore::CreateDevice)>);
 static_assert(
     std::is_same_v<decltype(&Core::CreateDeviceByAutoSelection), decltype(&ICore::CreateDeviceByAutoSelection)>);
 
 static_assert(std::is_abstract_v<Device>);
-static_assert(std::is_same_v<decltype(&Device::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&Device::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&Device::CreateBottomLevelAccelerationStructure),
                              decltype(&IDevice::CreateBottomLevelAccelerationStructure)>);
 static_assert(std::is_same_v<decltype(&Device::CreateTopLevelAccelerationStructure),
@@ -118,65 +106,45 @@ static_assert(std::is_same_v<decltype(&Device::GetQueue), decltype(&IDevice::Get
 static_assert(std::is_same_v<decltype(&Device::CreateCommandContext), decltype(&IDevice::CreateCommandContext)>);
 
 static_assert(std::is_abstract_v<DownloadToken>);
-static_assert(std::is_same_v<decltype(&DownloadToken::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&DownloadToken::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&DownloadToken::GetStatus), decltype(&IDownloadToken::GetStatus)>);
 static_assert(std::is_same_v<decltype(&DownloadToken::WaitHost), decltype(&IDownloadToken::WaitHost)>);
 static_assert(std::is_same_v<decltype(&DownloadToken::GetSize), decltype(&IDownloadToken::GetSize)>);
 static_assert(std::is_same_v<decltype(&DownloadToken::CopyTo), decltype(&IDownloadToken::CopyTo)>);
 
 static_assert(std::is_abstract_v<Image>);
-static_assert(std::is_same_v<decltype(&Image::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&Image::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&Image::GetDesc), decltype(&IImage::GetDesc)>);
 static_assert(std::is_same_v<decltype(&Image::IsValid), decltype(&IImage::IsValid)>);
 
 static_assert(std::is_abstract_v<Program>);
-static_assert(std::is_same_v<decltype(&Program::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&Program::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&Program::GetDesc), decltype(&IProgram::GetDesc)>);
 
 static_assert(std::is_abstract_v<Queue>);
-static_assert(std::is_same_v<decltype(&Queue::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&Queue::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&Queue::Submit), decltype(&IQueue::Submit)>);
 static_assert(std::is_same_v<decltype(&Queue::GetType), decltype(&IQueue::GetType)>);
 static_assert(std::is_same_v<decltype(&Queue::SharesPhysicalQueue), decltype(&IQueue::SharesPhysicalQueue)>);
 
 static_assert(std::is_abstract_v<RayTracingProgram>);
-static_assert(std::is_same_v<decltype(&RayTracingProgram::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&RayTracingProgram::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&RayTracingProgram::CreateShaderBindingTable),
                              decltype(&IRayTracingProgram::CreateShaderBindingTable)>);
 static_assert(std::is_same_v<decltype(&RayTracingProgram::GetDesc), decltype(&IRayTracingProgram::GetDesc)>);
 
 static_assert(std::is_abstract_v<Sampler>);
-static_assert(std::is_same_v<decltype(&Sampler::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&Sampler::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&Sampler::GetDesc), decltype(&ISampler::GetDesc)>);
 
 static_assert(std::is_abstract_v<Shader>);
-static_assert(std::is_same_v<decltype(&Shader::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&Shader::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&Shader::GetStage), decltype(&IShader::GetStage)>);
 static_assert(std::is_same_v<decltype(&Shader::GetEntry), decltype(&IShader::GetEntry)>);
 static_assert(std::is_same_v<decltype(&Shader::GetPreprocessedCode), decltype(&IShader::GetPreprocessedCode)>);
 
 static_assert(std::is_abstract_v<ShaderBindingTable>);
-static_assert(std::is_same_v<decltype(&ShaderBindingTable::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&ShaderBindingTable::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&ShaderBindingTable::GetDesc), decltype(&IShaderBindingTable::GetDesc)>);
 static_assert(std::is_same_v<decltype(&ShaderBindingTable::GetProgram), decltype(&IShaderBindingTable::GetProgram)>);
 
 static_assert(std::is_abstract_v<SubmissionToken>);
-static_assert(std::is_same_v<decltype(&SubmissionToken::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&SubmissionToken::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&SubmissionToken::GetStatus), decltype(&ISubmissionToken::GetStatus)>);
 static_assert(std::is_same_v<decltype(&SubmissionToken::WaitHost), decltype(&ISubmissionToken::WaitHost)>);
 
 static_assert(std::is_abstract_v<Window>);
-static_assert(std::is_same_v<decltype(&Window::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&Window::Release), decltype(&IObject::Release)>);
 static_assert(std::is_same_v<decltype(&Window::ResizeEvent), decltype(&IWindow::ResizeEvent)>);
 static_assert(std::is_same_v<decltype(&Window::FramebufferResizeEvent), decltype(&IWindow::FramebufferResizeEvent)>);
 static_assert(std::is_same_v<decltype(&Window::CursorEnterEvent), decltype(&IWindow::CursorEnterEvent)>);
@@ -217,8 +185,7 @@ static_assert(IsBindingInterface<BufferView>(&BindingGroup::BindResource));
 static_assert(IsBindingInterface<IImage *>(&BindingGroup::BindResource));
 static_assert(IsBindingInterface<ISampler *>(&BindingGroup::BindResource));
 static_assert(IsBindingInterface<ITopLevelAccelerationStructure *>(&BindingGroup::BindResource));
-static_assert(std::is_abstract_v<Object<IObject>>);
-static_assert(std::is_same_v<decltype(&BindingGroup::Version::AddRef), decltype(&IObject::AddRef)>);
-static_assert(std::is_same_v<decltype(&BindingGroup::Version::Release), decltype(&IObject::Release)>);
+// Object is the shared lifetime-management exception.
+static_assert(!std::is_abstract_v<Object<IObject>>);
 }  // namespace
 }  // namespace grassland::rhi::backend

@@ -13,15 +13,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanDevice final : public Device {
  public:
-  void AddRef() noexcept override {
-    RetainReference();
-  }
-
-  void Release() noexcept override {
-    if (ReleaseReference())
-      delete this;
-  }
-
   std::string Name() const override {
     return DeviceName();
   }
