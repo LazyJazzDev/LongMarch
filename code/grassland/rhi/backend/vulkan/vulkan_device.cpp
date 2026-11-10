@@ -57,7 +57,7 @@ bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer 
       return false;
   } else {
     VkCommandPoolCreateInfo create{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    create.queueFamilyIndex = graphics_queue_family_index_;
+    create.queueFamilyIndex = queue_family_index_;
     create.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     if (!Check(vkCreateCommandPool(device_, &create, nullptr, &pool), "Create command pool"))
       return false;
@@ -128,29 +128,33 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, nullptr);
   std::vector<VkQueueFamilyProperties> families(count);
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, families.data());
-  std::vector<VkDeviceQueueCreateInfo> queues;
-  uint32_t graphics_family = UINT32_MAX;
-  const float priorities[] = {1.0f, 1.0f};
+  uint32_t queue_family = UINT32_MAX;
   for (uint32_t i = 0; i < count; ++i) {
-    if (!families[i].queueCount)
+    const auto required = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
+    if (!families[i].queueCount || (families[i].queueFlags & required) != required)
       continue;
-    if (graphics_family == UINT32_MAX && ((families[i].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) ==
-                                          (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)))
-      graphics_family = i;
-    VkDeviceQueueCreateInfo queue{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-    queue.queueFamilyIndex = i;
-    queue.queueCount = i == graphics_family ? std::min(2u, families[i].queueCount) : 1;
-    queue.pQueuePriorities = priorities;
-    queues.push_back(queue);
+    if (queue_family == UINT32_MAX)
+      queue_family = i;
+    if (families[i].queueCount >= 2) {
+      queue_family = i;
+      break;
+    }
   }
-  VkDeviceCreateInfo create{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
-  if (graphics_family == UINT32_MAX) {
-    ReportError(-1, "No Vulkan graphics queue is available.");
+  if (queue_family == UINT32_MAX) {
+    ReportError(-1, "No Vulkan graphics and compute queue is available.");
     return {};
   }
+  // Both roles share a family, so ordinary resources need no ownership transfers.
+  // Do not create unused queues in unrelated families.
+  const float priorities[] = {1.0f, 1.0f};
+  VkDeviceQueueCreateInfo queue_create{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
+  queue_create.queueFamilyIndex = queue_family;
+  queue_create.queueCount = std::min(2u, families[queue_family].queueCount);
+  queue_create.pQueuePriorities = priorities;
+  VkDeviceCreateInfo create{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
   create.pNext = &enabled.Features();
-  create.queueCreateInfoCount = static_cast<uint32_t>(queues.size());
-  create.pQueueCreateInfos = queues.data();
+  create.queueCreateInfoCount = 1;
+  create.pQueueCreateInfos = &queue_create;
   create.enabledExtensionCount = static_cast<uint32_t>(enabled.Extensions().size());
   create.ppEnabledExtensionNames = enabled.Extensions().data();
   const VkResult result = vkCreateDevice(physical_device, &create, nullptr, &device->device_);
@@ -176,11 +180,11 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   device->render_targets_ =
       std::make_unique<VulkanRenderTargetPool>(device->device_, device->procedures_.CmdBeginRendering != nullptr);
   device->physical_ = physical_device;
-  device->graphics_queue_family_index_ = graphics_family;
+  device->queue_family_index_ = queue_family;
   device->swapchain_enabled_ = swapchain;
-  for (uint32_t index = 0; index < std::min(2u, families[graphics_family].queueCount); ++index) {
+  for (uint32_t index = 0; index < std::min(2u, families[queue_family].queueCount); ++index) {
     VkQueue queue;
-    vkGetDeviceQueue(device->device_, graphics_family, index, &queue);
+    vkGetDeviceQueue(device->device_, queue_family, index, &queue);
     device->queues_[index] =
         ObjectPtr<Queue>::Adopt(VulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue));
     if (!device->queues_[index])
@@ -226,7 +230,7 @@ VkInstance VulkanDevice::Instance() const {
 }
 
 uint32_t VulkanDevice::QueueFamily() const {
-  return graphics_queue_family_index_;
+  return queue_family_index_;
 }
 
 bool VulkanDevice::SupportsSwapchain() const {

@@ -274,7 +274,7 @@ void VulkanWindow::DestroySwapchain() {
   for (auto image : images_)
     device_->RenderTargets().Retire(image);
   image_views_.clear();
-  // Device idle covers submitted waits; acquisition itself is a presentation-engine operation.
+  // Main queue idle covers submitted waits; acquisition itself is a presentation-engine operation.
   for (auto &sync : acquire_sync_) {
     if (sync.acquired)
       vkWaitForFences(device_->NativeDevice(), 1, &sync.fence, VK_TRUE, UINT64_MAX);

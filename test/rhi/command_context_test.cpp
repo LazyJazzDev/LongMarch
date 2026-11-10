@@ -455,15 +455,15 @@ TEST(RhiCommands, SealedContextsCannotRecordOrSubmitAgain) {
 
 #endif
 
-TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
+TEST(RhiCommands, CrossQueueDependencyDoesNotWaitForGpuOnCpu) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto transfer = Queue(device->GetQueue(QUEUE_TYPE_ASSIST));
-  auto graphics = Queue(device->GetQueue(QUEUE_TYPE_MAIN));
-  auto context = CommandContext(new TestCommandContext(transfer.Get(), gate));
+  auto assist = Queue(device->GetQueue(QUEUE_TYPE_ASSIST));
+  auto main = Queue(device->GetQueue(QUEUE_TYPE_MAIN));
+  auto context = CommandContext(new TestCommandContext(assist.Get(), gate));
   auto upload = std::move(context).Submit();
   ASSERT_TRUE(upload);
-  context = CommandContext(new TestCommandContext(graphics.Get(), gate));
+  context = CommandContext(new TestCommandContext(main.Get(), gate));
   auto done = std::move(context).Submit({{upload.GetEvent()}});
   ASSERT_TRUE(done);
   EXPECT_EQ(done.GetStatus(), SUBMISSION_STATUS_PENDING);
