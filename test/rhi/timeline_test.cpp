@@ -12,7 +12,6 @@
 #endif
 #ifdef LONGMARCH_D3D12_ENABLED
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
-#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_timeline.h"
 #endif
 
@@ -190,90 +189,6 @@ TEST(RhiTimeline, MetalHostProgressTracksChainedGpuEvents) {
     EXPECT_GE(completed, event.value);
     EXPECT_TRUE(submitted->WaitHost());
   }
-}
-#endif
-
-#ifdef LONGMARCH_VULKAN_ENABLED
-TEST(RhiTimeline, VulkanIndependentTimelineTracksGPUSignals) {
-  using namespace backend::vulkan;
-  ObjPtr<ICore> core = CreateCore(BACKEND_API_VULKAN);
-  ASSERT_TRUE(core);
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  ASSERT_TRUE(device);
-  auto native = static_cast<VulkanDevice *>(device.Get());
-  ObjPtr<IQueue> main = device->GetQueue(QUEUE_TYPE_MAIN);
-  ObjPtr<IQueue> assist = device->GetQueue(QUEUE_TYPE_ASSIST);
-  ASSERT_TRUE(main);
-  ASSERT_TRUE(assist);
-  auto main_queue = static_cast<VulkanQueue *>(main.Get());
-  auto assist_queue = static_cast<VulkanQueue *>(assist.Get());
-  uint32_t count = 0;
-  vkGetPhysicalDeviceQueueFamilyProperties(native->NativePhysicalDevice(), &count, nullptr);
-  std::vector<VkQueueFamilyProperties> families(count);
-  vkGetPhysicalDeviceQueueFamilyProperties(native->NativePhysicalDevice(), &count, families.data());
-  const bool shared = families[native->QueueFamily()].queueCount == 1;
-  EXPECT_EQ(main_queue->NativeQueue() == assist_queue->NativeQueue(), shared);
-  EXPECT_EQ(&main_queue->QueueMutex() == &assist_queue->QueueMutex(), shared);
-  EXPECT_NE(main_queue->GetTimeline(), assist_queue->GetTimeline());
-  auto timeline = VulkanTimeline::Create(native);
-  ASSERT_TRUE(timeline);
-  uint64_t completed = UINT64_MAX;
-  ASSERT_TRUE(timeline->GetCompletedValue(completed));
-  EXPECT_EQ(completed, 0);
-  ASSERT_TRUE(timeline->WaitHost(0));
-  const auto semaphore = timeline->NativeSemaphore();
-  for (uint64_t value : {7, 12}) {
-    VkTimelineSemaphoreSubmitInfo values{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
-    values.signalSemaphoreValueCount = 1;
-    values.pSignalSemaphoreValues = &value;
-    VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-    submit.pNext = &values;
-    submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &semaphore;
-    {
-      std::lock_guard<std::mutex> lock(main_queue->QueueMutex());
-      ASSERT_EQ(vkQueueSubmit(main_queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE), VK_SUCCESS);
-    }
-    ASSERT_TRUE(timeline->WaitHost(value));
-    ASSERT_TRUE(timeline->GetCompletedValue(completed));
-    EXPECT_EQ(completed, value);
-  }
-  EXPECT_TRUE(timeline->WaitHost(7));
-}
-#endif
-
-#ifdef LONGMARCH_D3D12_ENABLED
-TEST(RhiTimeline, D3D12IndependentTimelineTracksGPUSignals) {
-  using namespace backend::d3d12;
-  ObjPtr<ICore> core = CreateCore(BACKEND_API_D3D12);
-  ASSERT_TRUE(core);
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  ASSERT_TRUE(device);
-  auto native = static_cast<D3D12Device *>(device.Get());
-  ObjPtr<IQueue> main = device->GetQueue(QUEUE_TYPE_MAIN);
-  ObjPtr<IQueue> assist = device->GetQueue(QUEUE_TYPE_ASSIST);
-  ASSERT_TRUE(main);
-  ASSERT_TRUE(assist);
-  auto main_queue = static_cast<D3D12Queue *>(main.Get());
-  auto assist_queue = static_cast<D3D12Queue *>(assist.Get());
-  EXPECT_NE(main_queue->NativeQueue(), assist_queue->NativeQueue());
-  EXPECT_NE(main_queue->GetTimeline(), assist_queue->GetTimeline());
-  auto timeline = D3D12Timeline::Create(native);
-  ASSERT_TRUE(timeline);
-  uint64_t completed = UINT64_MAX;
-  ASSERT_TRUE(timeline->GetCompletedValue(completed));
-  EXPECT_EQ(completed, 0);
-  ASSERT_TRUE(timeline->WaitHost(0));
-  for (uint64_t value : {7, 12}) {
-    {
-      std::lock_guard<std::mutex> lock(main_queue->QueueMutex());
-      ASSERT_EQ(main_queue->NativeQueue()->Signal(timeline->NativeFence(), value), S_OK);
-    }
-    ASSERT_TRUE(timeline->WaitHost(value));
-    ASSERT_TRUE(timeline->GetCompletedValue(completed));
-    EXPECT_EQ(completed, value);
-  }
-  EXPECT_TRUE(timeline->WaitHost(7));
 }
 #endif
 

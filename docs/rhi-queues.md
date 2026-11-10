@@ -1,75 +1,52 @@
 # RHI queues, timelines, and completion
 
-A Device creates a fixed set of queues. `GetQueue(QUEUE_TYPE_MAIN)` and
-`GetQueue(QUEUE_TYPE_ASSIST)` return references to stable objects, not new wrappers.
-Each role has its own monotonically increasing timeline. Vulkan prefers two native
-queues in one graphics+compute family; when the family has only one queue, both
-roles share that native queue and its host submission mutex. Both roles support graphics, compute, and
-transfer commands. Swapchain images belong exclusively to Main.
+A Device provides stable Main and Assist queues through `GetQueue`. Both support
+graphics, compute, and transfer commands; swapchain images are Main-only.
+Create contexts through their queue. Each context permanently belongs to that
+queue and is single-use; submit it with `context->Submit(info)`.
 
-Create contexts through their queue. A context permanently belongs to that exact
-queue; `context->Submit(info)` requires no queue argument. Commands validate
-resource/queue compatibility during recording in Debug. Release callers must obey
-the same preconditions. Contexts remain single-use.
+Vulkan prefers two native queues in one graphics+compute family. If only one is
+available, Main and Assist share the native queue and its submission mutex but
+keep separate timelines. D3D12 uses two DIRECT queues; Metal uses two command
+queues. Logical queue identity does not guarantee independent GPU execution.
 
-`ITimeline` exposes completion queries and CPU waiting. `Event { timeline, value }`
-is a borrowed timeline point, without a reference count or an owning queue reference.
-Its Device must outlive all uses. There is no separate IEvent or TimelinePoint.
+## Events and dependencies
 
-`SubmitInfo::waits` supplies GPU dependencies. Submit consumes the values and emits
-native queue waits, deduplicating repeated timelines by their greatest value. The
-retirement record does not retain the waits. The returned SubmissionToken owns one
-completion Event and its result state, not a duplicate timeline point. Accepted GPU
-work retains its resources through retirement even when the caller releases its
-context or token. Submission records are inserted under the queue mutex before
-native submission. Rejected work is removed before unlocking; accepted work remains
-registered even if later error handling fails. Next-frame image preparation occurs
-after unlocking and updates Window state, not the current submission result.
+`ITimeline` exposes completion queries and CPU waits. `Event { timeline, value }`
+is a borrowed timeline point; its Device must outlive every use of the Event.
 
-A completed Event means the GPU reached that point. SubmissionToken completion also
-means CPU-side retirement and result processing finished; waiting for an Event is
-not a substitute for waiting for a download token before reading its CPU storage.
-`Device::WaitEvents(events, wait_all)` waits for GPU timeline progress, with All/Any
-semantics. Duplicate timelines use the maximum value for All and minimum for Any.
-An empty All succeeds; an empty Any returns false.
+Pass producer completion Events in `SubmitInfo::waits` for cross-queue GPU
+dependencies. Repeated waits on one timeline use the greatest value. CPU submit
+order alone does not synchronize different queues. When logical queues share a
+native queue, submit producers before consumers to avoid blocking a producer
+behind its own consumer.
 
-Each Queue owns its pending Submission list and performs its own submission and
-retirement. Each Device starts one collector after initializing its native resources
-and all queues. Each iteration queries each timeline once, reuses that completed
-value to retire submissions, and waits for the next value. Queue locking protects native submit
-order and list handoff; completion polling, resource release, and token publication
-run outside that lock. A blocked Assist submission does not prevent an already
-completed Main submission from retiring. Independent GPU progress is only possible
-when the native queues can execute independently; shared queues can block behind
-an earlier wait. Submit producers before consumers rather than relying on a later
-submission to unblock a shared native queue. The collector can wait for the next value
-before that submission exists. Because records are registered before GPU submission,
-a snapshot that includes a submission's completion always has an already registered
-record. No per-submit CPU wakeup or notification generation is needed. Shutdown uses an internal
-one-shot signal: a dedicated CPU-signaled Vulkan timeline, a D3D12 event, or a Metal
-condition-variable notification. After consuming that signal, the collector drains
-pending GPU work before exiting. Metal also retains command-buffer completion and
-error notifications, since a GPU timeline signal can precede the final command-buffer
-status. There is no periodic polling timeout, and no later Submit is needed to
-trigger retirement.
+A completed Event means the GPU reached that point. A completed SubmissionToken
+also means CPU-side retirement and result processing finished. Wait for the
+download token before reading downloaded CPU storage; waiting for its Event alone
+is insufficient. Submitted work retains its resources through retirement even
+if the caller releases the context or token.
 
-Vulkan queues share a graphics+compute family to avoid ownership transfers for
-ordinary resources. D3D12 uses two DIRECT queues; Metal uses two command queues and
-separate GPU-only MTLEvent and CPU-visible MTLSharedEvent timelines. GPU waits
-and signals use MTLEvent. Completion callbacks publish CPU progress on the
-SharedEvent and wake the collector; failed commands mark the timeline failed
-instead. The collector needs neither SharedEvent listeners nor polling. Logical
-queue identity does not promise that the hardware executes their work simultaneously.
+`Device::WaitEvents(events, wait_all)` supports All/Any waits. Duplicate timelines
+use the maximum value for All and the minimum for Any. Empty All succeeds; empty
+Any returns false. Timeline waits may precede the corresponding signal submission.
 
-Vulkan WSI still requires binary acquire/present semaphores. After acquisition, the
-Main queue immediately consumes the acquire semaphore in a semaphore-only submit
-before exposing the image. Later Main work inherits that ordering. Ordinary context
-submission neither scans image states for acquisition waits nor retains acquisition
-semaphores. Only the swapchain manages WSI binary semaphore reuse.
+## Completion and presentation
 
-Cross-queue resource hazards remain the caller's responsibility. Use the producer's
-completion Event when submitting dependent work; do not infer synchronization from
-CPU submit order. See `demo/rhi_multiqueue` for an Event/no-Event comparison.
+Each Queue owns its pending submissions. A Device collector retires completed
+work without requiring another Submit. Submission records are registered before
+native submission; rejected work is removed. Completion processing runs outside
+the queue submission lock, so blocked Assist work does not prevent completed Main
+work from retiring. Shutdown wakes the collector and drains pending work.
 
-CUDA interop, externally created timelines, and changes to the HeadlessWindow design
-are outside this change.
+Metal uses MTLEvent for GPU dependencies and a separate MTLSharedEvent for host
+progress. Completion callbacks publish host progress or failure and wake the
+collector, without polling or repeated collector listener registration.
+
+Preparing the next swapchain image occurs outside the submission lock and does
+not change the current submission result. Vulkan consumes binary acquisition
+semaphores on Main before exposing the image; the swapchain manages WSI semaphore
+reuse internally.
+
+See `demo/rhi_multiqueue` for an upload/compute/readback example and an intentionally
+unsynchronized comparison.
