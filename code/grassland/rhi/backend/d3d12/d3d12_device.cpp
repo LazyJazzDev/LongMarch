@@ -182,20 +182,8 @@ IDXGIFactory4 *D3D12Device::Factory() const {
   return factory_.Get();
 }
 
-ID3D12CommandQueue *D3D12Device::NativeQueue() const {
-  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->NativeQueue();
-}
-
 bool D3D12Device::SupportsTearing() const {
   return tearing_;
-}
-
-std::mutex &D3D12Device::QueueMutex() {
-  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->QueueMutex();
-}
-
-bool D3D12Device::WaitIdle() {
-  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->WaitIdle();
 }
 
 D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)

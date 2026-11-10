@@ -9,12 +9,15 @@
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
@@ -26,10 +29,12 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto owner = static_cast<MetalDevice *>(device);
+    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<MetalQueue *>(queue_owner.Get());
     auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(sizeof(output), MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
-    std::lock_guard<std::mutex> lock(owner->QueueMutex());
-    auto commands = NS::RetainPtr(owner->NativeQueue()->commandBuffer());
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
     blit->copyFromBuffer(static_cast<MetalBuffer *>(buffer)->NativeBuffer(), 0, readback.get(), 0, sizeof(output));
     blit->endEncoding();
@@ -45,6 +50,8 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
     auto owner = static_cast<D3D12Device *>(device);
+    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<D3D12Queue *>(queue_owner.Get());
     auto source = static_cast<D3D12Buffer *>(buffer)->NativeBuffer();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
@@ -77,10 +84,10 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     list->ResourceBarrier(1, &barrier);
     ASSERT_TRUE(SUCCEEDED(list->Close()));
     {
-      std::lock_guard<std::mutex> lock(owner->QueueMutex());
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
       ID3D12CommandList *lists[] = {list.Get()};
-      owner->NativeQueue()->ExecuteCommandLists(1, lists);
-      ASSERT_TRUE(owner->WaitIdle());
+      native_queue->NativeQueue()->ExecuteCommandLists(1, lists);
+      ASSERT_TRUE(native_queue->WaitIdle());
     }
     void *mapped{};
     D3D12_RANGE range{0, sizeof(output)};
@@ -95,6 +102,8 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
   if (api == BACKEND_API_VULKAN) {
     using namespace backend::vulkan;
     auto owner = static_cast<VulkanDevice *>(device);
+    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<VulkanQueue *>(queue_owner.Get());
     auto native = owner->NativeDevice();
     auto source = static_cast<VulkanBuffer *>(buffer)->NativeBuffer();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -142,9 +151,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     ASSERT_EQ(vkEndCommandBuffer(commands), VK_SUCCESS);
     uint64_t value{};
     {
-      std::lock_guard<std::mutex> lock(owner->QueueMutex());
-      value = owner->NextSerial();
-      auto semaphore = owner->Timeline();
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      value = native_queue->NextSerial();
+      auto semaphore = native_queue->GetTimeline()->NativeSemaphore();
       VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
       timeline.signalSemaphoreValueCount = 1;
       timeline.pSignalSemaphoreValues = &value;
@@ -154,9 +163,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
       submit.pCommandBuffers = &commands;
       submit.signalSemaphoreCount = 1;
       submit.pSignalSemaphores = &semaphore;
-      ASSERT_EQ(vkQueueSubmit(owner->NativeQueue(), 1, &submit, {}), VK_SUCCESS);
+      ASSERT_EQ(vkQueueSubmit(native_queue->NativeQueue(), 1, &submit, {}), VK_SUCCESS);
     }
-    ASSERT_EQ(owner->Wait(value), VK_SUCCESS);
+    ASSERT_EQ(native_queue->Wait(value), VK_SUCCESS);
     void *mapped{};
     ASSERT_EQ(vkMapMemory(native, memory, 0, sizeof(output), 0, &mapped), VK_SUCCESS);
     std::memcpy(output.data(), mapped, sizeof(output));

@@ -29,10 +29,7 @@ class D3D12Device final : public Device {
   D3D12DescriptorPool &ResourceDescriptorStorage();
   D3D12DescriptorPool &SamplerDescriptorStorage();
   IDXGIFactory4 *Factory() const;
-  ID3D12CommandQueue *NativeQueue() const;
   bool SupportsTearing() const;
-  std::mutex &QueueMutex();
-  bool WaitIdle();
   rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;

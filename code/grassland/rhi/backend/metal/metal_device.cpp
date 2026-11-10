@@ -67,22 +67,6 @@ MTL::Device *MetalDevice::NativeDevice() const noexcept {
   return device_.get();
 }
 
-MTL::CommandQueue *MetalDevice::NativeQueue() const {
-  return static_cast<MetalQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->NativeQueue();
-}
-
-std::mutex &MetalDevice::QueueMutex() {
-  return static_cast<MetalQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->QueueMutex();
-}
-
-NS::SharedPtr<MTL::CommandBuffer> MetalDevice::CreateCommandBuffer() {
-  return static_cast<MetalQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->CreateCommandBuffer();
-}
-
-bool MetalDevice::WaitIdle() {
-  return static_cast<MetalQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->WaitIdle();
-}
-
 rhi::IWindow *MetalDevice::CreateGLFWWindow(const WindowDesc &desc) {
   return MetalWindow::Create(this, desc);
 }

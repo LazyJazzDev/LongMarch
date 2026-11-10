@@ -8,6 +8,7 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/rhix/rhix.h"
 
 namespace grassland::rhix {
@@ -47,7 +48,9 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     auto device = core.CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
     auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
-    auto commands = native->CreateCommandBuffer();
+    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<backend::metal::MetalQueue *>(queue_owner.Get());
+    auto commands = native_queue->CreateCommandBuffer();
     ASSERT_TRUE(commands);
     EXPECT_EQ(commands->errorOptions(),
               enabled ? MTL::CommandBufferErrorOptionEncoderExecutionStatus : MTL::CommandBufferErrorOptionNone);
@@ -199,10 +202,12 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
     ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   }
   auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+  ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+  auto native_queue = static_cast<backend::metal::MetalQueue *>(queue_owner.Get());
   auto readback = NS::TransferPtr(native->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
   ASSERT_TRUE(readback);
   auto check = [&](const Image &image, std::array<int, 4> expected) {
-    auto commands = NS::RetainPtr(native->NativeQueue()->commandBuffer());
+    auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
     auto texture = static_cast<backend::metal::MetalImage *>(image.Get())->NativeImage();
     blit->copyFromTexture(texture, 0, 0, MTL::Origin::Make(0, 0, 0), MTL::Size::Make(1, 1, 1), readback.get(), 0, 256,

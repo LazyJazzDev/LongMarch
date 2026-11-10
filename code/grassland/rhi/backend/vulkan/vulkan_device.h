@@ -33,14 +33,8 @@ class VulkanDevice final : public Device {
   VmaAllocator Allocator() const;
   VkPhysicalDevice NativePhysicalDevice() const;
   VkInstance Instance() const;
-  VkQueue NativeQueue() const;
   uint32_t QueueFamily() const;
   bool SupportsSwapchain() const;
-  std::mutex &QueueMutex();
-  VkSemaphore Timeline() const;
-  // Allocate and submit serials while holding QueueMutex, preserving signal order.
-  uint64_t NextSerial();
-  VkResult Wait(uint64_t value, uint64_t timeout = UINT64_MAX) const;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   VulkanTemporalBufferPool &UploadPool();

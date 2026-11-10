@@ -189,18 +189,6 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   return device.release();
 }
 
-VkSemaphore VulkanDevice::Timeline() const {
-  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->GetTimeline()->NativeSemaphore();
-}
-
-uint64_t VulkanDevice::NextSerial() {
-  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->NextSerial();
-}
-
-VkResult VulkanDevice::Wait(uint64_t value, uint64_t timeout) const {
-  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->Wait(value, timeout);
-}
-
 const DeviceProcedures &VulkanDevice::Procedures() const {
   return procedures_;
 }
@@ -237,20 +225,12 @@ VkInstance VulkanDevice::Instance() const {
   return static_cast<VulkanCore *>(OwnerCore())->Instance();
 }
 
-VkQueue VulkanDevice::NativeQueue() const {
-  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->NativeQueue();
-}
-
 uint32_t VulkanDevice::QueueFamily() const {
   return graphics_queue_family_index_;
 }
 
 bool VulkanDevice::SupportsSwapchain() const {
   return swapchain_enabled_;
-}
-
-std::mutex &VulkanDevice::QueueMutex() {
-  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->QueueMutex();
 }
 
 VulkanTemporalBufferPool &VulkanDevice::UploadPool() {

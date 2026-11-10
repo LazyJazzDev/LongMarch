@@ -20,6 +20,7 @@
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
@@ -27,10 +28,12 @@
 
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
@@ -42,10 +45,12 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto owner = static_cast<MetalDevice *>(device);
+    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<MetalQueue *>(queue_owner.Get());
     auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
-    std::lock_guard<std::mutex> lock(owner->QueueMutex());
-    auto commands = NS::RetainPtr(owner->NativeQueue()->commandBuffer());
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
     blit->copyFromTexture(static_cast<MetalImage *>(image)->NativeImage(), 0, 0, MTL::Origin::Make(x, y, 0),
                           MTL::Size::Make(1, 1, 1), readback.get(), 0, 256, 256);
@@ -62,6 +67,8 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
     auto owner = static_cast<D3D12Device *>(device);
+    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<D3D12Queue *>(queue_owner.Get());
     auto source = static_cast<D3D12Image *>(image)->NativeImage();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
@@ -102,10 +109,10 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
     list->ResourceBarrier(1, &barrier);
     ASSERT_TRUE(SUCCEEDED(list->Close()));
     {
-      std::lock_guard<std::mutex> lock(owner->QueueMutex());
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
       ID3D12CommandList *lists[] = {list.Get()};
-      owner->NativeQueue()->ExecuteCommandLists(1, lists);
-      ASSERT_TRUE(owner->WaitIdle());
+      native_queue->NativeQueue()->ExecuteCommandLists(1, lists);
+      ASSERT_TRUE(native_queue->WaitIdle());
     }
     void *mapped{};
     D3D12_RANGE range{0, sizeof(output)};
@@ -120,6 +127,8 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
   if (api == BACKEND_API_VULKAN) {
     using namespace backend::vulkan;
     auto owner = static_cast<VulkanDevice *>(device);
+    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<VulkanQueue *>(queue_owner.Get());
     auto native = owner->NativeDevice();
     auto source = static_cast<VulkanImage *>(image)->NativeImage();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -179,9 +188,9 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
     ASSERT_EQ(vkEndCommandBuffer(commands), VK_SUCCESS);
     uint64_t value{};
     {
-      std::lock_guard<std::mutex> lock(owner->QueueMutex());
-      value = owner->NextSerial();
-      auto semaphore = owner->Timeline();
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      value = native_queue->NextSerial();
+      auto semaphore = native_queue->GetTimeline()->NativeSemaphore();
       VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
       timeline.signalSemaphoreValueCount = 1;
       timeline.pSignalSemaphoreValues = &value;
@@ -191,9 +200,9 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
       submit.pCommandBuffers = &commands;
       submit.signalSemaphoreCount = 1;
       submit.pSignalSemaphores = &semaphore;
-      ASSERT_EQ(vkQueueSubmit(owner->NativeQueue(), 1, &submit, {}), VK_SUCCESS);
+      ASSERT_EQ(vkQueueSubmit(native_queue->NativeQueue(), 1, &submit, {}), VK_SUCCESS);
     }
-    ASSERT_EQ(owner->Wait(value), VK_SUCCESS);
+    ASSERT_EQ(native_queue->Wait(value), VK_SUCCESS);
     void *mapped{};
     ASSERT_EQ(vkMapMemory(native, memory, 0, sizeof(output), 0, &mapped), VK_SUCCESS);
     std::memcpy(output.data(), mapped, sizeof(output));
@@ -1416,33 +1425,37 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
     auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<backend::d3d12::D3D12Queue *>(queue_owner.Get());
     backend::d3d12::ComPtr<ID3D12Fence> fence;
     ASSERT_TRUE(SUCCEEDED(native->NativeDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))));
-    gate = std::shared_ptr<void>(native, [native, fence](void *) {
+    gate = std::shared_ptr<void>(native, [native_queue, fence](void *) {
       EXPECT_TRUE(SUCCEEDED(fence->Signal(1)));
-      std::lock_guard<std::mutex> lock(native->QueueMutex());
-      EXPECT_TRUE(native->WaitIdle());
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      EXPECT_TRUE(native_queue->WaitIdle());
     });
-    std::lock_guard<std::mutex> lock(native->QueueMutex());
-    ASSERT_TRUE(SUCCEEDED(native->NativeQueue()->Wait(fence.Get(), 1)));
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    ASSERT_TRUE(SUCCEEDED(native_queue->NativeQueue()->Wait(fence.Get(), 1)));
   }
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN) {
     auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<backend::vulkan::VulkanQueue *>(queue_owner.Get());
     VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
     type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
     VkSemaphoreCreateInfo create{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     create.pNext = &type;
     VkSemaphore semaphore{};
     ASSERT_EQ(vkCreateSemaphore(native->NativeDevice(), &create, nullptr, &semaphore), VK_SUCCESS);
-    gate = std::shared_ptr<void>(native, [native, semaphore](void *) {
+    gate = std::shared_ptr<void>(native, [native, native_queue, semaphore](void *) {
       VkSemaphoreSignalInfo signal{VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO};
       signal.semaphore = semaphore;
       signal.value = 1;
       EXPECT_EQ(vkSignalSemaphore(native->NativeDevice(), &signal), VK_SUCCESS);
-      std::lock_guard<std::mutex> lock(native->QueueMutex());
-      EXPECT_EQ(vkQueueWaitIdle(native->NativeQueue()), VK_SUCCESS);
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      EXPECT_EQ(vkQueueWaitIdle(native_queue->NativeQueue()), VK_SUCCESS);
       vkDestroySemaphore(native->NativeDevice(), semaphore, nullptr);
     });
     const uint64_t value = 1;
@@ -1455,23 +1468,25 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
     submit.waitSemaphoreCount = 1;
     submit.pWaitSemaphores = &semaphore;
     submit.pWaitDstStageMask = &stage;
-    std::lock_guard<std::mutex> lock(native->QueueMutex());
-    ASSERT_EQ(vkQueueSubmit(native->NativeQueue(), 1, &submit, VK_NULL_HANDLE), VK_SUCCESS);
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    ASSERT_EQ(vkQueueSubmit(native_queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE), VK_SUCCESS);
   }
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL) {
     auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<backend::metal::MetalQueue *>(queue_owner.Get());
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto event = NS::TransferPtr(native->NativeDevice()->newSharedEvent());
     ASSERT_TRUE(event);
-    gate = std::shared_ptr<void>(native, [native, event](void *) {
+    gate = std::shared_ptr<void>(native, [native_queue, event](void *) {
       event->setSignaledValue(1);
-      std::lock_guard<std::mutex> lock(native->QueueMutex());
-      EXPECT_TRUE(native->WaitIdle());
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      EXPECT_TRUE(native_queue->WaitIdle());
     });
-    std::lock_guard<std::mutex> lock(native->QueueMutex());
-    auto blocker = native->NativeQueue()->commandBuffer();
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    auto blocker = native_queue->NativeQueue()->commandBuffer();
     blocker->encodeWait(event.get(), 1);
     blocker->commit();
   }

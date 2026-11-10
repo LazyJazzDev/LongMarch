@@ -18,6 +18,7 @@
 
 #ifdef LONGMARCH_METAL_ENABLED
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_timeline.h"
 #endif
 
@@ -171,8 +172,8 @@ TEST(RhiTimeline, VulkanIndependentTimelineTracksGPUSignals) {
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &semaphore;
     {
-      std::lock_guard<std::mutex> lock(native->QueueMutex());
-      ASSERT_EQ(vkQueueSubmit(native->NativeQueue(), 1, &submit, VK_NULL_HANDLE), VK_SUCCESS);
+      std::lock_guard<std::mutex> lock(main_queue->QueueMutex());
+      ASSERT_EQ(vkQueueSubmit(main_queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE), VK_SUCCESS);
     }
     ASSERT_TRUE(timeline->WaitHost(value));
     ASSERT_TRUE(timeline->GetCompletedValue(completed));
@@ -206,8 +207,8 @@ TEST(RhiTimeline, D3D12IndependentTimelineTracksGPUSignals) {
   ASSERT_TRUE(timeline->WaitHost(0));
   for (uint64_t value : {7, 12}) {
     {
-      std::lock_guard<std::mutex> lock(native->QueueMutex());
-      ASSERT_EQ(native->NativeQueue()->Signal(timeline->NativeFence(), value), S_OK);
+      std::lock_guard<std::mutex> lock(main_queue->QueueMutex());
+      ASSERT_EQ(main_queue->NativeQueue()->Signal(timeline->NativeFence(), value), S_OK);
     }
     ASSERT_TRUE(timeline->WaitHost(value));
     ASSERT_TRUE(timeline->GetCompletedValue(completed));
