@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
@@ -11,10 +11,10 @@ class VulkanSwapChainImage final : public VulkanImage {
   VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image, VkImageView attachment);
   ~VulkanSwapChainImage() override;
   bool IsValid() const override;
-  bool SupportsQueue(const Queue *queue) const override;
   VkImage NativeImage() const override;
   VkImageView AttachmentView() const override;
   VkImageView BindingView() const override;
+  VulkanWindow *Owner() const;
 
  private:
   VulkanWindow *window_;

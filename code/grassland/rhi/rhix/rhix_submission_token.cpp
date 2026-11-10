@@ -1,4 +1,4 @@
-#include "grassland/rhi/rhix/rhix_submission_token.h"
+﻿#include "grassland/rhi/rhix/rhix_submission_token.h"
 
 namespace grassland::rhix {
 
@@ -17,10 +17,6 @@ rhi::SubmissionStatus SubmissionToken::GetStatus() const {
     return rhi::SUBMISSION_STATUS_CANCELED;
 #endif
   return Get()->GetStatus();
-}
-
-Event SubmissionToken::GetEvent() const {
-  return Get() ? Event(Get()->GetEvent()) : Event{};
 }
 
 bool SubmissionToken::WaitHost() const {

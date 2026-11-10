@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -64,10 +64,10 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     for (size_t i = 0; i < 256; ++i)
       EXPECT_EQ(static_cast<const uint8_t *>(buffer->contents())[i], 0x5a);
     auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
-    auto context = queue.CreateCommandContext();
+    auto context = device.CreateCommandContext();
     ASSERT_TRUE(queue);
     ASSERT_TRUE(context);
-    auto done = context.Submit();
+    auto done = queue.Submit(std::move(context));
     ASSERT_TRUE(done);
     EXPECT_TRUE(done.WaitHost());
   }
@@ -147,18 +147,16 @@ TEST(RhiMetal, CompletionTokensSurviveBatchesAndParentRelease) {
       for (int i = 0; i < 16; ++i) {
         // Abandoned recordings must not consume queue capacity permanently.
         {
-          ObjPtr<IQueue> abandoned_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-          rhi::ObjPtr<rhi::ICommandContext> abandoned = abandoned_queue->CreateCommandContext();
+          rhi::ObjPtr<rhi::ICommandContext> abandoned = device->CreateCommandContext();
           ASSERT_TRUE(abandoned);
         }
-        auto queue = i % 2 ? graphics.Get() : transfer.Get();
-        rhi::ObjPtr<rhi::ICommandContext> context = queue->CreateCommandContext();
+        rhi::ObjPtr<rhi::ICommandContext> context = device->CreateCommandContext();
         ASSERT_TRUE(context);
-        rhi::Event event = tokens.empty() ? rhi::Event{} : tokens.back()->GetEvent();
+        auto queue = i % 2 ? graphics.Get() : transfer.Get();
         rhi::SubmitInfo desc;
         if (!tokens.empty())
-          desc.waits.push_back(event);
-        rhi::ObjPtr<rhi::ISubmissionToken> token = context->Submit(desc);
+          desc.waits.push_back(tokens.back().Get());
+        rhi::ObjPtr<rhi::ISubmissionToken> token = queue->Submit(context.Get(), desc);
         ASSERT_TRUE(token);
         tokens.push_back(std::move(token));
         held.push_back(std::move(context));
@@ -188,14 +186,14 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   ASSERT_TRUE(second);
   auto a = first.GetNextImage();
   auto b = second.GetNextImage();
-  auto clear = queue.CreateCommandContext();
+  auto clear = device.CreateCommandContext();
   ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1.0f}));
-  auto done = clear.Submit();
+  auto done = queue.Submit(std::move(clear));
   ASSERT_TRUE(done.WaitHost());
   {
-    auto abandoned = device.GetQueue(grassland::rhi::QUEUE_TYPE_GRAPHICS).CreateCommandContext();
+    auto abandoned = device.CreateCommandContext();
     ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   }
   auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
@@ -222,9 +220,9 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   std::vector<Image> old_images;
   for (int i = 0; i < 12; ++i) {
     old_images.push_back(first.GetNextImage());
-    auto present = queue.CreateCommandContext();
+    auto present = device.CreateCommandContext();
     ASSERT_TRUE(present.CmdPresent(first));
-    auto presented = present.Submit();
+    auto presented = queue.Submit(std::move(present));
     ASSERT_TRUE(presented);
     ASSERT_TRUE(presented.WaitHost());
   }

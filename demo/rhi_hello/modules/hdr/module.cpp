@@ -148,7 +148,7 @@ int RunHDR(grassland::rhi::IDevice *device) {
         return 1;
       std::cout << "Rendering " << ColorSpaceName(color_space) << " / " << ImageFormatName(extent.format) << '\n';
     }
-    ObjPtr<ICommandContext> context = queue->CreateCommandContext();
+    ObjPtr<ICommandContext> context = device->CreateCommandContext();
     RETURN_IF_FAIL(context);
     RETURN_IF_FAIL(context->CmdUploadBuffer(settings_buffer.Get(), 0, settings, sizeof(settings)));
     RETURN_IF_FAIL(context->CmdBindProgram(program.Get()));
@@ -161,7 +161,7 @@ int RunHDR(grassland::rhi::IDevice *device) {
     RETURN_IF_FAIL(context->CmdEndRendering());
     RETURN_IF_FAIL(context->CmdPresent(window.Get()));
 
-    ObjPtr<ISubmissionToken> token = context->Submit();
+    ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
     if (!token || !token->WaitHost())
       return 1;

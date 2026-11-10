@@ -1,10 +1,8 @@
-#pragma once
+﻿#pragma once
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-
-class VulkanQueue;
 
 class VulkanWindow final : public Window {
  public:
@@ -15,7 +13,8 @@ class VulkanWindow final : public Window {
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   const void *DeviceIdentity() const;
-  VulkanQueue *PresentationQueue() const;
+  VkSemaphore AcquireSemaphore() const;
+  void MarkAcquireWaitSubmitted(uint64_t value);
   VkSemaphore RenderSemaphore() const;
   VkResult PresentFrame();
 
@@ -24,7 +23,6 @@ class VulkanWindow final : public Window {
 
   void DestroySwapchain();
   VulkanDevice *device_;
-  VulkanQueue *queue_;
   VkSurfaceKHR surface_{};
   VkSwapchainKHR swapchain_{};
 

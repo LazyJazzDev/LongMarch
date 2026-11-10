@@ -1,8 +1,6 @@
-#include "grassland/rhi/backend/backend_command_context.h"
+﻿#include "grassland/rhi/backend/backend_command_context.h"
 
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image.h"
-#include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/rhi_program.h"
 
@@ -11,9 +9,8 @@ bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
 #if !defined(NDEBUG)
   auto native = dynamic_cast<Window *>(window);
   auto image = dynamic_cast<Image *>(target);
-  if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
-      image->DeviceIdentity() != DeviceIdentity() || !glfw::IsWindowThread() || sealed_ ||
-      !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+  if (!native || !image || native->DeviceIdentity() != identity_ || image->DeviceIdentity() != identity_ ||
+      !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
     recording_failed_ = true;
     ReportError(-1,
                 "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
@@ -28,7 +25,7 @@ bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
     ReportError(-1, "CmdDrawImGui requires a non-integer color target.");
     return false;
   }
-  if (!RetainImage(static_cast<Image *>(target)))
+  if (!RetainResource(target))
     return false;
   if (!native->RecordImGui(this, target, COLOR_SPACE_BT709_LINEAR, 1.0f)) {
     recording_failed_ = true;
@@ -41,9 +38,8 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
 #if !defined(NDEBUG)
   auto native = dynamic_cast<Window *>(window);
   auto image = dynamic_cast<Image *>(frame_img);
-  if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
-      image->DeviceIdentity() != DeviceIdentity() || !glfw::IsWindowThread() || sealed_ ||
-      !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+  if (!native || !image || native->DeviceIdentity() != identity_ || image->DeviceIdentity() != identity_ ||
+      !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
     recording_failed_ = true;
     ReportError(-1,
                 "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");
@@ -52,7 +48,7 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
 #else
   auto native = static_cast<Window *>(window);
 #endif
-  if (!RetainImage(static_cast<Image *>(frame_img)))
+  if (!RetainResource(frame_img))
     return false;
   if (!native->RecordPresentImage(this, frame_img, frame_color_space)) {
     recording_failed_ = true;
@@ -123,7 +119,7 @@ bool CommandContext::PrepareRendering(const RenderingInfo &info) {
           previous->GetDesc().height != image->GetDesc().height)
         return false;
     images.push_back(image);
-    return RetainImage(native);
+    return RetainResource(image);
   };
   for (auto color : next.color_attachments)
     if (!validate(color.color_attachment, false, color.load_op, color.store_op)) {
@@ -154,18 +150,10 @@ bool CommandContext::RenderingMatches(const IProgram *program) const {
          (rendering_.depth_stencil.image ? rendering_.depth_stencil.image->GetDesc().format : IMAGE_FORMAT_UNKNOWN);
 }
 
-CommandContext::CommandContext(Queue *queue) : queue_(queue) {
+CommandContext::CommandContext(const void *identity) : identity_(identity) {
 }
 
 CommandContext::~CommandContext() = default;
-
-ISubmissionToken *CommandContext::Submit(const SubmitInfo &info) {
-  return queue_->Submit(this, info);
-}
-
-Queue *CommandContext::OwnerQueue() const noexcept {
-  return queue_;
-}
 
 void CommandContext::BindDownloads(SubmissionToken *submission) {
   for (const auto &token : downloads_)
@@ -189,19 +177,6 @@ IDownloadToken *CommandContext::CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t)
 IDownloadToken *CommandContext::CmdDownloadImage(IImage *, const ImageDownloadRegion &) {
   recording_failed_ = true;
   return nullptr;
-}
-
-bool CommandContext::ValidateImageQueue(const Image *image) {
-  if (!image->SupportsQueue(queue_)) {
-    recording_failed_ = true;
-    ReportError(-1, "The image cannot be used on this command context's queue.");
-    return false;
-  }
-  return true;
-}
-
-bool CommandContext::RetainImage(Image *image) {
-  return ValidateImageQueue(image) && RetainResource(image);
 }
 
 bool CommandContext::RetainResource(rhi::IObject *resource) {
@@ -236,7 +211,7 @@ bool CommandContext::Seal() {
 }
 
 const void *CommandContext::DeviceIdentity() const {
-  return queue_->Owner()->NativeIdentity();
+  return identity_;
 }
 
 void CommandContext::MarkSubmitted() {

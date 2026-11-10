@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
@@ -220,14 +220,14 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
   RayTracingInstance instance;
   instance.blas = blas.Get();
   instance.disable_triangle_culling = true;
-  ObjPtr<ICommandContext> build = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> build = device->CreateCommandContext();
   ASSERT_TRUE(build);
   ASSERT_TRUE(build->CmdUploadBuffer(vertices.Get(), 0, positions, sizeof(positions)));
   ASSERT_TRUE(build->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{vertices.Get()}, {}}}));
   ASSERT_TRUE(build->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{vertices.Get()}, {}}},
                                                               ACCELERATION_STRUCTURE_UPDATE));
   ASSERT_TRUE(build->CmdQueryCompactedSize(blas.Get()));
-  ObjPtr<ISubmissionToken> token = build->Submit();
+  ObjPtr<ISubmissionToken> token = queue->Submit(build.Get());
   ASSERT_TRUE(token);
   build.Release();
   vertices.Release();
@@ -236,13 +236,13 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
   ASSERT_GT(desc.compacted_size, 0u);
   ObjPtr<IBottomLevelAccelerationStructure> compact = device->CreateBottomLevelAccelerationStructure(desc);
   ASSERT_TRUE(compact);
-  build = queue->CreateCommandContext();
+  build = device->CreateCommandContext();
   ASSERT_TRUE(build);
   ASSERT_TRUE(build->CmdCompactAccelerationStructure(blas.Get(), compact.Get()));
   instance.blas = compact.Get();
   ASSERT_TRUE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {instance}));
   ASSERT_TRUE(build->CmdQueryCompactedSize(tlas.Get()));
-  token = build->Submit();
+  token = queue->Submit(build.Get());
   ASSERT_TRUE(token);
   build.Release();
   blas.Release();
@@ -252,10 +252,10 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
   ASSERT_GT(top_desc.compacted_size, 0u);
   ObjPtr<ITopLevelAccelerationStructure> compact_top = device->CreateTopLevelAccelerationStructure(top_desc);
   ASSERT_TRUE(compact_top);
-  build = queue->CreateCommandContext();
+  build = device->CreateCommandContext();
   ASSERT_TRUE(build);
   ASSERT_TRUE(build->CmdCompactAccelerationStructure(tlas.Get(), compact_top.Get()));
-  token = build->Submit();
+  token = queue->Submit(build.Get());
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   build.Release();
@@ -268,8 +268,7 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
     ObjPtr<IBottomLevelAccelerationStructure> replacement =
         device->CreateBottomLevelAccelerationStructure(replacement_desc);
     ASSERT_TRUE(replacement);
-    ObjPtr<IQueue> abandoned_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-    ObjPtr<ICommandContext> abandoned = abandoned_queue->CreateCommandContext();
+    ObjPtr<ICommandContext> abandoned = device->CreateCommandContext();
     ASSERT_TRUE(abandoned);
     auto next_instance = instance;
     next_instance.blas = replacement.Get();
@@ -318,14 +317,14 @@ void CSMain() {
   ASSERT_TRUE(group->BindResource(0, tlas.Get()));
   ASSERT_TRUE(group->BindResource(1, output.Get()));
   for (int frame = 0; frame < 2; ++frame) {
-    build = queue->CreateCommandContext();
+    build = device->CreateCommandContext();
     ASSERT_TRUE(build);
     instance.transform[3] = frame ? 5.0f : 0.0f;
     ASSERT_TRUE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {instance}, ACCELERATION_STRUCTURE_UPDATE));
     ASSERT_TRUE(build->CmdBindComputeProgram(program.Get()));
     ASSERT_TRUE(build->CmdBindGroup(0, group.Get()));
     ASSERT_TRUE(build->CmdDispatch(1));
-    token = build->Submit();
+    token = queue->Submit(build.Get());
     ASSERT_TRUE(token);
     ASSERT_TRUE(token->WaitHost());
     build.Release();
@@ -357,7 +356,7 @@ TEST_P(RhiRayTracing, ProceduralQueriesUseArraysMasksAndCapturedBindings) {
   ObjPtr<IBuffer> input = device->CreateBuffer({sizeof(bounds)});
   ASSERT_TRUE(input);
   std::array<ObjPtr<ITopLevelAccelerationStructure>, 2> tops;
-  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(input.Get(), 0, bounds, sizeof(bounds)));
   ASSERT_TRUE(commands->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{input.Get()}, {}}}));
@@ -408,7 +407,7 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,8,output);
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
   ASSERT_TRUE(group->BindResource(3, std::vector<ITopLevelAccelerationStructure *>{tops[1].Get()}, 0));
   ASSERT_TRUE(commands->CmdDispatch(4));
-  ObjPtr<ISubmissionToken> token = commands->Submit();
+  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
   ASSERT_TRUE(token);
   commands.Release();
   input.Release();
@@ -448,7 +447,7 @@ TEST_P(RhiRayTracing, CustomShaderBindingTablesRouteRecordsAndRestoreDefault) {
   const float vertices[] = {-0.5f, -0.5f, 0, 0, 0.5f, 0, 0.5f, -0.5f, 0};
   const uint16_t indices[] = {0, 1, 2};
   const float bounds[] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
-  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(input.Get(), 0, vertices, sizeof(vertices)));
   ASSERT_TRUE(commands->CmdUploadBuffer(input.Get(), 40, indices, sizeof(indices)));
@@ -551,43 +550,43 @@ void Sphere(inout Payload p, Attributes attr) { p.result = 222; }
   ASSERT_TRUE(group->BindResource(1, output.Get()));
   ObjPtr<IRayTracingProgram> other = device->CreateRayTracingProgram(desc);
   ASSERT_TRUE(other);
-  ObjPtr<ICommandContext> rejected = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> rejected = device->CreateCommandContext();
   ASSERT_TRUE(rejected->CmdBindRayTracingProgram(other.Get()));
   ASSERT_TRUE(rejected->CmdBindGroup(0, group.Get()));
   EXPECT_FALSE(rejected->CmdDispatchRays(3, 1, 1, custom.Get()));
-  EXPECT_FALSE(rejected->Submit());
+  EXPECT_FALSE(queue->Submit(rejected.Get()));
   rejected.Release();
   other.Release();
   ASSERT_TRUE(commands->CmdBindRayTracingProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
   ASSERT_TRUE(commands->CmdDispatchRays(3, 1));
-  ObjPtr<ISubmissionToken> token = commands->Submit();
+  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
   ASSERT_TRUE(token && token->WaitHost());
   std::array<uint32_t, 3> result{};
   ReadBuffer(device.Get(), output.Get(), api, result);
   EXPECT_EQ(result, (std::array<uint32_t, 3>{112, 223, 334}));
 
-  commands = queue->CreateCommandContext();
+  commands = device->CreateCommandContext();
   a.hit_group_offset = 2;  // Exercise a repeated record beyond the original two groups.
   ASSERT_TRUE(commands->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {a, b}));
   ASSERT_TRUE(commands->CmdBindRayTracingProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
   ASSERT_TRUE(commands->CmdDispatchRays(3, 1, 1, custom.Get()));
   custom.Release();  // The recorded command must keep the SBT buffer alive.
-  token = commands->Submit();
+  token = queue->Submit(commands.Get());
   ASSERT_TRUE(token);
   commands.Release();
   ASSERT_TRUE(token->WaitHost());
   ReadBuffer(device.Get(), output.Get(), api, result);
   EXPECT_EQ(result, (std::array<uint32_t, 3>{454, 232, 565}));
 
-  commands = queue->CreateCommandContext();
+  commands = device->CreateCommandContext();
   a.hit_group_offset = 0;
   ASSERT_TRUE(commands->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {a, b}));
   ASSERT_TRUE(commands->CmdBindRayTracingProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
   ASSERT_TRUE(commands->CmdDispatchRays(3, 1));
-  token = commands->Submit();
+  token = queue->Submit(commands.Get());
   ASSERT_TRUE(token);
   commands.Release();
   group.Release();
@@ -623,12 +622,12 @@ TEST_P(RhiRayTracing, CompactedLargeBlasSupportsInPlaceUpdate) {
   desc.allow_compaction = true;
   ObjPtr<IBottomLevelAccelerationStructure> original = device->CreateBottomLevelAccelerationStructure(desc);
   ASSERT_TRUE(original);
-  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(vertices.Get(), 0, positions.data(), positions.size() * sizeof(float)));
   ASSERT_TRUE(commands->CmdBuildBottomLevelAccelerationStructure(original.Get(), {{{vertices.Get()}, {}}}));
   ASSERT_TRUE(commands->CmdQueryCompactedSize(original.Get()));
-  ObjPtr<ISubmissionToken> token = commands->Submit();
+  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   commands.Release();
@@ -636,7 +635,7 @@ TEST_P(RhiRayTracing, CompactedLargeBlasSupportsInPlaceUpdate) {
   ASSERT_GT(desc.compacted_size, 0u);
   ObjPtr<IBottomLevelAccelerationStructure> compact = device->CreateBottomLevelAccelerationStructure(desc);
   ASSERT_TRUE(compact);
-  commands = queue->CreateCommandContext();
+  commands = device->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdCompactAccelerationStructure(original.Get(), compact.Get()));
   for (size_t i = 2; i < positions.size(); i += 3)
@@ -644,7 +643,7 @@ TEST_P(RhiRayTracing, CompactedLargeBlasSupportsInPlaceUpdate) {
   ASSERT_TRUE(commands->CmdUploadBuffer(vertices.Get(), 0, positions.data(), positions.size() * sizeof(float)));
   ASSERT_TRUE(commands->CmdBuildBottomLevelAccelerationStructure(compact.Get(), {{{vertices.Get()}, {}}},
                                                                  ACCELERATION_STRUCTURE_UPDATE));
-  token = commands->Submit();
+  token = queue->Submit(commands.Get());
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   commands.Release();
@@ -671,11 +670,11 @@ TEST_P(RhiRayTracing, RebuildsTlasWithChangingInstanceCountWithinCapacity) {
   const float positions[] = {-1, -1, 0, 0, 1, 0, 1, -1, 0};
   ObjPtr<ITopLevelAccelerationStructure> tlas = device->CreateTopLevelAccelerationStructure({4, true});
   ASSERT_TRUE(tlas);
-  ObjPtr<ICommandContext> build = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> build = device->CreateCommandContext();
   ASSERT_TRUE(build);
   ASSERT_TRUE(build->CmdUploadBuffer(vertices.Get(), 0, positions, sizeof(positions)));
   ASSERT_TRUE(build->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{vertices.Get()}, {}}}));
-  ObjPtr<ISubmissionToken> token = build->Submit();
+  ObjPtr<ISubmissionToken> token = queue->Submit(build.Get());
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   const char *source = R"(
@@ -709,14 +708,14 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
       instances[i].transform[3] = float(i * 3);
       instances[i].disable_triangle_culling = true;
     }
-    build = queue->CreateCommandContext();
+    build = device->CreateCommandContext();
     ASSERT_TRUE(build);
     ASSERT_TRUE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances));
     ASSERT_TRUE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances, ACCELERATION_STRUCTURE_UPDATE));
     ASSERT_TRUE(build->CmdBindComputeProgram(program.Get()));
     ASSERT_TRUE(build->CmdBindGroup(0, group.Get()));
     ASSERT_TRUE(build->CmdDispatch(4));
-    token = build->Submit();
+    token = queue->Submit(build.Get());
     ASSERT_TRUE(token);
     ASSERT_TRUE(token->WaitHost());
     std::array<uint32_t, 4> result{};
@@ -726,12 +725,11 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
   }
   RayTracingInstance instance;
   instance.blas = blas.Get();
-  ObjPtr<IQueue> build_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  build = build_queue->CreateCommandContext();
+  build = device->CreateCommandContext();
   ASSERT_TRUE(build);
   EXPECT_FALSE(
       build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {instance, instance}, ACCELERATION_STRUCTURE_UPDATE));
-  build = build_queue->CreateCommandContext();
+  build = device->CreateCommandContext();
   ASSERT_TRUE(build);
   EXPECT_FALSE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), std::vector<RayTracingInstance>(5, instance)));
   CheckNativeErrors(device.Get());
@@ -808,10 +806,10 @@ TEST_P(RhiRayTracing, SharedScratchSurvivesResizingAndOutOfOrderContextSubmissio
   const float positions[] = {-1, -1, 0, 0, 1, 0, 1, -1, 0};
   ObjPtr<IBuffer> vertices = device->CreateBuffer({sizeof(positions)});
   ASSERT_TRUE(vertices);
-  ObjPtr<ICommandContext> upload = transfer->CreateCommandContext();
+  ObjPtr<ICommandContext> upload = device->CreateCommandContext();
   ASSERT_TRUE(upload);
   ASSERT_TRUE(upload->CmdUploadBuffer(vertices.Get(), 0, positions, sizeof(positions)));
-  ObjPtr<ISubmissionToken> uploaded = upload->Submit();
+  ObjPtr<ISubmissionToken> uploaded = transfer->Submit(upload.Get());
   ASSERT_TRUE(uploaded);
   upload.Release();
   ASSERT_TRUE(uploaded->WaitHost());
@@ -820,9 +818,7 @@ TEST_P(RhiRayTracing, SharedScratchSurvivesResizingAndOutOfOrderContextSubmissio
   std::array<ObjPtr<IBottomLevelAccelerationStructure>, count> blases;
   std::array<ObjPtr<ICommandContext>, 4> contexts;
   for (uint32_t batch = 0; batch < contexts.size(); ++batch) {
-    contexts[batch] =
-        grassland::rhi::ObjPtr<grassland::rhi::IQueue>(device->GetQueue(grassland::rhi::QUEUE_TYPE_GRAPHICS))
-            ->CreateCommandContext();
+    contexts[batch] = device->CreateCommandContext();
     ASSERT_TRUE(contexts[batch]);
     for (uint32_t i = batch * 8; i < (batch + 1) * 8; ++i) {
       blases[i] = device->CreateBottomLevelAccelerationStructure(desc);
@@ -848,7 +844,7 @@ TEST_P(RhiRayTracing, SharedScratchSurvivesResizingAndOutOfOrderContextSubmissio
   std::vector<ObjPtr<ISubmissionToken>> tokens;
   for (uint32_t i : {3u, 1u, 0u, 2u}) {
     auto queue = i % 2 ? transfer.Get() : graphics.Get();
-    tokens.emplace_back(contexts[i]->Submit());
+    tokens.emplace_back(queue->Submit(contexts[i].Get()));
     ASSERT_TRUE(tokens.back());
     contexts[i].Release();
   }
@@ -884,13 +880,13 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, tlas.Get()));
   ASSERT_TRUE(group->BindResource(1, output.Get()));
-  ObjPtr<ICommandContext> query = graphics->CreateCommandContext();
+  ObjPtr<ICommandContext> query = device->CreateCommandContext();
   ASSERT_TRUE(query);
   ASSERT_TRUE(query->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances));
   ASSERT_TRUE(query->CmdBindComputeProgram(program.Get()));
   ASSERT_TRUE(query->CmdBindGroup(0, group.Get()));
   ASSERT_TRUE(query->CmdDispatch(count));
-  ObjPtr<ISubmissionToken> completed = query->Submit();
+  ObjPtr<ISubmissionToken> completed = graphics->Submit(query.Get());
   ASSERT_TRUE(completed);
   query.Release();
   ASSERT_TRUE(completed->WaitHost());
@@ -933,13 +929,13 @@ TEST_P(RhiRayTracing, ProgramCreationRejectsInvalidDescriptionAndShader) {
   raygen.Release();
   ObjPtr<IShaderBindingTable> table = program->CreateShaderBindingTable({});
   ASSERT_TRUE(table);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ASSERT_TRUE(queue);
-  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdBindRayTracingProgram(program.Get()));
   ASSERT_TRUE(commands->CmdDispatchRays(1, 1, 1, table.Get()));
-  ObjPtr<ISubmissionToken> token = commands->Submit();
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
   ASSERT_TRUE(token);
   commands.Release();
   ASSERT_TRUE(token->WaitHost());

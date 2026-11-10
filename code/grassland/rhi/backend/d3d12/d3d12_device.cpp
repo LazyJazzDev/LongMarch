@@ -1,4 +1,4 @@
-#include "grassland/rhi/backend/d3d12/d3d12_device.h"
+﻿#include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
@@ -81,15 +81,14 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
       LogWarning(
           "D3D12 debug message callbacks are unavailable; validation messages remain in the native debug output.");
   }
-  if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2") ||
-      !Check(object->device_.As(&object->device1_), "Query ID3D12Device1"))
+  D3D12_COMMAND_QUEUE_DESC desc{};
+  desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+  if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2"))
     return nullptr;
-  for (auto type : {QUEUE_TYPE_GRAPHICS, QUEUE_TYPE_TRANSFER}) {
-    auto queue = ObjectPtr<D3D12Queue>::Adopt(D3D12Queue::Create(object.get(), type));
-    if (!queue)
-      return nullptr;
-    object->InitializeQueue(std::move(queue));
-  }
+  if (!Check(object->device_->CreateCommandQueue(&desc, IID_PPV_ARGS(&object->queue_)), "CreateCommandQueue"))
+    return nullptr;
+  if (!Check(object->device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&object->fence_)), "CreateFence"))
+    return nullptr;
   ComPtr<IDXGIAdapter> adapter;
   if (!Check(object->factory_->EnumAdapterByLuid(object->device_->GetAdapterLuid(), IID_PPV_ARGS(&adapter)),
              "Find allocation adapter"))
@@ -99,6 +98,11 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
   memory.pAdapter = adapter.Get();
   if (!Check(D3D12MA::CreateAllocator(&memory, &object->allocator_), "Create D3D12MA allocator"))
     return nullptr;
+  object->idle_event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (!object->idle_event_) {
+    ReportError(GetLastError(), "Create fence event failed.");
+    return nullptr;
+  }
   ComPtr<IDXGIFactory5> factory5;
   BOOL tearing = FALSE;
   if (SUCCEEDED(object->factory_.As(&factory5)) &&
@@ -143,32 +147,45 @@ IDXGIFactory4 *D3D12Device::Factory() const {
   return factory_.Get();
 }
 
-ID3D12CommandQueue *D3D12Device::NativeQueue(QueueType type) const {
-  return static_cast<D3D12Queue *>(QueueState(type))->Native();
+ID3D12CommandQueue *D3D12Device::NativeQueue() const {
+  return queue_.Get();
 }
 
-ID3D12Fence *D3D12Device::Fence(QueueType type) const {
-  return static_cast<D3D12Queue *>(QueueState(type))->Timeline();
+ID3D12Fence *D3D12Device::Fence() const {
+  return fence_.Get();
 }
 
 bool D3D12Device::SupportsTearing() const {
   return tearing_;
 }
 
-std::mutex &D3D12Device::QueueMutex(QueueType type) {
-  return QueueState(type)->Mutex();
+std::mutex &D3D12Device::QueueMutex() {
+  return mutex_;
 }
 
-uint64_t D3D12Device::NextSerial(QueueType type) {
-  return QueueState(type)->NextSerial();
+uint64_t D3D12Device::NextSerial() {
+  return ++serial_;
 }
 
-bool D3D12Device::Wait(uint64_t value, HANDLE event, QueueType type) const {
-  return static_cast<D3D12Queue *>(QueueState(type))->Wait(value, event);
+bool D3D12Device::Wait(uint64_t value, HANDLE event) const {
+  if (fence_->GetCompletedValue() == UINT64_MAX)
+    return false;
+  if (fence_->GetCompletedValue() >= value)
+    return true;
+  if (!Check(fence_->SetEventOnCompletion(value, event), "SetEventOnCompletion"))
+    return false;
+  DWORD result;
+  do {
+    result = WaitForSingleObject(event, 50);
+    if (FAILED(device_->GetDeviceRemovedReason()))
+      return false;
+  } while (result == WAIT_TIMEOUT);
+  return result == WAIT_OBJECT_0 && fence_->GetCompletedValue() != UINT64_MAX;
 }
 
-bool D3D12Device::WaitIdle(QueueType type) {
-  return static_cast<D3D12Queue *>(QueueState(type))->WaitIdle();
+bool D3D12Device::WaitIdle() {
+  auto value = NextSerial();
+  return Check(queue_->Signal(fence_.Get(), value), "Signal idle fence") && Wait(value, idle_event_);
 }
 
 D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
@@ -187,13 +204,14 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
 
 D3D12Device::~D3D12Device() {
   ShutdownQueues();
-  ReleaseQueues();
   upload_pool_.Clear();
   download_pool_.Clear();
   scratch_pool_.Clear();
   for (auto &entry : command_pool_)
     CloseHandle(std::get<2>(entry));
   command_pool_.clear();
+  if (idle_event_)
+    CloseHandle(idle_event_);
   if (debug_callback_cookie_)
     debug_messages_->UnregisterMessageCallback(debug_callback_cookie_);
 }
@@ -220,6 +238,14 @@ rhi::IBuffer *D3D12Device::CreateBuffer(const BufferDesc &desc) {
 
 rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {
   return D3D12Window::Create(this, desc);
+}
+
+rhi::ICommandContext *D3D12Device::CreateCommandContext() {
+  return D3D12CommandContext::Create(this);
+}
+
+rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
+  return new D3D12Queue(this, type);
 }
 
 ISampler *D3D12Device::CreateSampler(const SamplerDesc &desc) {
@@ -258,36 +284,4 @@ IRayTracingProgram *D3D12Device::CreateRayTracingProgram(const RayTracingProgram
 D3D12TemporalBufferPool &D3D12Device::DownloadPool() {
   return download_pool_;
 }
-}  // namespace grassland::rhi::backend::d3d12
-
-namespace grassland::rhi::backend::d3d12 {
-
-bool D3D12Device::WaitTimelines(const std::vector<Event> &points, bool wait_all) const {
-  const auto unique = CoalesceEvents(points, wait_all);
-  std::vector<ID3D12Fence *> fences;
-  std::vector<uint64_t> values;
-  for (auto event : unique) {
-    fences.push_back(static_cast<D3D12Timeline *>(event.timeline)->Native());
-    values.push_back(event.value);
-  }
-  return SUCCEEDED(device1_->SetEventOnMultipleFenceCompletion(
-             fences.data(), values.data(), static_cast<UINT>(fences.size()),
-             wait_all ? D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL : D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, nullptr)) &&
-         SUCCEEDED(device_->GetDeviceRemovedReason());
-}
-
-void D3D12Device::WakeCollector() {
-  std::vector<Event> wake;
-  for (auto type : {QUEUE_TYPE_GRAPHICS, QUEUE_TYPE_TRANSFER}) {
-    std::lock_guard<std::mutex> lock(QueueMutex(type));
-    if (NativeQueue(type) && Fence(type)) {
-      auto value = NextSerial(type);
-      if (Check(NativeQueue(type)->Signal(Fence(type), value), "Signal collector shutdown"))
-        wake.push_back({QueueState(type)->TimelineState(), value});
-    }
-  }
-  if (!wake.empty())
-    WaitTimelines(wake, true);
-}
-
 }  // namespace grassland::rhi::backend::d3d12

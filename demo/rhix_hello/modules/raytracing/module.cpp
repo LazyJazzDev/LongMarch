@@ -1,4 +1,4 @@
-#include "../../module.h"
+﻿#include "../../module.h"
 
 #include <fmt/format.h>
 
@@ -138,7 +138,7 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, con
     Buffer aabb_buffer = device.CreateBuffer({sizeof(bounds)});
     if (!aabb_buffer)
       return 1;
-    CommandContext build = queue.CreateCommandContext();
+    CommandContext build = device.CreateCommandContext();
     if (!build)
       return 1;
     if (!build.CmdUploadBuffer(vertex_buffer, 0, vertices, sizeof(vertices)))
@@ -151,7 +151,7 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, con
       return 1;
     if (!build.CmdQueryCompactedSize(triangle))
       return 1;
-    SubmissionToken token = build.Submit();
+    SubmissionToken token = queue.Submit(std::move(build));
     if (!token)
       return 1;
     if (!token.WaitHost())
@@ -162,12 +162,12 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, con
     BottomLevelAccelerationStructure compact = device.CreateBottomLevelAccelerationStructure(triangles);
     if (!compact)
       return 1;
-    CommandContext copy = queue.CreateCommandContext();
+    CommandContext copy = device.CreateCommandContext();
     if (!copy)
       return 1;
     if (!copy.CmdCompactAccelerationStructure(triangle, compact))
       return 1;
-    token = copy.Submit();
+    token = queue.Submit(std::move(copy));
     if (!token)
       return 1;
     if (!token.WaitHost())
@@ -180,12 +180,12 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, con
   instances[1].transform[3] = 2.0f;
   instances[1].hit_group_offset = 1;
   {
-    CommandContext build = queue.CreateCommandContext();
+    CommandContext build = device.CreateCommandContext();
     if (!build)
       return 1;
     if (!build.CmdBuildTopLevelAccelerationStructure(tlas, instances))
       return 1;
-    SubmissionToken token = build.Submit();
+    SubmissionToken token = queue.Submit(std::move(build));
     if (!token)
       return 1;
     if (!token.WaitHost())
@@ -276,7 +276,7 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, con
       continue;
     }
     auto extent = image.GetDesc();
-    CommandContext context = queue.CreateCommandContext();
+    CommandContext context = device.CreateCommandContext();
     if (!context)
       return 1;
     if (!output || output.GetDesc().width != extent.width || output.GetDesc().height != extent.height) {
@@ -336,7 +336,7 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless, con
       last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
       last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     }
-    SubmissionToken token = context.Submit();
+    SubmissionToken token = queue.Submit(std::move(context));
 
     if (!token)
       return 1;

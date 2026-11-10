@@ -6,8 +6,6 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-class D3D12Queue;
-
 class D3D12Window final : public Window {
  public:
   ~D3D12Window() override;
@@ -18,14 +16,12 @@ class D3D12Window final : public Window {
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;
   const void *DeviceIdentity() const;
-  D3D12Queue *PresentationQueue() const;
   HRESULT PresentFrame(uint64_t generation);
 
  private:
   D3D12Window(D3D12Device *device);
 
   D3D12Device *device_;
-  D3D12Queue *queue_;
   ComPtr<IDXGISwapChain3> swapchain_;
   std::array<ComPtr<ID3D12Resource>, 3> images_;
   std::array<ObjectPtr<D3D12DescriptorPool::Lease>, 3> attachments_;

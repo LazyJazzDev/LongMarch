@@ -21,5 +21,3 @@ if (APPLE)
     target_sources(test_rhi PRIVATE cocoa_hdr_test.mm)
     target_link_libraries(test_rhi PRIVATE "-framework Cocoa")
 endif ()
-
-target_sources(test_rhi PRIVATE multiqueue_test.cpp ../../demo/rhi_multiqueue/experiment.cpp)

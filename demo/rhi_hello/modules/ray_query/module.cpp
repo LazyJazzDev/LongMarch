@@ -94,7 +94,7 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
     ObjPtr<IBuffer> aabb_buffer = device->CreateBuffer({sizeof(bounds)});
     if (!aabb_buffer)
       return 1;
-    ObjPtr<ICommandContext> build = queue->CreateCommandContext();
+    ObjPtr<ICommandContext> build = device->CreateCommandContext();
     if (!build)
       return 1;
     RETURN_IF_FAIL(build->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)));
@@ -102,7 +102,7 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
     RETURN_IF_FAIL(build->CmdBuildBottomLevelAccelerationStructure(triangle.Get(), {{{vertex_buffer.Get()}, {}}}));
     RETURN_IF_FAIL(build->CmdBuildBottomLevelAccelerationStructure(sphere.Get(), {{{aabb_buffer.Get()}, {}}}));
     RETURN_IF_FAIL(build->CmdQueryCompactedSize(triangle.Get()));
-    ObjPtr<ISubmissionToken> token = build->Submit();
+    ObjPtr<ISubmissionToken> token = queue->Submit(build.Get());
     if (!token)
       return 1;
     if (!token->WaitHost())
@@ -113,11 +113,11 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
     ObjPtr<IBottomLevelAccelerationStructure> compact = device->CreateBottomLevelAccelerationStructure(triangles);
     if (!compact)
       return 1;
-    ObjPtr<ICommandContext> copy = queue->CreateCommandContext();
+    ObjPtr<ICommandContext> copy = device->CreateCommandContext();
     if (!copy)
       return 1;
     RETURN_IF_FAIL(copy->CmdCompactAccelerationStructure(triangle.Get(), compact.Get()));
-    token = copy->Submit();
+    token = queue->Submit(copy.Get());
     if (!token)
       return 1;
     if (!token->WaitHost())
@@ -130,11 +130,11 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
   instances[1].transform[3] = 2.0f;
   instances[1].hit_group_offset = 0;
   {
-    ObjPtr<ICommandContext> build = queue->CreateCommandContext();
+    ObjPtr<ICommandContext> build = device->CreateCommandContext();
     if (!build)
       return 1;
     RETURN_IF_FAIL(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances));
-    ObjPtr<ISubmissionToken> token = build->Submit();
+    ObjPtr<ISubmissionToken> token = queue->Submit(build.Get());
     if (!token)
       return 1;
     if (!token->WaitHost())
@@ -197,7 +197,7 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
       continue;
     }
     auto extent = image->GetDesc();
-    ObjPtr<ICommandContext> context = queue->CreateCommandContext();
+    ObjPtr<ICommandContext> context = device->CreateCommandContext();
     if (!context)
       return 1;
     if (!output || output->GetDesc().width != extent.width || output->GetDesc().height != extent.height) {
@@ -237,7 +237,7 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
 
     RETURN_IF_FAIL(context->CmdPresent(window.Get()));
 
-    ObjPtr<ISubmissionToken> token = context->Submit();
+    ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
 
     if (!token)
       return 1;

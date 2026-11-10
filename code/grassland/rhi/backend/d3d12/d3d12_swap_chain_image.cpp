@@ -1,6 +1,5 @@
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 
-#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
 namespace grassland::rhi::backend::d3d12 {
@@ -16,10 +15,6 @@ D3D12SwapChainImage::D3D12SwapChainImage(ImageDesc desc,
 }
 
 D3D12SwapChainImage::~D3D12SwapChainImage() = default;
-
-bool D3D12SwapChainImage::SupportsQueue(const Queue *queue) const {
-  return queue == window_->PresentationQueue();
-}
 
 bool D3D12SwapChainImage::IsValid() const {
 #if !defined(NDEBUG)

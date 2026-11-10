@@ -1,6 +1,5 @@
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
-#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -53,9 +52,7 @@ bool HDRDisplayEnabled(IDXGIFactory4 *factory, GLFWwindow *window) {
 }
 }  // namespace
 
-D3D12Window::D3D12Window(D3D12Device *device)
-    : device_(device),
-      queue_(static_cast<D3D12Queue *>(device->QueueState(QUEUE_TYPE_GRAPHICS))) {
+D3D12Window::D3D12Window(D3D12Device *device) : device_(device) {
 }
 
 D3D12Window::~D3D12Window() {
@@ -80,10 +77,6 @@ bool D3D12Window::IsFrameValid(uint64_t generation) const {
 
 const void *D3D12Window::DeviceIdentity() const {
   return device_;
-}
-
-D3D12Queue *D3D12Window::PresentationQueue() const {
-  return queue_;
 }
 
 HRESULT D3D12Window::PresentFrame(uint64_t generation) {
@@ -180,8 +173,9 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
     desc.Flags = flags;
     ComPtr<IDXGISwapChain1> chain;
     const HWND hwnd = glfwGetWin32Window(GLFWWindow());
-    if (!Check(device_->Factory()->CreateSwapChainForHwnd(queue_->Native(), hwnd, &desc, nullptr, nullptr, &chain),
-               "CreateSwapChainForHwnd") ||
+    if (!Check(
+            device_->Factory()->CreateSwapChainForHwnd(device_->NativeQueue(), hwnd, &desc, nullptr, nullptr, &chain),
+            "CreateSwapChainForHwnd") ||
         !Check(chain.As(&swapchain_), "Query IDXGISwapChain3"))
       return false;
     device_->Factory()->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);

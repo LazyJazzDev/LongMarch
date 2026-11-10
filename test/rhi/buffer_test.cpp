@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
@@ -187,22 +187,21 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ASSERT_TRUE(source);
   ObjPtr<IBuffer> target = device->CreateBuffer({sizeof(expected)});
   ASSERT_TRUE(target);
-  ObjPtr<ICommandContext> upload = transfer->CreateCommandContext();
+  ObjPtr<ICommandContext> upload = device->CreateCommandContext();
   ASSERT_TRUE(upload);
   auto bytes = expected;
   ASSERT_TRUE(upload->CmdUploadBuffer(source.Get(), 0, bytes.data(), sizeof(bytes)));
   bytes.fill(0);
-  ObjPtr<ISubmissionToken> ready = upload->Submit();
+  ObjPtr<ISubmissionToken> ready = transfer->Submit(upload.Get());
   ASSERT_TRUE(ready);
   upload.Release();
-  ObjPtr<ICommandContext> copy = graphics->CreateCommandContext();
+  ObjPtr<ICommandContext> copy = device->CreateCommandContext();
   ASSERT_TRUE(copy);
   ASSERT_TRUE(copy->CmdCopyBuffer(source.Get(), 0, target.Get(), 0, sizeof(expected)));
   source.Release();
   SubmitInfo info;
-  rhi::Event dependency = ready->GetEvent();
-  info.waits = {dependency};
-  ObjPtr<ISubmissionToken> done = copy->Submit(info);
+  info.waits = {ready.Get()};
+  ObjPtr<ISubmissionToken> done = graphics->Submit(copy.Get(), info);
   ASSERT_TRUE(done);
   copy.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -227,8 +226,7 @@ TEST_P(RhiBuffer, AbandonedUploadsReturnStorageAndLeasesDoNotOverlap) {
     EXPECT_NE(identity, second->NativeBuffer());
     first.Reset();
     {
-      ObjPtr<IQueue> context_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-      ObjPtr<ICommandContext> context = context_queue->CreateCommandContext();
+      ObjPtr<ICommandContext> context = device->CreateCommandContext();
       std::array<uint32_t, 16> bytes{};
       ASSERT_TRUE(context->CmdUploadBuffer(target.Get(), 0, bytes.data(), sizeof(bytes)));
     }
@@ -349,13 +347,13 @@ TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) 
     auto alias = lease;
     lease.Reset();
     EXPECT_EQ(pool.GetBufferCounts(sizeof(expected)).second, 1u);
-    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdCopyBuffer(alias.Get(), 0, target.Get(), 0, sizeof(expected)));
     alias.Reset();
     // The common resource table keeps the lease occupied after all caller references go away.
     EXPECT_EQ(pool.GetBufferCounts(sizeof(expected)).second, 1u);
-    ObjPtr<ISubmissionToken> done = commands->Submit();
+    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
     ASSERT_TRUE(done);
     commands.Release();
     ASSERT_TRUE(done->WaitHost());
@@ -414,7 +412,7 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
   desc.compute_shader = shader.Get();
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
   ASSERT_TRUE(program);
-  ObjPtr<ICommandContext> context = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> context = device->CreateCommandContext();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->CmdBindComputeProgram(program.Get()));
   std::array<ObjPtr<IBuffer>, 8> buffers;
@@ -427,7 +425,7 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
     ASSERT_TRUE(context->CmdBindGroup(i, group.Get()));
   }
   ASSERT_TRUE(context->CmdDispatch(1));
-  ObjPtr<ISubmissionToken> token = context->Submit();
+  ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   for (uint32_t i = 0; i < buffers.size(); ++i) {
@@ -473,7 +471,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   std::array<uint32_t, 16> input{};
   for (uint32_t i = 0; i < 16; ++i)
     input[i] = i;
-  ObjPtr<ICommandContext> ctx = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> ctx = device->CreateCommandContext();
   ASSERT_TRUE(ctx);
   ASSERT_TRUE(ctx->CmdUploadBuffer(first.Get(), 0, input.data(), sizeof(input)));
   ASSERT_TRUE(ctx->CmdUploadBuffer(second.Get(), 0, input.data(), sizeof(input)));
@@ -489,7 +487,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   first.Release();
   group.Release();
   program.Release();
-  ObjPtr<ISubmissionToken> token = ctx->Submit();
+  ObjPtr<ISubmissionToken> token = queue->Submit(ctx.Get());
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   std::array<uint32_t, 16> actual{};
@@ -507,12 +505,12 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, second.Get()));
-  ctx = queue->CreateCommandContext();
+  ctx = device->CreateCommandContext();
   ASSERT_TRUE(ctx);
   ASSERT_TRUE(ctx->CmdBindComputeProgram(program.Get()));
   ASSERT_TRUE(ctx->CmdBindGroup(0, group.Get()));
   ASSERT_TRUE(ctx->CmdDispatch(4));
-  token = ctx->Submit();
+  token = queue->Submit(ctx.Get());
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   ReadBuffer(device.Get(), second.Get(), GetParam(), actual);
@@ -546,7 +544,7 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, buffer.Get()));
-  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, values.data(), sizeof(values)));
   ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
@@ -555,7 +553,7 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
   ASSERT_TRUE(commands->CmdDispatch(0, 2, 2));
   ASSERT_TRUE(commands->CmdDispatch(2, 0, 2));
   ASSERT_TRUE(commands->CmdDispatch(2, 2, 0));
-  ObjPtr<ISubmissionToken> token = commands->Submit();
+  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   ReadBuffer(device.Get(), buffer.Get(), GetParam(), values);

@@ -1,12 +1,10 @@
-#pragma once
-#include <array>
+﻿#pragma once
 #include <condition_variable>
-#include <list>
+#include <deque>
 #include <mutex>
 #include <thread>
 
-#include "grassland/rhi/backend/backend_queue.h"
-#include "grassland/rhi/backend/backend_submission.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_device.h"
@@ -39,34 +37,29 @@ class Device : public Object<rhi::IDevice> {
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::IQueue *GetQueue(QueueType type) override;
+  rhi::ICommandContext *CreateCommandContext() override;
   virtual const void *NativeIdentity() const;
-  Queue *QueueState(QueueType type) const;
-  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override;
-  bool HasNativeTimelines() const;
-  virtual bool WaitTimelines(const std::vector<Event> &points, bool wait_all) const;
-  virtual void WakeCollector();
 
   ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands,
-                                    const std::vector<Event> &waits,
-                                    Queue *queue);
+                                    const std::vector<ObjectPtr<SubmissionToken>> &waits);
 
  protected:
   void ShutdownQueues();
-  void InitializeQueue(ObjectPtr<Queue> queue);
-  void ReleaseQueues();
   Core *OwnerCore() const;
 
  private:
+  struct Submission {
+    ObjectPtr<CommandContext> commands;
+    ObjectPtr<SubmissionToken> completion;
+  };
+
   void Collect();
-  void CollectTimelines();
   BackendAPI api_;
   Core *core_;
   PhysicalDevice info_;
-  mutable std::mutex mutex_;
-  mutable std::condition_variable changed_;
-  std::array<ObjectPtr<Queue>, 2> queues_;
-  std::list<Submission> pending_;
-  std::vector<Event> collector_points_;
+  std::mutex mutex_;
+  std::condition_variable changed_;
+  std::deque<Submission> pending_;
   std::thread collector_;
   bool stopping_{};
 };

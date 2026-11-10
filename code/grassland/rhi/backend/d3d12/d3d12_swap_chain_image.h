@@ -15,7 +15,6 @@ class D3D12SwapChainImage final : public D3D12Image {
                       ObjectPtr<D3D12DescriptorPool::Lease> attachment);
   ~D3D12SwapChainImage() override;
   bool IsValid() const override;
-  bool SupportsQueue(const Queue *queue) const override;
   HRESULT Present();
 
  private:

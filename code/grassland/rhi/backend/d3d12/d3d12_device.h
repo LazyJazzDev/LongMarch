@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <d3d12sdklayers.h>
 
 #include <tuple>
@@ -29,16 +29,13 @@ class D3D12Device final : public Device {
   D3D12DescriptorPool &ResourceDescriptorStorage();
   D3D12DescriptorPool &SamplerDescriptorStorage();
   IDXGIFactory4 *Factory() const;
-  ID3D12CommandQueue *NativeQueue(QueueType type = QUEUE_TYPE_GRAPHICS) const;
-  ID3D12Fence *Fence(QueueType type = QUEUE_TYPE_GRAPHICS) const;
+  ID3D12CommandQueue *NativeQueue() const;
+  ID3D12Fence *Fence() const;
   bool SupportsTearing() const;
-
-  bool WaitTimelines(const std::vector<Event> &points, bool wait_all) const override;
-  void WakeCollector() override;
-  std::mutex &QueueMutex(QueueType type = QUEUE_TYPE_GRAPHICS);
-  uint64_t NextSerial(QueueType type = QUEUE_TYPE_GRAPHICS);
-  bool Wait(uint64_t value, HANDLE event, QueueType type = QUEUE_TYPE_GRAPHICS) const;
-  bool WaitIdle(QueueType type = QUEUE_TYPE_GRAPHICS);
+  std::mutex &QueueMutex();
+  uint64_t NextSerial();
+  bool Wait(uint64_t value, HANDLE event) const;
+  bool WaitIdle();
   rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
@@ -51,6 +48,8 @@ class D3D12Device final : public Device {
 
   D3D12ScratchPool &ScratchPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
+  rhi::ICommandContext *CreateCommandContext() override;
+  rhi::IQueue *GetQueue(QueueType type) override;
 
   // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
   // The pool grows on demand, independently of swapchain image count.
@@ -78,7 +77,11 @@ class D3D12Device final : public Device {
   D3D12TransientDescriptorPool resource_descriptors_, sampler_descriptors_;
   D3D12DescriptorPool resource_descriptor_storage_, sampler_descriptor_storage_;
   ComPtr<IDXGIFactory4> factory_;
-  ComPtr<ID3D12Device1> device1_;
+  ComPtr<ID3D12CommandQueue> queue_;
+  ComPtr<ID3D12Fence> fence_;
+  std::mutex mutex_;
+  uint64_t serial_{};
+  HANDLE idle_event_{};
   bool tearing_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <array>
 
 #include "grassland/rhi/rhi.h"
@@ -11,11 +11,8 @@
 #include "grassland/rhi/rhix/rhix_object_container.h"
 #include "grassland/rhi/rhix/rhix_program.h"
 #include "grassland/rhi/rhix/rhix_ray_tracing_program.h"
-#include "grassland/rhi/rhix/rhix_submission_token.h"
 
 namespace grassland::rhix {
-using rhi::SubmitInfo;
-
 class Window;
 
 struct ColorAttachmentInfo {
@@ -36,8 +33,6 @@ class CommandContext : public ObjectContainer {
   CommandContext(rhi::ICommandContext *object) noexcept;
   rhi::ICommandContext *Get() const noexcept;
   CommandContext();
-  // Ends recording and consumes this wrapper, including on failure.
-  SubmissionToken Submit(const SubmitInfo &info = {});
   CommandContext(CommandContext &&) noexcept;
   CommandContext &operator=(CommandContext &&) noexcept;
   CommandContext(const CommandContext &) = delete;

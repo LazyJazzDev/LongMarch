@@ -1,4 +1,4 @@
-#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+﻿#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -6,13 +6,11 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_glfw_helper.h"
-#include "grassland/rhi/backend/backend_submission.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_download_token.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
-#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
@@ -20,9 +18,7 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-D3D12CommandContext::D3D12CommandContext(D3D12Queue *queue)
-    : CommandContext(queue),
-      device_(static_cast<D3D12Device *>(queue->Owner())) {
+D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(device), device_(device) {
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
@@ -38,12 +34,12 @@ D3D12CommandContext::~D3D12CommandContext() {
     CloseHandle(event_);
 }
 
-D3D12CommandContext *D3D12CommandContext::Create(D3D12Queue *queue) {
-  auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(queue));
+D3D12CommandContext *D3D12CommandContext::Create(D3D12Device *device) {
+  auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(device));
   object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_, object->event_);
   if (!object->reusable_)
     return nullptr;
-  if (object->device_->SupportRayTracingPipeline() || object->device_->SupportRayQuery()) {
+  if (device->SupportRayTracingPipeline() || device->SupportRayQuery()) {
     if (FAILED(object->list_.As(&object->ray_list_)))
       return nullptr;
   }
@@ -95,7 +91,7 @@ bool D3D12CommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
 #else
   const auto native = static_cast<D3D12Image *>(image);
 #endif
-  if (!RetainImage(native))
+  if (!RetainResource(native))
     return false;
   const auto format = native->GetDesc().format;
   if (IsDepthFormat(format)) {
@@ -198,7 +194,7 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
   auto frame = ObjectPtr<D3D12SwapChainImage>::Adopt(static_cast<D3D12SwapChainImage *>(target->GetNextImage()));
   if (!frame)
     return false;
-  if (!RetainImage(frame.Get()))
+  if (!RetainResource(frame.Get()))
     return false;
   if (!target->RecordImGui(this, frame.Get())) {
     recording_failed_ = true;
@@ -227,11 +223,7 @@ bool D3D12CommandContext::EndRecording() {
   return closed_;
 }
 
-CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const std::vector<Event> &waits,
-                                                               Submission &submission) {
-  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
-  if (queue->GetType() != QUEUE_TYPE_GRAPHICS && !presents_.empty())
-    return SUBMIT_RESULT_REJECTED;
+CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -243,14 +235,10 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const std::vector
   }
 #endif
   {
-    for (auto event : waits) {
-      auto timeline = static_cast<D3D12Timeline *>(event.timeline);
-      if (!Check(queue->Native()->Wait(timeline->Native(), event.value), "Queue::Wait"))
-        return SUBMIT_RESULT_REJECTED;
-    }
-    submission.failed = true;
+    std::lock_guard<std::mutex> lock(device_->QueueMutex());
+    submission_failed_ = true;
     ID3D12CommandList *lists[] = {list_.Get()};
-    queue->Native()->ExecuteCommandLists(1, lists);
+    device_->NativeQueue()->ExecuteCommandLists(1, lists);
     MarkSubmitted();
     for (auto &entry : as_dependencies_)
       entry.first->CommitDependencies(std::move(entry.second));
@@ -260,40 +248,34 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const std::vector
       if (!Check(present.second->Present(), "Swapchain::Present"))
         presented = false;
     }
-    submission.failed =
-        !Check(queue->Native()->Signal(queue->Timeline(), submission.completion->GetEvent().value), "Queue::Signal");
+    value_ = device_->NextSerial();
+    submission_failed_ = !Check(device_->NativeQueue()->Signal(device_->Fence(), value_), "Queue::Signal");
     if (!presented)
-      submission.failed = true;
+      submission_failed_ = true;
   }
-  if (submission.failed)
+  if (submission_failed_)
     return SUBMIT_RESULT_FAILED_IN_FLIGHT;
-  return SUBMIT_RESULT_SUBMITTED;
-}
-
-CommandContext::SubmitResult D3D12CommandContext::FinishSubmitNative(Submission &submission) {
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next swapchain image after submission.");
-      submission.failed = true;
-      return SUBMIT_RESULT_FAILED_IN_FLIGHT;
+      std::abort();
     }
   }
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-SubmissionStatus D3D12CommandContext::WaitForProgress(Submission &submission) {
-  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
-  if (submission.failed) {
-    std::lock_guard<std::mutex> lock(queue->Mutex());
-    if (queue->WaitIdle() || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
+SubmissionStatus D3D12CommandContext::WaitForProgress() {
+  if (submission_failed_) {
+    std::lock_guard<std::mutex> lock(device_->QueueMutex());
+    if (device_->WaitIdle() || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
       return SUBMISSION_STATUS_FAILED;
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     return SUBMISSION_STATUS_PENDING;
   }
-  if (queue->Wait(submission.completion->GetEvent().value, event_))
+  if (device_->Wait(value_, event_))
     return SUBMISSION_STATUS_COMPLETED;
   // A failed host wait does not prove that GPU resource use has ended.
-  submission.failed = true;
+  submission_failed_ = true;
   return SUBMISSION_STATUS_PENDING;
 }
 
@@ -740,8 +722,6 @@ bool D3D12CommandContext::PrepareGroups() {
             return false;
         } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
           auto image = static_cast<D3D12Image *>(version->GetReferences()[binding_index][j].Get());
-          if (!ValidateImageQueue(image))
-            return false;
           resource = image->NativeImage();
           for (auto color : rendering_.color_attachments)
             if (color.color_attachment == image) {
@@ -860,7 +840,7 @@ bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64
   UINT64 bytes{}, total{};
   device_->NativeDevice()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &rows, &bytes, &total);
   auto upload = device_->UploadPool().Acquire(total);
-  if (!upload || !RetainResource(upload.Get()) || !RetainImage(native)) {
+  if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
     recording_failed_ = true;
     return false;
   }
@@ -1005,7 +985,7 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
     const UINT planes = HasStencil(desc.format) ? 2 : 1;
     device_->NativeDevice()->GetCopyableFootprints(&native_desc, 0, planes, 0, footprints, rows, row_bytes, &total);
     auto lease = device_->DownloadPool().Acquire(total);
-    if (!lease || !RetainImage(native) || !RetainResource(lease.Get())) {
+    if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
       recording_failed_ = true;
       return nullptr;
     }
@@ -1041,7 +1021,7 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
     return nullptr;
   }
   auto lease = device_->DownloadPool().Acquire(pitch * height);
-  if (!lease || !RetainImage(native) || !RetainResource(lease.Get())) {
+  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
   }

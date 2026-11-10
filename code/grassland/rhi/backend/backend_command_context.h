@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <array>
 #include <unordered_map>
 
@@ -9,9 +9,6 @@
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend {
-class Queue;
-class Image;
-struct Submission;
 
 class CommandContext : public Object<rhi::ICommandContext> {
  public:
@@ -39,9 +36,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
     SUBMIT_RESULT_FAILED_IN_FLIGHT,
   } SubmitResult;
 
-  explicit CommandContext(Queue *queue);
-  ISubmissionToken *Submit(const SubmitInfo &info = {}) override;
-  Queue *OwnerQueue() const noexcept;
+  CommandContext(const void *identity);
   ~CommandContext() override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
   bool CmdCopyBuffer(IBuffer *source,
@@ -77,24 +72,13 @@ class CommandContext : public Object<rhi::ICommandContext> {
   const void *DeviceIdentity() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
-
-  // The queue mutex is held and the immutable signal value has been allocated.
-  virtual SubmitResult SubmitNative(const std::vector<Event> &waits, Submission &submission) = 0;
-
-  // Runs outside the queue mutex (e.g. acquiring the next swapchain image).
-  virtual SubmitResult FinishSubmitNative(Submission &) {
-    return SUBMIT_RESULT_SUBMITTED;
-  }
-
-  virtual SubmissionStatus WaitForProgress(Submission &submission) = 0;
+  virtual SubmitResult SubmitNative() = 0;
+  virtual SubmissionStatus WaitForProgress() = 0;
 
  protected:
   // Call before encoding each resource use. Retains each exact object once.
   IDownloadToken *RegisterDownload(ObjectPtr<DownloadToken> token);
   bool RetainResource(rhi::IObject *resource);
-  // Validate the actual queue before retaining or encoding an image operation.
-  bool RetainImage(Image *image);
-  bool ValidateImageQueue(const Image *image);
   virtual bool EndRecording() = 0;
   bool PrepareRendering(const RenderingInfo &info);
   bool RenderingMatches(const IProgram *program) const;
@@ -103,7 +87,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
   bool sealed_{};
 
  private:
-  Queue *queue_;
+  const void *identity_;
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_;
   bool submitted_{};
   std::vector<ObjectPtr<DownloadToken>> downloads_;

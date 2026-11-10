@@ -1,13 +1,11 @@
-#include "grassland/rhi/backend/metal/metal_command_context.h"
+﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
 
 #include <cstring>
 
-#include "grassland/rhi/backend/backend_submission.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_download_token.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
-#include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
@@ -29,17 +27,15 @@ MTL::ClearColor NativeClearColor(ImageFormat format, const ClearColorValue &valu
 }
 }  // namespace
 
-MetalCommandContext::MetalCommandContext(MetalQueue *queue)
-    : CommandContext(queue),
-      device_(static_cast<MetalDevice *>(queue->Owner())) {
+MetalCommandContext::MetalCommandContext(MetalDevice *device) : CommandContext(device), device_(device) {
 }
 
-MetalCommandContext *MetalCommandContext::Create(MetalQueue *queue) {
-  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(queue));
+MetalCommandContext *MetalCommandContext::Create(MetalDevice *device) {
+  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(device));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   // Metal command buffers are single-use. The persistent native queue manages
   // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
-  object->commands_ = queue->CreateCommandBuffer();
+  object->commands_ = object->device_->CreateCommandBuffer();
   if (!object->commands_) {
     ReportError(-1, "Metal command buffer creation failed.");
     return nullptr;
@@ -63,7 +59,7 @@ bool MetalCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
 #else
   const auto native = static_cast<MetalImage *>(image);
 #endif
-  if (!RetainImage(native))
+  if (!RetainResource(native))
     return false;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto pass = MTL::RenderPassDescriptor::renderPassDescriptor();
@@ -127,7 +123,7 @@ bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
   const auto target = static_cast<MetalWindow *>(window);
 #endif
   auto frame = ObjectPtr<MetalSwapChainImage>::Adopt(static_cast<MetalSwapChainImage *>(target->GetNextImage()));
-  if (!frame || !RetainImage(frame.Get()))
+  if (!frame || !RetainResource(frame.Get()))
     return false;
 
   if (!target->RecordImGui(this, frame.Get())) {
@@ -151,11 +147,7 @@ bool MetalCommandContext::EndRecording() {
   return true;
 }
 
-CommandContext::SubmitResult MetalCommandContext::SubmitNative(const std::vector<Event> &waits,
-                                                               Submission &submission) {
-  auto queue = static_cast<MetalQueue *>(OwnerQueue());
-  if (queue->GetType() != QUEUE_TYPE_GRAPHICS && !presents_.empty())
-    return SUBMIT_RESULT_REJECTED;
+CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -168,16 +160,7 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative(const std::vector
 #endif
   {
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    if (!waits.empty()) {
-      auto dependency = queue->CreateCommandBuffer();
-      if (!dependency)
-        return SUBMIT_RESULT_REJECTED;
-      for (auto event : waits)
-        dependency->encodeWait(static_cast<MetalTimeline *>(event.timeline)->Native(), event.value);
-      dependency->commit();
-    }
-    commands_->encodeSignalEvent(queue->Timeline(), submission.completion->GetEvent().value);
-    device_->TrackCompletion(commands_.get(), queue->TimelineState());
+    std::lock_guard<std::mutex> lock(device_->QueueMutex());
     for (const auto &present : presents_)
       commands_->presentDrawable(present.second->NativeDrawable());
     commands_->commit();
@@ -188,13 +171,9 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative(const std::vector
     for (const auto &present : presents_)
       present.second->DidPresent();
   }
-  return SUBMIT_RESULT_SUBMITTED;
-}
-
-CommandContext::SubmitResult MetalCommandContext::FinishSubmitNative(Submission &submission) {
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
-      submission.failed = true;
+      submission_failed_ = true;
       ReportError(-1, "Failed to prepare the next Metal drawable after submission.");
       return SUBMIT_RESULT_FAILED_IN_FLIGHT;
     }
@@ -202,7 +181,7 @@ CommandContext::SubmitResult MetalCommandContext::FinishSubmitNative(Submission 
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-SubmissionStatus MetalCommandContext::WaitForProgress(Submission &submission) {
+SubmissionStatus MetalCommandContext::WaitForProgress() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   commands_->waitUntilCompleted();
   if (commands_->status() == MTL::CommandBufferStatusError) {
@@ -212,7 +191,7 @@ SubmissionStatus MetalCommandContext::WaitForProgress(Submission &submission) {
   }
   if (commands_->status() != MTL::CommandBufferStatusCompleted)
     return SUBMISSION_STATUS_PENDING;
-  return submission.failed ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
+  return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
 }
 
 MetalCommandContext::~MetalCommandContext() {
@@ -289,7 +268,7 @@ bool MetalCommandContext::CmdUploadImage(IImage *image, const void *data, uint64
   const auto desc = native->GetDesc();
   const uint64_t size = pitch * desc.height;
   auto upload = device_->UploadPool().Acquire(size);
-  if (!upload || !RetainResource(upload.Get()) || !RetainImage(native)) {
+  if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
     recording_failed_ = true;
     return false;
   }
@@ -455,7 +434,7 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
       return nullptr;
     width = desc.width;
     height = desc.height;
-    return RetainImage(value) ? value : nullptr;
+    return RetainResource(value) ? value : nullptr;
   };
   const MTL::LoadAction loads[] = {MTL::LoadActionLoad, MTL::LoadActionClear, MTL::LoadActionDontCare};
   auto store = [](AttachmentStoreOp op) {
@@ -737,7 +716,7 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
   const uint64_t pitch = packed;
   const bool stencil = HasStencil(desc.format);
   auto lease = device_->DownloadPool().Acquire(pitch * height + (stencil ? uint64_t(width) * height : 0));
-  if (!lease || !RetainImage(native) || !RetainResource(lease.Get())) {
+  if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return nullptr;
   }

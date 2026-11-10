@@ -1,12 +1,8 @@
-#include "grassland/rhi/backend/backend_submission_token.h"
+﻿#include "grassland/rhi/backend/backend_submission_token.h"
 
 namespace grassland::rhi::backend {
 
-SubmissionToken::SubmissionToken(Device *device, Event event) : device_(device), event_(std::move(event)) {
-}
-
-Event SubmissionToken::GetEvent() const {
-  return event_;
+SubmissionToken::SubmissionToken(Device *device) : device_(device) {
 }
 
 Device *SubmissionToken::Owner() const {

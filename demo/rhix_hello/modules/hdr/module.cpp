@@ -157,7 +157,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &captur
         return 1;
       std::cout << "Rendering " << ColorSpaceName(color_space) << " / " << ImageFormatName(extent.format) << '\n';
     }
-    grassland::rhix::CommandContext context = queue.CreateCommandContext();
+    grassland::rhix::CommandContext context = device.CreateCommandContext();
     if (!context || !context.CmdUploadBuffer(settings_buffer, 0, settings, sizeof(settings)) ||
         !context.CmdBindProgram(program) || !context.CmdBindGroup(0, settings_group) ||
         !context.CmdBeginRendering(image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}) ||
@@ -175,7 +175,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &captur
       last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
       last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     }
-    grassland::rhix::SubmissionToken token = context.Submit();
+    grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
 
     if (!token || !token.WaitHost())
       return 1;

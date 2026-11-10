@@ -64,8 +64,7 @@ class RhiRasterizer : public testing::TestWithParam<BackendAPI> {
     ObjPtr<IBuffer> buffer = device->CreateBuffer({vertices.size() * 8});
     ObjPtr<IBuffer> indices = device->CreateBuffer({vertices.size() * 4});
     ASSERT_TRUE(image && buffer && indices);
-    ObjPtr<IQueue> commands_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-    ObjPtr<ICommandContext> commands = commands_queue->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, vertices.data(), vertices.size() * 8));
     std::vector<uint32_t> index_data(vertices.size());
@@ -90,7 +89,7 @@ class RhiRasterizer : public testing::TestWithParam<BackendAPI> {
     }
     ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get());
     ASSERT_TRUE(token);
-    ObjPtr<ISubmissionToken> done = commands->Submit();
+    ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
     ASSERT_TRUE(done && done->WaitHost());
     pixels.resize(token->GetSize());
     ASSERT_TRUE(token->CopyTo(pixels.data(), pixels.size()));
@@ -206,8 +205,7 @@ TEST_P(RhiRasterizer, SwitchingProgramsReappliesRasterizerStateInsideOneScope) {
   const float vertices[] = {-.8f, -.8f, .8f, -.8f, 0, .8f};
   ObjPtr<IBuffer> buffer = device->CreateBuffer({sizeof(vertices)});
   ASSERT_TRUE(image && buffer);
-  ObjPtr<IQueue> commands_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<ICommandContext> commands = commands_queue->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, vertices, sizeof(vertices)));
   ASSERT_TRUE(commands->CmdBeginRendering(
@@ -223,7 +221,7 @@ TEST_P(RhiRasterizer, SwitchingProgramsReappliesRasterizerStateInsideOneScope) {
   ASSERT_TRUE(commands->CmdEndRendering());
   ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get());
   ASSERT_TRUE(token);
-  ObjPtr<ISubmissionToken> done = commands->Submit();
+  ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
   ASSERT_TRUE(done && done->WaitHost());
   std::vector<uint8_t> pixels(token->GetSize());
   ASSERT_TRUE(token->CopyTo(pixels.data(), pixels.size()));
@@ -244,11 +242,10 @@ TEST_P(RhiRasterizer, SwitchingProgramsReappliesRasterizerStateInsideOneScope) {
 #if !defined(NDEBUG)
 TEST_P(RhiRasterizer, ViewportRequiresPositiveExtents) {
   for (auto extent : {std::array<float, 2>{0, 16}, {16, 0}, {-16, 16}, {16, -16}}) {
-    ObjPtr<IQueue> commands_queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-    ObjPtr<ICommandContext> commands = commands_queue->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
     EXPECT_FALSE(commands->CmdSetViewport({0, 0, extent[0], extent[1], 0, 1}));
-    EXPECT_FALSE(ObjPtr<ISubmissionToken>(commands->Submit()));
+    EXPECT_FALSE(ObjPtr<ISubmissionToken>(device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get())));
   }
 }
 #endif

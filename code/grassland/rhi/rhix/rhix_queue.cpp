@@ -1,4 +1,4 @@
-#include "grassland/rhi/rhix/rhix_queue.h"
+﻿#include "grassland/rhi/rhix/rhix_queue.h"
 
 #include "grassland/rhi/rhix/rhix_command_context.h"
 
@@ -10,10 +10,6 @@ Queue::Queue(rhi::IQueue *object) noexcept : ObjectContainer(object) {
 
 rhi::IQueue *Queue::Get() const noexcept {
   return static_cast<rhi::IQueue *>(GetObject());
-}
-
-CommandContext Queue::CreateCommandContext() const {
-  return Get() ? CommandContext(Get()->CreateCommandContext()) : CommandContext{};
 }
 
 rhi::QueueType Queue::GetType() const {
@@ -32,4 +28,16 @@ bool Queue::SharesPhysicalQueue(const Queue &other) const {
   return Get()->SharesPhysicalQueue(other.Get());
 }
 
+SubmissionToken Queue::Submit(CommandContext &&commands, const SubmitInfo &info) const {
+  CommandContext consumed = std::move(commands);
+#if !defined(NDEBUG)
+  if (!*this || !consumed)
+    return {};
+#endif
+  rhi::SubmitInfo native_info;
+  native_info.waits.reserve(info.waits.size());
+  for (const auto &token : info.waits)
+    native_info.waits.push_back(token.Get());
+  return Get()->Submit(consumed.Get(), native_info);
+}
 }  // namespace grassland::rhix

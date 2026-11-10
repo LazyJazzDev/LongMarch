@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 
 #include <type_traits>
 
@@ -27,14 +27,14 @@ TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   ASSERT_NE(device, nullptr);
   IQueue *queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_NE(queue, nullptr);
-  ICommandContext *context = queue->CreateCommandContext();
+  ICommandContext *context = device->CreateCommandContext();
   ASSERT_NE(context, nullptr);
-  ISubmissionToken *done = context->Submit();
+  ISubmissionToken *done = queue->Submit(context);
   ASSERT_NE(done, nullptr);
 #if !defined(NDEBUG)
   EXPECT_FALSE(context->CmdClearImage(nullptr, {0.0f, 0.0f, 0.0f, 1.0f}));
   EXPECT_FALSE(context->CmdPresent(nullptr));
-  EXPECT_EQ(context->Submit(), nullptr);  // One-shot submission.
+  EXPECT_EQ(queue->Submit(context), nullptr);  // One-shot submission.
 #endif
   context->Release();  // Submit borrowed the caller reference and retained work.
   EXPECT_TRUE(done->WaitHost());

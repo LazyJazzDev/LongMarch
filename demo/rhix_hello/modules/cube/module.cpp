@@ -1,4 +1,4 @@
-#include "../../module.h"
+﻿#include "../../module.h"
 
 #include <fmt/format.h>
 
@@ -113,14 +113,14 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
   grassland::rhix::Image depth;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
-    grassland::rhix::CommandContext upload = queue.CreateCommandContext();
+    grassland::rhix::CommandContext upload = device.CreateCommandContext();
     if (!upload)
       return 1;
     if (!upload.CmdUploadBuffer(vertex_buffer, 0, vertices, sizeof(vertices)))
       return 1;
     if (!upload.CmdUploadBuffer(index_buffer, 0, indices, sizeof(indices)))
       return 1;
-    grassland::rhix::SubmissionToken uploaded = upload.Submit();
+    grassland::rhix::SubmissionToken uploaded = queue.Submit(std::move(upload));
     if (!uploaded)
       return 1;
     if (headless) {
@@ -192,7 +192,7 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
       continue;
     }
     auto extent = image.GetDesc();
-    grassland::rhix::CommandContext context = queue.CreateCommandContext();
+    grassland::rhix::CommandContext context = device.CreateCommandContext();
     if (!context)
       return 1;
     // GPU copies and draws are ordered on the same queue; the upload takes a CPU snapshot.
@@ -252,7 +252,7 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
       last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
       last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     }
-    grassland::rhix::SubmissionToken token = context.Submit();
+    grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
 
     if (!token)
       return 1;

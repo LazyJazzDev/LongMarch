@@ -1,4 +1,4 @@
-#include "grassland/rhi/rhix/rhix_device.h"
+﻿#include "grassland/rhi/rhix/rhix_device.h"
 
 namespace grassland::rhix {
 Device::Device() noexcept = default;
@@ -8,12 +8,6 @@ Device::Device(rhi::IDevice *object) noexcept : ObjectContainer(object) {
 
 rhi::IDevice *Device::Get() const noexcept {
   return static_cast<rhi::IDevice *>(GetObject());
-}
-
-bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
-  if (!Get())
-    return false;
-  return Get()->WaitEvents(events, wait_all);
 }
 
 std::string Device::Name() const {
@@ -62,6 +56,14 @@ Queue Device::GetQueue(rhi::QueueType type) const {
     return nullptr;
 #endif
   return Get()->GetQueue(type);
+}
+
+CommandContext Device::CreateCommandContext() const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return nullptr;
+#endif
+  return Get()->CreateCommandContext();
 }
 
 Shader Device::CreateShader(const rhi::ShaderDesc &desc) const {
