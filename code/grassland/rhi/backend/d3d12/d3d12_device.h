@@ -75,11 +75,6 @@ class D3D12Device final : public Device {
   D3D12TransientDescriptorPool resource_descriptors_, sampler_descriptors_;
   D3D12DescriptorPool resource_descriptor_storage_, sampler_descriptor_storage_;
   ComPtr<IDXGIFactory4> factory_;
-  ComPtr<ID3D12CommandQueue> queue_;
-  ComPtr<ID3D12Fence> fence_;
-  std::mutex mutex_;
-  uint64_t serial_{};
-  HANDLE idle_event_{};
   bool tearing_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

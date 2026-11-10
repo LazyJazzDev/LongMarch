@@ -4,10 +4,12 @@
 
 #ifdef LONGMARCH_VULKAN_ENABLED
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_timeline.h"
 #endif
 #ifdef LONGMARCH_D3D12_ENABLED
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_timeline.h"
 #endif
 
@@ -21,6 +23,15 @@ TEST(RhiTimeline, VulkanIndependentTimelineTracksGPUSignals) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto native = static_cast<VulkanDevice *>(device.Get());
+  ObjPtr<IQueue> main = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> assist = device->GetQueue(QUEUE_TYPE_ASSIST);
+  ASSERT_TRUE(main);
+  ASSERT_TRUE(assist);
+  auto main_queue = static_cast<VulkanQueue *>(main.Get());
+  auto assist_queue = static_cast<VulkanQueue *>(assist.Get());
+  EXPECT_NE(main_queue->NativeQueue(), assist_queue->NativeQueue());
+  EXPECT_NE(main_queue->GetTimeline(), assist_queue->GetTimeline());
+  EXPECT_FALSE(main->SharesPhysicalQueue(assist.Get()));
   auto timeline = VulkanTimeline::Create(native);
   ASSERT_TRUE(timeline);
   uint64_t completed = UINT64_MAX;
@@ -56,6 +67,15 @@ TEST(RhiTimeline, D3D12IndependentTimelineTracksGPUSignals) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto native = static_cast<D3D12Device *>(device.Get());
+  ObjPtr<IQueue> main = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> assist = device->GetQueue(QUEUE_TYPE_ASSIST);
+  ASSERT_TRUE(main);
+  ASSERT_TRUE(assist);
+  auto main_queue = static_cast<D3D12Queue *>(main.Get());
+  auto assist_queue = static_cast<D3D12Queue *>(assist.Get());
+  EXPECT_NE(main_queue->NativeQueue(), assist_queue->NativeQueue());
+  EXPECT_NE(main_queue->GetTimeline(), assist_queue->GetTimeline());
+  EXPECT_FALSE(main->SharesPhysicalQueue(assist.Get()));
   auto timeline = D3D12Timeline::Create(native);
   ASSERT_TRUE(timeline);
   uint64_t completed = UINT64_MAX;

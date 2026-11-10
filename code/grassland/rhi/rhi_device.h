@@ -18,6 +18,7 @@ struct ShaderDesc;
 class IWindow;
 class IQueue;
 class ICommandContext;
+struct SubmitInfo;
 
 class IDevice : public IObject {
  public:

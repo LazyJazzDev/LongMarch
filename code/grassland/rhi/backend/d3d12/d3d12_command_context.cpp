@@ -226,7 +226,8 @@ bool D3D12CommandContext::EndRecording() {
   return closed_;
 }
 
-CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
+CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const SubmitInfo &info, Event signal) {
+  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -238,10 +239,14 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
   }
 #endif
   {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
+    for (const auto &wait : info.waits) {
+      auto timeline = static_cast<D3D12Timeline *>(wait.timeline);
+      if (!Check(queue->NativeQueue()->Wait(timeline->NativeFence(), wait.value), "Queue::Wait"))
+        return SUBMIT_RESULT_REJECTED;
+    }
     submission_failed_ = true;
     ID3D12CommandList *lists[] = {list_.Get()};
-    device_->NativeQueue()->ExecuteCommandLists(1, lists);
+    queue->NativeQueue()->ExecuteCommandLists(1, lists);
     MarkSubmitted();
     for (auto &entry : as_dependencies_)
       entry.first->CommitDependencies(std::move(entry.second));
@@ -251,31 +256,37 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
       if (!Check(present.second->Present(), "Swapchain::Present"))
         presented = false;
     }
-    value_ = device_->NextSerial();
-    submission_failed_ = !Check(device_->NativeQueue()->Signal(device_->Fence(), value_), "Queue::Signal");
+    submission_failed_ =
+        !Check(queue->NativeQueue()->Signal(queue->GetTimeline()->NativeFence(), signal.value), "Queue::Signal");
     if (!presented)
       submission_failed_ = true;
   }
   if (submission_failed_)
     return SUBMIT_RESULT_FAILED_IN_FLIGHT;
-  for (const auto &present : presents_) {
-    if (!present.first->UpdateNextImage()) {
-      ReportError(-1, "Failed to prepare the next swapchain image after submission.");
-      std::abort();
-    }
-  }
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-SubmissionStatus D3D12CommandContext::WaitForProgress() {
+bool D3D12CommandContext::UpdatePresentedImages() {
+  for (const auto &present : presents_) {
+    if (!present.first->UpdateNextImage()) {
+      ReportError(-1, "Failed to prepare the next swapchain image after submission.");
+      submission_failed_ = true;
+      return false;
+    }
+  }
+  return true;
+}
+
+SubmissionStatus D3D12CommandContext::WaitForProgress(Event signal) {
+  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
   if (submission_failed_) {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
-    if (device_->WaitIdle() || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
+    std::lock_guard<std::mutex> lock(queue->QueueMutex());
+    if (queue->WaitIdle() || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
       return SUBMISSION_STATUS_FAILED;
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     return SUBMISSION_STATUS_PENDING;
   }
-  if (device_->Wait(value_, event_))
+  if (queue->GetTimeline()->WaitHost(signal.value))
     return SUBMISSION_STATUS_COMPLETED;
   // A failed host wait does not prove that GPU resource use has ended.
   submission_failed_ = true;

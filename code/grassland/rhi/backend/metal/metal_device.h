@@ -38,9 +38,6 @@ class MetalDevice final : public Device {
   MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
 
   NS::SharedPtr<MTL::Device> device_;
-  NS::SharedPtr<MTL::CommandQueue> queue_;
-  NS::SharedPtr<MTL::CommandBufferDescriptor> command_buffer_descriptor_;
-  std::mutex queue_mutex_;
   // Shared storage is reused across uploads and downloads.
   MetalTemporalBufferPool temporal_buffers_;
   MetalScratchPool scratch_{this};

@@ -1,5 +1,7 @@
 ﻿#include "grassland/rhi/backend/backend_device.h"
 
+#include <algorithm>
+
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
@@ -106,31 +108,31 @@ const void *Device::NativeIdentity() const {
   return this;
 }
 
-ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands,
-                                          const std::vector<ObjectPtr<SubmissionToken>> &waits) {
+ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info) {
   if (!commands->Seal())
     return {};
+  SubmitInfo native_info;
+  native_info.waits.reserve(info.waits.size());
+  for (const auto &wait : info.waits) {
 #if !defined(NDEBUG)
-  if (commands->DeviceIdentity() != NativeIdentity()) {
-    ReportError(-1, "Submission requires a context from this device.");
-    return {};
-  }
-#endif
-  for (const auto &wait : waits) {
-#if !defined(NDEBUG)
-    if (!wait || wait->Owner() != this) {
-      ReportError(-1, "Submission dependency is empty or belongs to another device.");
+    auto timeline = dynamic_cast<Timeline *>(wait.timeline);
+    if (!timeline || timeline->Owner() != this) {
+      ReportError(-1, "Submission waits require a timeline from this device.");
       return {};
     }
 #endif
-    if (wait->GetStatus() == SUBMISSION_STATUS_FAILED || wait->GetStatus() == SUBMISSION_STATUS_CANCELED) {
-      ReportError(-1, "Submission dependency failed or was canceled.");
-      return {};
-    }
+    // A submit waits for all dependencies; Vulkan requires unique semaphore handles.
+    auto existing = std::find_if(native_info.waits.begin(), native_info.waits.end(),
+                                 [&](const Event &event) { return event.timeline == wait.timeline; });
+    if (existing == native_info.waits.end())
+      native_info.waits.push_back(wait);
+    else
+      existing->value = std::max(existing->value, wait.value);
   }
-  // Both logical roles share one physical queue. Its ordering already supplies
-  // these GPU dependencies; no host wait or additional native wait is required.
-  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(this));
+  auto queue = commands->OwnerQueue();
+  std::unique_lock<std::mutex> queue_lock(queue->QueueMutex());
+  const Event signal{queue->GetTimeline(), queue->NextSerial()};
+  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(signal));
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopping_)
     return {};
@@ -141,7 +143,7 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   commands->BindDownloads(completion.Get());
   CommandContext::SubmitResult result;
   try {
-    result = commands->SubmitNative();
+    result = commands->SubmitNative(native_info, signal);
   } catch (...) {
     // Even error reporting can allocate after a native submit. Keep already
     // submitted work alive before propagating to the public allocation boundary.
@@ -164,6 +166,9 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   commands->MarkSubmitted();
   pending_.back().commands = commands;
   changed_.notify_one();
+  queue_lock.unlock();
+  if (result == CommandContext::SUBMIT_RESULT_SUBMITTED && !commands->UpdatePresentedImages())
+    return {};
   return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
 }
 
@@ -180,7 +185,7 @@ void Device::Collect() {
     }
     SubmissionStatus status;
     do {
-      status = pending.commands->WaitForProgress();
+      status = pending.commands->WaitForProgress(pending.completion->GetEvent());
     } while (status == SUBMISSION_STATUS_PENDING);
     // Release payload before publishing completion; tokens never keep it alive.
     pending.commands->ReleaseDownloads();

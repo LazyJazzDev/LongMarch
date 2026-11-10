@@ -17,18 +17,16 @@ namespace grassland::rhi::backend::metal {
 MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device) {
   auto object = std::unique_ptr<MetalDevice>(new MetalDevice(std::move(info), core, std::move(device)));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  object->command_buffer_descriptor_ = NS::TransferPtr(MTL::CommandBufferDescriptor::alloc()->init());
-  object->command_buffer_descriptor_->setRetainedReferences(true);
-  object->command_buffer_descriptor_->setErrorOptions(static_cast<MetalCore *>(core)->DebugEnabled()
-                                                          ? MTL::CommandBufferErrorOptionEncoderExecutionStatus
-                                                          : MTL::CommandBufferErrorOptionNone);
-  object->queue_ = NS::TransferPtr(object->device_->newCommandQueue());
-  if (!object->queue_) {
-    ReportError(-1, "Metal command queue creation failed.");
-    return nullptr;
+  auto descriptor = NS::TransferPtr(MTL::CommandBufferDescriptor::alloc()->init());
+  descriptor->setRetainedReferences(true);
+  descriptor->setErrorOptions(static_cast<MetalCore *>(core)->DebugEnabled()
+                                  ? MTL::CommandBufferErrorOptionEncoderExecutionStatus
+                                  : MTL::CommandBufferErrorOptionNone);
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
+    object->queues_[type] = ObjectPtr<Queue>::Adopt(MetalQueue::Create(object.get(), type, descriptor.get()));
+    if (!object->queues_[type])
+      return nullptr;
   }
-  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
-    object->queues_[type] = ObjectPtr<Queue>::Adopt(new MetalQueue(object.get(), type));
   return object.release();
 }
 
@@ -42,6 +40,8 @@ MetalDevice::~MetalDevice() {
   ShutdownQueues();
   temporal_buffers_.Clear();
   scratch_.Clear();
+  for (auto &queue : queues_)
+    queue.Reset();
 }
 
 MetalScratchPool &MetalDevice::ScratchPool() {
@@ -63,33 +63,19 @@ MTL::Device *MetalDevice::NativeDevice() const noexcept {
 }
 
 MTL::CommandQueue *MetalDevice::NativeQueue() const {
-  return queue_.get();
+  return static_cast<MetalQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->NativeQueue();
 }
 
 std::mutex &MetalDevice::QueueMutex() {
-  return queue_mutex_;
+  return static_cast<MetalQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->QueueMutex();
 }
 
 NS::SharedPtr<MTL::CommandBuffer> MetalDevice::CreateCommandBuffer() {
-  return NS::RetainPtr(queue_->commandBuffer(command_buffer_descriptor_.get()));
+  return static_cast<MetalQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->CreateCommandBuffer();
 }
 
 bool MetalDevice::WaitIdle() {
-  // Caller serializes this marker with commits using QueueMutex().
-  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto marker = CreateCommandBuffer();
-  if (!marker) {
-    ReportError(-1, "Metal idle marker allocation failed.");
-    return false;
-  }
-  marker->commit();
-  marker->waitUntilCompleted();
-  if (marker->status() != MTL::CommandBufferStatusCompleted) {
-    ReportMetalError(marker->error(), "Metal idle marker failed",
-                     static_cast<MetalCore *>(OwnerCore())->DebugEnabled());
-    return false;
-  }
-  return true;
+  return static_cast<MetalQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->WaitIdle();
 }
 
 rhi::IWindow *MetalDevice::CreateGLFWWindow(const WindowDesc &desc) {

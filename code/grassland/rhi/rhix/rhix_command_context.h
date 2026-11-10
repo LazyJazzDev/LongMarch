@@ -14,9 +14,7 @@
 #include "grassland/rhi/rhix/rhix_submission_token.h"
 
 namespace grassland::rhix {
-struct SubmitInfo {
-  std::vector<SubmissionToken> waits;
-};
+using SubmitInfo = rhi::SubmitInfo;
 
 class Window;
 

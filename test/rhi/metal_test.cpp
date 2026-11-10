@@ -157,7 +157,7 @@ TEST(RhiMetal, CompletionTokensSurviveBatchesAndParentRelease) {
         auto queue = i % 2 ? graphics.Get() : transfer.Get();
         rhi::SubmitInfo desc;
         if (!tokens.empty())
-          desc.waits.push_back(tokens.back().Get());
+          desc.waits.push_back(tokens.back()->GetEvent());
         rhi::ObjPtr<rhi::ISubmissionToken> token = context->Submit(desc);
         ASSERT_TRUE(token);
         tokens.push_back(std::move(token));

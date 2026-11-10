@@ -446,7 +446,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto transfer = device.GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
-  EXPECT_TRUE(graphics.SharesPhysicalQueue(transfer));
+  EXPECT_FALSE(graphics.SharesPhysicalQueue(transfer));
   EXPECT_FALSE(device.CreateGLFWWindow({0, 240, "Invalid window"}));
   auto first = device.CreateGLFWWindow({320, 240, "RHI window test A"});
   auto second = device.CreateGLFWWindow({320, 240, "RHI window test B"});
@@ -571,7 +571,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   const auto second_hwnd = FindWindowA(nullptr, "RHI window test B");
   ASSERT_NE(second_hwnd, nullptr);
 #endif
-  last = std::move(context).Submit({{ready}});
+  last = std::move(context).Submit({{ready.GetEvent()}});
   ASSERT_TRUE(last);
   second.Release();  // Destruction waits for native GPU use; Device does not retain Window.
 #ifdef _WIN32
@@ -628,12 +628,12 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
   auto reclear = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(reclear.CmdClearImage(b, {0.6f, 0.7f, 0.8f, 1.0f}));
   ASSERT_TRUE(reclear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1.0f}));
-  auto ready = std::move(reclear).Submit({{cleared}});
+  auto ready = std::move(reclear).Submit({{cleared.GetEvent()}});
   ASSERT_TRUE(ready);
   auto present = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(present.CmdPresent(second));
   ASSERT_TRUE(present.CmdPresent(first));
-  auto done = std::move(present).Submit({{ready}});
+  auto done = std::move(present).Submit({{ready.GetEvent()}});
   ASSERT_TRUE(done);
   ASSERT_TRUE(done.WaitHost());
   EXPECT_NE(a.Get(), first.GetNextImage().Get());

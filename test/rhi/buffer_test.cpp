@@ -187,7 +187,7 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ASSERT_TRUE(source);
   ObjPtr<IBuffer> target = device->CreateBuffer({sizeof(expected)});
   ASSERT_TRUE(target);
-  ObjPtr<ICommandContext> upload = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+  ObjPtr<ICommandContext> upload = transfer->CreateCommandContext();
   ASSERT_TRUE(upload);
   auto bytes = expected;
   ASSERT_TRUE(upload->CmdUploadBuffer(source.Get(), 0, bytes.data(), sizeof(bytes)));
@@ -195,14 +195,17 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ObjPtr<ISubmissionToken> ready = upload->Submit();
   ASSERT_TRUE(ready);
   upload.Release();
-  ObjPtr<ICommandContext> copy = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+  ObjPtr<ICommandContext> copy = graphics->CreateCommandContext();
   ASSERT_TRUE(copy);
   ASSERT_TRUE(copy->CmdCopyBuffer(source.Get(), 0, target.Get(), 0, sizeof(expected)));
   source.Release();
   SubmitInfo info;
-  info.waits = {ready.Get()};
+  const auto event = ready->GetEvent();
+  info.waits = {{event.timeline, 0}, event, event};
+  ready.Release();
   ObjPtr<ISubmissionToken> done = copy->Submit(info);
   ASSERT_TRUE(done);
+  info.waits.clear();
   copy.Release();
   ASSERT_TRUE(done->WaitHost());
   std::array<uint32_t, 16> actual{};

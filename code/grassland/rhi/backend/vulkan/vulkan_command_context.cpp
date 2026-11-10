@@ -189,7 +189,8 @@ bool VulkanCommandContext::EndRecording() {
   return Check(vkEndCommandBuffer(command_), "End command buffer");
 }
 
-CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
+CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const SubmitInfo &info, Event signal) {
+  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -216,8 +217,13 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   }
   for (const auto &present : presents_)
     rendered.push_back(present->RenderSemaphore());
-  rendered.push_back(device_->Timeline());
+  rendered.push_back(queue->GetTimeline()->NativeSemaphore());
   std::vector<uint64_t> wait_values(acquired.size(), 0);
+  for (const auto &wait : info.waits) {
+    acquired.push_back(static_cast<VulkanTimeline *>(wait.timeline)->NativeSemaphore());
+    stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    wait_values.push_back(wait.value);
+  }
   std::vector<uint64_t> signal_values(rendered.size(), 0);
   VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
   timeline.waitSemaphoreValueCount = static_cast<uint32_t>(wait_values.size());
@@ -234,17 +240,15 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   submit.signalSemaphoreCount = static_cast<uint32_t>(rendered.size());
   submit.pSignalSemaphores = rendered.data();
   {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
-    value_ = device_->NextSerial();
-    signal_values.back() = value_;
-    if (!Check(vkQueueSubmit(device_->NativeQueue(), 1, &submit, VK_NULL_HANDLE), "vkQueueSubmit"))
+    signal_values.back() = signal.value;
+    if (!Check(vkQueueSubmit(queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE), "vkQueueSubmit"))
       return SUBMIT_RESULT_REJECTED;
     MarkSubmitted();
     for (auto &entry : as_dependencies_)
       entry.first->CommitDependencies(std::move(entry.second));
     as_dependencies_.clear();
     for (auto window : acquired_windows)
-      window->MarkAcquireWaitSubmitted(value_);
+      window->MarkAcquireWaitSubmitted(signal.value);
     submission_failed_ = true;
     bool presented = true;
     for (const auto &present : presents_) {
@@ -258,6 +262,10 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   }
   if (submission_failed_)
     return SUBMIT_RESULT_FAILED_IN_FLIGHT;
+  return SUBMIT_RESULT_SUBMITTED;
+}
+
+bool VulkanCommandContext::UpdatePresentedImages() {
   for (const auto &present : presents_) {
     if (present->IsSwapChainInvalid()) {
       present->ReleaseNextImage();
@@ -268,11 +276,12 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
       submission_failed_ = true;
     }
   }
-  return submission_failed_ ? SUBMIT_RESULT_FAILED_IN_FLIGHT : SUBMIT_RESULT_SUBMITTED;
+  return !submission_failed_;
 }
 
-SubmissionStatus VulkanCommandContext::WaitForProgress() {
-  const auto result = device_->Wait(value_, 50000000);
+SubmissionStatus VulkanCommandContext::WaitForProgress(Event signal) {
+  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
+  const auto result = queue->Wait(signal.value, 50000000);
   if (result == VK_TIMEOUT)
     return SUBMISSION_STATUS_PENDING;
   if (result == VK_ERROR_DEVICE_LOST)
@@ -280,8 +289,8 @@ SubmissionStatus VulkanCommandContext::WaitForProgress() {
   if (result != VK_SUCCESS)
     submission_failed_ = true;
   if (submission_failed_) {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
-    const auto idle = vkDeviceWaitIdle(device_->NativeDevice());
+    std::lock_guard<std::mutex> lock(queue->QueueMutex());
+    const auto idle = vkQueueWaitIdle(queue->NativeQueue());
     return idle == VK_SUCCESS || idle == VK_ERROR_DEVICE_LOST ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_PENDING;
   }
   return SUBMISSION_STATUS_COMPLETED;

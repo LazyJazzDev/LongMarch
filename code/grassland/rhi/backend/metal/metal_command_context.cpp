@@ -38,7 +38,7 @@ MetalCommandContext *MetalCommandContext::Create(MetalQueue *queue) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   // Metal command buffers are single-use. The persistent native queue manages
   // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
-  object->commands_ = object->device_->CreateCommandBuffer();
+  object->commands_ = queue->CreateCommandBuffer();
   if (!object->commands_) {
     ReportError(-1, "Metal command buffer creation failed.");
     return nullptr;
@@ -150,7 +150,7 @@ bool MetalCommandContext::EndRecording() {
   return true;
 }
 
-CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
+CommandContext::SubmitResult MetalCommandContext::SubmitNative(const SubmitInfo &info, Event signal) {
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -163,7 +163,15 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
 #endif
   {
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
+    if (!info.waits.empty()) {
+      auto preamble = static_cast<MetalQueue *>(OwnerQueue())->CreateCommandBuffer();
+      if (!preamble)
+        return SUBMIT_RESULT_REJECTED;
+      for (const auto &wait : info.waits)
+        preamble->encodeWait(static_cast<MetalTimeline *>(wait.timeline)->NativeEvent(), wait.value);
+      preamble->commit();
+    }
+    commands_->encodeSignalEvent(static_cast<MetalTimeline *>(signal.timeline)->NativeEvent(), signal.value);
     for (const auto &present : presents_)
       commands_->presentDrawable(present.second->NativeDrawable());
     commands_->commit();
@@ -174,20 +182,25 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
     for (const auto &present : presents_)
       present.second->DidPresent();
   }
+  return SUBMIT_RESULT_SUBMITTED;
+}
+
+bool MetalCommandContext::UpdatePresentedImages() {
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
       submission_failed_ = true;
       ReportError(-1, "Failed to prepare the next Metal drawable after submission.");
-      return SUBMIT_RESULT_FAILED_IN_FLIGHT;
+      return false;
     }
   }
-  return SUBMIT_RESULT_SUBMITTED;
+  return true;
 }
 
-SubmissionStatus MetalCommandContext::WaitForProgress() {
+SubmissionStatus MetalCommandContext::WaitForProgress(Event signal) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   commands_->waitUntilCompleted();
   if (commands_->status() == MTL::CommandBufferStatusError) {
+    static_cast<MetalTimeline *>(signal.timeline)->MarkFailed();
     ReportMetalError(commands_->error(), "Metal command buffer failed",
                      commands_->errorOptions() & MTL::CommandBufferErrorOptionEncoderExecutionStatus);
     return SUBMISSION_STATUS_FAILED;

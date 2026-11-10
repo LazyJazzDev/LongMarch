@@ -11,7 +11,7 @@
 namespace grassland::rhi {
 struct SubmitInfo {
   // Borrowed for the duration of Submit.
-  std::vector<ISubmissionToken *> waits;
+  std::vector<Event> waits;
 };
 
 class IBuffer;

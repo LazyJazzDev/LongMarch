@@ -12,17 +12,17 @@ class Device;
 // Completion state borrows its device; it owns no native resources or commands.
 class SubmissionToken final : public Object<rhi::ISubmissionToken> {
  public:
-  explicit SubmissionToken(Device *device);
+  explicit SubmissionToken(Event event);
+  Event GetEvent() const override;
   SubmissionStatus GetStatus() const override;
   bool WaitHost() const override;
   void Complete(SubmissionStatus status);
-  Device *Owner() const;
 
  private:
   mutable std::mutex mutex_;
   mutable std::condition_variable changed_;
   SubmissionStatus status_{SUBMISSION_STATUS_PENDING};
-  Device *device_;
+  const Event event_;
 };
 
 }  // namespace grassland::rhi::backend

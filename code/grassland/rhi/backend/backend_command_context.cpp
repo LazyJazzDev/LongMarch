@@ -162,17 +162,7 @@ CommandContext::~CommandContext() = default;
 
 rhi::ISubmissionToken *CommandContext::Submit(const rhi::SubmitInfo &info) {
   try {
-    std::vector<ObjectPtr<SubmissionToken>> waits;
-    waits.reserve(info.waits.size());
-    for (auto token : info.waits) {
-#if !defined(NDEBUG)
-      auto state = dynamic_cast<SubmissionToken *>(token);
-#else
-      auto state = static_cast<SubmissionToken *>(token);
-#endif
-      waits.push_back(ObjectPtr<SubmissionToken>::Retain(state));
-    }
-    return queue_->Owner()->Submit(ObjectPtr<CommandContext>::Retain(this), waits).Detach();
+    return queue_->Owner()->Submit(ObjectPtr<CommandContext>::Retain(this), info).Detach();
   } catch (const std::system_error &error) {
     ReportError(error.code().value(), error.what());
   }
@@ -232,6 +222,10 @@ bool CommandContext::Seal() {
     return false;
   }
   return true;
+}
+
+Queue *CommandContext::OwnerQueue() const {
+  return queue_;
 }
 
 const void *CommandContext::DeviceIdentity() const {

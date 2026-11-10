@@ -81,13 +81,7 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
       LogWarning(
           "D3D12 debug message callbacks are unavailable; validation messages remain in the native debug output.");
   }
-  D3D12_COMMAND_QUEUE_DESC desc{};
-  desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
   if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2"))
-    return nullptr;
-  if (!Check(object->device_->CreateCommandQueue(&desc, IID_PPV_ARGS(&object->queue_)), "CreateCommandQueue"))
-    return nullptr;
-  if (!Check(object->device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&object->fence_)), "CreateFence"))
     return nullptr;
   ComPtr<IDXGIAdapter> adapter;
   if (!Check(object->factory_->EnumAdapterByLuid(object->device_->GetAdapterLuid(), IID_PPV_ARGS(&adapter)),
@@ -98,18 +92,16 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
   memory.pAdapter = adapter.Get();
   if (!Check(D3D12MA::CreateAllocator(&memory, &object->allocator_), "Create D3D12MA allocator"))
     return nullptr;
-  object->idle_event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!object->idle_event_) {
-    ReportError(GetLastError(), "Create fence event failed.");
-    return nullptr;
-  }
   ComPtr<IDXGIFactory5> factory5;
   BOOL tearing = FALSE;
   if (SUCCEEDED(object->factory_.As(&factory5)) &&
       SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
     object->tearing_ = tearing;
-  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
-    object->queues_[type] = ObjectPtr<Queue>::Adopt(new D3D12Queue(object.get(), type));
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
+    object->queues_[type] = ObjectPtr<Queue>::Adopt(D3D12Queue::Create(object.get(), type));
+    if (!object->queues_[type])
+      return nullptr;
+  }
   return object.release();
 }
 
@@ -150,11 +142,11 @@ IDXGIFactory4 *D3D12Device::Factory() const {
 }
 
 ID3D12CommandQueue *D3D12Device::NativeQueue() const {
-  return queue_.Get();
+  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->NativeQueue();
 }
 
 ID3D12Fence *D3D12Device::Fence() const {
-  return fence_.Get();
+  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->GetTimeline()->NativeFence();
 }
 
 bool D3D12Device::SupportsTearing() const {
@@ -162,19 +154,19 @@ bool D3D12Device::SupportsTearing() const {
 }
 
 std::mutex &D3D12Device::QueueMutex() {
-  return mutex_;
+  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->QueueMutex();
 }
 
 uint64_t D3D12Device::NextSerial() {
-  return ++serial_;
+  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->NextSerial();
 }
 
 bool D3D12Device::Wait(uint64_t value, HANDLE event) const {
-  if (fence_->GetCompletedValue() == UINT64_MAX)
+  if (Fence()->GetCompletedValue() == UINT64_MAX)
     return false;
-  if (fence_->GetCompletedValue() >= value)
+  if (Fence()->GetCompletedValue() >= value)
     return true;
-  if (!Check(fence_->SetEventOnCompletion(value, event), "SetEventOnCompletion"))
+  if (!Check(Fence()->SetEventOnCompletion(value, event), "SetEventOnCompletion"))
     return false;
   DWORD result;
   do {
@@ -182,12 +174,11 @@ bool D3D12Device::Wait(uint64_t value, HANDLE event) const {
     if (FAILED(device_->GetDeviceRemovedReason()))
       return false;
   } while (result == WAIT_TIMEOUT);
-  return result == WAIT_OBJECT_0 && fence_->GetCompletedValue() != UINT64_MAX;
+  return result == WAIT_OBJECT_0 && Fence()->GetCompletedValue() != UINT64_MAX;
 }
 
 bool D3D12Device::WaitIdle() {
-  auto value = NextSerial();
-  return Check(queue_->Signal(fence_.Get(), value), "Signal idle fence") && Wait(value, idle_event_);
+  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->WaitIdle();
 }
 
 D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
@@ -212,8 +203,8 @@ D3D12Device::~D3D12Device() {
   for (auto &entry : command_pool_)
     CloseHandle(std::get<2>(entry));
   command_pool_.clear();
-  if (idle_event_)
-    CloseHandle(idle_event_);
+  for (auto &queue : queues_)
+    queue.Reset();
   if (debug_callback_cookie_)
     debug_messages_->UnregisterMessageCallback(debug_callback_cookie_);
 }

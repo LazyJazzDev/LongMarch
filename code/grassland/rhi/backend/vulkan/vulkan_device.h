@@ -68,11 +68,7 @@ class VulkanDevice final : public Device {
   VkDevice device_{VK_NULL_HANDLE};
   DeviceProcedures procedures_;
   VkPhysicalDevice physical_{};
-  VkQueue queue_{};
-  VkSemaphore timeline_{};
-  uint64_t next_serial_{};
   uint32_t graphics_queue_family_index_{};
   bool swapchain_enabled_{};
-  std::mutex mutex_;
 };
 }  // namespace grassland::rhi::backend::vulkan

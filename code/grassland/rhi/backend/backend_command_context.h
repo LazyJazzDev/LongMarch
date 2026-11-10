@@ -72,10 +72,12 @@ class CommandContext : public Object<rhi::ICommandContext> {
   void ReleaseDownloads();
   bool Seal();
   const void *DeviceIdentity() const;
+  Queue *OwnerQueue() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
-  virtual SubmitResult SubmitNative() = 0;
-  virtual SubmissionStatus WaitForProgress() = 0;
+  virtual bool UpdatePresentedImages() = 0;
+  virtual SubmitResult SubmitNative(const SubmitInfo &info, Event signal) = 0;
+  virtual SubmissionStatus WaitForProgress(Event signal) = 0;
 
  protected:
   // Call before encoding each resource use. Retains each exact object once.

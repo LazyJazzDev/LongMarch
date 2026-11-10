@@ -71,8 +71,8 @@ VulkanDevice::~VulkanDevice() {
   for (const auto &entry : command_pool_) {
     vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
   }
-  if (timeline_)
-    vkDestroySemaphore(device_, timeline_, nullptr);
+  for (auto &queue : queues_)
+    queue.Reset();
   if (allocator_)
     vmaDestroyAllocator(allocator_);
   if (device_)
@@ -101,7 +101,7 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, families.data());
   std::vector<VkDeviceQueueCreateInfo> queues;
   uint32_t graphics_family = UINT32_MAX;
-  const float priority = 1.0f;
+  const float priorities[] = {1.0f, 1.0f};
   for (uint32_t i = 0; i < count; ++i) {
     if (!families[i].queueCount)
       continue;
@@ -110,8 +110,8 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
       graphics_family = i;
     VkDeviceQueueCreateInfo queue{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
     queue.queueFamilyIndex = i;
-    queue.queueCount = 1;
-    queue.pQueuePriorities = &priority;
+    queue.queueCount = i == graphics_family ? std::min(2u, families[i].queueCount) : 1;
+    queue.pQueuePriorities = priorities;
     queues.push_back(queue);
   }
   VkDeviceCreateInfo create{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
@@ -131,12 +131,6 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   }
   if (!device->procedures_.Load(device->device_, api_version, enabled))
     return {};
-  VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
-  type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-  VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-  semaphore.pNext = &type;
-  if (!Check(vkCreateSemaphore(device->device_, &semaphore, nullptr, &device->timeline_), "Create submission timeline"))
-    return {};
   const bool swapchain = std::any_of(enabled.Extensions().begin(), enabled.Extensions().end(), [](const char *name) {
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
   });
@@ -155,26 +149,27 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   device->physical_ = physical_device;
   device->graphics_queue_family_index_ = graphics_family;
   device->swapchain_enabled_ = swapchain;
-  vkGetDeviceQueue(device->device_, graphics_family, 0, &device->queue_);
-  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
-    device->queues_[type] = ObjectPtr<Queue>::Adopt(new VulkanQueue(device.get(), type));
+  for (uint32_t index = 0; index < std::min(2u, families[graphics_family].queueCount); ++index) {
+    VkQueue queue;
+    vkGetDeviceQueue(device->device_, graphics_family, index, &queue);
+    device->queues_[index] =
+        ObjectPtr<Queue>::Adopt(VulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue));
+    if (!device->queues_[index])
+      return nullptr;
+  }
   return device.release();
 }
 
 VkSemaphore VulkanDevice::Timeline() const {
-  return timeline_;
+  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->GetTimeline()->NativeSemaphore();
 }
 
 uint64_t VulkanDevice::NextSerial() {
-  return ++next_serial_;
+  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->NextSerial();
 }
 
 VkResult VulkanDevice::Wait(uint64_t value, uint64_t timeout) const {
-  VkSemaphoreWaitInfo wait{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
-  wait.semaphoreCount = 1;
-  wait.pSemaphores = &timeline_;
-  wait.pValues = &value;
-  return vkWaitSemaphores(device_, &wait, timeout);
+  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->Wait(value, timeout);
 }
 
 const DeviceProcedures &VulkanDevice::Procedures() const {
@@ -214,7 +209,7 @@ VkInstance VulkanDevice::Instance() const {
 }
 
 VkQueue VulkanDevice::NativeQueue() const {
-  return queue_;
+  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->NativeQueue();
 }
 
 uint32_t VulkanDevice::QueueFamily() const {
@@ -226,7 +221,7 @@ bool VulkanDevice::SupportsSwapchain() const {
 }
 
 std::mutex &VulkanDevice::QueueMutex() {
-  return mutex_;
+  return static_cast<VulkanQueue *>(queues_[QUEUE_TYPE_MAIN].Get())->QueueMutex();
 }
 
 VulkanTemporalBufferPool &VulkanDevice::UploadPool() {

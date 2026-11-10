@@ -2,11 +2,11 @@
 
 namespace grassland::rhi::backend {
 
-SubmissionToken::SubmissionToken(Device *device) : device_(device) {
+SubmissionToken::SubmissionToken(Event event) : event_(event) {
 }
 
-Device *SubmissionToken::Owner() const {
-  return device_;
+Event SubmissionToken::GetEvent() const {
+  return event_;
 }
 
 SubmissionStatus SubmissionToken::GetStatus() const {

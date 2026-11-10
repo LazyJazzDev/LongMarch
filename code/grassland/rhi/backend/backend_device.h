@@ -41,8 +41,7 @@ class Device : public Object<rhi::IDevice> {
   rhi::IQueue *GetQueue(QueueType type) override;
   virtual const void *NativeIdentity() const;
 
-  ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands,
-                                    const std::vector<ObjectPtr<SubmissionToken>> &waits);
+  ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info);
 
  protected:
   void ShutdownQueues();

@@ -151,7 +151,11 @@ class TestCommandContext final : public backend::CommandContext {
     return true;
   }
 
-  SubmitResult SubmitNative() override {
+  bool UpdatePresentedImages() override {
+    return true;
+  }
+
+  SubmitResult SubmitNative(const SubmitInfo &, Event) override {
     EXPECT_EQ(ended, 1);
     if (fail_after_submit_) {
       MarkSubmitted();
@@ -160,7 +164,7 @@ class TestCommandContext final : public backend::CommandContext {
     return SUBMIT_RESULT_SUBMITTED;
   }
 
-  SubmissionStatus WaitForProgress() override {
+  SubmissionStatus WaitForProgress(Event) override {
     std::unique_lock<std::mutex> lock(gate_->mutex);
     gate_->changed.wait_for(lock, std::chrono::milliseconds(10), [&] { return gate_->complete; });
     return gate_->complete ? SUBMISSION_STATUS_COMPLETED : SUBMISSION_STATUS_PENDING;
@@ -194,19 +198,46 @@ class TestDevice final : public backend::Device {
   std::shared_ptr<Gate> gate_;
 };
 
+class TestTimeline final : public backend::Timeline {
+ public:
+  TestTimeline(backend::Device *device, std::shared_ptr<Gate> gate) : Timeline(device), gate_(std::move(gate)) {
+  }
+
+  bool GetCompletedValue(uint64_t &value) const override {
+    std::lock_guard<std::mutex> lock(gate_->mutex);
+    value = gate_->complete ? UINT64_MAX - 1 : 0;
+    return true;
+  }
+
+  bool WaitHost(uint64_t value) const override {
+    std::unique_lock<std::mutex> lock(gate_->mutex);
+    gate_->changed.wait(lock, [&] { return !value || gate_->complete; });
+    return true;
+  }
+
+ private:
+  std::shared_ptr<Gate> gate_;
+};
+
 class TestQueue final : public backend::Queue {
  public:
+  TestTimeline *GetTimeline() const override {
+    return timeline_.get();
+  }
+
   rhi::ICommandContext *CreateCommandContext() override {
     return new TestCommandContext(this, gate_);
   }
 
   TestQueue(const ObjectPtr<TestDevice> &device, QueueType type, std::shared_ptr<Gate> gate)
       : backend::Queue(device.Get(), type),
-        gate_(std::move(gate)) {
+        gate_(std::move(gate)),
+        timeline_(std::make_unique<TestTimeline>(device.Get(), gate_)) {
   }
 
  private:
   std::shared_ptr<Gate> gate_;
+  std::unique_ptr<TestTimeline> timeline_;
 };
 
 TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
@@ -400,7 +431,7 @@ TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
   auto upload = std::move(context).Submit();
   ASSERT_TRUE(upload);
   context = CommandContext(new TestCommandContext(graphics.Get(), gate));
-  auto done = std::move(context).Submit({{upload}});
+  auto done = std::move(context).Submit({{upload.GetEvent()}});
   ASSERT_TRUE(done);
   EXPECT_EQ(done.GetStatus(), SUBMISSION_STATUS_PENDING);
   {

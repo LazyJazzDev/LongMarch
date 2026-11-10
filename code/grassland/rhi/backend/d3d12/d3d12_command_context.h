@@ -65,8 +65,9 @@ class D3D12CommandContext final : public CommandContext {
                       uint32_t first_instance = 0) override;
   bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
   bool CmdPresent(rhi::IWindow *window) override;
-  SubmitResult SubmitNative() override;
-  SubmissionStatus WaitForProgress() override;
+  bool UpdatePresentedImages() override;
+  SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
+  SubmissionStatus WaitForProgress(Event signal) override;
 
  private:
   D3D12CommandContext(D3D12Queue *queue);
@@ -113,7 +114,6 @@ class D3D12CommandContext final : public CommandContext {
   ComPtr<ID3D12GraphicsCommandList> list_;
   ComPtr<ID3D12GraphicsCommandList4> ray_list_;
   HANDLE event_{};
-  uint64_t value_{};
   bool submission_failed_{};
   bool reusable_{};
   bool closed_{};
