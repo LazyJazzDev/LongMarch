@@ -37,7 +37,7 @@ def main():
     parser.add_argument("--apis", default="vulkan,d3d12")
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--depth", type=int, default=8)
-    parser.add_argument("--profile", choices=["standard", "ray-heavy"], default="standard")
+    parser.add_argument("--profile", choices=["standard", "ray-heavy", "batched-check"], default="standard")
     args = parser.parse_args()
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -48,10 +48,14 @@ def main():
         writer = csv.DictWriter(csv_file, fieldnames=["round", "case"] + FIELDS)
         writer.writeheader()
         for round_index in range(args.rounds):
-            cases = [(api, case) for api in args.apis.split(",") for case in (CASES if args.profile == "standard" else RAY_HEAVY_CASES)]
+            selected = CASES if args.profile == "standard" else RAY_HEAVY_CASES
+            if args.profile == "batched-check":
+                selected = [("as-update-batched-check", "as-update", 256, 8, 8192)]
+            cases = [(api, case) for api in args.apis.split(",") for case in selected]
             rng.shuffle(cases)
             for api, (label, workload, size, loops, frames) in cases:
-                modes = [(args.baseline, "main"), (args.current, "main"), (args.current, "assist")]
+                single = "main-batched" if args.profile == "batched-check" else "main"
+                modes = [(args.baseline, single), (args.current, single), (args.current, "assist")]
                 rng.shuffle(modes)
                 for executable, mode in modes:
                     command = [executable, api, mode, workload, str(size), str(loops), str(args.depth), str(frames), "0"]

@@ -58,12 +58,12 @@ uint32_t Compute(uint32_t v, uint32_t loops) {
 // Fixed work, no window, no synthetic GPU delays, no readback inside the timed loop.
 int main(int argc, char **argv) {
   if (argc != 9) {
-    std::cerr << "Usage: demo_rhi_queue_bench <vulkan|d3d12> <main|assist> <upload|as-build|as-update> "
+    std::cerr << "Usage: demo_rhi_queue_bench <vulkan|d3d12> <main|main-batched|assist> <upload|as-build|as-update> "
                  "<elements-or-grid-side> <compute-loops-or-rays> <inflight> <frames> <validation:0|1>\n";
     return 2;
   }
   const std::string api_name = argv[1], mode = argv[2], workload = argv[3];
-  if ((api_name != "vulkan" && api_name != "d3d12") || (mode != "main" && mode != "assist") ||
+  if ((api_name != "vulkan" && api_name != "d3d12") || (mode != "main" && mode != "main-batched" && mode != "assist") ||
       (workload != "upload" && workload != "as-build" && workload != "as-update"))
     return 2;
   const uint32_t size = std::stoul(argv[4]), loops = std::stoul(argv[5]), depth = std::stoul(argv[6]),
@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
   if (!device || (ray && !device->SupportRayQuery()))
     return 1;
 #ifdef RHI_BENCH_LEGACY
-  if (mode != "main")
+  if (mode == "assist")
     return 2;
   ObjPtr<IQueue> main = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   const char *revision = "baseline";
@@ -199,10 +199,14 @@ RHI_RW_STRUCTURED_BUFFER(0, 1, uint, output);
         if (!update->CmdBuildTopLevelAccelerationStructure(s.tlas.Get(), {instance}, build_mode))
           return false;
       }
-      auto prepared = Submit(prep, update.Get());
-      if (!prepared)
-        return false;
-      auto compute = Context(device.Get(), main.Get());
+      ObjPtr<ISubmissionToken> prepared;
+      if (mode != "main-batched") {
+        prepared = Submit(prep, update.Get());
+        if (!prepared)
+          return false;
+      }
+      auto compute =
+          mode == "main-batched" ? ObjPtr<ICommandContext>::Retain(update.Get()) : Context(device.Get(), main.Get());
       if (!compute || !compute->CmdBindComputeProgram(program.Get()) || !compute->CmdBindGroup(0, s.bindings.Get()) ||
           !compute->CmdDispatch(elements / 64))
         return false;

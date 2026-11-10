@@ -1,4 +1,4 @@
-﻿# Offscreen queue throughput benchmark
+# Offscreen queue throughput benchmark
 
 This compares the same work on main before PR113 (`6ddcd48e`), the current Main
 queue, and current Assist preparation plus Main consumption. It does not create
@@ -14,7 +14,7 @@ Old revision Assist is deliberately excluded: it was not a distinct native queue
 Arguments:
 
 ```
-demo_rhi_queue_bench <vulkan|d3d12> <main|assist> <upload|as-build|as-update> <elements-or-grid-side> <compute-loops-or-rays> <inflight> <frames> <validation:0|1>
+demo_rhi_queue_bench <vulkan|d3d12> <main|main-batched|assist> <upload|as-build|as-update> <elements-or-grid-side> <compute-loops-or-rays> <inflight> <frames> <validation:0|1>
 ```
 
 - Upload: upload a uint buffer and compute an integer recurrence for every element.
@@ -23,7 +23,9 @@ demo_rhi_queue_bench <vulkan|d3d12> <main|assist> <upload|as-build|as-update> <e
   Updates use uncompressed AS allocated with update support.
 - Every in-flight slot has separate input/output and AS resources. The CPU waits
   before reusing a slot. Assist mode adds the producer Event to Main submission;
-  all-Main mode relies on native queue order. Both modes submit twice per frame.
+  all-Main mode relies on native queue order. Standard Main and Assist modes submit
+  twice per frame. `main-batched` records preparation and consumption in one context
+  and submits once, providing a practical single-queue batching comparison.
 - Slot geometry/data alternate between two real inputs on successive reuse cycles.
   The first max(32, 2*inflight) frames warm up before timing. Resource allocation,
   shader compilation, input generation, output downloads and CPU verification are
@@ -44,3 +46,9 @@ Use `--profile ray-heavy` for the supplementary AS cases: the same 256x256 grid,
 64 rays per output pixel, 2,048 measured frames, and the same in-flight depth.
 This increases consumer work without changing upload/AS preparation size, to check
 whether a longer Main workload provides more opportunity for useful overlap.
+
+Use `--profile batched-check` to compare old/current `main-batched` against current
+Assist for the AS-update case with eight rays per pixel. This checks whether the
+positive Assist result against two Main submissions survives comparison with a
+single Main submission. GPU task inputs are unchanged; submission granularity and
+inter-context resource transitions can differ, as they would in an application.
