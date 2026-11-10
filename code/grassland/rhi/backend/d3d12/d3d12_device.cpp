@@ -143,6 +143,7 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
     if (!object->queues_[type])
       return nullptr;
   }
+  object->StartCollector();
   return object.release();
 }
 

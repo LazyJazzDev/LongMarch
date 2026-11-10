@@ -37,10 +37,9 @@ class Device : public Object<rhi::IDevice> {
   rhi::IQueue *GetQueue(QueueType type) override;
   bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override;
 
-  // Starts the single device collector before a queue accepts native work.
-  bool StartCollector();
-
  protected:
+  // Called once after native device resources and all queues are initialized.
+  void StartCollector();
   virtual bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const = 0;
   // Collector-only bounded wait; native registrations may be reused across calls.
   virtual void WaitForProgress(const std::vector<Event> &next) = 0;

@@ -32,8 +32,6 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
   // cannot allocate, including when error reporting throws after native submit.
   std::list<Submission> submission;
   submission.push_back({commands, completion});
-  if (!device_->StartCollector())
-    return {};
   auto publish = [&] {
     if (!queue_lock.owns_lock())
       queue_lock.lock();

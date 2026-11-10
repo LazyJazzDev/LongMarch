@@ -32,6 +32,7 @@ MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<
     if (!object->queues_[type])
       return nullptr;
   }
+  object->StartCollector();
   return object.release();
 }
 

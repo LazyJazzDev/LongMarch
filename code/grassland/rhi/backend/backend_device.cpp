@@ -103,13 +103,8 @@ Core *Device::OwnerCore() const {
   return core_;
 }
 
-bool Device::StartCollector() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (stopping_)
-    return false;
-  if (!collector_.joinable())
-    collector_ = std::thread([this] { Collect(); });
-  return true;
+void Device::StartCollector() {
+  collector_ = std::thread([this] { Collect(); });
 }
 
 bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {

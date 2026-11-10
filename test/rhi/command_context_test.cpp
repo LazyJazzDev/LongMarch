@@ -229,6 +229,7 @@ class TestDevice final : public backend::Device {
   explicit TestDevice(std::shared_ptr<Gate> gate) : backend::Device({}, {}), gate_(std::move(gate)) {
     for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
       queues_[type] = ObjectPtr<backend::Queue>::Adopt(new TestQueue(this, type, gate_));
+    StartCollector();
   }
 
   ~TestDevice() override {

@@ -193,6 +193,7 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     if (!device->queues_[index])
       return nullptr;
   }
+  device->StartCollector();
   return device.release();
 }
 
