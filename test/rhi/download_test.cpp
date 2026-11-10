@@ -31,7 +31,7 @@ TEST_P(RhiDownload, BufferRangeSnapshotsAndRetainedLeases) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
   ASSERT_TRUE(buffer);
   std::array<uint32_t, 64> source{};
@@ -110,7 +110,7 @@ TEST_P(RhiDownload, D24S8ReadbackIsRejectedBeforeSubmission) {
     ASSERT_TRUE(commands);
     ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), region);
     EXPECT_FALSE(token);
-    ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_MAIN)->Submit(commands.Get());
     EXPECT_FALSE(done);
   }
 }
@@ -121,7 +121,7 @@ TEST_P(RhiDownload, ImageSubrectangleIsTightlyPackedAndUnconverted) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   for (auto format : {IMAGE_FORMAT_R8G8B8A8_UNORM, IMAGE_FORMAT_B8G8R8A8_UNORM, IMAGE_FORMAT_R16G16B16A16_SFLOAT,
                       IMAGE_FORMAT_R10G10B10A2_UNORM, IMAGE_FORMAT_B10G10R10A2_UNORM}) {
     if (format == IMAGE_FORMAT_B10G10R10A2_UNORM && GetParam() == BACKEND_API_D3D12)
@@ -162,7 +162,7 @@ TEST_P(RhiDownload, DepthSubrectangleIsTightlyPacked) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   const auto format = IMAGE_FORMAT_D32_SFLOAT;
   ObjPtr<IImage> image = device->CreateImage({13, 7, format});
   ASSERT_TRUE(image);
@@ -192,7 +192,7 @@ TEST_P(RhiDownload, RejectedSubmissionLeavesDownloadUnassociated) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64});
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ObjPtr<IDownloadToken> token = commands->CmdDownloadBuffer(buffer.Get(), 0, 64);
@@ -209,7 +209,7 @@ TEST_P(RhiDownload, WaitHostSurvivesSubmissionHandleReleaseAndSupportsMultipleWa
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64});
   ASSERT_TRUE(buffer);
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
@@ -245,7 +245,7 @@ TEST_P(RhiDownload, TemporalPoolRetainsTokenLeaseAndShrinksExpiredDemand) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64});
   ASSERT_TRUE(buffer);
   {

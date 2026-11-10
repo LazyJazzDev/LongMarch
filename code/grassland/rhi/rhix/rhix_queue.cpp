@@ -15,7 +15,7 @@ rhi::IQueue *Queue::Get() const noexcept {
 rhi::QueueType Queue::GetType() const {
 #if !defined(NDEBUG)
   if (!*this)
-    return rhi::QUEUE_TYPE_GRAPHICS;
+    return rhi::QUEUE_TYPE_MAIN;
 #endif
   return Get()->GetType();
 }

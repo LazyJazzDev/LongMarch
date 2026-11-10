@@ -25,7 +25,7 @@ namespace {
 int RunHDR(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
 
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   size_t color_space_changes = 0;

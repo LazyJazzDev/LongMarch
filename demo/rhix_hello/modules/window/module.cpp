@@ -54,7 +54,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
       return 1;
   }
 
-  auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto graphics = device.GetQueue(QUEUE_TYPE_MAIN);
   if (!graphics)
     return 1;
   if (!headless) {

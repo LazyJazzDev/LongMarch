@@ -203,7 +203,7 @@ class TestQueue final : public backend::Queue {
 TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
   auto *native = new TestCommandContext(gate);
@@ -237,7 +237,7 @@ TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
 TEST(RhiCommands, DifferentResourceTypesAreRetainedOnceUntilSubmissionCompletes) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
   auto window = Window(new TestWindow(gate));
   auto image = ObjectPtr<TestImage>::Adopt(new TestImage(gate));
   auto resource = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
@@ -293,7 +293,7 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   static_assert(!std::is_copy_constructible_v<CommandContext>);
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
   auto context = CommandContext(new TestCommandContext(gate));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
@@ -326,7 +326,7 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
 TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
   auto context = CommandContext(new TestCommandContext(gate));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
@@ -357,7 +357,7 @@ TEST(RhiCommands, CancellationReleasesResourcesAndForeignQueueConsumesRejectedPa
   ASSERT_TRUE(context.CmdPresent(window));
   auto packet = std::move(context);
   auto other = ObjectPtr<TestDevice>::Adopt(new TestDevice(std::make_shared<Gate>()));
-  auto queue = Queue(new TestQueue(other, QUEUE_TYPE_GRAPHICS));
+  auto queue = Queue(new TestQueue(other, QUEUE_TYPE_MAIN));
   EXPECT_FALSE(queue.Submit(std::move(packet)));
   EXPECT_FALSE(packet);
   image = {};
@@ -367,7 +367,7 @@ TEST(RhiCommands, CancellationReleasesResourcesAndForeignQueueConsumesRejectedPa
 TEST(RhiCommands, SealedContextsCannotRecordOrSubmitAgain) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
   auto image = Image(new TestImage(gate));
   auto native = ObjectPtr<TestCommandContext>::Adopt(new TestCommandContext(gate));
   auto context = CommandContext(ObjPtr<rhi::ICommandContext>::Retain(native.Get()).Detach());
@@ -390,8 +390,8 @@ TEST(RhiCommands, SealedContextsCannotRecordOrSubmitAgain) {
 TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto transfer = Queue(new TestQueue(device, QUEUE_TYPE_TRANSFER));
-  auto graphics = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto transfer = Queue(new TestQueue(device, QUEUE_TYPE_ASSIST));
+  auto graphics = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
   auto context = CommandContext(new TestCommandContext(gate));
   auto upload = transfer.Submit(std::move(context));
   ASSERT_TRUE(upload);
@@ -410,7 +410,7 @@ TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
 TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletion) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
   auto context = CommandContext(new TestCommandContext(gate, true));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
@@ -431,7 +431,7 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
 TEST(RhiCommands, DeviceShutdownDrainsSubmittedResources) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
   auto resource = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
   auto *native = new TestCommandContext(gate);
   CommandContext context = native;

@@ -39,7 +39,7 @@ TEST_P(RhiFormats, ColorUploadsAndSubrectangleDownloadsPreserveNativeBytes) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
   for (auto c : formats) {
     SCOPED_TRACE(to_string(c.format));
     EXPECT_EQ(ImageFormatSize(c.format), c.channels * c.bytes);
@@ -71,7 +71,7 @@ TEST_P(RhiFormats, IntegerClearsUseNumericValuesForTransferAndRenderPass) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
   for (auto c : formats) {
     const bool signed_integer = IsSignedIntegerFormat(c.format);
     if (!signed_integer && !IsUnsignedIntegerFormat(c.format))
@@ -130,7 +130,7 @@ TEST_P(RhiFormats, FloatClearValuesPreserveFloatAndNormalizedColors) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
   for (auto c : formats) {
     if (IsSignedIntegerFormat(c.format) || IsUnsignedIntegerFormat(c.format))
       continue;
@@ -184,7 +184,7 @@ TEST_P(RhiFormats, D16DepthSubrectangleKeepsTwoBytePixels) {
   ASSERT_TRUE(commands->CmdEndRendering());
   ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {3, 2, 5, 3});
   ASSERT_TRUE(token);
-  ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_MAIN)->Submit(commands.Get());
   ASSERT_TRUE(done && done->WaitHost());
   ASSERT_EQ(token->GetSize(), 30);
   std::array<uint16_t, 15> actual{};
@@ -256,7 +256,7 @@ TEST_P(RhiFormats, FloatSignedAndUnsignedVertexInputsRenderEveryDimension) {
       ASSERT_TRUE(commands->CmdEndRendering());
       ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {4, 4, 1, 1});
       ASSERT_TRUE(token);
-      ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
+      ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_MAIN)->Submit(commands.Get());
       ASSERT_TRUE(done && done->WaitHost());
       std::array<uint8_t, 4> pixel{};
       ASSERT_TRUE(token->CopyTo(pixel.data(), pixel.size()));
@@ -334,7 +334,7 @@ TEST_P(RhiFormats, IntegerStorageWritesAndRenderTargetsPreserveValues) {
       }
       ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {4, 4, 1, 1});
       ASSERT_TRUE(token);
-      ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
+      ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_MAIN)->Submit(commands.Get());
       ASSERT_TRUE(done && done->WaitHost());
       std::array<uint8_t, 16> actual{};
       ASSERT_TRUE(token->CopyTo(actual.data(), actual.size()));
@@ -356,7 +356,7 @@ TEST_P(RhiFormats, ClearValueSelectsDepthForStandaloneAndRendering) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
   // Stencil rendering is tested through color output; do not read back stencil images.
   for (auto format : {IMAGE_FORMAT_D16_UNORM, IMAGE_FORMAT_D32_SFLOAT}) {
     SCOPED_TRACE(to_string(format));
@@ -437,7 +437,7 @@ TEST_P(RhiFormats, IntegerClearsPreserveBoundDescriptorTablesAndOrderWrites) {
     tokens[i] = commands->CmdDownloadImage(image.Get());
     ASSERT_TRUE(tokens[i]);
   }
-  ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_MAIN)->Submit(commands.Get());
   ASSERT_TRUE(done && done->WaitHost());
   for (uint32_t i = 0; i < tokens.size(); ++i) {
     std::array<uint32_t, 16> pixels{};

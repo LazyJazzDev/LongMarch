@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     if (!window)
       return 1;
   }
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   std::array<ObjPtr<IImage>, 3> targets;

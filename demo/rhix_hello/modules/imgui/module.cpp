@@ -33,7 +33,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
   ImageDesc last_frame_desc{};
   ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
   float last_frame_white_scale = 1.0f;
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   PresentMode requested = PRESENT_MODE_VSYNC;

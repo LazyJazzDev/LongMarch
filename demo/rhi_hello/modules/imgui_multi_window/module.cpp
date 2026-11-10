@@ -17,7 +17,7 @@
 int RunImGuiMultiWindow(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
 
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
 

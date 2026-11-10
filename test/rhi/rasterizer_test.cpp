@@ -89,7 +89,7 @@ class RhiRasterizer : public testing::TestWithParam<BackendAPI> {
     }
     ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get());
     ASSERT_TRUE(token);
-    ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_MAIN)->Submit(commands.Get());
     ASSERT_TRUE(done && done->WaitHost());
     pixels.resize(token->GetSize());
     ASSERT_TRUE(token->CopyTo(pixels.data(), pixels.size()));
@@ -221,7 +221,7 @@ TEST_P(RhiRasterizer, SwitchingProgramsReappliesRasterizerStateInsideOneScope) {
   ASSERT_TRUE(commands->CmdEndRendering());
   ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get());
   ASSERT_TRUE(token);
-  ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_MAIN)->Submit(commands.Get());
   ASSERT_TRUE(done && done->WaitHost());
   std::vector<uint8_t> pixels(token->GetSize());
   ASSERT_TRUE(token->CopyTo(pixels.data(), pixels.size()));
@@ -245,7 +245,7 @@ TEST_P(RhiRasterizer, ViewportRequiresPositiveExtents) {
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
     EXPECT_FALSE(commands->CmdSetViewport({0, 0, extent[0], extent[1], 0, 1}));
-    EXPECT_FALSE(ObjPtr<ISubmissionToken>(device->GetQueue(QUEUE_TYPE_GRAPHICS)->Submit(commands.Get())));
+    EXPECT_FALSE(ObjPtr<ISubmissionToken>(device->GetQueue(QUEUE_TYPE_MAIN)->Submit(commands.Get())));
   }
 }
 #endif

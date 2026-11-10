@@ -16,8 +16,8 @@ TEST(RhiVulkanTimeline, CompletionValuesSurviveContextRecyclingAcrossLogicalQueu
   ASSERT_NE(timeline, VK_NULL_HANDLE);
   EXPECT_EQ(native->Wait(0, 0), VK_SUCCESS);
   EXPECT_EQ(native->Wait(1, 0), VK_TIMEOUT);
-  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_TRANSFER);
+  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
   uint64_t previous = 0;

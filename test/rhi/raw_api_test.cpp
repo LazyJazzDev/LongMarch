@@ -25,7 +25,7 @@ TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
 #endif
   IDevice *device = core->CreateDeviceByAutoSelection();
   ASSERT_NE(device, nullptr);
-  IQueue *queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  IQueue *queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_NE(queue, nullptr);
   ICommandContext *context = device->CreateCommandContext();
   ASSERT_NE(context, nullptr);

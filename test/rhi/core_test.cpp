@@ -29,7 +29,7 @@ TEST(RhiCoreSettings, D3D12OverridesDefaultAcrossSequentialCores) {
     auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get())->NativeDevice();
     backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
     EXPECT_EQ(SUCCEEDED(native->QueryInterface(IID_PPV_ARGS(&messages))), enabled);
-    ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+    ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(queue);
     ASSERT_TRUE(commands);

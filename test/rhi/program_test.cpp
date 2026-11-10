@@ -289,7 +289,7 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
 #endif
   ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "RHI draw regression"});
   ASSERT_TRUE(window);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   const std::string source = R"(
     struct Input { RHI_INPUT(0,float3,position); };
@@ -378,7 +378,7 @@ TEST_P(RhiProgram, ExplicitRenderingSupportsEmptyScopesAndAttachmentOperations) 
   ASSERT_TRUE(device);
   ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "RHI rendering scopes"});
   ASSERT_TRUE(window);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IImage> image = window->GetNextImage();
   ASSERT_TRUE(image);
@@ -411,7 +411,7 @@ TEST_P(RhiProgram, ExplicitRenderingRejectsUnbalancedScopesAndOutsideCommands) {
   ASSERT_TRUE(device);
   ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "RHI scope contract"});
   ASSERT_TRUE(window);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IImage> image = window->GetNextImage();
   ASSERT_TRUE(image);

@@ -27,7 +27,7 @@ int RunTriangle(grassland::rhi::IDevice *device) {
   if (!window)
     return 1;
 
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
 

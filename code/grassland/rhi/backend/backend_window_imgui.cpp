@@ -167,7 +167,7 @@ bool WindowImGui::Initialize(GLFWwindow *window, const char *font_file_path, flo
   if (!font_ || !sampler_)
     return false;
   ObjPtr<ICommandContext> upload = device_->CreateCommandContext();
-  ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_MAIN);
   if (!upload || !queue || !upload->CmdUploadImage(font_.Get(), pixels, uint64_t(width) * 4))
     return false;
   ObjPtr<ISubmissionToken> token = queue->Submit(upload.Get());

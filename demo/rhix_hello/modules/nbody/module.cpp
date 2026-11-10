@@ -78,7 +78,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
         spaces.push_back(option.color_space);
     }
   }
-  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   std::array<grassland::rhix::Image, 3> targets;

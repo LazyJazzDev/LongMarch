@@ -69,7 +69,7 @@ int RunNBody(grassland::rhi::IDevice *device) {
       spaces.push_back(option.color_space);
   }
 
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
 

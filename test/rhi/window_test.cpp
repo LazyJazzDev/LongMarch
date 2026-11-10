@@ -98,7 +98,7 @@ TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupported
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   auto window = device.CreateGLFWWindow({320, 240, "RHI HDR transitions"});
   ASSERT_TRUE(window);
   const auto options = window.GetSupportedPresentationOptions();
@@ -224,7 +224,7 @@ TEST_P(RhiWindow, ImGuiFontInitializationOptions) {
     ImGui::TextUnformatted("Font file at 28 pixels");
     ImGui::End();
   };
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ASSERT_TRUE(window.UpdateImGui(draw_window));
   auto commands = device.CreateCommandContext();
@@ -243,7 +243,7 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   auto first = device.CreateGLFWWindow({240, 180, "RHI ImGui first"});
   auto second = device.CreateGLFWWindow({240, 180, "RHI ImGui second"});
   ASSERT_TRUE(first);
@@ -388,7 +388,7 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
   auto window = device.CreateGLFWWindow({240, 180, "ImGui input verification"});
   ASSERT_TRUE(window);
   ASSERT_TRUE(window.EnableImGui());
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   int clicked = 0, mouse_events = 0;
   ImVec2 center{};
   window.MouseButtonEvent().RegisterCallback([&](int button, int, int, double, double) {
@@ -442,8 +442,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
-  auto transfer = device.GetQueue(QUEUE_TYPE_TRANSFER);
+  auto graphics = device.GetQueue(QUEUE_TYPE_MAIN);
+  auto transfer = device.GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
   EXPECT_TRUE(graphics.SharesPhysicalQueue(transfer));
@@ -602,7 +602,7 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
     messages->ClearStoredMessages();
   }
 #endif
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   auto first = device.CreateGLFWWindow({320, 240, "RHI state test A"});
   auto second = device.CreateGLFWWindow({320, 240, "RHI state test B"});
   ASSERT_TRUE(first);
@@ -741,7 +741,7 @@ TEST(RhiVulkanWindow, OutOfDateDefersRebuildAndKeepsSubmittedWorkAlive) {
   ASSERT_TRUE(device);
   auto window = device.CreateGLFWWindow({320, 240, "RHI out of date"});
   ASSERT_TRUE(window);
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ASSERT_TRUE(Window::PollEvents());
   auto native = window.GLFWWindow();

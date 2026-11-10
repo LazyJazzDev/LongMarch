@@ -31,7 +31,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, const std::string &captur
   ImageDesc last_frame_desc{};
   ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
   float last_frame_white_scale = 1.0f;
-  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   size_t color_space_changes = 0;

@@ -63,7 +63,7 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     ASSERT_EQ(commands->status(), MTL::CommandBufferStatusCompleted);
     for (size_t i = 0; i < 256; ++i)
       EXPECT_EQ(static_cast<const uint8_t *>(buffer->contents())[i], 0x5a);
-    auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+    auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
     auto context = device.CreateCommandContext();
     ASSERT_TRUE(queue);
     ASSERT_TRUE(context);
@@ -138,8 +138,8 @@ TEST(RhiMetal, CompletionTokensSurviveBatchesAndParentRelease) {
     ASSERT_TRUE(core);
     rhi::ObjPtr<rhi::IDevice> device = core->CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
-    rhi::ObjPtr<rhi::IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-    rhi::ObjPtr<rhi::IQueue> transfer = device->GetQueue(QUEUE_TYPE_TRANSFER);
+    rhi::ObjPtr<rhi::IQueue> graphics = device->GetQueue(QUEUE_TYPE_MAIN);
+    rhi::ObjPtr<rhi::IQueue> transfer = device->GetQueue(QUEUE_TYPE_ASSIST);
     ASSERT_TRUE(graphics);
     ASSERT_TRUE(transfer);
     for (int batch = 0; batch < 8; ++batch) {
@@ -179,7 +179,7 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   auto core = rhix::CreateCore(BACKEND_API_METAL);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   auto first = device.CreateGLFWWindow({160, 120, "Metal readback A"});
   auto second = device.CreateGLFWWindow({160, 120, "Metal readback B"});
   ASSERT_TRUE(first);

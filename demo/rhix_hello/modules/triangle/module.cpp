@@ -46,7 +46,7 @@ int RunTriangle(grassland::rhi::BackendAPI api, int frames, bool headless, const
     if (!window)
       return 1;
   }
-  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   std::array<grassland::rhix::Image, 3> targets;

@@ -44,7 +44,7 @@ int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless, const
     if (!window)
       return 1;
   }
-  Queue queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  Queue queue = device.GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   std::array<Image, 3> targets;

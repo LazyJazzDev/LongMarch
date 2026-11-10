@@ -13,7 +13,7 @@
 int RunWindow(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
   ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "RHI window - Escape: close"});
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!window || !queue)
     return 1;
   window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {

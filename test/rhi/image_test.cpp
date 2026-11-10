@@ -246,7 +246,7 @@ TEST_P(RhiImage, HDRUploadUsesFullPixelStrideAndRenderingPreservesHighlights) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   for (auto format :
        {IMAGE_FORMAT_R16G16B16A16_SFLOAT, IMAGE_FORMAT_R10G10B10A2_UNORM, IMAGE_FORMAT_B10G10R10A2_UNORM}) {
@@ -407,7 +407,7 @@ TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch)
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IImage> image = device->CreateImage({3, 3, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(image);
@@ -442,7 +442,7 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   backend::ImagePresenter presenter(static_cast<backend::Device *>(device.Get()));
   ObjPtr<IImage> input = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> encoded = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
@@ -501,7 +501,7 @@ TEST_P(RhiImage, PresentImageUsesTheSelectedSwapChainEncoding) {
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Present image color spaces"});
   ASSERT_TRUE(window);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> source = device->CreateImage({4, 4, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ASSERT_TRUE(source);
   for (auto space : {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084,
@@ -578,7 +578,7 @@ TEST_P(RhiImage, ExplicitImGuiAndPresentConsumeEachUpdateOnce) {
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Linear ImGui consumption"});
   ASSERT_TRUE(window && window->EnableImGui());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({160, 120, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> unused = device->CreateImage({160, 120, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ASSERT_TRUE(target && unused);
@@ -649,7 +649,7 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ObjPtr<IImage> target = device->CreateImage({width, height, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(target && texture);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ImVec2 framebuffer_scale;
   auto draw_window = [&] {
     framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
@@ -702,7 +702,7 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   auto ui =
       backend::WindowImGui::Create(static_cast<backend::Device *>(device.Get()), window->GLFWWindow(), nullptr, 13);
   ASSERT_TRUE(ui);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(texture);
@@ -824,7 +824,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
   ObjPtr<IImage> target =
       device->CreateImage({frame->GetDesc().width, frame->GetDesc().height, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(target);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   bool record_ui = true;
   auto draw_window = [&] {
@@ -861,7 +861,7 @@ TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "ImGui buffer reuse"});
   ASSERT_TRUE(window && window->EnableImGui());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   std::vector<ObjPtr<IImage>> targets;
   std::vector<ObjPtr<ICommandContext>> recordings;
@@ -912,7 +912,7 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
   EXPECT_FALSE(disabled_callback_ran);
   ASSERT_TRUE(window->EnableImGui());
   ObjPtr<IImage> target = device->CreateImage({320, 240, IMAGE_FORMAT_R8G8B8A8_UNORM});
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(target && queue);
   int updates = 0;
   ClearValue background{0.0f, 0.0f, 1.0f, 1.0f};
@@ -978,7 +978,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
   Track(device.Get());
   EXPECT_EQ(device->CreateImage({0, 64, IMAGE_FORMAT_R8G8B8A8_UNORM}), nullptr);
   EXPECT_EQ(device->CreateImage({64, 64, IMAGE_FORMAT_UNKNOWN}), nullptr);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   const std::string source = R"(
     float4 VSMain(uint id : SV_VertexID) : SV_Position {
@@ -1045,7 +1045,7 @@ TEST_P(RhiImage, FragmentRayQueriesRetainIndirectBlasResources) {
     GTEST_SKIP() << "Render-stage ray query unavailable";
 #endif
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(queue && image);
   BottomLevelAccelerationStructureDesc bottom;
@@ -1121,7 +1121,7 @@ TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(queue && image);
   ProgramDesc desc;
@@ -1182,7 +1182,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> image = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(image);
   const std::string source = R"(
@@ -1246,7 +1246,7 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> first = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   // Keep an intervening view alive so MRT cannot assume contiguous handles.
   ObjPtr<IImage> spacer = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
@@ -1305,7 +1305,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> red = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> green = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
@@ -1512,7 +1512,7 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
   ASSERT_TRUE(queue);
@@ -1580,7 +1580,7 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
   ASSERT_TRUE(queue);
@@ -1656,7 +1656,7 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64 * 64 * 16});
@@ -1733,7 +1733,7 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64 * 64 * 16});
@@ -1810,7 +1810,7 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> texture = device->CreateImage({2, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<ISampler> nearest = device->CreateSampler({SAMPLER_FILTER_NEAREST});
@@ -1881,7 +1881,7 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({1024});
   ASSERT_TRUE(buffer && target && queue);
@@ -1948,7 +1948,7 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D24_UNORM_S8_UINT});
   ASSERT_TRUE(target && depth);
@@ -2021,7 +2021,7 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   std::array<ObjPtr<IImage>, 3> targets;
   for (auto &target : targets) {
@@ -2119,7 +2119,7 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IImage> a = device->CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(a);

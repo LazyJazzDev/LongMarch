@@ -204,7 +204,7 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
   if (!device)
     GTEST_SKIP() << "Ray query unavailable";
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   BottomLevelAccelerationStructureDesc desc;
   desc.geometries = {{3}};
@@ -345,7 +345,7 @@ TEST_P(RhiRayTracing, ProceduralQueriesUseArraysMasksAndCapturedBindings) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
   if (!device)
     GTEST_SKIP() << "Ray query unavailable";
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   BottomLevelAccelerationStructureDesc desc;
   desc.aabbs = {{1}};
@@ -430,7 +430,7 @@ TEST_P(RhiRayTracing, CustomShaderBindingTablesRouteRecordsAndRestoreDefault) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
   if (!device)
     GTEST_SKIP() << "Ray pipeline unavailable";
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   BottomLevelAccelerationStructureDesc triangles;
   triangles.geometries = {{3, 12, 3, INDEX_FORMAT_UINT16}};
@@ -605,7 +605,7 @@ TEST_P(RhiRayTracing, CompactedLargeBlasSupportsInPlaceUpdate) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
   if (!device)
     GTEST_SKIP();
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   constexpr uint32_t count = 1024;
   std::vector<float> positions(count * 9);
@@ -659,7 +659,7 @@ TEST_P(RhiRayTracing, RebuildsTlasWithChangingInstanceCountWithinCapacity) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
   if (!device)
     GTEST_SKIP();
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   BottomLevelAccelerationStructureDesc desc;
   desc.geometries = {{3}};
@@ -798,8 +798,8 @@ TEST_P(RhiRayTracing, SharedScratchSurvivesResizingAndOutOfOrderContextSubmissio
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
   if (!device)
     GTEST_SKIP();
-  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_TRANSFER);
+  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
   constexpr uint32_t count = 32;
@@ -933,7 +933,7 @@ TEST_P(RhiRayTracing, ProgramCreationRejectsInvalidDescriptionAndShader) {
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdBindRayTracingProgram(program.Get()));
   ASSERT_TRUE(commands->CmdDispatchRays(1, 1, 1, table.Get()));
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
   ASSERT_TRUE(token);

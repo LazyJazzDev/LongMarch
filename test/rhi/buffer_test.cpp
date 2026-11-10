@@ -176,9 +176,9 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   EXPECT_EQ(device->CreateBuffer({0}), nullptr);
-  ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_TRANSFER);
+  ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(transfer);
-  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(graphics);
   std::array<uint32_t, 16> expected{};
   for (uint32_t i = 0; i < expected.size(); ++i)
@@ -322,7 +322,7 @@ TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) 
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_TRANSFER);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(queue);
   std::array<uint32_t, 16> expected{};
   for (uint32_t i = 0; i < expected.size(); ++i)
@@ -395,7 +395,7 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   std::string source;
   std::string body;
@@ -443,7 +443,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   const std::string source = R"(
     RHI_RW_STRUCTURED_BUFFER(0, 0, uint, values);
@@ -523,7 +523,7 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
     RHI_RW_STRUCTURED_BUFFER(0, 0, uint, values);
