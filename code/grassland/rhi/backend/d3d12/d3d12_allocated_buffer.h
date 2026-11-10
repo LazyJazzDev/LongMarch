@@ -7,8 +7,12 @@ class Allocator;
 }  // namespace D3D12MA
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12AllocatedBuffer final : public D3D12Buffer {
+class D3D12AllocatedBuffer final : public Object<IBuffer>, public D3D12Buffer {
  public:
+  BufferDesc GetDesc() const override {
+    return desc_;
+  }
+
   ~D3D12AllocatedBuffer() override;
   static D3D12AllocatedBuffer *Create(D3D12Device *device,
                                       const BufferDesc &desc,

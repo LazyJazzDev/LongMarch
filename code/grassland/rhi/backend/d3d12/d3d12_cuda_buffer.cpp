@@ -3,11 +3,21 @@
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12CUDABuffer::D3D12CUDABuffer(const BufferDesc &desc, int cuda_device) : desc_(desc), mapping_(cuda_device) {
+D3D12CUDABuffer::D3D12CUDABuffer(D3D12Device *device, const BufferDesc &desc, int cuda_device)
+    : D3D12Buffer(device, desc),
+      mapping_(cuda_device) {
 }
 
 BufferDesc D3D12CUDABuffer::GetDesc() const {
   return desc_;
+}
+
+ID3D12Resource *D3D12CUDABuffer::NativeBuffer() const {
+  return resource_.Get();
+}
+
+D3D12_RESOURCE_STATES D3D12CUDABuffer::DefaultState() const {
+  return D3D12_RESOURCE_STATE_COMMON;
 }
 
 void *D3D12CUDABuffer::GetDevicePointer() const {
@@ -22,7 +32,7 @@ D3D12CUDABuffer *D3D12CUDABuffer::Create(D3D12Device *device, const BufferDesc &
     ReportError(-1, "No CUDA device matches this D3D12 adapter.");
     return nullptr;
   }
-  auto object = std::unique_ptr<D3D12CUDABuffer>(new D3D12CUDABuffer(desc, ordinal));
+  auto object = std::unique_ptr<D3D12CUDABuffer>(new D3D12CUDABuffer(device, desc, ordinal));
   D3D12_HEAP_PROPERTIES heap{};
   heap.Type = D3D12_HEAP_TYPE_DEFAULT;
   heap.CreationNodeMask = heap.VisibleNodeMask = 1;

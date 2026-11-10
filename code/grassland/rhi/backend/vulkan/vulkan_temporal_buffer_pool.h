@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanTemporalBufferLease;
 using VulkanTemporalBufferPool = TemporalBufferPool<VulkanDevice, VulkanAllocatedBuffer, VulkanTemporalBufferLease>;
 
-class VulkanTemporalBufferLease final : public VulkanBuffer {
+class VulkanTemporalBufferLease final : public Object<IBuffer>, public VulkanBuffer {
  public:
   VulkanTemporalBufferLease(VulkanTemporalBufferPool *pool, VulkanAllocatedBuffer *buffer, size_t level);
   ~VulkanTemporalBufferLease() override;

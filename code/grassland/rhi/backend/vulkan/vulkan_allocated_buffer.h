@@ -4,8 +4,12 @@ typedef struct VmaAllocation_T *VmaAllocation;
 typedef struct VmaAllocator_T *VmaAllocator;
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanAllocatedBuffer final : public VulkanBuffer {
+class VulkanAllocatedBuffer final : public Object<IBuffer>, public VulkanBuffer {
  public:
+  BufferDesc GetDesc() const override {
+    return desc_;
+  }
+
   ~VulkanAllocatedBuffer() override;
   static VulkanAllocatedBuffer *Create(VulkanDevice *device,
                                        const BufferDesc &desc,

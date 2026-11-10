@@ -2,8 +2,12 @@
 #include "grassland/rhi/backend/metal/metal_buffer.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalAllocatedBuffer final : public MetalBuffer {
+class MetalAllocatedBuffer final : public Object<IBuffer>, public MetalBuffer {
  public:
+  BufferDesc GetDesc() const override {
+    return desc_;
+  }
+
   static MetalAllocatedBuffer *Create(MetalDevice *device,
                                       const BufferDesc &desc,
                                       bool upload = false,

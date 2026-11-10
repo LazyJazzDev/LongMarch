@@ -5,6 +5,10 @@
 
 #include "grassland/rhi/rhi.h"
 
+#if defined(LONGMARCH_CUDA_ENABLED)
+cudaError_t TransformCUDABuffer(void *, uint32_t, cudaStream_t);
+#endif
+
 namespace grassland::rhi {
 namespace {
 struct CUDAStream {
@@ -88,6 +92,51 @@ TEST_P(RhiCUDATimeline, BothQueuesWaitForCUDAAndCUDAWaitsForQueueEvents) {
   ASSERT_EQ(cudaStreamSynchronize(nullptr), cudaSuccess);
   ASSERT_TRUE(submitted->WaitHost());
 }
+
+#if defined(LONGMARCH_CUDA_ENABLED)
+TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  if (device->GetCUDADeviceIndex() < 0)
+    GTEST_SKIP();
+  ASSERT_EQ(cudaSetDevice(device->GetCUDADeviceIndex()), cudaSuccess);
+  auto timeline = device->CreateCUDATimeline();
+  ASSERT_NE(timeline, nullptr);
+  constexpr uint32_t count = 16387;
+  ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({count * sizeof(uint32_t)});
+  ASSERT_TRUE(buffer);
+  auto pointer = buffer->GetDevicePointer();
+  CUDAStream stream;
+  ASSERT_EQ(cudaStreamCreateWithFlags(&stream.stream, cudaStreamNonBlocking), cudaSuccess);
+  std::vector<uint32_t> expected(count), actual(count);
+  for (uint32_t round = 0; round < 8; ++round) {
+    for (uint32_t i = 0; i < count; ++i)
+      expected[i] = i + round * count;
+    ObjPtr<IQueue> queue = device->GetQueue(round % 2 ? QUEUE_TYPE_ASSIST : QUEUE_TYPE_MAIN);
+    ObjPtr<ICommandContext> upload = queue->CreateCommandContext();
+    ASSERT_TRUE(upload->CmdUploadBuffer(buffer.Get(), 0, expected.data(), count * sizeof(uint32_t)));
+    ObjPtr<ISubmissionToken> uploaded = upload->Submit();
+    ASSERT_TRUE(uploaded);
+    ASSERT_TRUE(timeline->Wait(stream.stream, uploaded->GetEvent()));
+    ASSERT_EQ(TransformCUDABuffer(pointer, count, stream.stream), cudaSuccess);
+    auto ready = timeline->Signal(stream.stream, round + 1);
+    ASSERT_NE(ready.timeline, nullptr);
+    ObjPtr<ICommandContext> readback = queue->CreateCommandContext();
+    ObjPtr<IDownloadToken> downloaded = readback->CmdDownloadBuffer(buffer.Get(), 0, count * sizeof(uint32_t));
+    ASSERT_TRUE(downloaded);
+    ObjPtr<ISubmissionToken> done = readback->Submit({{ready}});
+    ASSERT_TRUE(done);
+    ASSERT_TRUE(downloaded->WaitHost());
+    ASSERT_TRUE(downloaded->CopyTo(actual.data(), count * sizeof(uint32_t)));
+    for (auto &value : expected)
+      value = value * 3 + 7;
+    EXPECT_EQ(actual, expected);
+    EXPECT_EQ(buffer->GetDevicePointer(), pointer);
+  }
+}
+#endif
 
 TEST_P(RhiCUDATimeline, NonCUDADevicesRejectTimelineCreation) {
   ObjPtr<ICore> core = CreateCore(GetParam());

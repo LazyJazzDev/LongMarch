@@ -150,7 +150,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   for (const auto &view : buffers) {
     if (view.offset % alignment || view.size > limit)
       return false;
-    infos.push_back({static_cast<VulkanBuffer *>(view.buffer)->NativeBuffer(), view.offset, view.size});
+    infos.push_back({dynamic_cast<VulkanBuffer *>(view.buffer)->NativeBuffer(), view.offset, view.size});
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();

@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::metal {
 class MetalTemporalBufferLease;
 using MetalTemporalBufferPool = TemporalBufferPool<MetalDevice, MetalAllocatedBuffer, MetalTemporalBufferLease>;
 
-class MetalTemporalBufferLease final : public MetalBuffer {
+class MetalTemporalBufferLease final : public Object<IBuffer>, public MetalBuffer {
  public:
   MetalTemporalBufferLease(MetalTemporalBufferPool *pool, MetalAllocatedBuffer *buffer, size_t level);
   ~MetalTemporalBufferLease() override;

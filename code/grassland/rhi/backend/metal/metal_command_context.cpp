@@ -226,7 +226,7 @@ bool MetalCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, cons
     return false;
   }
 #else
-  auto native = static_cast<MetalBuffer *>(buffer);
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
   if (!data || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;
@@ -253,15 +253,15 @@ bool MetalCommandContext::CmdCopyBuffer(IBuffer *source,
     return false;
   }
 #else
-  auto src = static_cast<MetalBuffer *>(source);
-  auto dst = static_cast<MetalBuffer *>(destination);
+  auto src = dynamic_cast<MetalBuffer *>(source);
+  auto dst = dynamic_cast<MetalBuffer *>(destination);
 #endif
   if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
       destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
     recording_failed_ = true;
     return false;
   }
-  if (!RetainResource(src) || !RetainResource(dst))
+  if (!RetainResource(source) || !RetainResource(destination))
     return false;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto blit = commands_->blitCommandEncoder();
@@ -560,9 +560,9 @@ bool MetalCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer,
     return false;
   }
 #else
-  auto native = static_cast<MetalBuffer *>(buffer);
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
-  if (!RetainResource(native))
+  if (!RetainResource(buffer))
     return false;
   if (!program_ || binding >= vertex_buffers_.size() || offset >= native->GetDesc().size) {
     recording_failed_ = true;
@@ -582,9 +582,9 @@ bool MetalCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format
     return false;
   }
 #else
-  auto native = static_cast<MetalBuffer *>(buffer);
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
-  if (!RetainResource(native))
+  if (!RetainResource(buffer))
     return false;
   if ((format != INDEX_FORMAT_UINT16 && format != INDEX_FORMAT_UINT32) || offset >= native->GetDesc().size ||
       offset % (format == INDEX_FORMAT_UINT16 ? 2 : 4)) {
@@ -702,14 +702,14 @@ IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
     return nullptr;
   }
 #else
-  auto native = static_cast<MetalBuffer *>(buffer);
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
   if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;
     return nullptr;
   }
   auto lease = device_->DownloadPool().Acquire(size);
-  if (!lease || !CmdCopyBuffer(native, offset, lease.Get(), 0, size)) {
+  if (!lease || !CmdCopyBuffer(buffer, offset, lease.Get(), 0, size)) {
     recording_failed_ = true;
     return nullptr;
   }

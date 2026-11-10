@@ -14,14 +14,13 @@ constexpr auto memory_handle = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 }  // namespace
 
 VulkanCUDABuffer::VulkanCUDABuffer(VulkanDevice *device, const BufferDesc &desc, int cuda_device)
-    : desc_(desc),
-      device_(device),
+    : VulkanBuffer(device, desc),
       mapping_(cuda_device) {
 }
 
 VulkanCUDABuffer::~VulkanCUDABuffer() {
   mapping_.Reset();
-  auto device = device_->NativeDevice();
+  auto device = static_cast<VulkanDevice *>(Owner())->NativeDevice();
   if (buffer_)
     vkDestroyBuffer(device, buffer_, nullptr);
   if (memory_)
@@ -30,6 +29,10 @@ VulkanCUDABuffer::~VulkanCUDABuffer() {
 
 BufferDesc VulkanCUDABuffer::GetDesc() const {
   return desc_;
+}
+
+VkBuffer VulkanCUDABuffer::NativeBuffer() const {
+  return buffer_;
 }
 
 void *VulkanCUDABuffer::GetDevicePointer() const {

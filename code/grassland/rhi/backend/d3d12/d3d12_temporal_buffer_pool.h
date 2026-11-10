@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::d3d12 {
 class D3D12TemporalBufferLease;
 using D3D12TemporalBufferPool = TemporalBufferPool<D3D12Device, D3D12AllocatedBuffer, D3D12TemporalBufferLease>;
 
-class D3D12TemporalBufferLease final : public D3D12Buffer {
+class D3D12TemporalBufferLease final : public Object<IBuffer>, public D3D12Buffer {
  public:
   D3D12TemporalBufferLease(D3D12TemporalBufferPool *pool, D3D12AllocatedBuffer *buffer, size_t level);
   ~D3D12TemporalBufferLease() override;

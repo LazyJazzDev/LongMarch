@@ -5,9 +5,11 @@
 namespace grassland::rhi::backend {
 class Device;
 
-class Buffer : public Object<IBuffer> {
+// Backend resource access and allocation metadata; public interfaces own their reference count.
+class Buffer {
  public:
-  BufferDesc GetDesc() const override;
+  virtual ~Buffer() = default;
+  virtual BufferDesc GetDesc() const;
   Device *Owner() const;
 
  protected:

@@ -106,6 +106,9 @@ class VulkanCommandContext final : public CommandContext {
   VulkanDevice *device_;
   VkCommandPool pool_{};
   VkCommandBuffer command_{};
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  VkCommandBuffer cuda_acquire_{};
+#endif
   bool submission_failed_{};
   bool reusable_{};
 };

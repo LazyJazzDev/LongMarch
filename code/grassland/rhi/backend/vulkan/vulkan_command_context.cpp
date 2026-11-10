@@ -14,6 +14,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
+#include "grassland/rhi/rhi_cuda_buffer.h"
 
 namespace grassland::rhi::backend::vulkan {
 namespace {
@@ -41,6 +42,10 @@ VulkanCommandContext::VulkanCommandContext(VulkanQueue *queue)
 }
 
 VulkanCommandContext::~VulkanCommandContext() {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (cuda_acquire_)
+    vkFreeCommandBuffers(device_->NativeDevice(), pool_, 1, &cuda_acquire_);
+#endif
   if (reusable_) {
     device_->RecycleCommandResources(pool_, command_);
     return;
@@ -179,6 +184,46 @@ bool VulkanCommandContext::EndRecording() {
                           VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT))
       return false;
   }
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  // Acquire in a preamble so first use inside a rendering scope is also covered.
+  // Release at the end of this command buffer before its queue timeline signal.
+  std::vector<VkBufferMemoryBarrier> external;
+  for (const auto &entry : buffer_states_) {
+    if (!dynamic_cast<ICUDABuffer *>(entry.first))
+      continue;
+    VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+    barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    barrier.srcQueueFamilyIndex = device_->QueueFamily();
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
+    barrier.buffer = entry.first->NativeBuffer();
+    barrier.size = VK_WHOLE_SIZE;
+    external.push_back(barrier);
+  }
+  if (!external.empty()) {
+    vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
+                         nullptr, uint32_t(external.size()), external.data(), 0, nullptr);
+    VkCommandBufferAllocateInfo allocation{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    allocation.commandPool = pool_;
+    allocation.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocation.commandBufferCount = 1;
+    if (!Check(vkAllocateCommandBuffers(device_->NativeDevice(), &allocation, &cuda_acquire_),
+               "Allocate CUDA ownership preamble"))
+      return false;
+    VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    if (!Check(vkBeginCommandBuffer(cuda_acquire_, &begin), "Begin CUDA ownership preamble"))
+      return false;
+    for (auto &barrier : external) {
+      barrier.dstAccessMask = barrier.srcAccessMask;
+      barrier.srcAccessMask = 0;
+      std::swap(barrier.srcQueueFamilyIndex, barrier.dstQueueFamilyIndex);
+    }
+    vkCmdPipelineBarrier(cuda_acquire_, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+                         nullptr, uint32_t(external.size()), external.data(), 0, nullptr);
+    if (!Check(vkEndCommandBuffer(cuda_acquire_), "End CUDA ownership preamble"))
+      return false;
+  }
+#endif
   for (auto &entry : image_states_) {
     const auto layout = entry.first->DefaultLayout();
     const auto access = layout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
@@ -223,6 +268,13 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const SubmitInfo
   submit.pNext = &timeline;
   submit.commandBufferCount = 1;
   submit.pCommandBuffers = &command_;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  const VkCommandBuffer commands[]{cuda_acquire_, command_};
+  if (cuda_acquire_) {
+    submit.commandBufferCount = 2;
+    submit.pCommandBuffers = commands;
+  }
+#endif
   submit.waitSemaphoreCount = static_cast<uint32_t>(waited.size());
   submit.pWaitSemaphores = waited.data();
   submit.pWaitDstStageMask = stages.data();
@@ -285,9 +337,9 @@ bool VulkanCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, con
     return false;
   }
 #else
-  auto native = static_cast<VulkanBuffer *>(buffer);
+  auto native = dynamic_cast<VulkanBuffer *>(buffer);
 #endif
-  if (!RetainResource(native))
+  if (!RetainResource(buffer))
     return false;
 
   if (!data || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
@@ -330,17 +382,17 @@ bool VulkanCommandContext::CmdCopyBuffer(IBuffer *source,
     return false;
   }
 #else
-  auto src = static_cast<VulkanBuffer *>(source);
-  auto dst = static_cast<VulkanBuffer *>(destination);
+  auto src = dynamic_cast<VulkanBuffer *>(source);
+  auto dst = dynamic_cast<VulkanBuffer *>(destination);
 #endif
   if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
       destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
     recording_failed_ = true;
     return false;
   }
-  if (!RetainResource(src))
+  if (!RetainResource(source))
     return false;
-  if (!RetainResource(dst))
+  if (!RetainResource(destination))
     return false;
   if (!TransitionBuffer(src, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT))
     return false;
@@ -528,9 +580,9 @@ bool VulkanCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer
     return false;
   }
 #else
-  auto native = static_cast<VulkanBuffer *>(buffer);
+  auto native = dynamic_cast<VulkanBuffer *>(buffer);
 #endif
-  if (!RetainResource(native))
+  if (!RetainResource(buffer))
     return false;
   if (!program_ || binding >= program_->GetDesc().vertex_bindings.size() || offset >= native->GetDesc().size) {
     recording_failed_ = true;
@@ -553,9 +605,9 @@ bool VulkanCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat forma
     return false;
   }
 #else
-  auto native = static_cast<VulkanBuffer *>(buffer);
+  auto native = dynamic_cast<VulkanBuffer *>(buffer);
 #endif
-  if (!RetainResource(native))
+  if (!RetainResource(buffer))
     return false;
   if (format != INDEX_FORMAT_UINT16 && format != INDEX_FORMAT_UINT32) {
     recording_failed_ = true;
@@ -685,8 +737,13 @@ bool VulkanCommandContext::CmdEndRendering() {
 }
 
 bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access) {
-  if (render_target_)
+  if (render_target_) {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+    if (dynamic_cast<ICUDABuffer *>(buffer))
+      buffer_states_.try_emplace(buffer, BufferState{stages, access});
+#endif
     return true;  // Graphics buffer accesses are synchronized by the explicit scope boundaries.
+  }
   auto known = buffer_states_.find(buffer);
   constexpr VkAccessFlags reads =
       VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
@@ -783,7 +840,7 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
             return false;
       }
       if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
-        auto buffer = static_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
+        auto buffer = dynamic_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
         if (!TransitionBuffer(buffer, stages, b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
           return false;
       }
@@ -910,14 +967,14 @@ IDownloadToken *VulkanCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_
     return nullptr;
   }
 #else
-  auto native = static_cast<VulkanBuffer *>(buffer);
+  auto native = dynamic_cast<VulkanBuffer *>(buffer);
 #endif
   if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;
     return nullptr;
   }
   auto lease = device_->DownloadPool().Acquire(size);
-  if (!lease || !CmdCopyBuffer(native, offset, lease.Get(), 0, size)) {
+  if (!lease || !CmdCopyBuffer(buffer, offset, lease.Get(), 0, size)) {
     recording_failed_ = true;
     return nullptr;
   }
