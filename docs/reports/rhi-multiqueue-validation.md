@@ -10,7 +10,7 @@ Validation date: 2026-11-10. The earlier PR111 is closed; this is a separate imp
 | One borrowed timeline point | `rhi_timeline.h`: readonly ITimeline and plain Event. Token has one Event; no IEvent, TimelinePoint, submission waits, or duplicate completion value. |
 | Stable physical queues | Device owns fixed Main/Assist objects; D3D12 DIRECT queues, Vulkan queue indices in one graphics+compute family, Metal command queues. Native identity tests compare distinct queue handles and timelines. |
 | Context queue binding | Only Queue creates contexts; Submit uses the bound Queue pointer. Raw API tests release caller queue references and still submit successfully. |
-| Submit-only dependency consumption | Device normalizes borrowed waits; each native backend encodes them during Submit. Submission stores only context and completion token. Retirement list storage is allocated before native submission. |
+| Submit-only dependency consumption | Queue normalizes borrowed waits; each native backend encodes them during Submit. Submission stores only context and completion token. Retirement list storage is allocated before native submission. |
 | Independent retirement and CPU waits | A real GPU gate blocks Assist while Main retires without another submit. WaitAny succeeds, WaitAll remains blocked until the gate opens; duplicate timeline values test min/max semantics. |
 | Swapchain isolation | Recording rejects Assist clear, rendering, download and present of swapchain images. Main still presents afterward. Vulkan acquisition waits are submitted internally before exposing the image; only WSI retains binary semaphores. |
 | Demonstrable dependency | `demo/rhi_multiqueue`: Assist updates input, Main computes and downloads; event/no-event modes use the same workload. |
@@ -71,3 +71,17 @@ missing synchronization always produces visible errors.
 
 See [queue semantics](../rhi-queues.md) and the
 [demo instructions](../../demo/rhi_multiqueue/README.md).
+
+## Queue-owned submission follow-up
+
+Submission records, dependency encoding, and retirement now belong to Queue.
+Device retains only collector lifecycle control and multi-timeline waiting. Queue
+uses its submission mutex for list handoff as well as native submit ordering;
+completion polling and resource/token retirement run outside it. Unfinished records
+return to their owning Queue without allocation.
+
+The follow-up passed 58 local Windows Debug tests and 37 Meshy-PC-3090 Debug tests,
+with validation and window tests enabled (explicit X11/Xvfb remotely). Coverage
+includes Commands, Timeline, VulkanTimeline, Window, Raw API, and Download tests.
+Both native builds passed; pre-commit checks passed. The platform limitations above
+remain unchanged.

@@ -3,7 +3,6 @@
 #include <algorithm>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
-#include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_shader.h"
@@ -104,70 +103,13 @@ Core *Device::OwnerCore() const {
   return core_;
 }
 
-ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info) {
-  if (!commands->Seal())
-    return {};
-  SubmitInfo native_info;
-  native_info.waits.reserve(info.waits.size());
-  for (const auto &wait : info.waits) {
-#if !defined(NDEBUG)
-    auto timeline = dynamic_cast<Timeline *>(wait.timeline);
-    if (!timeline || timeline->Owner() != this) {
-      ReportError(-1, "Submission waits require a timeline from this device.");
-      return {};
-    }
-#endif
-    // A submit waits for all dependencies; Vulkan requires unique semaphore handles.
-    auto existing = std::find_if(native_info.waits.begin(), native_info.waits.end(),
-                                 [&](const Event &event) { return event.timeline == wait.timeline; });
-    if (existing == native_info.waits.end())
-      native_info.waits.push_back(wait);
-    else
-      existing->value = std::max(existing->value, wait.value);
-  }
-  auto queue = commands->OwnerQueue();
-  std::unique_lock<std::mutex> queue_lock(queue->QueueMutex());
-  const Event signal{queue->GetTimeline(), queue->NextSerial()};
-  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(signal));
-  // Allocate the node before accepting GPU work. Splicing into the collector
-  // cannot allocate, including when error reporting throws after native submit.
-  std::list<Submission> submission;
-  submission.push_back({commands, completion});
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (stopping_)
-      return {};
-    if (!collector_.joinable())
-      collector_ = std::thread([this] { Collect(); });
-  }
-  auto publish = [&] {
-    std::lock_guard<std::mutex> lock(mutex_);
-    pending_.splice(pending_.end(), submission);
-  };
-  commands->BindDownloads(completion.Get());
-  CommandContext::SubmitResult result;
-  try {
-    result = commands->SubmitNative(native_info, signal);
-    if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
-      completion->Complete(SUBMISSION_STATUS_FAILED);
-      commands->ReleaseDownloads();
-      return {};
-    }
-    commands->MarkSubmitted();
-    queue_lock.unlock();
-    if (result == CommandContext::SUBMIT_RESULT_SUBMITTED && !commands->UpdatePresentedImages())
-      result = CommandContext::SUBMIT_RESULT_FAILED_IN_FLIGHT;
-  } catch (...) {
-    if (commands->WasSubmitted())
-      publish();
-    else {
-      completion->Complete(SUBMISSION_STATUS_FAILED);
-      commands->ReleaseDownloads();
-    }
-    throw;
-  }
-  publish();
-  return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
+bool Device::StartCollector() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (stopping_)
+    return false;
+  if (!collector_.joinable())
+    collector_ = std::thread([this] { Collect(); });
+  return true;
 }
 
 bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
@@ -194,16 +136,9 @@ bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
 }
 
 void Device::Collect() {
-  std::list<Submission> work;
   std::vector<Event> next;
   next.reserve(queues_.size());
   for (;;) {
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      work.splice(work.end(), pending_);
-      if (stopping_ && work.empty())
-        return;
-    }
     // Snapshot before polling: progress racing with the poll will satisfy this
     // wait, even when no subsequent submit arrives to wake the collector.
     next.clear();
@@ -212,16 +147,14 @@ void Device::Collect() {
       if (queue && queue->GetTimeline()->GetCompletedValue(completed) && completed != UINT64_MAX)
         next.push_back({queue->GetTimeline(), completed + 1});
     }
-    for (auto it = work.begin(); it != work.end();) {
-      const auto status = it->commands->PollCompletion(it->completion->GetEvent());
-      if (status == SUBMISSION_STATUS_PENDING) {
-        ++it;
-        continue;
-      }
-      it->commands->ReleaseDownloads();
-      it->commands.Reset();
-      it->completion->Complete(status);
-      it = work.erase(it);
+    bool empty = true;
+    for (const auto &queue : queues_)
+      if (queue && !queue->CollectCompleted())
+        empty = false;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (stopping_ && empty)
+        return;
     }
     // A bounded native wait also permits shutdown and error recovery without
     // adding a synthetic GPU signal to any queue's monotonic timeline.

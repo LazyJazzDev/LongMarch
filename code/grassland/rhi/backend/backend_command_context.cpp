@@ -163,7 +163,7 @@ CommandContext::~CommandContext() = default;
 
 rhi::ISubmissionToken *CommandContext::Submit(const rhi::SubmitInfo &info) {
   try {
-    return queue_->Owner()->Submit(ObjectPtr<CommandContext>::Retain(this), info).Detach();
+    return queue_->Submit(ObjectPtr<CommandContext>::Retain(this), info).Detach();
   } catch (const std::system_error &error) {
     ReportError(error.code().value(), error.what());
   }

@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <list>
+
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_timeline.h"
@@ -16,8 +18,17 @@ class Queue : public Object<rhi::IQueue> {
   std::mutex &QueueMutex();
   // Called under QueueMutex, in native submission order.
   uint64_t NextSerial();
+  ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info);
+  // Called only by the device collector; returns whether this queue is drained.
+  bool CollectCompleted();
 
  private:
+  struct Submission {
+    ObjectPtr<CommandContext> commands;
+    ObjectPtr<SubmissionToken> completion;
+  };
+
+  std::list<Submission> pending_;
   Device *device_;
   QueueType type_;
   std::mutex mutex_;

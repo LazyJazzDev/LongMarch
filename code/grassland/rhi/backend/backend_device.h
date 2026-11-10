@@ -1,10 +1,8 @@
 ﻿#pragma once
 #include <array>
-#include <list>
 #include <mutex>
 #include <thread>
 
-#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_device.h"
@@ -12,7 +10,6 @@
 
 namespace grassland::rhi::backend {
 
-class CommandContext;
 class Queue;
 
 class Device : public Object<rhi::IDevice> {
@@ -40,7 +37,8 @@ class Device : public Object<rhi::IDevice> {
   rhi::IQueue *GetQueue(QueueType type) override;
   bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override;
 
-  ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info);
+  // Starts the single device collector before a queue accepts native work.
+  bool StartCollector();
 
  protected:
   virtual bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const = 0;
@@ -51,17 +49,11 @@ class Device : public Object<rhi::IDevice> {
   std::array<ObjectPtr<Queue>, 2> queues_;
 
  private:
-  struct Submission {
-    ObjectPtr<CommandContext> commands;
-    ObjectPtr<SubmissionToken> completion;
-  };
-
   void Collect();
   BackendAPI api_;
   Core *core_;
   PhysicalDevice info_;
   std::mutex mutex_;
-  std::list<Submission> pending_;
   std::thread collector_;
   bool stopping_{};
 };

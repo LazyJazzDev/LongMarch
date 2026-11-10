@@ -30,8 +30,11 @@ not a substitute for waiting for a download token before reading its CPU storage
 semantics. Duplicate timelines use the maximum value for All and minimum for Any.
 An empty All succeeds; an empty Any returns false.
 
-One collector thread per Device watches the fixed timelines and retires each
-completed submission independently. A blocked Assist submission does not prevent a
+Each Queue owns its pending Submission list and performs its own submission and
+retirement. One collector thread per Device watches the fixed timelines and asks
+each Queue to collect completed submissions. Queue locking protects native submit
+order and list handoff; completion polling, resource release, and token publication
+run outside that lock. A blocked Assist submission does not prevent a
 completed Main submission from retiring. The collector can wait for the next value
 before that submission exists. Native waits use a bounded 50 ms interval to observe
 shutdown, failures, and publication races without adding fake queue signals. Thus
