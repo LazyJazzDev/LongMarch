@@ -78,7 +78,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
         spaces.push_back(option.color_space);
     }
   }
-  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   std::array<grassland::rhix::Image, 3> targets;
@@ -456,7 +456,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       if (!output_program)
         return 1;
     }
-    grassland::rhix::CommandContext context = device.CreateCommandContext();
+    grassland::rhix::CommandContext context = queue.CreateCommandContext();
     if (!context)
       return 1;
     const auto view = glm::lookAt(glm::vec3(10, 20, 30), glm::vec3(0), glm::vec3(0, 1, 0)) * rotation;
@@ -519,7 +519,7 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless, const st
       last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_BT709_LINEAR;
       last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     }
-    grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
+    grassland::rhix::SubmissionToken token = std::move(context).Submit();
 
     if (!token)
       return 1;

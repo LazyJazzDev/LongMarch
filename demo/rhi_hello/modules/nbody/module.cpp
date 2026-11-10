@@ -69,7 +69,7 @@ int RunNBody(grassland::rhi::IDevice *device) {
       spaces.push_back(option.color_space);
   }
 
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
 
@@ -405,7 +405,7 @@ int RunNBody(grassland::rhi::IDevice *device) {
       if (!output_program)
         return 1;
     }
-    ObjPtr<ICommandContext> context = device->CreateCommandContext();
+    ObjPtr<ICommandContext> context = queue->CreateCommandContext();
     if (!context)
       return 1;
     const auto view = glm::lookAt(glm::vec3(10, 20, 30), glm::vec3(0), glm::vec3(0, 1, 0)) * rotation;
@@ -456,7 +456,7 @@ int RunNBody(grassland::rhi::IDevice *device) {
         return 1;
     }
 
-    ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+    ObjPtr<ISubmissionToken> token = context->Submit();
 
     if (!token)
       return 1;

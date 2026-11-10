@@ -15,29 +15,17 @@ rhi::IQueue *Queue::Get() const noexcept {
 rhi::QueueType Queue::GetType() const {
 #if !defined(NDEBUG)
   if (!*this)
-    return rhi::QUEUE_TYPE_GRAPHICS;
+    return rhi::QUEUE_TYPE_MAIN;
 #endif
   return Get()->GetType();
 }
 
-bool Queue::SharesPhysicalQueue(const Queue &other) const {
+CommandContext Queue::CreateCommandContext() const {
 #if !defined(NDEBUG)
   if (!*this)
-    return false;
+    return nullptr;
 #endif
-  return Get()->SharesPhysicalQueue(other.Get());
+  return Get()->CreateCommandContext();
 }
 
-SubmissionToken Queue::Submit(CommandContext &&commands, const SubmitInfo &info) const {
-  CommandContext consumed = std::move(commands);
-#if !defined(NDEBUG)
-  if (!*this || !consumed)
-    return {};
-#endif
-  rhi::SubmitInfo native_info;
-  native_info.waits.reserve(info.waits.size());
-  for (const auto &token : info.waits)
-    native_info.waits.push_back(token.Get());
-  return Get()->Submit(consumed.Get(), native_info);
-}
 }  // namespace grassland::rhix

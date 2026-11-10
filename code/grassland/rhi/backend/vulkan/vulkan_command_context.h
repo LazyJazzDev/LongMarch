@@ -5,6 +5,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
+class VulkanQueue;
 class VulkanImage;
 class VulkanBuffer;
 class VulkanProgram;
@@ -31,7 +32,7 @@ class VulkanCommandContext final : public CommandContext {
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   ~VulkanCommandContext() override;
-  static VulkanCommandContext *Create(VulkanDevice *device);
+  static VulkanCommandContext *Create(VulkanQueue *queue);
   IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
   IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
@@ -62,11 +63,12 @@ class VulkanCommandContext final : public CommandContext {
                       uint32_t first_instance = 0) override;
   bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
   bool CmdPresent(rhi::IWindow *window) override;
-  SubmitResult SubmitNative() override;
-  SubmissionStatus WaitForProgress() override;
+  void UpdatePresentedImages() override;
+  SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
+  SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
-  VulkanCommandContext(VulkanDevice *device);
+  VulkanCommandContext(VulkanQueue *queue);
 
   bool ValidateGroups();
   bool BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *version);
@@ -104,7 +106,6 @@ class VulkanCommandContext final : public CommandContext {
   VulkanDevice *device_;
   VkCommandPool pool_{};
   VkCommandBuffer command_{};
-  uint64_t value_{};
   bool submission_failed_{};
   bool reusable_{};
 };

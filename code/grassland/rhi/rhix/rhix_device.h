@@ -21,6 +21,7 @@ class Device : public ObjectContainer {
   rhi::IDevice *Get() const noexcept;
   Device() noexcept;
   std::string Name() const;
+  bool WaitEvents(const std::vector<rhi::Event> &events, bool wait_all = true) const;
   bool SupportRayTracingPipeline() const;
   bool SupportRayQuery() const;
   bool SupportGeometryShader() const;
@@ -49,7 +50,6 @@ class Device : public ObjectContainer {
   Buffer CreateBuffer(const rhi::BufferDesc &desc) const;
   Window CreateGLFWWindow(const rhi::WindowDesc &desc = {}) const;
   Queue GetQueue(rhi::QueueType type) const;
-  CommandContext CreateCommandContext() const;
 };
 
 }  // namespace grassland::rhix

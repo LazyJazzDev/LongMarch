@@ -14,6 +14,7 @@
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 #include "grassland/rhi/rhi_shader.h"
 #include "grassland/rhi/rhi_submission_token.h"
+#include "grassland/rhi/rhi_timeline.h"
 #include "grassland/rhi/rhi_util.h"
 #include "grassland/rhi/rhi_window.h"
 

@@ -8,6 +8,7 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/rhix/rhix.h"
 
 namespace grassland::rhix {
@@ -47,7 +48,9 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     auto device = core.CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
     auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
-    auto commands = native->CreateCommandBuffer();
+    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<backend::metal::MetalQueue *>(queue_owner.Get());
+    auto commands = native_queue->CreateCommandBuffer();
     ASSERT_TRUE(commands);
     EXPECT_EQ(commands->errorOptions(),
               enabled ? MTL::CommandBufferErrorOptionEncoderExecutionStatus : MTL::CommandBufferErrorOptionNone);
@@ -63,11 +66,11 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     ASSERT_EQ(commands->status(), MTL::CommandBufferStatusCompleted);
     for (size_t i = 0; i < 256; ++i)
       EXPECT_EQ(static_cast<const uint8_t *>(buffer->contents())[i], 0x5a);
-    auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
-    auto context = device.CreateCommandContext();
+    auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
+    auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(queue);
     ASSERT_TRUE(context);
-    auto done = queue.Submit(std::move(context));
+    auto done = std::move(context).Submit();
     ASSERT_TRUE(done);
     EXPECT_TRUE(done.WaitHost());
   }
@@ -138,8 +141,8 @@ TEST(RhiMetal, CompletionTokensSurviveBatchesAndParentRelease) {
     ASSERT_TRUE(core);
     rhi::ObjPtr<rhi::IDevice> device = core->CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
-    rhi::ObjPtr<rhi::IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-    rhi::ObjPtr<rhi::IQueue> transfer = device->GetQueue(QUEUE_TYPE_TRANSFER);
+    rhi::ObjPtr<rhi::IQueue> graphics = device->GetQueue(QUEUE_TYPE_MAIN);
+    rhi::ObjPtr<rhi::IQueue> transfer = device->GetQueue(QUEUE_TYPE_ASSIST);
     ASSERT_TRUE(graphics);
     ASSERT_TRUE(transfer);
     for (int batch = 0; batch < 8; ++batch) {
@@ -147,16 +150,18 @@ TEST(RhiMetal, CompletionTokensSurviveBatchesAndParentRelease) {
       for (int i = 0; i < 16; ++i) {
         // Abandoned recordings must not consume queue capacity permanently.
         {
-          rhi::ObjPtr<rhi::ICommandContext> abandoned = device->CreateCommandContext();
+          rhi::ObjPtr<rhi::ICommandContext> abandoned =
+              ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
           ASSERT_TRUE(abandoned);
         }
-        rhi::ObjPtr<rhi::ICommandContext> context = device->CreateCommandContext();
+        rhi::ObjPtr<rhi::ICommandContext> context =
+            ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
         ASSERT_TRUE(context);
         auto queue = i % 2 ? graphics.Get() : transfer.Get();
         rhi::SubmitInfo desc;
         if (!tokens.empty())
-          desc.waits.push_back(tokens.back().Get());
-        rhi::ObjPtr<rhi::ISubmissionToken> token = queue->Submit(context.Get(), desc);
+          desc.waits.push_back(tokens.back()->GetEvent());
+        rhi::ObjPtr<rhi::ISubmissionToken> token = context->Submit(desc);
         ASSERT_TRUE(token);
         tokens.push_back(std::move(token));
         held.push_back(std::move(context));
@@ -179,28 +184,30 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   auto core = rhix::CreateCore(BACKEND_API_METAL);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   auto first = device.CreateGLFWWindow({160, 120, "Metal readback A"});
   auto second = device.CreateGLFWWindow({160, 120, "Metal readback B"});
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
   auto a = first.GetNextImage();
   auto b = second.GetNextImage();
-  auto clear = device.CreateCommandContext();
+  auto clear = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1.0f}));
-  auto done = queue.Submit(std::move(clear));
+  auto done = std::move(clear).Submit();
   ASSERT_TRUE(done.WaitHost());
   {
-    auto abandoned = device.CreateCommandContext();
+    auto abandoned = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   }
   auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+  ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+  auto native_queue = static_cast<backend::metal::MetalQueue *>(queue_owner.Get());
   auto readback = NS::TransferPtr(native->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
   ASSERT_TRUE(readback);
   auto check = [&](const Image &image, std::array<int, 4> expected) {
-    auto commands = NS::RetainPtr(native->NativeQueue()->commandBuffer());
+    auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
     auto texture = static_cast<backend::metal::MetalImage *>(image.Get())->NativeImage();
     blit->copyFromTexture(texture, 0, 0, MTL::Origin::Make(0, 0, 0), MTL::Size::Make(1, 1, 1), readback.get(), 0, 256,
@@ -220,9 +227,9 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   std::vector<Image> old_images;
   for (int i = 0; i < 12; ++i) {
     old_images.push_back(first.GetNextImage());
-    auto present = device.CreateCommandContext();
+    auto present = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(present.CmdPresent(first));
-    auto presented = queue.Submit(std::move(present));
+    auto presented = std::move(present).Submit();
     ASSERT_TRUE(presented);
     ASSERT_TRUE(presented.WaitHost());
   }

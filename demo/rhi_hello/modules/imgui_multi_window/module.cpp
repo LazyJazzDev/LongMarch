@@ -17,7 +17,7 @@
 int RunImGuiMultiWindow(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
 
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
 
@@ -115,13 +115,13 @@ int RunImGuiMultiWindow(grassland::rhi::IDevice *device) {
       ObjPtr<IImage> image = window->GetNextImage();
       if (!image)
         continue;
-      ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+      ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
       if (!commands)
         return 1;
       RETURN_IF_FAIL(commands->CmdClearImage(image.Get(), colors[i]));
       RETURN_IF_FAIL(commands->CmdPresent(window.Get()));
 
-      pending[i] = queue->Submit(commands.Get());
+      pending[i] = commands->Submit();
 
       if (!pending[i])
         return 1;

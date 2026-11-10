@@ -21,7 +21,8 @@ class D3D12Image : public Image {
              const void *device,
              ID3D12Resource *image,
              ObjectPtr<D3D12DescriptorPool::Lease> attachment,
-             D3D12_RESOURCE_STATES default_state = D3D12_RESOURCE_STATE_COMMON);
+             D3D12_RESOURCE_STATES default_state = D3D12_RESOURCE_STATE_COMMON,
+             Queue *queue = nullptr);
 
  private:
   ObjectPtr<D3D12DescriptorPool::Lease> attachment_;

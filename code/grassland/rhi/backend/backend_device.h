@@ -1,10 +1,9 @@
 ﻿#pragma once
-#include <condition_variable>
-#include <deque>
+#include <array>
+#include <atomic>
 #include <mutex>
 #include <thread>
 
-#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_device.h"
@@ -12,7 +11,7 @@
 
 namespace grassland::rhi::backend {
 
-class CommandContext;
+class Queue;
 
 class Device : public Object<rhi::IDevice> {
  public:
@@ -37,31 +36,25 @@ class Device : public Object<rhi::IDevice> {
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::IQueue *GetQueue(QueueType type) override;
-  rhi::ICommandContext *CreateCommandContext() override;
-  virtual const void *NativeIdentity() const;
-
-  ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands,
-                                    const std::vector<ObjectPtr<SubmissionToken>> &waits);
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override;
 
  protected:
+  // Called once after native device resources and all queues are initialized.
+  void StartCollector();
+  virtual bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const = 0;
+  virtual void WaitForProgress(const std::vector<Event> &next) = 0;
+  virtual void InterruptCollector() = 0;
   void ShutdownQueues();
   Core *OwnerCore() const;
+  std::array<ObjectPtr<Queue>, 2> queues_;
+  std::atomic<bool> stopping_{};
 
  private:
-  struct Submission {
-    ObjectPtr<CommandContext> commands;
-    ObjectPtr<SubmissionToken> completion;
-  };
-
   void Collect();
   BackendAPI api_;
   Core *core_;
   PhysicalDevice info_;
-  std::mutex mutex_;
-  std::condition_variable changed_;
-  std::deque<Submission> pending_;
   std::thread collector_;
-  bool stopping_{};
 };
 
 }  // namespace grassland::rhi::backend

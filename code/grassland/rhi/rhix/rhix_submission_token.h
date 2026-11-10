@@ -11,6 +11,7 @@ class SubmissionToken : public ObjectContainer {
   SubmissionToken() noexcept;
   rhi::SubmissionStatus GetStatus() const;
   bool WaitHost() const;
+  rhi::Event GetEvent() const;
 };
 
 }  // namespace grassland::rhix

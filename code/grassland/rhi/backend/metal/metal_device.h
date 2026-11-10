@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <Metal/Metal.hpp>
+#include <condition_variable>
 
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/metal/metal_scratch_pool.h"
@@ -28,21 +29,27 @@ class MetalDevice final : public Device {
   ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
       const TopLevelAccelerationStructureDesc &desc) override;
   MTL::Device *NativeDevice() const noexcept;
-  MTL::CommandQueue *NativeQueue() const;
-  NS::SharedPtr<MTL::CommandBuffer> CreateCommandBuffer();
-  std::mutex &QueueMutex();
-  bool WaitIdle();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
-  rhi::ICommandContext *CreateCommandContext() override;
-  rhi::IQueue *GetQueue(QueueType type) override;
+
+  void ObserveCompletion(MTL::CommandBuffer *commands, Event signal);
+  void NotifyTimelineFailure();
 
  private:
+  void InterruptCollector() override;
+  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
+  void WaitForProgress(const std::vector<Event> &next) override;
   MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
 
   NS::SharedPtr<MTL::Device> device_;
-  NS::SharedPtr<MTL::CommandQueue> queue_;
-  NS::SharedPtr<MTL::CommandBufferDescriptor> command_buffer_descriptor_;
-  std::mutex queue_mutex_;
+
+  struct WaitState {
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool notified{};
+    NS::SharedPtr<MTL::SharedEventListener> listener;
+  };
+
+  std::shared_ptr<WaitState> wait_state_{std::make_shared<WaitState>()};
   // Shared storage is reused across uploads and downloads.
   MetalTemporalBufferPool temporal_buffers_;
   MetalScratchPool scratch_{this};

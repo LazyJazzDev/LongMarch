@@ -8,7 +8,7 @@ MetalSwapChainImage::MetalSwapChainImage(ImageDesc desc,
                                          MetalWindow *window,
                                          uint64_t generation,
                                          CA::MetalDrawable *drawable)
-    : MetalImage(desc, window->DeviceIdentity(), drawable->texture()),
+    : MetalImage(desc, window->DeviceIdentity(), drawable->texture(), window->OwnerQueue()),
       window_(window),
       generation_(generation),
       drawable_(NS::RetainPtr(drawable)) {

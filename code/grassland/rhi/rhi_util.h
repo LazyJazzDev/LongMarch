@@ -56,8 +56,8 @@ std::string to_string(PresentMode value);
 std::string PresentModeName(PresentMode value);
 
 typedef enum {
-  QUEUE_TYPE_GRAPHICS,
-  QUEUE_TYPE_TRANSFER,
+  QUEUE_TYPE_MAIN,
+  QUEUE_TYPE_ASSIST,
 } QueueType;
 
 std::string to_string(QueueType value);

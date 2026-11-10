@@ -33,7 +33,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
   ImageDesc last_frame_desc{};
   ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
   float last_frame_white_scale = 1.0f;
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   PresentMode requested = PRESENT_MODE_VSYNC;
@@ -96,7 +96,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
-    auto commands = device.CreateCommandContext();
+    auto commands = queue.CreateCommandContext();
     if (!commands)
       return 1;
     if (!commands.CmdClearImage(image, {0.6f, 0.7f, 0.8f, 1.0f}))
@@ -111,7 +111,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
       last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
       last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     }
-    auto done = queue.Submit(std::move(commands));
+    auto done = std::move(commands).Submit();
 
     if (!done)
       return 1;

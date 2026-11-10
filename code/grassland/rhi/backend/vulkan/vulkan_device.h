@@ -33,14 +33,8 @@ class VulkanDevice final : public Device {
   VmaAllocator Allocator() const;
   VkPhysicalDevice NativePhysicalDevice() const;
   VkInstance Instance() const;
-  VkQueue NativeQueue() const;
   uint32_t QueueFamily() const;
   bool SupportsSwapchain() const;
-  std::mutex &QueueMutex();
-  VkSemaphore Timeline() const;
-  // Allocate and submit serials while holding QueueMutex, preserving signal order.
-  uint64_t NextSerial();
-  VkResult Wait(uint64_t value, uint64_t timeout = UINT64_MAX) const;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   VulkanTemporalBufferPool &UploadPool();
@@ -49,8 +43,6 @@ class VulkanDevice final : public Device {
 
   VulkanScratchPool &ScratchPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
-  rhi::ICommandContext *CreateCommandContext() override;
-  rhi::IQueue *GetQueue(QueueType type) override;
 
   // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
   // The pool grows on demand, independently of swapchain image count.
@@ -58,6 +50,9 @@ class VulkanDevice final : public Device {
   void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command);
 
  private:
+  void InterruptCollector() override;
+  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
+  void WaitForProgress(const std::vector<Event> &next) override;
   VulkanTemporalBufferPool upload_pool_;
   VulkanTemporalBufferPool download_pool_;
   VulkanScratchPool scratch_pool_;
@@ -70,11 +65,9 @@ class VulkanDevice final : public Device {
   VkDevice device_{VK_NULL_HANDLE};
   DeviceProcedures procedures_;
   VkPhysicalDevice physical_{};
-  VkQueue queue_{};
-  VkSemaphore timeline_{};
-  uint64_t next_serial_{};
-  uint32_t graphics_queue_family_index_{};
+  uint32_t queue_family_index_{};
   bool swapchain_enabled_{};
-  std::mutex mutex_;
+  VkSemaphore collector_shutdown_{VK_NULL_HANDLE};
+  bool shutdown_consumed_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

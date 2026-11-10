@@ -8,8 +8,9 @@ D3D12Image::D3D12Image(ImageDesc desc,
                        const void *device,
                        ID3D12Resource *image,
                        ObjectPtr<D3D12DescriptorPool::Lease> attachment,
-                       D3D12_RESOURCE_STATES default_state)
-    : Image(desc),
+                       D3D12_RESOURCE_STATES default_state,
+                       Queue *queue)
+    : Image(desc, queue),
       attachment_(std::move(attachment)),
       device_(device),
       image_(image),

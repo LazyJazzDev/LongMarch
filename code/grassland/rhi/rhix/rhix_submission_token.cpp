@@ -1,6 +1,9 @@
 ﻿#include "grassland/rhi/rhix/rhix_submission_token.h"
 
 namespace grassland::rhix {
+rhi::Event SubmissionToken::GetEvent() const {
+  return *this ? Get()->GetEvent() : rhi::Event{};
+}
 
 SubmissionToken::SubmissionToken() noexcept = default;
 

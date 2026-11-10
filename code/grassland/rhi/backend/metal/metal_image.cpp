@@ -2,8 +2,8 @@
 
 namespace grassland::rhi::backend::metal {
 
-MetalImage::MetalImage(ImageDesc desc, const void *device, MTL::Texture *image)
-    : Image(desc),
+MetalImage::MetalImage(ImageDesc desc, const void *device, MTL::Texture *image, Queue *queue)
+    : Image(desc, queue),
       device_(device),
       image_(image) {
 }

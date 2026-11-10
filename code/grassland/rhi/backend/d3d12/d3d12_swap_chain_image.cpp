@@ -9,7 +9,12 @@ D3D12SwapChainImage::D3D12SwapChainImage(ImageDesc desc,
                                          uint64_t generation,
                                          ID3D12Resource *image,
                                          ObjectPtr<D3D12DescriptorPool::Lease> attachment)
-    : D3D12Image(desc, window->DeviceIdentity(), image, std::move(attachment)),
+    : D3D12Image(desc,
+                 window->DeviceIdentity(),
+                 image,
+                 std::move(attachment),
+                 D3D12_RESOURCE_STATE_COMMON,
+                 window->OwnerQueue()),
       window_(window),
       generation_(generation) {
 }
