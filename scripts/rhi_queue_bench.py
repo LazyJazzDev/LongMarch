@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Run identical offscreen workloads in balanced, randomized revision order."""
 import argparse
 import csv
@@ -13,6 +13,10 @@ CASES = [
     ("upload-compute", "upload", 1048576, 256, 16384),
     ("as-build", "as-build", 256, 8, 4096),
     ("as-update", "as-update", 256, 8, 8192),
+]
+RAY_HEAVY_CASES = [
+    ("as-build-rayheavy", "as-build", 256, 64, 2048),
+    ("as-update-rayheavy", "as-update", 256, 64, 2048),
 ]
 FIELDS = ["revision", "api", "mode", "workload", "size", "loops", "depth", "frames", "seconds", "fps", "mismatches", "device"]
 
@@ -33,6 +37,7 @@ def main():
     parser.add_argument("--apis", default="vulkan,d3d12")
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--depth", type=int, default=8)
+    parser.add_argument("--profile", choices=["standard", "ray-heavy"], default="standard")
     args = parser.parse_args()
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -43,7 +48,7 @@ def main():
         writer = csv.DictWriter(csv_file, fieldnames=["round", "case"] + FIELDS)
         writer.writeheader()
         for round_index in range(args.rounds):
-            cases = [(api, case) for api in args.apis.split(",") for case in CASES]
+            cases = [(api, case) for api in args.apis.split(",") for case in (CASES if args.profile == "standard" else RAY_HEAVY_CASES)]
             rng.shuffle(cases)
             for api, (label, workload, size, loops, frames) in cases:
                 modes = [(args.baseline, "main"), (args.current, "main"), (args.current, "assist")]

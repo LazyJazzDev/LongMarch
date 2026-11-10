@@ -39,3 +39,8 @@ Each process uses one API and one device, avoiding repeated Vulkan instance load
 Do not run other GPU benchmarks concurrently on the same machine. Report medians
 and variation, not just the fastest sample. Distinct native queues alone do not
 prove hardware overlap or a speedup; throughput is the observed outcome.
+
+Use `--profile ray-heavy` for the supplementary AS cases: the same 256x256 grid,
+64 rays per output pixel, 2,048 measured frames, and the same in-flight depth.
+This increases consumer work without changing upload/AS preparation size, to check
+whether a longer Main workload provides more opportunity for useful overlap.
