@@ -175,7 +175,7 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative(const SubmitInfo 
     commands_->encodeSignalEvent(static_cast<MetalTimeline *>(signal.timeline)->NativeEvent(), signal.value);
     for (const auto &present : presents_)
       commands_->presentDrawable(present.second->NativeDrawable());
-    device_->ObserveCompletion(commands_.get());
+    device_->ObserveCompletion(commands_.get(), signal);
     commands_->commit();
     MarkSubmitted();
     for (auto &entry : as_dependencies_)

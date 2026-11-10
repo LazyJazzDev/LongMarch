@@ -84,8 +84,22 @@ void CheckIndependentRetirement(BackendAPI api) {
   if (api == BACKEND_API_METAL) {
     auto timeline = backend::metal::MetalTimeline::Create(static_cast<backend::metal::MetalDevice *>(device.Get()));
     ASSERT_TRUE(timeline);
-    auto event = timeline->NativeEvent();
-    release.open = [event] { event->setSignaledValue(1); };
+    auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+    auto event = NS::TransferPtr(native->NativeDevice()->newSharedEvent());
+    ASSERT_TRUE(event);
+    // A CPU-controlled gate must use a SharedEvent. Bridge it to the GPU-only
+    // timeline on a separate queue, leaving Main free to make progress.
+    auto gate_queue = NS::TransferPtr(native->NativeDevice()->newCommandQueue());
+    ASSERT_TRUE(gate_queue);
+    auto commands = NS::RetainPtr(gate_queue->commandBuffer());
+    ASSERT_TRUE(commands);
+    commands->encodeWait(event.get(), 1);
+    commands->encodeSignalEvent(timeline->NativeEvent(), 1);
+    commands->commit();
+    release.open = [event, gate_queue, commands] {
+      event->setSignaledValue(1);
+      commands->waitUntilCompleted();
+    };
     gate = std::move(timeline);
   }
 #endif
@@ -142,6 +156,40 @@ TEST(RhiTimeline, VulkanRetiresMainWhileAssistIsBlockedAndWaitsForAnyOrAll) {
 #ifdef LONGMARCH_METAL_ENABLED
 TEST(RhiTimeline, MetalRetiresMainWhileAssistIsBlockedAndWaitsForAnyOrAll) {
   CheckIndependentRetirement(BACKEND_API_METAL);
+}
+
+TEST(RhiTimeline, MetalHostProgressTracksChainedGpuEvents) {
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_METAL);
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queues[] = {device->GetQueue(QUEUE_TYPE_MAIN), device->GetQueue(QUEUE_TYPE_ASSIST)};
+  ASSERT_TRUE(queues[0]);
+  ASSERT_TRUE(queues[1]);
+  std::vector<ObjPtr<ISubmissionToken>> submissions;
+  Event previous{};
+  for (int index = 0; index < 64; ++index) {
+    ObjPtr<ICommandContext> commands = queues[index % 2]->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    SubmitInfo info;
+    if (previous.timeline)
+      info.waits.push_back(previous);
+    ObjPtr<ISubmissionToken> submitted = commands->Submit(info);
+    ASSERT_TRUE(submitted);
+    previous = submitted->GetEvent();
+    submissions.push_back(std::move(submitted));
+  }
+  // The final GPU dependency transitively covers both queues. Host events must
+  // also advance after completion, even when contexts are released immediately.
+  ASSERT_TRUE(previous.timeline->WaitHost(previous.value));
+  for (const auto &submitted : submissions) {
+    const auto event = submitted->GetEvent();
+    ASSERT_TRUE(event.timeline->WaitHost(event.value));
+    uint64_t completed = 0;
+    ASSERT_TRUE(event.timeline->GetCompletedValue(completed));
+    EXPECT_GE(completed, event.value);
+    EXPECT_TRUE(submitted->WaitHost());
+  }
 }
 #endif
 

@@ -19,8 +19,9 @@ MetalTimeline::MetalTimeline(MetalDevice *device) : Timeline(device), state_(std
 std::unique_ptr<MetalTimeline> MetalTimeline::Create(MetalDevice *device) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto result = std::unique_ptr<MetalTimeline>(new MetalTimeline(device));
+  result->gpu_event_ = NS::TransferPtr(device->NativeDevice()->newEvent());
   result->event_ = NS::TransferPtr(device->NativeDevice()->newSharedEvent());
-  if (!result->event_) {
+  if (!result->gpu_event_ || !result->event_) {
     ReportError(-1, "Create Metal timeline failed.");
     return {};
   }
@@ -51,8 +52,31 @@ bool MetalTimeline::WaitHost(uint64_t value) const {
   return !state->failed;
 }
 
-MTL::SharedEvent *MetalTimeline::NativeEvent() const {
+MTL::Event *MetalTimeline::NativeEvent() const {
+  return gpu_event_.get();
+}
+
+MTL::SharedEvent *MetalTimeline::HostEvent() const {
   return event_.get();
+}
+
+void MetalTimeline::ObserveCompletion(MTL::CommandBuffer *commands, uint64_t value, std::function<void()> notify) {
+  auto state = state_;
+  auto host_event = event_;
+  [(__bridge id<MTLCommandBuffer>)(void *)commands addCompletedHandler:^(id<MTLCommandBuffer> completed) {
+    {
+      std::lock_guard<std::mutex> lock(state->mutex);
+      if (completed.status == MTLCommandBufferStatusError) {
+        state->failed = true;
+        state->changed.notify_all();
+      } else if (host_event->signaledValue() < value) {
+        // GPU dependencies use a separate MTLEvent. Publish host progress only
+        // after successful execution, without a GPU-side SharedEvent signal.
+        host_event->setSignaledValue(value);
+      }
+    }
+    notify();
+  }];
 }
 
 void MetalTimeline::MarkFailed() {

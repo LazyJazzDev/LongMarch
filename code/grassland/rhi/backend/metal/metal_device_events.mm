@@ -16,20 +16,20 @@ void MetalDevice::NotifyTimelineFailure() {
   wait_state_->changed.notify_all();
 }
 
-void MetalDevice::ObserveCompletion(MTL::CommandBuffer *commands) {
+void MetalDevice::ObserveCompletion(MTL::CommandBuffer *commands, Event signal) {
   auto state = wait_state_;
-  [(__bridge id<MTLCommandBuffer>)(void *)commands addCompletedHandler:^(id<MTLCommandBuffer>) {
+  static_cast<MetalTimeline *>(signal.timeline)->ObserveCompletion(commands, signal.value, [state] {
     std::lock_guard<std::mutex> lock(state->mutex);
     state->notified = true;
     state->changed.notify_all();
-  }];
+  });
 }
 
 bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto state = wait_state_;
   for (const auto &event : events) {
-    auto native = (__bridge id<MTLSharedEvent>)(void *)static_cast<MetalTimeline *>(event.timeline)->NativeEvent();
+    auto native = (__bridge id<MTLSharedEvent>)(void *)static_cast<MetalTimeline *>(event.timeline)->HostEvent();
     std::weak_ptr<WaitState> weak = state;
     [native notifyListener:(__bridge MTLSharedEventListener *)(void *)state->listener.get()
                    atValue:event.value
@@ -59,30 +59,8 @@ bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
   }
 }
 
-void MetalDevice::WaitForProgress(const std::vector<Event> &next) {
-  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+void MetalDevice::WaitForProgress(const std::vector<Event> &) {
   auto state = wait_state_;
-  for (const auto &event : next) {
-    for (size_t index = 0; index < queues_.size(); ++index) {
-      if (!queues_[index] || queues_[index]->GetTimeline() != event.timeline)
-        continue;
-      if (state->values[index] == event.value)
-        break;
-      state->values[index] = event.value;
-      auto native = (__bridge id<MTLSharedEvent>)(void *)static_cast<MetalTimeline *>(event.timeline)->NativeEvent();
-      std::weak_ptr<WaitState> weak = state;
-      [native notifyListener:(__bridge MTLSharedEventListener *)(void *)state->listener.get()
-                     atValue:event.value
-                       block:^(id<MTLSharedEvent>, uint64_t) {
-                         if (auto alive = weak.lock()) {
-                           std::lock_guard<std::mutex> lock(alive->mutex);
-                           alive->notified = true;
-                           alive->changed.notify_all();
-                         }
-                       }];
-      break;
-    }
-  }
   std::unique_lock<std::mutex> lock(state->mutex);
   state->changed.wait(lock, [&] { return state->notified; });
   state->notified = false;

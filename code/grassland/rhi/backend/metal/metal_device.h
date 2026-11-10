@@ -31,7 +31,7 @@ class MetalDevice final : public Device {
   MTL::Device *NativeDevice() const noexcept;
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
 
-  void ObserveCompletion(MTL::CommandBuffer *commands);
+  void ObserveCompletion(MTL::CommandBuffer *commands, Event signal);
   void NotifyTimelineFailure();
 
  private:
@@ -46,7 +46,6 @@ class MetalDevice final : public Device {
     std::mutex mutex;
     std::condition_variable changed;
     bool notified{};
-    std::array<uint64_t, 2> values{};
     NS::SharedPtr<MTL::SharedEventListener> listener;
   };
 

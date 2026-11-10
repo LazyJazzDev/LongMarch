@@ -49,14 +49,17 @@ record. No per-submit CPU wakeup or notification generation is needed. Shutdown 
 one-shot signal: a dedicated CPU-signaled Vulkan timeline, a D3D12 event, or a Metal
 condition-variable notification. After consuming that signal, the collector drains
 pending GPU work before exiting. Metal also retains command-buffer completion and
-error notifications, since a timeline signal can precede the final command-buffer
+error notifications, since a GPU timeline signal can precede the final command-buffer
 status. There is no periodic polling timeout, and no later Submit is needed to
 trigger retirement.
 
 Vulkan queues share a graphics+compute family to avoid ownership transfers for
 ordinary resources. D3D12 uses two DIRECT queues; Metal uses two command queues and
-SharedEvent timelines. Logical queue identity does not promise that the
-hardware executes their work simultaneously.
+separate GPU-only MTLEvent and CPU-visible MTLSharedEvent timelines. GPU waits
+and signals use MTLEvent. Completion callbacks publish CPU progress on the
+SharedEvent and wake the collector; failed commands mark the timeline failed
+instead. The collector needs neither SharedEvent listeners nor polling. Logical
+queue identity does not promise that the hardware executes their work simultaneously.
 
 Vulkan WSI still requires binary acquire/present semaphores. After acquisition, the
 Main queue immediately consumes the acquire semaphore in a semaphore-only submit
