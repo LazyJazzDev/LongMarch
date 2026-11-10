@@ -19,6 +19,55 @@
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
+bool D3D12Device::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
+  std::vector<ID3D12Fence *> fences;
+  std::vector<uint64_t> values;
+  for (const auto &event : events) {
+    fences.push_back(static_cast<D3D12Timeline *>(event.timeline)->NativeFence());
+    values.push_back(event.value);
+  }
+  ComPtr<ID3D12Device1> device;
+  if (!Check(device_.As(&device), "Query multi-fence wait interface"))
+    return false;
+  if (!Check(device->SetEventOnMultipleFenceCompletion(
+                 fences.data(), values.data(), static_cast<UINT>(fences.size()),
+                 wait_all ? D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL : D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, nullptr),
+             "Wait for timeline events"))
+    return false;
+  return SUCCEEDED(device_->GetDeviceRemovedReason());
+}
+
+void D3D12Device::WaitForProgress(const std::vector<Event> &next) {
+  std::array<HANDLE, 2> handles{};
+  DWORD count = 0;
+  for (const auto &event : next) {
+    for (size_t index = 0; index < queues_.size(); ++index) {
+      if (!queues_[index] || queues_[index]->GetTimeline() != event.timeline)
+        continue;
+      auto &handle = progress_events_[index];
+      if (!handle)
+        handle = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+      if (!handle) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        return;
+      }
+      if (progress_values_[index] != event.value) {
+        ResetEvent(handle);
+        if (!Check(
+                static_cast<D3D12Timeline *>(event.timeline)->NativeFence()->SetEventOnCompletion(event.value, handle),
+                "Listen for queue progress")) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(50));
+          return;
+        }
+        progress_values_[index] = event.value;
+      }
+      handles[count++] = handle;
+      break;
+    }
+  }
+  if (count)
+    WaitForMultipleObjects(count, handles.data(), FALSE, 50);
+}
 
 bool D3D12Device::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
                                           ComPtr<ID3D12GraphicsCommandList> &list,
@@ -205,6 +254,9 @@ D3D12Device::~D3D12Device() {
   command_pool_.clear();
   for (auto &queue : queues_)
     queue.Reset();
+  for (auto event : progress_events_)
+    if (event)
+      CloseHandle(event);
   if (debug_callback_cookie_)
     debug_messages_->UnregisterMessageCallback(debug_callback_cookie_);
 }

@@ -1,7 +1,6 @@
 ﻿#pragma once
 #include <array>
-#include <condition_variable>
-#include <deque>
+#include <list>
 #include <mutex>
 #include <thread>
 
@@ -40,10 +39,14 @@ class Device : public Object<rhi::IDevice> {
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::IQueue *GetQueue(QueueType type) override;
   virtual const void *NativeIdentity() const;
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override;
 
   ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info);
 
  protected:
+  virtual bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const = 0;
+  // Collector-only bounded wait; native registrations may be reused across calls.
+  virtual void WaitForProgress(const std::vector<Event> &next) = 0;
   void ShutdownQueues();
   Core *OwnerCore() const;
   std::array<ObjectPtr<Queue>, 2> queues_;
@@ -59,8 +62,7 @@ class Device : public Object<rhi::IDevice> {
   Core *core_;
   PhysicalDevice info_;
   std::mutex mutex_;
-  std::condition_variable changed_;
-  std::deque<Submission> pending_;
+  std::list<Submission> pending_;
   std::thread collector_;
   bool stopping_{};
 };

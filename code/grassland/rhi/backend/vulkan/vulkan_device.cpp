@@ -14,6 +14,35 @@
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
 namespace grassland::rhi::backend::vulkan {
+bool VulkanDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
+  std::vector<VkSemaphore> semaphores;
+  std::vector<uint64_t> values;
+  for (const auto &event : events) {
+    semaphores.push_back(static_cast<VulkanTimeline *>(event.timeline)->NativeSemaphore());
+    values.push_back(event.value);
+  }
+  VkSemaphoreWaitInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
+  info.flags = wait_all ? 0 : VK_SEMAPHORE_WAIT_ANY_BIT;
+  info.semaphoreCount = static_cast<uint32_t>(events.size());
+  info.pSemaphores = semaphores.data();
+  info.pValues = values.data();
+  return Check(vkWaitSemaphores(device_, &info, UINT64_MAX), "Wait for timeline events");
+}
+
+void VulkanDevice::WaitForProgress(const std::vector<Event> &next) {
+  std::array<VkSemaphore, 2> semaphores{};
+  std::array<uint64_t, 2> values{};
+  for (size_t index = 0; index < next.size(); ++index) {
+    semaphores[index] = static_cast<VulkanTimeline *>(next[index].timeline)->NativeSemaphore();
+    values[index] = next[index].value;
+  }
+  VkSemaphoreWaitInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
+  info.flags = VK_SEMAPHORE_WAIT_ANY_BIT;
+  info.semaphoreCount = static_cast<uint32_t>(next.size());
+  info.pSemaphores = semaphores.data();
+  info.pValues = values.data();
+  vkWaitSemaphores(device_, &info, 50000000);
+}
 
 bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command) {
   {

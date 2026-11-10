@@ -56,6 +56,8 @@ class VulkanDevice final : public Device {
   void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command);
 
  private:
+  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
+  void WaitForProgress(const std::vector<Event> &next) override;
   VulkanTemporalBufferPool upload_pool_;
   VulkanTemporalBufferPool download_pool_;
   VulkanScratchPool scratch_pool_;

@@ -77,7 +77,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
   bool WasSubmitted() const;
   virtual bool UpdatePresentedImages() = 0;
   virtual SubmitResult SubmitNative(const SubmitInfo &info, Event signal) = 0;
-  virtual SubmissionStatus WaitForProgress(Event signal) = 0;
+  virtual SubmissionStatus PollCompletion(Event signal) = 0;
 
  protected:
   // Call before encoding each resource use. Retains each exact object once.

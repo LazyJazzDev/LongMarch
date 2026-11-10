@@ -277,19 +277,22 @@ bool D3D12CommandContext::UpdatePresentedImages() {
   return true;
 }
 
-SubmissionStatus D3D12CommandContext::WaitForProgress(Event signal) {
+SubmissionStatus D3D12CommandContext::PollCompletion(Event signal) {
   auto queue = static_cast<D3D12Queue *>(OwnerQueue());
+  uint64_t completed;
+  if (!queue->GetTimeline()->GetCompletedValue(completed))
+    return SUBMISSION_STATUS_FAILED;
+  if (completed >= signal.value)
+    return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
   if (submission_failed_) {
-    std::lock_guard<std::mutex> lock(queue->QueueMutex());
-    if (queue->WaitIdle() || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
+    if (FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
       return SUBMISSION_STATUS_FAILED;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    return SUBMISSION_STATUS_PENDING;
+    // A failed signal does not prove the preceding ExecuteCommandLists finished.
+    // Retry with a new monotonically ordered value, without blocking other queues.
+    std::lock_guard<std::mutex> lock(queue->QueueMutex());
+    Check(queue->NativeQueue()->Signal(queue->GetTimeline()->NativeFence(), queue->NextSerial()),
+          "Signal failed submission retirement");
   }
-  if (queue->GetTimeline()->WaitHost(signal.value))
-    return SUBMISSION_STATUS_COMPLETED;
-  // A failed host wait does not prove that GPU resource use has ended.
-  submission_failed_ = true;
   return SUBMISSION_STATUS_PENDING;
 }
 

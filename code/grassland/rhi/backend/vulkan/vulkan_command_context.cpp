@@ -279,21 +279,14 @@ bool VulkanCommandContext::UpdatePresentedImages() {
   return !submission_failed_;
 }
 
-SubmissionStatus VulkanCommandContext::WaitForProgress(Event signal) {
+SubmissionStatus VulkanCommandContext::PollCompletion(Event signal) {
   auto queue = static_cast<VulkanQueue *>(OwnerQueue());
-  const auto result = queue->Wait(signal.value, 50000000);
-  if (result == VK_TIMEOUT)
-    return SUBMISSION_STATUS_PENDING;
+  const auto result = queue->Wait(signal.value, 0);
   if (result == VK_ERROR_DEVICE_LOST)
     return SUBMISSION_STATUS_FAILED;
   if (result != VK_SUCCESS)
-    submission_failed_ = true;
-  if (submission_failed_) {
-    std::lock_guard<std::mutex> lock(queue->QueueMutex());
-    const auto idle = vkQueueWaitIdle(queue->NativeQueue());
-    return idle == VK_SUCCESS || idle == VK_ERROR_DEVICE_LOST ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_PENDING;
-  }
-  return SUBMISSION_STATUS_COMPLETED;
+    return SUBMISSION_STATUS_PENDING;
+  return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
 }
 
 bool VulkanCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {

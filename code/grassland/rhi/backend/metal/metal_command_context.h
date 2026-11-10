@@ -62,7 +62,7 @@ class MetalCommandContext final : public CommandContext {
   bool CmdPresent(rhi::IWindow *window) override;
   bool UpdatePresentedImages() override;
   SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
-  SubmissionStatus WaitForProgress(Event signal) override;
+  SubmissionStatus PollCompletion(Event signal) override;
 
  private:
   MetalCommandContext(MetalQueue *queue);

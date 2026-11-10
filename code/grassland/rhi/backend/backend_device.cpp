@@ -149,7 +149,6 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
     // submitted work alive before propagating to the public allocation boundary.
     if (commands->WasSubmitted()) {
       pending_.back().commands = commands;
-      changed_.notify_one();
     } else {
       pending_.pop_back();
       completion->Complete(SUBMISSION_STATUS_FAILED);
@@ -165,32 +164,71 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   }
   commands->MarkSubmitted();
   pending_.back().commands = commands;
-  changed_.notify_one();
   queue_lock.unlock();
   if (result == CommandContext::SUBMIT_RESULT_SUBMITTED && !commands->UpdatePresentedImages())
     return {};
   return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
 }
 
-void Device::Collect() {
-  for (;;) {
-    Submission pending;
-    {
-      std::unique_lock<std::mutex> lock(mutex_);
-      changed_.wait(lock, [&] { return stopping_ || !pending_.empty(); });
-      if (pending_.empty())
-        return;
-      pending = std::move(pending_.front());
-      pending_.pop_front();
+bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
+  if (events.empty())
+    return wait_all;
+  std::vector<Event> unique;
+  unique.reserve(events.size());
+  for (const auto &event : events) {
+#if !defined(NDEBUG)
+    auto timeline = dynamic_cast<Timeline *>(event.timeline);
+    if (!timeline || timeline->Owner() != this) {
+      ReportError(-1, "Host waits require timelines from this device.");
+      return false;
     }
-    SubmissionStatus status;
-    do {
-      status = pending.commands->WaitForProgress(pending.completion->GetEvent());
-    } while (status == SUBMISSION_STATUS_PENDING);
-    // Release payload before publishing completion; tokens never keep it alive.
-    pending.commands->ReleaseDownloads();
-    pending.commands.Reset();
-    pending.completion->Complete(status);
+#endif
+    auto found = std::find_if(unique.begin(), unique.end(),
+                              [&](const Event &other) { return other.timeline == event.timeline; });
+    if (found == unique.end())
+      unique.push_back(event);
+    else
+      found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
+  }
+  return WaitNativeEvents(unique, wait_all);
+}
+
+void Device::Collect() {
+  std::list<Submission> work;
+  std::vector<Event> next;
+  next.reserve(queues_.size());
+  for (;;) {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      work.splice(work.end(), pending_);
+      if (stopping_ && work.empty())
+        return;
+    }
+    // Snapshot before polling: progress racing with the poll will satisfy this
+    // wait, even when no subsequent submit arrives to wake the collector.
+    next.clear();
+    for (const auto &queue : queues_) {
+      uint64_t completed;
+      if (queue && queue->GetTimeline()->GetCompletedValue(completed) && completed != UINT64_MAX)
+        next.push_back({queue->GetTimeline(), completed + 1});
+    }
+    for (auto it = work.begin(); it != work.end();) {
+      const auto status = it->commands->PollCompletion(it->completion->GetEvent());
+      if (status == SUBMISSION_STATUS_PENDING) {
+        ++it;
+        continue;
+      }
+      it->commands->ReleaseDownloads();
+      it->commands.Reset();
+      it->completion->Complete(status);
+      it = work.erase(it);
+    }
+    // A bounded native wait also permits shutdown and error recovery without
+    // adding a synthetic GPU signal to any queue's monotonic timeline.
+    if (next.empty())
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    else
+      WaitForProgress(next);
   }
 }
 
@@ -199,7 +237,6 @@ void Device::ShutdownQueues() {
     std::lock_guard<std::mutex> lock(mutex_);
     stopping_ = true;
   }
-  changed_.notify_one();
   if (collector_.joinable())
     collector_.join();
 }

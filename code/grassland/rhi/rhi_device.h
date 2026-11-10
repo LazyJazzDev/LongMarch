@@ -3,6 +3,7 @@
 #include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
+#include "grassland/rhi/rhi_timeline.h"
 #include "grassland/util/file_system.h"
 
 namespace grassland::rhi {
@@ -54,6 +55,9 @@ class IDevice : public IObject {
   // Returns an owned reference to a fixed device-owned queue. Repeated calls
   // return the same queue object, even after all caller references are released.
   virtual IQueue *GetQueue(QueueType type) = 0;
+  // Blocks the CPU until all events (or any event when wait_all is false) complete.
+  // Events must belong to this device. Empty All succeeds; empty Any fails.
+  virtual bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const = 0;
 
  protected:
   ~IDevice() override;

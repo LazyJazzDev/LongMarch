@@ -17,6 +17,11 @@ namespace grassland::rhi::backend::metal {
 MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device) {
   auto object = std::unique_ptr<MetalDevice>(new MetalDevice(std::move(info), core, std::move(device)));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  object->wait_state_->listener = NS::TransferPtr(MTL::SharedEventListener::alloc()->init());
+  if (!object->wait_state_->listener) {
+    ReportError(-1, "Create Metal progress listener failed.");
+    return nullptr;
+  }
   auto descriptor = NS::TransferPtr(MTL::CommandBufferDescriptor::alloc()->init());
   descriptor->setRetainedReferences(true);
   descriptor->setErrorOptions(static_cast<MetalCore *>(core)->DebugEnabled()

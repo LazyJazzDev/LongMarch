@@ -59,6 +59,8 @@ class D3D12Device final : public Device {
                                HANDLE event);
 
  private:
+  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
+  void WaitForProgress(const std::vector<Event> &next) override;
   D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
 
   D3D12TemporalBufferPool upload_pool_;
@@ -76,5 +78,7 @@ class D3D12Device final : public Device {
   D3D12DescriptorPool resource_descriptor_storage_, sampler_descriptor_storage_;
   ComPtr<IDXGIFactory4> factory_;
   bool tearing_{};
+  std::array<HANDLE, 2> progress_events_{};
+  std::array<uint64_t, 2> progress_values_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

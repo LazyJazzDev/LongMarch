@@ -196,9 +196,8 @@ bool MetalCommandContext::UpdatePresentedImages() {
   return true;
 }
 
-SubmissionStatus MetalCommandContext::WaitForProgress(Event signal) {
+SubmissionStatus MetalCommandContext::PollCompletion(Event signal) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  commands_->waitUntilCompleted();
   if (commands_->status() == MTL::CommandBufferStatusError) {
     static_cast<MetalTimeline *>(signal.timeline)->MarkFailed();
     ReportMetalError(commands_->error(), "Metal command buffer failed",
