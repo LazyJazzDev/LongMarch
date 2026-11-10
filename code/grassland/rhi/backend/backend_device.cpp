@@ -3,6 +3,7 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_shader.h"
 
 namespace grassland::rhi::backend {
@@ -87,8 +88,10 @@ rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &) {
   return nullptr;
 }
 
-rhi::IQueue *Device::GetQueue(QueueType) {
-  return nullptr;
+rhi::IQueue *Device::GetQueue(QueueType type) {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return ObjectPtr<Queue>::Retain(queues_[type].Get()).Detach();
 }
 
 rhi::ICommandContext *Device::CreateCommandContext() {

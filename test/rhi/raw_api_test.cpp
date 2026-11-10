@@ -17,6 +17,28 @@ static_assert(std::is_abstract_v<ISubmissionToken>);
 
 class RhiRaw : public testing::TestWithParam<BackendAPI> {};
 
+TEST_P(RhiRaw, QueueIdentitySurvivesCallerReferenceRelease) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  IQueue *identities[2]{};
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
+    ObjPtr<IQueue> queue = device->GetQueue(type);
+    ASSERT_TRUE(queue);
+    ObjPtr<IQueue> second = device->GetQueue(type);
+    EXPECT_EQ(queue.Get(), second.Get());
+    identities[type] = queue.Get();
+  }
+  EXPECT_NE(identities[0], identities[1]);
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
+    ObjPtr<IQueue> queue = device->GetQueue(type);
+    ASSERT_TRUE(queue);
+    EXPECT_EQ(queue.Get(), identities[type]);
+    EXPECT_EQ(queue->GetType(), type);
+  }
+}
+
 TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   ICore *core = CreateCore(GetParam());
   ASSERT_NE(core, nullptr);

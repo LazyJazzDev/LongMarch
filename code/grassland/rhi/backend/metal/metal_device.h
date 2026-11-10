@@ -34,7 +34,6 @@ class MetalDevice final : public Device {
   bool WaitIdle();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::ICommandContext *CreateCommandContext() override;
-  rhi::IQueue *GetQueue(QueueType type) override;
 
  private:
   MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);

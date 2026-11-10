@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <array>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -13,6 +14,7 @@
 namespace grassland::rhi::backend {
 
 class CommandContext;
+class Queue;
 
 class Device : public Object<rhi::IDevice> {
  public:
@@ -46,6 +48,7 @@ class Device : public Object<rhi::IDevice> {
  protected:
   void ShutdownQueues();
   Core *OwnerCore() const;
+  std::array<ObjectPtr<Queue>, 2> queues_;
 
  private:
   struct Submission {

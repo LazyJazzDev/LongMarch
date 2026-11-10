@@ -27,6 +27,8 @@ MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<
     ReportError(-1, "Metal command queue creation failed.");
     return nullptr;
   }
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
+    object->queues_[type] = ObjectPtr<Queue>::Adopt(new MetalQueue(object.get(), type));
   return object.release();
 }
 
@@ -96,10 +98,6 @@ rhi::IWindow *MetalDevice::CreateGLFWWindow(const WindowDesc &desc) {
 
 rhi::ICommandContext *MetalDevice::CreateCommandContext() {
   return MetalCommandContext::Create(this);
-}
-
-rhi::IQueue *MetalDevice::GetQueue(QueueType type) {
-  return new MetalQueue(this, type);
 }
 
 rhi::IBuffer *MetalDevice::CreateBuffer(const BufferDesc &desc) {

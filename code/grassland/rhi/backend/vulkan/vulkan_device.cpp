@@ -156,6 +156,8 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   device->graphics_queue_family_index_ = graphics_family;
   device->swapchain_enabled_ = swapchain;
   vkGetDeviceQueue(device->device_, graphics_family, 0, &device->queue_);
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
+    device->queues_[type] = ObjectPtr<Queue>::Adopt(new VulkanQueue(device.get(), type));
   return device.release();
 }
 
@@ -253,10 +255,6 @@ rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
 
 rhi::ICommandContext *VulkanDevice::CreateCommandContext() {
   return VulkanCommandContext::Create(this);
-}
-
-rhi::IQueue *VulkanDevice::GetQueue(QueueType type) {
-  return new VulkanQueue(this, type);
 }
 
 }  // namespace grassland::rhi::backend::vulkan

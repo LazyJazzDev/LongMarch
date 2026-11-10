@@ -50,6 +50,8 @@ class IDevice : public IObject {
                                   const std::vector<std::string> &include_paths = {},
                                   const std::vector<std::pair<std::string, std::string>> &defines = {});
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
+  // Returns an owned reference to a fixed device-owned queue. Repeated calls
+  // return the same queue object, even after all caller references are released.
   virtual IQueue *GetQueue(QueueType type) = 0;
   virtual ICommandContext *CreateCommandContext() = 0;
 

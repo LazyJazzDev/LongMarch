@@ -49,7 +49,6 @@ class D3D12Device final : public Device {
   D3D12ScratchPool &ScratchPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::ICommandContext *CreateCommandContext() override;
-  rhi::IQueue *GetQueue(QueueType type) override;
 
   // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
   // The pool grows on demand, independently of swapchain image count.

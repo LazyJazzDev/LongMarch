@@ -108,6 +108,8 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
   if (SUCCEEDED(object->factory_.As(&factory5)) &&
       SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
     object->tearing_ = tearing;
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
+    object->queues_[type] = ObjectPtr<Queue>::Adopt(new D3D12Queue(object.get(), type));
   return object.release();
 }
 
@@ -242,10 +244,6 @@ rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {
 
 rhi::ICommandContext *D3D12Device::CreateCommandContext() {
   return D3D12CommandContext::Create(this);
-}
-
-rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
-  return new D3D12Queue(this, type);
 }
 
 ISampler *D3D12Device::CreateSampler(const SamplerDesc &desc) {
