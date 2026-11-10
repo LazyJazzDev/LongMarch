@@ -20,7 +20,7 @@ class Queue : public Object<rhi::IQueue> {
   uint64_t NextSerial();
   ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info);
   // Called only by the device collector; returns whether this queue is drained.
-  bool CollectCompleted();
+  bool CollectCompleted(uint64_t completed, bool timeline_valid);
 
  private:
   struct Submission {

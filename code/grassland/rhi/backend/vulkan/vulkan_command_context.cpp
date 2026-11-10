@@ -269,12 +269,10 @@ bool VulkanCommandContext::UpdatePresentedImages() {
   return ready;
 }
 
-SubmissionStatus VulkanCommandContext::PollCompletion(Event signal) {
-  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
-  const auto result = queue->Wait(signal.value, 0);
-  if (result == VK_ERROR_DEVICE_LOST)
+SubmissionStatus VulkanCommandContext::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {
+  if (!timeline_valid)
     return SUBMISSION_STATUS_FAILED;
-  if (result != VK_SUCCESS)
+  if (completed < signal.value)
     return SUBMISSION_STATUS_PENDING;
   return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
 }

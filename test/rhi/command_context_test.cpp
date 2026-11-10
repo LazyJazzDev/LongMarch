@@ -1,5 +1,6 @@
 ﻿#include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <type_traits>
@@ -20,6 +21,7 @@ struct Gate {
   std::mutex mutex;
   std::condition_variable changed;
   bool complete{};
+  uint64_t completed_limit{UINT64_MAX};
   int destroyed{};
   int resources_destroyed{};
   int devices_destroyed{};
@@ -113,7 +115,7 @@ class TestTimeline final : public backend::Timeline {
 
   bool GetCompletedValue(uint64_t &value) const override {
     std::lock_guard<std::mutex> lock(gate_->mutex);
-    value = gate_->complete ? value_ : 0;
+    value = gate_->complete ? std::min(value_, gate_->completed_limit) : 0;
     return true;
   }
 
@@ -193,9 +195,10 @@ class TestCommandContext final : public backend::CommandContext {
     return SUBMIT_RESULT_SUBMITTED;
   }
 
-  SubmissionStatus PollCompletion(Event) override {
-    std::lock_guard<std::mutex> lock(gate_->mutex);
-    return gate_->complete ? SUBMISSION_STATUS_COMPLETED : SUBMISSION_STATUS_PENDING;
+  SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override {
+    if (!timeline_valid)
+      return SUBMISSION_STATUS_FAILED;
+    return completed >= signal.value ? SUBMISSION_STATUS_COMPLETED : SUBMISSION_STATUS_PENDING;
   }
 
  private:
@@ -236,6 +239,7 @@ class TestDevice final : public backend::Device {
     {
       std::lock_guard<std::mutex> lock(gate_->mutex);
       gate_->complete = true;
+      gate_->completed_limit = UINT64_MAX;
     }
     gate_->changed.notify_all();
     ShutdownQueues();
@@ -397,6 +401,37 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   device.Reset();
   EXPECT_EQ(gate->devices_destroyed, 1);
   EXPECT_FALSE(token);
+}
+
+TEST(RhiCommands, CompletionSnapshotRetiresOnlyValuesAtOrBelowItsLimit) {
+  auto gate = std::make_shared<Gate>();
+  auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
+  auto queue = Queue(device->GetQueue(QUEUE_TYPE_MAIN));
+  std::vector<SubmissionToken> tokens;
+  for (int i = 0; i < 3; ++i) {
+    auto context = CommandContext(new TestCommandContext(queue.Get(), gate));
+    auto image = Image(new TestImage(gate));
+    ASSERT_TRUE(context.CmdClearImage(image, {}));
+    tokens.push_back(std::move(context).Submit());
+    ASSERT_TRUE(tokens.back());
+  }
+  {
+    std::lock_guard<std::mutex> lock(gate->mutex);
+    gate->completed_limit = 2;
+    gate->complete = true;
+  }
+  gate->changed.notify_all();
+  ASSERT_TRUE(tokens[1].WaitHost());
+  EXPECT_EQ(tokens[0].GetStatus(), SUBMISSION_STATUS_COMPLETED);
+  EXPECT_EQ(tokens[2].GetStatus(), SUBMISSION_STATUS_PENDING);
+  {
+    std::lock_guard<std::mutex> lock(gate->mutex);
+    EXPECT_EQ(gate->destroyed, 2);
+    gate->completed_limit = 3;
+  }
+  gate->changed.notify_all();
+  ASSERT_TRUE(tokens[2].WaitHost());
+  EXPECT_EQ(gate->destroyed, 3);
 }
 
 TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {

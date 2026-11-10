@@ -278,10 +278,9 @@ bool D3D12CommandContext::UpdatePresentedImages() {
   return true;
 }
 
-SubmissionStatus D3D12CommandContext::PollCompletion(Event signal) {
+SubmissionStatus D3D12CommandContext::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {
   auto queue = static_cast<D3D12Queue *>(OwnerQueue());
-  uint64_t completed;
-  if (!queue->GetTimeline()->GetCompletedValue(completed))
+  if (!timeline_valid)
     return SUBMISSION_STATUS_FAILED;
   if (completed >= signal.value)
     return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;

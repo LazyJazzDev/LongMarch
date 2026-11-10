@@ -199,7 +199,7 @@ bool MetalCommandContext::UpdatePresentedImages() {
   return true;
 }
 
-SubmissionStatus MetalCommandContext::PollCompletion(Event signal) {
+SubmissionStatus MetalCommandContext::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   if (commands_->status() == MTL::CommandBufferStatusError) {
     static_cast<MetalTimeline *>(signal.timeline)->MarkFailed();
@@ -208,6 +208,10 @@ SubmissionStatus MetalCommandContext::PollCompletion(Event signal) {
     return SUBMISSION_STATUS_FAILED;
   }
   if (commands_->status() != MTL::CommandBufferStatusCompleted)
+    return SUBMISSION_STATUS_PENDING;
+  if (!timeline_valid)
+    return SUBMISSION_STATUS_FAILED;
+  if (completed < signal.value)
     return SUBMISSION_STATUS_PENDING;
   return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
 }

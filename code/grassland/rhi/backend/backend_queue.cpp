@@ -63,7 +63,7 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
   return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
 }
 
-bool Queue::CollectCompleted() {
+bool Queue::CollectCompleted(uint64_t completed, bool timeline_valid) {
   std::list<Submission> work;
   {
     std::lock_guard<std::mutex> lock(*mutex_);
@@ -72,7 +72,7 @@ bool Queue::CollectCompleted() {
   // Polling may submit a recovery signal; releasing resources may acquire other
   // backend locks. Neither operation runs under the submission mutex.
   for (auto it = work.begin(); it != work.end();) {
-    const auto status = it->commands->PollCompletion(it->completion->GetEvent());
+    const auto status = it->commands->PollCompletion(it->completion->GetEvent(), completed, timeline_valid);
     if (status == SUBMISSION_STATUS_PENDING) {
       ++it;
       continue;

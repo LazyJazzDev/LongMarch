@@ -137,15 +137,17 @@ void Device::Collect() {
     // Snapshot before polling: progress racing with the poll will satisfy this
     // wait, even when no subsequent submit arrives to wake the collector.
     next.clear();
-    for (const auto &queue : queues_) {
-      uint64_t completed;
-      if (queue && queue->GetTimeline()->GetCompletedValue(completed) && completed != UINT64_MAX)
-        next.push_back({queue->GetTimeline(), completed + 1});
-    }
     bool empty = true;
-    for (const auto &queue : queues_)
-      if (queue && !queue->CollectCompleted())
+    for (const auto &queue : queues_) {
+      if (!queue)
+        continue;
+      uint64_t completed = 0;
+      const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+      if (timeline_valid && completed != UINT64_MAX)
+        next.push_back({queue->GetTimeline(), completed + 1});
+      if (!queue->CollectCompleted(completed, timeline_valid))
         empty = false;
+    }
     {
       std::lock_guard<std::mutex> lock(mutex_);
       if (stopping_ && empty)

@@ -65,7 +65,7 @@ class VulkanCommandContext final : public CommandContext {
   bool CmdPresent(rhi::IWindow *window) override;
   bool UpdatePresentedImages() override;
   SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
-  SubmissionStatus PollCompletion(Event signal) override;
+  SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
   VulkanCommandContext(VulkanQueue *queue);
