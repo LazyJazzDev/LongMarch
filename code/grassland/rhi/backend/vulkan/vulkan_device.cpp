@@ -278,6 +278,12 @@ rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
+ICUDATimeline *VulkanDevice::CreateCUDATimeline() {
+  if (GetCUDADeviceIndex() < 0)
+    return nullptr;
+  return OwnCUDATimeline(VulkanTimeline::Create(this));
+}
+
 ICUDABuffer *VulkanDevice::CreateCUDABuffer(const BufferDesc &desc) {
   return VulkanCUDABuffer::Create(this, desc);
 }

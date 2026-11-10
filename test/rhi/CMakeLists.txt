@@ -25,6 +25,9 @@ endif ()
 
 # Standalone CUDA-only validation. This target never records/submits RHI commands.
 if (LONGMARCH_CUDA_RUNTIME)
+    add_executable(test_rhi_cuda_timeline cuda_timeline_test.cpp)
+    target_link_libraries(test_rhi_cuda_timeline PRIVATE grassland_rhi CUDA::cudart_static GTest::gtest_main)
+    gtest_discover_tests(test_rhi_cuda_timeline)
     add_executable(test_rhi_cuda_buffer cuda_buffer_test.cpp)
     target_link_libraries(test_rhi_cuda_buffer PRIVATE grassland_rhi CUDA::cudart_static GTest::gtest_main)
     if (LONGMARCH_VULKAN_ENABLED)

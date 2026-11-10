@@ -21,8 +21,10 @@ struct DeviceProcedures {
 #if defined(LONGMARCH_CUDA_RUNTIME)
 #if defined(_WIN32)
   PFN_vkGetMemoryWin32HandleKHR GetMemoryWin32HandleKHR{};
+  PFN_vkGetSemaphoreWin32HandleKHR GetSemaphoreWin32HandleKHR{};
 #else
   PFN_vkGetMemoryFdKHR GetMemoryFdKHR{};
+  PFN_vkGetSemaphoreFdKHR GetSemaphoreFdKHR{};
 #endif
 #endif
   PFN_vkCmdBeginRendering CmdBeginRendering{};

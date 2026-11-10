@@ -11,6 +11,7 @@ class IImage;
 class IBuffer;
 #if defined(LONGMARCH_CUDA_RUNTIME)
 class ICUDABuffer;
+class ICUDATimeline;
 #endif
 struct BufferDesc;
 class IComputeProgram;
@@ -44,6 +45,8 @@ class IDevice : public IObject {
   virtual IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
 #if defined(LONGMARCH_CUDA_RUNTIME)
   virtual ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) = 0;
+  // Borrowed timeline owned by this device; returns null for non-CUDA devices.
+  virtual ICUDATimeline *CreateCUDATimeline() = 0;
 #endif
   virtual IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;
   virtual IProgram *CreateProgram(const ProgramDesc &desc) = 0;

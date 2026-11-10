@@ -158,6 +158,15 @@ DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
     extensions_.push_back(external_memory);
     external_memory_ = true;
   }
+#if defined(_WIN32)
+  const char *external_semaphore = VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
+#else
+  const char *external_semaphore = VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
+#endif
+  if (has(external_semaphore)) {
+    extensions_.push_back(external_semaphore);
+    external_semaphore_ = true;
+  }
 #endif
   features_.pNext = &v11_;
   if (has(VK_KHR_SWAPCHAIN_EXTENSION_NAME))
@@ -244,6 +253,10 @@ bool DeviceFeatures::ScalarBlockLayout() const {
 
 bool DeviceFeatures::TimelineSemaphore() const {
   return v12_.timelineSemaphore == VK_TRUE;
+}
+
+bool DeviceFeatures::ExternalSemaphore() const {
+  return external_semaphore_;
 }
 
 bool DeviceFeatures::ExternalMemory() const {

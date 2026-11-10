@@ -248,6 +248,12 @@ rhi::IBuffer *D3D12Device::CreateBuffer(const BufferDesc &desc) {
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
+ICUDATimeline *D3D12Device::CreateCUDATimeline() {
+  if (GetCUDADeviceIndex() < 0)
+    return nullptr;
+  return OwnCUDATimeline(D3D12Timeline::Create(this));
+}
+
 ICUDABuffer *D3D12Device::CreateCUDABuffer(const BufferDesc &desc) {
   return D3D12CUDABuffer::Create(this, desc);
 }

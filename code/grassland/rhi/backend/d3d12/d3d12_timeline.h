@@ -8,6 +8,7 @@ class D3D12Device;
 class D3D12Timeline final : public Timeline {
  public:
   static std::unique_ptr<D3D12Timeline> Create(D3D12Device *device);
+  ~D3D12Timeline() override;
   bool GetCompletedValue(uint64_t &value) const override;
   bool WaitHost(uint64_t value) const override;
   ID3D12Fence *NativeFence() const;

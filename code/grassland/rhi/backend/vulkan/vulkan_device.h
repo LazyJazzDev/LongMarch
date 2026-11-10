@@ -39,6 +39,7 @@ class VulkanDevice final : public Device {
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
 #if defined(LONGMARCH_CUDA_RUNTIME)
   ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) override;
+  ICUDATimeline *CreateCUDATimeline() override;
 #endif
   VulkanTemporalBufferPool &UploadPool();
 

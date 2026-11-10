@@ -12,6 +12,7 @@
 namespace grassland::rhi::backend {
 
 class Queue;
+class Timeline;
 
 class Device : public Object<rhi::IDevice> {
  public:
@@ -34,6 +35,7 @@ class Device : public Object<rhi::IDevice> {
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
 #if defined(LONGMARCH_CUDA_RUNTIME)
   ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) override;
+  ICUDATimeline *CreateCUDATimeline() override;
 #endif
   rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
@@ -45,6 +47,9 @@ class Device : public Object<rhi::IDevice> {
  protected:
   // Called once after native device resources and all queues are initialized.
   void StartCollector();
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  ICUDATimeline *OwnCUDATimeline(std::unique_ptr<Timeline> timeline);
+#endif
   virtual bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const = 0;
   virtual void WaitForProgress(const std::vector<Event> &next) = 0;
   virtual void InterruptCollector() = 0;
@@ -59,6 +64,10 @@ class Device : public Object<rhi::IDevice> {
   Core *core_;
   PhysicalDevice info_;
   std::thread collector_;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  std::mutex cuda_timelines_mutex_;
+  std::vector<std::unique_ptr<Timeline>> cuda_timelines_;
+#endif
 };
 
 }  // namespace grassland::rhi::backend

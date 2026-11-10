@@ -15,6 +15,19 @@ void ReportError(int32_t error_code, const std::string &error_message);
 #if defined(LONGMARCH_CUDA_RUNTIME)
 bool CheckCUDA(cudaError_t error, const char *operation);
 
+class CUDADeviceScope {
+ public:
+  explicit CUDADeviceScope(int device);
+  CUDADeviceScope(const CUDADeviceScope &) = delete;
+  CUDADeviceScope &operator=(const CUDADeviceScope &) = delete;
+  ~CUDADeviceScope();
+  explicit operator bool() const;
+
+ private:
+  int previous_{-1};
+  bool valid_{};
+};
+
 // Match a CUDA Runtime UUID or Windows adapter LUID without changing current device.
 int FindCUDADeviceByUUID(const void *uuid);
 #if defined(_WIN32)

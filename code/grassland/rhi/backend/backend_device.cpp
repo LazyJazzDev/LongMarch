@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_shader.h"
+#include "grassland/rhi/backend/backend_timeline.h"
 
 namespace grassland::rhi::backend {
 IBottomLevelAccelerationStructure *Device::CreateBottomLevelAccelerationStructure(
@@ -163,12 +164,31 @@ void Device::Collect() {
   }
 }
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+ICUDATimeline *Device::CreateCUDATimeline() {
+  ReportError(-1, "CUDA timelines are unavailable on this device.");
+  return nullptr;
+}
+
+ICUDATimeline *Device::OwnCUDATimeline(std::unique_ptr<Timeline> timeline) {
+  if (!timeline)
+    return nullptr;
+  auto result = timeline.get();
+  std::lock_guard<std::mutex> lock(cuda_timelines_mutex_);
+  cuda_timelines_.push_back(std::move(timeline));
+  return result;
+}
+#endif
+
 void Device::ShutdownQueues() {
   if (!collector_.joinable())
     return;
   stopping_ = true;
   InterruptCollector();
   collector_.join();
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  cuda_timelines_.clear();
+#endif
 }
 
 }  // namespace grassland::rhi::backend

@@ -6,6 +6,26 @@
 #endif
 
 namespace grassland::rhi::backend {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+CUDADeviceScope::CUDADeviceScope(int device) {
+  int current;
+  if (device < 0 || !CheckCUDA(cudaGetDevice(&current), "Get CUDA device"))
+    return;
+  valid_ = current == device || CheckCUDA(cudaSetDevice(device), "Select CUDA device");
+  if (valid_ && current != device)
+    previous_ = current;
+}
+
+CUDADeviceScope::~CUDADeviceScope() {
+  if (previous_ >= 0)
+    CheckCUDA(cudaSetDevice(previous_), "Restore CUDA device");
+}
+
+CUDADeviceScope::operator bool() const {
+  return valid_;
+}
+#endif
+
 void ReportError(int32_t error_code, const std::string &error_message) {
   LogError("Error {}: {}", error_code, error_message);
 }

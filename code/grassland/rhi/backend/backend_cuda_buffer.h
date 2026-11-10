@@ -6,20 +6,6 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
-class CUDADeviceScope {
- public:
-  explicit CUDADeviceScope(int device);
-  CUDADeviceScope(const CUDADeviceScope &) = delete;
-  CUDADeviceScope &operator=(const CUDADeviceScope &) = delete;
-  ~CUDADeviceScope();
-  explicit operator bool() const;
-
- private:
-  int previous_{-1};
-  bool valid_{};
-  bool changed_{};
-};
-
 class CUDAMapping {
  public:
   explicit CUDAMapping(int device);

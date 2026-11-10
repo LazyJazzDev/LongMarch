@@ -15,7 +15,6 @@ class VulkanTimeline final : public Timeline {
 
  private:
   explicit VulkanTimeline(VulkanDevice *device);
-  VkDevice device_{};
   VkSemaphore semaphore_{};
 };
 

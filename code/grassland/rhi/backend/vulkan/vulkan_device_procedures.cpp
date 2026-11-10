@@ -4,6 +4,18 @@ namespace grassland::rhi::backend::vulkan {
 bool DeviceProcedures::Load(VkDevice device, uint32_t api_version, const DeviceFeatures &enabled) {
   *this = {};
 #if defined(LONGMARCH_CUDA_RUNTIME)
+  if (enabled.ExternalSemaphore()) {
+#if defined(_WIN32)
+    GetSemaphoreWin32HandleKHR =
+        reinterpret_cast<PFN_vkGetSemaphoreWin32HandleKHR>(vkGetDeviceProcAddr(device, "vkGetSemaphoreWin32HandleKHR"));
+    if (!GetSemaphoreWin32HandleKHR)
+      return false;
+#else
+    GetSemaphoreFdKHR = reinterpret_cast<PFN_vkGetSemaphoreFdKHR>(vkGetDeviceProcAddr(device, "vkGetSemaphoreFdKHR"));
+    if (!GetSemaphoreFdKHR)
+      return false;
+#endif
+  }
   if (enabled.ExternalMemory()) {
 #if defined(_WIN32)
     GetMemoryWin32HandleKHR =
