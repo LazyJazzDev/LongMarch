@@ -36,6 +36,8 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
     if (!queue_lock.owns_lock())
       queue_lock.lock();
     pending_.splice(pending_.end(), submission);
+    queue_lock.unlock();
+    device_->NotifyCollector();
   };
   commands->BindDownloads(completion.Get());
   CommandContext::SubmitResult result;

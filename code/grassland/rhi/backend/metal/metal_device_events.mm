@@ -5,8 +5,42 @@
 
 namespace grassland::rhi::backend::metal {
 
-bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
+uint64_t MetalDevice::ProgressGeneration() const {
+  std::lock_guard<std::mutex> lock(wait_state_->mutex);
+  return wait_state_->generation;
+}
+
+void MetalDevice::NotifyCollector() {
+  std::lock_guard<std::mutex> lock(wait_state_->mutex);
+  ++wait_state_->generation;
+  wait_state_->changed.notify_all();
+}
+
+void MetalDevice::ObserveCompletion(MTL::CommandBuffer *commands) {
   auto state = wait_state_;
+  [(__bridge id<MTLCommandBuffer>)(void *)commands addCompletedHandler:^(id<MTLCommandBuffer>) {
+    std::lock_guard<std::mutex> lock(state->mutex);
+    ++state->generation;
+    state->changed.notify_all();
+  }];
+}
+
+bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto state = wait_state_;
+  for (const auto &event : events) {
+    auto native = (__bridge id<MTLSharedEvent>)(void *)static_cast<MetalTimeline *>(event.timeline)->NativeEvent();
+    std::weak_ptr<WaitState> weak = state;
+    [native notifyListener:(__bridge MTLSharedEventListener *)(void *)state->listener.get()
+                   atValue:event.value
+                     block:^(id<MTLSharedEvent>, uint64_t) {
+                       if (auto alive = weak.lock()) {
+                         std::lock_guard<std::mutex> lock(alive->mutex);
+                         ++alive->generation;
+                         alive->changed.notify_all();
+                       }
+                     }];
+  }
   std::unique_lock<std::mutex> lock(state->mutex);
   for (;;) {
     size_t ready = 0, failed = 0;
@@ -21,20 +55,13 @@ bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
       return true;
     if ((wait_all && failed) || failed == events.size())
       return false;
-    // Queue progress listeners are shared with the collector. A bounded check
-    // also observes command-buffer failures, which do not signal SharedEvent.
-    state->changed.wait_for(lock, std::chrono::milliseconds(50));
+    state->changed.wait(lock);
   }
 }
 
-void MetalDevice::WaitForProgress(const std::vector<Event> &next) {
+void MetalDevice::WaitForProgress(const std::vector<Event> &next, uint64_t observed) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto state = wait_state_;
-  uint64_t observed;
-  {
-    std::lock_guard<std::mutex> lock(state->mutex);
-    observed = state->generation;
-  }
   for (const auto &event : next) {
     for (size_t index = 0; index < queues_.size(); ++index) {
       if (!queues_[index] || queues_[index]->GetTimeline() != event.timeline)
@@ -57,7 +84,7 @@ void MetalDevice::WaitForProgress(const std::vector<Event> &next) {
     }
   }
   std::unique_lock<std::mutex> lock(state->mutex);
-  state->changed.wait_for(lock, std::chrono::milliseconds(50), [&] { return state->generation != observed; });
+  state->changed.wait(lock, [&] { return state->generation != observed; });
 }
 
 }  // namespace grassland::rhi::backend::metal

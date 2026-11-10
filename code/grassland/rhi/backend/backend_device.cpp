@@ -134,8 +134,7 @@ void Device::Collect() {
   std::vector<Event> next;
   next.reserve(queues_.size());
   for (;;) {
-    // Snapshot before polling: progress racing with the poll will satisfy this
-    // wait, even when no subsequent submit arrives to wake the collector.
+    const auto observed = ProgressGeneration();
     next.clear();
     bool empty = true;
     for (const auto &queue : queues_) {
@@ -153,22 +152,19 @@ void Device::Collect() {
       if (stopping_ && empty)
         return;
     }
-    // A bounded native wait also permits shutdown and error recovery without
-    // adding a synthetic GPU signal to any queue's monotonic timeline.
-    if (next.empty())
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    else
-      WaitForProgress(next);
+    WaitForProgress(next, observed);
   }
 }
 
 void Device::ShutdownQueues() {
+  if (!collector_.joinable())
+    return;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     stopping_ = true;
   }
-  if (collector_.joinable())
-    collector_.join();
+  NotifyCollector();
+  collector_.join();
 }
 
 }  // namespace grassland::rhi::backend

@@ -29,19 +29,34 @@ bool VulkanDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_
   return Check(vkWaitSemaphores(device_, &info, UINT64_MAX), "Wait for timeline events");
 }
 
-void VulkanDevice::WaitForProgress(const std::vector<Event> &next) {
-  std::array<VkSemaphore, 2> semaphores{};
-  std::array<uint64_t, 2> values{};
+uint64_t VulkanDevice::ProgressGeneration() const {
+  std::lock_guard<std::mutex> lock(wake_mutex_);
+  return wake_value_;
+}
+
+void VulkanDevice::NotifyCollector() {
+  std::lock_guard<std::mutex> lock(wake_mutex_);
+  VkSemaphoreSignalInfo signal{VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO};
+  signal.semaphore = collector_wake_;
+  signal.value = ++wake_value_;
+  Check(vkSignalSemaphore(device_, &signal), "Wake device collector");
+}
+
+void VulkanDevice::WaitForProgress(const std::vector<Event> &next, uint64_t observed) {
+  std::array<VkSemaphore, 3> semaphores{};
+  std::array<uint64_t, 3> values{};
   for (size_t index = 0; index < next.size(); ++index) {
     semaphores[index] = static_cast<VulkanTimeline *>(next[index].timeline)->NativeSemaphore();
     values[index] = next[index].value;
   }
+  semaphores[next.size()] = collector_wake_;
+  values[next.size()] = observed + 1;
   VkSemaphoreWaitInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
   info.flags = VK_SEMAPHORE_WAIT_ANY_BIT;
-  info.semaphoreCount = static_cast<uint32_t>(next.size());
+  info.semaphoreCount = static_cast<uint32_t>(next.size() + 1);
   info.pSemaphores = semaphores.data();
   info.pValues = values.data();
-  vkWaitSemaphores(device_, &info, 50000000);
+  vkWaitSemaphores(device_, &info, UINT64_MAX);
 }
 
 bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command) {
@@ -102,6 +117,8 @@ VulkanDevice::~VulkanDevice() {
   }
   for (auto &queue : queues_)
     queue.Reset();
+  if (collector_wake_)
+    vkDestroySemaphore(device_, collector_wake_, nullptr);
   if (allocator_)
     vmaDestroyAllocator(allocator_);
   if (device_)
@@ -193,6 +210,13 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     if (!device->queues_[index])
       return nullptr;
   }
+  VkSemaphoreTypeCreateInfo wake_type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
+  wake_type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+  VkSemaphoreCreateInfo wake_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+  wake_info.pNext = &wake_type;
+  if (!Check(vkCreateSemaphore(device->device_, &wake_info, nullptr, &device->collector_wake_),
+             "Create collector wake semaphore"))
+    return nullptr;
   device->StartCollector();
   return device.release();
 }

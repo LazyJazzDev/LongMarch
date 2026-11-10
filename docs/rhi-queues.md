@@ -40,11 +40,13 @@ completed Main submission from retiring. Independent GPU progress is only possib
 when the native queues can execute independently; shared queues can block behind
 an earlier wait. Submit producers before consumers rather than relying on a later
 submission to unblock a shared native queue. The collector can wait for the next value
-before that submission exists. Native waits use a bounded 50 ms interval to observe
-shutdown, failures, and publication races without adding fake queue signals. Thus
-resource retirement can lag GPU completion by up to one wait interval when a record
-is published after the collector has taken its progress snapshot. No subsequent
-Submit is required to trigger retirement.
+before that submission exists. Submission publication and shutdown explicitly wake
+the collector. A notification captured before retirement prevents lost wakeups when
+GPU completion precedes publication of its submission record. Vulkan waits on a
+separate CPU-signaled timeline alongside queue timelines; D3D12 combines a wake event
+with fence completion events; Metal uses shared-event listeners and command-buffer
+completion callbacks. These waits have no periodic timeout and do not modify queue
+completion values. No subsequent Submit is required to trigger retirement.
 
 Vulkan queues share a graphics+compute family to avoid ownership transfers for
 ordinary resources. D3D12 uses two DIRECT queues; Metal uses two command queues and

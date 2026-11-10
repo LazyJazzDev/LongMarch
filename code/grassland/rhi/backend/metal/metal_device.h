@@ -31,9 +31,13 @@ class MetalDevice final : public Device {
   MTL::Device *NativeDevice() const noexcept;
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
 
+  void NotifyCollector() override;
+  void ObserveCompletion(MTL::CommandBuffer *commands);
+
  private:
+  uint64_t ProgressGeneration() const override;
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
-  void WaitForProgress(const std::vector<Event> &next) override;
+  void WaitForProgress(const std::vector<Event> &next, uint64_t observed) override;
   MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
 
   NS::SharedPtr<MTL::Device> device_;

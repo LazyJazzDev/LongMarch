@@ -41,7 +41,15 @@ class TestDevice final : public backend::Device {
     return false;
   }
 
-  void WaitForProgress(const std::vector<Event> &) override {
+  uint64_t ProgressGeneration() const override {
+    return 0;
+  }
+
+  void NotifyCollector() override {
+    ADD_FAILURE();
+  }
+
+  void WaitForProgress(const std::vector<Event> &, uint64_t) override {
     ADD_FAILURE();
   }
 

@@ -48,9 +48,12 @@ class D3D12Device final : public Device {
   bool AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator, ComPtr<ID3D12GraphicsCommandList> &list);
   void RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator, ComPtr<ID3D12GraphicsCommandList> list);
 
+  void NotifyCollector() override;
+
  private:
+  uint64_t ProgressGeneration() const override;
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
-  void WaitForProgress(const std::vector<Event> &next) override;
+  void WaitForProgress(const std::vector<Event> &next, uint64_t observed) override;
   D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
 
   D3D12TemporalBufferPool upload_pool_;
@@ -68,6 +71,7 @@ class D3D12Device final : public Device {
   D3D12DescriptorPool resource_descriptor_storage_, sampler_descriptor_storage_;
   ComPtr<IDXGIFactory4> factory_;
   bool tearing_{};
+  HANDLE collector_wake_{};
   std::array<HANDLE, 2> progress_events_{};
   std::array<uint64_t, 2> progress_values_{};
 };

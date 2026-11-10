@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
+#include <future>
 #include <type_traits>
 
 #include "grassland/rhi/backend/backend_core.h"
@@ -20,6 +21,10 @@ using backend::ObjectPtr;
 struct Gate {
   std::mutex mutex;
   std::condition_variable changed;
+  uint64_t generation{};
+  bool pause_publication{};
+  bool publication_entered{};
+  uint64_t wait_target{};
   bool complete{};
   uint64_t completed_limit{UINT64_MAX};
   int destroyed{};
@@ -128,6 +133,7 @@ class TestTimeline final : public backend::Timeline {
   void Signal(uint64_t value) {
     std::lock_guard<std::mutex> lock(gate_->mutex);
     value_ = value;
+    ++gate_->generation;
     gate_->changed.notify_all();
   }
 
@@ -182,6 +188,10 @@ class TestCommandContext final : public backend::CommandContext {
   }
 
   bool UpdatePresentedImages() override {
+    std::unique_lock<std::mutex> lock(gate_->mutex);
+    gate_->publication_entered = true;
+    gate_->changed.notify_all();
+    gate_->changed.wait(lock, [&] { return !gate_->pause_publication; });
     return true;
   }
 
@@ -239,6 +249,7 @@ class TestDevice final : public backend::Device {
     {
       std::lock_guard<std::mutex> lock(gate_->mutex);
       gate_->complete = true;
+      ++gate_->generation;
       gate_->completed_limit = UINT64_MAX;
     }
     gate_->changed.notify_all();
@@ -265,14 +276,27 @@ class TestDevice final : public backend::Device {
     }
   }
 
-  void WaitForProgress(const std::vector<Event> &next) override {
+  uint64_t ProgressGeneration() const override {
+    std::lock_guard<std::mutex> lock(gate_->mutex);
+    return gate_->generation;
+  }
+
+  void NotifyCollector() override {
+    std::lock_guard<std::mutex> lock(gate_->mutex);
+    ++gate_->generation;
+    gate_->changed.notify_all();
+  }
+
+  void WaitForProgress(const std::vector<Event> &next, uint64_t observed) override {
     for (auto event : next) {
       uint64_t value;
       if (event.timeline->GetCompletedValue(value) && value >= event.value)
         return;
     }
     std::unique_lock<std::mutex> lock(gate_->mutex);
-    gate_->changed.wait_for(lock, std::chrono::milliseconds(10));
+    gate_->wait_target = next.empty() ? 0 : next.front().value;
+    gate_->changed.notify_all();
+    gate_->changed.wait(lock, [&] { return gate_->generation != observed; });
   }
 
   std::shared_ptr<Gate> gate_;
@@ -306,6 +330,7 @@ TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     gate->complete = true;
+    ++gate->generation;
   }
   gate->changed.notify_all();
   ASSERT_TRUE(token.WaitHost());
@@ -344,6 +369,7 @@ TEST(RhiCommands, DifferentResourceTypesAreRetainedOnceUntilSubmissionCompletes)
     EXPECT_EQ(gate->destroyed, 0);
     EXPECT_EQ(gate->resources_destroyed, 0);
     gate->complete = true;
+    ++gate->generation;
   }
   gate->changed.notify_all();
   ASSERT_TRUE(token.WaitHost());
@@ -391,6 +417,7 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
     std::lock_guard<std::mutex> lock(gate->mutex);
     EXPECT_EQ(gate->destroyed, 0);
     gate->complete = true;
+    ++gate->generation;
   }
   gate->changed.notify_all();
   ASSERT_TRUE(token.WaitHost());
@@ -401,6 +428,37 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   device.Reset();
   EXPECT_EQ(gate->devices_destroyed, 1);
   EXPECT_FALSE(token);
+}
+
+TEST(RhiCommands, PublicationAfterGpuCompletionWakesCollector) {
+  auto gate = std::make_shared<Gate>();
+  gate->complete = true;
+  gate->pause_publication = true;
+  auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
+  auto queue = Queue(device->GetQueue(QUEUE_TYPE_MAIN));
+  auto submitted = std::async(std::launch::async, [&] {
+    auto context = queue.CreateCommandContext();
+    return std::move(context).Submit();
+  });
+  bool waiting_after_completion;
+  {
+    std::unique_lock<std::mutex> lock(gate->mutex);
+    waiting_after_completion = gate->changed.wait_for(
+        lock, std::chrono::seconds(2), [&] { return gate->publication_entered && gate->wait_target == 2; });
+    // Release publication without advancing the timeline or notification generation.
+    gate->pause_publication = false;
+  }
+  gate->changed.notify_all();
+  auto token = submitted.get();
+  ASSERT_TRUE(token);
+  auto retired = std::async(std::launch::async, [&] { return token.WaitHost(); });
+  const auto status = retired.wait_for(std::chrono::seconds(2));
+  // Make a failure clean up instead of leaving the test blocked forever.
+  if (status != std::future_status::ready)
+    static_cast<backend::Device *>(device.Get())->NotifyCollector();
+  EXPECT_TRUE(waiting_after_completion);
+  EXPECT_EQ(status, std::future_status::ready);
+  EXPECT_TRUE(retired.get());
 }
 
 TEST(RhiCommands, CompletionSnapshotRetiresOnlyValuesAtOrBelowItsLimit) {
@@ -419,6 +477,7 @@ TEST(RhiCommands, CompletionSnapshotRetiresOnlyValuesAtOrBelowItsLimit) {
     std::lock_guard<std::mutex> lock(gate->mutex);
     gate->completed_limit = 2;
     gate->complete = true;
+    ++gate->generation;
   }
   gate->changed.notify_all();
   ASSERT_TRUE(tokens[1].WaitHost());
@@ -428,6 +487,7 @@ TEST(RhiCommands, CompletionSnapshotRetiresOnlyValuesAtOrBelowItsLimit) {
     std::lock_guard<std::mutex> lock(gate->mutex);
     EXPECT_EQ(gate->destroyed, 2);
     gate->completed_limit = 3;
+    ++gate->generation;
   }
   gate->changed.notify_all();
   ASSERT_TRUE(tokens[2].WaitHost());
@@ -448,6 +508,7 @@ TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     gate->complete = true;
+    ++gate->generation;
   }
   gate->changed.notify_all();
   std::unique_lock<std::mutex> lock(gate->mutex);
@@ -471,6 +532,7 @@ TEST(RhiCommands, SealedContextsCannotRecordOrSubmitAgain) {
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     gate->complete = true;
+    ++gate->generation;
   }
   gate->changed.notify_all();
   EXPECT_TRUE(token.WaitHost());
@@ -493,6 +555,7 @@ TEST(RhiCommands, CrossQueueDependencyDoesNotWaitForGpuOnCpu) {
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     gate->complete = true;
+    ++gate->generation;
   }
   gate->changed.notify_all();
   EXPECT_TRUE(done.WaitHost());
@@ -513,6 +576,7 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
     std::lock_guard<std::mutex> lock(gate->mutex);
     EXPECT_EQ(gate->destroyed, 0);
     gate->complete = true;
+    ++gate->generation;
   }
   gate->changed.notify_all();
   std::unique_lock<std::mutex> lock(gate->mutex);

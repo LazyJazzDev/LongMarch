@@ -175,6 +175,7 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative(const SubmitInfo 
     commands_->encodeSignalEvent(static_cast<MetalTimeline *>(signal.timeline)->NativeEvent(), signal.value);
     for (const auto &present : presents_)
       commands_->presentDrawable(present.second->NativeDrawable());
+    device_->ObserveCompletion(commands_.get());
     commands_->commit();
     MarkSubmitted();
     for (auto &entry : as_dependencies_)
@@ -203,6 +204,7 @@ SubmissionStatus MetalCommandContext::PollCompletion(Event signal, uint64_t comp
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   if (commands_->status() == MTL::CommandBufferStatusError) {
     static_cast<MetalTimeline *>(signal.timeline)->MarkFailed();
+    device_->NotifyCollector();
     ReportMetalError(commands_->error(), "Metal command buffer failed",
                      commands_->errorOptions() & MTL::CommandBufferErrorOptionEncoderExecutionStatus);
     return SUBMISSION_STATUS_FAILED;

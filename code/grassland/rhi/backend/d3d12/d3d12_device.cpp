@@ -37,26 +37,27 @@ bool D3D12Device::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
   return SUCCEEDED(device_->GetDeviceRemovedReason());
 }
 
-void D3D12Device::WaitForProgress(const std::vector<Event> &next) {
-  std::array<HANDLE, 2> handles{};
-  DWORD count = 0;
+uint64_t D3D12Device::ProgressGeneration() const {
+  return 0;  // The auto-reset event retains notifications until consumed.
+}
+
+void D3D12Device::NotifyCollector() {
+  SetEvent(collector_wake_);
+}
+
+void D3D12Device::WaitForProgress(const std::vector<Event> &next, uint64_t) {
+  std::array<HANDLE, 3> handles{collector_wake_};
+  DWORD count = 1;
   for (const auto &event : next) {
     for (size_t index = 0; index < queues_.size(); ++index) {
       if (!queues_[index] || queues_[index]->GetTimeline() != event.timeline)
         continue;
       auto &handle = progress_events_[index];
-      if (!handle)
-        handle = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-      if (!handle) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        return;
-      }
       if (progress_values_[index] != event.value) {
         ResetEvent(handle);
         if (!Check(
                 static_cast<D3D12Timeline *>(event.timeline)->NativeFence()->SetEventOnCompletion(event.value, handle),
                 "Listen for queue progress")) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(50));
           return;
         }
         progress_values_[index] = event.value;
@@ -65,8 +66,7 @@ void D3D12Device::WaitForProgress(const std::vector<Event> &next) {
       break;
     }
   }
-  if (count)
-    WaitForMultipleObjects(count, handles.data(), FALSE, 50);
+  WaitForMultipleObjects(count, handles.data(), FALSE, INFINITE);
 }
 
 bool D3D12Device::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
@@ -143,6 +143,18 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
     if (!object->queues_[type])
       return nullptr;
   }
+  object->collector_wake_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (!object->collector_wake_) {
+    ReportError(GetLastError(), "Create collector wake event");
+    return nullptr;
+  }
+  for (auto &event : object->progress_events_) {
+    event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!event) {
+      ReportError(GetLastError(), "Create queue progress event");
+      return nullptr;
+    }
+  }
   object->StartCollector();
   return object.release();
 }
@@ -212,6 +224,8 @@ D3D12Device::~D3D12Device() {
   for (auto event : progress_events_)
     if (event)
       CloseHandle(event);
+  if (collector_wake_)
+    CloseHandle(collector_wake_);
   if (debug_callback_cookie_)
     debug_messages_->UnregisterMessageCallback(debug_callback_cookie_);
 }
