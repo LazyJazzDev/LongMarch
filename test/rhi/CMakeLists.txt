@@ -23,7 +23,7 @@ if (APPLE)
     target_link_libraries(test_rhi PRIVATE "-framework Cocoa")
 endif ()
 
-# Standalone CUDA-only validation. This target never records/submits RHI commands.
+# CUDA buffer and graphics/CUDA timeline interoperability validation.
 if (LONGMARCH_CUDA_RUNTIME)
     add_executable(test_rhi_cuda_timeline cuda_timeline_test.cpp)
     target_link_libraries(test_rhi_cuda_timeline PRIVATE grassland_rhi CUDA::cudart_static GTest::gtest_main)
@@ -35,7 +35,7 @@ if (LONGMARCH_CUDA_RUNTIME)
     endif ()
     if (LONGMARCH_CUDA_ENABLED)
         target_compile_definitions(test_rhi_cuda_timeline PRIVATE LONGMARCH_CUDA_ENABLED)
-        target_sources(test_rhi_cuda_timeline PRIVATE cuda_buffer_kernel.cu)
+        target_sources(test_rhi_cuda_timeline PRIVATE cuda_buffer_kernel.cu ${PROJECT_SOURCE_DIR}/demo/rhi_hello/modules/nbody/cuda_simulation.cu)
         target_compile_definitions(test_rhi_cuda_buffer PRIVATE LONGMARCH_CUDA_ENABLED)
         target_sources(test_rhi_cuda_buffer PRIVATE cuda_buffer_kernel.cu)
     endif ()

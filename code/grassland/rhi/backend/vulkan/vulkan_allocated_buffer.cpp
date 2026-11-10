@@ -27,17 +27,7 @@ VulkanAllocatedBuffer *VulkanAllocatedBuffer::Create(VulkanDevice *device,
   auto object = std::unique_ptr<VulkanAllocatedBuffer>(new VulkanAllocatedBuffer(device, desc));
   VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   info.size = object->desc_.size;
-  info.usage = download ? VK_BUFFER_USAGE_TRANSFER_DST_BIT
-               : upload ? VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-                        : VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                              VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-  if (device->SupportRayTracingPipeline() || device->SupportRayQuery()) {
-    info.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-                  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-    if (device->SupportRayTracingPipeline())
-      info.usage |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
-  }
+  info.usage = BufferUsage(device, upload, download);
   VmaAllocationCreateInfo memory{};
   memory.usage = (upload || download) ? VMA_MEMORY_USAGE_AUTO_PREFER_HOST : VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
   if (upload)

@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 
+#include "cuda_simulation.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
@@ -39,7 +40,7 @@ struct Simulation {
 
 struct Camera {
   glm::mat4 world_to_screen, camera_to_world;
-  float particle_size;
+  glm::vec4 particle;
 };
 }  // namespace
 
@@ -49,6 +50,7 @@ int RunNBody(grassland::rhi::IDevice *device) {
   PresentMode requested = PRESENT_MODE_VSYNC;
   bool present_mode_changed = false;
   bool running = true, reset_requested = true;
+  bool cuda_active = false;
   float delta_t = 0.03f;
   int galaxy_count = 10;
   glm::mat4 rotation{1.0f};
@@ -87,7 +89,8 @@ int RunNBody(grassland::rhi::IDevice *device) {
                                   BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, BLEND_OP_ADD)};
   desc.vertex_bindings = {{sizeof(glm::vec3), true}};
   desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}};
-  desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
+  desc.pipeline_layout.groups = {
+      {{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX | SHADER_VISIBILITY_FRAGMENT}}}};
   desc.color_formats = {IMAGE_FORMAT_R32G32B32A32_SFLOAT};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   if (!program)
@@ -117,15 +120,28 @@ int RunNBody(grassland::rhi::IDevice *device) {
   if (!compute)
     return 1;
   constexpr uint64_t bytes = particle_count * sizeof(glm::vec3);
-  ObjPtr<IBuffer> positions = device->CreateBuffer({bytes});
+  auto create_particles = [&]() -> IBuffer * {
+#if defined(LONGMARCH_CUDA_ENABLED)
+    if (device->GetCUDADeviceIndex() >= 0)
+      return device->CreateCUDABuffer({bytes});
+#endif
+    return device->CreateBuffer({bytes});
+  };
+  ObjPtr<IBuffer> positions = create_particles();
   if (!positions)
     return 1;
-  ObjPtr<IBuffer> velocities = device->CreateBuffer({bytes});
+  ObjPtr<IBuffer> velocities = create_particles();
   if (!velocities)
     return 1;
-  ObjPtr<IBuffer> next_positions = device->CreateBuffer({bytes});
+  ObjPtr<IBuffer> next_positions = create_particles();
   if (!next_positions)
     return 1;
+#if defined(LONGMARCH_CUDA_ENABLED)
+  NBodyCUDA cuda(device);
+  if (device->GetCUDADeviceIndex() >= 0 && !cuda)
+    return 1;
+  Event last_graphics{};
+#endif
   ObjPtr<IBuffer> simulation_uniform = device->CreateBuffer({256});
   if (!simulation_uniform)
     return 1;
@@ -277,6 +293,15 @@ int RunNBody(grassland::rhi::IDevice *device) {
               ImGui::Text("Frame Duration: %.3f ms", rate > 0 ? 1000.0 / rate : 0.0);
               ImGui::Text("Estimated: %.2f TFLOP/s", running ? flops_per_frame * rate * 1e-12 : 0.0);
               ImGui::SeparatorText("Control");
+#if defined(LONGMARCH_CUDA_ENABLED)
+              if (cuda) {
+                if (ImGui::Button(cuda_active ? "Use Graphics Compute" : "Use CUDA Compute")) {
+                  cuda_active = !cuda_active;
+                  fps.Reset();
+                  std::cout << "nbody: compute " << (cuda_active ? "CUDA" : "Graphics") << '\n';
+                }
+              }
+#endif
               const auto &style = ImGui::GetStyle();
               const float row_width = ImGui::GetContentRegionAvail().x;
               const ImVec2 button_size{(row_width - style.ItemSpacing.x) * 0.5f, ImGui::GetFrameHeight() + 6.0f};
@@ -410,15 +435,40 @@ int RunNBody(grassland::rhi::IDevice *device) {
       return 1;
     const auto view = glm::lookAt(glm::vec3(10, 20, 30), glm::vec3(0), glm::vec3(0, 1, 0)) * rotation;
     Camera camera{glm::perspective(glm::radians(60.0f), float(extent.width) / extent.height, 0.1f, 100.0f) * view,
-                  glm::inverse(view), 0.07f};
+                  glm::inverse(view),
+                  cuda_active ? glm::vec4{0.07f, 1.0f, 0.13286832f, 0.03310477f}
+                              : glm::vec4{0.07f, 0.03310477f, 0.13286832f, 1.0f}};
     RETURN_IF_FAIL(context->CmdUploadBuffer(camera_uniform.Get(), 0, &camera, sizeof(camera)));
     if (reset_requested) {
       if (!reset_particles(context.Get()))
         return 1;
+#if defined(LONGMARCH_CUDA_ENABLED)
+      if (cuda_active && running) {
+        ObjPtr<ISubmissionToken> initialized = context->Submit();
+        if (!initialized)
+          return 1;
+        last_graphics = initialized->GetEvent();
+        context = queue->CreateCommandContext();
+        if (!context)
+          return 1;
+      }
+#endif
       reset_requested = false;
       std::cout << "nbody: reset " << galaxy_count << " galaxies\n";
     }
-    if (running) {
+    SubmitInfo submit_info;
+#if defined(LONGMARCH_CUDA_ENABLED)
+    if (running && cuda_active) {
+      const auto ready = cuda.Step(static_cast<ICUDABuffer *>(positions.Get())->GetDevicePointer(),
+                                   static_cast<ICUDABuffer *>(velocities.Get())->GetDevicePointer(),
+                                   static_cast<ICUDABuffer *>(next_positions.Get())->GetDevicePointer(), particle_count,
+                                   delta_t, 100.0f / particle_count, last_graphics);
+      if (!ready.timeline)
+        return 1;
+      submit_info.waits.push_back(ready);
+    } else
+#endif
+        if (running) {
       const Simulation settings{particle_count, delta_t, 100.0f / particle_count};
       RETURN_IF_FAIL(context->CmdUploadBuffer(simulation_uniform.Get(), 0, &settings, sizeof(settings)));
       RETURN_IF_FAIL(context->CmdBindComputeProgram(compute.Get()));
@@ -456,11 +506,14 @@ int RunNBody(grassland::rhi::IDevice *device) {
         return 1;
     }
 
-    ObjPtr<ISubmissionToken> token = context->Submit();
+    ObjPtr<ISubmissionToken> token = context->Submit(submit_info);
 
     if (!token)
       return 1;
 
+#if defined(LONGMARCH_CUDA_ENABLED)
+    last_graphics = token->GetEvent();
+#endif
     fps.TickFrame();
   }
 

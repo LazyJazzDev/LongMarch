@@ -4,6 +4,7 @@
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanDevice;
+VkBufferUsageFlags BufferUsage(VulkanDevice *device, bool upload = false, bool download = false);
 
 // Resource access only. Derived classes define allocation ownership (standalone or future pool leases).
 class VulkanBuffer : public Buffer {

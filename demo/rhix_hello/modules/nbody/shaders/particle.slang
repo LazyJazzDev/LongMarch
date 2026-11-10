@@ -1,7 +1,7 @@
 struct GlobalUniformObject {
   float4x4 world_to_screen;
   float4x4 camera_to_world;
-  float particle_size;
+  float4 particle;
 };
 
 struct PSInput {
@@ -17,7 +17,7 @@ PSInput VSMain(RHI_INPUT(0, float3, pos), uint vertex_index : SV_VertexID) {
   float2 v = vertices[vertex_index];
   PSInput ps_input;
   ps_input.position =
-      mul(ubo.world_to_screen, float4(pos, 1.0) + mul(ubo.camera_to_world, float4(v, 0.0, 0.0) * ubo.particle_size));
+      mul(ubo.world_to_screen, float4(pos, 1.0) + mul(ubo.camera_to_world, float4(v, 0.0, 0.0) * ubo.particle.x));
   ps_input.frag_v = v;
   return ps_input;
 }
@@ -25,7 +25,7 @@ PSInput VSMain(RHI_INPUT(0, float3, pos), uint vertex_index : SV_VertexID) {
 float4 PSMain(PSInput input) : SV_TARGET {
   float scale = max(1.0 - length(input.frag_v), 0.0);
   // Decode the original sRGB particle tint before linear accumulation.
-  const float3 linear_tint = float3(0.03310477, 0.13286832, 1.0);
+  const float3 linear_tint = ubo.particle.yzw;
   // A compact, bright stellar core: half the radius and eight times the peak.
   const float peak_radiance = 8.0;
   return float4(linear_tint * peak_radiance * scale * scale * scale, 0.0);

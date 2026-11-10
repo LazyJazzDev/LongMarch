@@ -50,3 +50,22 @@ reuse internally.
 
 See `demo/rhi_multiqueue` for an upload/compute/readback example and an intentionally
 unsynchronized comparison.
+
+## CUDA timelines
+
+When built with `LONGMARCH_CUDA_RUNTIME`, `GetCUDADeviceIndex()` identifies the matching CUDA device (`-1` means unavailable). On a matching device, both queue timelines are automatically exported to CUDA. `CreateCUDATimeline()` creates an independent, device-owned `ICUDATimeline`; neither it nor its Events retain the Device.
+
+`Wait(stream, event)` inserts a CUDA stream wait for a graphics submission. `Signal(stream, value)` inserts a CUDA signal and returns the Event to pass in `SubmitInfo::waits`. Both operations are asynchronous; `nullptr` means the default CUDA stream. Check the boolean result or returned Event before using it. The caller must use strictly increasing signal values and ensure their execution order across streams. Queue timeline values remain controlled by their Queue.
+
+```cpp
+// Resources and the device remain alive throughout this sequence.
+if (!cuda_timeline->Wait(stream, uploaded->GetEvent()))
+  return false;
+// Enqueue CUDA work on stream using ICUDABuffer::GetDevicePointer().
+Event ready = cuda_timeline->Signal(stream, 1);
+if (!ready.timeline)
+  return false;
+ObjPtr<ISubmissionToken> rendered = render_context->Submit({{ready}});
+```
+
+CUDA buffers implement the normal `IBuffer` interface, with one stable borrowed device pointer. Vulkan submissions acquire external buffer ownership before commands and release it afterward; D3D12 restores the resource's COMMON state. These transitions do not replace Event dependencies. Finish CUDA work before releasing the last buffer reference or destroying the Device. CPU waits remain available through the inherited `ITimeline` interface and submission tokens.

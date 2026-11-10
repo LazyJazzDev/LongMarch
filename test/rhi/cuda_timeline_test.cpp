@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <atomic>
+#include <cmath>
 #include <thread>
 
+#include "../../demo/rhi_hello/modules/nbody/cuda_simulation.h"
 #include "grassland/rhi/rhi.h"
 
 #if defined(LONGMARCH_CUDA_ENABLED)
@@ -94,6 +97,70 @@ TEST_P(RhiCUDATimeline, BothQueuesWaitForCUDAAndCUDAWaitsForQueueEvents) {
 }
 
 #if defined(LONGMARCH_CUDA_ENABLED)
+TEST_P(RhiCUDATimeline, NBodyCUDAAgreesWithCPUReference) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  if (device->GetCUDADeviceIndex() < 0)
+    GTEST_SKIP();
+  constexpr uint32_t count = 257;
+  constexpr float dt = 0.01f, gravity = 0.4f;
+  using Vector = std::array<float, 3>;
+  std::vector<Vector> positions(count), velocities(count), expected_positions(count), expected_velocities(count);
+  for (uint32_t i = 0; i < count; ++i) {
+    positions[i] = {float(i % 7) * 0.3f, float(i % 17) * 0.2f, float(i / 7) * 0.1f};
+    velocities[i] = {0.01f, -0.02f, 0.03f};
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    Vector acceleration{};
+    for (uint32_t j = 0; j < count; ++j) {
+      Vector difference{};
+      float squared = 0.00125f * 0.00125f;
+      for (unsigned axis = 0; axis < 3; ++axis) {
+        difference[axis] = positions[i][axis] - positions[j][axis];
+        squared += difference[axis] * difference[axis];
+      }
+      const float inverse = 1.0f / std::sqrt(squared);
+      for (unsigned axis = 0; axis < 3; ++axis)
+        acceleration[axis] += difference[axis] * (inverse * inverse * inverse * (-dt * gravity));
+    }
+    for (unsigned axis = 0; axis < 3; ++axis) {
+      expected_velocities[i][axis] = velocities[i][axis] + acceleration[axis];
+      expected_positions[i][axis] = positions[i][axis] + expected_velocities[i][axis] * dt;
+    }
+  }
+  constexpr uint64_t bytes = count * sizeof(Vector);
+  ObjPtr<ICUDABuffer> p = device->CreateCUDABuffer({bytes});
+  ObjPtr<ICUDABuffer> v = device->CreateCUDABuffer({bytes});
+  ObjPtr<ICUDABuffer> next = device->CreateCUDABuffer({bytes});
+  ASSERT_TRUE(p && v && next);
+  NBodyCUDA cuda(device.Get());
+  ASSERT_TRUE(cuda);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<ICommandContext> upload = queue->CreateCommandContext();
+  ASSERT_TRUE(upload->CmdUploadBuffer(p.Get(), 0, positions.data(), bytes));
+  ASSERT_TRUE(upload->CmdUploadBuffer(v.Get(), 0, velocities.data(), bytes));
+  ObjPtr<ISubmissionToken> uploaded = upload->Submit();
+  ASSERT_TRUE(uploaded);
+  auto ready = cuda.Step(p->GetDevicePointer(), v->GetDevicePointer(), next->GetDevicePointer(), count, dt, gravity,
+                         uploaded->GetEvent());
+  ASSERT_NE(ready.timeline, nullptr);
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ObjPtr<IDownloadToken> downloaded_positions = commands->CmdDownloadBuffer(p.Get(), 0, bytes);
+  ObjPtr<IDownloadToken> downloaded_velocities = commands->CmdDownloadBuffer(v.Get(), 0, bytes);
+  ASSERT_TRUE(downloaded_positions && downloaded_velocities);
+  ObjPtr<ISubmissionToken> done = commands->Submit({{ready}});
+  ASSERT_TRUE(done && done->WaitHost());
+  ASSERT_TRUE(downloaded_positions->CopyTo(positions.data(), bytes));
+  ASSERT_TRUE(downloaded_velocities->CopyTo(velocities.data(), bytes));
+  for (uint32_t i = 0; i < count; ++i)
+    for (unsigned axis = 0; axis < 3; ++axis) {
+      EXPECT_NEAR(positions[i][axis], expected_positions[i][axis], 2e-5f);
+      EXPECT_NEAR(velocities[i][axis], expected_velocities[i][axis], 2e-5f);
+    }
+}
+
 TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);

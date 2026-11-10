@@ -56,9 +56,7 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
 #endif
   VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   buffer.size = desc.size;
-  buffer.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  buffer.usage = BufferUsage(device);
   VkPhysicalDeviceExternalBufferInfo query{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO};
   query.usage = buffer.usage;
   query.handleType = memory_handle;
@@ -89,6 +87,11 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
     return nullptr;
   VkMemoryDedicatedAllocateInfo dedicated{VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO};
   dedicated.buffer = object->buffer_;
+  VkMemoryAllocateFlagsInfo address{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
+  if (buffer.usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+    address.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    dedicated.pNext = &address;
+  }
   VkExportMemoryAllocateInfo export_info{VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO};
   export_info.handleTypes = memory_handle;
   export_info.pNext = &dedicated;
