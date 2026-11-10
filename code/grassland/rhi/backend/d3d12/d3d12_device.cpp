@@ -37,16 +37,12 @@ bool D3D12Device::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
   return SUCCEEDED(device_->GetDeviceRemovedReason());
 }
 
-uint64_t D3D12Device::ProgressGeneration() const {
-  return 0;  // The auto-reset event retains notifications until consumed.
+void D3D12Device::InterruptCollector() {
+  SetEvent(collector_shutdown_);
 }
 
-void D3D12Device::NotifyCollector() {
-  SetEvent(collector_wake_);
-}
-
-void D3D12Device::WaitForProgress(const std::vector<Event> &next, uint64_t) {
-  std::array<HANDLE, 3> handles{collector_wake_};
+void D3D12Device::WaitForProgress(const std::vector<Event> &next) {
+  std::array<HANDLE, 3> handles{collector_shutdown_};
   DWORD count = 1;
   for (const auto &event : next) {
     for (size_t index = 0; index < queues_.size(); ++index) {
@@ -143,9 +139,9 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
     if (!object->queues_[type])
       return nullptr;
   }
-  object->collector_wake_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!object->collector_wake_) {
-    ReportError(GetLastError(), "Create collector wake event");
+  object->collector_shutdown_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (!object->collector_shutdown_) {
+    ReportError(GetLastError(), "Create collector shutdown event");
     return nullptr;
   }
   for (auto &event : object->progress_events_) {
@@ -224,8 +220,8 @@ D3D12Device::~D3D12Device() {
   for (auto event : progress_events_)
     if (event)
       CloseHandle(event);
-  if (collector_wake_)
-    CloseHandle(collector_wake_);
+  if (collector_shutdown_)
+    CloseHandle(collector_shutdown_);
   if (debug_callback_cookie_)
     debug_messages_->UnregisterMessageCallback(debug_callback_cookie_);
 }

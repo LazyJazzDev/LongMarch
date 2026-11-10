@@ -252,9 +252,7 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const SubmitInfo
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-bool VulkanCommandContext::UpdatePresentedImages() {
-  submission_failed_ = true;
-  bool ready = true;
+void VulkanCommandContext::UpdatePresentedImages() {
   for (const auto &present : presents_) {
     if (present->IsSwapChainInvalid()) {
       present->ReleaseNextImage();
@@ -262,11 +260,8 @@ bool VulkanCommandContext::UpdatePresentedImages() {
     }
     if (!present->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next swapchain image after submission.");
-      ready = false;
     }
   }
-  submission_failed_ = !ready;
-  return ready;
 }
 
 SubmissionStatus VulkanCommandContext::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {

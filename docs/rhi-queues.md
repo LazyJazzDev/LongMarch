@@ -21,7 +21,10 @@ native queue waits, deduplicating repeated timelines by their greatest value. Th
 retirement record does not retain the waits. The returned SubmissionToken owns one
 completion Event and its result state, not a duplicate timeline point. Accepted GPU
 work retains its resources through retirement even when the caller releases its
-context or token. Retirement storage is allocated before native submission.
+context or token. Submission records are inserted under the queue mutex before
+native submission. Rejected work is removed before unlocking; accepted work remains
+registered even if later error handling fails. Next-frame image preparation occurs
+after unlocking and updates Window state, not the current submission result.
 
 A completed Event means the GPU reached that point. SubmissionToken completion also
 means CPU-side retirement and result processing finished; waiting for an Event is
@@ -40,13 +43,15 @@ completed Main submission from retiring. Independent GPU progress is only possib
 when the native queues can execute independently; shared queues can block behind
 an earlier wait. Submit producers before consumers rather than relying on a later
 submission to unblock a shared native queue. The collector can wait for the next value
-before that submission exists. Submission publication and shutdown explicitly wake
-the collector. A notification captured before retirement prevents lost wakeups when
-GPU completion precedes publication of its submission record. Vulkan waits on a
-separate CPU-signaled timeline alongside queue timelines; D3D12 combines a wake event
-with fence completion events; Metal uses shared-event listeners and command-buffer
-completion callbacks. These waits have no periodic timeout and do not modify queue
-completion values. No subsequent Submit is required to trigger retirement.
+before that submission exists. Because records are registered before GPU submission,
+a snapshot that includes a submission's completion always has an already registered
+record. No per-submit CPU wakeup or notification generation is needed. Shutdown uses an internal
+one-shot signal: a dedicated CPU-signaled Vulkan timeline, a D3D12 event, or a Metal
+condition-variable notification. After consuming that signal, the collector drains
+pending GPU work before exiting. Metal also retains command-buffer completion and
+error notifications, since a timeline signal can precede the final command-buffer
+status. There is no periodic polling timeout, and no later Submit is needed to
+trigger retirement.
 
 Vulkan queues share a graphics+compute family to avoid ownership transfers for
 ordinary resources. D3D12 uses two DIRECT queues; Metal uses two command queues and

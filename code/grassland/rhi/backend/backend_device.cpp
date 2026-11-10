@@ -134,7 +134,6 @@ void Device::Collect() {
   std::vector<Event> next;
   next.reserve(queues_.size());
   for (;;) {
-    const auto observed = ProgressGeneration();
     next.clear();
     bool empty = true;
     for (const auto &queue : queues_) {
@@ -147,23 +146,17 @@ void Device::Collect() {
       if (!queue->CollectCompleted(completed, timeline_valid))
         empty = false;
     }
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      if (stopping_ && empty)
-        return;
-    }
-    WaitForProgress(next, observed);
+    if (stopping_ && empty)
+      return;
+    WaitForProgress(next);
   }
 }
 
 void Device::ShutdownQueues() {
   if (!collector_.joinable())
     return;
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    stopping_ = true;
-  }
-  NotifyCollector();
+  stopping_ = true;
+  InterruptCollector();
   collector_.join();
 }
 

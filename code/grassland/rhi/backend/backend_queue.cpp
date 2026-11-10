@@ -28,40 +28,32 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
   std::unique_lock<std::mutex> queue_lock(*mutex_);
   const Event signal{GetTimeline(), NextSerial()};
   auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(signal));
-  // Allocate the node before accepting GPU work. Splicing into the collector
-  // cannot allocate, including when error reporting throws after native submit.
-  std::list<Submission> submission;
-  submission.push_back({commands, completion});
-  auto publish = [&] {
-    if (!queue_lock.owns_lock())
-      queue_lock.lock();
-    pending_.splice(pending_.end(), submission);
-    queue_lock.unlock();
-    device_->NotifyCollector();
-  };
-  commands->BindDownloads(completion.Get());
+  // Register before native submission, while the collector cannot take the list.
+  auto entry = pending_.insert(pending_.end(), {commands, completion});
   CommandContext::SubmitResult result;
   try {
+    commands->BindDownloads(completion.Get());
     result = commands->SubmitNative(native_info, signal);
     if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
+      pending_.erase(entry);
       completion->Complete(SUBMISSION_STATUS_FAILED);
       commands->ReleaseDownloads();
       return {};
     }
     commands->MarkSubmitted();
-    queue_lock.unlock();
-    if (result == CommandContext::SUBMIT_RESULT_SUBMITTED && !commands->UpdatePresentedImages())
-      result = CommandContext::SUBMIT_RESULT_FAILED_IN_FLIGHT;
   } catch (...) {
-    if (commands->WasSubmitted())
-      publish();
-    else {
+    if (!commands->WasSubmitted()) {
+      pending_.erase(entry);
       completion->Complete(SUBMISSION_STATUS_FAILED);
       commands->ReleaseDownloads();
     }
     throw;
   }
-  publish();
+  queue_lock.unlock();
+  // The caller's context reference keeps it alive while the collector retires it.
+  // Next-frame preparation belongs to the Window, not this submission's result.
+  if (result == CommandContext::SUBMIT_RESULT_SUBMITTED)
+    commands->UpdatePresentedImages();
   return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
 }
 

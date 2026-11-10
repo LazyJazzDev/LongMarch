@@ -60,7 +60,7 @@ class MetalCommandContext final : public CommandContext {
                       uint32_t first_instance = 0) override;
   bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
   bool CmdPresent(rhi::IWindow *window) override;
-  bool UpdatePresentedImages() override;
+  void UpdatePresentedImages() override;
   SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
@@ -94,7 +94,6 @@ class MetalCommandContext final : public CommandContext {
   MetalDevice *device_;
   NS::SharedPtr<MTL::CommandBuffer> commands_;
   std::vector<std::pair<MetalWindow *, MetalSwapChainImage *>> presents_;
-  bool submission_failed_{};
 };
 
 }  // namespace grassland::rhi::backend::metal

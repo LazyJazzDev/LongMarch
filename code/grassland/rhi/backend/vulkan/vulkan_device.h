@@ -49,12 +49,10 @@ class VulkanDevice final : public Device {
   bool AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command);
   void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command);
 
-  void NotifyCollector() override;
-
  private:
-  uint64_t ProgressGeneration() const override;
+  void InterruptCollector() override;
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
-  void WaitForProgress(const std::vector<Event> &next, uint64_t observed) override;
+  void WaitForProgress(const std::vector<Event> &next) override;
   VulkanTemporalBufferPool upload_pool_;
   VulkanTemporalBufferPool download_pool_;
   VulkanScratchPool scratch_pool_;
@@ -69,8 +67,7 @@ class VulkanDevice final : public Device {
   VkPhysicalDevice physical_{};
   uint32_t queue_family_index_{};
   bool swapchain_enabled_{};
-  VkSemaphore collector_wake_{VK_NULL_HANDLE};
-  mutable std::mutex wake_mutex_;
-  uint64_t wake_value_{};
+  VkSemaphore collector_shutdown_{VK_NULL_HANDLE};
+  bool shutdown_consumed_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

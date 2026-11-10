@@ -5,14 +5,14 @@
 
 namespace grassland::rhi::backend::metal {
 
-uint64_t MetalDevice::ProgressGeneration() const {
+void MetalDevice::InterruptCollector() {
   std::lock_guard<std::mutex> lock(wait_state_->mutex);
-  return wait_state_->generation;
+  wait_state_->notified = true;
+  wait_state_->changed.notify_all();
 }
 
-void MetalDevice::NotifyCollector() {
+void MetalDevice::NotifyTimelineFailure() {
   std::lock_guard<std::mutex> lock(wait_state_->mutex);
-  ++wait_state_->generation;
   wait_state_->changed.notify_all();
 }
 
@@ -20,7 +20,7 @@ void MetalDevice::ObserveCompletion(MTL::CommandBuffer *commands) {
   auto state = wait_state_;
   [(__bridge id<MTLCommandBuffer>)(void *)commands addCompletedHandler:^(id<MTLCommandBuffer>) {
     std::lock_guard<std::mutex> lock(state->mutex);
-    ++state->generation;
+    state->notified = true;
     state->changed.notify_all();
   }];
 }
@@ -36,7 +36,7 @@ bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
                      block:^(id<MTLSharedEvent>, uint64_t) {
                        if (auto alive = weak.lock()) {
                          std::lock_guard<std::mutex> lock(alive->mutex);
-                         ++alive->generation;
+                         alive->notified = true;
                          alive->changed.notify_all();
                        }
                      }];
@@ -59,7 +59,7 @@ bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
   }
 }
 
-void MetalDevice::WaitForProgress(const std::vector<Event> &next, uint64_t observed) {
+void MetalDevice::WaitForProgress(const std::vector<Event> &next) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto state = wait_state_;
   for (const auto &event : next) {
@@ -76,7 +76,7 @@ void MetalDevice::WaitForProgress(const std::vector<Event> &next, uint64_t obser
                        block:^(id<MTLSharedEvent>, uint64_t) {
                          if (auto alive = weak.lock()) {
                            std::lock_guard<std::mutex> lock(alive->mutex);
-                           ++alive->generation;
+                           alive->notified = true;
                            alive->changed.notify_all();
                          }
                        }];
@@ -84,7 +84,8 @@ void MetalDevice::WaitForProgress(const std::vector<Event> &next, uint64_t obser
     }
   }
   std::unique_lock<std::mutex> lock(state->mutex);
-  state->changed.wait(lock, [&] { return state->generation != observed; });
+  state->changed.wait(lock, [&] { return state->notified; });
+  state->notified = false;
 }
 
 }  // namespace grassland::rhi::backend::metal

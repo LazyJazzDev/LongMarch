@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <array>
+#include <atomic>
 #include <mutex>
 #include <thread>
 
@@ -37,28 +38,23 @@ class Device : public Object<rhi::IDevice> {
   rhi::IQueue *GetQueue(QueueType type) override;
   bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override;
 
-  // Wake the collector after publishing work; also used for shutdown.
-  virtual void NotifyCollector() = 0;
-
  protected:
   // Called once after native device resources and all queues are initialized.
   void StartCollector();
   virtual bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const = 0;
-  // Capture before collecting so notifications racing with retirement are not lost.
-  virtual uint64_t ProgressGeneration() const = 0;
-  virtual void WaitForProgress(const std::vector<Event> &next, uint64_t observed) = 0;
+  virtual void WaitForProgress(const std::vector<Event> &next) = 0;
+  virtual void InterruptCollector() = 0;
   void ShutdownQueues();
   Core *OwnerCore() const;
   std::array<ObjectPtr<Queue>, 2> queues_;
+  std::atomic<bool> stopping_{};
 
  private:
   void Collect();
   BackendAPI api_;
   Core *core_;
   PhysicalDevice info_;
-  std::mutex mutex_;
   std::thread collector_;
-  bool stopping_{};
 };
 
 }  // namespace grassland::rhi::backend

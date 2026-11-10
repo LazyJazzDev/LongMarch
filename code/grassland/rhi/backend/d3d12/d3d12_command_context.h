@@ -65,7 +65,7 @@ class D3D12CommandContext final : public CommandContext {
                       uint32_t first_instance = 0) override;
   bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
   bool CmdPresent(rhi::IWindow *window) override;
-  bool UpdatePresentedImages() override;
+  void UpdatePresentedImages() override;
   SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 

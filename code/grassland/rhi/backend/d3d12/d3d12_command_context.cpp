@@ -265,17 +265,12 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const SubmitInfo 
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-bool D3D12CommandContext::UpdatePresentedImages() {
-  submission_failed_ = true;
+void D3D12CommandContext::UpdatePresentedImages() {
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next swapchain image after submission.");
-      submission_failed_ = true;
-      return false;
     }
   }
-  submission_failed_ = false;
-  return true;
 }
 
 SubmissionStatus D3D12CommandContext::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {

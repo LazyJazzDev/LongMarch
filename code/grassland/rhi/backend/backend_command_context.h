@@ -75,7 +75,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
   Queue *OwnerQueue() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
-  virtual bool UpdatePresentedImages() = 0;
+  virtual void UpdatePresentedImages() = 0;
   virtual SubmitResult SubmitNative(const SubmitInfo &info, Event signal) = 0;
   virtual SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) = 0;
 

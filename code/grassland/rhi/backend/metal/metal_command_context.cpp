@@ -187,24 +187,19 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative(const SubmitInfo 
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-bool MetalCommandContext::UpdatePresentedImages() {
-  submission_failed_ = true;
+void MetalCommandContext::UpdatePresentedImages() {
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
-      submission_failed_ = true;
       ReportError(-1, "Failed to prepare the next Metal drawable after submission.");
-      return false;
     }
   }
-  submission_failed_ = false;
-  return true;
 }
 
 SubmissionStatus MetalCommandContext::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   if (commands_->status() == MTL::CommandBufferStatusError) {
     static_cast<MetalTimeline *>(signal.timeline)->MarkFailed();
-    device_->NotifyCollector();
+    device_->NotifyTimelineFailure();
     ReportMetalError(commands_->error(), "Metal command buffer failed",
                      commands_->errorOptions() & MTL::CommandBufferErrorOptionEncoderExecutionStatus);
     return SUBMISSION_STATUS_FAILED;
@@ -215,7 +210,7 @@ SubmissionStatus MetalCommandContext::PollCompletion(Event signal, uint64_t comp
     return SUBMISSION_STATUS_FAILED;
   if (completed < signal.value)
     return SUBMISSION_STATUS_PENDING;
-  return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
+  return SUBMISSION_STATUS_COMPLETED;
 }
 
 MetalCommandContext::~MetalCommandContext() {
