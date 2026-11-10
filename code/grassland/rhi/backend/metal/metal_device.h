@@ -33,7 +33,6 @@ class MetalDevice final : public Device {
   std::mutex &QueueMutex();
   bool WaitIdle();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
-  rhi::ICommandContext *CreateCommandContext() override;
 
  private:
   MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);

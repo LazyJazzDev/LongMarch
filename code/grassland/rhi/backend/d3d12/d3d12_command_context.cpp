@@ -11,6 +11,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_download_token.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
@@ -18,7 +19,9 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(device), device_(device) {
+D3D12CommandContext::D3D12CommandContext(D3D12Queue *queue)
+    : CommandContext(queue),
+      device_(static_cast<D3D12Device *>(queue->Owner())) {
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
@@ -34,12 +37,12 @@ D3D12CommandContext::~D3D12CommandContext() {
     CloseHandle(event_);
 }
 
-D3D12CommandContext *D3D12CommandContext::Create(D3D12Device *device) {
-  auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(device));
+D3D12CommandContext *D3D12CommandContext::Create(D3D12Queue *queue) {
+  auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(queue));
   object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_, object->event_);
   if (!object->reusable_)
     return nullptr;
-  if (device->SupportRayTracingPipeline() || device->SupportRayQuery()) {
+  if (object->device_->SupportRayTracingPipeline() || object->device_->SupportRayQuery()) {
     if (FAILED(object->list_.As(&object->ray_list_)))
       return nullptr;
   }

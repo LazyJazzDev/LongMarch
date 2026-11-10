@@ -140,7 +140,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
-    auto context = device.CreateCommandContext();
+    auto context = graphics.CreateCommandContext();
     if (!context)
       return 1;
     if (!context.CmdClearImage(image, {0.6f, 0.7f, 0.8f, 1.0f}))
@@ -157,7 +157,7 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless, const s
       last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
       last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     }
-    auto token = graphics.Submit(std::move(context));
+    auto token = std::move(context).Submit();
 
     if (!token)
       return 1;

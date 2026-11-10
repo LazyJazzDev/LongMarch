@@ -37,7 +37,7 @@ TEST_P(RhiDownload, BufferRangeSnapshotsAndRetainedLeases) {
   std::array<uint32_t, 64> source{};
   for (uint32_t i = 0; i < source.size(); ++i)
     source[i] = i * 137 + 19;
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, source.data(), sizeof(source)));
   ObjPtr<IDownloadToken> first = commands->CmdDownloadBuffer(buffer.Get(), 12, 100);
   ASSERT_TRUE(first);
@@ -45,7 +45,7 @@ TEST_P(RhiDownload, BufferRangeSnapshotsAndRetainedLeases) {
   ObjPtr<IDownloadToken> unaligned = commands->CmdDownloadBuffer(buffer.Get(), 7, 19);
   ASSERT_TRUE(unaligned);
   std::array<uint32_t, 25> output{};
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   commands.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -60,7 +60,7 @@ TEST_P(RhiDownload, BufferRangeSnapshotsAndRetainedLeases) {
   EXPECT_FALSE(first->CopyTo(nullptr, sizeof(output)));
   // A completed token holds its snapshot across later uploads/downloads.
   for (int i = 0; i < 8; ++i) {
-    commands = device->CreateCommandContext();
+    commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     std::array<uint32_t, 64> replacement{};
     replacement.fill(900 + i);
     ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, replacement.data(), sizeof(replacement)));
@@ -68,7 +68,7 @@ TEST_P(RhiDownload, BufferRangeSnapshotsAndRetainedLeases) {
     ASSERT_TRUE(next);
     if (i % 2)
       next.Release();  // Early release must not recycle in-flight storage.
-    done = queue->Submit(commands.Get());
+    done = commands->Submit();
     ASSERT_TRUE(done && done->WaitHost());
     if (next) {
       ASSERT_TRUE(next->CopyTo(output.data(), sizeof(output)));
@@ -85,14 +85,14 @@ TEST_P(RhiDownload, AbandonedAndInvalidDownloads) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64});
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ObjPtr<IDownloadToken> token = commands->CmdDownloadBuffer(buffer.Get(), 0, 64);
   ASSERT_TRUE(token);
   commands.Release();
   // Abandonment is owned by the caller; release the unused download explicitly.
   token.Release();
   for (auto range : {std::pair<uint64_t, uint64_t>{64, 1}, {0, 0}, {UINT64_MAX, 16}, {1, 64}}) {
-    commands = device->CreateCommandContext();
+    commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     EXPECT_EQ(commands->CmdDownloadBuffer(buffer.Get(), range.first, range.second), nullptr);
   }
 }
@@ -106,11 +106,11 @@ TEST_P(RhiDownload, D24S8ReadbackIsRejectedBeforeSubmission) {
   ObjPtr<IImage> image = device->CreateImage({8, 8, IMAGE_FORMAT_D24_UNORM_S8_UINT});
   ASSERT_TRUE(image);
   for (const auto &region : {ImageDownloadRegion{}, ImageDownloadRegion{1, 1, 2, 2}}) {
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), region);
     EXPECT_FALSE(token);
-    ObjPtr<ISubmissionToken> done = device->GetQueue(QUEUE_TYPE_MAIN)->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     EXPECT_FALSE(done);
   }
 }
@@ -133,13 +133,13 @@ TEST_P(RhiDownload, ImageSubrectangleIsTightlyPackedAndUnconverted) {
       source[i] = uint8_t(i * 13 + 17);
     ObjPtr<IImage> image = device->CreateImage({11, 7, format});
     ASSERT_TRUE(image);
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands->CmdUploadImage(image.Get(), source.data(), pitch));
     ObjPtr<IDownloadToken> region = commands->CmdDownloadImage(image.Get(), {2, 1, 5, 3});
     ASSERT_TRUE(region);
     ObjPtr<IDownloadToken> edge = commands->CmdDownloadImage(image.Get(), {9, 5});
     ASSERT_TRUE(edge);
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     image.Release();
     commands.Release();
@@ -166,7 +166,7 @@ TEST_P(RhiDownload, DepthSubrectangleIsTightlyPacked) {
   const auto format = IMAGE_FORMAT_D32_SFLOAT;
   ObjPtr<IImage> image = device->CreateImage({13, 7, format});
   ASSERT_TRUE(image);
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   RenderingInfo info;
   info.depth_stencil.image = image.Get();
   info.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
@@ -175,7 +175,7 @@ TEST_P(RhiDownload, DepthSubrectangleIsTightlyPacked) {
   ASSERT_TRUE(commands->CmdEndRendering());
   ObjPtr<IDownloadToken> token = commands->CmdDownloadImage(image.Get(), {3, 2, 5, 3});
   ASSERT_TRUE(token);
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done && done->WaitHost());
   ASSERT_EQ(token->GetSize(), 60);
   std::array<uint32_t, 15> values{};
@@ -194,11 +194,11 @@ TEST_P(RhiDownload, RejectedSubmissionLeavesDownloadUnassociated) {
   ASSERT_TRUE(device);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64});
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ObjPtr<IDownloadToken> token = commands->CmdDownloadBuffer(buffer.Get(), 0, 64);
   ASSERT_TRUE(token);
   EXPECT_EQ(commands->CmdDownloadBuffer(buffer.Get(), 64, 1), nullptr);
-  ObjPtr<ISubmissionToken> rejected = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> rejected = commands->Submit();
   EXPECT_FALSE(rejected);
   EXPECT_EQ(token->GetStatus(), SUBMISSION_STATUS_PENDING);
   EXPECT_FALSE(token->WaitHost());
@@ -212,7 +212,7 @@ TEST_P(RhiDownload, WaitHostSurvivesSubmissionHandleReleaseAndSupportsMultipleWa
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64});
   ASSERT_TRUE(buffer);
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   std::array<uint32_t, 16> source{};
   source.fill(0x12345678);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, source.data(), sizeof(source)));
@@ -220,7 +220,7 @@ TEST_P(RhiDownload, WaitHostSurvivesSubmissionHandleReleaseAndSupportsMultipleWa
   ASSERT_TRUE(token);
   ObjPtr<IDownloadToken> other = commands->CmdDownloadBuffer(buffer.Get(), 4, 8);
   ASSERT_TRUE(other);
-  ObjPtr<ISubmissionToken> submitted = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> submitted = commands->Submit();
   ASSERT_TRUE(submitted);
   submitted.Release();
   commands.Release();
@@ -249,10 +249,10 @@ TEST_P(RhiDownload, TemporalPoolRetainsTokenLeaseAndShrinksExpiredDemand) {
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64});
   ASSERT_TRUE(buffer);
   {
-    ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+    ObjPtr<ICommandContext> upload = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     std::array<uint32_t, 16> data{};
     ASSERT_TRUE(upload->CmdUploadBuffer(buffer.Get(), 0, data.data(), sizeof(data)));
-    ObjPtr<ISubmissionToken> submitted = queue->Submit(upload.Get());
+    ObjPtr<ISubmissionToken> submitted = upload->Submit();
     upload.Release();
     ASSERT_TRUE(submitted && submitted->WaitHost());
   }
@@ -260,11 +260,11 @@ TEST_P(RhiDownload, TemporalPoolRetainsTokenLeaseAndShrinksExpiredDemand) {
     auto &pool = owner->DownloadPool();
     pool.Clear();
     EXPECT_EQ(&pool == &owner->UploadPool(), GetParam() == BACKEND_API_METAL);
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ObjPtr<IDownloadToken> token = commands->CmdDownloadBuffer(buffer.Get(), 0, 64);
     ASSERT_TRUE(token);
     EXPECT_EQ(pool.GetBufferCounts(64).second, 1u);
-    ObjPtr<ISubmissionToken> submitted = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> submitted = commands->Submit();
     ASSERT_TRUE(submitted);
     commands.Release();
     submitted.Release();

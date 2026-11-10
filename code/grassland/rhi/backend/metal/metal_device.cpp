@@ -96,10 +96,6 @@ rhi::IWindow *MetalDevice::CreateGLFWWindow(const WindowDesc &desc) {
   return MetalWindow::Create(this, desc);
 }
 
-rhi::ICommandContext *MetalDevice::CreateCommandContext() {
-  return MetalCommandContext::Create(this);
-}
-
 rhi::IBuffer *MetalDevice::CreateBuffer(const BufferDesc &desc) {
   return MetalAllocatedBuffer::Create(this, desc);
 }

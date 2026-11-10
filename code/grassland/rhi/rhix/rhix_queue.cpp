@@ -28,16 +28,12 @@ bool Queue::SharesPhysicalQueue(const Queue &other) const {
   return Get()->SharesPhysicalQueue(other.Get());
 }
 
-SubmissionToken Queue::Submit(CommandContext &&commands, const SubmitInfo &info) const {
-  CommandContext consumed = std::move(commands);
+CommandContext Queue::CreateCommandContext() const {
 #if !defined(NDEBUG)
-  if (!*this || !consumed)
-    return {};
+  if (!*this)
+    return nullptr;
 #endif
-  rhi::SubmitInfo native_info;
-  native_info.waits.reserve(info.waits.size());
-  for (const auto &token : info.waits)
-    native_info.waits.push_back(token.Get());
-  return Get()->Submit(consumed.Get(), native_info);
+  return Get()->CreateCommandContext();
 }
+
 }  // namespace grassland::rhix

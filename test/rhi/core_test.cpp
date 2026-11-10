@@ -30,10 +30,10 @@ TEST(RhiCoreSettings, D3D12OverridesDefaultAcrossSequentialCores) {
     backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
     EXPECT_EQ(SUCCEEDED(native->QueryInterface(IID_PPV_ARGS(&messages))), enabled);
     ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(queue);
     ASSERT_TRUE(commands);
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     ASSERT_TRUE(done->WaitHost());
   }

@@ -10,6 +10,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_download_token.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
@@ -34,7 +35,9 @@ VkClearValue NativeClearValue(ImageFormat format, const ClearValue &value) {
 }
 }  // namespace
 
-VulkanCommandContext::VulkanCommandContext(VulkanDevice *device) : CommandContext(device), device_(device) {
+VulkanCommandContext::VulkanCommandContext(VulkanQueue *queue)
+    : CommandContext(queue),
+      device_(static_cast<VulkanDevice *>(queue->Owner())) {
 }
 
 VulkanCommandContext::~VulkanCommandContext() {
@@ -46,8 +49,8 @@ VulkanCommandContext::~VulkanCommandContext() {
     vkDestroyCommandPool(device_->NativeDevice(), pool_, nullptr);
 }
 
-VulkanCommandContext *VulkanCommandContext::Create(VulkanDevice *device) {
-  auto object = std::unique_ptr<VulkanCommandContext>(new VulkanCommandContext(device));
+VulkanCommandContext *VulkanCommandContext::Create(VulkanQueue *queue) {
+  auto object = std::unique_ptr<VulkanCommandContext>(new VulkanCommandContext(queue));
   object->reusable_ = object->device_->AcquireCommandResources(object->pool_, object->command_);
   if (!object->reusable_)
     return nullptr;

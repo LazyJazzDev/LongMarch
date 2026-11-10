@@ -5,6 +5,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
+class VulkanQueue;
 class VulkanImage;
 class VulkanBuffer;
 class VulkanProgram;
@@ -31,7 +32,7 @@ class VulkanCommandContext final : public CommandContext {
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   ~VulkanCommandContext() override;
-  static VulkanCommandContext *Create(VulkanDevice *device);
+  static VulkanCommandContext *Create(VulkanQueue *queue);
   IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
   IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
@@ -66,7 +67,7 @@ class VulkanCommandContext final : public CommandContext {
   SubmissionStatus WaitForProgress() override;
 
  private:
-  VulkanCommandContext(VulkanDevice *device);
+  VulkanCommandContext(VulkanQueue *queue);
 
   bool ValidateGroups();
   bool BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *version);

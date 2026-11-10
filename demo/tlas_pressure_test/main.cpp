@@ -192,7 +192,7 @@ int main(int argc, char **argv) {
     ObjPtr<IBuffer> aabbs = device->CreateBuffer({sizeof(bounds)});
     if (!aabbs)
       return 1;
-    ObjPtr<ICommandContext> build = device->CreateCommandContext();
+    ObjPtr<ICommandContext> build = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     if (!build)
       return 1;
     if (!build->CmdUploadBuffer(vertices.Get(), 0, cube_vertices, sizeof(cube_vertices)))
@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
       return 1;
     if (!build->CmdBuildBottomLevelAccelerationStructure(ground.Get(), {{{plane_vertices.Get()}, {}}}))
       return 1;
-    ObjPtr<ISubmissionToken> token = queue->Submit(build.Get());
+    ObjPtr<ISubmissionToken> token = build->Submit();
     if (!token)
       return 1;
     if (!token->WaitHost())
@@ -316,7 +316,7 @@ int main(int argc, char **argv) {
     }
     const auto wait_end = std::chrono::steady_clock::now();
     auto extent = image->GetDesc();
-    ObjPtr<ICommandContext> context = device->CreateCommandContext();
+    ObjPtr<ICommandContext> context = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     if (!context)
       return 1;
     if (!output || output->GetDesc().width != extent.width || output->GetDesc().height != extent.height) {
@@ -417,7 +417,7 @@ int main(int argc, char **argv) {
       }
     }
     const auto submit_start = std::chrono::steady_clock::now();
-    ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+    ObjPtr<ISubmissionToken> token = context->Submit();
     if (!token)
       return 1;
     if (headless)

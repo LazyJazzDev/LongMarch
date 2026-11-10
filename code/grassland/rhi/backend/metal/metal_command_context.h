@@ -7,6 +7,7 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
+class MetalQueue;
 class MetalProgram;
 class MetalComputeProgram;
 class MetalProgramBase;
@@ -17,7 +18,7 @@ class MetalSwapChainImage;
 
 class MetalCommandContext final : public CommandContext {
  public:
-  static MetalCommandContext *Create(MetalDevice *device);
+  static MetalCommandContext *Create(MetalQueue *queue);
   ~MetalCommandContext() override;
   bool CmdBuildBottomLevelAccelerationStructure(
       IBottomLevelAccelerationStructure *destination,
@@ -63,7 +64,7 @@ class MetalCommandContext final : public CommandContext {
   SubmissionStatus WaitForProgress() override;
 
  private:
-  MetalCommandContext(MetalDevice *device);
+  MetalCommandContext(MetalQueue *queue);
 
   bool EndRecording() override;
   std::vector<MTL::Resource *> AccelerationResources();

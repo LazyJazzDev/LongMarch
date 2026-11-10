@@ -53,7 +53,6 @@ class IDevice : public IObject {
   // Returns an owned reference to a fixed device-owned queue. Repeated calls
   // return the same queue object, even after all caller references are released.
   virtual IQueue *GetQueue(QueueType type) = 0;
-  virtual ICommandContext *CreateCommandContext() = 0;
 
  protected:
   ~IDevice() override;

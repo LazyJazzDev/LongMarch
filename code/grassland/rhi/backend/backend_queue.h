@@ -12,7 +12,6 @@ class Queue : public Object<rhi::IQueue> {
   Device *Owner() const;
   QueueType GetType() const override;
   bool SharesPhysicalQueue(const rhi::IQueue *other) const override;
-  rhi::ISubmissionToken *Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info = {}) override;
 
  private:
   Device *device_;

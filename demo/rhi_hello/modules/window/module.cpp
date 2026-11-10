@@ -32,12 +32,12 @@ int RunWindow(grassland::rhi::IDevice *device) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     RETURN_IF_FAIL(commands);
     RETURN_IF_FAIL(commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}));
     RETURN_IF_FAIL(commands->CmdPresent(window.Get()));
     // Submit borrows commands; accepted GPU work retains its resources until completion.
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     if (!done)
       return 1;
   }

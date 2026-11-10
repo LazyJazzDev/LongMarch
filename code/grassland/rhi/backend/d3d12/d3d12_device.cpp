@@ -242,10 +242,6 @@ rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {
   return D3D12Window::Create(this, desc);
 }
 
-rhi::ICommandContext *D3D12Device::CreateCommandContext() {
-  return D3D12CommandContext::Create(this);
-}
-
 ISampler *D3D12Device::CreateSampler(const SamplerDesc &desc) {
   return D3D12Sampler::Create(this, desc);
 }

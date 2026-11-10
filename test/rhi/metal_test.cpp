@@ -64,10 +64,10 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     for (size_t i = 0; i < 256; ++i)
       EXPECT_EQ(static_cast<const uint8_t *>(buffer->contents())[i], 0x5a);
     auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
-    auto context = device.CreateCommandContext();
+    auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(queue);
     ASSERT_TRUE(context);
-    auto done = queue.Submit(std::move(context));
+    auto done = std::move(context).Submit();
     ASSERT_TRUE(done);
     EXPECT_TRUE(done.WaitHost());
   }
@@ -147,16 +147,18 @@ TEST(RhiMetal, CompletionTokensSurviveBatchesAndParentRelease) {
       for (int i = 0; i < 16; ++i) {
         // Abandoned recordings must not consume queue capacity permanently.
         {
-          rhi::ObjPtr<rhi::ICommandContext> abandoned = device->CreateCommandContext();
+          rhi::ObjPtr<rhi::ICommandContext> abandoned =
+              ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
           ASSERT_TRUE(abandoned);
         }
-        rhi::ObjPtr<rhi::ICommandContext> context = device->CreateCommandContext();
+        rhi::ObjPtr<rhi::ICommandContext> context =
+            ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
         ASSERT_TRUE(context);
         auto queue = i % 2 ? graphics.Get() : transfer.Get();
         rhi::SubmitInfo desc;
         if (!tokens.empty())
           desc.waits.push_back(tokens.back().Get());
-        rhi::ObjPtr<rhi::ISubmissionToken> token = queue->Submit(context.Get(), desc);
+        rhi::ObjPtr<rhi::ISubmissionToken> token = context->Submit(desc);
         ASSERT_TRUE(token);
         tokens.push_back(std::move(token));
         held.push_back(std::move(context));
@@ -186,14 +188,14 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   ASSERT_TRUE(second);
   auto a = first.GetNextImage();
   auto b = second.GetNextImage();
-  auto clear = device.CreateCommandContext();
+  auto clear = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1.0f}));
-  auto done = queue.Submit(std::move(clear));
+  auto done = std::move(clear).Submit();
   ASSERT_TRUE(done.WaitHost());
   {
-    auto abandoned = device.CreateCommandContext();
+    auto abandoned = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   }
   auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
@@ -220,9 +222,9 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   std::vector<Image> old_images;
   for (int i = 0; i < 12; ++i) {
     old_images.push_back(first.GetNextImage());
-    auto present = device.CreateCommandContext();
+    auto present = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(present.CmdPresent(first));
-    auto presented = queue.Submit(std::move(present));
+    auto presented = std::move(present).Submit();
     ASSERT_TRUE(presented);
     ASSERT_TRUE(presented.WaitHost());
   }

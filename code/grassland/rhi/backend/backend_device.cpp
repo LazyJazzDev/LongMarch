@@ -94,10 +94,6 @@ rhi::IQueue *Device::GetQueue(QueueType type) {
   return ObjectPtr<Queue>::Retain(queues_[type].Get()).Detach();
 }
 
-rhi::ICommandContext *Device::CreateCommandContext() {
-  return nullptr;
-}
-
 const PhysicalDevice &Device::GetPhysicalDevice() const noexcept {
   return info_;
 }

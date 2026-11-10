@@ -62,12 +62,12 @@ int RunTriangle(grassland::rhi::IDevice *device) {
     return 1;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
-    ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+    ObjPtr<ICommandContext> upload = queue->CreateCommandContext();
     if (!upload)
       return 1;
     RETURN_IF_FAIL(upload->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)));
     RETURN_IF_FAIL(upload->CmdUploadBuffer(index_buffer.Get(), 0, indices, sizeof(indices)));
-    ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
+    ObjPtr<ISubmissionToken> uploaded = upload->Submit();
     if (!uploaded)
       return 1;
   }
@@ -95,7 +95,7 @@ int RunTriangle(grassland::rhi::IDevice *device) {
       continue;
     }
     auto extent = image->GetDesc();
-    ObjPtr<ICommandContext> context = device->CreateCommandContext();
+    ObjPtr<ICommandContext> context = queue->CreateCommandContext();
     if (!context)
       return 1;
     RETURN_IF_FAIL(context->CmdBindProgram(program.Get()));
@@ -111,7 +111,7 @@ int RunTriangle(grassland::rhi::IDevice *device) {
 
     RETURN_IF_FAIL(context->CmdPresent(window.Get()));
 
-    ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+    ObjPtr<ISubmissionToken> token = context->Submit();
 
     if (!token)
       return 1;

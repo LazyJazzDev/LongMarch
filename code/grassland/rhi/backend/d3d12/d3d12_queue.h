@@ -6,6 +6,7 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12Queue final : public Queue {
  public:
+  rhi::ICommandContext *CreateCommandContext() override;
   D3D12Queue(D3D12Device *device, QueueType type);
 };
 

@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_download_token.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
@@ -27,11 +28,13 @@ MTL::ClearColor NativeClearColor(ImageFormat format, const ClearColorValue &valu
 }
 }  // namespace
 
-MetalCommandContext::MetalCommandContext(MetalDevice *device) : CommandContext(device), device_(device) {
+MetalCommandContext::MetalCommandContext(MetalQueue *queue)
+    : CommandContext(queue),
+      device_(static_cast<MetalDevice *>(queue->Owner())) {
 }
 
-MetalCommandContext *MetalCommandContext::Create(MetalDevice *device) {
-  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(device));
+MetalCommandContext *MetalCommandContext::Create(MetalQueue *queue) {
+  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(queue));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   // Metal command buffers are single-use. The persistent native queue manages
   // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.

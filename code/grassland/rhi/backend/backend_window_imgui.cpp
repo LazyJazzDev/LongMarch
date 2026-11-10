@@ -166,11 +166,11 @@ bool WindowImGui::Initialize(GLFWwindow *window, const char *font_file_path, flo
       device_->CreateSampler({SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_CLAMP_TO_EDGE});
   if (!font_ || !sampler_)
     return false;
-  ObjPtr<ICommandContext> upload = device_->CreateCommandContext();
+  ObjPtr<ICommandContext> upload = ObjPtr<IQueue>(device_->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_MAIN);
   if (!upload || !queue || !upload->CmdUploadImage(font_.Get(), pixels, uint64_t(width) * 4))
     return false;
-  ObjPtr<ISubmissionToken> token = queue->Submit(upload.Get());
+  ObjPtr<ISubmissionToken> token = upload->Submit();
   if (!token || !token->WaitHost())
     return false;
   io.Fonts->SetTexID(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(font_.Get())));

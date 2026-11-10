@@ -49,7 +49,6 @@ class Device : public ObjectContainer {
   Buffer CreateBuffer(const rhi::BufferDesc &desc) const;
   Window CreateGLFWWindow(const rhi::WindowDesc &desc = {}) const;
   Queue GetQueue(rhi::QueueType type) const;
-  CommandContext CreateCommandContext() const;
 };
 
 }  // namespace grassland::rhix

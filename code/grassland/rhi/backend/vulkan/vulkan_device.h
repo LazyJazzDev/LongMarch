@@ -49,7 +49,6 @@ class VulkanDevice final : public Device {
 
   VulkanScratchPool &ScratchPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
-  rhi::ICommandContext *CreateCommandContext() override;
 
   // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
   // The pool grows on demand, independently of swapchain image count.

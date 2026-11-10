@@ -6,6 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanQueue final : public Queue {
  public:
+  rhi::ICommandContext *CreateCommandContext() override;
   VulkanQueue(VulkanDevice *device, QueueType type);
 };
 

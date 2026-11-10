@@ -253,10 +253,6 @@ rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
   return VulkanWindow::Create(this, desc);
 }
 
-rhi::ICommandContext *VulkanDevice::CreateCommandContext() {
-  return VulkanCommandContext::Create(this);
-}
-
 }  // namespace grassland::rhi::backend::vulkan
 
 namespace grassland::rhi::backend::vulkan {

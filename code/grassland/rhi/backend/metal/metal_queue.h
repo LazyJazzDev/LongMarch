@@ -6,6 +6,7 @@ namespace grassland::rhi::backend::metal {
 
 class MetalQueue final : public Queue {
  public:
+  rhi::ICommandContext *CreateCommandContext() override;
   MetalQueue(MetalDevice *device, QueueType type);
 };
 

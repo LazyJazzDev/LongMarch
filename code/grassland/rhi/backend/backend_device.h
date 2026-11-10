@@ -39,7 +39,6 @@ class Device : public Object<rhi::IDevice> {
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::IQueue *GetQueue(QueueType type) override;
-  rhi::ICommandContext *CreateCommandContext() override;
   virtual const void *NativeIdentity() const;
 
   ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands,

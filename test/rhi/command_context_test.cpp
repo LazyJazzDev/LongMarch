@@ -108,8 +108,8 @@ class TestResource final : public backend::Object<rhi::IObject> {
 
 class TestCommandContext final : public backend::CommandContext {
  public:
-  TestCommandContext(std::shared_ptr<Gate> gate, bool fail_after_submit = false)
-      : backend::CommandContext(gate.get()),
+  TestCommandContext(rhi::IQueue *queue, std::shared_ptr<Gate> gate, bool fail_after_submit = false)
+      : backend::CommandContext(static_cast<backend::Queue *>(queue)),
         gate_(std::move(gate)),
         fail_after_submit_(fail_after_submit) {
   }
@@ -196,17 +196,26 @@ class TestDevice final : public backend::Device {
 
 class TestQueue final : public backend::Queue {
  public:
-  TestQueue(const ObjectPtr<TestDevice> &device, QueueType type) : backend::Queue(device.Get(), type) {
+  rhi::ICommandContext *CreateCommandContext() override {
+    return new TestCommandContext(this, gate_);
   }
+
+  TestQueue(const ObjectPtr<TestDevice> &device, QueueType type, std::shared_ptr<Gate> gate)
+      : backend::Queue(device.Get(), type),
+        gate_(std::move(gate)) {
+  }
+
+ private:
+  std::shared_ptr<Gate> gate_;
 };
 
 TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
-  auto *native = new TestCommandContext(gate);
+  auto *native = new TestCommandContext(queue.Get(), gate);
   CommandContext context = native;
   ClearValue color{1.0f, 0.0f, 0.0f, 1.0f};
   ASSERT_TRUE(context.CmdClearImage(image, color));
@@ -221,7 +230,7 @@ TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
   EXPECT_EQ(gate->destroyed, 0);
   ASSERT_TRUE(context.CmdPresent(window));
   EXPECT_EQ(native->recorded_presents, 1);
-  auto token = queue.Submit(std::move(context));
+  auto token = std::move(context).Submit();
   ASSERT_TRUE(token);
   EXPECT_EQ(native->ended, 1);
   EXPECT_EQ(native->recorded_values.size(), 2u);
@@ -237,12 +246,12 @@ TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
 TEST(RhiCommands, DifferentResourceTypesAreRetainedOnceUntilSubmissionCompletes) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
   auto window = Window(new TestWindow(gate));
   auto image = ObjectPtr<TestImage>::Adopt(new TestImage(gate));
   auto resource = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
   auto another = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
-  auto *native = new TestCommandContext(gate);
+  auto *native = new TestCommandContext(queue.Get(), gate);
   CommandContext context = native;
   ASSERT_TRUE(native->CmdUseResource(resource.Get()));
   ASSERT_TRUE(native->CmdClearImage(image.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
@@ -259,7 +268,7 @@ TEST(RhiCommands, DifferentResourceTypesAreRetainedOnceUntilSubmissionCompletes)
   EXPECT_TRUE(borrowed_resource->IsUniquelyOwned());
   EXPECT_TRUE(borrowed_another->IsUniquelyOwned());
   ASSERT_TRUE(context.CmdPresent(window));
-  auto token = queue.Submit(std::move(context));
+  auto token = std::move(context).Submit();
   ASSERT_TRUE(token);
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
@@ -275,7 +284,9 @@ TEST(RhiCommands, DifferentResourceTypesAreRetainedOnceUntilSubmissionCompletes)
 
 TEST(RhiCommands, UnsubmittedContextReleasesAllResourceTypes) {
   auto gate = std::make_shared<Gate>();
-  auto context = ObjectPtr<TestCommandContext>::Adopt(new TestCommandContext(gate));
+  auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
+  auto context = ObjectPtr<TestCommandContext>::Adopt(new TestCommandContext(queue.Get(), gate));
   auto image = ObjectPtr<TestImage>::Adopt(new TestImage(gate));
   auto resource = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
   ASSERT_TRUE(context->CmdUseResource(image.Get()));
@@ -293,8 +304,8 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   static_assert(!std::is_copy_constructible_v<CommandContext>);
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
-  auto context = CommandContext(new TestCommandContext(gate));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
+  auto context = CommandContext(new TestCommandContext(queue.Get(), gate));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.CmdClearImage(image, {0.0f, 0.0f, 1.0f, 1.0f}));
@@ -303,7 +314,7 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   auto recorded = std::move(context);
   ASSERT_FALSE(context);
   ASSERT_TRUE(recorded);
-  auto token = queue.Submit(std::move(recorded));
+  auto token = std::move(recorded).Submit();
   ASSERT_FALSE(recorded);
   ASSERT_TRUE(token);
   EXPECT_EQ(token.GetStatus(), SUBMISSION_STATUS_PENDING);
@@ -326,13 +337,13 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
 TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
-  auto context = CommandContext(new TestCommandContext(gate));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
+  auto context = CommandContext(new TestCommandContext(queue.Get(), gate));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.CmdClearImage(image, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(context.CmdPresent(window));
-  ASSERT_TRUE(queue.Submit(std::move(context)));
+  ASSERT_TRUE(std::move(context).Submit());
   image = {};
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
@@ -344,38 +355,31 @@ TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
 }
 
 #if !defined(NDEBUG)
-TEST(RhiCommands, CancellationReleasesResourcesAndForeignQueueConsumesRejectedPacket) {
+TEST(RhiCommands, CancellationReleasesResources) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto window = Window(new TestWindow(gate));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
   auto image = Image(new TestImage(gate));
-  auto context = CommandContext(new TestCommandContext(gate));
+  auto context = queue.CreateCommandContext();
   ASSERT_TRUE(context.CmdClearImage(image, {1.0f, 0.0f, 0.0f, 1.0f}));
-  context = {};
-  context = CommandContext(new TestCommandContext(gate));
-  ASSERT_TRUE(context.CmdClearImage(image, {1.0f, 0.0f, 0.0f, 1.0f}));
-  ASSERT_TRUE(context.CmdPresent(window));
-  auto packet = std::move(context);
-  auto other = ObjectPtr<TestDevice>::Adopt(new TestDevice(std::make_shared<Gate>()));
-  auto queue = Queue(new TestQueue(other, QUEUE_TYPE_MAIN));
-  EXPECT_FALSE(queue.Submit(std::move(packet)));
-  EXPECT_FALSE(packet);
-  image = {};
+  image.Release();
+  EXPECT_EQ(gate->destroyed, 0);
+  context.Release();
   EXPECT_EQ(gate->destroyed, 1);
 }
 
 TEST(RhiCommands, SealedContextsCannotRecordOrSubmitAgain) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
   auto image = Image(new TestImage(gate));
-  auto native = ObjectPtr<TestCommandContext>::Adopt(new TestCommandContext(gate));
+  auto native = ObjectPtr<TestCommandContext>::Adopt(new TestCommandContext(queue.Get(), gate));
   auto context = CommandContext(ObjPtr<rhi::ICommandContext>::Retain(native.Get()).Detach());
   ASSERT_TRUE(context.CmdClearImage(image, {1.0f, 0.0f, 0.0f, 1.0f}));
-  auto token = queue.Submit(std::move(context));
+  auto token = std::move(context).Submit();
   ASSERT_TRUE(token);
   EXPECT_FALSE(native->CmdClearImage(image.Get(), {0.0f, 1.0f, 0.0f, 1.0f}));
-  EXPECT_EQ(queue.Get()->Submit(native.Get()), nullptr);
+  EXPECT_EQ(native->Submit(), nullptr);
   native.Reset();
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
@@ -390,13 +394,13 @@ TEST(RhiCommands, SealedContextsCannotRecordOrSubmitAgain) {
 TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto transfer = Queue(new TestQueue(device, QUEUE_TYPE_ASSIST));
-  auto graphics = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
-  auto context = CommandContext(new TestCommandContext(gate));
-  auto upload = transfer.Submit(std::move(context));
+  auto transfer = Queue(new TestQueue(device, QUEUE_TYPE_ASSIST, gate));
+  auto graphics = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
+  auto context = CommandContext(new TestCommandContext(transfer.Get(), gate));
+  auto upload = std::move(context).Submit();
   ASSERT_TRUE(upload);
-  context = CommandContext(new TestCommandContext(gate));
-  auto done = graphics.Submit(std::move(context), {{upload}});
+  context = CommandContext(new TestCommandContext(graphics.Get(), gate));
+  auto done = std::move(context).Submit({{upload}});
   ASSERT_TRUE(done);
   EXPECT_EQ(done.GetStatus(), SUBMISSION_STATUS_PENDING);
   {
@@ -410,14 +414,14 @@ TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
 TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletion) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
-  auto context = CommandContext(new TestCommandContext(gate, true));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
+  auto context = CommandContext(new TestCommandContext(queue.Get(), gate, true));
   auto window = Window(new TestWindow(gate));
   auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.CmdClearImage(image, {0.0f, 0.0f, 1.0f, 1.0f}));
   ASSERT_TRUE(context.CmdPresent(window));
   image = {};
-  EXPECT_THROW(queue.Submit(std::move(context)), std::bad_alloc);
+  EXPECT_THROW(std::move(context).Submit(), std::bad_alloc);
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     EXPECT_EQ(gate->destroyed, 0);
@@ -431,13 +435,13 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
 TEST(RhiCommands, DeviceShutdownDrainsSubmittedResources) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
   auto resource = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
-  auto *native = new TestCommandContext(gate);
+  auto *native = new TestCommandContext(queue.Get(), gate);
   CommandContext context = native;
   ASSERT_TRUE(native->CmdUseResource(resource.Get()));
   resource.Reset();
-  auto token = queue.Submit(std::move(context));
+  auto token = std::move(context).Submit();
   ASSERT_TRUE(token);
   token.Release();
   queue.Release();
@@ -452,9 +456,10 @@ TEST(RhiCommands, DeviceShutdownDrainsSubmittedResources) {
 TEST(RhiCommands, CallerReleasesRecordingBeforeWindowAndDevice) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_MAIN, gate));
   auto window = ObjectPtr<TestWindow>::Adopt(new TestWindow(gate));
   auto image = Image(new TestImage(gate, window.Get()));
-  auto context = CommandContext(new TestCommandContext(gate));
+  auto context = CommandContext(new TestCommandContext(queue.Get(), gate));
   ASSERT_TRUE(context.CmdClearImage(image, {0.0f, 0.0f, 0.0f, 1.0f}));
   image.Release();
   EXPECT_TRUE(window->IsUniquelyOwned());
