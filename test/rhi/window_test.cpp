@@ -562,10 +562,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
       auto before_submit = window.GetNextImage();
       EXPECT_EQ(frame.Get(), before_submit.Get());
       frame = {};  // Recording already owns the exact frame.
-      if (window.Get() == first.Get())
-        last = std::move(context).Submit();
-      else
-        last = std::move(context).Submit();
+      last = std::move(context).Submit();
       ASSERT_TRUE(last);
       auto after_submit = window.GetNextImage();
       ASSERT_TRUE(after_submit);

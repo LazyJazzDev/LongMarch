@@ -1,7 +1,0 @@
-﻿add_executable(${DEMO_NAME} main.cpp)
-target_link_libraries(${DEMO_NAME} PRIVATE grassland_rhi)
-option(RHI_BENCH_LEGACY "Build the same workload against the pre-multiqueue API" OFF)
-if(RHI_BENCH_LEGACY)
-    target_compile_definitions(${DEMO_NAME} PRIVATE RHI_BENCH_LEGACY=1)
-endif()
-LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(${DEMO_NAME})

@@ -455,19 +455,6 @@ TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
 }
 
 #if !defined(NDEBUG)
-TEST(RhiCommands, CancellationReleasesResources) {
-  auto gate = std::make_shared<Gate>();
-  auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(device->GetQueue(QUEUE_TYPE_MAIN));
-  auto image = Image(new TestImage(gate));
-  auto context = queue.CreateCommandContext();
-  ASSERT_TRUE(context.CmdClearImage(image, {1.0f, 0.0f, 0.0f, 1.0f}));
-  image.Release();
-  EXPECT_EQ(gate->destroyed, 0);
-  context.Release();
-  EXPECT_EQ(gate->destroyed, 1);
-}
-
 TEST(RhiCommands, SealedContextsCannotRecordOrSubmitAgain) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));

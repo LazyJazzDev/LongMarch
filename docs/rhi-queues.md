@@ -31,8 +31,9 @@ semantics. Duplicate timelines use the maximum value for All and minimum for Any
 An empty All succeeds; an empty Any returns false.
 
 Each Queue owns its pending Submission list and performs its own submission and
-retirement. One collector thread per Device watches the fixed timelines and asks
-each Queue to collect completed submissions. Queue locking protects native submit
+retirement. Each Device starts one collector after initializing its native resources
+and all queues. Each iteration queries each timeline once, reuses that completed
+value to retire submissions, and waits for the next value. Queue locking protects native submit
 order and list handoff; completion polling, resource release, and token publication
 run outside that lock. A blocked Assist submission does not prevent an already
 completed Main submission from retiring. Independent GPU progress is only possible
@@ -61,5 +62,4 @@ completion Event when submitting dependent work; do not infer synchronization fr
 CPU submit order. See `demo/rhi_multiqueue` for an Event/no-Event comparison.
 
 CUDA interop, externally created timelines, and changes to the HeadlessWindow design
-are outside this change. Metal and shared-queue Vulkan have macOS Debug/Release validation; see
-[the validation report](reports/rhi-multiqueue-validation.md).
+are outside this change.
