@@ -11,8 +11,11 @@
 #include "grassland/rhi/rhix/rhix_object_container.h"
 #include "grassland/rhi/rhix/rhix_program.h"
 #include "grassland/rhi/rhix/rhix_ray_tracing_program.h"
+#include "grassland/rhi/rhix/rhix_submission_token.h"
 
 namespace grassland::rhix {
+using SubmitInfo = rhi::SubmitInfo;
+
 class Window;
 
 struct ColorAttachmentInfo {
@@ -33,6 +36,8 @@ class CommandContext : public ObjectContainer {
   CommandContext(rhi::ICommandContext *object) noexcept;
   rhi::ICommandContext *Get() const noexcept;
   CommandContext();
+  // Consumes this context on both success and failure; an empty token reports failure.
+  SubmissionToken Submit(const SubmitInfo &info = {}) &&;
   CommandContext(CommandContext &&) noexcept;
   CommandContext &operator=(CommandContext &&) noexcept;
   CommandContext(const CommandContext &) = delete;

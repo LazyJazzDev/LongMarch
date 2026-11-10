@@ -5,6 +5,7 @@
 #include <cstdlib>
 
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 
 namespace grassland::rhi::backend::vulkan {
 VulkanAllocatedImage::VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc)
@@ -80,7 +81,9 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
   // Establish the fixed default layout once, before exposing the resource.
   // Temporary initialization commands are outside the rendering loop.
   const auto native = device->NativeDevice();
-  std::lock_guard<std::mutex> lock(device->QueueMutex());
+  auto queue_owner = ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN));
+  auto queue = static_cast<VulkanQueue *>(queue_owner.Get());
+  std::lock_guard<std::mutex> lock(queue->QueueMutex());
   VkCommandPool pool{};
   const auto status = [&]() -> VkResult {
     VkCommandPoolCreateInfo create{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
@@ -113,8 +116,8 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     status = vkEndCommandBuffer(commands);
     if (status != VK_SUCCESS)
       return status;
-    const auto semaphore = device->Timeline();
-    const auto value = device->NextSerial();
+    const auto semaphore = queue->GetTimeline()->NativeSemaphore();
+    const auto value = queue->NextSerial();
     VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
     timeline.signalSemaphoreValueCount = 1;
     timeline.pSignalSemaphoreValues = &value;
@@ -124,10 +127,10 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     submit.pSignalSemaphores = &semaphore;
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &commands;
-    status = vkQueueSubmit(device->NativeQueue(), 1, &submit, VK_NULL_HANDLE);
+    status = vkQueueSubmit(queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE);
     if (status != VK_SUCCESS)
       return status;
-    if (!Check(device->Wait(value), "Wait for image initialization"))
+    if (!Check(queue->Wait(value), "Wait for image initialization"))
       std::abort();
     return VK_SUCCESS;
   }();

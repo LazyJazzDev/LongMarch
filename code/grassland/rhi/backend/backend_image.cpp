@@ -2,7 +2,11 @@
 
 namespace grassland::rhi::backend {
 
-Image::Image(ImageDesc desc) : desc_(desc) {
+Image::Image(ImageDesc desc, Queue *queue) : desc_(desc), queue_(queue) {
+}
+
+bool Image::SupportsQueue(const Queue *queue) const {
+  return !queue_ || queue_ == queue;
 }
 
 bool Image::SupportsStorage() const {

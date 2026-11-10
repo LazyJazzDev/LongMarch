@@ -1,8 +1,10 @@
 ﻿#include "grassland/rhi/backend/backend_device.h"
 
+#include <algorithm>
+
 #include "grassland/rhi/backend/backend_binding_group.h"
-#include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_shader.h"
 
 namespace grassland::rhi::backend {
@@ -94,12 +96,10 @@ rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &) {
   return nullptr;
 }
 
-rhi::IQueue *Device::GetQueue(QueueType) {
-  return nullptr;
-}
-
-rhi::ICommandContext *Device::CreateCommandContext() {
-  return nullptr;
+rhi::IQueue *Device::GetQueue(QueueType type) {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return ObjectPtr<Queue>::Retain(queues_[type].Get()).Detach();
 }
 
 int Device::GetCUDADeviceIndex() const noexcept {
@@ -114,101 +114,61 @@ Core *Device::OwnerCore() const {
   return core_;
 }
 
-const void *Device::NativeIdentity() const {
-  return this;
+void Device::StartCollector() {
+  collector_ = std::thread([this] { Collect(); });
 }
 
-ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands,
-                                          const std::vector<ObjectPtr<SubmissionToken>> &waits) {
-  if (!commands->Seal())
-    return {};
+bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
+  if (events.empty())
+    return wait_all;
+  std::vector<Event> unique;
+  unique.reserve(events.size());
+  for (const auto &event : events) {
 #if !defined(NDEBUG)
-  if (commands->DeviceIdentity() != NativeIdentity()) {
-    ReportError(-1, "Submission requires a context from this device.");
-    return {};
-  }
-#endif
-  for (const auto &wait : waits) {
-#if !defined(NDEBUG)
-    if (!wait || wait->Owner() != this) {
-      ReportError(-1, "Submission dependency is empty or belongs to another device.");
-      return {};
+    auto timeline = dynamic_cast<Timeline *>(event.timeline);
+    if (!timeline || timeline->Owner() != this) {
+      ReportError(-1, "Host waits require timelines from this device.");
+      return false;
     }
 #endif
-    if (wait->GetStatus() == SUBMISSION_STATUS_FAILED || wait->GetStatus() == SUBMISSION_STATUS_CANCELED) {
-      ReportError(-1, "Submission dependency failed or was canceled.");
-      return {};
-    }
+    auto found = std::find_if(unique.begin(), unique.end(),
+                              [&](const Event &other) { return other.timeline == event.timeline; });
+    if (found == unique.end())
+      unique.push_back(event);
+    else
+      found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
   }
-  // Both logical roles share one physical queue. Its ordering already supplies
-  // these GPU dependencies; no host wait or additional native wait is required.
-  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(this));
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (stopping_)
-    return {};
-  if (!collector_.joinable())
-    collector_ = std::thread([this] { Collect(); });
-  // Allocate the retirement record before submitting any GPU work.
-  pending_.push_back({{}, completion});
-  commands->BindDownloads(completion.Get());
-  CommandContext::SubmitResult result;
-  try {
-    result = commands->SubmitNative();
-  } catch (...) {
-    // Even error reporting can allocate after a native submit. Keep already
-    // submitted work alive before propagating to the public allocation boundary.
-    if (commands->WasSubmitted()) {
-      pending_.back().commands = commands;
-      changed_.notify_one();
-    } else {
-      pending_.pop_back();
-      completion->Complete(SUBMISSION_STATUS_FAILED);
-      commands->ReleaseDownloads();
-    }
-    throw;
-  }
-  if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
-    pending_.pop_back();
-    completion->Complete(SUBMISSION_STATUS_FAILED);
-    commands->ReleaseDownloads();
-    return {};
-  }
-  commands->MarkSubmitted();
-  pending_.back().commands = commands;
-  changed_.notify_one();
-  return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
+  return WaitNativeEvents(unique, wait_all);
 }
 
 void Device::Collect() {
+  std::vector<Event> next;
+  next.reserve(queues_.size());
   for (;;) {
-    Submission pending;
-    {
-      std::unique_lock<std::mutex> lock(mutex_);
-      changed_.wait(lock, [&] { return stopping_ || !pending_.empty(); });
-      if (pending_.empty())
-        return;
-      pending = std::move(pending_.front());
-      pending_.pop_front();
+    next.clear();
+    bool empty = true;
+    for (const auto &queue : queues_) {
+      if (!queue)
+        continue;
+      uint64_t completed = 0;
+      const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+      if (timeline_valid && completed != UINT64_MAX)
+        next.push_back({queue->GetTimeline(), completed + 1});
+      if (!queue->CollectCompleted(completed, timeline_valid))
+        empty = false;
     }
-    SubmissionStatus status;
-    do {
-      status = pending.commands->WaitForProgress();
-    } while (status == SUBMISSION_STATUS_PENDING);
-    // Release payload before publishing completion; tokens never keep it alive.
-    pending.commands->ReleaseDownloads();
-    pending.commands.Reset();
-    pending.completion->Complete(status);
+    if (stopping_ && empty)
+      return;
+    WaitForProgress(next);
   }
 }
 
 void Device::ShutdownQueues() {
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    stopping_ = true;
-  }
-  changed_.notify_one();
-  if (collector_.joinable())
-    collector_.join();
+  if (!collector_.joinable())
+    return;
+  stopping_ = true;
+  InterruptCollector();
+  collector_.join();
 }
 
 }  // namespace grassland::rhi::backend

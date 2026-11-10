@@ -11,6 +11,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_download_token.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
@@ -18,7 +19,9 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(device), device_(device) {
+D3D12CommandContext::D3D12CommandContext(D3D12Queue *queue)
+    : CommandContext(queue),
+      device_(static_cast<D3D12Device *>(queue->Owner())) {
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
@@ -26,20 +29,18 @@ D3D12CommandContext::~D3D12CommandContext() {
     if (!closed_)
       reusable_ = SUCCEEDED(list_->Close());
     if (reusable_) {
-      device_->RecycleCommandResources(std::move(allocator_), std::move(list_), event_);
+      device_->RecycleCommandResources(std::move(allocator_), std::move(list_));
       return;
     }
   }
-  if (event_)
-    CloseHandle(event_);
 }
 
-D3D12CommandContext *D3D12CommandContext::Create(D3D12Device *device) {
-  auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(device));
-  object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_, object->event_);
+D3D12CommandContext *D3D12CommandContext::Create(D3D12Queue *queue) {
+  auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(queue));
+  object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_);
   if (!object->reusable_)
     return nullptr;
-  if (device->SupportRayTracingPipeline() || device->SupportRayQuery()) {
+  if (object->device_->SupportRayTracingPipeline() || object->device_->SupportRayQuery()) {
     if (FAILED(object->list_.As(&object->ray_list_)))
       return nullptr;
   }
@@ -83,7 +84,7 @@ bool D3D12CommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
     return false;
   }
   const auto native = dynamic_cast<D3D12Image *>(image);
-  if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
+  if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
@@ -176,7 +177,8 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
     return false;
   }
   const auto target = dynamic_cast<D3D12Window *>(window);
-  if (!target || target->DeviceIdentity() != device_ || !glfw::IsWindowThread()) {
+  if (!target || target->DeviceIdentity() != device_ || target->OwnerQueue() != OwnerQueue() ||
+      !glfw::IsWindowThread()) {
     recording_failed_ = true;
     ReportError(-1, "CmdPresent requires a window from this device on the window thread.");
     return false;
@@ -223,7 +225,8 @@ bool D3D12CommandContext::EndRecording() {
   return closed_;
 }
 
-CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
+CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const SubmitInfo &info, Event signal) {
+  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -235,10 +238,14 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
   }
 #endif
   {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
+    for (const auto &wait : info.waits) {
+      auto timeline = static_cast<D3D12Timeline *>(wait.timeline);
+      if (!Check(queue->NativeQueue()->Wait(timeline->NativeFence(), wait.value), "Queue::Wait"))
+        return SUBMIT_RESULT_REJECTED;
+    }
     submission_failed_ = true;
     ID3D12CommandList *lists[] = {list_.Get()};
-    device_->NativeQueue()->ExecuteCommandLists(1, lists);
+    queue->NativeQueue()->ExecuteCommandLists(1, lists);
     MarkSubmitted();
     for (auto &entry : as_dependencies_)
       entry.first->CommitDependencies(std::move(entry.second));
@@ -248,34 +255,39 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
       if (!Check(present.second->Present(), "Swapchain::Present"))
         presented = false;
     }
-    value_ = device_->NextSerial();
-    submission_failed_ = !Check(device_->NativeQueue()->Signal(device_->Fence(), value_), "Queue::Signal");
+    submission_failed_ =
+        !Check(queue->NativeQueue()->Signal(queue->GetTimeline()->NativeFence(), signal.value), "Queue::Signal");
     if (!presented)
       submission_failed_ = true;
   }
   if (submission_failed_)
     return SUBMIT_RESULT_FAILED_IN_FLIGHT;
-  for (const auto &present : presents_) {
-    if (!present.first->UpdateNextImage()) {
-      ReportError(-1, "Failed to prepare the next swapchain image after submission.");
-      std::abort();
-    }
-  }
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-SubmissionStatus D3D12CommandContext::WaitForProgress() {
-  if (submission_failed_) {
-    std::lock_guard<std::mutex> lock(device_->QueueMutex());
-    if (device_->WaitIdle() || FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
-      return SUBMISSION_STATUS_FAILED;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    return SUBMISSION_STATUS_PENDING;
+void D3D12CommandContext::UpdatePresentedImages() {
+  for (const auto &present : presents_) {
+    if (!present.first->UpdateNextImage()) {
+      ReportError(-1, "Failed to prepare the next swapchain image after submission.");
+    }
   }
-  if (device_->Wait(value_, event_))
-    return SUBMISSION_STATUS_COMPLETED;
-  // A failed host wait does not prove that GPU resource use has ended.
-  submission_failed_ = true;
+}
+
+SubmissionStatus D3D12CommandContext::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {
+  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
+  if (!timeline_valid)
+    return SUBMISSION_STATUS_FAILED;
+  if (completed >= signal.value)
+    return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
+  if (submission_failed_) {
+    if (FAILED(device_->NativeDevice()->GetDeviceRemovedReason()))
+      return SUBMISSION_STATUS_FAILED;
+    // A failed signal does not prove the preceding ExecuteCommandLists finished.
+    // Retry with a new monotonically ordered value, without blocking other queues.
+    std::lock_guard<std::mutex> lock(queue->QueueMutex());
+    Check(queue->NativeQueue()->Signal(queue->GetTimeline()->NativeFence(), queue->NextSerial()),
+          "Signal failed submission retirement");
+  }
   return SUBMISSION_STATUS_PENDING;
 }
 
@@ -826,8 +838,8 @@ bool D3D12CommandContext::PrepareGroups() {
 
 bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
   auto native = dynamic_cast<D3D12Image *>(image);
-  if (!native || native->DeviceIdentity() != device_ || !native->IsValid() || !data || sealed_ || rendering_active_ ||
-      IsDepthFormat(image->GetDesc().format) ||
+  if (!native || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !native->IsValid() ||
+      !data || sealed_ || rendering_active_ || IsDepthFormat(image->GetDesc().format) ||
       row_pitch < uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) ||
       (image->GetDesc().height - 1) >
           (SIZE_MAX - uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format)) / row_pitch) {
@@ -949,7 +961,8 @@ IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
 IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
 #if !defined(NDEBUG)
   auto native = dynamic_cast<D3D12Image *>(image);
-  if (sealed_ || rendering_active_ || !native || native->DeviceIdentity() != device_) {
+  if (sealed_ || rendering_active_ || !native ||
+      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     return nullptr;
   }

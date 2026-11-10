@@ -98,7 +98,7 @@ TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupported
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   auto window = device.CreateGLFWWindow({320, 240, "RHI HDR transitions"});
   ASSERT_TRUE(window);
   const auto options = window.GetSupportedPresentationOptions();
@@ -127,13 +127,13 @@ TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupported
       EXPECT_TRUE(std::any_of(options.begin(), options.end(), [&](const auto &option) {
         return option.color_space == space && option.format == frame.GetDesc().format;
       }));
-      auto context = device.CreateCommandContext();
+      auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
       ASSERT_TRUE(
           context.CmdClearImage(frame, (space == COLOR_SPACE_EXTENDED_SRGB_LINEAR || space == COLOR_SPACE_BT709_LINEAR)
                                            ? ClearValue{2.0f, 2.0f, 2.0f, 1.0f}
                                            : ClearValue{.5f, .5f, .5f, 1.0f}));
       ASSERT_TRUE(context.CmdPresent(window));
-      auto done = queue.Submit(std::move(context));
+      auto done = std::move(context).Submit();
       ASSERT_TRUE(done && done.WaitHost());
     }
     glfwSetWindowSize(window.GLFWWindow(), 360, 260);
@@ -224,13 +224,13 @@ TEST_P(RhiWindow, ImGuiFontInitializationOptions) {
     ImGui::TextUnformatted("Font file at 28 pixels");
     ImGui::End();
   };
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ASSERT_TRUE(window.UpdateImGui(draw_window));
-  auto commands = device.CreateCommandContext();
+  auto commands = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands.CmdPresent(window));
-  auto token = queue.Submit(std::move(commands));
+  auto token = std::move(commands).Submit();
   ASSERT_TRUE(token);
   EXPECT_TRUE(token.WaitHost());
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
@@ -243,7 +243,7 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   auto first = device.CreateGLFWWindow({240, 180, "RHI ImGui first"});
   auto second = device.CreateGLFWWindow({240, 180, "RHI ImGui second"});
   ASSERT_TRUE(first);
@@ -310,12 +310,12 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   EXPECT_EQ(first_draws, 1);
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
   {
-    auto abandoned = device.CreateCommandContext();
+    auto abandoned = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(abandoned.CmdPresent(first));
     EXPECT_EQ(first_draws, 1);
   }
   {
-    auto without_update = device.CreateCommandContext();
+    auto without_update = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(without_update.CmdPresent(first));
     EXPECT_EQ(first_draws, 1);  // Abandoning a recording does not rerun UI logic.
   }
@@ -325,7 +325,7 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
     ASSERT_TRUE(second.UpdateImGui(draw_second));
     EXPECT_EQ(first_draws, i + 2);
     EXPECT_EQ(second_draws, i + 1);
-    auto commands = device.CreateCommandContext();
+    auto commands = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     auto a = first.GetNextImage();
     auto b = second.GetNextImage();
     ASSERT_TRUE(commands.CmdClearImage(a, {0.0f, 0.0f, 1.0f, 1.0f}));
@@ -335,7 +335,7 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
     EXPECT_EQ(first_draws, i + 2);
     EXPECT_EQ(second_draws, i + 1);
     EXPECT_EQ(ImGui::GetCurrentContext(), previous);
-    auto done = queue.Submit(std::move(commands));
+    auto done = std::move(commands).Submit();
     ASSERT_TRUE(done);
     pending.push_back(std::move(done));
   }
@@ -346,9 +346,9 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(), nullptr);
   for (auto &done : pending)
     EXPECT_TRUE(done.WaitHost());
-  auto commands = device.CreateCommandContext();
+  auto commands = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(commands.CmdPresent(first));
-  auto done = queue.Submit(std::move(commands));
+  auto done = std::move(commands).Submit();
   ASSERT_TRUE(done);
   EXPECT_TRUE(done.WaitHost());
   EXPECT_EQ(first_draws, 7);
@@ -370,9 +370,9 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   EXPECT_GT(resize_events, 0);
   ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_CONTINUOUS));
   ASSERT_TRUE(first.UpdateImGui(draw_first));
-  commands = device.CreateCommandContext();
+  commands = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(commands.CmdPresent(first));
-  done = queue.Submit(std::move(commands));
+  done = std::move(commands).Submit();
   ASSERT_TRUE(done);
   EXPECT_TRUE(done.WaitHost());
   EXPECT_EQ(first_draws, 8);
@@ -388,7 +388,7 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
   auto window = device.CreateGLFWWindow({240, 180, "ImGui input verification"});
   ASSERT_TRUE(window);
   ASSERT_TRUE(window.EnableImGui());
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   int clicked = 0, mouse_events = 0;
   ImVec2 center{};
   window.MouseButtonEvent().RegisterCallback([&](int button, int, int, double, double) {
@@ -408,10 +408,10 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
   auto render = [&] {
     if (!window.UpdateImGui(draw_window))
       return false;
-    auto commands = device.CreateCommandContext();
+    auto commands = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     if (!commands.CmdPresent(window))
       return false;
-    auto done = queue.Submit(std::move(commands));
+    auto done = std::move(commands).Submit();
     return done && done.WaitHost();
   };
   ASSERT_TRUE(render());
@@ -435,6 +435,52 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
   EXPECT_EQ(mouse_events, 2);
 }
 
+TEST_P(RhiWindow, SwapchainRejectsAssistQueueDuringRecording) {
+#if defined(NDEBUG)
+  GTEST_SKIP() << "Invalid queue diagnostics require a debug build.";
+#else
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 on a desktop.";
+  ObjPtr<ICore> core = rhi::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> main = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> assist = device->GetQueue(QUEUE_TYPE_ASSIST);
+  ASSERT_TRUE(main);
+  ASSERT_TRUE(assist);
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({128, 128, "Queue restriction"});
+  ASSERT_TRUE(window);
+  ObjPtr<IImage> image = window->GetNextImage();
+  ASSERT_TRUE(image);
+  ObjPtr<ICommandContext> commands = assist->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  EXPECT_FALSE(commands->CmdClearImage(image.Get(), {0, 0, 0, 1}));
+  EXPECT_EQ(commands->Submit(), nullptr);
+  commands = assist->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  EXPECT_FALSE(commands->CmdPresent(window.Get()));
+  EXPECT_EQ(commands->Submit(), nullptr);
+  commands = assist->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  rhi::RenderingInfo rendering;
+  rendering.color_attachments.push_back({image.Get()});
+  EXPECT_FALSE(commands->CmdBeginRendering(rendering));
+  EXPECT_EQ(commands->Submit(), nullptr);
+  commands = assist->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  EXPECT_EQ(commands->CmdDownloadImage(image.Get()), nullptr);
+  EXPECT_EQ(commands->Submit(), nullptr);
+  commands = main->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdClearImage(image.Get(), {0, 0, 0, 1}));
+  ASSERT_TRUE(commands->CmdPresent(window.Get()));
+  ObjPtr<ISubmissionToken> done = commands->Submit();
+  ASSERT_TRUE(done);
+  EXPECT_TRUE(done->WaitHost());
+#endif
+}
+
 TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 on a desktop to run presentation tests.";
@@ -442,11 +488,11 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
-  auto transfer = device.GetQueue(QUEUE_TYPE_TRANSFER);
+  auto graphics = device.GetQueue(QUEUE_TYPE_MAIN);
+  auto transfer = device.GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
-  EXPECT_TRUE(graphics.SharesPhysicalQueue(transfer));
+  EXPECT_NE(graphics.Get(), transfer.Get());
   EXPECT_FALSE(device.CreateGLFWWindow({0, 240, "Invalid window"}));
   auto first = device.CreateGLFWWindow({320, 240, "RHI window test A"});
   auto second = device.CreateGLFWWindow({320, 240, "RHI window test B"});
@@ -458,11 +504,11 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   {
     auto frame = first.GetNextImage();
     ASSERT_TRUE(frame);
-    auto context = device.CreateCommandContext();
+    auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(context.CmdClearImage(frame, {0.0f, 0.0f, 0.0f, 1.0f}));
     ASSERT_TRUE(context.CmdPresent(first));
     EXPECT_FALSE(context.CmdPresent(first));
-    EXPECT_FALSE(graphics.Submit(std::move(context)));
+    EXPECT_FALSE(std::move(context).Submit());
   }
 #endif
   ASSERT_NE(first.GLFWWindow(), nullptr);
@@ -509,17 +555,14 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
       EXPECT_TRUE(std::any_of(supported.begin(), supported.end(), [&](const auto &option) {
         return option.format == frame.GetDesc().format && option.present_mode == window.GetPresentMode();
       }));
-      auto context = device.CreateCommandContext();
+      auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
       ASSERT_TRUE(context.CmdClearImage(frame, {1.0f, 0.0f, 0.0f, 1.0f}));
       ASSERT_TRUE(context.CmdClearImage(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(context.CmdPresent(window));
       auto before_submit = window.GetNextImage();
       EXPECT_EQ(frame.Get(), before_submit.Get());
       frame = {};  // Recording already owns the exact frame.
-      if (window.Get() == first.Get())
-        last = transfer.Submit(std::move(context));
-      else
-        last = graphics.Submit(std::move(context));
+      last = std::move(context).Submit();
       ASSERT_TRUE(last);
       auto after_submit = window.GetNextImage();
       ASSERT_TRUE(after_submit);
@@ -533,7 +576,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ASSERT_NE(hwnd, nullptr);
   auto old_frame = first.GetNextImage();
   ASSERT_TRUE(old_frame);
-  auto old_context = device.CreateCommandContext();
+  auto old_context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(old_context.CmdClearImage(old_frame, {0.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(old_context.CmdPresent(first));
   old_context.Release();
@@ -556,12 +599,12 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
     ASSERT_TRUE(restored);
   }
 #endif
-  auto upload = device.CreateCommandContext();
-  auto ready = transfer.Submit(std::move(upload));
+  auto upload = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
+  auto ready = std::move(upload).Submit();
   ASSERT_TRUE(ready);
   auto frame = second.GetNextImage();
   ASSERT_TRUE(frame);
-  auto context = device.CreateCommandContext();
+  auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(context.CmdClearImage(frame, {0.0f, 0.0f, 1.0f, 1.0f}));
   ASSERT_TRUE(context.CmdPresent(second));
   frame.Release();
@@ -571,7 +614,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   const auto second_hwnd = FindWindowA(nullptr, "RHI window test B");
   ASSERT_NE(second_hwnd, nullptr);
 #endif
-  last = graphics.Submit(std::move(context), {{ready}});
+  last = std::move(context).Submit({{ready.GetEvent()}});
   ASSERT_TRUE(last);
   second.Release();  // Destruction waits for native GPU use; Device does not retain Window.
 #ifdef _WIN32
@@ -602,7 +645,7 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
     messages->ClearStoredMessages();
   }
 #endif
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   auto first = device.CreateGLFWWindow({320, 240, "RHI state test A"});
   auto second = device.CreateGLFWWindow({320, 240, "RHI state test B"});
   ASSERT_TRUE(first);
@@ -612,28 +655,28 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
   ASSERT_TRUE(a);
   ASSERT_TRUE(b);
   {
-    auto abandoned = device.CreateCommandContext();
+    auto abandoned = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
     ASSERT_TRUE(abandoned.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   }  // Recording alone must not change the next context's initial resource state.
-  auto clear = device.CreateCommandContext();
+  auto clear = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(clear.CmdClearImage(a, {0.0f, 0.0f, 1.0f, 1.0f}));
-  auto cleared = queue.Submit(std::move(clear));
+  auto cleared = std::move(clear).Submit();
   ASSERT_TRUE(cleared);
   ASSERT_TRUE(cleared.WaitHost());
   EXPECT_EQ(a.Get(), first.GetNextImage().Get());
   EXPECT_EQ(b.Get(), second.GetNextImage().Get());
-  auto reclear = device.CreateCommandContext();
+  auto reclear = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(reclear.CmdClearImage(b, {0.6f, 0.7f, 0.8f, 1.0f}));
   ASSERT_TRUE(reclear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1.0f}));
-  auto ready = queue.Submit(std::move(reclear), {{cleared}});
+  auto ready = std::move(reclear).Submit({{cleared.GetEvent()}});
   ASSERT_TRUE(ready);
-  auto present = device.CreateCommandContext();
+  auto present = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(present.CmdPresent(second));
   ASSERT_TRUE(present.CmdPresent(first));
-  auto done = queue.Submit(std::move(present), {{ready}});
+  auto done = std::move(present).Submit({{ready.GetEvent()}});
   ASSERT_TRUE(done);
   ASSERT_TRUE(done.WaitHost());
   EXPECT_NE(a.Get(), first.GetNextImage().Get());
@@ -641,15 +684,15 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
   a.Release();
   b.Release();
   // Present without a clear must also transition a fresh image into its presentable layout.
-  auto next = device.CreateCommandContext();
+  auto next = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(next.CmdPresent(first));
-  auto next_done = queue.Submit(std::move(next));
+  auto next_done = std::move(next).Submit();
   ASSERT_TRUE(next_done);
   EXPECT_TRUE(next_done.WaitHost());
   auto cleanup_image = second.GetNextImage();
-  auto cleanup = device.CreateCommandContext();
+  auto cleanup = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
   ASSERT_TRUE(cleanup.CmdClearImage(cleanup_image, {0.0f, 0.0f, 0.0f, 1.0f}));
-  auto cleanup_done = queue.Submit(std::move(cleanup));
+  auto cleanup_done = std::move(cleanup).Submit();
   ASSERT_TRUE(cleanup_done);
   cleanup_image.Release();
   second.Release();  // A pending clear without Present must not require Window in image destruction.
@@ -664,15 +707,15 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
       rhi::ObjPtr<rhi::IImage> image = first.Get()->GetNextImage();
       ASSERT_TRUE(image);
       {
-        rhi::ObjPtr<rhi::ICommandContext> abandoned = device.Get()->CreateCommandContext();
+        rhi::ObjPtr<rhi::ICommandContext> abandoned = queue.Get()->CreateCommandContext();
         ASSERT_TRUE(abandoned);
         ASSERT_TRUE(abandoned->CmdClearImage(image.Get(), {1.0f, 0.0f, 0.0f, 1.0f}));
       }
-      rhi::ObjPtr<rhi::ICommandContext> recording = device.Get()->CreateCommandContext();
+      rhi::ObjPtr<rhi::ICommandContext> recording = queue.Get()->CreateCommandContext();
       ASSERT_TRUE(recording);
       ASSERT_TRUE(recording->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(recording->CmdPresent(first.Get()));
-      completed = queue.Get()->Submit(recording.Get());
+      completed = recording->Submit();
       ASSERT_TRUE(completed);
       held.push_back(std::move(recording));
     }
@@ -741,7 +784,7 @@ TEST(RhiVulkanWindow, OutOfDateDefersRebuildAndKeepsSubmittedWorkAlive) {
   ASSERT_TRUE(device);
   auto window = device.CreateGLFWWindow({320, 240, "RHI out of date"});
   ASSERT_TRUE(window);
-  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ASSERT_TRUE(Window::PollEvents());
   auto native = window.GLFWWindow();
@@ -752,14 +795,14 @@ TEST(RhiVulkanWindow, OutOfDateDefersRebuildAndKeepsSubmittedWorkAlive) {
   for (int i = 0; i < 8 && !invalid; ++i) {
     auto image = window.GetNextImage();
     ASSERT_TRUE(image);
-    auto context = device.CreateCommandContext();
+    auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(context.CmdClearImage(image, {0.6f, 0.7f, 0.8f, 1.0f}));
     ASSERT_TRUE(context.CmdPresent(window));
     glfwSetWindowSize(native, 400 + 40 * i, 300 + 30 * i);
     // No callback has replaced the prepared object, even though the native
     // surface changed. Submit may observe OUT_OF_DATE in Present or Acquire.
     EXPECT_EQ(image.Get(), window.GetNextImage().Get());
-    auto token = queue.Submit(std::move(context));
+    auto token = std::move(context).Submit();
     ASSERT_TRUE(token);
     ASSERT_TRUE(token.WaitHost());
     invalid = window.IsSwapChainInvalid();
@@ -782,10 +825,10 @@ TEST(RhiVulkanWindow, OutOfDateDefersRebuildAndKeepsSubmittedWorkAlive) {
     glfwGetFramebufferSize(native, &width, &height);
     EXPECT_EQ(image.GetDesc().width, static_cast<uint32_t>(width));
     EXPECT_EQ(image.GetDesc().height, static_cast<uint32_t>(height));
-    auto context = device.CreateCommandContext();
+    auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(context.CmdClearImage(image, {0.0f, 0.0f, 1.0f, 1.0f}));
     ASSERT_TRUE(context.CmdPresent(window));
-    auto token = queue.Submit(std::move(context));
+    auto token = std::move(context).Submit();
     ASSERT_TRUE(token);
     ASSERT_TRUE(token.WaitHost());
   }

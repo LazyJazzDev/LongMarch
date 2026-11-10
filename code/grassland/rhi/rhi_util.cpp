@@ -235,10 +235,10 @@ std::string PresentModeName(PresentMode value) {
 
 std::string to_string(QueueType value) {
   switch (value) {
-    case QUEUE_TYPE_GRAPHICS:
-      return "QUEUE_TYPE_GRAPHICS";
-    case QUEUE_TYPE_TRANSFER:
-      return "QUEUE_TYPE_TRANSFER";
+    case QUEUE_TYPE_MAIN:
+      return "QUEUE_TYPE_MAIN";
+    case QUEUE_TYPE_ASSIST:
+      return "QUEUE_TYPE_ASSIST";
     default:
 #if !defined(NDEBUG)
       ReportError(-1, "Unknown QueueType value.");
@@ -249,10 +249,10 @@ std::string to_string(QueueType value) {
 
 std::string QueueTypeName(QueueType value) {
   switch (value) {
-    case QUEUE_TYPE_GRAPHICS:
-      return "Graphics";
-    case QUEUE_TYPE_TRANSFER:
-      return "Transfer";
+    case QUEUE_TYPE_MAIN:
+      return "Main";
+    case QUEUE_TYPE_ASSIST:
+      return "Assist";
     default:
 #if !defined(NDEBUG)
       ReportError(-1, "Unknown QueueType value.");

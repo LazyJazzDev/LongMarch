@@ -20,27 +20,66 @@
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
+bool D3D12Device::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
+  std::vector<ID3D12Fence *> fences;
+  std::vector<uint64_t> values;
+  for (const auto &event : events) {
+    fences.push_back(static_cast<D3D12Timeline *>(event.timeline)->NativeFence());
+    values.push_back(event.value);
+  }
+  ComPtr<ID3D12Device1> device;
+  if (!Check(device_.As(&device), "Query multi-fence wait interface"))
+    return false;
+  if (!Check(device->SetEventOnMultipleFenceCompletion(
+                 fences.data(), values.data(), static_cast<UINT>(fences.size()),
+                 wait_all ? D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL : D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, nullptr),
+             "Wait for timeline events"))
+    return false;
+  return SUCCEEDED(device_->GetDeviceRemovedReason());
+}
+
+void D3D12Device::InterruptCollector() {
+  SetEvent(collector_shutdown_);
+}
+
+void D3D12Device::WaitForProgress(const std::vector<Event> &next) {
+  std::array<HANDLE, 3> handles{collector_shutdown_};
+  DWORD count = 1;
+  for (const auto &event : next) {
+    for (size_t index = 0; index < queues_.size(); ++index) {
+      if (!queues_[index] || queues_[index]->GetTimeline() != event.timeline)
+        continue;
+      auto &handle = progress_events_[index];
+      if (progress_values_[index] != event.value) {
+        ResetEvent(handle);
+        if (!Check(
+                static_cast<D3D12Timeline *>(event.timeline)->NativeFence()->SetEventOnCompletion(event.value, handle),
+                "Listen for queue progress")) {
+          return;
+        }
+        progress_values_[index] = event.value;
+      }
+      handles[count++] = handle;
+      break;
+    }
+  }
+  WaitForMultipleObjects(count, handles.data(), FALSE, INFINITE);
+}
 
 bool D3D12Device::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
-                                          ComPtr<ID3D12GraphicsCommandList> &list,
-                                          HANDLE &event) {
+                                          ComPtr<ID3D12GraphicsCommandList> &list) {
   {
     std::lock_guard<std::mutex> lock(command_pool_mutex_);
     if (!command_pool_.empty()) {
-      std::tie(allocator, list, event) = std::move(command_pool_.back());
+      std::tie(allocator, list) = std::move(command_pool_.back());
       command_pool_.pop_back();
     }
   }
   if (list) {
     if (!Check(allocator->Reset(), "Reset command allocator"))
       return false;
-    if (!ResetEvent(event))
-      return false;
     return Check(list->Reset(allocator.Get(), nullptr), "Reset command list");
   }
-  event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!event)
-    return false;
   if (!Check(device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator)),
              "CreateCommandAllocator"))
     return false;
@@ -50,16 +89,14 @@ bool D3D12Device::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &alloca
 }
 
 void D3D12Device::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator,
-                                          ComPtr<ID3D12GraphicsCommandList> list,
-                                          HANDLE event) {
+                                          ComPtr<ID3D12GraphicsCommandList> list) {
   try {
     std::lock_guard<std::mutex> lock(command_pool_mutex_);
-    command_pool_.emplace_back(std::move(allocator), std::move(list), event);
+    command_pool_.emplace_back(std::move(allocator), std::move(list));
     return;
   } catch (const std::bad_alloc &) {
     // Recycling is optional: release the idle native objects if the pool cannot grow.
   }
-  CloseHandle(event);
 }
 
 D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device) {
@@ -82,13 +119,7 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
       LogWarning(
           "D3D12 debug message callbacks are unavailable; validation messages remain in the native debug output.");
   }
-  D3D12_COMMAND_QUEUE_DESC desc{};
-  desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
   if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2"))
-    return nullptr;
-  if (!Check(object->device_->CreateCommandQueue(&desc, IID_PPV_ARGS(&object->queue_)), "CreateCommandQueue"))
-    return nullptr;
-  if (!Check(object->device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&object->fence_)), "CreateFence"))
     return nullptr;
   ComPtr<IDXGIAdapter> adapter;
   if (!Check(object->factory_->EnumAdapterByLuid(object->device_->GetAdapterLuid(), IID_PPV_ARGS(&adapter)),
@@ -99,16 +130,29 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
   memory.pAdapter = adapter.Get();
   if (!Check(D3D12MA::CreateAllocator(&memory, &object->allocator_), "Create D3D12MA allocator"))
     return nullptr;
-  object->idle_event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!object->idle_event_) {
-    ReportError(GetLastError(), "Create fence event failed.");
-    return nullptr;
-  }
   ComPtr<IDXGIFactory5> factory5;
   BOOL tearing = FALSE;
   if (SUCCEEDED(object->factory_.As(&factory5)) &&
       SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
     object->tearing_ = tearing;
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
+    object->queues_[type] = ObjectPtr<Queue>::Adopt(D3D12Queue::Create(object.get(), type));
+    if (!object->queues_[type])
+      return nullptr;
+  }
+  object->collector_shutdown_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (!object->collector_shutdown_) {
+    ReportError(GetLastError(), "Create collector shutdown event");
+    return nullptr;
+  }
+  for (auto &event : object->progress_events_) {
+    event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!event) {
+      ReportError(GetLastError(), "Create queue progress event");
+      return nullptr;
+    }
+  }
+  object->StartCollector();
   return object.release();
 }
 
@@ -148,45 +192,8 @@ IDXGIFactory4 *D3D12Device::Factory() const {
   return factory_.Get();
 }
 
-ID3D12CommandQueue *D3D12Device::NativeQueue() const {
-  return queue_.Get();
-}
-
-ID3D12Fence *D3D12Device::Fence() const {
-  return fence_.Get();
-}
-
 bool D3D12Device::SupportsTearing() const {
   return tearing_;
-}
-
-std::mutex &D3D12Device::QueueMutex() {
-  return mutex_;
-}
-
-uint64_t D3D12Device::NextSerial() {
-  return ++serial_;
-}
-
-bool D3D12Device::Wait(uint64_t value, HANDLE event) const {
-  if (fence_->GetCompletedValue() == UINT64_MAX)
-    return false;
-  if (fence_->GetCompletedValue() >= value)
-    return true;
-  if (!Check(fence_->SetEventOnCompletion(value, event), "SetEventOnCompletion"))
-    return false;
-  DWORD result;
-  do {
-    result = WaitForSingleObject(event, 50);
-    if (FAILED(device_->GetDeviceRemovedReason()))
-      return false;
-  } while (result == WAIT_TIMEOUT);
-  return result == WAIT_OBJECT_0 && fence_->GetCompletedValue() != UINT64_MAX;
-}
-
-bool D3D12Device::WaitIdle() {
-  auto value = NextSerial();
-  return Check(queue_->Signal(fence_.Get(), value), "Signal idle fence") && Wait(value, idle_event_);
 }
 
 D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
@@ -208,11 +215,14 @@ D3D12Device::~D3D12Device() {
   upload_pool_.Clear();
   download_pool_.Clear();
   scratch_pool_.Clear();
-  for (auto &entry : command_pool_)
-    CloseHandle(std::get<2>(entry));
   command_pool_.clear();
-  if (idle_event_)
-    CloseHandle(idle_event_);
+  for (auto &queue : queues_)
+    queue.Reset();
+  for (auto event : progress_events_)
+    if (event)
+      CloseHandle(event);
+  if (collector_shutdown_)
+    CloseHandle(collector_shutdown_);
   if (debug_callback_cookie_)
     debug_messages_->UnregisterMessageCallback(debug_callback_cookie_);
 }
@@ -245,14 +255,6 @@ ICUDABuffer *D3D12Device::CreateCUDABuffer(const BufferDesc &desc) {
 
 rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {
   return D3D12Window::Create(this, desc);
-}
-
-rhi::ICommandContext *D3D12Device::CreateCommandContext() {
-  return D3D12CommandContext::Create(this);
-}
-
-rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
-  return new D3D12Queue(this, type);
 }
 
 ISampler *D3D12Device::CreateSampler(const SamplerDesc &desc) {

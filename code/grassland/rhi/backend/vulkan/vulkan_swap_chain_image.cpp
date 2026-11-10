@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::vulkan {
 
 VulkanSwapChainImage::VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image, VkImageView attachment)
-    : VulkanImage(desc, window->DeviceIdentity(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR),
+    : VulkanImage(desc, window->DeviceIdentity(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, window->OwnerQueue()),
       window_(window),
       image_(image),
       attachment_(attachment) {

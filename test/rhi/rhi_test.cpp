@@ -36,6 +36,19 @@ struct Calls {
 
 class TestDevice final : public backend::Device {
  public:
+  bool WaitNativeEvents(const std::vector<Event> &, bool) const override {
+    ADD_FAILURE();
+    return false;
+  }
+
+  void InterruptCollector() override {
+    ADD_FAILURE();
+  }
+
+  void WaitForProgress(const std::vector<Event> &) override {
+    ADD_FAILURE();
+  }
+
   TestDevice(PhysicalDevice info, backend::Core *core, Calls &calls)
       : backend::Device(std::move(info), core),
         calls_(calls) {

@@ -3,6 +3,15 @@
 #include "grassland/rhi/rhix/rhix_window.h"
 
 namespace grassland::rhix {
+SubmissionToken CommandContext::Submit(const SubmitInfo &info) && {
+  CommandContext consumed = std::move(*this);
+#if !defined(NDEBUG)
+  if (!consumed)
+    return {};
+#endif
+  return consumed.Get()->Submit(info);
+}
+
 bool CommandContext::CmdBeginRendering(const RenderingInfo &info) {
   rhi::RenderingInfo native;
   for (const auto &color : info.colors)

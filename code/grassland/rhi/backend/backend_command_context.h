@@ -9,6 +9,7 @@
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend {
+class Queue;
 
 class CommandContext : public Object<rhi::ICommandContext> {
  public:
@@ -36,7 +37,8 @@ class CommandContext : public Object<rhi::ICommandContext> {
     SUBMIT_RESULT_FAILED_IN_FLIGHT,
   } SubmitResult;
 
-  CommandContext(const void *identity);
+  explicit CommandContext(Queue *queue);
+  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
   ~CommandContext() override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
   bool CmdCopyBuffer(IBuffer *source,
@@ -70,10 +72,12 @@ class CommandContext : public Object<rhi::ICommandContext> {
   void ReleaseDownloads();
   bool Seal();
   const void *DeviceIdentity() const;
+  Queue *OwnerQueue() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
-  virtual SubmitResult SubmitNative() = 0;
-  virtual SubmissionStatus WaitForProgress() = 0;
+  virtual void UpdatePresentedImages() = 0;
+  virtual SubmitResult SubmitNative(const SubmitInfo &info, Event signal) = 0;
+  virtual SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) = 0;
 
  protected:
   // Call before encoding each resource use. Retains each exact object once.
@@ -87,7 +91,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
   bool sealed_{};
 
  private:
-  const void *identity_;
+  Queue *queue_;
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_;
   bool submitted_{};
   std::vector<ObjectPtr<DownloadToken>> downloads_;

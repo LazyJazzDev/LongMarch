@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
+class D3D12Queue;
 class D3D12Image;
 class D3D12Buffer;
 class D3D12Program;
@@ -33,7 +34,7 @@ class D3D12CommandContext final : public CommandContext {
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   ~D3D12CommandContext() override;
-  static D3D12CommandContext *Create(D3D12Device *device);
+  static D3D12CommandContext *Create(D3D12Queue *queue);
   IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
   IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
@@ -64,11 +65,12 @@ class D3D12CommandContext final : public CommandContext {
                       uint32_t first_instance = 0) override;
   bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
   bool CmdPresent(rhi::IWindow *window) override;
-  SubmitResult SubmitNative() override;
-  SubmissionStatus WaitForProgress() override;
+  void UpdatePresentedImages() override;
+  SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
+  SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
-  D3D12CommandContext(D3D12Device *device);
+  D3D12CommandContext(D3D12Queue *queue);
 
   bool ClearColor(D3D12Image *image, const ClearColorValue &value);
   bool PrepareGroups();
@@ -111,8 +113,6 @@ class D3D12CommandContext final : public CommandContext {
   ComPtr<ID3D12CommandAllocator> allocator_;
   ComPtr<ID3D12GraphicsCommandList> list_;
   ComPtr<ID3D12GraphicsCommandList4> ray_list_;
-  HANDLE event_{};
-  uint64_t value_{};
   bool submission_failed_{};
   bool reusable_{};
   bool closed_{};

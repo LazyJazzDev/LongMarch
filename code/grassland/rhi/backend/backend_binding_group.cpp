@@ -195,8 +195,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &i
     return false;
   for (auto value : images) {
     auto image = dynamic_cast<Image *>(value);
-    if (!image || !image->IsValid() || image->DeviceIdentity() != device_->NativeIdentity() ||
-        IsDepthFormat(image->GetDesc().format))
+    if (!image || !image->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(image->GetDesc().format))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;

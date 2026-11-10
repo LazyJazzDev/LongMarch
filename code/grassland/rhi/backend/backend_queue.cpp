@@ -1,13 +1,101 @@
 ﻿#include "grassland/rhi/backend/backend_queue.h"
 
-#include <system_error>
+#include <algorithm>
 
 namespace grassland::rhi::backend {
 
-Queue::Queue(Device *device, QueueType type) : device_(device), type_(type) {
+ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info) {
+  if (!commands->Seal())
+    return {};
+  SubmitInfo native_info;
+  native_info.waits.reserve(info.waits.size());
+  for (const auto &wait : info.waits) {
+#if !defined(NDEBUG)
+    auto timeline = dynamic_cast<Timeline *>(wait.timeline);
+    if (!timeline || timeline->Owner() != device_) {
+      ReportError(-1, "Submission waits require a timeline from this device.");
+      return {};
+    }
+#endif
+    // A submit waits for all dependencies; Vulkan requires unique semaphore handles.
+    auto existing = std::find_if(native_info.waits.begin(), native_info.waits.end(),
+                                 [&](const Event &event) { return event.timeline == wait.timeline; });
+    if (existing == native_info.waits.end())
+      native_info.waits.push_back(wait);
+    else
+      existing->value = std::max(existing->value, wait.value);
+  }
+  std::unique_lock<std::mutex> queue_lock(*mutex_);
+  const Event signal{GetTimeline(), NextSerial()};
+  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(signal));
+  // Register before native submission, while the collector cannot take the list.
+  auto entry = pending_.insert(pending_.end(), {commands, completion});
+  CommandContext::SubmitResult result;
+  try {
+    commands->BindDownloads(completion.Get());
+    result = commands->SubmitNative(native_info, signal);
+    if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
+      pending_.erase(entry);
+      completion->Complete(SUBMISSION_STATUS_FAILED);
+      commands->ReleaseDownloads();
+      return {};
+    }
+    commands->MarkSubmitted();
+  } catch (...) {
+    if (!commands->WasSubmitted()) {
+      pending_.erase(entry);
+      completion->Complete(SUBMISSION_STATUS_FAILED);
+      commands->ReleaseDownloads();
+    }
+    throw;
+  }
+  queue_lock.unlock();
+  // The caller's context reference keeps it alive while the collector retires it.
+  // Next-frame preparation belongs to the Window, not this submission's result.
+  if (result == CommandContext::SUBMIT_RESULT_SUBMITTED)
+    commands->UpdatePresentedImages();
+  return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
+}
+
+bool Queue::CollectCompleted(uint64_t completed, bool timeline_valid) {
+  std::list<Submission> work;
+  {
+    std::lock_guard<std::mutex> lock(*mutex_);
+    work.splice(work.end(), pending_);
+  }
+  // Polling may submit a recovery signal; releasing resources may acquire other
+  // backend locks. Neither operation runs under the submission mutex.
+  for (auto it = work.begin(); it != work.end();) {
+    const auto status = it->commands->PollCompletion(it->completion->GetEvent(), completed, timeline_valid);
+    if (status == SUBMISSION_STATUS_PENDING) {
+      ++it;
+      continue;
+    }
+    it->commands->ReleaseDownloads();
+    it->commands.Reset();
+    it->completion->Complete(status);
+    it = work.erase(it);
+  }
+  std::lock_guard<std::mutex> lock(*mutex_);
+  pending_.splice(pending_.begin(), work);
+  return pending_.empty();
+}
+
+Queue::Queue(Device *device, QueueType type, std::shared_ptr<std::mutex> mutex)
+    : device_(device),
+      type_(type),
+      mutex_(std::move(mutex)) {
 }
 
 Queue::~Queue() = default;
+
+std::mutex &Queue::QueueMutex() {
+  return *mutex_;
+}
+
+uint64_t Queue::NextSerial() {
+  return ++serial_;
+}
 
 Device *Queue::Owner() const {
   return device_;
@@ -15,39 +103,6 @@ Device *Queue::Owner() const {
 
 QueueType Queue::GetType() const {
   return type_;
-}
-
-bool Queue::SharesPhysicalQueue(const rhi::IQueue *other) const {
-  const auto queue = dynamic_cast<const Queue *>(other);
-  return queue && Owner() == queue->Owner();
-}
-
-rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info) {
-#if !defined(NDEBUG)
-  const auto impl = dynamic_cast<CommandContext *>(commands);
-  if (!impl || impl->DeviceIdentity() != Owner()->NativeIdentity()) {
-    ReportError(-1, "Commands must be submitted to a queue from their device.");
-    return nullptr;
-  }
-#else
-  const auto impl = static_cast<CommandContext *>(commands);
-#endif
-  try {
-    std::vector<ObjectPtr<SubmissionToken>> waits;
-    waits.reserve(info.waits.size());
-    for (auto token : info.waits) {
-#if !defined(NDEBUG)
-      auto state = dynamic_cast<SubmissionToken *>(token);
-#else
-      auto state = static_cast<SubmissionToken *>(token);
-#endif
-      waits.push_back(ObjectPtr<SubmissionToken>::Retain(state));
-    }
-    return Owner()->Submit(ObjectPtr<CommandContext>::Retain(impl), waits).Detach();
-  } catch (const std::system_error &error) {
-    ReportError(error.code().value(), error.what());
-  }
-  return nullptr;
 }
 
 }  // namespace grassland::rhi::backend

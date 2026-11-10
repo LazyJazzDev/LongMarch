@@ -10,6 +10,7 @@
 #include <memory>
 #include <thread>
 
+#include "format_support.h"
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image_presenter.h"
@@ -20,6 +21,7 @@
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
@@ -27,10 +29,12 @@
 
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
@@ -42,10 +46,12 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto owner = static_cast<MetalDevice *>(device);
+    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<MetalQueue *>(queue_owner.Get());
     auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
-    std::lock_guard<std::mutex> lock(owner->QueueMutex());
-    auto commands = NS::RetainPtr(owner->NativeQueue()->commandBuffer());
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
     blit->copyFromTexture(static_cast<MetalImage *>(image)->NativeImage(), 0, 0, MTL::Origin::Make(x, y, 0),
                           MTL::Size::Make(1, 1, 1), readback.get(), 0, 256, 256);
@@ -62,6 +68,8 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
     auto owner = static_cast<D3D12Device *>(device);
+    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<D3D12Queue *>(queue_owner.Get());
     auto source = static_cast<D3D12Image *>(image)->NativeImage();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
@@ -102,10 +110,10 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
     list->ResourceBarrier(1, &barrier);
     ASSERT_TRUE(SUCCEEDED(list->Close()));
     {
-      std::lock_guard<std::mutex> lock(owner->QueueMutex());
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
       ID3D12CommandList *lists[] = {list.Get()};
-      owner->NativeQueue()->ExecuteCommandLists(1, lists);
-      ASSERT_TRUE(owner->WaitIdle());
+      native_queue->NativeQueue()->ExecuteCommandLists(1, lists);
+      ASSERT_TRUE(native_queue->WaitIdle());
     }
     void *mapped{};
     D3D12_RANGE range{0, sizeof(output)};
@@ -120,6 +128,8 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
   if (api == BACKEND_API_VULKAN) {
     using namespace backend::vulkan;
     auto owner = static_cast<VulkanDevice *>(device);
+    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<VulkanQueue *>(queue_owner.Get());
     auto native = owner->NativeDevice();
     auto source = static_cast<VulkanImage *>(image)->NativeImage();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -179,9 +189,9 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
     ASSERT_EQ(vkEndCommandBuffer(commands), VK_SUCCESS);
     uint64_t value{};
     {
-      std::lock_guard<std::mutex> lock(owner->QueueMutex());
-      value = owner->NextSerial();
-      auto semaphore = owner->Timeline();
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      value = native_queue->NextSerial();
+      auto semaphore = native_queue->GetTimeline()->NativeSemaphore();
       VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
       timeline.signalSemaphoreValueCount = 1;
       timeline.pSignalSemaphoreValues = &value;
@@ -191,9 +201,9 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
       submit.pCommandBuffers = &commands;
       submit.signalSemaphoreCount = 1;
       submit.pSignalSemaphores = &semaphore;
-      ASSERT_EQ(vkQueueSubmit(owner->NativeQueue(), 1, &submit, {}), VK_SUCCESS);
+      ASSERT_EQ(vkQueueSubmit(native_queue->NativeQueue(), 1, &submit, {}), VK_SUCCESS);
     }
-    ASSERT_EQ(owner->Wait(value), VK_SUCCESS);
+    ASSERT_EQ(native_queue->Wait(value), VK_SUCCESS);
     void *mapped{};
     ASSERT_EQ(vkMapMemory(native, memory, 0, sizeof(output), 0, &mapped), VK_SUCCESS);
     std::memcpy(output.data(), mapped, sizeof(output));
@@ -246,7 +256,7 @@ TEST_P(RhiImage, HDRUploadUsesFullPixelStrideAndRenderingPreservesHighlights) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   for (auto format :
        {IMAGE_FORMAT_R16G16B16A16_SFLOAT, IMAGE_FORMAT_R10G10B10A2_UNORM, IMAGE_FORMAT_B10G10R10A2_UNORM}) {
@@ -265,9 +275,9 @@ TEST_P(RhiImage, HDRUploadUsesFullPixelStrideAndRenderingPreservesHighlights) {
       for (uint32_t x = 0; x < 5; ++x)
         std::memcpy(pixels.data() + y * pitch + x * bytes,
                     floating ? static_cast<const void *>(half) : static_cast<const void *>(&packed), bytes);
-    ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+    ObjPtr<ICommandContext> upload = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(upload->CmdUploadImage(image.Get(), pixels.data(), pitch));
-    ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
+    ObjPtr<ISubmissionToken> uploaded = upload->Submit();
     ASSERT_TRUE(uploaded && uploaded->WaitHost());
     if (floating) {
       std::array<uint8_t, 8> actual{};
@@ -300,14 +310,14 @@ TEST_P(RhiImage, HDRUploadUsesFullPixelStrideAndRenderingPreservesHighlights) {
     desc.color_formats = {format};
     ObjPtr<IProgram> program = device->CreateProgram(desc);
     ASSERT_TRUE(program);
-    ObjPtr<ICommandContext> draw = device->CreateCommandContext();
+    ObjPtr<ICommandContext> draw = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(draw->CmdBindProgram(program.Get()));
     ASSERT_TRUE(draw->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE}}}));
     ASSERT_TRUE(draw->CmdSetViewport({0, 0, 5, 3, 0, 1}));
     ASSERT_TRUE(draw->CmdSetScissor({0, 0, 5, 3}));
     ASSERT_TRUE(draw->CmdDraw(3));
     ASSERT_TRUE(draw->CmdEndRendering());
-    ObjPtr<ISubmissionToken> done = queue->Submit(draw.Get());
+    ObjPtr<ISubmissionToken> done = draw->Submit();
     ASSERT_TRUE(done && done->WaitHost());
     if (floating) {
       std::array<uint8_t, 8> actual{};
@@ -333,6 +343,8 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
   ASSERT_TRUE(device);
   for (auto format : {IMAGE_FORMAT_R8G8B8A8_UNORM, IMAGE_FORMAT_B8G8R8A8_UNORM, IMAGE_FORMAT_D32_SFLOAT,
                       IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
+    if (format == IMAGE_FORMAT_D24_UNORM_S8_UINT && !SupportsD24S8(device.Get(), GetParam()))
+      continue;
     ObjPtr<IImage> image = device->CreateImage({16, 16, format});
     ASSERT_TRUE(image);
     const auto native = static_cast<backend::Image *>(image.Get());
@@ -381,7 +393,7 @@ TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
   EXPECT_NE(handle, 0u);
   EXPECT_EQ(owner->RTVPool().GetPageCounts().second, 1u);
   EXPECT_EQ(owner->DSVPool().GetPageCounts().second, 1u);
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdClearImage(color.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
   RenderingInfo rendering;
@@ -407,7 +419,7 @@ TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch)
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IImage> image = device->CreateImage({3, 3, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(image);
@@ -420,11 +432,11 @@ TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch)
       const std::array<uint8_t, 4> pixel{uint8_t(x * 70), uint8_t(y * 80), 37, 255};
       std::memcpy(source.data() + y * 20 + x * 4, pixel.data(), pixel.size());
     }
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadImage(image.Get(), source.data(), 20));
   source.fill(0);  // Recording must already own the uploaded bytes.
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   commands.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -442,7 +454,7 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   backend::ImagePresenter presenter(static_cast<backend::Device *>(device.Get()));
   ObjPtr<IImage> input = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> encoded = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
@@ -453,7 +465,7 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
   for (int from = 0; from <= 3; ++from) {
     for (int to = 0; to <= 3; ++to) {
       SCOPED_TRACE(std::to_string(from) + " -> " + std::to_string(to));
-      ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+      ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
       ASSERT_TRUE(commands->CmdClearImage(input.Get(), {0.1f, 0.3f, 0.7f, 0.6f}));
       ASSERT_TRUE(presenter.Record(commands.Get(), input.Get(), encoded.Get(), COLOR_SPACE_BT709_LINEAR,
                                    ColorSpace(from), 1.0f));
@@ -462,7 +474,7 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
       ASSERT_TRUE(presenter.Record(commands.Get(), converted.Get(), decoded.Get(), ColorSpace(to),
                                    COLOR_SPACE_BT709_LINEAR, white));
       auto result = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(decoded.Get(), {0, 0, 1, 1}));
-      auto done = ObjPtr<ISubmissionToken>(queue->Submit(commands.Get()));
+      auto done = ObjPtr<ISubmissionToken>(commands->Submit());
       ASSERT_TRUE(result && done && done->WaitHost());
       std::array<float, 4> pixel{};
       ASSERT_TRUE(result->CopyTo(pixel.data(), sizeof(pixel)));
@@ -476,12 +488,12 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
   }
   for (auto space : {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084,
                      COLOR_SPACE_BT709_LINEAR}) {
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands->CmdClearImage(input.Get(), {4.0f, 2.0f, 1.0f, 1.0f}));
     ASSERT_TRUE(presenter.Record(commands.Get(), input.Get(), encoded.Get(), COLOR_SPACE_BT709_LINEAR, space, white));
     ASSERT_TRUE(presenter.Record(commands.Get(), encoded.Get(), decoded.Get(), space, COLOR_SPACE_BT709_LINEAR, white));
     auto result = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(decoded.Get(), {0, 0, 1, 1}));
-    auto done = ObjPtr<ISubmissionToken>(queue->Submit(commands.Get()));
+    auto done = ObjPtr<ISubmissionToken>(commands->Submit());
     ASSERT_TRUE(result && done && done->WaitHost());
     std::array<float, 4> pixel{};
     ASSERT_TRUE(result->CopyTo(pixel.data(), sizeof(pixel)));
@@ -501,7 +513,7 @@ TEST_P(RhiImage, PresentImageUsesTheSelectedSwapChainEncoding) {
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Present image color spaces"});
   ASSERT_TRUE(window);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> source = device->CreateImage({4, 4, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ASSERT_TRUE(source);
   for (auto space : {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084,
@@ -511,11 +523,11 @@ TEST_P(RhiImage, PresentImageUsesTheSelectedSwapChainEncoding) {
     SCOPED_TRACE(ColorSpaceName(space));
     ObjPtr<IImage> frame = window->GetNextImage();
     ASSERT_TRUE(frame);
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands->CmdClearImage(source.Get(), {0.1f, 0.3f, 0.7f, 1.0f}));
     ASSERT_TRUE(commands->CmdPresentImage(window.Get(), source.Get(), COLOR_SPACE_BT709_LINEAR));
     auto result = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(frame.Get(), {10, 10, 1, 1}));
-    auto done = ObjPtr<ISubmissionToken>(queue->Submit(commands.Get()));
+    auto done = ObjPtr<ISubmissionToken>(commands->Submit());
     ASSERT_TRUE(result && done && done->WaitHost());
     std::array<uint8_t, 16> bytes{};
     ASSERT_TRUE(result->CopyTo(bytes.data(), bytes.size()));
@@ -578,7 +590,7 @@ TEST_P(RhiImage, ExplicitImGuiAndPresentConsumeEachUpdateOnce) {
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Linear ImGui consumption"});
   ASSERT_TRUE(window && window->EnableImGui());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({160, 120, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> unused = device->CreateImage({160, 120, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ASSERT_TRUE(target && unused);
@@ -588,7 +600,7 @@ TEST_P(RhiImage, ExplicitImGuiAndPresentConsumeEachUpdateOnce) {
     });
   };
   ASSERT_TRUE(update());
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 0.25f, 1.0f}));
   ASSERT_TRUE(commands->CmdClearImage(unused.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(commands->CmdDrawImGui(window.Get(), target.Get()));
@@ -599,7 +611,7 @@ TEST_P(RhiImage, ExplicitImGuiAndPresentConsumeEachUpdateOnce) {
   auto linear = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(target.Get(), {10, 10, 1, 1}));
   auto output = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(frame.Get(), {10, 10, 1, 1}));
   auto blank = ObjPtr<IDownloadToken>(commands->CmdDownloadImage(unused.Get(), {10, 10, 1, 1}));
-  auto done = ObjPtr<ISubmissionToken>(queue->Submit(commands.Get()));
+  auto done = ObjPtr<ISubmissionToken>(commands->Submit());
   ASSERT_TRUE(linear && output && blank && done && done->WaitHost());
   std::array<float, 4> pixel{};
   ASSERT_TRUE(linear->CopyTo(pixel.data(), sizeof(pixel)));
@@ -619,13 +631,13 @@ TEST_P(RhiImage, ExplicitImGuiAndPresentConsumeEachUpdateOnce) {
   done.Release();
   // Conversely, ordinary Present consumes the update before an explicit draw.
   ASSERT_TRUE(update());
-  commands = device->CreateCommandContext();
+  commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   frame = window->GetNextImage();
   ASSERT_TRUE(frame && commands->CmdClearImage(frame.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
   ASSERT_TRUE(commands->CmdPresent(window.Get()));
   ASSERT_TRUE(commands->CmdDrawImGui(window.Get(), unused.Get()));
   blank = commands->CmdDownloadImage(unused.Get(), {10, 10, 1, 1});
-  done = queue->Submit(commands.Get());
+  done = commands->Submit();
   ASSERT_TRUE(blank && done && done->WaitHost());
   ASSERT_TRUE(blank->CopyTo(pixel.data(), sizeof(pixel)));
   EXPECT_EQ(pixel[0], 0.0f);
@@ -649,7 +661,7 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ObjPtr<IImage> target = device->CreateImage({width, height, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(target && texture);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ImVec2 framebuffer_scale;
   auto draw_window = [&] {
     framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
@@ -664,14 +676,14 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
     draw->AddImage(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(texture.Get())), {80, 10}, {110, 40});
   };
   ASSERT_TRUE(window->UpdateImGui(draw_window));
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
   const uint32_t green = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), &green, 4));
   ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
   ASSERT_TRUE(window->EnableImGui(false));
   texture.Release();
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   commands.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -702,14 +714,14 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   auto ui =
       backend::WindowImGui::Create(static_cast<backend::Device *>(device.Get()), window->GLFWWindow(), nullptr, 13);
   ASSERT_TRUE(ui);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(texture);
-  ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+  ObjPtr<ICommandContext> upload = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   const uint8_t texel[] = {128, 64, 200, 128};
   ASSERT_TRUE(upload && upload->CmdUploadImage(texture.Get(), texel, 4));
-  ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
+  ObjPtr<ISubmissionToken> uploaded = upload->Submit();
   ASSERT_TRUE(uploaded && uploaded->WaitHost());
   auto linear = [](double v) { return v <= 0.04045 ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4); };
 #if defined(__APPLE__)
@@ -746,10 +758,10 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   std::array<std::array<uint8_t, 4>, 5> baseline{};
   ObjPtr<IImage> sdr = device->CreateImage({160, 120, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(sdr && ui->Update(draw));
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands && commands->CmdClearImage(sdr.Get(), {0.2f, 0.3f, 0.4f, 1.0f}));
   ASSERT_TRUE(ui->Record(commands.Get(), sdr.Get()));
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done && done->WaitHost());
   for (size_t i = 0; i < baseline.size(); ++i)
     ReadPixel(device.Get(), sdr.Get(), GetParam(), uint32_t(i * 30 + 10), 10, baseline[i]);
@@ -775,10 +787,10 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
       blend(1, {220.0 / 255, 40.0 / 255, 80.0 / 255}, 128.0 / 255);
       blend(1, {40.0 / 255, 180.0 / 255, 200.0 / 255}, 96.0 / 255);
       blend(2, {128.0 * 180 / (255 * 255), 64.0 * 220 / (255 * 255), 200.0 / 255}, 128.0 * 192 / (255 * 255));
-      commands = device->CreateCommandContext();
+      commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
       ASSERT_TRUE(commands && commands->CmdClearImage(target.Get(), {float(bg[0]), float(bg[1]), float(bg[2]), 1.0f}));
       ASSERT_TRUE(ui->Record(commands.Get(), target.Get(), space, white));
-      done = queue->Submit(commands.Get());
+      done = commands->Submit();
       ASSERT_TRUE(done && done->WaitHost());
       for (size_t i = 0; i < baseline.size(); ++i) {
         std::array<uint8_t, 8> bytes{};
@@ -792,11 +804,11 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
       // Direct rendering must leave background highlights untouched.
       const auto highlight = encode({4, 2, 1}, space, white);
       ASSERT_TRUE(ui->Update(draw));
-      commands = device->CreateCommandContext();
+      commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
       ASSERT_TRUE(commands && commands->CmdClearImage(
                                   target.Get(), {float(highlight[0]), float(highlight[1]), float(highlight[2]), 1.0f}));
       ASSERT_TRUE(ui->Record(commands.Get(), target.Get(), space, white));
-      done = queue->Submit(commands.Get());
+      done = commands->Submit();
       ASSERT_TRUE(done && done->WaitHost());
       std::array<uint8_t, 8> bytes{};
       ReadPixel(device.Get(), target.Get(), GetParam(), 120, 90, bytes);
@@ -824,7 +836,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
   ObjPtr<IImage> target =
       device->CreateImage({frame->GetDesc().width, frame->GetDesc().height, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(target);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   bool record_ui = true;
   auto draw_window = [&] {
@@ -836,11 +848,11 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
   for (bool visible : {true, false, false, true, false}) {
     record_ui = visible;
     ASSERT_TRUE(window->UpdateImGui(draw_window));
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
     ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     ASSERT_TRUE(done->WaitHost());
     std::array<uint8_t, 4> pixel{};
@@ -861,7 +873,7 @@ TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "ImGui buffer reuse"});
   ASSERT_TRUE(window && window->EnableImGui());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   std::vector<ObjPtr<IImage>> targets;
   std::vector<ObjPtr<ICommandContext>> recordings;
@@ -874,7 +886,7 @@ TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
       for (int i = 0; i < rectangles; ++i)
         ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, ImGui::GetIO().DisplaySize, color);
     }));
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
     ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
@@ -885,7 +897,7 @@ TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
   ASSERT_TRUE(window->EnableImGui(false));
   std::vector<ObjPtr<ISubmissionToken>> submissions;
   for (auto &commands : recordings) {
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     submissions.push_back(done);
   }
@@ -912,7 +924,7 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
   EXPECT_FALSE(disabled_callback_ran);
   ASSERT_TRUE(window->EnableImGui());
   ObjPtr<IImage> target = device->CreateImage({320, 240, IMAGE_FORMAT_R8G8B8A8_UNORM});
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(target && queue);
   int updates = 0;
   ClearValue background{0.0f, 0.0f, 1.0f, 1.0f};
@@ -931,12 +943,12 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
   const auto previous = ImGui::GetCurrentContext();
   auto record = [&](bool overlay) {
     const auto before = updates;
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), background));
     ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
     EXPECT_EQ(updates, before);  // Recording must not run UI logic.
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done && done->WaitHost());
     std::array<uint8_t, 4> pixel{};
     ReadPixel(device.Get(), target.Get(), GetParam(), uint32_t(20 * target_scale.x), uint32_t(20 * target_scale.y),
@@ -978,7 +990,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
   Track(device.Get());
   EXPECT_EQ(device->CreateImage({0, 64, IMAGE_FORMAT_R8G8B8A8_UNORM}), nullptr);
   EXPECT_EQ(device->CreateImage({64, 64, IMAGE_FORMAT_UNKNOWN}), nullptr);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   const std::string source = R"(
     float4 VSMain(uint id : SV_VertexID) : SV_Position {
@@ -1001,7 +1013,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
     ObjPtr<IProgram> program = device->CreateProgram(desc);
     ASSERT_TRUE(program);
     for (int frame = 0; frame < 3; ++frame) {
-      ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+      ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
       ASSERT_TRUE(commands);
       ASSERT_TRUE(commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -1010,7 +1022,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
       ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
       ASSERT_TRUE(commands->CmdDraw(3));
       ASSERT_TRUE(commands->CmdEndRendering());
-      ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+      ObjPtr<ISubmissionToken> done = commands->Submit();
       ASSERT_TRUE(done);
       commands.Release();
       ASSERT_TRUE(done->WaitHost());
@@ -1045,7 +1057,7 @@ TEST_P(RhiImage, FragmentRayQueriesRetainIndirectBlasResources) {
     GTEST_SKIP() << "Render-stage ray query unavailable";
 #endif
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(queue && image);
   BottomLevelAccelerationStructureDesc bottom;
@@ -1055,7 +1067,7 @@ TEST_P(RhiImage, FragmentRayQueriesRetainIndirectBlasResources) {
   const float positions[] = {-1, -1, 0, 0, 1, 0, 1, -1, 0};
   ObjPtr<IBuffer> vertices = device->CreateBuffer({sizeof(positions)});
   ASSERT_TRUE(blas && tlas && vertices);
-  ObjPtr<ICommandContext> build = device->CreateCommandContext();
+  ObjPtr<ICommandContext> build = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(build);
   ASSERT_TRUE(build->CmdUploadBuffer(vertices.Get(), 0, positions, sizeof(positions)));
   ASSERT_TRUE(build->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{vertices.Get()}, {}}}));
@@ -1063,7 +1075,7 @@ TEST_P(RhiImage, FragmentRayQueriesRetainIndirectBlasResources) {
   instance.blas = blas.Get();
   instance.disable_triangle_culling = true;
   ASSERT_TRUE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {instance}));
-  ObjPtr<ISubmissionToken> built = queue->Submit(build.Get());
+  ObjPtr<ISubmissionToken> built = build->Submit();
   ASSERT_TRUE(built);
   build.Release();
   ASSERT_TRUE(built->WaitHost());
@@ -1094,7 +1106,7 @@ float4 PSMain():SV_Target0 {
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, tlas.Get()));
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBeginRendering(
@@ -1106,7 +1118,7 @@ float4 PSMain():SV_Target0 {
   ASSERT_TRUE(commands->CmdEndRendering());
   group.Release();
   tlas.Release();
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   commands.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -1121,7 +1133,7 @@ TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(queue && image);
   ProgramDesc desc;
@@ -1147,7 +1159,7 @@ TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
   const float vertices[] = {-1, -1, 3, -1, -1, 3};
   ObjPtr<IBuffer> vertex = device->CreateBuffer({sizeof(vertices)});
   ASSERT_TRUE(vertex);
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(vertex.Get(), 0, vertices, sizeof(vertices)));
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -1167,7 +1179,7 @@ TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
   ASSERT_TRUE(commands->CmdSetScissor({0, 0, 16, 16}));
   ASSERT_TRUE(commands->CmdDraw(3));
   ASSERT_TRUE(commands->CmdEndRendering());
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   commands.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -1182,7 +1194,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> image = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(image);
   const std::string source = R"(
@@ -1210,7 +1222,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ASSERT_TRUE(vertex);
   ASSERT_TRUE(color);
   ASSERT_TRUE(index);
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands->CmdUploadBuffer(vertex.Get(), 0, vertices, sizeof(vertices)));
   ASSERT_TRUE(commands->CmdUploadBuffer(color.Get(), 0, colors, sizeof(colors)));
   ASSERT_TRUE(commands->CmdUploadBuffer(index.Get(), 0, indices, sizeof(indices)));
@@ -1230,7 +1242,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ASSERT_TRUE(commands->CmdBeginRendering(
       {{{smaller.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 1, 0, 1}}}}));
   ASSERT_TRUE(commands->CmdEndRendering());
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   ASSERT_TRUE(done->WaitHost());
   std::array<uint8_t, 4> pixel{};
@@ -1246,7 +1258,7 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> first = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   // Keep an intervening view alive so MRT cannot assume contiguous handles.
   ObjPtr<IImage> spacer = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
@@ -1275,7 +1287,7 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
   for (int repeat = 0; repeat < 3; ++repeat) {
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
     RenderingInfo rendering;
     rendering.color_attachments = {{first.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}},
@@ -1287,7 +1299,7 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
     ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
     ASSERT_TRUE(commands->CmdDraw(6));
     ASSERT_TRUE(commands->CmdEndRendering());
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     commands.Release();
     ASSERT_TRUE(done->WaitHost());
@@ -1305,7 +1317,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> red = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> green = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
@@ -1352,7 +1364,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}}, 0));
   EXPECT_NE(static_cast<backend::BindingGroup *>(material.Get())->CurrentVersion(), original.Get());
   original.Reset();
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   const uint32_t red_pixel = 0xff0000ff, green_pixel = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(red.Get(), &red_pixel, 4));
   ASSERT_TRUE(commands->CmdUploadImage(green.Get(), &green_pixel, 4));
@@ -1416,33 +1428,37 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
     auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<backend::d3d12::D3D12Queue *>(queue_owner.Get());
     backend::d3d12::ComPtr<ID3D12Fence> fence;
     ASSERT_TRUE(SUCCEEDED(native->NativeDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))));
-    gate = std::shared_ptr<void>(native, [native, fence](void *) {
+    gate = std::shared_ptr<void>(native, [native_queue, fence](void *) {
       EXPECT_TRUE(SUCCEEDED(fence->Signal(1)));
-      std::lock_guard<std::mutex> lock(native->QueueMutex());
-      EXPECT_TRUE(native->WaitIdle());
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      EXPECT_TRUE(native_queue->WaitIdle());
     });
-    std::lock_guard<std::mutex> lock(native->QueueMutex());
-    ASSERT_TRUE(SUCCEEDED(native->NativeQueue()->Wait(fence.Get(), 1)));
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    ASSERT_TRUE(SUCCEEDED(native_queue->NativeQueue()->Wait(fence.Get(), 1)));
   }
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN) {
     auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<backend::vulkan::VulkanQueue *>(queue_owner.Get());
     VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
     type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
     VkSemaphoreCreateInfo create{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     create.pNext = &type;
     VkSemaphore semaphore{};
     ASSERT_EQ(vkCreateSemaphore(native->NativeDevice(), &create, nullptr, &semaphore), VK_SUCCESS);
-    gate = std::shared_ptr<void>(native, [native, semaphore](void *) {
+    gate = std::shared_ptr<void>(native, [native, native_queue, semaphore](void *) {
       VkSemaphoreSignalInfo signal{VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO};
       signal.semaphore = semaphore;
       signal.value = 1;
       EXPECT_EQ(vkSignalSemaphore(native->NativeDevice(), &signal), VK_SUCCESS);
-      std::lock_guard<std::mutex> lock(native->QueueMutex());
-      EXPECT_EQ(vkQueueWaitIdle(native->NativeQueue()), VK_SUCCESS);
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      EXPECT_EQ(vkQueueWaitIdle(native_queue->NativeQueue()), VK_SUCCESS);
       vkDestroySemaphore(native->NativeDevice(), semaphore, nullptr);
     });
     const uint64_t value = 1;
@@ -1455,28 +1471,30 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
     submit.waitSemaphoreCount = 1;
     submit.pWaitSemaphores = &semaphore;
     submit.pWaitDstStageMask = &stage;
-    std::lock_guard<std::mutex> lock(native->QueueMutex());
-    ASSERT_EQ(vkQueueSubmit(native->NativeQueue(), 1, &submit, VK_NULL_HANDLE), VK_SUCCESS);
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    ASSERT_EQ(vkQueueSubmit(native_queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE), VK_SUCCESS);
   }
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL) {
     auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = static_cast<backend::metal::MetalQueue *>(queue_owner.Get());
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto event = NS::TransferPtr(native->NativeDevice()->newSharedEvent());
     ASSERT_TRUE(event);
-    gate = std::shared_ptr<void>(native, [native, event](void *) {
+    gate = std::shared_ptr<void>(native, [native_queue, event](void *) {
       event->setSignaledValue(1);
-      std::lock_guard<std::mutex> lock(native->QueueMutex());
-      EXPECT_TRUE(native->WaitIdle());
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      EXPECT_TRUE(native_queue->WaitIdle());
     });
-    std::lock_guard<std::mutex> lock(native->QueueMutex());
-    auto blocker = native->NativeQueue()->commandBuffer();
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    auto blocker = native_queue->NativeQueue()->commandBuffer();
     blocker->encodeWait(event.get(), 1);
     blocker->commit();
   }
 #endif
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   EXPECT_EQ(done->GetStatus(), SUBMISSION_STATUS_PENDING);
   ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), 0, 256}));
@@ -1512,7 +1530,7 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
   ASSERT_TRUE(queue);
@@ -1555,7 +1573,7 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
   ASSERT_TRUE(group->BindResource(1, buffer.Get()));
   EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
   EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2 - 1}));
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, data.data(), data.size()));
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -1566,7 +1584,7 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
   ASSERT_TRUE(commands->CmdSetScissor({0, 0, 32, 32}));
   ASSERT_TRUE(commands->CmdDraw(3));
   ASSERT_TRUE(commands->CmdEndRendering());
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   ASSERT_TRUE(done->WaitHost());
   std::array<uint8_t, 4> pixel{};
@@ -1580,7 +1598,7 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
   ASSERT_TRUE(queue);
@@ -1631,7 +1649,7 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
   ASSERT_TRUE(group->BindResource(1, buffer.Get()));
   EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
   EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2 - 1}));
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, data.data(), sizeof(data)));
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -1642,7 +1660,7 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
   ASSERT_TRUE(commands->CmdSetScissor({0, 0, 32, 32}));
   ASSERT_TRUE(commands->CmdDraw(3));
   ASSERT_TRUE(commands->CmdEndRendering());
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   ASSERT_TRUE(done->WaitHost());
   std::array<uint8_t, 4> pixel{};
@@ -1656,7 +1674,7 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64 * 64 * 16});
@@ -1707,7 +1725,7 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
     ASSERT_TRUE(group->BindResource(0, storage.Get()));
     ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get()}));
   }
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   for (auto program : {writer.Get(), reader.Get()}) {
     ASSERT_TRUE(commands->CmdBindProgram(program));
     ASSERT_TRUE(commands->CmdBindGroup(0, program == writer.Get() ? wg.Get() : rg.Get()));
@@ -1718,7 +1736,7 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
     ASSERT_TRUE(commands->CmdDraw(3));
     ASSERT_TRUE(commands->CmdEndRendering());
   }
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   commands.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -1733,7 +1751,7 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64 * 64 * 16});
@@ -1784,7 +1802,7 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
     ASSERT_TRUE(group->BindResource(0, storage.Get()));
     ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get()}));
   }
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   for (auto program : {writer.Get(), reader.Get()}) {
     ASSERT_TRUE(commands->CmdBindProgram(program));
     ASSERT_TRUE(commands->CmdBindGroup(0, program == writer.Get() ? wg.Get() : rg.Get()));
@@ -1795,7 +1813,7 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
     ASSERT_TRUE(commands->CmdDraw(3));
     ASSERT_TRUE(commands->CmdEndRendering());
   }
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   commands.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -1810,7 +1828,7 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> texture = device->CreateImage({2, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<ISampler> nearest = device->CreateSampler({SAMPLER_FILTER_NEAREST});
@@ -1840,7 +1858,7 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, texture.Get()));
   ASSERT_TRUE(group->BindResource(3, std::vector<ISampler *>{linear.Get(), nearest.Get()}));
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   const std::array<uint8_t, 8> pixels{255, 0, 0, 255, 0, 0, 255, 255};
   ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), pixels.data(), pixels.size()));
@@ -1861,7 +1879,7 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
   ASSERT_TRUE(commands->CmdEndRendering());
   group.Release();
   texture.Release();
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   commands.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -1881,7 +1899,7 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({1024});
   ASSERT_TRUE(buffer && target && queue);
@@ -1918,7 +1936,7 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
   ASSERT_TRUE(group->BindResource(9, std::vector<BufferView>{{buffer.Get(), 768, 4}, {buffer.Get(), 784, 8}}));
   std::array<float, 256> data{};
   data[64] = data[67] = 1;
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, data.data(), sizeof(data)));
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -1934,7 +1952,7 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
   ASSERT_TRUE(commands->CmdSetScissor({0, 0, 8, 8}));
   ASSERT_TRUE(commands->CmdDraw(3));
   ASSERT_TRUE(commands->CmdEndRendering());
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   ASSERT_TRUE(done->WaitHost());
   std::array<uint8_t, 4> pixel{};
@@ -1947,8 +1965,10 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
+  if (!SupportsD24S8(device.Get(), GetParam()))
+    GTEST_SKIP() << "Vulkan does not support D24S8 with the required image usage.";
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D24_UNORM_S8_UINT});
   ASSERT_TRUE(target && depth);
@@ -1975,7 +1995,7 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   desc.depth_stencil.front.compare = desc.depth_stencil.back.compare = COMPARE_EQUAL;
   ObjPtr<IProgram> reader = device->CreateProgram(desc);
   ASSERT_TRUE(writer && reader);
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   RenderingInfo rendering;
   rendering.depth_stencil.image = depth.Get();
   rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
@@ -1993,7 +2013,7 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
   ASSERT_TRUE(commands->CmdDraw(3));
   ASSERT_TRUE(commands->CmdEndRendering());
-  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   commands.Release();
   ASSERT_TRUE(done->WaitHost());
@@ -2021,7 +2041,7 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   std::array<ObjPtr<IImage>, 3> targets;
   for (auto &target : targets) {
@@ -2087,7 +2107,7 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
       desc.blend_states.push_back(cases[(std::min)(first + j, cases.size() - 1)].state);
     ObjPtr<IProgram> program = device->CreateProgram(desc);
     ASSERT_TRUE(program);
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
     RenderingInfo rendering;
@@ -2099,7 +2119,7 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
     ASSERT_TRUE(commands->CmdSetScissor({0, 0, 8, 8}));
     ASSERT_TRUE(commands->CmdDraw(3));
     ASSERT_TRUE(commands->CmdEndRendering());
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     ASSERT_TRUE(done->WaitHost());
     for (size_t j = 0; j < targets.size(); ++j) {
@@ -2119,7 +2139,7 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IImage> a = device->CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(a);
@@ -2165,7 +2185,7 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   ASSERT_TRUE(ca->BindResource(0, a.Get()));
   ASSERT_TRUE(cb->BindResource(0, b.Get()));
   ASSERT_TRUE(ga->BindResource(0, a.Get()));
-  ObjPtr<ICommandContext> ctx = device->CreateCommandContext();
+  ObjPtr<ICommandContext> ctx = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(ctx);
   ASSERT_TRUE(ctx->CmdClearImage(a.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));
   for (int round = 0; round < 40; ++round) {
@@ -2188,7 +2208,7 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   ca.Release();
   cb.Release();
   ga.Release();
-  ObjPtr<ISubmissionToken> token = queue->Submit(ctx.Get());
+  ObjPtr<ISubmissionToken> token = ctx->Submit();
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   std::array<uint8_t, 4> pixel{};

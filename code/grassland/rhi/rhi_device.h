@@ -3,6 +3,7 @@
 #include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
+#include "grassland/rhi/rhi_timeline.h"
 #include "grassland/util/file_system.h"
 
 namespace grassland::rhi {
@@ -21,6 +22,7 @@ struct ShaderDesc;
 class IWindow;
 class IQueue;
 class ICommandContext;
+struct SubmitInfo;
 
 class IDevice : public IObject {
  public:
@@ -58,8 +60,14 @@ class IDevice : public IObject {
                                   const std::vector<std::string> &include_paths = {},
                                   const std::vector<std::pair<std::string, std::string>> &defines = {});
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
+  // Returns an owned reference to a fixed device-owned queue. Repeated calls
+  // return the same queue object, even after all caller references are released.
+  // Main and Assist have separate timelines but may share a native queue.
+  // Separate logical queues do not guarantee independent GPU progress.
   virtual IQueue *GetQueue(QueueType type) = 0;
-  virtual ICommandContext *CreateCommandContext() = 0;
+  // Blocks the CPU until all events (or any event when wait_all is false) complete.
+  // Events must belong to this device. Empty All succeeds; empty Any fails.
+  virtual bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const = 0;
 
  protected:
   ~IDevice() override;

@@ -15,7 +15,6 @@ class MetalWindow final : public Window {
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;
-  const void *DeviceIdentity() const;
 
  private:
   MetalWindow(MetalDevice *device);

@@ -15,6 +15,49 @@
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
 namespace grassland::rhi::backend::vulkan {
+bool VulkanDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
+  std::vector<VkSemaphore> semaphores;
+  std::vector<uint64_t> values;
+  for (const auto &event : events) {
+    semaphores.push_back(static_cast<VulkanTimeline *>(event.timeline)->NativeSemaphore());
+    values.push_back(event.value);
+  }
+  VkSemaphoreWaitInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
+  info.flags = wait_all ? 0 : VK_SEMAPHORE_WAIT_ANY_BIT;
+  info.semaphoreCount = static_cast<uint32_t>(events.size());
+  info.pSemaphores = semaphores.data();
+  info.pValues = values.data();
+  return Check(vkWaitSemaphores(device_, &info, UINT64_MAX), "Wait for timeline events");
+}
+
+void VulkanDevice::InterruptCollector() {
+  VkSemaphoreSignalInfo signal{VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO};
+  signal.semaphore = collector_shutdown_;
+  signal.value = 1;
+  Check(vkSignalSemaphore(device_, &signal), "Stop device collector");
+}
+
+void VulkanDevice::WaitForProgress(const std::vector<Event> &next) {
+  std::array<VkSemaphore, 3> semaphores{};
+  std::array<uint64_t, 3> values{};
+  for (size_t index = 0; index < next.size(); ++index) {
+    semaphores[index] = static_cast<VulkanTimeline *>(next[index].timeline)->NativeSemaphore();
+    values[index] = next[index].value;
+  }
+  size_t count = next.size();
+  if (!shutdown_consumed_) {
+    semaphores[count] = collector_shutdown_;
+    values[count++] = 1;
+  }
+  VkSemaphoreWaitInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
+  info.flags = VK_SEMAPHORE_WAIT_ANY_BIT;
+  info.semaphoreCount = static_cast<uint32_t>(count);
+  info.pSemaphores = semaphores.data();
+  info.pValues = values.data();
+  vkWaitSemaphores(device_, &info, UINT64_MAX);
+  // Consume the one-shot shutdown notification, then drain real GPU work.
+  shutdown_consumed_ = stopping_;
+}
 
 bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command) {
   {
@@ -29,7 +72,7 @@ bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer 
       return false;
   } else {
     VkCommandPoolCreateInfo create{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    create.queueFamilyIndex = graphics_queue_family_index_;
+    create.queueFamilyIndex = queue_family_index_;
     create.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     if (!Check(vkCreateCommandPool(device_, &create, nullptr, &pool), "Create command pool"))
       return false;
@@ -72,8 +115,10 @@ VulkanDevice::~VulkanDevice() {
   for (const auto &entry : command_pool_) {
     vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
   }
-  if (timeline_)
-    vkDestroySemaphore(device_, timeline_, nullptr);
+  for (auto &queue : queues_)
+    queue.Reset();
+  if (collector_shutdown_)
+    vkDestroySemaphore(device_, collector_shutdown_, nullptr);
   if (allocator_)
     vmaDestroyAllocator(allocator_);
   if (device_)
@@ -100,29 +145,33 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, nullptr);
   std::vector<VkQueueFamilyProperties> families(count);
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, families.data());
-  std::vector<VkDeviceQueueCreateInfo> queues;
-  uint32_t graphics_family = UINT32_MAX;
-  const float priority = 1.0f;
+  uint32_t queue_family = UINT32_MAX;
   for (uint32_t i = 0; i < count; ++i) {
-    if (!families[i].queueCount)
+    const auto required = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
+    if (!families[i].queueCount || (families[i].queueFlags & required) != required)
       continue;
-    if (graphics_family == UINT32_MAX && ((families[i].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) ==
-                                          (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)))
-      graphics_family = i;
-    VkDeviceQueueCreateInfo queue{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-    queue.queueFamilyIndex = i;
-    queue.queueCount = 1;
-    queue.pQueuePriorities = &priority;
-    queues.push_back(queue);
+    if (queue_family == UINT32_MAX)
+      queue_family = i;
+    if (families[i].queueCount >= 2) {
+      queue_family = i;
+      break;
+    }
   }
-  VkDeviceCreateInfo create{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
-  if (graphics_family == UINT32_MAX) {
-    ReportError(-1, "No Vulkan graphics queue is available.");
+  if (queue_family == UINT32_MAX) {
+    ReportError(-1, "No Vulkan graphics and compute queue is available.");
     return {};
   }
+  // Both roles share a family, so ordinary resources need no ownership transfers.
+  // Do not create unused queues in unrelated families.
+  const float priorities[] = {1.0f, 1.0f};
+  VkDeviceQueueCreateInfo queue_create{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
+  queue_create.queueFamilyIndex = queue_family;
+  queue_create.queueCount = std::min(2u, families[queue_family].queueCount);
+  queue_create.pQueuePriorities = priorities;
+  VkDeviceCreateInfo create{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
   create.pNext = &enabled.Features();
-  create.queueCreateInfoCount = static_cast<uint32_t>(queues.size());
-  create.pQueueCreateInfos = queues.data();
+  create.queueCreateInfoCount = 1;
+  create.pQueueCreateInfos = &queue_create;
   create.enabledExtensionCount = static_cast<uint32_t>(enabled.Extensions().size());
   create.ppEnabledExtensionNames = enabled.Extensions().data();
   const VkResult result = vkCreateDevice(physical_device, &create, nullptr, &device->device_);
@@ -131,12 +180,6 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     return {};
   }
   if (!device->procedures_.Load(device->device_, api_version, enabled))
-    return {};
-  VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
-  type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-  VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-  semaphore.pNext = &type;
-  if (!Check(vkCreateSemaphore(device->device_, &semaphore, nullptr, &device->timeline_), "Create submission timeline"))
     return {};
   const bool swapchain = std::any_of(enabled.Extensions().begin(), enabled.Extensions().end(), [](const char *name) {
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
@@ -154,26 +197,28 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   device->render_targets_ =
       std::make_unique<VulkanRenderTargetPool>(device->device_, device->procedures_.CmdBeginRendering != nullptr);
   device->physical_ = physical_device;
-  device->graphics_queue_family_index_ = graphics_family;
+  device->queue_family_index_ = queue_family;
   device->swapchain_enabled_ = swapchain;
-  vkGetDeviceQueue(device->device_, graphics_family, 0, &device->queue_);
+  auto main_mutex = std::make_shared<std::mutex>();
+  for (uint32_t index = 0; index < 2; ++index) {
+    const auto native_index = index < queue_create.queueCount ? index : 0u;
+    VkQueue queue;
+    vkGetDeviceQueue(device->device_, queue_family, native_index, &queue);
+    auto mutex = native_index == 0 ? main_mutex : std::make_shared<std::mutex>();
+    device->queues_[index] = ObjectPtr<Queue>::Adopt(
+        VulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue, std::move(mutex)));
+    if (!device->queues_[index])
+      return nullptr;
+  }
+  VkSemaphoreTypeCreateInfo shutdown_type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
+  shutdown_type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+  VkSemaphoreCreateInfo shutdown_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+  shutdown_info.pNext = &shutdown_type;
+  if (!Check(vkCreateSemaphore(device->device_, &shutdown_info, nullptr, &device->collector_shutdown_),
+             "Create collector shutdown semaphore"))
+    return nullptr;
+  device->StartCollector();
   return device.release();
-}
-
-VkSemaphore VulkanDevice::Timeline() const {
-  return timeline_;
-}
-
-uint64_t VulkanDevice::NextSerial() {
-  return ++next_serial_;
-}
-
-VkResult VulkanDevice::Wait(uint64_t value, uint64_t timeout) const {
-  VkSemaphoreWaitInfo wait{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
-  wait.semaphoreCount = 1;
-  wait.pSemaphores = &timeline_;
-  wait.pValues = &value;
-  return vkWaitSemaphores(device_, &wait, timeout);
 }
 
 const DeviceProcedures &VulkanDevice::Procedures() const {
@@ -212,20 +257,12 @@ VkInstance VulkanDevice::Instance() const {
   return static_cast<VulkanCore *>(OwnerCore())->Instance();
 }
 
-VkQueue VulkanDevice::NativeQueue() const {
-  return queue_;
-}
-
 uint32_t VulkanDevice::QueueFamily() const {
-  return graphics_queue_family_index_;
+  return queue_family_index_;
 }
 
 bool VulkanDevice::SupportsSwapchain() const {
   return swapchain_enabled_;
-}
-
-std::mutex &VulkanDevice::QueueMutex() {
-  return mutex_;
 }
 
 VulkanTemporalBufferPool &VulkanDevice::UploadPool() {
@@ -256,14 +293,6 @@ rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
 
 rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
   return VulkanWindow::Create(this, desc);
-}
-
-rhi::ICommandContext *VulkanDevice::CreateCommandContext() {
-  return VulkanCommandContext::Create(this);
-}
-
-rhi::IQueue *VulkanDevice::GetQueue(QueueType type) {
-  return new VulkanQueue(this, type);
 }
 
 }  // namespace grassland::rhi::backend::vulkan

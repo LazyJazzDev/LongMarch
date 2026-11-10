@@ -47,7 +47,7 @@ int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless, const 
     if (!window)
       return 1;
   }
-  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   std::array<grassland::rhix::Image, 3> targets;
@@ -108,7 +108,7 @@ int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless, const 
     return 1;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
-    grassland::rhix::CommandContext upload = device.CreateCommandContext();
+    grassland::rhix::CommandContext upload = queue.CreateCommandContext();
     if (!upload)
       return 1;
     if (!upload.CmdUploadBuffer(vertex_buffer, 0, vertices, sizeof(vertices)))
@@ -123,7 +123,7 @@ int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless, const 
       }
     if (!upload.CmdUploadImage(texture, pixels.data(), 256 * 4))
       return 1;
-    grassland::rhix::SubmissionToken uploaded = queue.Submit(std::move(upload));
+    grassland::rhix::SubmissionToken uploaded = std::move(upload).Submit();
     if (!uploaded)
       return 1;
     if (headless) {
@@ -195,7 +195,7 @@ int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless, const 
       continue;
     }
     auto extent = image.GetDesc();
-    grassland::rhix::CommandContext context = device.CreateCommandContext();
+    grassland::rhix::CommandContext context = queue.CreateCommandContext();
     if (!context)
       return 1;
     if (!context.CmdBindProgram(program))
@@ -228,7 +228,7 @@ int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless, const 
       last_frame_space = window ? window.GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
       last_frame_white_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     }
-    grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
+    grassland::rhix::SubmissionToken token = std::move(context).Submit();
 
     if (!token)
       return 1;

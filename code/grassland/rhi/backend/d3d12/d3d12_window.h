@@ -15,7 +15,6 @@ class D3D12Window final : public Window {
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;
-  const void *DeviceIdentity() const;
   HRESULT PresentFrame(uint64_t generation);
 
  private:

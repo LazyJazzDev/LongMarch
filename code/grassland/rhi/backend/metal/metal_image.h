@@ -13,7 +13,7 @@ class MetalImage : public Image {
   MTL::Texture *NativeImage() const;
 
  protected:
-  MetalImage(ImageDesc desc, const void *device, MTL::Texture *image);
+  MetalImage(ImageDesc desc, const void *device, MTL::Texture *image, Queue *queue = nullptr);
 
  private:
   const void *device_;
