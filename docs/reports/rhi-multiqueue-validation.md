@@ -1,4 +1,4 @@
-﻿# Main / Assist queue validation
+# Main / Assist queue validation
 
 Implementation tested: `eda07217`, based on main `6ddcd48e` (PR109).
 Validation date: 2026-11-10. The earlier PR111 is closed; this is a separate implementation.
@@ -8,7 +8,7 @@ Validation date: 2026-11-10. The earlier PR111 is closed; this is a separate imp
 | Requirement | Implementation and evidence |
 | --- | --- |
 | One borrowed timeline point | `rhi_timeline.h`: readonly ITimeline and plain Event. Token has one Event; no IEvent, TimelinePoint, submission waits, or duplicate completion value. |
-| Stable physical queues | Device owns fixed Main/Assist objects; D3D12 DIRECT queues, Vulkan queue indices in one graphics+compute family, Metal command queues. Native identity tests compare distinct queue handles and timelines. |
+| Stable logical queues | Device owns fixed Main/Assist objects; D3D12 DIRECT queues, Vulkan queue indices in one graphics+compute family, Metal command queues. Native identity tests verify queue sharing against native capacity and require separate timelines. |
 | Context queue binding | Only Queue creates contexts; Submit uses the bound Queue pointer. Raw API tests release caller queue references and still submit successfully. |
 | Submit-only dependency consumption | Queue normalizes borrowed waits; each native backend encodes them during Submit. Submission stores only context and completion token. Retirement list storage is allocated before native submission. |
 | Independent retirement and CPU waits | A real GPU gate blocks Assist while Main retires without another submit. WaitAny succeeds, WaitAll remains blocked until the gate opens; duplicate timeline values test min/max semantics. |
@@ -62,12 +62,13 @@ missing synchronization always produces visible errors.
   crashed in `xkb_state_key_get_layout` via `_glfwGetScancodeNameWayland`, during the
   synthetic ImGui key callback test. Explicit `LONGMARCH_WINDOW_SYSTEM=x11` passes.
   Wayland runtime validation is not claimed; no root-cause fix is included.
-- Metal source was reviewed and updated, but no macOS build/runtime was available.
+- Initial validation did not include macOS; see the macOS follow-up below.
 - Collector native waits have a 50 ms bound for shutdown, failures and submission
   publication races. CPU retirement may therefore lag the GPU timeline; it does
   not require another Submit to make progress.
-- Vulkan Assist may be unavailable on hardware without a second queue in a suitable
-  graphics+compute family. It is never silently mapped to the Main native queue.
+- Main and Assist share a native Vulkan queue when the selected graphics+compute
+  family has only one queue. Timelines remain separate; native host operations
+  share a mutex. Independent GPU progress is not guaranteed.
 
 See [queue semantics](../rhi-queues.md) and the
 [demo instructions](../../demo/rhi_multiqueue/README.md).
@@ -85,3 +86,38 @@ with validation and window tests enabled (explicit X11/Xvfb remotely). Coverage
 includes Commands, Timeline, VulkanTimeline, Window, Raw API, and Download tests.
 Both native builds passed; pre-commit checks passed. The platform limitations above
 remain unchanged.
+
+
+## macOS follow-up (2026-11-10)
+
+Apple M5, native Metal and MoltenVK. Main/Assist now share one native Vulkan queue
+when only one is available in the selected family. The shared native queue uses
+one submission mutex; logical queues retain separate timelines and retirement
+lists. Two CPU threads each submit 128 contexts and verify independent timeline
+values and completed tokens. Existing cross-queue upload/copy, window ownership,
+and context lifetime tests run without an absent-Assist fallback.
+
+Both CLion Debug and Release configurations build `test_rhi`, `demo_rhi_hello`,
+`demo_rhix_hello`, and `demo_rhi_multiqueue`. Full RHI suites run sequentially with
+`LONGMARCH_RHI_WINDOW_TESTS=1`:
+
+| Configuration | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| Debug | 220 | 0 | 15 |
+| Release | 211 | 0 | 16 |
+
+No Vulkan VUID/validation errors occurred in the final runs. Removed four unused,
+unreleased raw queue references from format tests. D24S8 tests query Vulkan native
+format support before allocation; supported formats still require allocation and
+all behavior assertions to pass. Only unsupported D24S8 cases are omitted.
+The independent-GPU-progress test skips a shared native queue; both logical queues
+are still required, and their identity, mutex sharing and separate timelines are
+checked against native queue capacity. Other existing skips cover unsupported
+features and Debug-only contracts, not unexpected failures.
+
+Metal and Vulkan Event demos each report 0/32 incorrect frames and 0/2,097,152
+incorrect integers in both configurations. Without Events, Metal reports 32/32
+incorrect frames in Debug and 11/32 in Release; shared-queue Vulkan reports 0/32
+in both. Unsynchronized results remain observations, not a correctness guarantee.
+
+This follow-up does not rerun the historical Windows/Linux results above.

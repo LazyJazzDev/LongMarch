@@ -182,11 +182,14 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   device->physical_ = physical_device;
   device->queue_family_index_ = queue_family;
   device->swapchain_enabled_ = swapchain;
-  for (uint32_t index = 0; index < std::min(2u, families[queue_family].queueCount); ++index) {
+  auto main_mutex = std::make_shared<std::mutex>();
+  for (uint32_t index = 0; index < 2; ++index) {
+    const auto native_index = index < queue_create.queueCount ? index : 0u;
     VkQueue queue;
-    vkGetDeviceQueue(device->device_, queue_family, index, &queue);
-    device->queues_[index] =
-        ObjectPtr<Queue>::Adopt(VulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue));
+    vkGetDeviceQueue(device->device_, queue_family, native_index, &queue);
+    auto mutex = native_index == 0 ? main_mutex : std::make_shared<std::mutex>();
+    device->queues_[index] = ObjectPtr<Queue>::Adopt(
+        VulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue, std::move(mutex)));
     if (!device->queues_[index])
       return nullptr;
   }

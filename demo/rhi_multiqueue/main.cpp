@@ -16,7 +16,7 @@ bool Run(IDevice *device, bool synchronize) {
   ObjPtr<IQueue> main = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IQueue> assist = device->GetQueue(QUEUE_TYPE_ASSIST);
   if (!main || !assist) {
-    std::cerr << "Two independent queues are required.\n";
+    std::cerr << "Main and Assist queues are required.\n";
     return false;
   }
   ObjPtr<IBuffer> input = device->CreateBuffer({bytes});

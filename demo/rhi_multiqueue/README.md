@@ -1,11 +1,11 @@
-﻿# RHI multi-queue synchronization example
+# RHI multi-queue synchronization example
 
 `demo_rhi_multiqueue <vulkan|d3d12|metal> <event|no-event>`
 
 Assist uploads an input buffer. Main runs a compute shader (`output = input * 3 + 7`)
 and downloads the result. Each of 32 iterations checks all 65,536 integers.
-Both queues must be available as distinct native queues; the example fails if Assist
-is unavailable.
+Main and Assist have separate timelines but may share one native queue. Event mode
+works in either case; the example does not require independent GPU execution.
 
 In `event` mode, Main submits with the upload token's completion Event in
 `SubmitInfo::waits`. The CPU does not wait between the two submissions. Any incorrect

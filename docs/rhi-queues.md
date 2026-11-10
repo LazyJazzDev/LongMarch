@@ -1,10 +1,10 @@
-﻿# RHI queues, timelines, and completion
+# RHI queues, timelines, and completion
 
 A Device creates a fixed set of queues. `GetQueue(QUEUE_TYPE_MAIN)` and
 `GetQueue(QUEUE_TYPE_ASSIST)` return references to stable objects, not new wrappers.
-Each available role has a distinct native queue and its own monotonically increasing
-timeline. Assist is unavailable when Vulkan cannot provide a second compatible
-queue; it never silently aliases Main. Both roles support graphics, compute, and
+Each role has its own monotonically increasing timeline. Vulkan prefers two native
+queues in one graphics+compute family; when the family has only one queue, both
+roles share that native queue and its host submission mutex. Both roles support graphics, compute, and
 transfer commands. Swapchain images belong exclusively to Main.
 
 Create contexts through their queue. A context permanently belongs to that exact
@@ -34,8 +34,11 @@ Each Queue owns its pending Submission list and performs its own submission and
 retirement. One collector thread per Device watches the fixed timelines and asks
 each Queue to collect completed submissions. Queue locking protects native submit
 order and list handoff; completion polling, resource release, and token publication
-run outside that lock. A blocked Assist submission does not prevent a
-completed Main submission from retiring. The collector can wait for the next value
+run outside that lock. A blocked Assist submission does not prevent an already
+completed Main submission from retiring. Independent GPU progress is only possible
+when the native queues can execute independently; shared queues can block behind
+an earlier wait. Submit producers before consumers rather than relying on a later
+submission to unblock a shared native queue. The collector can wait for the next value
 before that submission exists. Native waits use a bounded 50 ms interval to observe
 shutdown, failures, and publication races without adding fake queue signals. Thus
 resource retirement can lag GPU completion by up to one wait interval when a record
@@ -44,7 +47,7 @@ Submit is required to trigger retirement.
 
 Vulkan queues share a graphics+compute family to avoid ownership transfers for
 ordinary resources. D3D12 uses two DIRECT queues; Metal uses two command queues and
-SharedEvent timelines. This establishes distinct API queues, not a promise that the
+SharedEvent timelines. Logical queue identity does not promise that the
 hardware executes their work simultaneously.
 
 Vulkan WSI still requires binary acquire/present semaphores. After acquisition, the
@@ -58,5 +61,5 @@ completion Event when submitting dependent work; do not infer synchronization fr
 CPU submit order. See `demo/rhi_multiqueue` for an Event/no-Event comparison.
 
 CUDA interop, externally created timelines, and changes to the HeadlessWindow design
-are outside this change. Metal implementation is included, but requires macOS build
-and runtime validation before claiming platform verification.
+are outside this change. Metal and shared-queue Vulkan have macOS Debug/Release validation; see
+[the validation report](reports/rhi-multiqueue-validation.md).

@@ -54,8 +54,8 @@ class IDevice : public IObject {
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   // Returns an owned reference to a fixed device-owned queue. Repeated calls
   // return the same queue object, even after all caller references are released.
-  // Non-null Main and Assist queues are distinct native queues; Assist may be
-  // unavailable when the device does not expose a second compatible queue.
+  // Main and Assist have separate timelines but may share a native queue.
+  // Separate logical queues do not guarantee independent GPU progress.
   virtual IQueue *GetQueue(QueueType type) = 0;
   // Blocks the CPU until all events (or any event when wait_all is false) complete.
   // Events must belong to this device. Empty All succeeds; empty Any fails.

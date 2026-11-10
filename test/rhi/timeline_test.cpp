@@ -34,6 +34,11 @@ void CheckIndependentRetirement(BackendAPI api) {
   ObjPtr<IQueue> assist = device->GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(main);
   ASSERT_TRUE(assist);
+#ifdef LONGMARCH_VULKAN_ENABLED
+  if (api == BACKEND_API_VULKAN && static_cast<backend::vulkan::VulkanQueue *>(main.Get())->NativeQueue() ==
+                                       static_cast<backend::vulkan::VulkanQueue *>(assist.Get())->NativeQueue())
+    GTEST_SKIP() << "Independent GPU progress requires distinct native queues.";
+#endif
   std::unique_ptr<backend::Timeline> gate;
 
   struct GateRelease {
@@ -154,7 +159,13 @@ TEST(RhiTimeline, VulkanIndependentTimelineTracksGPUSignals) {
   ASSERT_TRUE(assist);
   auto main_queue = static_cast<VulkanQueue *>(main.Get());
   auto assist_queue = static_cast<VulkanQueue *>(assist.Get());
-  EXPECT_NE(main_queue->NativeQueue(), assist_queue->NativeQueue());
+  uint32_t count = 0;
+  vkGetPhysicalDeviceQueueFamilyProperties(native->NativePhysicalDevice(), &count, nullptr);
+  std::vector<VkQueueFamilyProperties> families(count);
+  vkGetPhysicalDeviceQueueFamilyProperties(native->NativePhysicalDevice(), &count, families.data());
+  const bool shared = families[native->QueueFamily()].queueCount == 1;
+  EXPECT_EQ(main_queue->NativeQueue() == assist_queue->NativeQueue(), shared);
+  EXPECT_EQ(&main_queue->QueueMutex() == &assist_queue->QueueMutex(), shared);
   EXPECT_NE(main_queue->GetTimeline(), assist_queue->GetTimeline());
   auto timeline = VulkanTimeline::Create(native);
   ASSERT_TRUE(timeline);

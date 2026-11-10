@@ -10,7 +10,7 @@ namespace grassland::rhi::backend {
 
 class Queue : public Object<rhi::IQueue> {
  public:
-  Queue(Device *device, QueueType type);
+  Queue(Device *device, QueueType type, std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
   ~Queue() override;
   Device *Owner() const;
   virtual Timeline *GetTimeline() const = 0;
@@ -31,7 +31,8 @@ class Queue : public Object<rhi::IQueue> {
   std::list<Submission> pending_;
   Device *device_;
   QueueType type_;
-  std::mutex mutex_;
+  // Logical queues that share a native queue also share its host synchronization.
+  std::shared_ptr<std::mutex> mutex_;
   uint64_t serial_{};
 };
 

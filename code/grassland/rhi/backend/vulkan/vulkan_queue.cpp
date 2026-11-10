@@ -9,8 +9,11 @@ rhi::ICommandContext *VulkanQueue::CreateCommandContext() {
   return VulkanCommandContext::Create(this);
 }
 
-VulkanQueue *VulkanQueue::Create(VulkanDevice *device, QueueType type, VkQueue queue) {
-  auto result = std::unique_ptr<VulkanQueue>(new VulkanQueue(device, type, queue));
+VulkanQueue *VulkanQueue::Create(VulkanDevice *device,
+                                 QueueType type,
+                                 VkQueue queue,
+                                 std::shared_ptr<std::mutex> mutex) {
+  auto result = std::unique_ptr<VulkanQueue>(new VulkanQueue(device, type, queue, std::move(mutex)));
   result->timeline_ = VulkanTimeline::Create(device);
   if (!result->timeline_)
     return nullptr;
@@ -34,7 +37,9 @@ VkResult VulkanQueue::Wait(uint64_t value, uint64_t timeout) const {
   return vkWaitSemaphores(static_cast<VulkanDevice *>(Owner())->NativeDevice(), &info, timeout);
 }
 
-VulkanQueue::VulkanQueue(VulkanDevice *device, QueueType type, VkQueue queue) : Queue(device, type), queue_(queue) {
+VulkanQueue::VulkanQueue(VulkanDevice *device, QueueType type, VkQueue queue, std::shared_ptr<std::mutex> mutex)
+    : Queue(device, type, std::move(mutex)),
+      queue_(queue) {
 }
 
 }  // namespace grassland::rhi::backend::vulkan

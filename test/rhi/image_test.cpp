@@ -10,6 +10,7 @@
 #include <memory>
 #include <thread>
 
+#include "format_support.h"
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image_presenter.h"
@@ -342,6 +343,8 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
   ASSERT_TRUE(device);
   for (auto format : {IMAGE_FORMAT_R8G8B8A8_UNORM, IMAGE_FORMAT_B8G8R8A8_UNORM, IMAGE_FORMAT_D32_SFLOAT,
                       IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
+    if (format == IMAGE_FORMAT_D24_UNORM_S8_UINT && !SupportsD24S8(device.Get(), GetParam()))
+      continue;
     ObjPtr<IImage> image = device->CreateImage({16, 16, format});
     ASSERT_TRUE(image);
     const auto native = static_cast<backend::Image *>(image.Get());
@@ -1962,6 +1965,8 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
+  if (!SupportsD24S8(device.Get(), GetParam()))
+    GTEST_SKIP() << "Vulkan does not support D24S8 with the required image usage.";
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});

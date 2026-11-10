@@ -25,7 +25,7 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
     else
       existing->value = std::max(existing->value, wait.value);
   }
-  std::unique_lock<std::mutex> queue_lock(mutex_);
+  std::unique_lock<std::mutex> queue_lock(*mutex_);
   const Event signal{GetTimeline(), NextSerial()};
   auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(signal));
   // Allocate the node before accepting GPU work. Splicing into the collector
@@ -68,7 +68,7 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
 bool Queue::CollectCompleted() {
   std::list<Submission> work;
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(*mutex_);
     work.splice(work.end(), pending_);
   }
   // Polling may submit a recovery signal; releasing resources may acquire other
@@ -84,18 +84,21 @@ bool Queue::CollectCompleted() {
     it->completion->Complete(status);
     it = work.erase(it);
   }
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::mutex> lock(*mutex_);
   pending_.splice(pending_.begin(), work);
   return pending_.empty();
 }
 
-Queue::Queue(Device *device, QueueType type) : device_(device), type_(type) {
+Queue::Queue(Device *device, QueueType type, std::shared_ptr<std::mutex> mutex)
+    : device_(device),
+      type_(type),
+      mutex_(std::move(mutex)) {
 }
 
 Queue::~Queue() = default;
 
 std::mutex &Queue::QueueMutex() {
-  return mutex_;
+  return *mutex_;
 }
 
 uint64_t Queue::NextSerial() {

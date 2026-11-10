@@ -1,12 +1,45 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <future>
 
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/rhi.h"
 
 namespace grassland::rhi::backend::vulkan {
 namespace {
+
+TEST(RhiVulkanTimeline, ConcurrentLogicalQueueSubmissionsKeepSeparateTimelines) {
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_VULKAN, {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  std::array<ObjPtr<IQueue>, 2> queues{device->GetQueue(QUEUE_TYPE_MAIN), device->GetQueue(QUEUE_TYPE_ASSIST)};
+  ASSERT_TRUE(queues[0]);
+  ASSERT_TRUE(queues[1]);
+  EXPECT_NE(queues[0].Get(), queues[1].Get());
+  auto submit = [](IQueue *queue) {
+    std::vector<ObjPtr<ISubmissionToken>> tokens;
+    for (uint64_t serial = 1; serial <= 128; ++serial) {
+      ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+      if (!commands)
+        return false;
+      ObjPtr<ISubmissionToken> token = commands->Submit();
+      if (!token || token->GetEvent().value != serial ||
+          token->GetEvent().timeline != static_cast<VulkanQueue *>(queue)->GetTimeline())
+        return false;
+      tokens.push_back(std::move(token));
+    }
+    for (const auto &token : tokens)
+      if (!token->WaitHost())
+        return false;
+    return true;
+  };
+  auto main = std::async(std::launch::async, submit, queues[0].Get());
+  auto assist = std::async(std::launch::async, submit, queues[1].Get());
+  EXPECT_TRUE(main.get());
+  EXPECT_TRUE(assist.get());
+}
 
 TEST(RhiVulkanTimeline, CompletionValuesSurviveContextRecyclingAcrossQueues) {
   ObjPtr<ICore> core = CreateCore(BACKEND_API_VULKAN);

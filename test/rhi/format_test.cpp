@@ -39,7 +39,6 @@ TEST_P(RhiFormats, ColorUploadsAndSubrectangleDownloadsPreserveNativeBytes) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
   for (auto c : formats) {
     SCOPED_TRACE(to_string(c.format));
     EXPECT_EQ(ImageFormatSize(c.format), c.channels * c.bytes);
@@ -71,7 +70,6 @@ TEST_P(RhiFormats, IntegerClearsUseNumericValuesForTransferAndRenderPass) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
   for (auto c : formats) {
     const bool signed_integer = IsSignedIntegerFormat(c.format);
     if (!signed_integer && !IsUnsignedIntegerFormat(c.format))
@@ -130,7 +128,6 @@ TEST_P(RhiFormats, FloatClearValuesPreserveFloatAndNormalizedColors) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
   for (auto c : formats) {
     if (IsSignedIntegerFormat(c.format) || IsUnsignedIntegerFormat(c.format))
       continue;
@@ -356,7 +353,6 @@ TEST_P(RhiFormats, ClearValueSelectsDepthForStandaloneAndRendering) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
   // Stencil rendering is tested through color output; do not read back stencil images.
   for (auto format : {IMAGE_FORMAT_D16_UNORM, IMAGE_FORMAT_D32_SFLOAT}) {
     SCOPED_TRACE(to_string(format));

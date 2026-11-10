@@ -5,6 +5,7 @@
 #include <cstring>
 #include <thread>
 
+#include "format_support.h"
 #include "grassland/rhi/rhix/rhix_download_token.h"
 
 #if defined(LONGMARCH_D3D12_ENABLED)
@@ -103,6 +104,8 @@ TEST_P(RhiDownload, D24S8ReadbackIsRejectedBeforeSubmission) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
+  if (!SupportsD24S8(device.Get(), GetParam()))
+    GTEST_SKIP() << "Vulkan does not support D24S8 with the required image usage.";
   ObjPtr<IImage> image = device->CreateImage({8, 8, IMAGE_FORMAT_D24_UNORM_S8_UINT});
   ASSERT_TRUE(image);
   for (const auto &region : {ImageDownloadRegion{}, ImageDownloadRegion{1, 1, 2, 2}}) {
