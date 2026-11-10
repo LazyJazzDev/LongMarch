@@ -241,10 +241,6 @@ class TestDevice final : public backend::Device {
     ++gate_->devices_destroyed;
   }
 
-  const void *NativeIdentity() const override {
-    return gate_.get();
-  }
-
  private:
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override {
     if (wait_all) {

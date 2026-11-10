@@ -75,10 +75,6 @@ bool D3D12Window::IsFrameValid(uint64_t generation) const {
   return generation_ == generation && valid_;
 }
 
-const void *D3D12Window::DeviceIdentity() const {
-  return device_;
-}
-
 HRESULT D3D12Window::PresentFrame(uint64_t generation) {
 #if !defined(NDEBUG)
   if (!IsFrameValid(generation))

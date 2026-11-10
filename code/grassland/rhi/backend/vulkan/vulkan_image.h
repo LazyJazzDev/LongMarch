@@ -32,7 +32,7 @@ class VulkanImage : public Image {
   VkImageLayout DefaultLayout() const;
 
  protected:
-  VulkanImage(ImageDesc desc, const void *device, VkImageLayout default_layout);
+  VulkanImage(ImageDesc desc, const void *device, VkImageLayout default_layout, Queue *queue = nullptr);
 
  private:
   const void *device_;

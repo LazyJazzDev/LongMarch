@@ -113,7 +113,6 @@ class D3D12CommandContext final : public CommandContext {
   ComPtr<ID3D12CommandAllocator> allocator_;
   ComPtr<ID3D12GraphicsCommandList> list_;
   ComPtr<ID3D12GraphicsCommandList4> ray_list_;
-  HANDLE event_{};
   bool submission_failed_{};
   bool reusable_{};
   bool closed_{};

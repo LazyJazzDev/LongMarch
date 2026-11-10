@@ -155,7 +155,6 @@ TEST(RhiTimeline, VulkanIndependentTimelineTracksGPUSignals) {
   auto assist_queue = static_cast<VulkanQueue *>(assist.Get());
   EXPECT_NE(main_queue->NativeQueue(), assist_queue->NativeQueue());
   EXPECT_NE(main_queue->GetTimeline(), assist_queue->GetTimeline());
-  EXPECT_FALSE(main->SharesPhysicalQueue(assist.Get()));
   auto timeline = VulkanTimeline::Create(native);
   ASSERT_TRUE(timeline);
   uint64_t completed = UINT64_MAX;
@@ -199,7 +198,6 @@ TEST(RhiTimeline, D3D12IndependentTimelineTracksGPUSignals) {
   auto assist_queue = static_cast<D3D12Queue *>(assist.Get());
   EXPECT_NE(main_queue->NativeQueue(), assist_queue->NativeQueue());
   EXPECT_NE(main_queue->GetTimeline(), assist_queue->GetTimeline());
-  EXPECT_FALSE(main->SharesPhysicalQueue(assist.Get()));
   auto timeline = D3D12Timeline::Create(native);
   ASSERT_TRUE(timeline);
   uint64_t completed = UINT64_MAX;

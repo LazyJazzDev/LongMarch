@@ -104,10 +104,6 @@ Core *Device::OwnerCore() const {
   return core_;
 }
 
-const void *Device::NativeIdentity() const {
-  return this;
-}
-
 ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info) {
   if (!commands->Seal())
     return {};
@@ -133,40 +129,44 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   std::unique_lock<std::mutex> queue_lock(queue->QueueMutex());
   const Event signal{queue->GetTimeline(), queue->NextSerial()};
   auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(signal));
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (stopping_)
-    return {};
-  if (!collector_.joinable())
-    collector_ = std::thread([this] { Collect(); });
-  // Allocate the retirement record before submitting any GPU work.
-  pending_.push_back({{}, completion});
+  // Allocate the node before accepting GPU work. Splicing into the collector
+  // cannot allocate, including when error reporting throws after native submit.
+  std::list<Submission> submission;
+  submission.push_back({commands, completion});
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopping_)
+      return {};
+    if (!collector_.joinable())
+      collector_ = std::thread([this] { Collect(); });
+  }
+  auto publish = [&] {
+    std::lock_guard<std::mutex> lock(mutex_);
+    pending_.splice(pending_.end(), submission);
+  };
   commands->BindDownloads(completion.Get());
   CommandContext::SubmitResult result;
   try {
     result = commands->SubmitNative(native_info, signal);
+    if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
+      completion->Complete(SUBMISSION_STATUS_FAILED);
+      commands->ReleaseDownloads();
+      return {};
+    }
+    commands->MarkSubmitted();
+    queue_lock.unlock();
+    if (result == CommandContext::SUBMIT_RESULT_SUBMITTED && !commands->UpdatePresentedImages())
+      result = CommandContext::SUBMIT_RESULT_FAILED_IN_FLIGHT;
   } catch (...) {
-    // Even error reporting can allocate after a native submit. Keep already
-    // submitted work alive before propagating to the public allocation boundary.
-    if (commands->WasSubmitted()) {
-      pending_.back().commands = commands;
-    } else {
-      pending_.pop_back();
+    if (commands->WasSubmitted())
+      publish();
+    else {
       completion->Complete(SUBMISSION_STATUS_FAILED);
       commands->ReleaseDownloads();
     }
     throw;
   }
-  if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
-    pending_.pop_back();
-    completion->Complete(SUBMISSION_STATUS_FAILED);
-    commands->ReleaseDownloads();
-    return {};
-  }
-  commands->MarkSubmitted();
-  pending_.back().commands = commands;
-  queue_lock.unlock();
-  if (result == CommandContext::SUBMIT_RESULT_SUBMITTED && !commands->UpdatePresentedImages())
-    return {};
+  publish();
   return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
 }
 

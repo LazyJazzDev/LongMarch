@@ -9,7 +9,6 @@ class IQueue : public IObject {
   // Creates an owned context permanently bound to this queue.
   virtual ICommandContext *CreateCommandContext() = 0;
   virtual QueueType GetType() const = 0;
-  virtual bool SharesPhysicalQueue(const IQueue *other) const = 0;
 
  protected:
   ~IQueue() override;

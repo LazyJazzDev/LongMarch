@@ -54,7 +54,7 @@ bool MetalCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
     return false;
   }
   const auto native = dynamic_cast<MetalImage *>(image);
-  if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
+  if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
@@ -110,7 +110,8 @@ bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
     return false;
   }
   const auto target = dynamic_cast<MetalWindow *>(window);
-  if (!target || target->DeviceIdentity() != device_ || !glfw::IsWindowThread()) {
+  if (!target || target->DeviceIdentity() != device_ || target->OwnerQueue() != OwnerQueue() ||
+      !glfw::IsWindowThread()) {
     recording_failed_ = true;
     ReportError(-1, "CmdPresent requires a window from this device on the window thread.");
     return false;
@@ -186,6 +187,7 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative(const SubmitInfo 
 }
 
 bool MetalCommandContext::UpdatePresentedImages() {
+  submission_failed_ = true;
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
       submission_failed_ = true;
@@ -193,6 +195,7 @@ bool MetalCommandContext::UpdatePresentedImages() {
       return false;
     }
   }
+  submission_failed_ = false;
   return true;
 }
 
@@ -273,7 +276,8 @@ bool MetalCommandContext::CmdCopyBuffer(IBuffer *source,
 bool MetalCommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
   auto native = dynamic_cast<MetalImage *>(image);
   const uint64_t pitch = native ? uint64_t(native->GetDesc().width) * ImageFormatSize(native->GetDesc().format) : 0;
-  if (sealed_ || encoder_ || !native || !native->IsValid() || native->DeviceIdentity() != device_ || !data ||
+  if (sealed_ || encoder_ || !native || !native->IsValid() ||
+      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
       !IsColorFormat(native->GetDesc().format) || !pitch || row_pitch < pitch ||
       (native->GetDesc().height - 1) > (SIZE_MAX - pitch) / row_pitch) {
     recording_failed_ = true;
@@ -312,6 +316,19 @@ bool MetalCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
     return false;
   }
   auto version = static_cast<MetalBindingGroup::Version *>(native->CurrentVersion());
+#if !defined(NDEBUG)
+  for (size_t binding = 0; binding < version->GetLayout().bindings.size(); ++binding) {
+    const auto type = version->GetLayout().bindings[binding].type;
+    if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
+      for (const auto &image : version->GetReferences()[binding]) {
+        if (!static_cast<MetalImage *>(image.Get())->SupportsQueue(OwnerQueue())) {
+          recording_failed_ = true;
+          return false;
+        }
+      }
+    }
+  }
+#endif
   if (!RetainResource(version))
     return false;
   groups_[index] = version;
@@ -441,8 +458,9 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   uint32_t width = 0, height = 0;
   auto validate = [&](IImage *image, AttachmentLoadOp load, AttachmentStoreOp store) -> MetalImage * {
     auto value = dynamic_cast<MetalImage *>(image);
-    if (!value || !value->IsValid() || value->DeviceIdentity() != device_ || load < ATTACHMENT_LOAD_OP_LOAD ||
-        load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE || store > ATTACHMENT_STORE_OP_DISCARD)
+    if (!value || !value->IsValid() || (value->DeviceIdentity() != device_ || !value->SupportsQueue(OwnerQueue())) ||
+        load < ATTACHMENT_LOAD_OP_LOAD || load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE ||
+        store > ATTACHMENT_STORE_OP_DISCARD)
       return nullptr;
     auto desc = value->GetDesc();
     if (width && (width != desc.width || height != desc.height))
@@ -700,7 +718,8 @@ IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
 IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
 #if !defined(NDEBUG)
   auto native = dynamic_cast<MetalImage *>(image);
-  if (sealed_ || render_target_ || !native || native->DeviceIdentity() != device_) {
+  if (sealed_ || render_target_ || !native ||
+      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     return nullptr;
   }

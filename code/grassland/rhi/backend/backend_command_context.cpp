@@ -13,8 +13,8 @@ bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
   auto native = dynamic_cast<Window *>(window);
   auto image = dynamic_cast<Image *>(target);
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
-      image->DeviceIdentity() != DeviceIdentity() || !glfw::IsWindowThread() || sealed_ ||
-      !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+      (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
+      sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
     recording_failed_ = true;
     ReportError(-1,
                 "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
@@ -43,8 +43,8 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
   auto native = dynamic_cast<Window *>(window);
   auto image = dynamic_cast<Image *>(frame_img);
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
-      image->DeviceIdentity() != DeviceIdentity() || !glfw::IsWindowThread() || sealed_ ||
-      !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+      (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
+      sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
     recording_failed_ = true;
     ReportError(-1,
                 "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");
@@ -115,7 +115,8 @@ bool CommandContext::PrepareRendering(const RenderingInfo &info) {
   std::vector<IImage *> images;
   auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
     auto native = dynamic_cast<Image *>(image);
-    if (!native || !native->IsValid() || native->DeviceIdentity() != DeviceIdentity() ||
+    if (!native || !native->IsValid() ||
+        (native->DeviceIdentity() != DeviceIdentity() || !native->SupportsQueue(OwnerQueue())) ||
         IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
         load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE || store > ATTACHMENT_STORE_OP_DISCARD)
       return false;
@@ -229,7 +230,7 @@ Queue *CommandContext::OwnerQueue() const {
 }
 
 const void *CommandContext::DeviceIdentity() const {
-  return queue_->Owner()->NativeIdentity();
+  return queue_->Owner();
 }
 
 void CommandContext::MarkSubmitted() {

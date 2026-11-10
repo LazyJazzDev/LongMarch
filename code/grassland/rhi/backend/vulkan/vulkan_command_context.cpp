@@ -98,7 +98,7 @@ bool VulkanCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &v
     return false;
   }
   const auto native = dynamic_cast<VulkanImage *>(image);
-  if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
+  if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
@@ -134,7 +134,8 @@ bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
     return false;
   }
   const auto target = dynamic_cast<VulkanWindow *>(window);
-  if (!target || target->DeviceIdentity() != device_ || !glfw::IsWindowThread()) {
+  if (!target || target->DeviceIdentity() != device_ || target->OwnerQueue() != OwnerQueue() ||
+      !glfw::IsWindowThread()) {
     recording_failed_ = true;
     ReportError(-1, "CmdPresent requires a window from this device on the window thread.");
     return false;
@@ -201,26 +202,14 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const SubmitInfo
       return SUBMIT_RESULT_REJECTED;
   }
 #endif
-  std::vector<VkSemaphore> acquired, rendered;
+  std::vector<VkSemaphore> waited, rendered;
   std::vector<VkPipelineStageFlags> stages;
-  std::vector<VulkanWindow *> acquired_windows;
-  for (const auto &entry : image_states_) {
-    // Swapchain acquisition synchronization is distinct from ordinary image barriers.
-    if (auto frame = dynamic_cast<VulkanSwapChainImage *>(entry.first)) {
-      auto window = frame->Owner();
-      if (auto semaphore = window->AcquireSemaphore()) {
-        acquired.push_back(semaphore);
-        stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-        acquired_windows.push_back(window);
-      }
-    }
-  }
   for (const auto &present : presents_)
     rendered.push_back(present->RenderSemaphore());
   rendered.push_back(queue->GetTimeline()->NativeSemaphore());
-  std::vector<uint64_t> wait_values(acquired.size(), 0);
+  std::vector<uint64_t> wait_values(waited.size(), 0);
   for (const auto &wait : info.waits) {
-    acquired.push_back(static_cast<VulkanTimeline *>(wait.timeline)->NativeSemaphore());
+    waited.push_back(static_cast<VulkanTimeline *>(wait.timeline)->NativeSemaphore());
     stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     wait_values.push_back(wait.value);
   }
@@ -234,8 +223,8 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const SubmitInfo
   submit.pNext = &timeline;
   submit.commandBufferCount = 1;
   submit.pCommandBuffers = &command_;
-  submit.waitSemaphoreCount = static_cast<uint32_t>(acquired.size());
-  submit.pWaitSemaphores = acquired.data();
+  submit.waitSemaphoreCount = static_cast<uint32_t>(waited.size());
+  submit.pWaitSemaphores = waited.data();
   submit.pWaitDstStageMask = stages.data();
   submit.signalSemaphoreCount = static_cast<uint32_t>(rendered.size());
   submit.pSignalSemaphores = rendered.data();
@@ -247,8 +236,6 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const SubmitInfo
     for (auto &entry : as_dependencies_)
       entry.first->CommitDependencies(std::move(entry.second));
     as_dependencies_.clear();
-    for (auto window : acquired_windows)
-      window->MarkAcquireWaitSubmitted(signal.value);
     submission_failed_ = true;
     bool presented = true;
     for (const auto &present : presents_) {
@@ -266,6 +253,8 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const SubmitInfo
 }
 
 bool VulkanCommandContext::UpdatePresentedImages() {
+  submission_failed_ = true;
+  bool ready = true;
   for (const auto &present : presents_) {
     if (present->IsSwapChainInvalid()) {
       present->ReleaseNextImage();
@@ -273,10 +262,11 @@ bool VulkanCommandContext::UpdatePresentedImages() {
     }
     if (!present->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next swapchain image after submission.");
-      submission_failed_ = true;
+      ready = false;
     }
   }
-  return !submission_failed_;
+  submission_failed_ = !ready;
+  return ready;
 }
 
 SubmissionStatus VulkanCommandContext::PollCompletion(Event signal) {
@@ -731,7 +721,8 @@ bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStag
 
 bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
   auto native = dynamic_cast<VulkanImage *>(image);
-  if (sealed_ || render_target_ || !native || !native->IsValid() || native->DeviceIdentity() != device_ || !data ||
+  if (sealed_ || render_target_ || !native || !native->IsValid() ||
+      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
       IsDepthFormat(native->GetDesc().format) ||
       row_pitch < uint64_t(native->GetDesc().width) * ImageFormatSize(native->GetDesc().format) ||
       (native->GetDesc().height - 1) >
@@ -945,7 +936,8 @@ IDownloadToken *VulkanCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_
 IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
 #if !defined(NDEBUG)
   auto native = dynamic_cast<VulkanImage *>(image);
-  if (sealed_ || render_target_ || !native || native->DeviceIdentity() != device_) {
+  if (sealed_ || render_target_ || !native ||
+      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     return nullptr;
   }

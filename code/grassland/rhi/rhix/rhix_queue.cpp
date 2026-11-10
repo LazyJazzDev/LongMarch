@@ -20,14 +20,6 @@ rhi::QueueType Queue::GetType() const {
   return Get()->GetType();
 }
 
-bool Queue::SharesPhysicalQueue(const Queue &other) const {
-#if !defined(NDEBUG)
-  if (!*this)
-    return false;
-#endif
-  return Get()->SharesPhysicalQueue(other.Get());
-}
-
 CommandContext Queue::CreateCommandContext() const {
 #if !defined(NDEBUG)
   if (!*this)

@@ -12,9 +12,6 @@ class VulkanWindow final : public Window {
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
-  const void *DeviceIdentity() const;
-  VkSemaphore AcquireSemaphore() const;
-  void MarkAcquireWaitSubmitted(uint64_t value);
   VkSemaphore RenderSemaphore() const;
   VkResult PresentFrame();
 

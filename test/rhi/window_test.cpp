@@ -435,6 +435,52 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
   EXPECT_EQ(mouse_events, 2);
 }
 
+TEST_P(RhiWindow, SwapchainRejectsAssistQueueDuringRecording) {
+#if defined(NDEBUG)
+  GTEST_SKIP() << "Invalid queue diagnostics require a debug build.";
+#else
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 on a desktop.";
+  ObjPtr<ICore> core = rhi::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> main = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> assist = device->GetQueue(QUEUE_TYPE_ASSIST);
+  ASSERT_TRUE(main);
+  ASSERT_TRUE(assist);
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({128, 128, "Queue restriction"});
+  ASSERT_TRUE(window);
+  ObjPtr<IImage> image = window->GetNextImage();
+  ASSERT_TRUE(image);
+  ObjPtr<ICommandContext> commands = assist->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  EXPECT_FALSE(commands->CmdClearImage(image.Get(), {0, 0, 0, 1}));
+  EXPECT_EQ(commands->Submit(), nullptr);
+  commands = assist->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  EXPECT_FALSE(commands->CmdPresent(window.Get()));
+  EXPECT_EQ(commands->Submit(), nullptr);
+  commands = assist->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  rhi::RenderingInfo rendering;
+  rendering.color_attachments.push_back({image.Get()});
+  EXPECT_FALSE(commands->CmdBeginRendering(rendering));
+  EXPECT_EQ(commands->Submit(), nullptr);
+  commands = assist->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  EXPECT_EQ(commands->CmdDownloadImage(image.Get()), nullptr);
+  EXPECT_EQ(commands->Submit(), nullptr);
+  commands = main->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdClearImage(image.Get(), {0, 0, 0, 1}));
+  ASSERT_TRUE(commands->CmdPresent(window.Get()));
+  ObjPtr<ISubmissionToken> done = commands->Submit();
+  ASSERT_TRUE(done);
+  EXPECT_TRUE(done->WaitHost());
+#endif
+}
+
 TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 on a desktop to run presentation tests.";
@@ -446,7 +492,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto transfer = device.GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
-  EXPECT_FALSE(graphics.SharesPhysicalQueue(transfer));
+  EXPECT_NE(graphics.Get(), transfer.Get());
   EXPECT_FALSE(device.CreateGLFWWindow({0, 240, "Invalid window"}));
   auto first = device.CreateGLFWWindow({320, 240, "RHI window test A"});
   auto second = device.CreateGLFWWindow({320, 240, "RHI window test B"});

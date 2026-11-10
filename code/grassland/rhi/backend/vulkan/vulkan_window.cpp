@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <optional>
 
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -38,9 +39,10 @@ VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
 }
 
 VulkanWindow::~VulkanWindow() {
+  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  vkDeviceWaitIdle(device_->NativeDevice());
+  std::lock_guard<std::mutex> lock(queue->QueueMutex());
+  vkQueueWaitIdle(queue->NativeQueue());
   ReleaseNextImage();
   DestroySwapchain();
   if (surface_)
@@ -71,11 +73,8 @@ VulkanWindow *VulkanWindow::Create(VulkanDevice *device, const WindowDesc &desc)
   return object.release();
 }
 
-const void *VulkanWindow::DeviceIdentity() const {
-  return device_;
-}
-
 ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
+  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
@@ -87,7 +86,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   auto &sync = acquire_sync_[current_sync_];
   const auto native = device_->NativeDevice();
   if (sync.submission_value) {
-    const auto status = device_->Wait(sync.submission_value);
+    const auto status = queue->Wait(sync.submission_value);
     if (!Check(status, "Acquire frame synchronization"))
       return {};
     sync.submission_value = 0;
@@ -107,6 +106,26 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       vkAcquireNextImageKHR(device_->NativeDevice(), swapchain_, UINT64_MAX, semaphore, fence, &current_image_);
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
     sync.acquired = true;
+    {
+      std::lock_guard<std::mutex> lock(queue->QueueMutex());
+      const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+      const uint64_t binary_value = 0;
+      const auto value = queue->NextSerial();
+      const auto completed = queue->GetTimeline()->NativeSemaphore();
+      VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
+      timeline.waitSemaphoreValueCount = timeline.signalSemaphoreValueCount = 1;
+      timeline.pWaitSemaphoreValues = &binary_value;
+      timeline.pSignalSemaphoreValues = &value;
+      VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+      submit.pNext = &timeline;
+      submit.waitSemaphoreCount = submit.signalSemaphoreCount = 1;
+      submit.pWaitSemaphores = &semaphore;
+      submit.pWaitDstStageMask = &stage;
+      submit.pSignalSemaphores = &completed;
+      if (!Check(vkQueueSubmit(queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE), "Consume swapchain acquisition"))
+        return {};
+      sync.submission_value = value;
+    }
     const auto image = images_[current_image_];
     if (!initialized_images_[current_image_]) {
       // Establish the fixed default layout before exposing this image to recording.
@@ -115,7 +134,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       auto status = vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
       if (!Check(status, "Acquire frame synchronization"))
         return {};
-      std::lock_guard<std::mutex> lock(device_->QueueMutex());
+      std::lock_guard<std::mutex> lock(queue->QueueMutex());
       VkCommandPool pool{};
       VkCommandBuffer commands{};
       status = [&]() -> VkResult {
@@ -147,8 +166,8 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
         status = vkEndCommandBuffer(commands);
         if (status != VK_SUCCESS)
           return status;
-        const auto semaphore = device_->Timeline();
-        const auto value = device_->NextSerial();
+        const auto semaphore = queue->GetTimeline()->NativeSemaphore();
+        const auto value = queue->NextSerial();
         VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
         timeline.signalSemaphoreValueCount = 1;
         timeline.pSignalSemaphoreValues = &value;
@@ -158,11 +177,11 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
         submit.pSignalSemaphores = &semaphore;
         submit.commandBufferCount = 1;
         submit.pCommandBuffers = &commands;
-        status = vkQueueSubmit(device_->NativeQueue(), 1, &submit, VK_NULL_HANDLE);
+        status = vkQueueSubmit(queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE);
         if (status != VK_SUCCESS)
           return status;
         // Submitted commands must finish before their temporary pool is destroyed.
-        if (!Check(device_->Wait(value), "Wait for image initialization"))
+        if (!Check(queue->Wait(value), "Wait for image initialization"))
           std::abort();
         return VK_SUCCESS;
       }();
@@ -184,20 +203,12 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       new VulkanSwapChainImage(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
 }
 
-VkSemaphore VulkanWindow::AcquireSemaphore() const {
-  const auto &sync = acquire_sync_[current_sync_];
-  return sync.submission_value ? VK_NULL_HANDLE : sync.semaphore;
-}
-
-void VulkanWindow::MarkAcquireWaitSubmitted(uint64_t value) {
-  acquire_sync_[current_sync_].submission_value = value;
-}
-
 VkSemaphore VulkanWindow::RenderSemaphore() const {
   return rendered_[current_image_];
 }
 
 VkResult VulkanWindow::PresentFrame() {
+  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
   const auto rendered = RenderSemaphore();
   VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
   present.waitSemaphoreCount = 1;
@@ -205,7 +216,7 @@ VkResult VulkanWindow::PresentFrame() {
   present.swapchainCount = 1;
   present.pSwapchains = &swapchain_;
   present.pImageIndices = &current_image_;
-  const auto result = vkQueuePresentKHR(device_->NativeQueue(), &present);
+  const auto result = vkQueuePresentKHR(queue->NativeQueue(), &present);
   // The prepared frame has been presented; this slot is reused only after
   // its acquire fence and consuming submission have completed.
   current_sync_ = (current_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
@@ -287,6 +298,7 @@ void VulkanWindow::DestroySwapchain() {
 }
 
 bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
+  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
   int width, height;
@@ -362,9 +374,9 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   }
   create.presentMode = mode;
   create.clipped = VK_TRUE;
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
+  std::lock_guard<std::mutex> lock(queue->QueueMutex());
   if (swapchain_) {
-    if (!Check(vkDeviceWaitIdle(device), "Wait before swapchain replacement"))
+    if (!Check(vkQueueWaitIdle(queue->NativeQueue()), "Wait before swapchain replacement"))
       return false;
   }
   DestroySwapchain();

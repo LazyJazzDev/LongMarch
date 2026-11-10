@@ -13,7 +13,6 @@ class Queue : public ObjectContainer {
   Queue() noexcept;
   CommandContext CreateCommandContext() const;
   rhi::QueueType GetType() const;
-  bool SharesPhysicalQueue(const Queue &other) const;
 };
 
 }  // namespace grassland::rhix

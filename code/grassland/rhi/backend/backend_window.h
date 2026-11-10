@@ -16,6 +16,7 @@ class Device;
 class Window : public Object<rhi::IWindow> {
  public:
   Window();
+  Queue *OwnerQueue() const;
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
   bool UpdateImGui(const std::function<void()> &callback) override;
   ImGuiContext *GetImGuiContext() const;
@@ -90,6 +91,7 @@ class Window : public Object<rhi::IWindow> {
 
  private:
   Device *device_{};
+  Queue *queue_{};
   std::unique_ptr<WindowImGui> imgui_;
   std::unique_ptr<ImagePresenter> presenter_;
   bool processing_imgui_{};

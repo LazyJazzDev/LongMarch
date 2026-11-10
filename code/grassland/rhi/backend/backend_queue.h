@@ -16,7 +16,6 @@ class Queue : public Object<rhi::IQueue> {
   std::mutex &QueueMutex();
   // Called under QueueMutex, in native submission order.
   uint64_t NextSerial();
-  bool SharesPhysicalQueue(const rhi::IQueue *other) const override;
 
  private:
   Device *device_;

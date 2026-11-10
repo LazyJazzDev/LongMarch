@@ -4,8 +4,8 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanImage::VulkanImage(ImageDesc desc, const void *device, VkImageLayout default_layout)
-    : Image(desc),
+VulkanImage::VulkanImage(ImageDesc desc, const void *device, VkImageLayout default_layout, Queue *queue)
+    : Image(desc, queue),
       device_(device),
       default_layout_(default_layout) {
 }

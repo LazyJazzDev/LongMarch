@@ -29,17 +29,15 @@ D3D12CommandContext::~D3D12CommandContext() {
     if (!closed_)
       reusable_ = SUCCEEDED(list_->Close());
     if (reusable_) {
-      device_->RecycleCommandResources(std::move(allocator_), std::move(list_), event_);
+      device_->RecycleCommandResources(std::move(allocator_), std::move(list_));
       return;
     }
   }
-  if (event_)
-    CloseHandle(event_);
 }
 
 D3D12CommandContext *D3D12CommandContext::Create(D3D12Queue *queue) {
   auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(queue));
-  object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_, object->event_);
+  object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_);
   if (!object->reusable_)
     return nullptr;
   if (object->device_->SupportRayTracingPipeline() || object->device_->SupportRayQuery()) {
@@ -86,7 +84,7 @@ bool D3D12CommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
     return false;
   }
   const auto native = dynamic_cast<D3D12Image *>(image);
-  if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
+  if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
@@ -179,7 +177,8 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
     return false;
   }
   const auto target = dynamic_cast<D3D12Window *>(window);
-  if (!target || target->DeviceIdentity() != device_ || !glfw::IsWindowThread()) {
+  if (!target || target->DeviceIdentity() != device_ || target->OwnerQueue() != OwnerQueue() ||
+      !glfw::IsWindowThread()) {
     recording_failed_ = true;
     ReportError(-1, "CmdPresent requires a window from this device on the window thread.");
     return false;
@@ -267,6 +266,7 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const SubmitInfo 
 }
 
 bool D3D12CommandContext::UpdatePresentedImages() {
+  submission_failed_ = true;
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next swapchain image after submission.");
@@ -274,6 +274,7 @@ bool D3D12CommandContext::UpdatePresentedImages() {
       return false;
     }
   }
+  submission_failed_ = false;
   return true;
 }
 
@@ -843,8 +844,8 @@ bool D3D12CommandContext::PrepareGroups() {
 
 bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
   auto native = dynamic_cast<D3D12Image *>(image);
-  if (!native || native->DeviceIdentity() != device_ || !native->IsValid() || !data || sealed_ || rendering_active_ ||
-      IsDepthFormat(image->GetDesc().format) ||
+  if (!native || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !native->IsValid() ||
+      !data || sealed_ || rendering_active_ || IsDepthFormat(image->GetDesc().format) ||
       row_pitch < uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) ||
       (image->GetDesc().height - 1) >
           (SIZE_MAX - uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format)) / row_pitch) {
@@ -966,7 +967,8 @@ IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
 IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
 #if !defined(NDEBUG)
   auto native = dynamic_cast<D3D12Image *>(image);
-  if (sealed_ || rendering_active_ || !native || native->DeviceIdentity() != device_) {
+  if (sealed_ || rendering_active_ || !native ||
+      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     return nullptr;
   }

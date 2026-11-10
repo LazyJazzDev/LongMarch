@@ -7,9 +7,7 @@
 
 namespace grassland::rhi::backend {
 
-class Device;
-
-// Completion state borrows its device; it owns no native resources or commands.
+// Completion state borrows its timeline; it owns no native resources or commands.
 class SubmissionToken final : public Object<rhi::ISubmissionToken> {
  public:
   explicit SubmissionToken(Event event);

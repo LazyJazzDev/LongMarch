@@ -23,8 +23,4 @@ QueueType Queue::GetType() const {
   return type_;
 }
 
-bool Queue::SharesPhysicalQueue(const rhi::IQueue *other) const {
-  return this == other;
-}
-
 }  // namespace grassland::rhi::backend

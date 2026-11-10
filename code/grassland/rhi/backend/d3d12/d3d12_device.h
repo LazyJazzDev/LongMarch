@@ -51,12 +51,8 @@ class D3D12Device final : public Device {
 
   // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
   // The pool grows on demand, independently of swapchain image count.
-  bool AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
-                               ComPtr<ID3D12GraphicsCommandList> &list,
-                               HANDLE &event);
-  void RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator,
-                               ComPtr<ID3D12GraphicsCommandList> list,
-                               HANDLE event);
+  bool AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator, ComPtr<ID3D12GraphicsCommandList> &list);
+  void RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator, ComPtr<ID3D12GraphicsCommandList> list);
 
  private:
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
@@ -67,7 +63,7 @@ class D3D12Device final : public Device {
   D3D12TemporalBufferPool download_pool_;
   D3D12ScratchPool scratch_pool_;
   std::mutex command_pool_mutex_;
-  std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>, HANDLE>> command_pool_;
+  std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>>> command_pool_;
   ComPtr<ID3D12Device> device_;
   ComPtr<ID3D12InfoQueue1> debug_messages_;
   DWORD debug_callback_cookie_{};

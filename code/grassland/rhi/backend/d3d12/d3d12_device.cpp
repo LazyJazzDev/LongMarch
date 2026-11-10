@@ -70,25 +70,19 @@ void D3D12Device::WaitForProgress(const std::vector<Event> &next) {
 }
 
 bool D3D12Device::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
-                                          ComPtr<ID3D12GraphicsCommandList> &list,
-                                          HANDLE &event) {
+                                          ComPtr<ID3D12GraphicsCommandList> &list) {
   {
     std::lock_guard<std::mutex> lock(command_pool_mutex_);
     if (!command_pool_.empty()) {
-      std::tie(allocator, list, event) = std::move(command_pool_.back());
+      std::tie(allocator, list) = std::move(command_pool_.back());
       command_pool_.pop_back();
     }
   }
   if (list) {
     if (!Check(allocator->Reset(), "Reset command allocator"))
       return false;
-    if (!ResetEvent(event))
-      return false;
     return Check(list->Reset(allocator.Get(), nullptr), "Reset command list");
   }
-  event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!event)
-    return false;
   if (!Check(device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator)),
              "CreateCommandAllocator"))
     return false;
@@ -98,16 +92,14 @@ bool D3D12Device::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &alloca
 }
 
 void D3D12Device::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator,
-                                          ComPtr<ID3D12GraphicsCommandList> list,
-                                          HANDLE event) {
+                                          ComPtr<ID3D12GraphicsCommandList> list) {
   try {
     std::lock_guard<std::mutex> lock(command_pool_mutex_);
-    command_pool_.emplace_back(std::move(allocator), std::move(list), event);
+    command_pool_.emplace_back(std::move(allocator), std::move(list));
     return;
   } catch (const std::bad_alloc &) {
     // Recycling is optional: release the idle native objects if the pool cannot grow.
   }
-  CloseHandle(event);
 }
 
 D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device) {
@@ -249,8 +241,6 @@ D3D12Device::~D3D12Device() {
   upload_pool_.Clear();
   download_pool_.Clear();
   scratch_pool_.Clear();
-  for (auto &entry : command_pool_)
-    CloseHandle(std::get<2>(entry));
   command_pool_.clear();
   for (auto &queue : queues_)
     queue.Reset();

@@ -6,6 +6,7 @@
 
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image_presenter.h"
+#include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -58,7 +59,7 @@ bool Window::UpdateImGui(const std::function<void()> &callback) {
 }
 
 const void *Window::DeviceIdentity() const {
-  return device_ ? device_->NativeIdentity() : nullptr;
+  return device_;
 }
 
 bool Window::RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) {
@@ -119,6 +120,10 @@ rhi::IImage *Window::GetNextImage() {
   }
 #endif
   return ObjectPtr<Image>(next_image_).Detach();
+}
+
+Queue *Window::OwnerQueue() const {
+  return queue_;
 }
 
 bool Window::UpdateNextImage() {
@@ -297,6 +302,7 @@ Window::~Window() {
 
 bool Window::InitializeWindow(Device *device, const WindowDesc &desc) {
   device_ = device;
+  queue_ = static_cast<Queue *>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get());
   requested_mode_ = desc.present_mode;
   requested_color_space_ = desc.color_space;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());

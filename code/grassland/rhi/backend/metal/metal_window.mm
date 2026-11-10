@@ -153,8 +153,4 @@ bool MetalWindow::IsFrameValid(uint64_t generation) const {
   return valid_ && generation_ == generation;
 }
 
-const void *MetalWindow::DeviceIdentity() const {
-  return device_;
-}
-
 }  // namespace grassland::rhi::backend::metal
