@@ -1,5 +1,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -57,8 +58,8 @@ D3D12Window::D3D12Window(D3D12Device *device) : device_(device) {
 
 D3D12Window::~D3D12Window() {
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  device_->WaitIdle();
+  std::lock_guard<std::mutex> lock(static_cast<D3D12Queue *>(OwnerQueue())->QueueMutex());
+  static_cast<D3D12Queue *>(OwnerQueue())->WaitIdle();
   ReleaseNextImage();
 }
 
@@ -143,10 +144,10 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return true;
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
+  std::lock_guard<std::mutex> lock(static_cast<D3D12Queue *>(OwnerQueue())->QueueMutex());
   const UINT flags = device_->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
   if (swapchain_) {
-    if (!device_->WaitIdle())
+    if (!static_cast<D3D12Queue *>(OwnerQueue())->WaitIdle())
       return false;
     ++generation_;
     valid_ = false;
@@ -169,9 +170,9 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
     desc.Flags = flags;
     ComPtr<IDXGISwapChain1> chain;
     const HWND hwnd = glfwGetWin32Window(GLFWWindow());
-    if (!Check(
-            device_->Factory()->CreateSwapChainForHwnd(device_->NativeQueue(), hwnd, &desc, nullptr, nullptr, &chain),
-            "CreateSwapChainForHwnd") ||
+    if (!Check(device_->Factory()->CreateSwapChainForHwnd(static_cast<D3D12Queue *>(OwnerQueue())->NativeQueue(), hwnd,
+                                                          &desc, nullptr, nullptr, &chain),
+               "CreateSwapChainForHwnd") ||
         !Check(chain.As(&swapchain_), "Query IDXGISwapChain3"))
       return false;
     device_->Factory()->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);

@@ -186,36 +186,12 @@ ID3D12CommandQueue *D3D12Device::NativeQueue() const {
   return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->NativeQueue();
 }
 
-ID3D12Fence *D3D12Device::Fence() const {
-  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->GetTimeline()->NativeFence();
-}
-
 bool D3D12Device::SupportsTearing() const {
   return tearing_;
 }
 
 std::mutex &D3D12Device::QueueMutex() {
   return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->QueueMutex();
-}
-
-uint64_t D3D12Device::NextSerial() {
-  return static_cast<D3D12Queue *>(queues_[QUEUE_TYPE_MAIN].Get())->NextSerial();
-}
-
-bool D3D12Device::Wait(uint64_t value, HANDLE event) const {
-  if (Fence()->GetCompletedValue() == UINT64_MAX)
-    return false;
-  if (Fence()->GetCompletedValue() >= value)
-    return true;
-  if (!Check(Fence()->SetEventOnCompletion(value, event), "SetEventOnCompletion"))
-    return false;
-  DWORD result;
-  do {
-    result = WaitForSingleObject(event, 50);
-    if (FAILED(device_->GetDeviceRemovedReason()))
-      return false;
-  } while (result == WAIT_TIMEOUT);
-  return result == WAIT_OBJECT_0 && Fence()->GetCompletedValue() != UINT64_MAX;
 }
 
 bool D3D12Device::WaitIdle() {

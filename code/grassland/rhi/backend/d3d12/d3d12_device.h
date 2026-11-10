@@ -30,11 +30,8 @@ class D3D12Device final : public Device {
   D3D12DescriptorPool &SamplerDescriptorStorage();
   IDXGIFactory4 *Factory() const;
   ID3D12CommandQueue *NativeQueue() const;
-  ID3D12Fence *Fence() const;
   bool SupportsTearing() const;
   std::mutex &QueueMutex();
-  uint64_t NextSerial();
-  bool Wait(uint64_t value, HANDLE event) const;
   bool WaitIdle();
   rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;

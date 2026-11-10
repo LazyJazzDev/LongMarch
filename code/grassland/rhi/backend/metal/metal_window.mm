@@ -1,4 +1,5 @@
 ﻿#include "grassland/rhi/backend/metal/metal_window.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
@@ -43,8 +44,8 @@ MetalWindow::MetalWindow(MetalDevice *device) : device_(device) {
 MetalWindow::~MetalWindow() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  device_->WaitIdle();
+  std::lock_guard<std::mutex> lock(static_cast<MetalQueue *>(OwnerQueue())->QueueMutex());
+  static_cast<MetalQueue *>(OwnerQueue())->WaitIdle();
   valid_ = false;
   ReleaseNextImage();
   if (GLFWWindow())
@@ -75,8 +76,8 @@ MetalWindow *MetalWindow::Create(MetalDevice *device, const WindowDesc &desc) {
 
 bool MetalWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  if (!device_->WaitIdle())
+  std::lock_guard<std::mutex> lock(static_cast<MetalQueue *>(OwnerQueue())->QueueMutex());
+  if (!static_cast<MetalQueue *>(OwnerQueue())->WaitIdle())
     return false;
   auto layer = (CAMetalLayer *)layer_.get();
   layer.displaySyncEnabled = requested_mode != PRESENT_MODE_CONTINUOUS;
