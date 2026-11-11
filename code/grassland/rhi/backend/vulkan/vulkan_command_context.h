@@ -13,7 +13,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanCommandContext
 namespace grassland::rhi::backend::vulkan {
 class VulkanQueue;
 class VulkanImage;
-class VulkanBuffer;
+class IVulkanBuffer;
 class VulkanProgram;
 class VulkanRayTracingProgram;
 class VulkanProgramBase;
@@ -89,18 +89,18 @@ class VulkanCommandContext final : public CommandContext {
   VulkanRayTracingProgram *ray_program_{};
   const PipelineLayoutDesc *binding_layout_{};
   VulkanImage *render_target_{};
-  std::vector<VulkanBuffer *> vertex_buffers_;
+  std::vector<IVulkanBuffer *> vertex_buffers_;
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
 
   bool EndRecording() override;
-  bool TransitionBuffer(VulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access);
+  bool TransitionBuffer(IVulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct BufferState {
     VkPipelineStageFlags stages;
     VkAccessFlags access;
   };
 
-  std::unordered_map<VulkanBuffer *, BufferState> buffer_states_;
+  std::unordered_map<IVulkanBuffer *, BufferState> buffer_states_;
   bool TransitionImage(VulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct ImageState {

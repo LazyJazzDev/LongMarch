@@ -5,11 +5,11 @@
 #include <vector>
 
 namespace grassland::rhi::backend::metal {
-MetalDownloadToken::MetalDownloadToken(ObjectPtr<MetalTemporalBufferLease> lease, uint64_t size)
+MetalDownloadToken::MetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size)
     : MetalDownloadToken(std::move(lease), DownloadLayout{0, size, size, 1}) {
 }
 
-MetalDownloadToken::MetalDownloadToken(ObjectPtr<MetalTemporalBufferLease> lease, const DownloadLayout &layout)
+MetalDownloadToken::MetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, const DownloadLayout &layout)
     : DownloadToken(layout.row_bytes * layout.rows),
       lease_(std::move(lease)),
       layout_(layout) {

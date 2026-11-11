@@ -139,7 +139,7 @@ ShaderBindingTable *D3D12RayTracingProgram::BuildShaderBindingTable(const Shader
   }
   auto owner = rhi::QueryInterfacePtr<D3D12Device>(device_).Get();
   auto buffer =
-      ObjectPtr<D3D12AllocatedBuffer>::Adopt(D3D12AllocatedBuffer::Create(owner, {uint64_t(data.size())}, true));
+      ObjectPtr<ID3D12AllocatedBuffer>::Adopt(ID3D12AllocatedBuffer::Create(owner, {uint64_t(data.size())}, true));
   if (!buffer || !buffer->Write(data.data(), data.size()))
     return nullptr;
   auto address = buffer->NativeBuffer()->GetGPUVirtualAddress();

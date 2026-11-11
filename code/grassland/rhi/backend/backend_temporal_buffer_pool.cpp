@@ -64,7 +64,7 @@ ObjectPtr<LeaseType> TemporalBufferPool<DeviceType, BufferType, LeaseType>::Acqu
       ++bucket.occupied;
     }
     // Construct outside the lock: failed construction returns the borrowed slot.
-    return ObjectPtr<Lease>::Adopt(new Lease(this, buffer, level));
+    return ObjectPtr<Lease>::Adopt(Lease::Create(this, buffer, level));
   } catch (const std::bad_alloc &) {
     if (buffer)
       ReleaseBuffer(buffer, level);
@@ -119,14 +119,14 @@ void TemporalBufferPool<DeviceType, BufferType, LeaseType>::Clear() {
   }
 }
 #if defined(LONGMARCH_D3D12_ENABLED)
-template class TemporalBufferPool<d3d12::D3D12Device, d3d12::D3D12AllocatedBuffer, d3d12::D3D12TemporalBufferLease>;
+template class TemporalBufferPool<d3d12::D3D12Device, d3d12::ID3D12AllocatedBuffer, d3d12::ID3D12TemporalBufferLease>;
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
 template class TemporalBufferPool<vulkan::VulkanDevice,
-                                  vulkan::VulkanAllocatedBuffer,
-                                  vulkan::VulkanTemporalBufferLease>;
+                                  vulkan::IVulkanAllocatedBuffer,
+                                  vulkan::IVulkanTemporalBufferLease>;
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
-template class TemporalBufferPool<metal::MetalDevice, metal::MetalAllocatedBuffer, metal::MetalTemporalBufferLease>;
+template class TemporalBufferPool<metal::MetalDevice, metal::IMetalAllocatedBuffer, metal::IMetalTemporalBufferLease>;
 #endif
 }  // namespace grassland::rhi::backend

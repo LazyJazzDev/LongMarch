@@ -2,31 +2,28 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanTemporalBufferLease;
+class IVulkanTemporalBufferLease;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanTemporalBufferLease)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTemporalBufferLease)
 #include "grassland/rhi/backend/backend_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanTemporalBufferLease;
-using VulkanTemporalBufferPool = TemporalBufferPool<VulkanDevice, VulkanAllocatedBuffer, VulkanTemporalBufferLease>;
+class IVulkanTemporalBufferLease;
+using VulkanTemporalBufferPool = TemporalBufferPool<VulkanDevice, IVulkanAllocatedBuffer, IVulkanTemporalBufferLease>;
 
-class VulkanTemporalBufferLease final : public VulkanBuffer {
+class IVulkanTemporalBufferLease : public IVulkanBuffer {
  public:
-  LONGMARCH_RHI_QUERY(VulkanTemporalBufferLease, VulkanBuffer)
+  static IVulkanTemporalBufferLease *Create(VulkanTemporalBufferPool *pool,
+                                            IVulkanAllocatedBuffer *buffer,
+                                            size_t level);
+  virtual BufferDesc GetDesc() const = 0;
+  virtual VkBuffer NativeBuffer() const = 0;
+  virtual bool Read(void *data, uint64_t size, uint64_t offset = 0) = 0;
+  virtual bool Write(const void *data, uint64_t size) = 0;
 
-  VulkanTemporalBufferLease(VulkanTemporalBufferPool *pool, VulkanAllocatedBuffer *buffer, size_t level);
-  ~VulkanTemporalBufferLease() override;
-  BufferDesc GetDesc() const override;
-  VkBuffer NativeBuffer() const override;
-  bool Read(void *data, uint64_t size, uint64_t offset = 0);
-  bool Write(const void *data, uint64_t size);
-
- private:
-  VulkanTemporalBufferPool *pool_;
-  VulkanAllocatedBuffer *buffer_;
-  size_t level_;
+ protected:
+  static void ReturnBuffer(VulkanTemporalBufferPool *pool, IVulkanAllocatedBuffer *buffer, size_t level);
 };
 
 }  // namespace grassland::rhi::backend::vulkan

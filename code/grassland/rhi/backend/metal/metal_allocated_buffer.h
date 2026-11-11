@@ -2,26 +2,20 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalAllocatedBuffer;
+class IMetalAllocatedBuffer;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalAllocatedBuffer)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalAllocatedBuffer)
 #include "grassland/rhi/backend/metal/metal_buffer.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalAllocatedBuffer final : public MetalBuffer {
+class IMetalAllocatedBuffer : public IMetalBuffer {
  public:
-  LONGMARCH_RHI_QUERY(MetalAllocatedBuffer, MetalBuffer)
-
-  static MetalAllocatedBuffer *Create(MetalDevice *device,
-                                      const BufferDesc &desc,
-                                      bool upload = false,
-                                      bool download = false);
-  MTL::Buffer *NativeBuffer() const override;
-  bool Read(void *data, uint64_t size, uint64_t offset = 0);
-  bool Write(const void *data, uint64_t size);
-
- private:
-  MetalAllocatedBuffer(MetalDevice *device, const BufferDesc &desc);
-  NS::SharedPtr<MTL::Buffer> buffer_;
+  static IMetalAllocatedBuffer *Create(MetalDevice *device,
+                                       const BufferDesc &desc,
+                                       bool upload = false,
+                                       bool download = false);
+  virtual MTL::IBackendBuffer *NativeBuffer() const = 0;
+  virtual bool Read(void *data, uint64_t size, uint64_t offset = 0) = 0;
+  virtual bool Write(const void *data, uint64_t size) = 0;
 };
 }  // namespace grassland::rhi::backend::metal

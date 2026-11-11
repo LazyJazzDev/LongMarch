@@ -12,13 +12,13 @@ class VulkanScratchPool {
  public:
   explicit VulkanScratchPool(VulkanDevice *device);
   // Share the current buffer; resize on demand using the last second's peak request.
-  ObjectPtr<VulkanAllocatedBuffer> Acquire(uint64_t size);
+  ObjectPtr<IVulkanAllocatedBuffer> Acquire(uint64_t size);
   void Clear();
 
  private:
   VulkanDevice *device_;
   std::mutex mutex_;
-  ObjectPtr<VulkanAllocatedBuffer> buffer_;
+  ObjectPtr<IVulkanAllocatedBuffer> buffer_;
   std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> peaks_;
 };
 }  // namespace grassland::rhi::backend::vulkan

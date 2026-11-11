@@ -42,7 +42,7 @@ class MetalBindingGroup final : public BindingGroup {
     std::vector<uint32_t> offsets_;
     std::vector<std::vector<bool>> initialized_;
     NS::SharedPtr<MTL::ArgumentEncoder> encoder_;
-    NS::SharedPtr<MTL::Buffer> arguments_, sizes_;
+    NS::SharedPtr<MTL::IBackendBuffer> arguments_, sizes_;
   };
 
   static MetalBindingGroup *Create(MetalDevice *device, const BindingLayoutDesc &layout);

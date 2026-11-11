@@ -36,7 +36,7 @@ bool D3D12CommandContext::CmdBuildBottomLevelAccelerationStructure(
     for (const auto &view : {geometry.data, geometry.indices}) {
       if (!view.buffer)
         continue;
-      auto buffer = rhi::QueryInterfacePtr<D3D12Buffer>(view.buffer).Get();
+      auto buffer = rhi::QueryInterfacePtr<ID3D12Buffer>(view.buffer).Get();
       if (!RetainResource(buffer))
         return false;
       if (!TransitionResource(buffer->NativeBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,

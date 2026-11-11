@@ -3,11 +3,11 @@
 #include <vector>
 
 namespace grassland::rhi::backend::vulkan {
-VulkanDownloadToken::VulkanDownloadToken(ObjectPtr<VulkanTemporalBufferLease> lease, uint64_t size)
+VulkanDownloadToken::VulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size)
     : VulkanDownloadToken(std::move(lease), DownloadLayout{0, size, size, 1}) {
 }
 
-VulkanDownloadToken::VulkanDownloadToken(ObjectPtr<VulkanTemporalBufferLease> lease, const DownloadLayout &layout)
+VulkanDownloadToken::VulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, const DownloadLayout &layout)
     : DownloadToken(layout.row_bytes * layout.rows),
       lease_(std::move(lease)),
       layout_(layout) {

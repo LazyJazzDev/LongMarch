@@ -213,7 +213,7 @@ MetalCommandContext::~MetalCommandContext() {
 }
 
 bool MetalCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
-  auto native = rhi::QueryInterfacePtr<MetalBuffer>(buffer).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_ || render_target_) {
     recording_failed_ = true;
     return false;
@@ -235,8 +235,8 @@ bool MetalCommandContext::CmdCopyBuffer(IBuffer *source,
                                         IBuffer *destination,
                                         uint64_t destination_offset,
                                         uint64_t size) {
-  auto src = rhi::QueryInterfacePtr<MetalBuffer>(source).Get();
-  auto dst = rhi::QueryInterfacePtr<MetalBuffer>(destination).Get();
+  auto src = rhi::QueryInterfacePtr<IMetalBuffer>(source).Get();
+  auto dst = rhi::QueryInterfacePtr<IMetalBuffer>(destination).Get();
   if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_ || render_target_) {
     recording_failed_ = true;
     return false;
@@ -532,7 +532,7 @@ bool MetalCommandContext::CmdEndRendering() {
 }
 
 bool MetalCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
-  auto native = rhi::QueryInterfacePtr<MetalBuffer>(buffer).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
@@ -550,7 +550,7 @@ bool MetalCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer,
 }
 
 bool MetalCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
-  auto native = rhi::QueryInterfacePtr<MetalBuffer>(buffer).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
@@ -666,7 +666,7 @@ bool MetalCommandContext::CmdDrawIndexed(uint32_t index_count,
 }
 
 IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
-  auto native = rhi::QueryInterfacePtr<MetalBuffer>(buffer).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
   if (sealed_ || render_target_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return nullptr;

@@ -161,7 +161,7 @@ ShaderBindingTable *VulkanRayTracingProgram::BuildShaderBindingTable(const Shade
   for (auto table : indices)
     capacity += table->size() * stride_ + alignment_;
   auto owner = rhi::QueryInterfacePtr<VulkanDevice>(device_).Get();
-  auto buffer = ObjectPtr<VulkanAllocatedBuffer>::Adopt(VulkanAllocatedBuffer::Create(owner, {capacity}, true));
+  auto buffer = ObjectPtr<IVulkanAllocatedBuffer>::Adopt(IVulkanAllocatedBuffer::Create(owner, {capacity}, true));
   if (!buffer)
     return nullptr;
   VkBufferDeviceAddressInfo info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};

@@ -162,7 +162,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
     return false;
   auto values = buffers;
   for (auto &view : values) {
-    auto buffer = rhi::QueryInterfacePtr<Buffer>(view.buffer).Get();
+    auto buffer = rhi::QueryInterfacePtr<IBackendBuffer>(view.buffer).Get();
     if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
       return false;
     if (!view.size)

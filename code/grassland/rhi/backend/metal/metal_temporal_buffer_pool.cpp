@@ -3,34 +3,67 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-MetalTemporalBufferLease::MetalTemporalBufferLease(MetalTemporalBufferPool *pool,
-                                                   MetalAllocatedBuffer *buffer,
-                                                   size_t level)
-    : MetalBuffer(rhi::QueryInterfacePtr<MetalDevice>(buffer->Owner()).Get(), buffer->GetDesc()),
-      pool_(pool),
+class MetalTemporalBufferLeaseImpl final : public Object<IMetalTemporalBufferLease> {
+ public:
+  LONGMARCH_RHI_QUERY_INTERFACES(Object<IMetalTemporalBufferLease>, IBuffer, IBackendBuffer, IMetalBuffer)
+
+  MetalTemporalBufferLeaseImpl(MetalTemporalBufferPool *pool, IMetalAllocatedBuffer *buffer, size_t level);
+  ~MetalTemporalBufferLeaseImpl() override;
+  BufferDesc GetDesc() const override;
+  MTL::IBackendBuffer *NativeBuffer() const override;
+  bool Read(void *data, uint64_t size, uint64_t offset = 0);
+  bool Write(const void *data, uint64_t size);
+
+ private:
+  MetalTemporalBufferPool *pool_;
+  IMetalAllocatedBuffer *buffer_;
+  size_t level_;
+
+ public:
+  Device *Owner() const override {
+    return buffer_->Owner();
+  }
+};
+
+IMetalTemporalBufferLease *IMetalTemporalBufferLease::Create(MetalTemporalBufferPool *pool,
+                                                             IMetalAllocatedBuffer *buffer,
+                                                             size_t level) {
+  return new MetalTemporalBufferLeaseImpl(pool, buffer, level);
+}
+
+void IMetalTemporalBufferLease::ReturnBuffer(MetalTemporalBufferPool *pool,
+                                             IMetalAllocatedBuffer *buffer,
+                                             size_t level) {
+  pool->ReleaseBuffer(buffer, level);
+}
+
+MetalTemporalBufferLeaseImpl::MetalTemporalBufferLeaseImpl(MetalTemporalBufferPool *pool,
+                                                           IMetalAllocatedBuffer *buffer,
+                                                           size_t level)
+    : pool_(pool),
       buffer_(buffer),
       level_(level) {
 }
 
-MetalTemporalBufferLease::~MetalTemporalBufferLease() {
-  pool_->ReleaseBuffer(buffer_, level_);
+MetalTemporalBufferLeaseImpl::~MetalTemporalBufferLeaseImpl() {
+  ReturnBuffer(pool_, buffer_, level_);
 }
 
-BufferDesc MetalTemporalBufferLease::GetDesc() const {
+BufferDesc MetalTemporalBufferLeaseImpl::GetDesc() const {
   return buffer_->GetDesc();
 }
 
-MTL::Buffer *MetalTemporalBufferLease::NativeBuffer() const {
+MTL::IBackendBuffer *MetalTemporalBufferLeaseImpl::NativeBuffer() const {
   return buffer_->NativeBuffer();
 }
 
-bool MetalTemporalBufferLease::Write(const void *data, uint64_t size) {
+bool MetalTemporalBufferLeaseImpl::Write(const void *data, uint64_t size) {
   return buffer_->Write(data, size);
 }
 
-bool MetalTemporalBufferLease::Read(void *data, uint64_t size, uint64_t offset) {
+bool MetalTemporalBufferLeaseImpl::Read(void *data, uint64_t size, uint64_t offset) {
   return buffer_->Read(data, size, offset);
 }
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalTemporalBufferLease, "d8febe53-823a-4731-847d-f2f1766778c8")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalTemporalBufferLease, "d8febe53-823a-4731-847d-f2f1766778c8")

@@ -2,9 +2,9 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12AllocatedBuffer;
+class ID3D12AllocatedBuffer;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12AllocatedBuffer)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12AllocatedBuffer)
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 
 namespace D3D12MA {
@@ -13,26 +13,15 @@ class Allocator;
 }  // namespace D3D12MA
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12AllocatedBuffer final : public D3D12Buffer {
+class ID3D12AllocatedBuffer : public ID3D12Buffer {
  public:
-  LONGMARCH_RHI_QUERY(D3D12AllocatedBuffer, D3D12Buffer)
-
-  ~D3D12AllocatedBuffer() override;
-  static D3D12AllocatedBuffer *Create(D3D12Device *device,
-                                      const BufferDesc &desc,
-                                      bool upload = false,
-                                      bool download = false);
-  ID3D12Resource *NativeBuffer() const override;
-  D3D12_RESOURCE_STATES DefaultState() const override;
-  bool Read(void *data, uint64_t size, uint64_t offset = 0);
-  bool Write(const void *data, uint64_t size, uint64_t offset = 0);
-
- private:
-  D3D12AllocatedBuffer(D3D12Device *device, const BufferDesc &desc);
-
-  ComPtr<ID3D12Resource> buffer_;
-  ComPtr<D3D12MA::Allocation> allocation_;
-  void *mapped_{};
-  bool download_{};
+  static ID3D12AllocatedBuffer *Create(D3D12Device *device,
+                                       const BufferDesc &desc,
+                                       bool upload = false,
+                                       bool download = false);
+  virtual ID3D12Resource *NativeBuffer() const = 0;
+  virtual D3D12_RESOURCE_STATES DefaultState() const = 0;
+  virtual bool Read(void *data, uint64_t size, uint64_t offset = 0) = 0;
+  virtual bool Write(const void *data, uint64_t size, uint64_t offset = 0) = 0;
 };
 }  // namespace grassland::rhi::backend::d3d12

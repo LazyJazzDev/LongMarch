@@ -36,3 +36,17 @@
   void Release() noexcept override {                                        \
     Base::Release();                                                        \
   }
+
+// The final implementation explicitly lists every supported ancestor interface.
+#define LONGMARCH_RHI_QUERY_INTERFACES(Base, ...)                        \
+  using Base::QueryInterface;                                            \
+  bool QueryInterface(InterfaceID id, void **output) noexcept override { \
+    if (!output)                                                         \
+      return false;                                                      \
+    if (auto result = MatchInterfaces<__VA_ARGS__>(id, this)) {          \
+      *output = result;                                                  \
+      AddRef();                                                          \
+      return true;                                                       \
+    }                                                                    \
+    return Base::QueryInterface(id, output);                             \
+  }

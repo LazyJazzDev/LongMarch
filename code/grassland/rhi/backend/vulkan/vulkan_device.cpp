@@ -273,7 +273,7 @@ rhi::IImage *VulkanDevice::CreateImage(const ImageDesc &desc) {
 }
 
 rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
-  return VulkanAllocatedBuffer::Create(this, desc);
+  return IVulkanAllocatedBuffer::Create(this, desc);
 }
 
 rhi::IComputeProgram *VulkanDevice::CreateComputeProgram(const ComputeProgramDesc &desc) {

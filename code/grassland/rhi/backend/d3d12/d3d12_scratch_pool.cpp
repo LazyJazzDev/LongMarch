@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::d3d12 {
 D3D12ScratchPool::D3D12ScratchPool(D3D12Device *device) : device_(device) {
 }
 
-ObjectPtr<D3D12AllocatedBuffer> D3D12ScratchPool::Acquire(uint64_t size) {
+ObjectPtr<ID3D12AllocatedBuffer> D3D12ScratchPool::Acquire(uint64_t size) {
   if (size > (uint64_t(1) << 63))
     return {};
   std::lock_guard<std::mutex> lock(mutex_);
@@ -27,7 +27,7 @@ ObjectPtr<D3D12AllocatedBuffer> D3D12ScratchPool::Acquire(uint64_t size) {
     while (capacity < demand)
       capacity *= 2;
     if (capacity != current) {
-      auto storage = ObjectPtr<D3D12AllocatedBuffer>::Adopt(D3D12AllocatedBuffer::Create(device_, {capacity}, false));
+      auto storage = ObjectPtr<ID3D12AllocatedBuffer>::Adopt(ID3D12AllocatedBuffer::Create(device_, {capacity}, false));
       if (!storage) {
         // Shrinking is optional; a failed growth must not return undersized storage.
         if (size <= current)

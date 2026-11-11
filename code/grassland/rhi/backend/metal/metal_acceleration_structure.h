@@ -29,7 +29,7 @@ class MetalAccelerationStructure : public IObject {
  public:
   MetalDevice *Owner() const;
   MTL::AccelerationStructure *NativeStructure() const;
-  MTL::Buffer *CompactionQuery() const;
+  MTL::IBackendBuffer *CompactionQuery() const;
   uint64_t ScratchSize(AccelerationStructureBuildMode mode) const;
   uint64_t ReadCompactedSize() const;
   bool AllowsUpdate() const;
@@ -46,7 +46,7 @@ class MetalAccelerationStructure : public IObject {
  private:
   MetalDevice *device_;
   NS::SharedPtr<MTL::AccelerationStructure> structure_;
-  NS::SharedPtr<MTL::Buffer> query_;
+  NS::SharedPtr<MTL::IBackendBuffer> query_;
   uint64_t build_scratch_{}, update_scratch_{};
   bool allow_update_{}, allow_compaction_{}, compact_{};
 };

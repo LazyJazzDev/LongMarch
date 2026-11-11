@@ -3,11 +3,11 @@
 #include <vector>
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12DownloadToken::D3D12DownloadToken(ObjectPtr<D3D12TemporalBufferLease> lease, uint64_t size)
+D3D12DownloadToken::D3D12DownloadToken(ObjectPtr<ID3D12TemporalBufferLease> lease, uint64_t size)
     : D3D12DownloadToken(std::move(lease), DownloadLayout{0, size, size, 1}) {
 }
 
-D3D12DownloadToken::D3D12DownloadToken(ObjectPtr<D3D12TemporalBufferLease> lease, const DownloadLayout &layout)
+D3D12DownloadToken::D3D12DownloadToken(ObjectPtr<ID3D12TemporalBufferLease> lease, const DownloadLayout &layout)
     : DownloadToken(layout.row_bytes * layout.rows),
       lease_(std::move(lease)),
       layout_(layout) {

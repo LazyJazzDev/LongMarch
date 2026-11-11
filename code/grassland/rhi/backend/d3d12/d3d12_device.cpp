@@ -245,7 +245,7 @@ rhi::IImage *D3D12Device::CreateImage(const ImageDesc &desc) {
 }
 
 rhi::IBuffer *D3D12Device::CreateBuffer(const BufferDesc &desc) {
-  return D3D12AllocatedBuffer::Create(this, desc);
+  return ID3D12AllocatedBuffer::Create(this, desc);
 }
 
 rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {

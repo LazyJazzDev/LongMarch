@@ -95,7 +95,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
     case BINDING_UNIFORM_BUFFER:
       for (size_t i = 0; i < buffers.size(); ++i) {
         const auto &view = buffers[i];
-        auto buffer = rhi::QueryInterfacePtr<D3D12Buffer>(view.buffer).Get();
+        auto buffer = rhi::QueryInterfacePtr<ID3D12Buffer>(view.buffer).Get();
         D3D12_CONSTANT_BUFFER_VIEW_DESC desc{buffer->NativeBuffer()->GetGPUVirtualAddress() + view.offset,
                                              UINT((view.size + 255) & ~uint64_t(255))};
         native->CreateConstantBufferView(&desc, resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
@@ -118,7 +118,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
         desc.Buffer.NumElements = UINT(view.size / stride);
         desc.Buffer.StructureByteStride = raw ? 0 : stride;
         desc.Buffer.Flags = raw ? D3D12_BUFFER_SRV_FLAG_RAW : D3D12_BUFFER_SRV_FLAG_NONE;
-        native->CreateShaderResourceView(rhi::QueryInterfacePtr<D3D12Buffer>(view.buffer).Get()->NativeBuffer(), &desc,
+        native->CreateShaderResourceView(rhi::QueryInterfacePtr<ID3D12Buffer>(view.buffer).Get()->NativeBuffer(), &desc,
                                          resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
       }
       break;
@@ -139,7 +139,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
         desc.Buffer.NumElements = UINT(view.size / stride);
         desc.Buffer.StructureByteStride = raw ? 0 : stride;
         desc.Buffer.Flags = raw ? D3D12_BUFFER_UAV_FLAG_RAW : D3D12_BUFFER_UAV_FLAG_NONE;
-        native->CreateUnorderedAccessView(rhi::QueryInterfacePtr<D3D12Buffer>(view.buffer).Get()->NativeBuffer(),
+        native->CreateUnorderedAccessView(rhi::QueryInterfacePtr<ID3D12Buffer>(view.buffer).Get()->NativeBuffer(),
                                           nullptr, &desc,
                                           resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
       }

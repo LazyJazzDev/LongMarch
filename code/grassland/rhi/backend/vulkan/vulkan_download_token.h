@@ -13,15 +13,15 @@ class VulkanDownloadToken final : public DownloadToken {
  public:
   LONGMARCH_RHI_QUERY(VulkanDownloadToken, DownloadToken)
 
-  VulkanDownloadToken(ObjectPtr<VulkanTemporalBufferLease> lease, uint64_t size);
-  VulkanDownloadToken(ObjectPtr<VulkanTemporalBufferLease> lease, const DownloadLayout &layout);
+  VulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size);
+  VulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, const DownloadLayout &layout);
   ~VulkanDownloadToken() override;
 
  protected:
   bool CopyData(void *destination) const override;
 
  private:
-  ObjectPtr<VulkanTemporalBufferLease> lease_;
+  ObjectPtr<IVulkanTemporalBufferLease> lease_;
   DownloadLayout layout_;
 };
 }  // namespace grassland::rhi::backend::vulkan

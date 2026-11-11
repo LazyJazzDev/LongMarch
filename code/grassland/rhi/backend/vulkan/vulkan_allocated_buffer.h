@@ -2,32 +2,22 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanAllocatedBuffer;
+class IVulkanAllocatedBuffer;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanAllocatedBuffer)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanAllocatedBuffer)
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 typedef struct VmaAllocation_T *VmaAllocation;
 typedef struct VmaAllocator_T *VmaAllocator;
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanAllocatedBuffer final : public VulkanBuffer {
+class IVulkanAllocatedBuffer : public IVulkanBuffer {
  public:
-  LONGMARCH_RHI_QUERY(VulkanAllocatedBuffer, VulkanBuffer)
-
-  ~VulkanAllocatedBuffer() override;
-  static VulkanAllocatedBuffer *Create(VulkanDevice *device,
-                                       const BufferDesc &desc,
-                                       bool upload = false,
-                                       bool download = false);
-  VkBuffer NativeBuffer() const override;
-  bool Read(void *data, uint64_t size, uint64_t offset = 0);
-  bool Write(const void *data, uint64_t size);
-
- private:
-  VulkanAllocatedBuffer(VulkanDevice *device, const BufferDesc &desc);
-
-  VkBuffer buffer_{};
-  VmaAllocation allocation_{};
-  void *mapped_{};
+  static IVulkanAllocatedBuffer *Create(VulkanDevice *device,
+                                        const BufferDesc &desc,
+                                        bool upload = false,
+                                        bool download = false);
+  virtual VkBuffer NativeBuffer() const = 0;
+  virtual bool Read(void *data, uint64_t size, uint64_t offset = 0) = 0;
+  virtual bool Write(const void *data, uint64_t size) = 0;
 };
 }  // namespace grassland::rhi::backend::vulkan

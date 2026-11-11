@@ -6,7 +6,7 @@
 
 namespace grassland::rhi::backend::vulkan {
 namespace {
-uint64_t BufferAddress(VulkanDevice *device, VulkanBuffer *buffer) {
+uint64_t BufferAddress(VulkanDevice *device, IVulkanBuffer *buffer) {
   VkBufferDeviceAddressInfo info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
   info.buffer = buffer->NativeBuffer();
   return vkGetBufferDeviceAddress(device->NativeDevice(), &info);
@@ -62,7 +62,7 @@ bool VulkanCommandContext::CmdBuildBottomLevelAccelerationStructure(
     for (const auto &view : {geometry.data, geometry.indices}) {
       if (!view.buffer)
         continue;
-      auto buffer = rhi::QueryInterfacePtr<VulkanBuffer>(view.buffer).Get();
+      auto buffer = rhi::QueryInterfacePtr<IVulkanBuffer>(view.buffer).Get();
       if (!RetainResource(buffer))
         return false;
       if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_ACCESS_SHADER_READ_BIT))

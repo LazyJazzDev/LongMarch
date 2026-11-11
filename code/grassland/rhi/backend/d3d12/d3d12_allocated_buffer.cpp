@@ -9,32 +9,79 @@
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12AllocatedBuffer::D3D12AllocatedBuffer(D3D12Device *device, const BufferDesc &desc) : D3D12Buffer(device, desc) {
+class D3D12AllocatedBufferImpl final : public Object<ID3D12AllocatedBuffer> {
+ public:
+  LONGMARCH_RHI_QUERY_INTERFACES(Object<ID3D12AllocatedBuffer>, IBuffer, IBackendBuffer, ID3D12Buffer)
+
+  ~D3D12AllocatedBufferImpl() override;
+  static ID3D12AllocatedBuffer *Create(D3D12Device *device,
+                                       const BufferDesc &desc,
+                                       bool upload = false,
+                                       bool download = false);
+  ID3D12Resource *NativeBuffer() const override;
+  D3D12_RESOURCE_STATES DefaultState() const override;
+  bool Read(void *data, uint64_t size, uint64_t offset = 0);
+  bool Write(const void *data, uint64_t size, uint64_t offset = 0);
+
+ private:
+  D3D12AllocatedBufferImpl(D3D12Device *device, const BufferDesc &desc);
+
+  ComPtr<ID3D12Resource> buffer_;
+  ComPtr<D3D12MA::Allocation> allocation_;
+  void *mapped_{};
+  bool download_{};
+
+ private:
+  D3D12Device *device_;
+  BufferDesc desc_;
+
+ public:
+  BufferDesc GetDesc() const override {
+    return desc_;
+  }
+
+  Device *Owner() const override;
+};
+
+ID3D12AllocatedBuffer *ID3D12AllocatedBuffer::Create(D3D12Device *device,
+                                                     const BufferDesc &desc,
+                                                     bool upload,
+                                                     bool download) {
+  return D3D12AllocatedBufferImpl::Create(device, desc, upload, download);
 }
 
-D3D12AllocatedBuffer::~D3D12AllocatedBuffer() {
+Device *D3D12AllocatedBufferImpl::Owner() const {
+  return device_;
+}
+
+D3D12AllocatedBufferImpl::D3D12AllocatedBufferImpl(D3D12Device *device, const BufferDesc &desc)
+    : device_(device),
+      desc_(desc) {
+}
+
+D3D12AllocatedBufferImpl::~D3D12AllocatedBufferImpl() {
   if (mapped_)
     buffer_->Unmap(0, nullptr);
   buffer_.Reset();
 }
 
-ID3D12Resource *D3D12AllocatedBuffer::NativeBuffer() const {
+ID3D12Resource *D3D12AllocatedBufferImpl::NativeBuffer() const {
   return buffer_.Get();
 }
 
-D3D12_RESOURCE_STATES D3D12AllocatedBuffer::DefaultState() const {
+D3D12_RESOURCE_STATES D3D12AllocatedBufferImpl::DefaultState() const {
   return download_ ? D3D12_RESOURCE_STATE_COPY_DEST
          : mapped_ ? D3D12_RESOURCE_STATE_GENERIC_READ
                    : D3D12_RESOURCE_STATE_COMMON;
 }
 
-D3D12AllocatedBuffer *D3D12AllocatedBuffer::Create(D3D12Device *device,
-                                                   const BufferDesc &desc,
-                                                   bool upload,
-                                                   bool download) {
+ID3D12AllocatedBuffer *D3D12AllocatedBufferImpl::Create(D3D12Device *device,
+                                                        const BufferDesc &desc,
+                                                        bool upload,
+                                                        bool download) {
   if (!desc.size)
     return nullptr;
-  auto object = std::unique_ptr<D3D12AllocatedBuffer>(new D3D12AllocatedBuffer(device, desc));
+  auto object = std::unique_ptr<D3D12AllocatedBufferImpl>(new D3D12AllocatedBufferImpl(device, desc));
   D3D12_RESOURCE_DESC info{};
   info.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
   info.Width = object->desc_.size;
@@ -63,14 +110,14 @@ D3D12AllocatedBuffer *D3D12AllocatedBuffer::Create(D3D12Device *device,
   return object.release();
 }
 
-bool D3D12AllocatedBuffer::Write(const void *data, uint64_t size, uint64_t offset) {
+bool D3D12AllocatedBufferImpl::Write(const void *data, uint64_t size, uint64_t offset) {
   if (!mapped_ || offset > desc_.size || size > desc_.size - offset)
     return false;
   std::memcpy(static_cast<uint8_t *>(mapped_) + offset, data, static_cast<size_t>(size));
   return true;
 }
 
-bool D3D12AllocatedBuffer::Read(void *data, uint64_t size, uint64_t offset) {
+bool D3D12AllocatedBufferImpl::Read(void *data, uint64_t size, uint64_t offset) {
   if (!download_ || !mapped_ || !data || offset > desc_.size || size > desc_.size - offset)
     return false;
   std::memcpy(data, static_cast<const uint8_t *>(mapped_) + offset, static_cast<size_t>(size));
@@ -78,4 +125,4 @@ bool D3D12AllocatedBuffer::Read(void *data, uint64_t size, uint64_t offset) {
 }
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12AllocatedBuffer, "f17438f1-4828-4dc2-943d-11e8afe77444")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12AllocatedBuffer, "f17438f1-4828-4dc2-943d-11e8afe77444")

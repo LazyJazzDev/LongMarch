@@ -12,13 +12,13 @@ class MetalScratchPool {
  public:
   explicit MetalScratchPool(MetalDevice *device);
   // Share the current buffer; resize on demand using the last second's peak request.
-  ObjectPtr<MetalAllocatedBuffer> Acquire(uint64_t size);
+  ObjectPtr<IMetalAllocatedBuffer> Acquire(uint64_t size);
   void Clear();
 
  private:
   MetalDevice *device_;
   std::mutex mutex_;
-  ObjectPtr<MetalAllocatedBuffer> buffer_;
+  ObjectPtr<IMetalAllocatedBuffer> buffer_;
   std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> peaks_;
 };
 }  // namespace grassland::rhi::backend::metal

@@ -69,7 +69,7 @@ TEST(RhiMetalAllocation, FactoriesPropagateCpuAllocationFailures) {
   ASSERT_TRUE(device);
   bool propagated = false;
   {
-    FailAllocation fail(sizeof(MetalAllocatedBuffer));
+    FailAllocation fail(sizeof(IMetalAllocatedBuffer));
     try {
       ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
     } catch (const std::bad_alloc &) {

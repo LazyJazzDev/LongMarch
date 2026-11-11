@@ -175,7 +175,7 @@ std::vector<VkAccelerationStructureGeometryKHR> NativeGeometries(
     const std::vector<AccelerationStructureGeometryBuffers> &buffers) {
   auto address = [device](const BufferView &view) {
     VkBufferDeviceAddressInfo info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
-    info.buffer = rhi::QueryInterfacePtr<VulkanBuffer>(view.buffer).Get()->NativeBuffer();
+    info.buffer = rhi::QueryInterfacePtr<IVulkanBuffer>(view.buffer).Get()->NativeBuffer();
     return vkGetBufferDeviceAddress(device->NativeDevice(), &info) + view.offset;
   };
   std::vector<VkAccelerationStructureGeometryKHR> result;

@@ -13,15 +13,15 @@ class MetalDownloadToken final : public DownloadToken {
  public:
   LONGMARCH_RHI_QUERY(MetalDownloadToken, DownloadToken)
 
-  MetalDownloadToken(ObjectPtr<MetalTemporalBufferLease> lease, uint64_t size);
-  MetalDownloadToken(ObjectPtr<MetalTemporalBufferLease> lease, const DownloadLayout &layout);
+  MetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size);
+  MetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, const DownloadLayout &layout);
   ~MetalDownloadToken() override;
 
  protected:
   bool CopyData(void *destination) const override;
 
  private:
-  ObjectPtr<MetalTemporalBufferLease> lease_;
+  ObjectPtr<IMetalTemporalBufferLease> lease_;
   DownloadLayout layout_;
 };
 }  // namespace grassland::rhi::backend::metal

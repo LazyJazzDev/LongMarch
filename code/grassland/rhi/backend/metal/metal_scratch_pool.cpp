@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::metal {
 MetalScratchPool::MetalScratchPool(MetalDevice *device) : device_(device) {
 }
 
-ObjectPtr<MetalAllocatedBuffer> MetalScratchPool::Acquire(uint64_t size) {
+ObjectPtr<IMetalAllocatedBuffer> MetalScratchPool::Acquire(uint64_t size) {
   if (size > (uint64_t(1) << 63))
     return {};
   std::lock_guard<std::mutex> lock(mutex_);
@@ -27,7 +27,7 @@ ObjectPtr<MetalAllocatedBuffer> MetalScratchPool::Acquire(uint64_t size) {
     while (capacity < demand)
       capacity *= 2;
     if (capacity != current) {
-      auto storage = ObjectPtr<MetalAllocatedBuffer>::Adopt(MetalAllocatedBuffer::Create(device_, {capacity}, false));
+      auto storage = ObjectPtr<IMetalAllocatedBuffer>::Adopt(IMetalAllocatedBuffer::Create(device_, {capacity}, false));
       if (!storage) {
         // Shrinking is optional; a failed growth must not return undersized storage.
         if (size <= current)

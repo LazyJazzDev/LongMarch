@@ -73,7 +73,7 @@ rhi::IWindow *MetalDevice::CreateGLFWWindow(const WindowDesc &desc) {
 }
 
 rhi::IBuffer *MetalDevice::CreateBuffer(const BufferDesc &desc) {
-  return MetalAllocatedBuffer::Create(this, desc);
+  return IMetalAllocatedBuffer::Create(this, desc);
 }
 
 rhi::IImage *MetalDevice::CreateImage(const ImageDesc &desc) {

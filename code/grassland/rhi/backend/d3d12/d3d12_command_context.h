@@ -14,7 +14,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12CommandContext)
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Queue;
 class D3D12Image;
-class D3D12Buffer;
+class ID3D12Buffer;
 class D3D12Program;
 class D3D12RayTracingProgram;
 class D3D12ProgramBase;
@@ -102,8 +102,8 @@ class D3D12CommandContext final : public CommandContext {
   D3D12RayTracingProgram *ray_program_{};
   const PipelineLayoutDesc *binding_layout_{};
   bool rendering_active_{};
-  std::vector<D3D12Buffer *> vertex_buffers_;
-  D3D12Buffer *index_buffer_{};
+  std::vector<ID3D12Buffer *> vertex_buffers_;
+  ID3D12Buffer *index_buffer_{};
   bool PrepareDrawBuffers(bool indexed);
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
 

@@ -2,31 +2,26 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalTemporalBufferLease;
+class IMetalTemporalBufferLease;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalTemporalBufferLease)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTemporalBufferLease)
 #include "grassland/rhi/backend/backend_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/metal/metal_allocated_buffer.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalTemporalBufferLease;
-using MetalTemporalBufferPool = TemporalBufferPool<MetalDevice, MetalAllocatedBuffer, MetalTemporalBufferLease>;
+class IMetalTemporalBufferLease;
+using MetalTemporalBufferPool = TemporalBufferPool<MetalDevice, IMetalAllocatedBuffer, IMetalTemporalBufferLease>;
 
-class MetalTemporalBufferLease final : public MetalBuffer {
+class IMetalTemporalBufferLease : public IMetalBuffer {
  public:
-  LONGMARCH_RHI_QUERY(MetalTemporalBufferLease, MetalBuffer)
+  static IMetalTemporalBufferLease *Create(MetalTemporalBufferPool *pool, IMetalAllocatedBuffer *buffer, size_t level);
+  virtual BufferDesc GetDesc() const = 0;
+  virtual MTL::IBackendBuffer *NativeBuffer() const = 0;
+  virtual bool Read(void *data, uint64_t size, uint64_t offset = 0) = 0;
+  virtual bool Write(const void *data, uint64_t size) = 0;
 
-  MetalTemporalBufferLease(MetalTemporalBufferPool *pool, MetalAllocatedBuffer *buffer, size_t level);
-  ~MetalTemporalBufferLease() override;
-  BufferDesc GetDesc() const override;
-  MTL::Buffer *NativeBuffer() const override;
-  bool Read(void *data, uint64_t size, uint64_t offset = 0);
-  bool Write(const void *data, uint64_t size);
-
- private:
-  MetalTemporalBufferPool *pool_;
-  MetalAllocatedBuffer *buffer_;
-  size_t level_;
+ protected:
+  static void ReturnBuffer(MetalTemporalBufferPool *pool, IMetalAllocatedBuffer *buffer, size_t level);
 };
 
 }  // namespace grassland::rhi::backend::metal

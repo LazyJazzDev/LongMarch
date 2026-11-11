@@ -271,7 +271,7 @@ bool VulkanCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, con
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  auto native = rhi::QueryInterfacePtr<VulkanBuffer>(buffer).Get();
+  auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
@@ -311,8 +311,8 @@ bool VulkanCommandContext::CmdCopyBuffer(IBuffer *source,
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  auto src = rhi::QueryInterfacePtr<VulkanBuffer>(source).Get();
-  auto dst = rhi::QueryInterfacePtr<VulkanBuffer>(destination).Get();
+  auto src = rhi::QueryInterfacePtr<IVulkanBuffer>(source).Get();
+  auto dst = rhi::QueryInterfacePtr<IVulkanBuffer>(destination).Get();
   if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
@@ -497,7 +497,7 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
 }
 
 bool VulkanCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
-  auto native = rhi::QueryInterfacePtr<VulkanBuffer>(buffer).Get();
+  auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
@@ -518,7 +518,7 @@ bool VulkanCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer
 }
 
 bool VulkanCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
-  auto native = rhi::QueryInterfacePtr<VulkanBuffer>(buffer).Get();
+  auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
@@ -634,7 +634,7 @@ bool VulkanCommandContext::CmdEndRendering() {
   else
     vkCmdEndRenderPass(command_);
   // Make reads in this scope complete before later buffer writes, including buffers
-  // first bound inside the scope. Buffer bindings do not change image layouts.
+  // first bound inside the scope. IBackendBuffer bindings do not change image layouts.
   VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
   barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
                           VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
@@ -652,7 +652,7 @@ bool VulkanCommandContext::CmdEndRendering() {
   return true;
 }
 
-bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access) {
+bool VulkanCommandContext::TransitionBuffer(IVulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access) {
   if (render_target_)
     return true;  // Graphics buffer accesses are synchronized by the explicit scope boundaries.
   auto known = buffer_states_.find(buffer);
@@ -753,7 +753,7 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
             return false;
       }
       if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
-        auto buffer = rhi::QueryInterfacePtr<VulkanBuffer>(native->GetReferences()[binding_index][i].Get()).Get();
+        auto buffer = rhi::QueryInterfacePtr<IVulkanBuffer>(native->GetReferences()[binding_index][i].Get()).Get();
         if (!TransitionBuffer(buffer, stages, b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
           return false;
       }
@@ -873,7 +873,7 @@ bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint
 }
 
 IDownloadToken *VulkanCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
-  auto native = rhi::QueryInterfacePtr<VulkanBuffer>(buffer).Get();
+  auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
   if (sealed_ || render_target_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return nullptr;
