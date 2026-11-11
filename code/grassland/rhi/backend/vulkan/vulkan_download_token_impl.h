@@ -14,12 +14,11 @@ class VulkanDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBacken
   ~VulkanDownloadTokenImpl() override;
 
   SubmissionStatus GetStatus() const override {
-    return submission_ ? rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->GetStatus()
-                       : SUBMISSION_STATUS_PENDING;
+    return submission_ ? submission_->GetStatus() : SUBMISSION_STATUS_PENDING;
   }
 
   bool WaitHost() const override {
-    return submission_ && rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->WaitHost();
+    return submission_ && submission_->WaitHost();
   }
 
   uint64_t GetSize() const override {
@@ -32,8 +31,8 @@ class VulkanDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBacken
     return CopyData(destination);
   }
 
-  void BindSubmission(IBackendSubmissionToken *submission) override {
-    submission_ = ObjectPtr<IBackendSubmissionToken>::Retain(submission);
+  void BindSubmission(rhi::ISubmissionToken *submission) override {
+    submission_ = ObjectPtr<ISubmissionToken>::Retain(submission);
   }
 
  private:
@@ -49,6 +48,6 @@ class VulkanDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBacken
 
   uint64_t size_{};
 
-  ObjectPtr<IBackendSubmissionToken> submission_{};
+  ObjectPtr<ISubmissionToken> submission_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

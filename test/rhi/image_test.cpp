@@ -456,7 +456,7 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
-  backend::ImagePresenter presenter(rhi::QueryInterfacePtr<backend::IBackendDevice>(device.Get()).Get());
+  backend::ImagePresenter presenter(device.Get());
   ObjPtr<IImage> input = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> encoded = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> converted = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
@@ -713,8 +713,7 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "HDR UI color verification"});
   ASSERT_TRUE(window);
-  auto ui = backend::WindowImGui::Create(rhi::QueryInterfacePtr<backend::IBackendDevice>(device.Get()).Get(),
-                                         window->GLFWWindow(), nullptr, 13);
+  auto ui = backend::WindowImGui::Create(device.Get(), window->GLFWWindow(), nullptr, 13);
   ASSERT_TRUE(ui);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);

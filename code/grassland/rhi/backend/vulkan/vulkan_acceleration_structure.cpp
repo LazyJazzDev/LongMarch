@@ -337,8 +337,7 @@ std::vector<VkAccelerationStructureGeometryKHR> NativeGeometries(
 IBottomLevelAccelerationStructure *VulkanBottomLevelAccelerationStructureImpl::Create(
     IVulkanDevice *device,
     const BottomLevelAccelerationStructureDesc &desc) {
-  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() &&
-      !rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery())
+  if (!device->GetPhysicalDevice().ray_tracing_pipeline_feature && !device->GetPhysicalDevice().ray_query_feature)
     return nullptr;
   if (!ValidateBottomLevelDesc(desc))
     return nullptr;
@@ -367,8 +366,7 @@ IBottomLevelAccelerationStructure *VulkanBottomLevelAccelerationStructureImpl::C
 ITopLevelAccelerationStructure *VulkanTopLevelAccelerationStructureImpl::Create(
     IVulkanDevice *device,
     const TopLevelAccelerationStructureDesc &desc) {
-  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() &&
-      !rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery())
+  if (!device->GetPhysicalDevice().ray_tracing_pipeline_feature && !device->GetPhysicalDevice().ray_query_feature)
     return nullptr;
   VkAccelerationStructureGeometryKHR geometry{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
   geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;

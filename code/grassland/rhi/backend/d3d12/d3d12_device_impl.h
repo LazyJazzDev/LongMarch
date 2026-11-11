@@ -5,6 +5,7 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
  public:
+  ID3D12Queue *GetNativeQueue(QueueType type) const override;
   LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, ID3D12Device, IBackendDevice, rhi::IDevice)
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
@@ -97,7 +98,7 @@ class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
 
   void ShutdownQueues();
 
-  std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
+  std::array<ObjectPtr<ID3D12Queue>, 2> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
   ICore *core_{};

@@ -194,7 +194,7 @@ MetalBottomLevelAccelerationStructureImpl::MetalBottomLevelAccelerationStructure
 IBottomLevelAccelerationStructure *MetalBottomLevelAccelerationStructureImpl::Create(
     IMetalDevice *device,
     const BottomLevelAccelerationStructureDesc &desc) {
-  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery() || !ValidateBottomLevelDesc(desc))
+  if (!device->GetPhysicalDevice().ray_query_feature || !ValidateBottomLevelDesc(desc))
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto result = std::unique_ptr<MetalBottomLevelAccelerationStructureImpl>(
@@ -226,7 +226,7 @@ MetalTopLevelAccelerationStructureImpl::MetalTopLevelAccelerationStructureImpl(
 ITopLevelAccelerationStructure *MetalTopLevelAccelerationStructureImpl::Create(
     IMetalDevice *device,
     const TopLevelAccelerationStructureDesc &desc) {
-  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery() || !desc.instance_count)
+  if (!device->GetPhysicalDevice().ray_query_feature || !desc.instance_count)
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto result =

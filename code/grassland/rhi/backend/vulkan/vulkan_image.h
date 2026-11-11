@@ -13,6 +13,7 @@ class IVulkanImage : public IBackendImage {
   virtual VkImageView BindingView() const = 0;
   const void *DeviceIdentity() const override = 0;
   virtual VkImage NativeImage() const = 0;
+  virtual VkImageAspectFlags Aspect() const = 0;
   virtual VkImageLayout DefaultLayout() const = 0;
 };
 

@@ -70,7 +70,7 @@ class MetalWindowImpl final : public Object<rhi::IWindow, IMetalWindow> {
 
   void DestroyWindow();
 
-  bool InitializeWindow(IBackendDevice *device, const WindowDesc &desc);
+  bool InitializeWindow(IMetalDevice *device, const WindowDesc &desc);
 
  public:
   GLFWwindow *GLFWWindow() const override;
@@ -104,7 +104,7 @@ class MetalWindowImpl final : public Object<rhi::IWindow, IMetalWindow> {
  private:
   bool invalid_{true};
 
-  IBackendQueue *queue_{};
+  IMetalQueue *queue_{};
   std::unique_ptr<WindowImGui> imgui_{};
   std::unique_ptr<ImagePresenter> presenter_{};
   bool processing_imgui_{};

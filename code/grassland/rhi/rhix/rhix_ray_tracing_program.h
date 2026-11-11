@@ -11,7 +11,7 @@ class ShaderBindingTable : public ObjectContainer {
   }
 
   rhi::IShaderBindingTable *Get() const noexcept {
-    return rhi::QueryInterfacePtr<rhi::IShaderBindingTable>(GetObject()).Get();
+    return static_cast<rhi::IShaderBindingTable *>(GetObject());
   }
 
   const rhi::ShaderBindingTableDesc &GetDesc() const {

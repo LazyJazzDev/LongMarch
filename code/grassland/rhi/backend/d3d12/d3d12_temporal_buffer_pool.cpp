@@ -51,7 +51,7 @@ D3D12TemporalBufferLeaseImpl::~D3D12TemporalBufferLeaseImpl() {
 }
 
 BufferDesc D3D12TemporalBufferLeaseImpl::GetDesc() const {
-  return rhi::QueryInterfacePtr<IBuffer>(buffer_)->GetDesc();
+  return {D3D12TemporalBufferPool::CapacityForLevel(level_)};
 }
 
 ID3D12Resource *D3D12TemporalBufferLeaseImpl::NativeBuffer() const {

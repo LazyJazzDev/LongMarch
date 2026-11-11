@@ -45,8 +45,8 @@ MetalWindowImpl::MetalWindowImpl(IMetalDevice *device) : device_(device) {
 MetalWindowImpl::~MetalWindowImpl() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(rhi::QueryInterfacePtr<IMetalQueue>(OwnerQueue()).Get()->QueueMutex());
-  rhi::QueryInterfacePtr<IMetalQueue>(OwnerQueue()).Get()->WaitIdle();
+  std::lock_guard<std::mutex> lock(queue_->QueueMutex());
+  queue_->WaitIdle();
   valid_ = false;
   ReleaseNextImage();
   if (GLFWWindow())
@@ -79,8 +79,8 @@ rhi::IWindow *MetalWindowImpl::Create(IMetalDevice *device, const WindowDesc &de
 
 bool MetalWindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  std::lock_guard<std::mutex> lock(rhi::QueryInterfacePtr<IMetalQueue>(OwnerQueue()).Get()->QueueMutex());
-  if (!rhi::QueryInterfacePtr<IMetalQueue>(OwnerQueue()).Get()->WaitIdle())
+  std::lock_guard<std::mutex> lock(queue_->QueueMutex());
+  if (!queue_->WaitIdle())
     return false;
   auto layer = (CAMetalLayer *)layer_.get();
   layer.displaySyncEnabled = requested_mode != PRESENT_MODE_CONTINUOUS;

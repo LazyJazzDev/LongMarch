@@ -27,7 +27,7 @@ class D3D12QueueImpl final : public Object<rhi::IQueue, ID3D12Queue> {
   bool CollectCompleted(uint64_t completed, bool timeline_valid) override;
 
  private:
-  void InitializeQueue(IBackendDevice *device,
+  void InitializeQueue(ID3D12Device *device,
                        QueueType type,
                        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
 
@@ -37,7 +37,7 @@ class D3D12QueueImpl final : public Object<rhi::IQueue, ID3D12Queue> {
   // Called under QueueMutex, in native submission order.
   uint64_t NextSerial() override;
 
-  IBackendDevice *Owner() const override;
+  ID3D12Device *Owner() const override;
 
   QueueType GetType() const override;
 
@@ -48,7 +48,7 @@ class D3D12QueueImpl final : public Object<rhi::IQueue, ID3D12Queue> {
   };
 
   std::list<Submission> pending_{};
-  IBackendDevice *device_{};
+  ID3D12Device *device_{};
   QueueType type_{};
   // Logical queues that share a native queue also share its host synchronization.
   std::shared_ptr<std::mutex> mutex_{};

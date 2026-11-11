@@ -83,8 +83,7 @@ IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc 
   // Establish the fixed default layout once, before exposing the resource.
   // Temporary initialization commands are outside the rendering loop.
   const auto native = device->NativeDevice();
-  auto queue_owner = ObjectPtr<IQueue>::Adopt(rhi::QueryInterfacePtr<IDevice>(device)->GetQueue(QUEUE_TYPE_MAIN));
-  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(queue_owner.Get()).Get();
+  auto queue = device->GetNativeQueue(QUEUE_TYPE_MAIN);
   std::lock_guard<std::mutex> lock(queue->QueueMutex());
   VkCommandPool pool{};
   const auto status = [&]() -> VkResult {
@@ -166,6 +165,10 @@ void VulkanAllocatedImageImpl::InitializeVulkanImage(ImageDesc desc,
                                                      IBackendQueue *queue) {
   InitializeImage(desc, queue);
   default_layout_ = default_layout;
+}
+
+VkImageAspectFlags VulkanAllocatedImageImpl::Aspect() const {
+  return ImageAspect(desc_.format);
 }
 
 VkImageLayout VulkanAllocatedImageImpl::DefaultLayout() const {

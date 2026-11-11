@@ -50,7 +50,7 @@ VulkanTemporalBufferLeaseImpl::~VulkanTemporalBufferLeaseImpl() {
 }
 
 BufferDesc VulkanTemporalBufferLeaseImpl::GetDesc() const {
-  return rhi::QueryInterfacePtr<IBuffer>(buffer_)->GetDesc();
+  return {VulkanTemporalBufferPool::CapacityForLevel(level_)};
 }
 
 VkBuffer VulkanTemporalBufferLeaseImpl::NativeBuffer() const {

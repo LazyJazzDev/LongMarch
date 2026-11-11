@@ -7,7 +7,7 @@ DownloadToken::DownloadToken(rhi::IDownloadToken *object) noexcept : ObjectConta
 }
 
 rhi::IDownloadToken *DownloadToken::Get() const noexcept {
-  return rhi::QueryInterfacePtr<rhi::IDownloadToken>(GetObject()).Get();
+  return static_cast<rhi::IDownloadToken *>(GetObject());
 }
 
 rhi::SubmissionStatus DownloadToken::GetStatus() const {

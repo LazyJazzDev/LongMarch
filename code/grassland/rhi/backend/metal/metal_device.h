@@ -13,7 +13,9 @@ namespace grassland::rhi::backend::metal {
 
 class IMetalDevice : public IBackendDevice {
  public:
-  static rhi::IDevice *Create(PhysicalDevice info, ICore *core, NS::SharedPtr<MTL::Device> device);
+  // Borrowed queue owned by this device.
+  virtual IMetalQueue *GetNativeQueue(QueueType type) const = 0;
+  static rhi::IDevice *Create(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device);
   virtual MetalTemporalBufferPool &UploadPool() = 0;
   virtual MetalTemporalBufferPool &DownloadPool() = 0;
   virtual MetalScratchPool &ScratchPool() = 0;

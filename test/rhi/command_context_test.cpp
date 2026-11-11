@@ -110,7 +110,8 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendW
       return true;
     }
     if (!imgui_)
-      imgui_ = WindowImGui::Create(device_, window_, font_file_path, font_size);
+      imgui_ =
+          WindowImGui::Create(rhi::QueryInterfacePtr<rhi::IDevice>(device_).Get(), window_, font_file_path, font_size);
     return bool(imgui_);
   }
 
@@ -148,7 +149,7 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendW
     if (!frame)
       return false;
     if (!presenter_)
-      presenter_ = std::make_unique<ImagePresenter>(device_);
+      presenter_ = std::make_unique<ImagePresenter>(rhi::QueryInterfacePtr<rhi::IDevice>(device_).Get());
     return presenter_->Record(commands, image, frame.Get(), color_space, GetColorSpace(), GetHDRReferenceWhiteScale());
   }
 
@@ -374,7 +375,7 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendW
     window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
     if (!window_)
       return false;
-    glfw::RegisterWindow(this);
+    glfw::RegisterWindow(this, this);
     return true;
   }
 
@@ -819,7 +820,7 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
     return nullptr;
   }
 
-  void BindDownloads(IBackendSubmissionToken *submission) override {
+  void BindDownloads(rhi::ISubmissionToken *submission) override {
     for (const auto &token : downloads_)
       token->BindSubmission(submission);
   }
@@ -1046,7 +1047,7 @@ class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQue
     auto entry = pending_.insert(pending_.end(), {commands, completion});
     IBackendCommandContext::SubmitResult result;
     try {
-      commands->BindDownloads(completion.Get());
+      commands->BindDownloads(rhi::QueryInterfacePtr<rhi::ISubmissionToken>(completion.Get()).Get());
       result = commands->SubmitNative(native_info, signal);
       if (result == IBackendCommandContext::SUBMIT_RESULT_REJECTED) {
         pending_.erase(entry);

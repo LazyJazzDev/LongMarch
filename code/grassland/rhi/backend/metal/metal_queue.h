@@ -10,6 +10,7 @@ namespace grassland::rhi::backend::metal {
 
 class IMetalQueue : public IBackendQueue {
  public:
+  virtual IMetalDevice *Owner() const override = 0;
   static IMetalQueue *Create(IMetalDevice *device, QueueType type, MTL::CommandBufferDescriptor *descriptor);
   virtual MTL::CommandQueue *NativeQueue() const = 0;
   virtual NS::SharedPtr<MTL::CommandBuffer> CreateCommandBuffer() = 0;

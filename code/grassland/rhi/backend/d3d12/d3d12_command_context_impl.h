@@ -58,8 +58,14 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBacke
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
+  // Inputs and ranges have been validated by the recording entry point.
+  bool CopyBuffer(ID3D12Buffer *source,
+                  uint64_t source_offset,
+                  ID3D12Buffer *destination,
+                  uint64_t destination_offset,
+                  uint64_t size);
   D3D12CommandContextImpl(ID3D12Queue *queue);
-  bool ClearColor(ID3D12Image *image, const ClearColorValue &value);
+  bool ClearColor(ID3D12Image *image, ImageFormat format, const ClearColorValue &value);
   bool PrepareGroups();
 
   struct BoundGroup {
@@ -73,7 +79,7 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBacke
   std::array<D3D12TransientDescriptorPool::Lease *, 2> descriptor_pages_{};
   std::array<uint32_t, 2> descriptor_used_{};
   bool tables_dirty_{};
-  ID3D12Program *program_{};
+  IProgram *program_{};
   ID3D12ProgramBase *native_program_{};
   std::unordered_map<ID3D12TopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
       as_dependencies_;
@@ -113,12 +119,12 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBacke
 
   bool RenderingMatches(const IProgram *program) const;
 
-  void InitializeCommandContext(IBackendQueue *queue);
+  void InitializeCommandContext(ID3D12Queue *queue);
 
  public:
   rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
 
-  void BindDownloads(IBackendSubmissionToken *submission) override;
+  void BindDownloads(rhi::ISubmissionToken *submission) override;
 
   void ReleaseDownloads() override;
 
@@ -148,7 +154,7 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBacke
   RenderingInfo rendering_{};
   bool recording_failed_{};
   bool sealed_{};
-  IBackendQueue *queue_{};
+  ID3D12Queue *queue_{};
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
   bool submitted_{};
   std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};

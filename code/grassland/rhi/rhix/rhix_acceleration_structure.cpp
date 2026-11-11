@@ -7,7 +7,7 @@ AccelerationStructure::AccelerationStructure(rhi::IAccelerationStructure *object
 }
 
 rhi::IAccelerationStructure *AccelerationStructure::Get() const noexcept {
-  return rhi::QueryInterfacePtr<rhi::IAccelerationStructure>(GetObject()).Get();
+  return static_cast<rhi::IAccelerationStructure *>(GetObject());
 }
 
 rhi::AccelerationStructureType AccelerationStructure::GetType() const {

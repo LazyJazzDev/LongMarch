@@ -166,7 +166,7 @@ IShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable(const 
   uint64_t capacity = alignment_;
   for (auto table : indices)
     capacity += table->size() * stride_ + alignment_;
-  auto owner = rhi::QueryInterfacePtr<IVulkanDevice>(device_).Get();
+  auto owner = device_;
   auto buffer = ObjectPtr<IVulkanAllocatedBuffer>::Adopt(IVulkanAllocatedBuffer::Create(owner, {capacity}, true));
   if (!buffer)
     return nullptr;
@@ -196,7 +196,7 @@ rhi::IRayTracingProgram *IVulkanRayTracingProgram::Create(IVulkanDevice *device,
   return VulkanRayTracingProgramImpl::Create(device, desc);
 }
 
-void VulkanRayTracingProgramImpl::InitializeRayTracingProgram(IBackendDevice *device,
+void VulkanRayTracingProgramImpl::InitializeRayTracingProgram(IVulkanDevice *device,
                                                               const RayTracingProgramDesc &desc) {
   device_ = device;
   desc_ = desc;

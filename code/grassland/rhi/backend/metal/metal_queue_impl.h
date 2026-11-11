@@ -29,7 +29,7 @@ class MetalQueueImpl final : public Object<rhi::IQueue, IMetalQueue> {
   bool CollectCompleted(uint64_t completed, bool timeline_valid) override;
 
  private:
-  void InitializeQueue(IBackendDevice *device,
+  void InitializeQueue(IMetalDevice *device,
                        QueueType type,
                        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
 
@@ -39,7 +39,7 @@ class MetalQueueImpl final : public Object<rhi::IQueue, IMetalQueue> {
   // Called under QueueMutex, in native submission order.
   uint64_t NextSerial() override;
 
-  IBackendDevice *Owner() const override;
+  IMetalDevice *Owner() const override;
 
   QueueType GetType() const override;
 
@@ -50,7 +50,7 @@ class MetalQueueImpl final : public Object<rhi::IQueue, IMetalQueue> {
   };
 
   std::list<Submission> pending_{};
-  IBackendDevice *device_{};
+  IMetalDevice *device_{};
   QueueType type_{};
   // Logical queues that share a native queue also share its host synchronization.
   std::shared_ptr<std::mutex> mutex_{};

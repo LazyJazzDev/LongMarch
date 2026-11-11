@@ -7,7 +7,7 @@ Program::Program(rhi::IProgram *object) noexcept : ObjectContainer(object) {
 }
 
 rhi::IProgram *Program::Get() const noexcept {
-  return rhi::QueryInterfacePtr<rhi::IProgram>(GetObject()).Get();
+  return static_cast<rhi::IProgram *>(GetObject());
 }
 
 const rhi::ProgramDesc &Program::GetDesc() const {

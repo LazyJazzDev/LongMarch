@@ -10,6 +10,7 @@ namespace grassland::rhi::backend::vulkan {
 
 class IVulkanQueue : public IBackendQueue {
  public:
+  virtual IVulkanDevice *Owner() const override = 0;
   static IVulkanQueue *Create(IVulkanDevice *device, QueueType type, VkQueue queue, std::shared_ptr<std::mutex> mutex);
   virtual VkQueue NativeQueue() const = 0;
   virtual IVulkanTimeline *GetTimeline() const = 0;

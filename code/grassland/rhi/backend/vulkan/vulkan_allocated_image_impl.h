@@ -40,6 +40,7 @@ class VulkanAllocatedImageImpl final : public Object<rhi::IImage, IVulkanImage> 
                              IBackendQueue *queue = nullptr);
 
  public:
+  VkImageAspectFlags Aspect() const override;
   VkImageLayout DefaultLayout() const override;
 
   const void *DeviceIdentity() const override;

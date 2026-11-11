@@ -32,7 +32,7 @@ class VulkanRenderTargetPool final {
   VkRenderPass RenderPass(const std::vector<ImageFormat> &colors,
                           ImageFormat depth,
                           const RenderingInfo *operations = nullptr);
-  ObjectPtr<Lease> Acquire(const std::vector<IVulkanImage *> &images, VkRenderPass pass);
+  ObjectPtr<Lease> Acquire(const std::vector<IVulkanImage *> &images, VkRenderPass pass, VkExtent2D extent);
   void Retire(VkImage image);
 
  private:

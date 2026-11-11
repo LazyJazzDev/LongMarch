@@ -176,13 +176,18 @@ bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
                                                 uint32_t first_element,
                                                 const std::vector<IImage *> &images) {
   const auto &binding = layout_.bindings[binding_index];
-  for (auto image : images)
-    if (!rhi::QueryInterfacePtr<IVulkanImage>(image).Get())
+  std::vector<IVulkanImage *> native_images;
+  native_images.reserve(images.size());
+  for (auto image : images) {
+    auto native_image = rhi::QueryInterfacePtr<IVulkanImage>(image);
+    if (!native_image)
       return false;
+    native_images.push_back(native_image.Get());
+  }
   auto native = device_->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(images.size());
   for (size_t i = 0; i < images.size(); ++i) {
-    infos[i].imageView = rhi::QueryInterfacePtr<IVulkanImage>(images[i]).Get()->BindingView();
+    infos[i].imageView = native_images[i]->BindingView();
     infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
@@ -275,14 +280,14 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
 bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
                                                 uint32_t first_element,
                                                 const std::vector<ITopLevelAccelerationStructure *> &values) {
+  std::vector<VkAccelerationStructureKHR> handles;
+  handles.reserve(values.size());
   for (auto value : values) {
     auto native = rhi::QueryInterfacePtr<IVulkanTopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
       return false;
+    handles.push_back(native->NativeStructure());
   }
-  std::vector<VkAccelerationStructureKHR> handles;
-  for (auto value : values)
-    handles.push_back(rhi::QueryInterfacePtr<IVulkanTopLevelAccelerationStructure>(value).Get()->NativeStructure());
   VkWriteDescriptorSetAccelerationStructureKHR as{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
   as.accelerationStructureCount = uint32_t(handles.size());
   as.pAccelerationStructures = handles.data();

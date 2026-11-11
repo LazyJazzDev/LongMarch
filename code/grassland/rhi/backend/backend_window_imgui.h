@@ -22,7 +22,7 @@ class ImGuiContextScope final {
 
 class WindowImGui final {
  public:
-  static std::unique_ptr<WindowImGui> Create(IBackendDevice *device,
+  static std::unique_ptr<WindowImGui> Create(IDevice *device,
                                              GLFWwindow *window,
                                              const char *font_file_path,
                                              float font_size);
@@ -39,7 +39,7 @@ class WindowImGui final {
               float reference_white_scale = 1.0f);
 
  private:
-  explicit WindowImGui(IBackendDevice *device) : device_(device) {
+  explicit WindowImGui(IDevice *device) : device_(device) {
   }
 
   bool Initialize(GLFWwindow *window, const char *font_file_path, float font_size);
@@ -48,7 +48,7 @@ class WindowImGui final {
               ImDrawData *data,
               ColorSpace color_space,
               float reference_white_scale);
-  IBackendDevice *device_;
+  IDevice *device_;
   ImGuiContext *context_{};
   bool platform_initialized_{};
   bool draw_data_ready_{};

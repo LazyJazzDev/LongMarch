@@ -50,7 +50,7 @@ MetalTemporalBufferLeaseImpl::~MetalTemporalBufferLeaseImpl() {
 }
 
 BufferDesc MetalTemporalBufferLeaseImpl::GetDesc() const {
-  return rhi::QueryInterfacePtr<IBuffer>(buffer_)->GetDesc();
+  return {MetalTemporalBufferPool::CapacityForLevel(level_)};
 }
 
 MTL::Buffer *MetalTemporalBufferLeaseImpl::NativeBuffer() const {

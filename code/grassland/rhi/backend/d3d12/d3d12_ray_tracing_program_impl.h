@@ -41,7 +41,7 @@ class D3D12RayTracingProgramImpl final
 
   std::array<std::vector<uint8_t>, 4> identifiers_;
 
-  void InitializeRayTracingProgram(IBackendDevice *device, const RayTracingProgramDesc &desc);
+  void InitializeRayTracingProgram(ID3D12Device *device, const RayTracingProgramDesc &desc);
 
   bool ValidateLayout() const;
 
@@ -49,7 +49,7 @@ class D3D12RayTracingProgramImpl final
 
   ShaderBindingTableDesc DefaultShaderBindingTableDesc() const;
 
-  IBackendDevice *device_{};
+  ID3D12Device *device_{};
 
   RayTracingProgramDesc desc_{};
 

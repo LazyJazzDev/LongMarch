@@ -339,8 +339,7 @@ std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> NativeGeometries(
 IBottomLevelAccelerationStructure *D3D12BottomLevelAccelerationStructureImpl::Create(
     ID3D12Device *device,
     const BottomLevelAccelerationStructureDesc &desc) {
-  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() &&
-      !rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery())
+  if (!device->GetPhysicalDevice().ray_tracing_pipeline_feature && !device->GetPhysicalDevice().ray_query_feature)
     return nullptr;
   if (!ValidateBottomLevelDesc(desc))
     return nullptr;
@@ -365,8 +364,7 @@ IBottomLevelAccelerationStructure *D3D12BottomLevelAccelerationStructureImpl::Cr
 ITopLevelAccelerationStructure *D3D12TopLevelAccelerationStructureImpl::Create(
     ID3D12Device *device,
     const TopLevelAccelerationStructureDesc &desc) {
-  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() &&
-      !rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery())
+  if (!device->GetPhysicalDevice().ray_tracing_pipeline_feature && !device->GetPhysicalDevice().ray_query_feature)
     return nullptr;
   auto object =
       std::unique_ptr<D3D12TopLevelAccelerationStructureImpl>(new D3D12TopLevelAccelerationStructureImpl(device, desc));

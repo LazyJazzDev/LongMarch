@@ -74,7 +74,7 @@ ObjectPtr<IBackendSubmissionToken> D3D12QueueImpl::Submit(const ObjectPtr<IBacke
   auto entry = pending_.insert(pending_.end(), {commands, completion});
   IBackendCommandContext::SubmitResult result;
   try {
-    commands->BindDownloads(completion.Get());
+    commands->BindDownloads(rhi::QueryInterfacePtr<rhi::ISubmissionToken>(completion.Get()).Get());
     result = commands->SubmitNative(native_info, signal);
     if (result == IBackendCommandContext::SUBMIT_RESULT_REJECTED) {
       pending_.erase(entry);
@@ -124,7 +124,7 @@ bool D3D12QueueImpl::CollectCompleted(uint64_t completed, bool timeline_valid) {
   return pending_.empty();
 }
 
-void D3D12QueueImpl::InitializeQueue(IBackendDevice *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
+void D3D12QueueImpl::InitializeQueue(ID3D12Device *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
   device_ = device;
   type_ = type;
   mutex_ = std::move(mutex);
@@ -138,7 +138,7 @@ uint64_t D3D12QueueImpl::NextSerial() {
   return ++serial_;
 }
 
-IBackendDevice *D3D12QueueImpl::Owner() const {
+ID3D12Device *D3D12QueueImpl::Owner() const {
   return device_;
 }
 

@@ -41,7 +41,7 @@ class VulkanRayTracingProgramImpl final
 
   uint64_t handle_size_{}, stride_{}, alignment_{};
 
-  void InitializeRayTracingProgram(IBackendDevice *device, const RayTracingProgramDesc &desc);
+  void InitializeRayTracingProgram(IVulkanDevice *device, const RayTracingProgramDesc &desc);
 
   bool ValidateLayout() const;
 
@@ -49,7 +49,7 @@ class VulkanRayTracingProgramImpl final
 
   ShaderBindingTableDesc DefaultShaderBindingTableDesc() const;
 
-  IBackendDevice *device_{};
+  IVulkanDevice *device_{};
 
   RayTracingProgramDesc desc_{};
 

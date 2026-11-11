@@ -2,6 +2,7 @@
 
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_buffer.h"
+#include "grassland/rhi/rhix/rhix_buffer.h"
 
 namespace query_test {
 class ILeft : public grassland::rhi::IObject {};
@@ -40,6 +41,37 @@ class Extended final : public Object<IExtended> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ILeft, IExtended, ILeft)
 };
+
+class SideBuffer final : public Object<ILeft, IBuffer> {
+ public:
+  LONGMARCH_RHI_FINAL_QUERY(ILeft, ILeft, IBuffer)
+
+  BufferDesc GetDesc() const override {
+    return {4096};
+  }
+};
+
+TEST(RhiQueryInterface, TypedWrapperPreservesNoncanonicalInterfaceThroughCopyMoveAndRelease) {
+  auto object = ObjPtr<SideBuffer>(new SideBuffer);
+  auto buffer = static_cast<IBuffer *>(object.Get());
+  ObjPtr<IObject> identity = buffer->QueryInterface<IObject>();
+  ASSERT_NE(identity.Get(), static_cast<IObject *>(buffer));
+  buffer->AddRef();
+  grassland::rhix::Buffer wrapped(buffer);
+  auto copy = wrapped;
+  auto moved = std::move(copy);
+  EXPECT_EQ(copy.Get(), nullptr);
+  wrapped.Release();
+  EXPECT_EQ(wrapped.Get(), nullptr);
+  EXPECT_EQ(moved.Get(), buffer);
+  EXPECT_EQ(moved.GetDesc().size, 4096);
+  ObjPtr<ILeft> side = moved.QueryInterface<ILeft>();
+  EXPECT_EQ(side.Get(), static_cast<ILeft *>(object.Get()));
+  moved.Release();
+  side.Release();
+  identity.Release();
+  EXPECT_TRUE(object->IsUniquelyOwned());
+}
 
 static_assert(std::is_abstract_v<Object<ILeft>>);
 static_assert(std::is_final_v<Diamond>);

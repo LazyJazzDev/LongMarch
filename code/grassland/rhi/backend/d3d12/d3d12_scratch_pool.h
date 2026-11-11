@@ -20,6 +20,7 @@ class D3D12ScratchPool final {
   ID3D12Device *device_;
   std::mutex mutex_;
   ObjectPtr<ID3D12AllocatedBuffer> buffer_;
+  uint64_t capacity_{};
   std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> peaks_;
 };
 }  // namespace grassland::rhi::backend::d3d12

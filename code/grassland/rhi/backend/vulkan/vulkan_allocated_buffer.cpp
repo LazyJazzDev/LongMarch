@@ -75,11 +75,10 @@ IVulkanAllocatedBuffer *VulkanAllocatedBufferImpl::Create(IVulkanDevice *device,
                         : VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                               VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-  if (rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() ||
-      rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery()) {
+  if (device->GetPhysicalDevice().ray_tracing_pipeline_feature || device->GetPhysicalDevice().ray_query_feature) {
     info.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-    if (rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline())
+    if (device->GetPhysicalDevice().ray_tracing_pipeline_feature)
       info.usage |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
   }
   VmaAllocationCreateInfo memory{};

@@ -23,7 +23,7 @@ class IBackendCommandContext : public IObject {
   void DestroyCommandContext();
 
  public:
-  virtual void BindDownloads(IBackendSubmissionToken *submission) = 0;
+  virtual void BindDownloads(rhi::ISubmissionToken *submission) = 0;
   virtual void ReleaseDownloads() = 0;
   virtual bool Seal() = 0;
   virtual const void *DeviceIdentity() const = 0;

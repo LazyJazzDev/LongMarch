@@ -141,7 +141,7 @@ IShaderBindingTable *D3D12RayTracingProgramImpl::BuildShaderBindingTable(const S
     for (size_t i = 0; i < indices[t]->size(); ++i)
       std::memcpy(data.data() + offset + i * stride, identifiers_[t].data() + (*indices[t])[i] * stride, stride);
   }
-  auto owner = rhi::QueryInterfacePtr<ID3D12Device>(device_).Get();
+  auto owner = device_;
   auto buffer =
       ObjectPtr<ID3D12AllocatedBuffer>::Adopt(ID3D12AllocatedBuffer::Create(owner, {uint64_t(data.size())}, true));
   if (!buffer || !buffer->Write(data.data(), data.size()))
@@ -158,8 +158,7 @@ rhi::IRayTracingProgram *ID3D12RayTracingProgram::Create(ID3D12Device *device, c
   return D3D12RayTracingProgramImpl::Create(device, desc);
 }
 
-void D3D12RayTracingProgramImpl::InitializeRayTracingProgram(IBackendDevice *device,
-                                                             const RayTracingProgramDesc &desc) {
+void D3D12RayTracingProgramImpl::InitializeRayTracingProgram(ID3D12Device *device, const RayTracingProgramDesc &desc) {
   device_ = device;
   desc_ = desc;
 

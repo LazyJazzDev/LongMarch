@@ -173,6 +173,45 @@ Correctness is checked separately using exact raw image comparisons; capture
 hashes are included with the samples. These measurements do not estimate
 Metal performance or Linux performance.
 
+## Internal interface access audit
+
+The follow-up audit covers RHI helpers, all three backends, and RHIX wrappers.
+Compared with `a0579640`, `QueryInterfacePtr` call sites fell from 364 to 222
+(142 removed). This is a source count, not a measured performance improvement.
+
+- WindowImGui and ImagePresenter retain the borrowed `IDevice` interface they
+  actually use. Download tokens retain `ISubmissionToken` directly.
+- Native queues, contexts, windows, ray-tracing programs, and Vulkan/Metal core
+  owners store the appropriate backend interface. Native queue lookup no longer
+  goes through a public queue and back. Device feature checks use physical-device
+  information already available to the backend.
+- Graphics recording uses the original frontend program/image arguments for
+  descriptions and validation. Vulkan framebuffer creation receives its extent;
+  image barriers obtain the native aspect mask directly. Buffer copies share a
+  private native-interface helper after entry-point validation, avoiding the
+  upload/download lease-to-frontend-to-native roundtrip.
+- Descriptor writes reuse interfaces/handles obtained during validation.
+  Collector iterations reuse their timeline query. Scratch pools track their
+  allocation capacity; temporal leases derive capacity from their bucket level.
+- GLFW registration receives both interfaces from the final window object.
+  Lookup retains the frontend interface for the callback, keeping both borrowed
+  facets alive without querying during input dispatch or introducing a cycle.
+- RHIX `Get()` recovers the exact interface subobject supplied to its typed
+  constructor. The container preserves that subobject rather than canonicalizing
+  it to `IObject`. This uses a defined static downcast along the same frontend
+  inheritance path, never a cast between frontend and backend facets. A test
+  covers a noncanonical buffer interface, copy/move, release, and explicit QI.
+
+Queries remain at capability boundaries: external resources/events need backend
+and ownership validation; heterogeneous binding references need the requested
+native resource capability; factories expose an owned frontend interface from
+native storage; submission completion and frontend observation use independent
+facets; resource retention requests canonical object identity. RHIX acceleration
+structure subtype access still queries because the assignable base wrapper can
+hold a different subtype. These are not replaced with assumed cross-facet casts.
+Caching raw acceleration-structure handles across recordings is also avoided:
+the backing allocation can change during build/compaction.
+
 ## Validation
 
 The following checks apply to the implementation with parallel interface chains.
@@ -180,17 +219,18 @@ The performance measurements above apply only to the older implementation.
 
 - Windows Release: 218 passed, two Debug-only queue-diagnostic tests skipped
   (`--gtest_filter=-*RayTracing*`, `LONGMARCH_RHI_WINDOW_TESTS=1`).
-- Windows Debug: 44 interface, timeline, offscreen, window, and ImGui tests
-  passed, including the two queue diagnostics skipped in Release.
+- After the final descriptor/GLFW/RHIX changes, Windows Release targeted
+  regression: 60 passed, two Debug-only checks skipped. Windows Debug: 47
+  interface, timeline, offscreen, window, ImGui, and scratch-pool tests passed.
 - Main versus final Release: ten raw color/depth outputs are byte-identical
   across Vulkan/D3D12 cube, texture, ray_query, and raytracing demos (nine frames
   per capture run). The full ray-tracing regression suite was not rerun because
   of the previously identified DXR compressed-BLAS validation issue; both
   backends' ray-tracing pipeline demos were explicitly exercised instead.
 - Meshy-PC-3090: GCC Release build passed; isolated regression runs yielded
-  103 passed, nine skipped, and no failures. Each test runs in a fresh process
+  104 passed, nine skipped, and no failures. Each test runs in a fresh process
   to avoid the previously observed repeated-Vulkan-load/static-TLS problem.
-- Clang syntax checks passed for 88 RHI/test translation units. Four interface
+- Clang syntax checks passed for 88 RHI/test translation units. Five interface
   tests executed successfully with both GCC and Clang with RTTI disabled.
 - Audit: 93 surviving library UUID registrations remain unique and unchanged.
   RHI contains no `dynamic_cast` or virtual inheritance. All 22 former state

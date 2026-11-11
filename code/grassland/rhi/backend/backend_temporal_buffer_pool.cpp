@@ -33,7 +33,7 @@ void TemporalBufferPool<DeviceType, BufferType, LeaseType>::Bucket::Record(size_
 
 template <typename DeviceType, typename BufferType, typename LeaseType>
 ObjectPtr<LeaseType> TemporalBufferPool<DeviceType, BufferType, LeaseType>::Acquire(uint64_t size) {
-  uint64_t capacity = 65536;
+  uint64_t capacity = CapacityForLevel(0);
   size_t level = 0;
   while (capacity < size && capacity <= UINT64_MAX / 2) {
     capacity *= 2;
@@ -95,7 +95,7 @@ void TemporalBufferPool<DeviceType, BufferType, LeaseType>::ReleaseBuffer(Buffer
 
 template <typename DeviceType, typename BufferType, typename LeaseType>
 std::pair<size_t, size_t> TemporalBufferPool<DeviceType, BufferType, LeaseType>::GetBufferCounts(uint64_t size) const {
-  uint64_t capacity = 65536;
+  uint64_t capacity = CapacityForLevel(0);
   size_t level = 0;
   while (capacity < size && capacity <= UINT64_MAX / 2) {
     capacity *= 2;

@@ -11,7 +11,7 @@ class Sampler : public ObjectContainer {
   }
 
   rhi::ISampler *Get() const noexcept {
-    return rhi::QueryInterfacePtr<rhi::ISampler>(GetObject()).Get();
+    return static_cast<rhi::ISampler *>(GetObject());
   }
 
   const rhi::SamplerDesc &GetDesc() const {

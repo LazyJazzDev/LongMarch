@@ -53,6 +53,12 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IBacke
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
+  // Inputs and ranges have been validated by the recording entry point.
+  bool CopyBuffer(IMetalBuffer *source,
+                  uint64_t source_offset,
+                  IMetalBuffer *destination,
+                  uint64_t destination_offset,
+                  uint64_t size);
   MetalCommandContextImpl(IMetalQueue *queue);
   bool EndRecording() override;
   std::vector<MTL::Resource *> AccelerationResources();
@@ -61,10 +67,10 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IBacke
   void ApplyBindings();
   void ApplyScissor();
   bool ValidateDraw(bool indexed);
-  IMetalProgram *program_{};
+  IProgram *program_{};
   IMetalComputeProgram *compute_program_{};
   IMetalProgramBase *native_program_{};
-  IMetalImage *render_target_{};
+  IImage *render_target_{};
   std::vector<ImageFormat> color_formats_;
   std::vector<IImage *> color_targets_;
   ImageFormat depth_format_{IMAGE_FORMAT_UNKNOWN};
@@ -98,12 +104,12 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IBacke
 
   bool RenderingMatches(const IProgram *program) const;
 
-  void InitializeCommandContext(IBackendQueue *queue);
+  void InitializeCommandContext(IMetalQueue *queue);
 
  public:
   rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
 
-  void BindDownloads(IBackendSubmissionToken *submission) override;
+  void BindDownloads(rhi::ISubmissionToken *submission) override;
 
   void ReleaseDownloads() override;
 
@@ -133,7 +139,7 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IBacke
   RenderingInfo rendering_{};
   bool recording_failed_{};
   bool sealed_{};
-  IBackendQueue *queue_{};
+  IMetalQueue *queue_{};
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
   bool submitted_{};
   std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};

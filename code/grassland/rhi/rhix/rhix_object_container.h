@@ -29,6 +29,9 @@ class ObjectContainer {
   ObjectContainer &operator=(const ObjectContainer &) noexcept;
   ObjectContainer &operator=(ObjectContainer &&) noexcept;
   ~ObjectContainer();
+  // Preserves the interface subobject passed by the typed wrapper constructor;
+  // this is not a QueryInterface(IObject) canonical identity conversion.
+  // Typed wrappers can recover that same interface without querying it again.
   rhi::IObject *GetObject() const noexcept;
 
  private:

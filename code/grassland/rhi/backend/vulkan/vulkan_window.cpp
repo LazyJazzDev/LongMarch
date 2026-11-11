@@ -55,7 +55,7 @@ VulkanWindowImpl::VulkanWindowImpl(IVulkanDevice *device) : device_(device) {
 }
 
 VulkanWindowImpl::~VulkanWindowImpl() {
-  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
+  auto queue = queue_;
   glfw::UnregisterWindow(GLFWWindow());
   std::lock_guard<std::mutex> lock(queue->QueueMutex());
   vkQueueWaitIdle(queue->NativeQueue());
@@ -92,7 +92,7 @@ rhi::IWindow *VulkanWindowImpl::Create(IVulkanDevice *device, const WindowDesc &
 }
 
 ObjectPtr<IBackendImage> VulkanWindowImpl::AcquireNativeFrame() {
-  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
+  auto queue = queue_;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
@@ -226,7 +226,7 @@ VkSemaphore VulkanWindowImpl::RenderSemaphore() const {
 }
 
 VkResult VulkanWindowImpl::PresentFrame() {
-  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
+  auto queue = queue_;
   const auto rendered = RenderSemaphore();
   VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
   present.waitSemaphoreCount = 1;
@@ -316,7 +316,7 @@ void VulkanWindowImpl::DestroySwapchain() {
 }
 
 bool VulkanWindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
-  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
+  auto queue = queue_;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
   int width, height;
@@ -440,7 +440,8 @@ bool VulkanWindowImpl::EnableImGui(bool enabled, const char *font_file_path, flo
     return true;
   }
   if (!imgui_)
-    imgui_ = WindowImGui::Create(device_, window_, font_file_path, font_size);
+    imgui_ =
+        WindowImGui::Create(rhi::QueryInterfacePtr<rhi::IDevice>(device_).Get(), window_, font_file_path, font_size);
   return bool(imgui_);
 }
 
@@ -478,7 +479,7 @@ bool VulkanWindowImpl::RecordPresentImage(ICommandContext *commands, IImage *ima
   if (!frame)
     return false;
   if (!presenter_)
-    presenter_ = std::make_unique<ImagePresenter>(device_);
+    presenter_ = std::make_unique<ImagePresenter>(rhi::QueryInterfacePtr<rhi::IDevice>(device_).Get());
   return presenter_->Record(commands, image, frame.Get(), color_space, GetColorSpace(), GetHDRReferenceWhiteScale());
 }
 
@@ -711,16 +712,14 @@ void VulkanWindowImpl::DestroyWindow() {
   glfw::DestroyWindow(window_);
 }
 
-bool VulkanWindowImpl::InitializeWindow(IBackendDevice *device, const WindowDesc &desc) {
-  queue_ = rhi::QueryInterfacePtr<IBackendQueue>(
-               ObjectPtr<IQueue>::Adopt(rhi::QueryInterfacePtr<IDevice>(device)->GetQueue(QUEUE_TYPE_MAIN)).Get())
-               .Get();
+bool VulkanWindowImpl::InitializeWindow(IVulkanDevice *device, const WindowDesc &desc) {
+  queue_ = device->GetNativeQueue(QUEUE_TYPE_MAIN);
   requested_mode_ = desc.present_mode;
   requested_color_space_ = desc.color_space;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
   if (!window_)
     return false;
-  glfw::RegisterWindow(this);
+  glfw::RegisterWindow(this, this);
   return true;
 }
 

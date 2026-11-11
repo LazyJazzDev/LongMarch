@@ -20,6 +20,7 @@ class MetalScratchPool final {
   IMetalDevice *device_;
   std::mutex mutex_;
   ObjectPtr<IMetalAllocatedBuffer> buffer_;
+  uint64_t capacity_{};
   std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> peaks_;
 };
 }  // namespace grassland::rhi::backend::metal

@@ -43,8 +43,7 @@ VkClearValue NativeClearValue(ImageFormat format, const ClearValue &value) {
 }
 }  // namespace
 
-VulkanCommandContextImpl::VulkanCommandContextImpl(IVulkanQueue *queue)
-    : device_(rhi::QueryInterfacePtr<IVulkanDevice>(queue->Owner()).Get()) {
+VulkanCommandContextImpl::VulkanCommandContextImpl(IVulkanQueue *queue) : device_(queue->Owner()) {
   InitializeCommandContext(queue);
 }
 
@@ -88,7 +87,7 @@ bool VulkanCommandContextImpl::TransitionImage(IVulkanImage *image,
     barrier.dstAccessMask = access;
     barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image->NativeImage();
-    barrier.subresourceRange = {ImageAspect(rhi::QueryInterfacePtr<IImage>(image)->GetDesc().format), 0, 1, 0, 1};
+    barrier.subresourceRange = {image->Aspect(), 0, 1, 0, 1};
     vkCmdPipelineBarrier(command_, current.stages, stages, 0, 0, nullptr, 0, nullptr, 1, &barrier);
     current = {layout, stages, access};
   } else {
@@ -156,7 +155,7 @@ bool VulkanCommandContextImpl::CmdPresent(rhi::IWindow *window) {
     return false;
   if (!RetainResource(frame.Get()))
     return false;
-  if (!target->RecordImGui(this, rhi::QueryInterfacePtr<IImage>(frame.Get()).Get())) {
+  if (!target->RecordImGui(this, frame_image.Get())) {
     recording_failed_ = true;
     return false;
   }
@@ -192,7 +191,7 @@ bool VulkanCommandContextImpl::EndRecording() {
 }
 
 IBackendCommandContext::SubmitResult VulkanCommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
-  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
+  auto queue = queue_;
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -330,6 +329,14 @@ bool VulkanCommandContextImpl::CmdCopyBuffer(IBuffer *source,
     recording_failed_ = true;
     return false;
   }
+  return CopyBuffer(src, source_offset, dst, destination_offset, size);
+}
+
+bool VulkanCommandContextImpl::CopyBuffer(IVulkanBuffer *src,
+                                          uint64_t source_offset,
+                                          IVulkanBuffer *dst,
+                                          uint64_t destination_offset,
+                                          uint64_t size) {
   if (!RetainResource(src))
     return false;
   if (!RetainResource(dst))
@@ -398,7 +405,7 @@ bool VulkanCommandContextImpl::CmdBindProgram(IProgram *program) {
   vertex_buffers_.assign(program->GetDesc().vertex_bindings.size(), nullptr);
   groups_.assign(program->GetDesc().pipeline_layout.groups.size(), nullptr);
 
-  program_ = native;
+  program_ = program;
   native_program_ = native;
   compute_active_ = false;
   ray_program_ = nullptr;
@@ -423,7 +430,7 @@ bool VulkanCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
                          VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))
       return false;
     images.push_back(image);
-    formats.push_back(rhi::QueryInterfacePtr<IImage>(image)->GetDesc().format);
+    formats.push_back(color.color_attachment->GetDesc().format);
   }
   auto depth = rhi::QueryInterfacePtr<IVulkanImage>(rendering_.depth_stencil.image).Get();
   if (depth) {
@@ -433,7 +440,7 @@ bool VulkanCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
       return false;
     images.push_back(depth);
   }
-  const auto depth_format = depth ? rhi::QueryInterfacePtr<IImage>(depth)->GetDesc().format : IMAGE_FORMAT_UNKNOWN;
+  const auto depth_format = depth ? rendering_.depth_stencil.image->GetDesc().format : IMAGE_FORMAT_UNKNOWN;
   auto pass = device_->Procedures().CmdBeginRendering
                   ? VK_NULL_HANDLE
                   : device_->RenderTargets().RenderPass(formats, depth_format, &rendering_);
@@ -441,7 +448,10 @@ bool VulkanCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
     recording_failed_ = true;
     return false;
   }
-  auto lease = device_->RenderTargets().Acquire(images, pass);
+  const auto desc = (rendering_.color_attachments.empty() ? rendering_.depth_stencil.image
+                                                          : rendering_.color_attachments.front().color_attachment)
+                        ->GetDesc();
+  auto lease = device_->RenderTargets().Acquire(images, pass, {desc.width, desc.height});
   if (!lease || !RetainResource(lease.Get())) {
     recording_failed_ = true;
     return false;
@@ -482,7 +492,6 @@ bool VulkanCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
     stencil_info.loadOp = loads[ds.stencil_load_op];
     stencil_info.storeOp = stores[ds.stencil_store_op];
   }
-  auto desc = rhi::QueryInterfacePtr<IImage>(images.front())->GetDesc();
   if (auto begin_rendering = device_->Procedures().CmdBeginRendering) {
     VkRenderingInfo rendering{VK_STRUCTURE_TYPE_RENDERING_INFO};
     rendering.renderArea.extent = {desc.width, desc.height};
@@ -513,8 +522,7 @@ bool VulkanCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *bu
   }
   if (!RetainResource(native))
     return false;
-  if (!program_ || binding >= rhi::QueryInterfacePtr<IProgram>(program_)->GetDesc().vertex_bindings.size() ||
-      offset >= buffer->GetDesc().size) {
+  if (!program_ || binding >= program_->GetDesc().vertex_bindings.size() || offset >= buffer->GetDesc().size) {
     recording_failed_ = true;
     return false;
   }
@@ -593,7 +601,7 @@ bool VulkanCommandContextImpl::CmdDraw(uint32_t vertex_count,
     return false;
   }
   if (std::find(vertex_buffers_.begin(), vertex_buffers_.end(), nullptr) != vertex_buffers_.end() ||
-      !RenderingMatches(rhi::QueryInterfacePtr<IProgram>(program_).Get())) {
+      !RenderingMatches(program_)) {
     recording_failed_ = true;
     return false;
   }
@@ -617,7 +625,7 @@ bool VulkanCommandContextImpl::CmdDrawIndexed(uint32_t index_count,
     return false;
   }
   if (std::find(vertex_buffers_.begin(), vertex_buffers_.end(), nullptr) != vertex_buffers_.end() ||
-      !RenderingMatches(rhi::QueryInterfacePtr<IProgram>(program_).Get())) {
+      !RenderingMatches(program_)) {
     recording_failed_ = true;
     return false;
   }
@@ -871,8 +879,7 @@ bool VulkanCommandContextImpl::CmdDispatchRays(uint32_t width,
 #else
     auto custom = rhi::QueryInterfacePtr<IBackendShaderBindingTable>(sbt).Get();
 #endif
-    if (!custom || rhi::QueryInterfacePtr<IShaderBindingTable>(custom)->GetProgram() !=
-                       rhi::QueryInterfacePtr<IRayTracingProgram>(ray_program_).Get()) {
+    if (!custom || sbt->GetProgram() != rhi::QueryInterfacePtr<IRayTracingProgram>(ray_program_).Get()) {
       recording_failed_ = true;
       return false;
     }
@@ -900,7 +907,7 @@ IDownloadToken *VulkanCommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uin
     return nullptr;
   }
   auto lease = device_->DownloadPool().Acquire(size);
-  if (!lease || !CmdCopyBuffer(buffer, offset, rhi::QueryInterfacePtr<IBuffer>(lease.Get()).Get(), 0, size)) {
+  if (!lease || !CopyBuffer(native, offset, lease.Get(), 0, size)) {
     recording_failed_ = true;
     return nullptr;
   }
@@ -1027,7 +1034,7 @@ bool VulkanCommandContextImpl::PrepareRendering(const RenderingInfo &info) {
   std::vector<IImage *> images;
   auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
     auto native = rhi::QueryInterfacePtr<IBackendImage>(image).Get();
-    if (!native || !rhi::QueryInterfacePtr<IImage>(native)->IsValid() ||
+    if (!native || !image->IsValid() ||
         (native->DeviceIdentity() != DeviceIdentity() || !native->SupportsQueue(OwnerQueue())) ||
         IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
         load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE || store > ATTACHMENT_STORE_OP_DISCARD)
@@ -1068,7 +1075,7 @@ bool VulkanCommandContextImpl::RenderingMatches(const IProgram *program) const {
          (rendering_.depth_stencil.image ? rendering_.depth_stencil.image->GetDesc().format : IMAGE_FORMAT_UNKNOWN);
 }
 
-void VulkanCommandContextImpl::InitializeCommandContext(IBackendQueue *queue) {
+void VulkanCommandContextImpl::InitializeCommandContext(IVulkanQueue *queue) {
   queue_ = queue;
 }
 
@@ -1082,7 +1089,7 @@ rhi::ISubmissionToken *VulkanCommandContextImpl::Submit(const rhi::SubmitInfo &i
   return nullptr;
 }
 
-void VulkanCommandContextImpl::BindDownloads(IBackendSubmissionToken *submission) {
+void VulkanCommandContextImpl::BindDownloads(rhi::ISubmissionToken *submission) {
   for (const auto &token : downloads_)
     token->BindSubmission(submission);
 }

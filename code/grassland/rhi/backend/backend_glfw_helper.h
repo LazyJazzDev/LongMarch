@@ -6,7 +6,8 @@ struct GLFWwindow;
 namespace grassland::rhi::backend {
 
 namespace glfw {
-void RegisterWindow(IBackendWindow *window);
+// Both borrowed interfaces must belong to the same window.
+void RegisterWindow(IWindow *window, IBackendWindow *backend);
 void UnregisterWindow(GLFWwindow *window);
 bool Initialize();
 bool PollEvents();

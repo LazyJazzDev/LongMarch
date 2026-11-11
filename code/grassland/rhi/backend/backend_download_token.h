@@ -16,7 +16,7 @@ struct DownloadLayout {
 
 class IBackendDownloadToken : public IObject {
  public:
-  virtual void BindSubmission(IBackendSubmissionToken *submission) = 0;
+  virtual void BindSubmission(rhi::ISubmissionToken *submission) = 0;
 
  protected:
   virtual bool CopyData(void *destination) const = 0;

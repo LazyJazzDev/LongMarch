@@ -91,7 +91,7 @@ ObjectPtr<IBackendSubmissionToken> MetalQueueImpl::Submit(const ObjectPtr<IBacke
   auto entry = pending_.insert(pending_.end(), {commands, completion});
   IBackendCommandContext::SubmitResult result;
   try {
-    commands->BindDownloads(completion.Get());
+    commands->BindDownloads(rhi::QueryInterfacePtr<rhi::ISubmissionToken>(completion.Get()).Get());
     result = commands->SubmitNative(native_info, signal);
     if (result == IBackendCommandContext::SUBMIT_RESULT_REJECTED) {
       pending_.erase(entry);
@@ -141,7 +141,7 @@ bool MetalQueueImpl::CollectCompleted(uint64_t completed, bool timeline_valid) {
   return pending_.empty();
 }
 
-void MetalQueueImpl::InitializeQueue(IBackendDevice *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
+void MetalQueueImpl::InitializeQueue(IMetalDevice *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
   device_ = device;
   type_ = type;
   mutex_ = std::move(mutex);
@@ -155,7 +155,7 @@ uint64_t MetalQueueImpl::NextSerial() {
   return ++serial_;
 }
 
-IBackendDevice *MetalQueueImpl::Owner() const {
+IMetalDevice *MetalQueueImpl::Owner() const {
   return device_;
 }
 

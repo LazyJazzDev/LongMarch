@@ -146,15 +146,16 @@ bool MetalBindingVersionImpl::WriteDescriptors(size_t b, uint32_t first, const s
 bool MetalBindingVersionImpl::WriteDescriptors(size_t b,
                                                uint32_t first,
                                                const std::vector<ITopLevelAccelerationStructure *> &values) {
+  std::vector<MTL::AccelerationStructure *> handles;
+  handles.reserve(values.size());
   for (auto value : values) {
     auto native = rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
       return false;
+    handles.push_back(native->NativeStructure());
   }
   for (size_t i = 0; i < values.size(); ++i) {
-    encoder_->setAccelerationStructure(
-        rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(values[i]).Get()->NativeStructure(),
-        offsets_[b] + first + i);
+    encoder_->setAccelerationStructure(handles[i], offsets_[b] + first + i);
     initialized_[b][first + i] = true;
   }
   return true;

@@ -74,6 +74,10 @@ void VulkanSwapChainImageImpl::InitializeVulkanImage(ImageDesc desc,
   default_layout_ = default_layout;
 }
 
+VkImageAspectFlags VulkanSwapChainImageImpl::Aspect() const {
+  return ImageAspect(desc_.format);
+}
+
 VkImageLayout VulkanSwapChainImageImpl::DefaultLayout() const {
   return default_layout_;
 }

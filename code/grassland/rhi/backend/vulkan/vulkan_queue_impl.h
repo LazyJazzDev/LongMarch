@@ -27,7 +27,7 @@ class VulkanQueueImpl final : public Object<rhi::IQueue, IVulkanQueue> {
   bool CollectCompleted(uint64_t completed, bool timeline_valid) override;
 
  private:
-  void InitializeQueue(IBackendDevice *device,
+  void InitializeQueue(IVulkanDevice *device,
                        QueueType type,
                        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
 
@@ -37,7 +37,7 @@ class VulkanQueueImpl final : public Object<rhi::IQueue, IVulkanQueue> {
   // Called under QueueMutex, in native submission order.
   uint64_t NextSerial() override;
 
-  IBackendDevice *Owner() const override;
+  IVulkanDevice *Owner() const override;
 
   QueueType GetType() const override;
 
@@ -48,7 +48,7 @@ class VulkanQueueImpl final : public Object<rhi::IQueue, IVulkanQueue> {
   };
 
   std::list<Submission> pending_{};
-  IBackendDevice *device_{};
+  IVulkanDevice *device_{};
   QueueType type_{};
   // Logical queues that share a native queue also share its host synchronization.
   std::shared_ptr<std::mutex> mutex_{};

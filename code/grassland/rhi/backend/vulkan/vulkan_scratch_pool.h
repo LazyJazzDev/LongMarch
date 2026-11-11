@@ -20,6 +20,7 @@ class VulkanScratchPool final {
   IVulkanDevice *device_;
   std::mutex mutex_;
   ObjectPtr<IVulkanAllocatedBuffer> buffer_;
+  uint64_t capacity_{};
   std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> peaks_;
 };
 }  // namespace grassland::rhi::backend::vulkan

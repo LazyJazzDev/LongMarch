@@ -14,12 +14,11 @@ class D3D12DownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackend
   ~D3D12DownloadTokenImpl() override;
 
   SubmissionStatus GetStatus() const override {
-    return submission_ ? rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->GetStatus()
-                       : SUBMISSION_STATUS_PENDING;
+    return submission_ ? submission_->GetStatus() : SUBMISSION_STATUS_PENDING;
   }
 
   bool WaitHost() const override {
-    return submission_ && rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->WaitHost();
+    return submission_ && submission_->WaitHost();
   }
 
   uint64_t GetSize() const override {
@@ -32,8 +31,8 @@ class D3D12DownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackend
     return CopyData(destination);
   }
 
-  void BindSubmission(IBackendSubmissionToken *submission) override {
-    submission_ = ObjectPtr<IBackendSubmissionToken>::Retain(submission);
+  void BindSubmission(rhi::ISubmissionToken *submission) override {
+    submission_ = ObjectPtr<ISubmissionToken>::Retain(submission);
   }
 
  private:
@@ -49,6 +48,6 @@ class D3D12DownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackend
 
   uint64_t size_{};
 
-  ObjectPtr<IBackendSubmissionToken> submission_{};
+  ObjectPtr<ISubmissionToken> submission_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

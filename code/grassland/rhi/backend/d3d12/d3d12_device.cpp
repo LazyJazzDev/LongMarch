@@ -55,17 +55,14 @@ void D3D12DeviceImpl::WaitForProgress(const std::vector<Event> &next) {
   std::array<HANDLE, 3> handles{collector_shutdown_};
   DWORD count = 1;
   for (const auto &event : next) {
+    auto timeline = rhi::QueryInterfacePtr<ID3D12Timeline>(event.timeline);
     for (size_t index = 0; index < queues_.size(); ++index) {
-      if (!queues_[index] || rhi::QueryInterfacePtr<ITimeline>(queues_[index]->GetTimeline()).Get() != event.timeline)
+      if (!queues_[index] || queues_[index]->GetTimeline() != timeline.Get())
         continue;
       auto &handle = progress_events_[index];
       if (progress_values_[index] != event.value) {
         ResetEvent(handle);
-        if (!Check(rhi::QueryInterfacePtr<ID3D12Timeline>(event.timeline)
-                       .Get()
-                       ->NativeFence()
-                       ->SetEventOnCompletion(event.value, handle),
-                   "Listen for queue progress")) {
+        if (!Check(timeline->NativeFence()->SetEventOnCompletion(event.value, handle), "Listen for queue progress")) {
           return;
         }
         progress_values_[index] = event.value;
@@ -147,7 +144,7 @@ rhi::IDevice *D3D12DeviceImpl::Create(PhysicalDevice info, ICore *core, ComPtr<:
       SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
     object->tearing_ = tearing;
   for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
-    object->queues_[type] = ObjectPtr<IBackendQueue>::Adopt(ID3D12Queue::Create(object.get(), type));
+    object->queues_[type] = ObjectPtr<ID3D12Queue>::Adopt(ID3D12Queue::Create(object.get(), type));
     if (!object->queues_[type])
       return nullptr;
   }
@@ -334,6 +331,12 @@ bool D3D12DeviceImpl::SupportGeometryShader() const {
   return info_.geometry_shader_feature;
 }
 
+ID3D12Queue *D3D12DeviceImpl::GetNativeQueue(QueueType type) const {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return queues_[type].Get();
+}
+
 rhi::IQueue *D3D12DeviceImpl::GetQueue(QueueType type) {
   if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
     return nullptr;
@@ -383,9 +386,10 @@ void D3D12DeviceImpl::Collect() {
       if (!queue)
         continue;
       uint64_t completed = 0;
-      const bool timeline_valid = rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline())->GetCompletedValue(completed);
+      auto timeline = rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline());
+      const bool timeline_valid = timeline->GetCompletedValue(completed);
       if (timeline_valid && completed != UINT64_MAX)
-        next.push_back({rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline()).Get(), completed + 1});
+        next.push_back({timeline.Get(), completed + 1});
       if (!queue->CollectCompleted(completed, timeline_valid))
         empty = false;
     }

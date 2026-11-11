@@ -9,7 +9,7 @@ Queue::Queue(rhi::IQueue *object) noexcept : ObjectContainer(object) {
 }
 
 rhi::IQueue *Queue::Get() const noexcept {
-  return rhi::QueryInterfacePtr<rhi::IQueue>(GetObject()).Get();
+  return static_cast<rhi::IQueue *>(GetObject());
 }
 
 rhi::QueueType Queue::GetType() const {

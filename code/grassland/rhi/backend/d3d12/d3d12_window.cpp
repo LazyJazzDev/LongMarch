@@ -76,8 +76,8 @@ D3D12WindowImpl::D3D12WindowImpl(ID3D12Device *device) : device_(device) {
 
 D3D12WindowImpl::~D3D12WindowImpl() {
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->QueueMutex());
-  rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->WaitIdle();
+  std::lock_guard<std::mutex> lock(queue_->QueueMutex());
+  queue_->WaitIdle();
   ReleaseNextImage();
 
   DestroyWindow();
@@ -164,10 +164,10 @@ bool D3D12WindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return true;
-  std::lock_guard<std::mutex> lock(rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->QueueMutex());
+  std::lock_guard<std::mutex> lock(queue_->QueueMutex());
   const UINT flags = device_->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
   if (swapchain_) {
-    if (!rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->WaitIdle())
+    if (!queue_->WaitIdle())
       return false;
     ++generation_;
     valid_ = false;
@@ -190,9 +190,7 @@ bool D3D12WindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
     desc.Flags = flags;
     ComPtr<IDXGISwapChain1> chain;
     const HWND hwnd = glfwGetWin32Window(GLFWWindow());
-    if (!Check(device_->Factory()->CreateSwapChainForHwnd(
-                   rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->NativeQueue(), hwnd, &desc, nullptr,
-                   nullptr, &chain),
+    if (!Check(device_->Factory()->CreateSwapChainForHwnd(queue_->NativeQueue(), hwnd, &desc, nullptr, nullptr, &chain),
                "CreateSwapChainForHwnd") ||
         !Check(chain.As(&swapchain_), "Query IDXGISwapChain3"))
       return false;
@@ -231,7 +229,8 @@ bool D3D12WindowImpl::EnableImGui(bool enabled, const char *font_file_path, floa
     return true;
   }
   if (!imgui_)
-    imgui_ = WindowImGui::Create(device_, window_, font_file_path, font_size);
+    imgui_ =
+        WindowImGui::Create(rhi::QueryInterfacePtr<rhi::IDevice>(device_).Get(), window_, font_file_path, font_size);
   return bool(imgui_);
 }
 
@@ -269,7 +268,7 @@ bool D3D12WindowImpl::RecordPresentImage(ICommandContext *commands, IImage *imag
   if (!frame)
     return false;
   if (!presenter_)
-    presenter_ = std::make_unique<ImagePresenter>(device_);
+    presenter_ = std::make_unique<ImagePresenter>(rhi::QueryInterfacePtr<rhi::IDevice>(device_).Get());
   return presenter_->Record(commands, image, frame.Get(), color_space, GetColorSpace(), GetHDRReferenceWhiteScale());
 }
 
@@ -502,16 +501,14 @@ void D3D12WindowImpl::DestroyWindow() {
   glfw::DestroyWindow(window_);
 }
 
-bool D3D12WindowImpl::InitializeWindow(IBackendDevice *device, const WindowDesc &desc) {
-  queue_ = rhi::QueryInterfacePtr<IBackendQueue>(
-               ObjectPtr<IQueue>::Adopt(rhi::QueryInterfacePtr<IDevice>(device)->GetQueue(QUEUE_TYPE_MAIN)).Get())
-               .Get();
+bool D3D12WindowImpl::InitializeWindow(ID3D12Device *device, const WindowDesc &desc) {
+  queue_ = device->GetNativeQueue(QUEUE_TYPE_MAIN);
   requested_mode_ = desc.present_mode;
   requested_color_space_ = desc.color_space;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
   if (!window_)
     return false;
-  glfw::RegisterWindow(this);
+  glfw::RegisterWindow(this, this);
   return true;
 }
 

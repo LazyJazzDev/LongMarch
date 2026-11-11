@@ -105,7 +105,7 @@ bool VulkanCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAc
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
-      !ValidateInstances(rhi::QueryInterfacePtr<ITopLevelAccelerationStructure>(target)->GetDesc(), instances)) {
+      !ValidateInstances(destination->GetDesc(), instances)) {
     recording_failed_ = true;
     return false;
   }

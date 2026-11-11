@@ -89,7 +89,7 @@ class VulkanWindowImpl final : public Object<rhi::IWindow, IVulkanWindow> {
 
   void DestroyWindow();
 
-  bool InitializeWindow(IBackendDevice *device, const WindowDesc &desc);
+  bool InitializeWindow(IVulkanDevice *device, const WindowDesc &desc);
 
  public:
   GLFWwindow *GLFWWindow() const override;
@@ -123,7 +123,7 @@ class VulkanWindowImpl final : public Object<rhi::IWindow, IVulkanWindow> {
  private:
   bool invalid_{true};
 
-  IBackendQueue *queue_{};
+  IVulkanQueue *queue_{};
   std::unique_ptr<WindowImGui> imgui_{};
   std::unique_ptr<ImagePresenter> presenter_{};
   bool processing_imgui_{};

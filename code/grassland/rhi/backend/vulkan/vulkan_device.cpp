@@ -107,7 +107,7 @@ void VulkanDeviceImpl::RecycleCommandResources(VkCommandPool pool, VkCommandBuff
   vkDestroyCommandPool(device_, pool, nullptr);
 }
 
-VulkanDeviceImpl::VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, ICore *core)
+VulkanDeviceImpl::VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, IVulkanCore *core)
     : upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
       download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
       scratch_pool_(this) {
@@ -137,7 +137,7 @@ VulkanDeviceImpl::~VulkanDeviceImpl() {
 }
 
 rhi::IDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                   ICore *core,
+                                                   IVulkanCore *core,
                                                    VkPhysicalDevice physical_device,
                                                    uint32_t api_version) {
   auto device = std::unique_ptr<VulkanDeviceImpl>(new VulkanDeviceImpl(std::move(info), core));
@@ -200,7 +200,7 @@ rhi::IDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevic
     memory.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
   memory.physicalDevice = physical_device;
   memory.device = device->device_;
-  memory.instance = rhi::QueryInterfacePtr<IVulkanCore>(core).Get()->Instance();
+  memory.instance = core->Instance();
   memory.vulkanApiVersion = VK_API_VERSION_1_2;
   if (!Check(vmaCreateAllocator(&memory, &device->allocator_), "Create VMA allocator"))
     return {};
@@ -216,7 +216,7 @@ rhi::IDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevic
     VkQueue queue;
     vkGetDeviceQueue(device->device_, queue_family, native_index, &queue);
     auto mutex = native_index == 0 ? main_mutex : std::make_shared<std::mutex>();
-    device->queues_[index] = ObjectPtr<IBackendQueue>::Adopt(
+    device->queues_[index] = ObjectPtr<IVulkanQueue>::Adopt(
         IVulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue, std::move(mutex)));
     if (!device->queues_[index])
       return nullptr;
@@ -265,7 +265,7 @@ VkPhysicalDevice VulkanDeviceImpl::NativePhysicalDevice() const {
 }
 
 VkInstance VulkanDeviceImpl::Instance() const {
-  return rhi::QueryInterfacePtr<IVulkanCore>(OwnerCore()).Get()->Instance();
+  return core_->Instance();
 }
 
 uint32_t VulkanDeviceImpl::QueueFamily() const {
@@ -326,13 +326,13 @@ VulkanTemporalBufferPool &VulkanDeviceImpl::DownloadPool() {
 }
 
 rhi::IDevice *IVulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                ICore *core,
+                                                IVulkanCore *core,
                                                 VkPhysicalDevice physical_device,
                                                 uint32_t api_version) {
   return VulkanDeviceImpl::CreateVulkanDevice(info, core, physical_device, api_version);
 }
 
-void VulkanDeviceImpl::InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api) {
+void VulkanDeviceImpl::InitializeDevice(PhysicalDevice info, IVulkanCore *core, BackendAPI api) {
   api_ = api;
   core_ = core;
   info_ = std::move(info);
@@ -365,6 +365,12 @@ bool VulkanDeviceImpl::SupportGeometryShader() const {
   return info_.geometry_shader_feature;
 }
 
+IVulkanQueue *VulkanDeviceImpl::GetNativeQueue(QueueType type) const {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return queues_[type].Get();
+}
+
 rhi::IQueue *VulkanDeviceImpl::GetQueue(QueueType type) {
   if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
     return nullptr;
@@ -375,7 +381,7 @@ const PhysicalDevice &VulkanDeviceImpl::GetPhysicalDevice() const noexcept {
   return info_;
 }
 
-ICore *VulkanDeviceImpl::OwnerCore() const {
+IVulkanCore *VulkanDeviceImpl::OwnerCore() const {
   return core_;
 }
 
@@ -414,9 +420,10 @@ void VulkanDeviceImpl::Collect() {
       if (!queue)
         continue;
       uint64_t completed = 0;
-      const bool timeline_valid = rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline())->GetCompletedValue(completed);
+      auto timeline = rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline());
+      const bool timeline_valid = timeline->GetCompletedValue(completed);
       if (timeline_valid && completed != UINT64_MAX)
-        next.push_back({rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline()).Get(), completed + 1});
+        next.push_back({timeline.Get(), completed + 1});
       if (!queue->CollectCompleted(completed, timeline_valid))
         empty = false;
     }

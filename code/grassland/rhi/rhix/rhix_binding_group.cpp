@@ -7,7 +7,7 @@ BindingGroup::BindingGroup(rhi::IBindingGroup *object) noexcept : ObjectContaine
 }
 
 rhi::IBindingGroup *BindingGroup::Get() const noexcept {
-  return rhi::QueryInterfacePtr<rhi::IBindingGroup>(GetObject()).Get();
+  return static_cast<rhi::IBindingGroup *>(GetObject());
 }
 
 const rhi::BindingLayoutDesc &BindingGroup::GetLayout() const {

@@ -16,6 +16,11 @@ template <typename DeviceType, typename BufferType, typename LeaseType>
 class TemporalBufferPool final {
  public:
   using Lease = LeaseType;
+
+  static constexpr uint64_t CapacityForLevel(size_t level) {
+    return uint64_t{65536} << level;
+  }
+
   TemporalBufferPool(DeviceType *device, TemporalBufferUsage usage);
   ~TemporalBufferPool();
   ObjectPtr<Lease> Acquire(uint64_t size);

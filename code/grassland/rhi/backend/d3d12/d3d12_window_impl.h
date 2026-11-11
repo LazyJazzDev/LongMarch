@@ -74,7 +74,7 @@ class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
 
   void DestroyWindow();
 
-  bool InitializeWindow(IBackendDevice *device, const WindowDesc &desc);
+  bool InitializeWindow(ID3D12Device *device, const WindowDesc &desc);
 
  public:
   GLFWwindow *GLFWWindow() const override;
@@ -108,7 +108,7 @@ class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
  private:
   bool invalid_{true};
 
-  IBackendQueue *queue_{};
+  ID3D12Queue *queue_{};
   std::unique_ptr<WindowImGui> imgui_{};
   std::unique_ptr<ImagePresenter> presenter_{};
   bool processing_imgui_{};

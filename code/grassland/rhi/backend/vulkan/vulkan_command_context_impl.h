@@ -58,11 +58,17 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBack
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
+  // Inputs and ranges have been validated by the recording entry point.
+  bool CopyBuffer(IVulkanBuffer *source,
+                  uint64_t source_offset,
+                  IVulkanBuffer *destination,
+                  uint64_t destination_offset,
+                  uint64_t size);
   VulkanCommandContextImpl(IVulkanQueue *queue);
   bool ValidateGroups();
   bool BindGroupVersion(uint32_t index, IVulkanBindingVersion *version);
   std::vector<IVulkanBindingVersion *> groups_;
-  IVulkanProgram *program_{};
+  IProgram *program_{};
   IVulkanProgramBase *native_program_{};
   std::unordered_map<IVulkanTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
       as_dependencies_;
@@ -107,12 +113,12 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBack
 
   bool RenderingMatches(const IProgram *program) const;
 
-  void InitializeCommandContext(IBackendQueue *queue);
+  void InitializeCommandContext(IVulkanQueue *queue);
 
  public:
   rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
 
-  void BindDownloads(IBackendSubmissionToken *submission) override;
+  void BindDownloads(rhi::ISubmissionToken *submission) override;
 
   void ReleaseDownloads() override;
 
@@ -142,7 +148,7 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBack
   RenderingInfo rendering_{};
   bool recording_failed_{};
   bool sealed_{};
-  IBackendQueue *queue_{};
+  IVulkanQueue *queue_{};
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
   bool submitted_{};
   std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};

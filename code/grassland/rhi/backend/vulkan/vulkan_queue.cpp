@@ -38,7 +38,7 @@ VkResult VulkanQueueImpl::Wait(uint64_t value, uint64_t timeout) const {
   info.semaphoreCount = 1;
   info.pSemaphores = &semaphore;
   info.pValues = &value;
-  return vkWaitSemaphores(rhi::QueryInterfacePtr<IVulkanDevice>(Owner()).Get()->NativeDevice(), &info, timeout);
+  return vkWaitSemaphores(device_->NativeDevice(), &info, timeout);
 }
 
 VulkanQueueImpl::VulkanQueueImpl(IVulkanDevice *device,
@@ -83,7 +83,7 @@ ObjectPtr<IBackendSubmissionToken> VulkanQueueImpl::Submit(const ObjectPtr<IBack
   auto entry = pending_.insert(pending_.end(), {commands, completion});
   IBackendCommandContext::SubmitResult result;
   try {
-    commands->BindDownloads(completion.Get());
+    commands->BindDownloads(rhi::QueryInterfacePtr<rhi::ISubmissionToken>(completion.Get()).Get());
     result = commands->SubmitNative(native_info, signal);
     if (result == IBackendCommandContext::SUBMIT_RESULT_REJECTED) {
       pending_.erase(entry);
@@ -133,7 +133,7 @@ bool VulkanQueueImpl::CollectCompleted(uint64_t completed, bool timeline_valid) 
   return pending_.empty();
 }
 
-void VulkanQueueImpl::InitializeQueue(IBackendDevice *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
+void VulkanQueueImpl::InitializeQueue(IVulkanDevice *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
   device_ = device;
   type_ = type;
   mutex_ = std::move(mutex);
@@ -147,7 +147,7 @@ uint64_t VulkanQueueImpl::NextSerial() {
   return ++serial_;
 }
 
-IBackendDevice *VulkanQueueImpl::Owner() const {
+IVulkanDevice *VulkanQueueImpl::Owner() const {
   return device_;
 }
 

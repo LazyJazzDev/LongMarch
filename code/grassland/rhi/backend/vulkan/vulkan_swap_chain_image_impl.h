@@ -38,6 +38,7 @@ class VulkanSwapChainImageImpl final : public Object<rhi::IImage, IVulkanSwapCha
                              IBackendQueue *queue = nullptr);
 
  public:
+  VkImageAspectFlags Aspect() const override;
   VkImageLayout DefaultLayout() const override;
 
   const void *DeviceIdentity() const override;

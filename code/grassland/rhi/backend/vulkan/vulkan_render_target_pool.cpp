@@ -126,7 +126,8 @@ VkRenderPass VulkanRenderTargetPool::RenderPass(const std::vector<ImageFormat> &
 }
 
 ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const std::vector<IVulkanImage *> &images,
-                                                                         VkRenderPass pass) {
+                                                                         VkRenderPass pass,
+                                                                         VkExtent2D extent) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::vector<VkImage> handles;
   for (auto image : images)
@@ -148,8 +149,8 @@ ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const s
       create.renderPass = pass;
       create.attachmentCount = uint32_t(fresh->views.size());
       create.pAttachments = fresh->views.data();
-      create.width = rhi::QueryInterfacePtr<IImage>(images[0])->GetDesc().width;
-      create.height = rhi::QueryInterfacePtr<IImage>(images[0])->GetDesc().height;
+      create.width = extent.width;
+      create.height = extent.height;
       create.layers = 1;
       if (!Check(vkCreateFramebuffer(device_, &create, nullptr, &fresh->framebuffer), "Create framebuffer")) {
         DestroyEntry(*fresh);

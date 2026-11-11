@@ -15,6 +15,8 @@ LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Device, "d258bd31-2295-
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12Device : public IBackendDevice {
  public:
+  // Borrowed queue owned by this device.
+  virtual ID3D12Queue *GetNativeQueue(QueueType type) const = 0;
   static rhi::IDevice *Create(PhysicalDevice info, ICore *core, ComPtr<::ID3D12Device> device);
   virtual ::ID3D12Device *NativeDevice() const = 0;
   virtual D3D12MA::Allocator *Allocator() const = 0;

@@ -14,8 +14,10 @@ LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanDevice, "96a1c412-20e
 namespace grassland::rhi::backend::vulkan {
 class IVulkanDevice : public IBackendDevice {
  public:
+  // Borrowed queue owned by this device.
+  virtual IVulkanQueue *GetNativeQueue(QueueType type) const = 0;
   static rhi::IDevice *CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                          ICore *core,
+                                          IVulkanCore *core,
                                           VkPhysicalDevice physical_device,
                                           uint32_t api_version);
   virtual VkDevice NativeDevice() const = 0;

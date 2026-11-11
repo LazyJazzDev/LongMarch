@@ -9,7 +9,7 @@ namespace grassland::rhi::backend {
 // Records a full-image color conversion. Cached pipelines do not retain source images.
 class ImagePresenter final {
  public:
-  explicit ImagePresenter(IBackendDevice *device);
+  explicit ImagePresenter(IDevice *device);
   bool Record(ICommandContext *commands,
               IImage *source,
               IImage *target,
@@ -18,7 +18,7 @@ class ImagePresenter final {
               float white_scale);
 
  private:
-  IBackendDevice *device_;
+  IDevice *device_;
   std::map<std::tuple<ImageFormat, ColorSpace, ColorSpace>, ObjPtr<IProgram>> programs_;
   ObjPtr<IBuffer> settings_;
   ObjPtr<ISampler> sampler_;
