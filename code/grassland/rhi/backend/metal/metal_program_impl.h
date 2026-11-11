@@ -1,12 +1,13 @@
 #pragma once
 #include "grassland/rhi/backend/backend_program_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_program_base_state.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalProgramImpl final : public Object<IMetalProgram> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IProgram, IMetalProgram, Program, IProgram, MetalProgramBase, IObject)
+  LONGMARCH_RHI_FINAL_QUERY(IProgram, IMetalProgram, IBackendProgram, IProgram, IMetalProgramBase, IObject)
   static IMetalProgram *Create(IMetalDevice *device, const ProgramDesc &desc);
   MTL::RenderPipelineState *NativePipeline() const;
   MTL::DepthStencilState *NativeDepthStencil() const;
@@ -41,6 +42,11 @@ class MetalProgramImpl final : public Object<IMetalProgram> {
 
   const MetalProgramBaseState &StateMetalProgramBase() const override {
     return state_MetalProgramBase_;
+  }
+
+ public:
+  const ProgramDesc &GetDesc() const override {
+    return IBackendProgram::CommonGetDesc();
   }
 };
 }  // namespace grassland::rhi::backend::metal

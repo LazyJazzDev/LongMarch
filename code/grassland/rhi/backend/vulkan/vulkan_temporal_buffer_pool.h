@@ -1,15 +1,12 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class IVulkanTemporalBufferLease;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTemporalBufferLease)
 #include "grassland/rhi/backend/backend_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanTemporalBufferLease;
 using VulkanTemporalBufferPool = TemporalBufferPool<IVulkanDevice, IVulkanAllocatedBuffer, IVulkanTemporalBufferLease>;
 
 class IVulkanTemporalBufferLease : public IVulkanBuffer {

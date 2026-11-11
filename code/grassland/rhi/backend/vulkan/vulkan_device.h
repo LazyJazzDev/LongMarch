@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class IVulkanDevice;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanDevice)
 #include <tuple>
 
@@ -16,10 +14,10 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanDevice)
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanDevice : public Device {
+class IVulkanDevice : public IBackendDevice {
  public:
   static IVulkanDevice *CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                           Core *core,
+                                           IBackendCore *core,
                                            VkPhysicalDevice physical_device,
                                            uint32_t api_version);
   virtual IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) = 0;

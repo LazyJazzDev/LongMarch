@@ -1,27 +1,23 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend {
-class Program;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Program)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendProgram)
 #include "grassland/rhi/backend/backend_shader_compiler.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_program.h"
 
 namespace grassland::rhi::backend {
-class Device;
-
 struct ProgramState;
 
-class Program : public IProgram {
+class IBackendProgram : public IProgram {
  protected:
-  void InitializeProgram(Device *device, const ProgramDesc &desc);
+  void InitializeProgram(IBackendDevice *device, const ProgramDesc &desc);
   void DestroyProgram();
 
  public:
-  const ProgramDesc &GetDesc() const override;
-  Device *Owner() const;
+  const ProgramDesc &GetDesc() const override = 0;
+  const ProgramDesc &CommonGetDesc() const;
+  IBackendDevice *Owner() const;
 
  protected:
   bool ValidateLayout() const;

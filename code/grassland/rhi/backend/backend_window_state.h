@@ -1,4 +1,5 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/backend_window.h"
 
 namespace grassland::rhi::backend {
@@ -6,8 +7,8 @@ struct WindowState final {
   WindowState();
   ~WindowState();
   bool invalid_{true};
-  Device *device_{};
-  Queue *queue_{};
+  IBackendDevice *device_{};
+  IBackendQueue *queue_{};
   std::unique_ptr<WindowImGui> imgui_{};
   std::unique_ptr<ImagePresenter> presenter_{};
   bool processing_imgui_{};
@@ -26,6 +27,6 @@ struct WindowState final {
   ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
   GLFWwindow *window_{};
   std::mutex next_image_mutex_{};
-  ObjectPtr<Image> next_image_{};
+  ObjectPtr<IBackendImage> next_image_{};
 };
 }  // namespace grassland::rhi::backend

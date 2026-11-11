@@ -10,28 +10,28 @@
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
-void D3D12AccelerationStructure::InitializeD3D12AccelerationStructure(ID3D12Device *device) {
+void ID3D12AccelerationStructure::InitializeD3D12AccelerationStructure(ID3D12Device *device) {
   StateD3D12AccelerationStructure().device_ = device;
 }
 
-ID3D12Device *D3D12AccelerationStructure::Owner() const {
+ID3D12Device *ID3D12AccelerationStructure::Owner() const {
   return StateD3D12AccelerationStructure().device_;
 }
 
-uint64_t D3D12AccelerationStructure::ScratchSize(AccelerationStructureBuildMode mode) const {
+uint64_t ID3D12AccelerationStructure::ScratchSize(AccelerationStructureBuildMode mode) const {
   return mode == ACCELERATION_STRUCTURE_UPDATE ? StateD3D12AccelerationStructure().update_scratch_
                                                : StateD3D12AccelerationStructure().build_scratch_;
 }
 
-bool D3D12AccelerationStructure::AllowsUpdate() const {
+bool ID3D12AccelerationStructure::AllowsUpdate() const {
   return StateD3D12AccelerationStructure().allow_update_;
 }
 
-bool D3D12AccelerationStructure::AllowsCompaction() const {
+bool ID3D12AccelerationStructure::AllowsCompaction() const {
   return StateD3D12AccelerationStructure().allow_compaction_;
 }
 
-bool D3D12AccelerationStructure::IsCompactStorage() const {
+bool ID3D12AccelerationStructure::IsCompactStorage() const {
   return StateD3D12AccelerationStructure().compact_;
 }
 
@@ -83,33 +83,33 @@ void D3D12TopLevelAccelerationStructureImpl::CommitDependencies(
   bottom_levels_ = std::move(references);
 }
 
-void D3D12AccelerationStructure::DestroyD3D12AccelerationStructure() {
+void ID3D12AccelerationStructure::DestroyD3D12AccelerationStructure() {
   StateD3D12AccelerationStructure().resource_.Reset();
   StateD3D12AccelerationStructure().query_buffer_.Reset();
   StateD3D12AccelerationStructure().query_output_.Reset();
 }
 
-ID3D12Resource *D3D12AccelerationStructure::NativeResource() const {
+ID3D12Resource *ID3D12AccelerationStructure::NativeResource() const {
   return StateD3D12AccelerationStructure().resource_.Get();
 }
 
-ID3D12Resource *D3D12AccelerationStructure::CompactionReadback() const {
+ID3D12Resource *ID3D12AccelerationStructure::CompactionReadback() const {
   return StateD3D12AccelerationStructure().query_buffer_.Get();
 }
 
-ID3D12Resource *D3D12AccelerationStructure::CompactionOutput() const {
+ID3D12Resource *ID3D12AccelerationStructure::CompactionOutput() const {
   return StateD3D12AccelerationStructure().query_output_.Get();
 }
 
-D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS D3D12AccelerationStructure::NativeInputs() const {
+D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS ID3D12AccelerationStructure::NativeInputs() const {
   return StateD3D12AccelerationStructure().inputs_;
 }
 
-uint64_t D3D12AccelerationStructure::Address() const {
+uint64_t ID3D12AccelerationStructure::Address() const {
   return StateD3D12AccelerationStructure().resource_->GetGPUVirtualAddress();
 }
 
-uint64_t D3D12AccelerationStructure::ReadCompactedSize() const {
+uint64_t ID3D12AccelerationStructure::ReadCompactedSize() const {
   if (!StateD3D12AccelerationStructure().query_buffer_)
     return 0;
   void *data{};
@@ -123,8 +123,8 @@ uint64_t D3D12AccelerationStructure::ReadCompactedSize() const {
   return result;
 }
 
-bool D3D12AccelerationStructure::Allocate(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &inputs,
-                                          uint64_t compacted_size) {
+bool ID3D12AccelerationStructure::Allocate(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &inputs,
+                                           uint64_t compacted_size) {
   ComPtr<ID3D12Device5> device;
   if (!Check(StateD3D12AccelerationStructure().device_->NativeDevice()->QueryInterface(IID_PPV_ARGS(&device)),
              "Query ray tracing device"))
@@ -282,7 +282,7 @@ LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BottomLevelAcceleration
 LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12TopLevelAccelerationStructure,
                    "4755c2d8-b4b6-477e-809f-939fc3683688")
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12AccelerationStructure, "c8f939f7-1266-44ee-ad3e-f0efb8e7007c")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12AccelerationStructure, "c8f939f7-1266-44ee-ad3e-f0efb8e7007c")
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12AccelerationStructureState::D3D12AccelerationStructureState() = default;

@@ -159,7 +159,7 @@ bool D3D12CommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
 }
 
 bool D3D12CommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *structure) {
-  auto target = rhi::QueryInterfacePtr<D3D12AccelerationStructure>(structure).Get();
+  auto target = rhi::QueryInterfacePtr<ID3D12AccelerationStructure>(structure).Get();
   if (!ray_list_ || !target || target->Owner() != device_ || !target->AllowsCompaction() || rendering_active_) {
     StateCommandContext().recording_failed_ = true;
     return false;
@@ -181,8 +181,8 @@ bool D3D12CommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *stru
 
 bool D3D12CommandContextImpl::CmdCompactAccelerationStructure(IAccelerationStructure *source,
                                                               IAccelerationStructure *destination) {
-  auto from = rhi::QueryInterfacePtr<D3D12AccelerationStructure>(source).Get();
-  auto to = rhi::QueryInterfacePtr<D3D12AccelerationStructure>(destination).Get();
+  auto from = rhi::QueryInterfacePtr<ID3D12AccelerationStructure>(source).Get();
+  auto to = rhi::QueryInterfacePtr<ID3D12AccelerationStructure>(destination).Get();
   if (!ray_list_ || !from || !to || from == to || from->Owner() != device_ || to->Owner() != device_ ||
       !from->AllowsCompaction() || !to->IsCompactStorage() || source->GetType() != destination->GetType() ||
       rendering_active_) {

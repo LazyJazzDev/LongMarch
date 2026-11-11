@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class IVulkanRayTracingProgram;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanRayTracingProgram)
 #include <array>
 
@@ -13,9 +11,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanRayTracingPro
 #include "grassland/rhi/backend/vulkan/vulkan_program_base.h"
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanDevice;
-
-class IVulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBase {
+class IVulkanRayTracingProgram : public IBackendRayTracingProgram, public IVulkanProgramBase {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;
@@ -30,7 +26,7 @@ class IVulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramB
  public:
   static IVulkanRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
   virtual IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) = 0;
-  virtual const ShaderBindingTable *DefaultShaderBindingTable() const = 0;
+  virtual const IBackendShaderBindingTable *DefaultShaderBindingTable() const = 0;
   virtual VkPipeline NativePipeline() const = 0;
 };
 

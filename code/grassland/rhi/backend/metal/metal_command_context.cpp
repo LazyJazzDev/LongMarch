@@ -53,7 +53,7 @@ bool MetalCommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue
     ReportError(-1, "End rendering before clear, present or submission.");
     return false;
   }
-  const auto native = rhi::QueryInterfacePtr<MetalImage>(image).Get();
+  const auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
   if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     StateCommandContext().recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
@@ -145,7 +145,7 @@ bool MetalCommandContextImpl::EndRecording() {
   return true;
 }
 
-CommandContext::SubmitResult MetalCommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
+IBackendCommandContext::SubmitResult MetalCommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -262,7 +262,7 @@ bool MetalCommandContextImpl::CmdCopyBuffer(IBuffer *source,
 }
 
 bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
-  auto native = rhi::QueryInterfacePtr<MetalImage>(image).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
   const uint64_t pitch = native ? uint64_t(native->GetDesc().width) * ImageFormatSize(native->GetDesc().format) : 0;
   if (StateCommandContext().sealed_ || encoder_ || !native || !native->IsValid() ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
@@ -296,7 +296,7 @@ bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
 }
 
 bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group) {
-  auto native = rhi::QueryInterfacePtr<MetalBindingGroup>(group).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalBindingGroup>(group).Get();
   if (StateCommandContext().sealed_ || !native_program_ || !native || native->Owner() != device_ ||
       index >= groups_.size() ||
       !SameBindingLayout(native->GetLayout(), native_program_->BindingLayout().groups[index]) ||
@@ -304,12 +304,12 @@ bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group)
     StateCommandContext().recording_failed_ = true;
     return false;
   }
-  auto version = rhi::QueryInterfacePtr<MetalBindingGroup::Version>(native->CurrentVersion()).Get();
+  auto version = rhi::QueryInterfacePtr<IMetalBindingVersion>(native->CurrentVersion()).Get();
   for (size_t binding = 0; binding < version->GetLayout().bindings.size(); ++binding) {
     const auto type = version->GetLayout().bindings[binding].type;
     if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
       for (const auto &image : version->GetReferences()[binding]) {
-        if (!rhi::QueryInterfacePtr<MetalImage>(image.Get()).Get()->SupportsQueue(OwnerQueue())) {
+        if (!rhi::QueryInterfacePtr<IMetalImage>(image.Get()).Get()->SupportsQueue(OwnerQueue())) {
           StateCommandContext().recording_failed_ = true;
           return false;
         }
@@ -437,10 +437,10 @@ bool MetalCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
   }
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto pass = MTL::RenderPassDescriptor::renderPassDescriptor();
-  MetalImage *native = nullptr;
+  IMetalImage *native = nullptr;
   uint32_t width = 0, height = 0;
-  auto validate = [&](IImage *image, AttachmentLoadOp load, AttachmentStoreOp store) -> MetalImage * {
-    auto value = rhi::QueryInterfacePtr<MetalImage>(image).Get();
+  auto validate = [&](IImage *image, AttachmentLoadOp load, AttachmentStoreOp store) -> IMetalImage * {
+    auto value = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
     if (!value || !value->IsValid() || (value->DeviceIdentity() != device_ || !value->SupportsQueue(OwnerQueue())) ||
         load < ATTACHMENT_LOAD_OP_LOAD || load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE ||
         store > ATTACHMENT_STORE_OP_DISCARD)
@@ -685,11 +685,11 @@ IDownloadToken *MetalCommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uint
     StateCommandContext().recording_failed_ = true;
     return nullptr;
   }
-  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(IMetalDownloadToken::Create(std::move(lease), size)));
+  return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(IMetalDownloadToken::Create(std::move(lease), size)));
 }
 
 IDownloadToken *MetalCommandContextImpl::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
-  auto native = rhi::QueryInterfacePtr<MetalImage>(image).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
   if (StateCommandContext().sealed_ || render_target_ || !native ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     StateCommandContext().recording_failed_ = true;
@@ -741,7 +741,7 @@ IDownloadToken *MetalCommandContextImpl::CmdDownloadImage(IImage *image, const I
                           MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height);
   }
   blit->endEncoding();
-  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(IMetalDownloadToken::Create(
+  return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(IMetalDownloadToken::Create(
       std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 }  // namespace grassland::rhi::backend::metal

@@ -139,7 +139,7 @@ bool MetalCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
 }
 
 bool MetalCommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *structure) {
-  auto target = rhi::QueryInterfacePtr<MetalAccelerationStructure>(structure).Get();
+  auto target = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(structure).Get();
   if (StateCommandContext().sealed_ || encoder_ || !target || target->Owner() != device_ ||
       !target->AllowsCompaction()) {
     StateCommandContext().recording_failed_ = true;
@@ -161,8 +161,8 @@ bool MetalCommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *stru
 
 bool MetalCommandContextImpl::CmdCompactAccelerationStructure(IAccelerationStructure *source,
                                                               IAccelerationStructure *destination) {
-  auto from = rhi::QueryInterfacePtr<MetalAccelerationStructure>(source).Get();
-  auto to = rhi::QueryInterfacePtr<MetalAccelerationStructure>(destination).Get();
+  auto from = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(source).Get();
+  auto to = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(destination).Get();
   if (StateCommandContext().sealed_ || encoder_ || !from || !to || from == to || from->Owner() != device_ ||
       to->Owner() != device_ || !from->AllowsCompaction() || !to->IsCompactStorage() ||
       source->GetType() != destination->GetType()) {

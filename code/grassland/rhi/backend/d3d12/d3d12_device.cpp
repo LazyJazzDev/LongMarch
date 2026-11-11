@@ -2,24 +2,17 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
-#include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
-#include "grassland/rhi/backend/d3d12/d3d12_allocated_image_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
+#include "grassland/rhi/backend/d3d12/d3d12_binding_group_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
-#include "grassland/rhi/backend/d3d12/d3d12_compute_program_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
-#include "grassland/rhi/backend/d3d12/d3d12_program_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
-#include "grassland/rhi/backend/d3d12/d3d12_queue_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
-#include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
-#include "grassland/rhi/backend/d3d12/d3d12_sampler_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
-#include "grassland/rhi/backend/d3d12/d3d12_window_impl.h"
 #include "grassland/util/log.h"
 
 // Match the Windows SDK declarations used by the backend.
@@ -109,7 +102,7 @@ void D3D12DeviceImpl::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> all
   }
 }
 
-ID3D12Device *D3D12DeviceImpl::Create(PhysicalDevice info, Core *core, ComPtr<::ID3D12Device> device) {
+ID3D12Device *D3D12DeviceImpl::Create(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device) {
   auto object = std::unique_ptr<D3D12DeviceImpl>(new D3D12DeviceImpl(std::move(info), core, std::move(device)));
   if (SUCCEEDED(object->device_.As(&object->debug_messages_))) {
     auto callback = [](D3D12_MESSAGE_CATEGORY, D3D12_MESSAGE_SEVERITY severity, D3D12_MESSAGE_ID id, LPCSTR description,
@@ -146,7 +139,7 @@ ID3D12Device *D3D12DeviceImpl::Create(PhysicalDevice info, Core *core, ComPtr<::
       SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
     object->tearing_ = tearing;
   for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
-    object->StateDevice().queues_[type] = ObjectPtr<Queue>::Adopt(ID3D12Queue::Create(object.get(), type));
+    object->StateDevice().queues_[type] = ObjectPtr<IBackendQueue>::Adopt(ID3D12Queue::Create(object.get(), type));
     if (!object->StateDevice().queues_[type])
       return nullptr;
   }
@@ -206,7 +199,7 @@ bool D3D12DeviceImpl::SupportsTearing() const {
   return tearing_;
 }
 
-D3D12DeviceImpl::D3D12DeviceImpl(PhysicalDevice info, Core *core, ComPtr<::ID3D12Device> device)
+D3D12DeviceImpl::D3D12DeviceImpl(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device)
     : upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
       download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
       scratch_pool_(this),
@@ -268,7 +261,7 @@ ISampler *D3D12DeviceImpl::CreateSampler(const SamplerDesc &desc) {
 }
 
 IBindingGroup *D3D12DeviceImpl::CreateBindingGroup(const BindingLayoutDesc &layout) {
-  return D3D12BindingGroup::Create(this, layout);
+  return ID3D12BindingGroup::Create(this, layout);
 }
 
 }  // namespace grassland::rhi::backend::d3d12
@@ -304,7 +297,7 @@ D3D12TemporalBufferPool &D3D12DeviceImpl::DownloadPool() {
 LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Device, "d258bd31-2295-4f22-9c98-bd0133662c47")
 
 namespace grassland::rhi::backend::d3d12 {
-ID3D12Device *ID3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<::ID3D12Device> device) {
+ID3D12Device *ID3D12Device::Create(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device) {
   return D3D12DeviceImpl::Create(info, core, device);
 }
 }  // namespace grassland::rhi::backend::d3d12

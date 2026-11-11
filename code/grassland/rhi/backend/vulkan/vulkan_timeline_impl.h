@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_timeline_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_timeline.h"
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanTimelineImpl final : public Object<IVulkanTimeline> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ITimeline, IVulkanTimeline, Timeline, ITimeline)
+  LONGMARCH_RHI_FINAL_QUERY(ITimeline, IVulkanTimeline, IBackendTimeline, ITimeline)
   static ObjectPtr<IVulkanTimeline> Create(IVulkanDevice *device);
   ~VulkanTimelineImpl() override;
   bool GetCompletedValue(uint64_t &value) const override;

@@ -1,4 +1,5 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure_state.h"
 
@@ -9,7 +10,7 @@ class MetalBottomLevelAccelerationStructureImpl final : public Object<IMetalBott
                             IMetalBottomLevelAccelerationStructure,
                             IBottomLevelAccelerationStructure,
                             IAccelerationStructure,
-                            MetalAccelerationStructure,
+                            IMetalAccelerationStructure,
                             IObject)
   static IMetalBottomLevelAccelerationStructure *Create(IMetalDevice *device,
                                                         const BottomLevelAccelerationStructureDesc &desc);
@@ -43,7 +44,7 @@ class MetalTopLevelAccelerationStructureImpl final : public Object<IMetalTopLeve
                             IMetalTopLevelAccelerationStructure,
                             ITopLevelAccelerationStructure,
                             IAccelerationStructure,
-                            MetalAccelerationStructure,
+                            IMetalAccelerationStructure,
                             IObject)
   static IMetalTopLevelAccelerationStructure *Create(IMetalDevice *device,
                                                      const TopLevelAccelerationStructureDesc &desc);

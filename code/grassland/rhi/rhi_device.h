@@ -7,6 +7,8 @@
 #include "grassland/rhi/rhi_timeline.h"
 #include "grassland/util/file_system.h"
 
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IDevice)
+
 namespace grassland::rhi {
 class IImage;
 class IBuffer;

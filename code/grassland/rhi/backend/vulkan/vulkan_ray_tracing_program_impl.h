@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/rhi/backend/backend_ray_tracing_program_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program_base_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 
@@ -8,21 +9,21 @@ class VulkanRayTracingProgramImpl final : public Object<IVulkanRayTracingProgram
  public:
   LONGMARCH_RHI_FINAL_QUERY(IRayTracingProgram,
                             IVulkanRayTracingProgram,
-                            RayTracingProgram,
+                            IBackendRayTracingProgram,
                             IRayTracingProgram,
-                            VulkanProgramBase,
+                            IVulkanProgramBase,
                             IObject)
   static IVulkanRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
-  const ShaderBindingTable *DefaultShaderBindingTable() const;
+  const IBackendShaderBindingTable *DefaultShaderBindingTable() const;
   ~VulkanRayTracingProgramImpl() override;
   VkPipeline NativePipeline() const;
 
  private:
   VulkanRayTracingProgramImpl(IVulkanDevice *device, const RayTracingProgramDesc &desc);
   VkPipeline pipeline_{};
-  ShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
-  ObjectPtr<ShaderBindingTable> table_;
+  IBackendShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
+  ObjectPtr<IBackendShaderBindingTable> table_;
   std::array<std::vector<uint8_t>, 4> identifiers_;
   uint64_t handle_size_{}, stride_{}, alignment_{};
 
@@ -46,6 +47,11 @@ class VulkanRayTracingProgramImpl final : public Object<IVulkanRayTracingProgram
 
   const VulkanProgramBaseState &StateVulkanProgramBase() const override {
     return state_VulkanProgramBase_;
+  }
+
+ public:
+  const RayTracingProgramDesc &GetDesc() const override {
+    return IBackendRayTracingProgram::CommonGetDesc();
   }
 };
 }  // namespace grassland::rhi::backend::vulkan

@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/rhi/backend/backend_image_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
@@ -7,7 +8,7 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanAllocatedImageImpl final : public Object<IVulkanAllocatedImage> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IVulkanAllocatedImage, VulkanImage, Image, rhi::IImage)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IVulkanAllocatedImage, IVulkanImage, IBackendImage, rhi::IImage)
   static IVulkanAllocatedImage *Create(IVulkanDevice *device, const ImageDesc &desc);
   ~VulkanAllocatedImageImpl() override;
   bool IsValid() const override;
@@ -44,6 +45,15 @@ class VulkanAllocatedImageImpl final : public Object<IVulkanAllocatedImage> {
 
   const ImageState &StateImage() const override {
     return state_Image_;
+  }
+
+ public:
+  const void *DeviceIdentity() const override {
+    return IVulkanImage::CommonDeviceIdentity();
+  }
+
+  const ImageDesc &GetDesc() const override {
+    return IBackendImage::CommonGetDesc();
   }
 };
 }  // namespace grassland::rhi::backend::vulkan

@@ -1,17 +1,13 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class IVulkanComputeProgram;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanComputeProgram)
 #include "grassland/rhi/backend/backend_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program_base.h"
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanDevice;
-
-class IVulkanComputeProgram : public ComputeProgram, public VulkanProgramBase {
+class IVulkanComputeProgram : public IBackendComputeProgram, public IVulkanProgramBase {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;

@@ -1,9 +1,7 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12Window;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Window)
 #include <array>
 
@@ -12,10 +10,10 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Window)
 
 namespace grassland::rhi::backend::d3d12 {
 
-class ID3D12Window : public Window {
+class ID3D12Window : public IBackendWindow {
  public:
   static ID3D12Window *Create(ID3D12Device *device, const WindowDesc &desc);
-  virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
+  virtual ObjectPtr<IBackendImage> AcquireNativeFrame() = 0;
   virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
   virtual PresentMode GetPresentMode() const = 0;
   virtual std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const = 0;

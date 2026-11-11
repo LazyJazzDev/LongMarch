@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_timeline_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_timeline.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalTimelineImpl final : public Object<IMetalTimeline> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ITimeline, IMetalTimeline, Timeline, ITimeline)
+  LONGMARCH_RHI_FINAL_QUERY(ITimeline, IMetalTimeline, IBackendTimeline, ITimeline)
   static ObjectPtr<IMetalTimeline> Create(IMetalDevice *device);
   bool GetCompletedValue(uint64_t &value) const override;
   bool WaitHost(uint64_t value) const override;

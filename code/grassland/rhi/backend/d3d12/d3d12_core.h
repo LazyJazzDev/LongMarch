@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12Core;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Core)
 #include <d3d12sdklayers.h>
 
@@ -12,7 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Core)
 
 namespace grassland::rhi::backend::d3d12 {
 
-class ID3D12Core : public Core {
+class ID3D12Core : public IBackendCore {
  public:
   static ID3D12Core *CreateD3D12Core(const CoreDesc &desc);
   virtual std::vector<PhysicalDevice> GetPhysicalDevices() const = 0;

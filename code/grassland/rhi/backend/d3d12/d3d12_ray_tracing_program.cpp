@@ -15,7 +15,7 @@ ID3D12StateObject *D3D12RayTracingProgramImpl::NativePipeline() const {
   return pipeline_.Get();
 }
 
-const ShaderBindingTable *D3D12RayTracingProgramImpl::DefaultShaderBindingTable() const {
+const IBackendShaderBindingTable *D3D12RayTracingProgramImpl::DefaultShaderBindingTable() const {
   return table_.Get();
 }
 
@@ -119,19 +119,19 @@ ID3D12RayTracingProgram *D3D12RayTracingProgramImpl::Create(ID3D12Device *owner_
                   D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
     }
   }
-  object->table_ =
-      ObjectPtr<ShaderBindingTable>::Adopt(object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc()));
+  object->table_ = ObjectPtr<IBackendShaderBindingTable>::Adopt(
+      object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc()));
   if (!object->table_)
     return nullptr;
   object->pipeline_ = std::move(pipeline);
   return object.release();
 }
 
-ShaderBindingTable *D3D12RayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
+IBackendShaderBindingTable *D3D12RayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
   constexpr uint64_t stride = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
   constexpr uint64_t alignment = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
   std::vector<uint8_t> data;
-  std::array<ShaderBindingTable::Region, 4> regions{};
+  std::array<IBackendShaderBindingTable::Region, 4> regions{};
   const std::vector<uint32_t> raygen{0};
   const std::vector<uint32_t> *indices[] = {&raygen, &desc.miss_shader_indices, &desc.hit_group_indices,
                                             &desc.callable_shader_indices};
@@ -154,7 +154,7 @@ ShaderBindingTable *D3D12RayTracingProgramImpl::BuildShaderBindingTable(const Sh
   for (auto &region : regions)
     if (region.size)
       region.address += address;
-  return new ShaderBindingTable(this, desc, std::move(buffer), regions);
+  return IBackendShaderBindingTable::Create(this, desc, std::move(buffer), regions);
 }
 
 }  // namespace grassland::rhi::backend::d3d12

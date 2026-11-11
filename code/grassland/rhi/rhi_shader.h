@@ -3,6 +3,8 @@
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/util/file_system.h"
 
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IShader)
+
 namespace grassland::rhi {
 struct ShaderDesc {
   std::string filename{"main.slang"};

@@ -90,7 +90,7 @@ float4 PSMain(Varying input) : SV_Target0 {
 
 }  // namespace
 
-std::unique_ptr<WindowImGui> WindowImGui::Create(Device *device,
+std::unique_ptr<WindowImGui> WindowImGui::Create(IBackendDevice *device,
                                                  GLFWwindow *window,
                                                  const char *font_file_path,
                                                  float font_size) {

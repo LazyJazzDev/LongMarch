@@ -1,12 +1,13 @@
 #pragma once
 #include "grassland/rhi/backend/backend_image_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_image_state.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalSwapChainImageImpl final : public Object<IMetalSwapChainImage> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IMetalSwapChainImage, MetalImage, Image, rhi::IImage)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IMetalSwapChainImage, IMetalImage, IBackendImage, rhi::IImage)
   MetalSwapChainImageImpl(ImageDesc desc, IMetalWindow *window, uint64_t generation, CA::MetalDrawable *drawable);
   bool IsValid() const override;
   CA::MetalDrawable *NativeDrawable() const;
@@ -44,6 +45,19 @@ class MetalSwapChainImageImpl final : public Object<IMetalSwapChainImage> {
 
   const ImageState &StateImage() const override {
     return state_Image_;
+  }
+
+ public:
+  bool SupportsStorage() const override {
+    return IMetalImage::CommonSupportsStorage();
+  }
+
+  const void *DeviceIdentity() const override {
+    return IMetalImage::CommonDeviceIdentity();
+  }
+
+  const ImageDesc &GetDesc() const override {
+    return IBackendImage::CommonGetDesc();
   }
 };
 }  // namespace grassland::rhi::backend::metal

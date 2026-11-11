@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_download_token_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_download_token.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12DownloadTokenImpl final : public Object<ID3D12DownloadToken> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, ID3D12DownloadToken, DownloadToken, IDownloadToken)
+  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, ID3D12DownloadToken, IBackendDownloadToken, IDownloadToken)
   D3D12DownloadTokenImpl(ObjectPtr<ID3D12TemporalBufferLease> lease, uint64_t size);
   D3D12DownloadTokenImpl(ObjectPtr<ID3D12TemporalBufferLease> lease, const DownloadLayout &layout);
   ~D3D12DownloadTokenImpl() override;
@@ -26,6 +27,23 @@ class D3D12DownloadTokenImpl final : public Object<ID3D12DownloadToken> {
 
   const DownloadTokenState &StateDownloadToken() const override {
     return state_DownloadToken_;
+  }
+
+ public:
+  SubmissionStatus GetStatus() const override {
+    return IBackendDownloadToken::CommonGetStatus();
+  }
+
+  bool WaitHost() const override {
+    return IBackendDownloadToken::CommonWaitHost();
+  }
+
+  uint64_t GetSize() const override {
+    return IBackendDownloadToken::CommonGetSize();
+  }
+
+  bool CopyTo(void *destination, uint64_t size) const override {
+    return IBackendDownloadToken::CommonCopyTo(destination, size);
   }
 };
 }  // namespace grassland::rhi::backend::d3d12

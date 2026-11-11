@@ -3,12 +3,13 @@
 #include <deque>
 #include <mutex>
 
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_allocated_buffer.h"
 
 namespace grassland::rhi::backend::metal {
 // All users must submit to the same physical queue and synchronize scratch accesses.
 // Contexts retain the returned storage directly, including buffers replaced by resizing.
-class MetalScratchPool {
+class MetalScratchPool final {
  public:
   explicit MetalScratchPool(IMetalDevice *device);
   // Share the current buffer; resize on demand using the last second's peak request.

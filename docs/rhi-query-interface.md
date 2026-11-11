@@ -25,20 +25,38 @@ canonical 36-character UUID spelling, with either case for hexadecimal digits,
 and returns an empty optional for malformed input. The halves follow textual
 order, independent of host endianness. They are not the Windows GUID memory layout.
 
-`LONGMARCH_RHI_UUID(Type, Text)` defines an inline constexpr specialization of
-`uuid<Type>()`. Use the macro at global namespace scope before the first query
-for the type. Invalid literals fail at compile time; unregistered types cannot
-instantiate `uuid<T>()`. Registration uses no runtime map, allocation, RTTI, or
-compiler-specific UUID extension. All registered library IDs were generated
-once with Python `uuid.uuid4()` and must remain stable for the same interface.
+Interface forward declarations are centralized in `rhi_util.h` and
+`backend_util.h`. Each interface header declares its `uuid<T>()` specialization
+with `LONGMARCH_RHI_DECLARE_UUID(Type)`. Its corresponding `.cpp` defines that
+specialization with `LONGMARCH_RHI_UUID(Type, Text)`, at global namespace scope.
+UUID definitions are neither inline nor collected in a registry header.
+Parsing remains constexpr, so invalid definition literals fail at compile time;
+`uuid<T>()` itself is an ordinary externally defined function. Unregistered
+types cannot instantiate it. There is no runtime registration map, allocation,
+RTTI, or compiler-specific UUID extension. All 111 library IDs were randomly
+generated UUIDv4 values and remain stable for the same interface.
 
-`Object<Interface, ...Bases>` supplies one atomic reference count. It exposes the
-primary interface, `IObject`, and any explicitly listed ancestor interfaces.
-This keeps the common implementation independent of particular resource types.
-Concrete backend classes advertise their implementation interfaces through the
-query helpers. Secondary interfaces use ordinary inheritance and forward
-reference operations to the primary base's counter. Querying `IObject` through
-any supported interface returns the same canonical identity pointer.
+Every inheritable RHI object layer is a data-free interface. Shared operations
+are nonvirtual helper functions; virtual contracts remain pure. Shared state
+is composed into the final implementation, accessed by shared helpers through
+protected pure virtual accessors. No intermediate interface owns state or a
+reference counter.
+
+For example, `IBuffer -> IBackendBuffer -> ID3D12Buffer ->
+ID3D12AllocatedBuffer` describes the interface chain. The allocation is a
+`D3D12AllocatedBufferImpl final : Object<ID3D12AllocatedBuffer>`, defined only
+in its `.cpp`. Other backend implementations are similarly private to their
+translation units or internal `*_impl.h` headers used by their defining sources.
+Objects communicate through the hidden interfaces, not final implementation
+layouts. Static interface factories return those interface pointers.
+
+`Object<Interface>` supplies exactly one atomic reference count and final
+`AddRef`/`Release` implementations. It remains abstract and does not decide
+which interfaces are supported. The final implementation explicitly lists its
+query interfaces and chooses a canonical `IObject` path. Ordinary multiple
+inheritance may combine interfaces, but the counter is introduced only once,
+after those interfaces are combined. Querying `IObject` through any supported
+interface returns the same canonical identity pointer.
 
 No additional type tag, query table, cached interface pointer, or second
 reference count is stored per object. UUID comparisons and pointer adjustments
@@ -56,7 +74,7 @@ reference, which must also be released before its Device.
 Internal resource cleanup must not query an owner that is already being
 destroyed: a query would attempt to acquire a new reference after final release.
 Buffer implementations and binding versions therefore store their single owner
-pointer at the native layer with its concrete type. Shared code accesses it
+pointer at the native layer with its backend interface type. Shared code accesses it
 through the owner interface where needed. Vulkan program cleanup reuses its
 existing native layout-device handle. This avoids both reference resurrection
 and duplicate owner caches.
@@ -80,7 +98,10 @@ including query reference operations and failure checks. They do not isolate
 GPU execution time or the cost of UUID comparisons. Results apply to the tested
 scenes, hardware, driver, and build configuration.
 
-### Windows measurement, 2026-11-11
+### Earlier implementation measurement, 2026-11-11
+
+The following data measures `8c166da4`, before the subsequent interface/state
+separation. It must not be treated as performance data for the current design.
 
 Baseline: main `e233d265`; candidate: `8c166da4`. Both use MSVC 14.51.36231,
 Ninja Release (`/O2 /Ob2 /DNDEBUG`) and identical runtime DLLs. Machine:

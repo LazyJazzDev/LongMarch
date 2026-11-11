@@ -1,9 +1,7 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class IMetalTimeline;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTimeline)
 #include <Metal/Metal.hpp>
 #include <functional>
@@ -12,9 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTimeline)
 #include "grassland/rhi/backend/backend_timeline.h"
 
 namespace grassland::rhi::backend::metal {
-class IMetalDevice;
-
-class IMetalTimeline : public Timeline {
+class IMetalTimeline : public IBackendTimeline {
  public:
   static ObjectPtr<IMetalTimeline> Create(IMetalDevice *device);
   virtual bool GetCompletedValue(uint64_t &value) const = 0;

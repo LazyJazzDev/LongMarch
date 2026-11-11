@@ -7,50 +7,50 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-void MetalAccelerationStructure::InitializeMetalAccelerationStructure(IMetalDevice *device) {
+void IMetalAccelerationStructure::InitializeMetalAccelerationStructure(IMetalDevice *device) {
   StateMetalAccelerationStructure().device_ = device;
 }
 
-IMetalDevice *MetalAccelerationStructure::Owner() const {
+IMetalDevice *IMetalAccelerationStructure::Owner() const {
   return StateMetalAccelerationStructure().device_;
 }
 
-MTL::AccelerationStructure *MetalAccelerationStructure::NativeStructure() const {
+MTL::AccelerationStructure *IMetalAccelerationStructure::NativeStructure() const {
   return StateMetalAccelerationStructure().structure_.get();
 }
 
-MTL::IBackendBuffer *MetalAccelerationStructure::CompactionQuery() const {
+MTL::Buffer *IMetalAccelerationStructure::CompactionQuery() const {
   return StateMetalAccelerationStructure().query_.get();
 }
 
-uint64_t MetalAccelerationStructure::ScratchSize(AccelerationStructureBuildMode mode) const {
+uint64_t IMetalAccelerationStructure::ScratchSize(AccelerationStructureBuildMode mode) const {
   return mode == ACCELERATION_STRUCTURE_UPDATE ? StateMetalAccelerationStructure().update_scratch_
                                                : StateMetalAccelerationStructure().build_scratch_;
 }
 
-uint64_t MetalAccelerationStructure::ReadCompactedSize() const {
+uint64_t IMetalAccelerationStructure::ReadCompactedSize() const {
   uint64_t size = 0;
   if (StateMetalAccelerationStructure().query_)
     std::memcpy(&size, StateMetalAccelerationStructure().query_->contents(), sizeof(size));
   return size;
 }
 
-bool MetalAccelerationStructure::AllowsUpdate() const {
+bool IMetalAccelerationStructure::AllowsUpdate() const {
   return StateMetalAccelerationStructure().allow_update_;
 }
 
-bool MetalAccelerationStructure::AllowsCompaction() const {
+bool IMetalAccelerationStructure::AllowsCompaction() const {
   return StateMetalAccelerationStructure().allow_compaction_;
 }
 
-bool MetalAccelerationStructure::IsCompactStorage() const {
+bool IMetalAccelerationStructure::IsCompactStorage() const {
   return StateMetalAccelerationStructure().compact_;
 }
 
-bool MetalAccelerationStructure::Allocate(MTL::AccelerationStructureDescriptor *desc,
-                                          bool update,
-                                          bool compaction,
-                                          uint64_t compacted_size) {
+bool IMetalAccelerationStructure::Allocate(MTL::AccelerationStructureDescriptor *desc,
+                                           bool update,
+                                           bool compaction,
+                                           uint64_t compacted_size) {
   const auto sizes = StateMetalAccelerationStructure().device_->NativeDevice()->accelerationStructureSizes(desc);
   const auto size = compacted_size ? compacted_size : sizes.accelerationStructureSize;
   if (!size)
@@ -206,7 +206,7 @@ LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalBottomLevelAcceleration
 LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalTopLevelAccelerationStructure,
                    "240cc2a8-c334-4c86-b106-32c7fcc0f439")
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalAccelerationStructure, "15b08793-ad90-4431-b925-abab83480476")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalAccelerationStructure, "15b08793-ad90-4431-b925-abab83480476")
 
 namespace grassland::rhi::backend::metal {
 MetalAccelerationStructureState::MetalAccelerationStructureState() = default;

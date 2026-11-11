@@ -1,18 +1,14 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12SwapChainImage;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12SwapChainImage)
 #include "grassland/rhi/backend/d3d12/d3d12_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
 
-class ID3D12Window;
-
-class ID3D12SwapChainImage : public D3D12Image {
+class ID3D12SwapChainImage : public ID3D12Image {
  public:
   static ID3D12SwapChainImage *Create(ImageDesc desc,
                                       ID3D12Window *window,

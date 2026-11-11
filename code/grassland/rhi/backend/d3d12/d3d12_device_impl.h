@@ -1,17 +1,18 @@
 #pragma once
 #include "grassland/rhi/backend/backend_device_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12DeviceImpl final : public Object<ID3D12Device> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, ID3D12Device, Device, rhi::IDevice)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, ID3D12Device, IBackendDevice, rhi::IDevice)
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override;
   ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
       const TopLevelAccelerationStructureDesc &desc) override;
-  static ID3D12Device *Create(PhysicalDevice info, Core *core, ComPtr<::ID3D12Device> device);
+  static ID3D12Device *Create(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device);
   ~D3D12DeviceImpl() override;
   ::ID3D12Device *NativeDevice() const;
   D3D12MA::Allocator *Allocator() const;
@@ -42,7 +43,7 @@ class D3D12DeviceImpl final : public Object<ID3D12Device> {
   void InterruptCollector() override;
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
   void WaitForProgress(const std::vector<Event> &next) override;
-  D3D12DeviceImpl(PhysicalDevice info, Core *core, ComPtr<::ID3D12Device> device);
+  D3D12DeviceImpl(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device);
   D3D12TemporalBufferPool upload_pool_;
   D3D12TemporalBufferPool download_pool_;
   D3D12ScratchPool scratch_pool_;
@@ -71,6 +72,35 @@ class D3D12DeviceImpl final : public Object<ID3D12Device> {
 
   const DeviceState &StateDevice() const override {
     return state_Device_;
+  }
+
+ public:
+  std::string Name() const override {
+    return IBackendDevice::CommonName();
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return IBackendDevice::CommonSupportRayTracingPipeline();
+  }
+
+  bool SupportRayQuery() const override {
+    return IBackendDevice::CommonSupportRayQuery();
+  }
+
+  bool SupportGeometryShader() const override {
+    return IBackendDevice::CommonSupportGeometryShader();
+  }
+
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
+    return IBackendDevice::CommonCreateShader(desc);
+  }
+
+  rhi::IQueue *GetQueue(QueueType type) override {
+    return IBackendDevice::CommonGetQueue(type);
+  }
+
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override {
+    return IBackendDevice::CommonWaitEvents(events, wait_all);
   }
 };
 }  // namespace grassland::rhi::backend::d3d12

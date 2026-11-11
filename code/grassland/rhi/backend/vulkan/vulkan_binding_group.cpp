@@ -5,6 +5,7 @@
 
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_binding_group_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
@@ -52,11 +53,11 @@ VkDescriptorSetLayout CreateBindingLayout(VkDevice device, const BindingLayoutDe
   return result;
 }
 
-VulkanBindingGroup::VulkanBindingGroup(IVulkanDevice *device, ObjectPtr<Version> version)
-    : BindingGroup(device, std::move(version)) {
+VulkanBindingGroupImpl::VulkanBindingGroupImpl(IVulkanDevice *device, ObjectPtr<Version> version) {
+  InitializeBindingGroup(device, std::move(version));
 }
 
-VulkanBindingGroup *VulkanBindingGroup::Create(IVulkanDevice *device, const BindingLayoutDesc &layout) {
+IVulkanBindingGroup *VulkanBindingGroupImpl::Create(IVulkanDevice *device, const BindingLayoutDesc &layout) {
   if (!ValidateBindingLayout(layout))
     return nullptr;
   if (!ValidatePipelineBindings(device->NativePhysicalDevice(), {{layout}}))
@@ -64,32 +65,32 @@ VulkanBindingGroup *VulkanBindingGroup::Create(IVulkanDevice *device, const Bind
   auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
   if (!version)
     return nullptr;
-  return new VulkanBindingGroup(device, std::move(version));
+  return new VulkanBindingGroupImpl(device, std::move(version));
 }
 
-VulkanBindingGroup::Version::Version(IVulkanDevice *device, const BindingLayoutDesc &layout)
-    : BindingGroup::Version(layout),
-      device_(device) {
-  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
-    const auto &binding = layout_.bindings[i];
+VulkanBindingVersionImpl::VulkanBindingVersionImpl(IVulkanDevice *device, const BindingLayoutDesc &layout)
+    : device_(device) {
+  InitializeBindingVersion(layout);
+
+  for (size_t i = 0; i < StateBindingVersion().layout_.bindings.size(); ++i) {
+    const auto &binding = StateBindingVersion().layout_.bindings[i];
     initialized_.emplace_back(binding.count, false);
   }
 }
 
-VulkanBindingGroup::Version::~Version() {
+VulkanBindingVersionImpl::~VulkanBindingVersionImpl() {
   auto device = device_->NativeDevice();
   lease_ = {};
   if (native_layout_)
     vkDestroyDescriptorSetLayout(device, native_layout_, nullptr);
 }
 
-VkDescriptorSet VulkanBindingGroup::Version::Set() const {
+VkDescriptorSet VulkanBindingVersionImpl::Set() const {
   return lease_->Set();
 }
 
-VulkanBindingGroup::Version *VulkanBindingGroup::Version::Create(IVulkanDevice *device,
-                                                                 const BindingLayoutDesc &layout) {
-  auto version = std::unique_ptr<Version>(new Version(device, layout));
+VulkanBindingVersionImpl *VulkanBindingVersionImpl::Create(IVulkanDevice *device, const BindingLayoutDesc &layout) {
+  auto version = std::unique_ptr<VulkanBindingVersionImpl>(new VulkanBindingVersionImpl(device, layout));
   version->native_layout_ = CreateBindingLayout(device->NativeDevice(), layout);
   if (!version->native_layout_)
     return nullptr;
@@ -99,15 +100,15 @@ VulkanBindingGroup::Version *VulkanBindingGroup::Version::Create(IVulkanDevice *
   return version.release();
 }
 
-ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::Clone() const {
-  auto copy = ObjectPtr<Version>::Adopt(Create(device_, layout_));
+ObjectPtr<IBackendBindingVersion> VulkanBindingVersionImpl::Clone() const {
+  auto copy = ObjectPtr<VulkanBindingVersionImpl>::Adopt(Create(device_, StateBindingVersion().layout_));
   if (!copy)
     return {};
-  copy->references_ = references_;
+  copy->StateBindingVersion().references_ = StateBindingVersion().references_;
   copy->initialized_ = initialized_;
   std::vector<VkCopyDescriptorSet> copies;
-  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
-    const auto &binding = layout_.bindings[i];
+  for (size_t i = 0; i < StateBindingVersion().layout_.bindings.size(); ++i) {
+    const auto &binding = StateBindingVersion().layout_.bindings[i];
     uint32_t element = 0;
     while (element < binding.count) {
       if (!initialized_[i][element]) {
@@ -130,14 +131,14 @@ ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::Clone() const {
   return copy;
 }
 
-bool VulkanBindingGroup::Version::IsInitialized(size_t binding_index, uint32_t element) const {
+bool VulkanBindingVersionImpl::IsInitialized(size_t binding_index, uint32_t element) const {
   return initialized_[binding_index][element];
 }
 
-bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
-                                                   uint32_t first_element,
-                                                   const std::vector<BufferView> &buffers) {
-  const auto &binding = layout_.bindings[binding_index];
+bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
+                                                uint32_t first_element,
+                                                const std::vector<BufferView> &buffers) {
+  const auto &binding = StateBindingVersion().layout_.bindings[binding_index];
   VkPhysicalDeviceProperties properties{};
   vkGetPhysicalDeviceProperties(device_->NativePhysicalDevice(), &properties);
   const bool uniform = binding.type == BINDING_UNIFORM_BUFFER;
@@ -164,17 +165,17 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   return true;
 }
 
-bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
-                                                   uint32_t first_element,
-                                                   const std::vector<IImage *> &images) {
-  const auto &binding = layout_.bindings[binding_index];
+bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
+                                                uint32_t first_element,
+                                                const std::vector<IImage *> &images) {
+  const auto &binding = StateBindingVersion().layout_.bindings[binding_index];
   for (auto image : images)
     if (!rhi::QueryInterfacePtr<IVulkanAllocatedImage>(image).Get())
       return false;
   auto native = device_->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(images.size());
   for (size_t i = 0; i < images.size(); ++i) {
-    infos[i].imageView = rhi::QueryInterfacePtr<VulkanImage>(images[i]).Get()->BindingView();
+    infos[i].imageView = rhi::QueryInterfacePtr<IVulkanImage>(images[i]).Get()->BindingView();
     infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
@@ -192,10 +193,10 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   return true;
 }
 
-bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
-                                                   uint32_t first_element,
-                                                   const std::vector<ISampler *> &samplers) {
-  const auto &binding = layout_.bindings[binding_index];
+bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
+                                                uint32_t first_element,
+                                                const std::vector<ISampler *> &samplers) {
+  const auto &binding = StateBindingVersion().layout_.bindings[binding_index];
   auto native = device_->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(samplers.size());
   for (size_t i = 0; i < samplers.size(); ++i)
@@ -264,9 +265,9 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
   return true;
 }
 
-bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
-                                                   uint32_t first_element,
-                                                   const std::vector<ITopLevelAccelerationStructure *> &values) {
+bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
+                                                uint32_t first_element,
+                                                const std::vector<ITopLevelAccelerationStructure *> &values) {
   for (auto value : values) {
     auto native = rhi::QueryInterfacePtr<IVulkanTopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
@@ -280,7 +281,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   as.pAccelerationStructures = handles.data();
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, &as};
   write.dstSet = Set();
-  write.dstBinding = layout_.bindings[binding_index].binding;
+  write.dstBinding = StateBindingVersion().layout_.bindings[binding_index].binding;
   write.dstArrayElement = first_element;
   write.descriptorCount = uint32_t(handles.size());
   write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
@@ -292,6 +293,18 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanBindingGroup, "d572985f-e699-4c7c-b9da-2c57af2e528c")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanBindingGroup, "d572985f-e699-4c7c-b9da-2c57af2e528c")
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanBindingGroup::Version, "fe3339ef-20d4-4c9c-b124-60c9431ce9b8")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanBindingVersion, "fe3339ef-20d4-4c9c-b124-60c9431ce9b8")
+
+namespace grassland::rhi::backend::vulkan {
+IVulkanBindingVersion *IVulkanBindingVersion::Create(IVulkanDevice *device, const BindingLayoutDesc &layout) {
+  return VulkanBindingVersionImpl::Create(device, layout);
+}
+}  // namespace grassland::rhi::backend::vulkan
+
+namespace grassland::rhi::backend::vulkan {
+IVulkanBindingGroup *IVulkanBindingGroup::Create(IVulkanDevice *device, const BindingLayoutDesc &layout) {
+  return VulkanBindingGroupImpl::Create(device, layout);
+}
+}  // namespace grassland::rhi::backend::vulkan

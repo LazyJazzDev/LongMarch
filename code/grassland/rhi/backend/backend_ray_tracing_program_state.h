@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_ray_tracing_program.h"
+#include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
 struct RayTracingProgramState final {
   RayTracingProgramState();
   ~RayTracingProgramState();
-  Device *device_{};
+  IBackendDevice *device_{};
   RayTracingProgramDesc desc_{};
   std::vector<ObjectPtr<IShader>> shaders_{};
 };

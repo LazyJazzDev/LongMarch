@@ -22,7 +22,7 @@ struct State {
   bool initialized{};
   std::mutex mutex;
   std::vector<GLFWwindow *> destroyed;
-  std::unordered_map<GLFWwindow *, Window *> windows;
+  std::unordered_map<GLFWwindow *, IBackendWindow *> windows;
   bool resize_failed{};
 
   ~State() {
@@ -36,15 +36,15 @@ State &Get() {
   return state;
 }
 
-ObjectPtr<Window> FindWindow(GLFWwindow *native) {
+ObjectPtr<IBackendWindow> FindWindow(GLFWwindow *native) {
   std::lock_guard<std::mutex> lock(Get().mutex);
   const auto it = Get().windows.find(native);
-  return it == Get().windows.end() ? ObjectPtr<Window>{} : ObjectPtr<Window>::Retain(it->second);
+  return it == Get().windows.end() ? ObjectPtr<IBackendWindow>{} : ObjectPtr<IBackendWindow>::Retain(it->second);
 }
 
 }  // namespace
 
-void RegisterWindow(Window *window) {
+void RegisterWindow(IBackendWindow *window) {
   auto native = window->GLFWWindow();
   {
     std::lock_guard<std::mutex> lock(Get().mutex);

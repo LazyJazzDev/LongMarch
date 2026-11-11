@@ -8,7 +8,7 @@
 #include "grassland/rhi/backend/metal/metal_timeline.h"
 
 namespace grassland::rhi::backend::metal {
-struct IMetalTimeline::State {
+struct MetalTimelineImpl::State {
   std::mutex mutex;
   std::condition_variable changed;
   bool failed{};
@@ -20,7 +20,7 @@ MetalTimelineImpl::MetalTimelineImpl(IMetalDevice *device) : state_(std::make_sh
 
 ObjectPtr<IMetalTimeline> MetalTimelineImpl::Create(IMetalDevice *device) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto result = ObjectPtr<IMetalTimeline>::Adopt(new MetalTimelineImpl(device));
+  auto result = ObjectPtr<MetalTimelineImpl>::Adopt(new MetalTimelineImpl(device));
   result->gpu_event_ = NS::TransferPtr(device->NativeDevice()->newEvent());
   result->event_ = NS::TransferPtr(device->NativeDevice()->newSharedEvent());
   if (!result->gpu_event_ || !result->event_) {

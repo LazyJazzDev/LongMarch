@@ -4,11 +4,13 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 #include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDescriptorPool {
+class VulkanDescriptorPool final {
+  class LeaseImpl;
   // Uniform buffers, storage buffers, sampled images, storage images, samplers, acceleration structures.
   using Pattern = std::array<uint32_t, 6>;
 
@@ -24,20 +26,12 @@ class VulkanDescriptorPool {
   };
 
  public:
-  class Lease final : public Object<IObject> {
+  class ILease : public IObject {
    public:
-    using Object<IObject>::QueryInterface;
-    bool QueryInterface(InterfaceID id, void **output) noexcept override;
-
-    Lease(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set);
-    ~Lease() override;
-    VkDescriptorSet Set() const;
-
-   private:
-    VulkanDescriptorPool *owner_;
-    Page *page_;
-    VkDescriptorSet set_;
+    virtual VkDescriptorSet Set() const = 0;
   };
+
+  using Lease = ILease;
 
   explicit VulkanDescriptorPool(VkDevice device);
   ~VulkanDescriptorPool();
@@ -53,16 +47,4 @@ class VulkanDescriptorPool {
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanDescriptorPool::Lease)
-
-inline bool grassland::rhi::backend::vulkan::VulkanDescriptorPool::Lease::QueryInterface(InterfaceID id,
-                                                                                         void **output) noexcept {
-  if (!output)
-    return false;
-  if (auto result = MatchInterface<Lease>(id, this)) {
-    *output = result;
-    AddRef();
-    return true;
-  }
-  return Object<IObject>::QueryInterface(id, output);
-}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanDescriptorPool::ILease)

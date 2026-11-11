@@ -1,17 +1,13 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12Program;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Program)
 #include "grassland/rhi/backend/backend_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class ID3D12Device;
-
-class ID3D12Program : public Program, public D3D12ProgramBase {
+class ID3D12Program : public IBackendProgram, public ID3D12ProgramBase {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;

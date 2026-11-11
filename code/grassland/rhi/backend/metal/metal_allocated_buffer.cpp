@@ -7,19 +7,19 @@
 namespace grassland::rhi::backend::metal {
 class MetalAllocatedBufferImpl final : public Object<IMetalAllocatedBuffer> {
  public:
-  LONGMARCH_RHI_QUERY_INTERFACES(Object<IMetalAllocatedBuffer>, IBuffer, IBackendBuffer, IMetalBuffer)
+  LONGMARCH_RHI_FINAL_QUERY(IBuffer, IMetalAllocatedBuffer, IBuffer, IBackendBuffer, IMetalBuffer)
 
   static IMetalAllocatedBuffer *Create(IMetalDevice *device,
                                        const BufferDesc &desc,
                                        bool upload = false,
                                        bool download = false);
-  MTL::IBackendBuffer *NativeBuffer() const override;
+  MTL::Buffer *NativeBuffer() const override;
   bool Read(void *data, uint64_t size, uint64_t offset = 0);
   bool Write(const void *data, uint64_t size);
 
  private:
   MetalAllocatedBufferImpl(IMetalDevice *device, const BufferDesc &desc);
-  NS::SharedPtr<MTL::IBackendBuffer> buffer_;
+  NS::SharedPtr<MTL::Buffer> buffer_;
 
  private:
   IMetalDevice *device_;
@@ -30,7 +30,7 @@ class MetalAllocatedBufferImpl final : public Object<IMetalAllocatedBuffer> {
     return desc_;
   }
 
-  Device *Owner() const override;
+  IBackendDevice *Owner() const override;
 };
 
 IMetalAllocatedBuffer *IMetalAllocatedBuffer::Create(IMetalDevice *device,
@@ -40,7 +40,7 @@ IMetalAllocatedBuffer *IMetalAllocatedBuffer::Create(IMetalDevice *device,
   return MetalAllocatedBufferImpl::Create(device, desc, upload, download);
 }
 
-Device *MetalAllocatedBufferImpl::Owner() const {
+IBackendDevice *MetalAllocatedBufferImpl::Owner() const {
   return device_;
 }
 
@@ -67,7 +67,7 @@ IMetalAllocatedBuffer *MetalAllocatedBufferImpl::Create(IMetalDevice *device,
   return object.release();
 }
 
-MTL::IBackendBuffer *MetalAllocatedBufferImpl::NativeBuffer() const {
+MTL::Buffer *MetalAllocatedBufferImpl::NativeBuffer() const {
   return buffer_.get();
 }
 

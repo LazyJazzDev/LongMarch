@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12TemporalBufferLeaseImpl final : public Object<ID3D12TemporalBufferLease> {
  public:
-  LONGMARCH_RHI_QUERY_INTERFACES(Object<ID3D12TemporalBufferLease>, IBuffer, IBackendBuffer, ID3D12Buffer)
+  LONGMARCH_RHI_FINAL_QUERY(IBuffer, ID3D12TemporalBufferLease, IBuffer, IBackendBuffer, ID3D12Buffer)
 
   D3D12TemporalBufferLeaseImpl(D3D12TemporalBufferPool *pool, ID3D12AllocatedBuffer *buffer, size_t level);
   ~D3D12TemporalBufferLeaseImpl() override;
@@ -21,7 +21,7 @@ class D3D12TemporalBufferLeaseImpl final : public Object<ID3D12TemporalBufferLea
   size_t level_;
 
  public:
-  Device *Owner() const override {
+  IBackendDevice *Owner() const override {
     return buffer_->Owner();
   }
 };

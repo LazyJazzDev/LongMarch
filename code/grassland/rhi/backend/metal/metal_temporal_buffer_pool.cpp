@@ -5,12 +5,12 @@
 namespace grassland::rhi::backend::metal {
 class MetalTemporalBufferLeaseImpl final : public Object<IMetalTemporalBufferLease> {
  public:
-  LONGMARCH_RHI_QUERY_INTERFACES(Object<IMetalTemporalBufferLease>, IBuffer, IBackendBuffer, IMetalBuffer)
+  LONGMARCH_RHI_FINAL_QUERY(IBuffer, IMetalTemporalBufferLease, IBuffer, IBackendBuffer, IMetalBuffer)
 
   MetalTemporalBufferLeaseImpl(MetalTemporalBufferPool *pool, IMetalAllocatedBuffer *buffer, size_t level);
   ~MetalTemporalBufferLeaseImpl() override;
   BufferDesc GetDesc() const override;
-  MTL::IBackendBuffer *NativeBuffer() const override;
+  MTL::Buffer *NativeBuffer() const override;
   bool Read(void *data, uint64_t size, uint64_t offset = 0);
   bool Write(const void *data, uint64_t size);
 
@@ -20,7 +20,7 @@ class MetalTemporalBufferLeaseImpl final : public Object<IMetalTemporalBufferLea
   size_t level_;
 
  public:
-  Device *Owner() const override {
+  IBackendDevice *Owner() const override {
     return buffer_->Owner();
   }
 };
@@ -53,7 +53,7 @@ BufferDesc MetalTemporalBufferLeaseImpl::GetDesc() const {
   return buffer_->GetDesc();
 }
 
-MTL::IBackendBuffer *MetalTemporalBufferLeaseImpl::NativeBuffer() const {
+MTL::Buffer *MetalTemporalBufferLeaseImpl::NativeBuffer() const {
   return buffer_->NativeBuffer();
 }
 

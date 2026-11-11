@@ -4,6 +4,12 @@
 #include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ITopLevelAccelerationStructure)
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IBottomLevelAccelerationStructure)
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IAccelerationStructure)
+
 namespace grassland::rhi {
 // Describes fixed geometry shape, not input buffer ownership. Counts/format/stride
 // are unchanged for this object's builds. Update also preserves index topology.

@@ -4,20 +4,20 @@
 #include "grassland/rhi/backend/d3d12/d3d12_program_base_state.h"
 
 namespace grassland::rhi::backend::d3d12 {
-void D3D12ProgramBase::InitializeD3D12ProgramBase() {
+void ID3D12ProgramBase::InitializeD3D12ProgramBase() {
 }
 
-ID3D12RootSignature *D3D12ProgramBase::NativeRootSignature() const {
+ID3D12RootSignature *ID3D12ProgramBase::NativeRootSignature() const {
   return StateD3D12ProgramBase().root_signature_.Get();
 }
 
-uint32_t D3D12ProgramBase::RootParameter(uint32_t group, bool sampler) const {
+uint32_t ID3D12ProgramBase::RootParameter(uint32_t group, bool sampler) const {
   return StateD3D12ProgramBase().root_parameters_[group][sampler];
 }
 
-bool D3D12ProgramBase::CreateLayout(::ID3D12Device *device,
-                                    const PipelineLayoutDesc &layout,
-                                    D3D12_ROOT_SIGNATURE_FLAGS flags) {
+bool ID3D12ProgramBase::CreateLayout(::ID3D12Device *device,
+                                     const PipelineLayoutDesc &layout,
+                                     D3D12_ROOT_SIGNATURE_FLAGS flags) {
   D3D12_ROOT_SIGNATURE_DESC root{};
   root.Flags = flags;
   const auto mappings = MapBindings(layout, BACKEND_API_D3D12);
@@ -62,7 +62,7 @@ bool D3D12ProgramBase::CreateLayout(::ID3D12Device *device,
 
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12ProgramBase, "1a8ecd83-21dd-483c-bd0b-6efba7356e93")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12ProgramBase, "1a8ecd83-21dd-483c-bd0b-6efba7356e93")
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12ProgramBaseState::D3D12ProgramBaseState() = default;

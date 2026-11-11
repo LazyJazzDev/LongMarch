@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_command_context_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalCommandContextImpl final : public Object<IMetalCommandContext> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IMetalCommandContext, CommandContext, rhi::ICommandContext)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IMetalCommandContext, IBackendCommandContext, rhi::ICommandContext)
   static IMetalCommandContext *Create(IMetalQueue *queue);
   ~MetalCommandContextImpl() override;
   bool CmdBuildBottomLevelAccelerationStructure(
@@ -63,12 +64,12 @@ class MetalCommandContextImpl final : public Object<IMetalCommandContext> {
   bool ValidateDraw(bool indexed);
   IMetalProgram *program_{};
   IMetalComputeProgram *compute_program_{};
-  MetalProgramBase *native_program_{};
-  MetalImage *render_target_{};
+  IMetalProgramBase *native_program_{};
+  IMetalImage *render_target_{};
   std::vector<ImageFormat> color_formats_;
   std::vector<IImage *> color_targets_;
   ImageFormat depth_format_{IMAGE_FORMAT_UNKNOWN};
-  std::vector<MetalBindingGroup::Version *> groups_;
+  std::vector<IMetalBindingVersion *> groups_;
   NS::SharedPtr<MTL::RenderCommandEncoder> encoder_;
   std::vector<std::pair<IMetalBuffer *, uint64_t>> vertex_buffers_;
   IMetalBuffer *index_{};
@@ -90,6 +91,30 @@ class MetalCommandContextImpl final : public Object<IMetalCommandContext> {
 
   const CommandContextState &StateCommandContext() const override {
     return state_CommandContext_;
+  }
+
+ public:
+  bool CmdDrawImGui(IWindow *window, IImage *target) override {
+    return IBackendCommandContext::CommonCmdDrawImGui(window, target);
+  }
+
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override {
+    return IBackendCommandContext::CommonCmdPresentImage(window, frame_img, frame_color_space);
+  }
+
+  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override {
+    return IBackendCommandContext::CommonCmdBindRayTracingProgram(program);
+  }
+
+  bool CmdDispatchRays(uint32_t width,
+                       uint32_t height,
+                       uint32_t depth = 1,
+                       IShaderBindingTable *sbt = nullptr) override {
+    return IBackendCommandContext::CommonCmdDispatchRays(width, height, depth, sbt);
+  }
+
+  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override {
+    return IBackendCommandContext::CommonSubmit(info);
   }
 };
 }  // namespace grassland::rhi::backend::metal

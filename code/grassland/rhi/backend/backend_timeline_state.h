@@ -1,10 +1,11 @@
 #pragma once
 #include "grassland/rhi/backend/backend_timeline.h"
+#include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
 struct TimelineState final {
   TimelineState();
   ~TimelineState();
-  Device *device_{};
+  IBackendDevice *device_{};
 };
 }  // namespace grassland::rhi::backend

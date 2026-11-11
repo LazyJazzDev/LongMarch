@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_command_context_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12CommandContextImpl final : public Object<ID3D12CommandContext> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, ID3D12CommandContext, CommandContext, rhi::ICommandContext)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, ID3D12CommandContext, IBackendCommandContext, rhi::ICommandContext)
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,
@@ -59,11 +60,11 @@ class D3D12CommandContextImpl final : public Object<ID3D12CommandContext> {
 
  private:
   D3D12CommandContextImpl(ID3D12Queue *queue);
-  bool ClearColor(D3D12Image *image, const ClearColorValue &value);
+  bool ClearColor(ID3D12Image *image, const ClearColorValue &value);
   bool PrepareGroups();
 
   struct BoundGroup {
-    D3D12BindingGroup::Version *version{};
+    ID3D12BindingVersion *version{};
     std::array<D3D12DescriptorPool::Lease *, 2> sources{};
     std::array<D3D12_GPU_DESCRIPTOR_HANDLE, 2> tables{};
     std::array<bool, 2> dirty{};
@@ -74,7 +75,7 @@ class D3D12CommandContextImpl final : public Object<ID3D12CommandContext> {
   std::array<uint32_t, 2> descriptor_used_{};
   bool tables_dirty_{};
   ID3D12Program *program_{};
-  D3D12ProgramBase *native_program_{};
+  ID3D12ProgramBase *native_program_{};
   std::unordered_map<ID3D12TopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
       as_dependencies_;
   bool compute_active_{};
@@ -112,6 +113,19 @@ class D3D12CommandContextImpl final : public Object<ID3D12CommandContext> {
 
   const CommandContextState &StateCommandContext() const override {
     return state_CommandContext_;
+  }
+
+ public:
+  bool CmdDrawImGui(IWindow *window, IImage *target) override {
+    return IBackendCommandContext::CommonCmdDrawImGui(window, target);
+  }
+
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override {
+    return IBackendCommandContext::CommonCmdPresentImage(window, frame_img, frame_color_space);
+  }
+
+  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override {
+    return IBackendCommandContext::CommonSubmit(info);
   }
 };
 }  // namespace grassland::rhi::backend::d3d12

@@ -7,10 +7,10 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-void VulkanImage::InitializeVulkanImage(ImageDesc desc,
-                                        const void *device,
-                                        VkImageLayout default_layout,
-                                        Queue *queue) {
+void IVulkanImage::InitializeVulkanImage(ImageDesc desc,
+                                         const void *device,
+                                         VkImageLayout default_layout,
+                                         IBackendQueue *queue) {
   InitializeImage(desc, queue);
   StateVulkanImage().device_ = device;
   StateVulkanImage().default_layout_ = default_layout;
@@ -76,17 +76,17 @@ bool VulkanImageViews::Initialize(VkDevice device, VkImage image, ImageFormat fo
   return true;
 }
 
-VkImageLayout VulkanImage::DefaultLayout() const {
+VkImageLayout IVulkanImage::DefaultLayout() const {
   return StateVulkanImage().default_layout_;
 }
 
-const void *VulkanImage::DeviceIdentity() const {
+const void *IVulkanImage::CommonDeviceIdentity() const {
   return StateVulkanImage().device_;
 }
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanImage, "bab85247-2604-44fe-b152-1ea15663177a")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanImage, "bab85247-2604-44fe-b152-1ea15663177a")
 
 namespace grassland::rhi::backend::vulkan {
 VulkanImageState::VulkanImageState() = default;

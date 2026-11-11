@@ -23,7 +23,7 @@ bool ValidateBottomLevelDesc(const BottomLevelAccelerationStructureDesc &desc) {
 
 bool ValidateGeometryBuffers(const BottomLevelAccelerationStructureDesc &desc,
                              const std::vector<AccelerationStructureGeometryBuffers> &buffers,
-                             Device *device) {
+                             IBackendDevice *device) {
   if (buffers.size() != desc.geometries.size() + desc.aabbs.size())
     return false;
   auto valid = [device](const BufferView &view, uint64_t required, uint64_t alignment) {

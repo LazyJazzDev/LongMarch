@@ -3,6 +3,8 @@
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_timeline.h"
 
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ISubmissionToken)
+
 namespace grassland::rhi {
 
 class ISubmissionToken : public IObject {

@@ -6,22 +6,22 @@
 #include "grassland/rhi/backend/backend_program_state.h"
 
 namespace grassland::rhi::backend {
-void Program::InitializeProgram(Device *device, const ProgramDesc &desc) {
+void IBackendProgram::InitializeProgram(IBackendDevice *device, const ProgramDesc &desc) {
   StateProgram().device_ = device;
   StateProgram().desc_ = desc;
   StateProgram().vertex_shader_ = ObjectPtr<IShader>::Retain(desc.vertex_shader);
   StateProgram().fragment_shader_ = ObjectPtr<IShader>::Retain(desc.fragment_shader);
 }
 
-const ProgramDesc &Program::GetDesc() const {
+const ProgramDesc &IBackendProgram::CommonGetDesc() const {
   return StateProgram().desc_;
 }
 
-Device *Program::Owner() const {
+IBackendDevice *IBackendProgram::Owner() const {
   return StateProgram().device_;
 }
 
-bool Program::ValidateLayout() const {
+bool IBackendProgram::ValidateLayout() const {
   if (StateProgram().desc_.topology < PRIMITIVE_TOPOLOGY_TRIANGLE_LIST ||
       StateProgram().desc_.topology > PRIMITIVE_TOPOLOGY_POINT_LIST ||
       StateProgram().desc_.rasterizer.cull_mode < CULL_MODE_NONE ||
@@ -96,7 +96,7 @@ bool Program::ValidateLayout() const {
 }
 }  // namespace grassland::rhi::backend
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::Program, "4a916e47-6d7c-4f6b-93bc-ed51bba0eaec")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendProgram, "4a916e47-6d7c-4f6b-93bc-ed51bba0eaec")
 
 namespace grassland::rhi::backend {
 ProgramState::ProgramState() = default;

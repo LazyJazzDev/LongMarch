@@ -3,6 +3,8 @@
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_sampler.h"
 
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IBindingGroup)
+
 namespace grassland::rhi {
 class IBuffer;
 class IImage;

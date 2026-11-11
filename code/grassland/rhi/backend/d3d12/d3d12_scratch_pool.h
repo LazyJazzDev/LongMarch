@@ -3,12 +3,13 @@
 #include <deque>
 #include <mutex>
 
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 
 namespace grassland::rhi::backend::d3d12 {
 // All users must submit to the same physical queue and synchronize scratch accesses.
 // Contexts retain the returned storage directly, including buffers replaced by resizing.
-class D3D12ScratchPool {
+class D3D12ScratchPool final {
  public:
   explicit D3D12ScratchPool(ID3D12Device *device);
   // Share the current buffer; resize on demand using the last second's peak request.

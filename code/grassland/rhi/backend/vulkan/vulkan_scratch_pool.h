@@ -3,12 +3,13 @@
 #include <deque>
 #include <mutex>
 
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
 
 namespace grassland::rhi::backend::vulkan {
 // All users must submit to the same physical queue and synchronize scratch accesses.
 // Contexts retain the returned storage directly, including buffers replaced by resizing.
-class VulkanScratchPool {
+class VulkanScratchPool final {
  public:
   explicit VulkanScratchPool(IVulkanDevice *device);
   // Share the current buffer; resize on demand using the last second's peak request.

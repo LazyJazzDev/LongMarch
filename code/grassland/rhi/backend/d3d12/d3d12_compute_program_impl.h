@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/rhi/backend/backend_compute_program_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program_base_state.h"
 
@@ -8,9 +9,9 @@ class D3D12ComputeProgramImpl final : public Object<ID3D12ComputeProgram> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IComputeProgram,
                             ID3D12ComputeProgram,
-                            ComputeProgram,
+                            IBackendComputeProgram,
                             IComputeProgram,
-                            D3D12ProgramBase,
+                            ID3D12ProgramBase,
                             IObject)
   static ID3D12ComputeProgram *Create(ID3D12Device *device, const ComputeProgramDesc &desc);
   ID3D12PipelineState *NativePipeline() const;
@@ -43,6 +44,11 @@ class D3D12ComputeProgramImpl final : public Object<ID3D12ComputeProgram> {
 
   const D3D12ProgramBaseState &StateD3D12ProgramBase() const override {
     return state_D3D12ProgramBase_;
+  }
+
+ public:
+  const ComputeProgramDesc &GetDesc() const override {
+    return IBackendComputeProgram::CommonGetDesc();
   }
 };
 }  // namespace grassland::rhi::backend::d3d12

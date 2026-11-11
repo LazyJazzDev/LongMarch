@@ -4,17 +4,19 @@
 
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_binding_group_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12BindingGroup::Version::Version(ID3D12Device *device, const BindingLayoutDesc &layout)
-    : BindingGroup::Version(layout),
-      device_(device) {
+D3D12BindingVersionImpl::D3D12BindingVersionImpl(ID3D12Device *device, const BindingLayoutDesc &layout)
+    : device_(device) {
+  InitializeBindingVersion(layout);
+
   uint32_t resource = 0, sampler = 0;
-  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
-    const auto &binding = layout_.bindings[i];
+  for (size_t i = 0; i < StateBindingVersion().layout_.bindings.size(); ++i) {
+    const auto &binding = StateBindingVersion().layout_.bindings[i];
     auto &offset = binding.type == BINDING_SAMPLER ? sampler : resource;
     offsets_.push_back(offset);
     offset += binding.count;
@@ -22,7 +24,7 @@ D3D12BindingGroup::Version::Version(ID3D12Device *device, const BindingLayoutDes
   }
 }
 
-D3D12BindingGroup::Version *D3D12BindingGroup::Version::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
+D3D12BindingVersionImpl *D3D12BindingVersionImpl::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
   uint64_t resources = 0, samplers = 0;
   for (auto b : layout.bindings) {
     if ((b.type == BINDING_STRUCTURED_BUFFER || b.type == BINDING_RW_STRUCTURED_BUFFER) &&
@@ -32,7 +34,7 @@ D3D12BindingGroup::Version *D3D12BindingGroup::Version::Create(ID3D12Device *dev
   }
   if (resources > 1000000 || samplers > 2048)
     return nullptr;
-  auto version = std::unique_ptr<Version>(new Version(device, layout));
+  auto version = std::unique_ptr<D3D12BindingVersionImpl>(new D3D12BindingVersionImpl(device, layout));
   if (resources) {
     version->resources_ = device->ResourceDescriptorStorage().Acquire(uint32_t(resources));
     if (!version->resources_)
@@ -46,41 +48,41 @@ D3D12BindingGroup::Version *D3D12BindingGroup::Version::Create(ID3D12Device *dev
   return version.release();
 }
 
-ObjectPtr<BindingGroup::Version> D3D12BindingGroup::Version::Clone() const {
-  auto copy = ObjectPtr<Version>::Adopt(Create(device_, layout_));
+ObjectPtr<IBackendBindingVersion> D3D12BindingVersionImpl::Clone() const {
+  auto copy = ObjectPtr<D3D12BindingVersionImpl>::Adopt(Create(device_, StateBindingVersion().layout_));
   if (!copy)
     return {};
-  copy->references_ = references_;
+  copy->StateBindingVersion().references_ = StateBindingVersion().references_;
   copy->initialized_ = initialized_;
   auto native = device_->NativeDevice();
-  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
-    const bool sampler = layout_.bindings[i].type == BINDING_SAMPLER;
+  for (size_t i = 0; i < StateBindingVersion().layout_.bindings.size(); ++i) {
+    const bool sampler = StateBindingVersion().layout_.bindings[i].type == BINDING_SAMPLER;
     auto source = sampler ? samplers_.Get() : resources_.Get();
     auto target = sampler ? copy->samplers_.Get() : copy->resources_.Get();
     const auto type = sampler ? D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER : D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    for (uint32_t j = 0; j < layout_.bindings[i].count; ++j)
+    for (uint32_t j = 0; j < StateBindingVersion().layout_.bindings[i].count; ++j)
       if (initialized_[i][j])
         native->CopyDescriptorsSimple(1, target->CPU(offsets_[i] + j), source->CPU(offsets_[i] + j), type);
   }
   return copy;
 }
 
-bool D3D12BindingGroup::Version::IsInitialized(size_t binding_index, uint32_t element) const {
+bool D3D12BindingVersionImpl::IsInitialized(size_t binding_index, uint32_t element) const {
   return initialized_[binding_index][element];
 }
 
-uint32_t D3D12BindingGroup::Version::ResourceCount() const {
+uint32_t D3D12BindingVersionImpl::ResourceCount() const {
   return resources_ ? resources_->Count() : 0;
 }
 
-D3D12DescriptorPool::Lease *D3D12BindingGroup::Version::SamplerDescriptors() const {
+D3D12DescriptorPool::Lease *D3D12BindingVersionImpl::SamplerDescriptors() const {
   return samplers_.Get();
 }
 
-bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
-                                                  uint32_t first_element,
-                                                  const std::vector<BufferView> &buffers) {
-  const auto &binding = layout_.bindings[binding_index];
+bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
+                                               uint32_t first_element,
+                                               const std::vector<BufferView> &buffers) {
+  const auto &binding = StateBindingVersion().layout_.bindings[binding_index];
   if (binding.type == BINDING_UNIFORM_BUFFER) {
     for (const auto &view : buffers) {
       if (view.size > 65536)
@@ -153,21 +155,21 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
   return true;
 }
 
-bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
-                                                  uint32_t first_element,
-                                                  const std::vector<IImage *> &images) {
-  const auto &binding = layout_.bindings[binding_index];
+bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
+                                               uint32_t first_element,
+                                               const std::vector<IImage *> &images) {
+  const auto &binding = StateBindingVersion().layout_.bindings[binding_index];
   for (auto image : images)
     if (!rhi::QueryInterfacePtr<ID3D12AllocatedImage>(image).Get())
       return false;
   auto native = device_->NativeDevice();
   if (binding.type == BINDING_TEXTURE2D) {
     for (size_t i = 0; i < images.size(); ++i)
-      native->CreateShaderResourceView(rhi::QueryInterfacePtr<D3D12Image>(images[i]).Get()->NativeImage(), nullptr,
+      native->CreateShaderResourceView(rhi::QueryInterfacePtr<ID3D12Image>(images[i]).Get()->NativeImage(), nullptr,
                                        resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
   } else {
     for (size_t i = 0; i < images.size(); ++i)
-      native->CreateUnorderedAccessView(rhi::QueryInterfacePtr<D3D12Image>(images[i]).Get()->NativeImage(), nullptr,
+      native->CreateUnorderedAccessView(rhi::QueryInterfacePtr<ID3D12Image>(images[i]).Get()->NativeImage(), nullptr,
                                         nullptr,
                                         resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
   }
@@ -176,9 +178,9 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
   return true;
 }
 
-bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
-                                                  uint32_t first_element,
-                                                  const std::vector<ISampler *> &samplers) {
+bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
+                                               uint32_t first_element,
+                                               const std::vector<ISampler *> &samplers) {
   auto native = device_->NativeDevice();
   for (size_t i = 0; i < samplers.size(); ++i)
     native->CopyDescriptorsSimple(1, samplers_->CPU(offsets_[binding_index] + first_element + uint32_t(i)),
@@ -189,26 +191,26 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
   return true;
 }
 
-D3D12DescriptorPool::Lease *D3D12BindingGroup::Version::ResourceDescriptors() const {
+D3D12DescriptorPool::Lease *D3D12BindingVersionImpl::ResourceDescriptors() const {
   return resources_.Get();
 }
 
-D3D12BindingGroup::D3D12BindingGroup(ID3D12Device *device, ObjectPtr<Version> version)
-    : BindingGroup(device, std::move(version)) {
+D3D12BindingGroupImpl::D3D12BindingGroupImpl(ID3D12Device *device, ObjectPtr<Version> version) {
+  InitializeBindingGroup(device, std::move(version));
 }
 
-D3D12BindingGroup *D3D12BindingGroup::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
+ID3D12BindingGroup *D3D12BindingGroupImpl::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
   if (!ValidateBindingLayout(layout))
     return nullptr;
   auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
   if (!version)
     return nullptr;
-  return new D3D12BindingGroup(device, std::move(version));
+  return new D3D12BindingGroupImpl(device, std::move(version));
 }
 
-bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
-                                                  uint32_t first_element,
-                                                  const std::vector<ITopLevelAccelerationStructure *> &values) {
+bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
+                                               uint32_t first_element,
+                                               const std::vector<ITopLevelAccelerationStructure *> &values) {
   for (auto value : values) {
     auto native = rhi::QueryInterfacePtr<ID3D12TopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
@@ -231,6 +233,18 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
 
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12BindingGroup, "b827b0e0-c57d-4316-b632-77a41d222ae7")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BindingGroup, "b827b0e0-c57d-4316-b632-77a41d222ae7")
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12BindingGroup::Version, "1e82b239-9a3f-4e32-aeab-b2fdaba168ff")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BindingVersion, "1e82b239-9a3f-4e32-aeab-b2fdaba168ff")
+
+namespace grassland::rhi::backend::d3d12 {
+ID3D12BindingVersion *ID3D12BindingVersion::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
+  return D3D12BindingVersionImpl::Create(device, layout);
+}
+}  // namespace grassland::rhi::backend::d3d12
+
+namespace grassland::rhi::backend::d3d12 {
+ID3D12BindingGroup *ID3D12BindingGroup::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
+  return D3D12BindingGroupImpl::Create(device, layout);
+}
+}  // namespace grassland::rhi::backend::d3d12

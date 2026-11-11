@@ -1,10 +1,11 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanCoreImpl final : public Object<IVulkanCore> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, IVulkanCore, Core, rhi::ICore)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, IVulkanCore, IBackendCore, rhi::ICore)
   static IVulkanCore *CreateVulkanCore(const CoreDesc &desc);
   ~VulkanCoreImpl() override;
   VkInstance Instance() const;
@@ -23,5 +24,10 @@ class VulkanCoreImpl final : public Object<IVulkanCore> {
   VkInstance instance_{VK_NULL_HANDLE};
   VkDebugUtilsMessengerEXT debug_messenger_{};
   std::vector<Adapter> adapters_;
+
+ public:
+  rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
+    return IBackendCore::CommonCreateDeviceByAutoSelection(requirement);
+  }
 };
 }  // namespace grassland::rhi::backend::vulkan

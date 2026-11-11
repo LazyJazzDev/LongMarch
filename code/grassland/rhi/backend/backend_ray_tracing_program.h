@@ -1,25 +1,21 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend {
-class RayTracingProgram;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::RayTracingProgram)
-#include "grassland/rhi/backend/backend_util.h"
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendRayTracingProgram)
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend {
-class Device;
-
 struct RayTracingProgramState;
 
-class RayTracingProgram : public IRayTracingProgram {
+class IBackendRayTracingProgram : public IRayTracingProgram {
  protected:
-  void InitializeRayTracingProgram(Device *device, const RayTracingProgramDesc &desc);
+  void InitializeRayTracingProgram(IBackendDevice *device, const RayTracingProgramDesc &desc);
 
  public:
-  const RayTracingProgramDesc &GetDesc() const override;
-  Device *Owner() const;
+  const RayTracingProgramDesc &GetDesc() const override = 0;
+  const RayTracingProgramDesc &CommonGetDesc() const;
+  IBackendDevice *Owner() const;
 
  protected:
   bool ValidateLayout() const;

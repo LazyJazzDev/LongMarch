@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_command_context_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanCommandContextImpl final : public Object<IVulkanCommandContext> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IVulkanCommandContext, CommandContext, rhi::ICommandContext)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IVulkanCommandContext, IBackendCommandContext, rhi::ICommandContext)
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,
@@ -60,16 +61,16 @@ class VulkanCommandContextImpl final : public Object<IVulkanCommandContext> {
  private:
   VulkanCommandContextImpl(IVulkanQueue *queue);
   bool ValidateGroups();
-  bool BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *version);
-  std::vector<VulkanBindingGroup::Version *> groups_;
+  bool BindGroupVersion(uint32_t index, IVulkanBindingVersion *version);
+  std::vector<IVulkanBindingVersion *> groups_;
   IVulkanProgram *program_{};
-  VulkanProgramBase *native_program_{};
+  IVulkanProgramBase *native_program_{};
   std::unordered_map<IVulkanTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
       as_dependencies_;
   bool compute_active_{};
   IVulkanRayTracingProgram *ray_program_{};
   const PipelineLayoutDesc *binding_layout_{};
-  VulkanImage *render_target_{};
+  IVulkanImage *render_target_{};
   std::vector<IVulkanBuffer *> vertex_buffers_;
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
   bool EndRecording() override;
@@ -81,7 +82,7 @@ class VulkanCommandContextImpl final : public Object<IVulkanCommandContext> {
   };
 
   std::unordered_map<IVulkanBuffer *, BufferState> buffer_states_;
-  bool TransitionImage(VulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
+  bool TransitionImage(IVulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct ImageState {
     VkImageLayout layout;
@@ -89,7 +90,7 @@ class VulkanCommandContextImpl final : public Object<IVulkanCommandContext> {
     VkAccessFlags access;
   };
 
-  std::unordered_map<VulkanImage *, ImageState> image_states_;
+  std::unordered_map<IVulkanImage *, ImageState> image_states_;
   std::vector<IVulkanWindow *> presents_;
   IVulkanDevice *device_;
   VkCommandPool pool_{};
@@ -106,6 +107,19 @@ class VulkanCommandContextImpl final : public Object<IVulkanCommandContext> {
 
   const CommandContextState &StateCommandContext() const override {
     return state_CommandContext_;
+  }
+
+ public:
+  bool CmdDrawImGui(IWindow *window, IImage *target) override {
+    return IBackendCommandContext::CommonCmdDrawImGui(window, target);
+  }
+
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override {
+    return IBackendCommandContext::CommonCmdPresentImage(window, frame_img, frame_color_space);
+  }
+
+  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override {
+    return IBackendCommandContext::CommonSubmit(info);
   }
 };
 }  // namespace grassland::rhi::backend::vulkan

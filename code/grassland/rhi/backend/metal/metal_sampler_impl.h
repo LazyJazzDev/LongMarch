@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_sampler_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalSamplerImpl final : public Object<IMetalSampler> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ISampler, IMetalSampler, Sampler, ISampler)
+  LONGMARCH_RHI_FINAL_QUERY(ISampler, IMetalSampler, IBackendSampler, ISampler)
   static IMetalSampler *Create(IMetalDevice *device, const SamplerDesc &desc);
   MTL::SamplerState *NativeSampler() const;
 
@@ -26,6 +27,11 @@ class MetalSamplerImpl final : public Object<IMetalSampler> {
 
   const SamplerState &StateSampler() const override {
     return state_Sampler_;
+  }
+
+ public:
+  const SamplerDesc &GetDesc() const override {
+    return IBackendSampler::CommonGetDesc();
   }
 };
 }  // namespace grassland::rhi::backend::metal

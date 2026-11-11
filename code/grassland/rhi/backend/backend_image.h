@@ -1,26 +1,23 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend {
-class Image;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Image)
-#include "grassland/rhi/backend/backend_util.h"
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendImage)
 #include "grassland/rhi/rhi_image.h"
 
 namespace grassland::rhi::backend {
-class Queue;
-
 struct ImageState;
 
-class Image : public rhi::IImage {
+class IBackendImage : public rhi::IImage {
  protected:
-  void InitializeImage(ImageDesc desc, Queue *queue = nullptr);
+  void InitializeImage(ImageDesc desc, IBackendQueue *queue = nullptr);
 
  public:
-  bool SupportsQueue(const Queue *queue) const;
-  const ImageDesc &GetDesc() const override;
-  virtual bool SupportsStorage() const;
+  bool SupportsQueue(const IBackendQueue *queue) const;
+  const ImageDesc &GetDesc() const override = 0;
+  const ImageDesc &CommonGetDesc() const;
+  virtual bool SupportsStorage() const = 0;
+  bool CommonSupportsStorage() const;
   virtual const void *DeviceIdentity() const = 0;
 
  protected:

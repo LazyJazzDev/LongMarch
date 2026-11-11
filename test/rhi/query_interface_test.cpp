@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/rhi_buffer.h"
 
 namespace query_test {
 class ILeft : public grassland::rhi::IObject {};
@@ -8,12 +9,18 @@ class ILeft : public grassland::rhi::IObject {};
 class IRight : public grassland::rhi::IObject {};
 
 class IExtended : public ILeft {};
-class Diamond;
+
+class IDiamond : public ILeft, public IRight {
+ public:
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(grassland::rhi::InterfaceID id, void **output) noexcept override = 0;
+};
 }  // namespace query_test
 
 LONGMARCH_RHI_UUID(query_test::ILeft, "523d719e-fb75-41e8-addc-fc6abcf4575f")
 LONGMARCH_RHI_UUID(query_test::IRight, "0ae16d45-31b1-4981-bba0-90a7df182c7e")
-LONGMARCH_RHI_UUID(query_test::Diamond, "31feaf71-6632-45be-94a3-d3c82599c9d2")
+LONGMARCH_RHI_UUID(query_test::IDiamond, "31feaf71-6632-45be-94a3-d3c82599c9d2")
 
 LONGMARCH_RHI_UUID(query_test::IExtended, "beff92a1-db2c-47cb-80d9-0abff454b583")
 
@@ -21,9 +28,9 @@ namespace query_test {
 using namespace grassland::rhi;
 using namespace grassland::rhi::backend;
 
-class Diamond final : public Object<ILeft>, public IRight {
+class Diamond final : public Object<IDiamond> {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(Diamond, Object<ILeft>, IRight)
+  LONGMARCH_RHI_FINAL_QUERY(ILeft, IDiamond, ILeft, IRight)
 
   explicit Diamond(bool &destroyed) : destroyed_(destroyed) {
   }
@@ -35,6 +42,15 @@ class Diamond final : public Object<ILeft>, public IRight {
  private:
   bool &destroyed_;
 };
+
+class Extended final : public Object<IExtended> {
+ public:
+  LONGMARCH_RHI_FINAL_QUERY(ILeft, IExtended, ILeft)
+};
+
+static_assert(std::is_abstract_v<Object<ILeft>>);
+static_assert(std::is_final_v<Diamond>);
+static_assert(sizeof(IExtended) == sizeof(ILeft));
 
 constexpr auto parsed = ParseInterfaceID("523d719e-fb75-41e8-addc-fc6abcf4575f");
 static_assert(parsed.has_value());
@@ -65,7 +81,7 @@ TEST(RhiQueryInterface, DiamondHasOneCounterAndCanonicalObjectIdentity) {
   ObjPtr<IObject> right_identity = right->QueryInterface<IObject>();
   ASSERT_TRUE(left_identity && right_identity);
   EXPECT_EQ(left_identity.Get(), right_identity.Get());
-  ObjPtr<Diamond> from_side = right->QueryInterface<Diamond>();
+  ObjPtr<IDiamond> from_side = right->QueryInterface<IDiamond>();
   ASSERT_EQ(from_side.Get(), object.Get());
   object.Release();
   left.Release();
@@ -78,7 +94,7 @@ TEST(RhiQueryInterface, DiamondHasOneCounterAndCanonicalObjectIdentity) {
 }
 
 TEST(RhiQueryInterface, ExtendedInterfacesExposeTheirDeclaredAncestors) {
-  ObjPtr<IExtended> extended = new Object<IExtended, ILeft>;
+  ObjPtr<IExtended> extended = new Extended;
   ObjPtr<ILeft> left = extended->QueryInterface<ILeft>();
   ASSERT_TRUE(left);
   ObjPtr<IExtended> roundtrip = left->QueryInterface<IExtended>();

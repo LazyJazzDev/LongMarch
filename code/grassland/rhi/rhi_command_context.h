@@ -9,6 +9,8 @@
 #include "grassland/rhi/rhi_submission_token.h"
 #include "grassland/rhi/rhi_util.h"
 
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ICommandContext)
+
 namespace grassland::rhi {
 struct SubmitInfo {
   // Borrowed for the duration of Submit.

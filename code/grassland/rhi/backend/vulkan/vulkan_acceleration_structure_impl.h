@@ -1,4 +1,5 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure_state.h"
 
@@ -9,7 +10,7 @@ class VulkanBottomLevelAccelerationStructureImpl final : public Object<IVulkanBo
                             IVulkanBottomLevelAccelerationStructure,
                             IBottomLevelAccelerationStructure,
                             IAccelerationStructure,
-                            VulkanAccelerationStructure,
+                            IVulkanAccelerationStructure,
                             IObject)
   static IVulkanBottomLevelAccelerationStructure *Create(IVulkanDevice *device,
                                                          const BottomLevelAccelerationStructureDesc &desc);
@@ -44,7 +45,7 @@ class VulkanTopLevelAccelerationStructureImpl final : public Object<IVulkanTopLe
                             IVulkanTopLevelAccelerationStructure,
                             ITopLevelAccelerationStructure,
                             IAccelerationStructure,
-                            VulkanAccelerationStructure,
+                            IVulkanAccelerationStructure,
                             IObject)
   static IVulkanTopLevelAccelerationStructure *Create(IVulkanDevice *device,
                                                       const TopLevelAccelerationStructureDesc &desc);

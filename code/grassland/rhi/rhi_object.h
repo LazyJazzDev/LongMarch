@@ -2,6 +2,8 @@
 #include "grassland/rhi/rhi_interface_id.h"
 #include "grassland/rhi/rhi_util.h"
 
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IObject)
+
 namespace grassland::rhi {
 // Factories return one owned reference. Ordinary object arguments are borrowed.
 // Release all caller-owned children before their parent; children do not retain it.

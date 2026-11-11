@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class IMetalDevice;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalDevice)
 #include <Metal/Metal.hpp>
 #include <condition_variable>
@@ -14,9 +12,9 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalDevice)
 
 namespace grassland::rhi::backend::metal {
 
-class IMetalDevice : public Device {
+class IMetalDevice : public IBackendDevice {
  public:
-  static IMetalDevice *Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
+  static IMetalDevice *Create(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device);
   virtual rhi::IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
   virtual rhi::IImage *CreateImage(const ImageDesc &desc) = 0;
   virtual IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;

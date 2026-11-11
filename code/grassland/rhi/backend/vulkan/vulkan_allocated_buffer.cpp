@@ -7,7 +7,7 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanAllocatedBufferImpl final : public Object<IVulkanAllocatedBuffer> {
  public:
-  LONGMARCH_RHI_QUERY_INTERFACES(Object<IVulkanAllocatedBuffer>, IBuffer, IBackendBuffer, IVulkanBuffer)
+  LONGMARCH_RHI_FINAL_QUERY(IBuffer, IVulkanAllocatedBuffer, IBuffer, IBackendBuffer, IVulkanBuffer)
 
   ~VulkanAllocatedBufferImpl() override;
   static IVulkanAllocatedBuffer *Create(IVulkanDevice *device,
@@ -34,7 +34,7 @@ class VulkanAllocatedBufferImpl final : public Object<IVulkanAllocatedBuffer> {
     return desc_;
   }
 
-  Device *Owner() const override;
+  IBackendDevice *Owner() const override;
 };
 
 IVulkanAllocatedBuffer *IVulkanAllocatedBuffer::Create(IVulkanDevice *device,
@@ -44,7 +44,7 @@ IVulkanAllocatedBuffer *IVulkanAllocatedBuffer::Create(IVulkanDevice *device,
   return VulkanAllocatedBufferImpl::Create(device, desc, upload, download);
 }
 
-Device *VulkanAllocatedBufferImpl::Owner() const {
+IBackendDevice *VulkanAllocatedBufferImpl::Owner() const {
   return device_;
 }
 

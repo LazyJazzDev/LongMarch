@@ -1,37 +1,26 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class MetalAccelerationStructure;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalAccelerationStructure)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalAccelerationStructure)
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class IMetalTopLevelAccelerationStructure;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTopLevelAccelerationStructure)
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class IMetalBottomLevelAccelerationStructure;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalBottomLevelAccelerationStructure)
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
-#include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::metal {
-class IMetalDevice;
-
 struct MetalAccelerationStructureState;
 
-class MetalAccelerationStructure : public IObject {
+class IMetalAccelerationStructure : public IObject {
  public:
   IMetalDevice *Owner() const;
   MTL::AccelerationStructure *NativeStructure() const;
-  MTL::IBackendBuffer *CompactionQuery() const;
+  MTL::Buffer *CompactionQuery() const;
   uint64_t ScratchSize(AccelerationStructureBuildMode mode) const;
   uint64_t ReadCompactedSize() const;
   bool AllowsUpdate() const;
@@ -49,7 +38,7 @@ class MetalAccelerationStructure : public IObject {
 };
 
 class IMetalBottomLevelAccelerationStructure : public IBottomLevelAccelerationStructure,
-                                               public MetalAccelerationStructure {
+                                               public IMetalAccelerationStructure {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;
@@ -71,7 +60,7 @@ class IMetalBottomLevelAccelerationStructure : public IBottomLevelAccelerationSt
 
 ;
 
-class IMetalTopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public MetalAccelerationStructure {
+class IMetalTopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public IMetalAccelerationStructure {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;

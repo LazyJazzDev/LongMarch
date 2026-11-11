@@ -11,7 +11,7 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12AllocatedBufferImpl final : public Object<ID3D12AllocatedBuffer> {
  public:
-  LONGMARCH_RHI_QUERY_INTERFACES(Object<ID3D12AllocatedBuffer>, IBuffer, IBackendBuffer, ID3D12Buffer)
+  LONGMARCH_RHI_FINAL_QUERY(IBuffer, ID3D12AllocatedBuffer, IBuffer, IBackendBuffer, ID3D12Buffer)
 
   ~D3D12AllocatedBufferImpl() override;
   static ID3D12AllocatedBuffer *Create(ID3D12Device *device,
@@ -40,7 +40,7 @@ class D3D12AllocatedBufferImpl final : public Object<ID3D12AllocatedBuffer> {
     return desc_;
   }
 
-  Device *Owner() const override;
+  IBackendDevice *Owner() const override;
 };
 
 ID3D12AllocatedBuffer *ID3D12AllocatedBuffer::Create(ID3D12Device *device,
@@ -50,7 +50,7 @@ ID3D12AllocatedBuffer *ID3D12AllocatedBuffer::Create(ID3D12Device *device,
   return D3D12AllocatedBufferImpl::Create(device, desc, upload, download);
 }
 
-Device *D3D12AllocatedBufferImpl::Owner() const {
+IBackendDevice *D3D12AllocatedBufferImpl::Owner() const {
   return device_;
 }
 

@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12RayTracingProgram;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12RayTracingProgram)
 #include "grassland/rhi/backend/backend_ray_tracing_program.h"
 #include "grassland/rhi/backend/backend_shader_binding_table.h"
@@ -11,9 +9,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12RayTracingProgr
 #include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class ID3D12Device;
-
-class ID3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase {
+class ID3D12RayTracingProgram : public IBackendRayTracingProgram, public ID3D12ProgramBase {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;
@@ -28,7 +24,7 @@ class ID3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBas
  public:
   static ID3D12RayTracingProgram *Create(ID3D12Device *device, const RayTracingProgramDesc &desc);
   virtual IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) = 0;
-  virtual const ShaderBindingTable *DefaultShaderBindingTable() const = 0;
+  virtual const IBackendShaderBindingTable *DefaultShaderBindingTable() const = 0;
   virtual ID3D12StateObject *NativePipeline() const = 0;
 };
 

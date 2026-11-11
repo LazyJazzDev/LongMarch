@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class IMetalCore;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalCore)
 
 #include <Metal/Metal.hpp>
@@ -12,7 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalCore)
 
 namespace grassland::rhi::backend::metal {
 
-class IMetalCore : public Core {
+class IMetalCore : public IBackendCore {
  public:
   static IMetalCore *CreateMetalCore(const CoreDesc &desc);
   virtual std::vector<PhysicalDevice> GetPhysicalDevices() const = 0;

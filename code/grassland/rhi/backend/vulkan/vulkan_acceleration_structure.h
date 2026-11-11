@@ -1,32 +1,21 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class VulkanAccelerationStructure;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanAccelerationStructure)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanAccelerationStructure)
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class IVulkanTopLevelAccelerationStructure;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTopLevelAccelerationStructure)
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class IVulkanBottomLevelAccelerationStructure;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanBottomLevelAccelerationStructure)
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanDevice;
-
 struct VulkanAccelerationStructureState;
 
-class VulkanAccelerationStructure : public IObject {
+class IVulkanAccelerationStructure : public IObject {
  public:
   IVulkanDevice *Owner() const;
   VkAccelerationStructureKHR NativeStructure() const;
@@ -50,7 +39,7 @@ class VulkanAccelerationStructure : public IObject {
 };
 
 class IVulkanBottomLevelAccelerationStructure : public IBottomLevelAccelerationStructure,
-                                                public VulkanAccelerationStructure {
+                                                public IVulkanAccelerationStructure {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;
@@ -72,7 +61,8 @@ class IVulkanBottomLevelAccelerationStructure : public IBottomLevelAccelerationS
 
 ;
 
-class IVulkanTopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public VulkanAccelerationStructure {
+class IVulkanTopLevelAccelerationStructure : public ITopLevelAccelerationStructure,
+                                             public IVulkanAccelerationStructure {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;

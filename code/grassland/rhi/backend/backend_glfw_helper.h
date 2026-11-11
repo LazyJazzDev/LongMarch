@@ -1,12 +1,12 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
+
 struct GLFWwindow;
 
 namespace grassland::rhi::backend {
 
-class Window;
-
 namespace glfw {
-void RegisterWindow(Window *window);
+void RegisterWindow(IBackendWindow *window);
 void UnregisterWindow(GLFWwindow *window);
 bool Initialize();
 bool PollEvents();

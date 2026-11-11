@@ -6,13 +6,14 @@
 
 namespace grassland::rhi::backend {
 
-ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info) {
+ObjectPtr<IBackendSubmissionToken> IBackendQueue::Submit(const ObjectPtr<IBackendCommandContext> &commands,
+                                                         const SubmitInfo &info) {
   if (!commands->Seal())
     return {};
   SubmitInfo native_info;
   native_info.waits.reserve(info.waits.size());
   for (const auto &wait : info.waits) {
-    auto timeline = rhi::QueryInterfacePtr<Timeline>(wait.timeline).Get();
+    auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(wait.timeline).Get();
     if (!timeline || timeline->Owner() != StateQueue().device_) {
       ReportError(-1, "Submission waits require a timeline from this device.");
       return {};
@@ -27,14 +28,14 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
   }
   std::unique_lock<std::mutex> queue_lock(*StateQueue().mutex_);
   const Event signal{GetTimeline(), NextSerial()};
-  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(signal));
+  auto completion = ObjectPtr<IBackendSubmissionToken>::Adopt(IBackendSubmissionToken::Create(signal));
   // Register before native submission, while the collector cannot take the list.
   auto entry = StateQueue().pending_.insert(StateQueue().pending_.end(), {commands, completion});
-  CommandContext::SubmitResult result;
+  IBackendCommandContext::SubmitResult result;
   try {
     commands->BindDownloads(completion.Get());
     result = commands->SubmitNative(native_info, signal);
-    if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
+    if (result == IBackendCommandContext::SUBMIT_RESULT_REJECTED) {
       StateQueue().pending_.erase(entry);
       completion->Complete(SUBMISSION_STATUS_FAILED);
       commands->ReleaseDownloads();
@@ -52,12 +53,12 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
   queue_lock.unlock();
   // The caller's context reference keeps it alive while the collector retires it.
   // Next-frame preparation belongs to the Window, not this submission's result.
-  if (result == CommandContext::SUBMIT_RESULT_SUBMITTED)
+  if (result == IBackendCommandContext::SUBMIT_RESULT_SUBMITTED)
     commands->UpdatePresentedImages();
-  return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
+  return result == IBackendCommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<IBackendSubmissionToken>{};
 }
 
-bool Queue::CollectCompleted(uint64_t completed, bool timeline_valid) {
+bool IBackendQueue::CollectCompleted(uint64_t completed, bool timeline_valid) {
   std::list<QueueState::Submission> work;
   {
     std::lock_guard<std::mutex> lock(*StateQueue().mutex_);
@@ -81,31 +82,31 @@ bool Queue::CollectCompleted(uint64_t completed, bool timeline_valid) {
   return StateQueue().pending_.empty();
 }
 
-void Queue::InitializeQueue(Device *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
+void IBackendQueue::InitializeQueue(IBackendDevice *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
   StateQueue().device_ = device;
   StateQueue().type_ = type;
   StateQueue().mutex_ = std::move(mutex);
 }
 
-std::mutex &Queue::QueueMutex() {
+std::mutex &IBackendQueue::QueueMutex() {
   return *StateQueue().mutex_;
 }
 
-uint64_t Queue::NextSerial() {
+uint64_t IBackendQueue::NextSerial() {
   return ++StateQueue().serial_;
 }
 
-Device *Queue::Owner() const {
+IBackendDevice *IBackendQueue::Owner() const {
   return StateQueue().device_;
 }
 
-QueueType Queue::GetType() const {
+QueueType IBackendQueue::CommonGetType() const {
   return StateQueue().type_;
 }
 
 }  // namespace grassland::rhi::backend
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::Queue, "5b1b277a-1b68-4947-bf02-14449939898d")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendQueue, "5b1b277a-1b68-4947-bf02-14449939898d")
 
 namespace grassland::rhi::backend {
 QueueState::QueueState() = default;

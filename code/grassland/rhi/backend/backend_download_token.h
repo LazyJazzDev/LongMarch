@@ -1,10 +1,8 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend {
-class DownloadToken;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::DownloadToken)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendDownloadToken)
 
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/rhi_download_token.h"
@@ -20,17 +18,21 @@ struct DownloadLayout {
 
 struct DownloadTokenState;
 
-class DownloadToken : public IDownloadToken {
+class IBackendDownloadToken : public IDownloadToken {
  protected:
   void InitializeDownloadToken(uint64_t size);
   void DestroyDownloadToken();
 
  public:
-  SubmissionStatus GetStatus() const override;
-  bool WaitHost() const override;
-  uint64_t GetSize() const override;
-  bool CopyTo(void *destination, uint64_t size) const override;
-  void BindSubmission(SubmissionToken *submission);
+  SubmissionStatus GetStatus() const override = 0;
+  SubmissionStatus CommonGetStatus() const;
+  bool WaitHost() const override = 0;
+  bool CommonWaitHost() const;
+  uint64_t GetSize() const override = 0;
+  uint64_t CommonGetSize() const;
+  bool CopyTo(void *destination, uint64_t size) const override = 0;
+  bool CommonCopyTo(void *destination, uint64_t size) const;
+  void BindSubmission(IBackendSubmissionToken *submission);
 
  protected:
   virtual bool CopyData(void *destination) const = 0;

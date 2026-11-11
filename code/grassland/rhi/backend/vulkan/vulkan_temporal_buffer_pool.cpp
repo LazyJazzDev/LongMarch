@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanTemporalBufferLeaseImpl final : public Object<IVulkanTemporalBufferLease> {
  public:
-  LONGMARCH_RHI_QUERY_INTERFACES(Object<IVulkanTemporalBufferLease>, IBuffer, IBackendBuffer, IVulkanBuffer)
+  LONGMARCH_RHI_FINAL_QUERY(IBuffer, IVulkanTemporalBufferLease, IBuffer, IBackendBuffer, IVulkanBuffer)
 
   VulkanTemporalBufferLeaseImpl(VulkanTemporalBufferPool *pool, IVulkanAllocatedBuffer *buffer, size_t level);
   ~VulkanTemporalBufferLeaseImpl() override;
@@ -20,7 +20,7 @@ class VulkanTemporalBufferLeaseImpl final : public Object<IVulkanTemporalBufferL
   size_t level_;
 
  public:
-  Device *Owner() const override {
+  IBackendDevice *Owner() const override {
     return buffer_->Owner();
   }
 };

@@ -1,4 +1,5 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure_state.h"
 
@@ -9,7 +10,7 @@ class D3D12BottomLevelAccelerationStructureImpl final : public Object<ID3D12Bott
                             ID3D12BottomLevelAccelerationStructure,
                             IBottomLevelAccelerationStructure,
                             IAccelerationStructure,
-                            D3D12AccelerationStructure,
+                            ID3D12AccelerationStructure,
                             IObject)
   static ID3D12BottomLevelAccelerationStructure *Create(ID3D12Device *device,
                                                         const BottomLevelAccelerationStructureDesc &desc);
@@ -44,7 +45,7 @@ class D3D12TopLevelAccelerationStructureImpl final : public Object<ID3D12TopLeve
                             ID3D12TopLevelAccelerationStructure,
                             ITopLevelAccelerationStructure,
                             IAccelerationStructure,
-                            D3D12AccelerationStructure,
+                            ID3D12AccelerationStructure,
                             IObject)
   static ID3D12TopLevelAccelerationStructure *Create(ID3D12Device *device,
                                                      const TopLevelAccelerationStructureDesc &desc);

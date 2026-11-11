@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class IMetalQueue;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalQueue)
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
@@ -11,7 +9,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalQueue)
 
 namespace grassland::rhi::backend::metal {
 
-class IMetalQueue : public Queue {
+class IMetalQueue : public IBackendQueue {
  public:
   static IMetalQueue *Create(IMetalDevice *device, QueueType type, MTL::CommandBufferDescriptor *descriptor);
   virtual rhi::ICommandContext *CreateCommandContext() = 0;

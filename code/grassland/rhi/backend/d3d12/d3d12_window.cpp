@@ -89,7 +89,7 @@ HRESULT D3D12WindowImpl::PresentFrame(uint64_t generation) {
                              mode_ == PRESENT_MODE_CONTINUOUS ? DXGI_PRESENT_ALLOW_TEARING : 0);
 }
 
-ObjectPtr<Image> D3D12WindowImpl::AcquireNativeFrame() {
+ObjectPtr<IBackendImage> D3D12WindowImpl::AcquireNativeFrame() {
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
@@ -112,7 +112,7 @@ ObjectPtr<Image> D3D12WindowImpl::AcquireNativeFrame() {
   }
 #endif
   const UINT index = swapchain_->GetCurrentBackBufferIndex();
-  auto frame = ObjectPtr<Image>::Adopt(
+  auto frame = ObjectPtr<IBackendImage>::Adopt(
       ID3D12SwapChainImage::Create(desc_, this, generation_, images_[index].Get(), attachments_[index]));
   acquired_ = true;
   return frame;
@@ -193,7 +193,7 @@ bool D3D12WindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
   for (UINT i = 0; i < 3; ++i) {
     if (!Check(swapchain_->GetBuffer(i, IID_PPV_ARGS(&images_[i])), "Get swapchain buffer"))
       return false;
-    attachments_[i] = D3D12Image::CreateAttachmentView(device_, images_[i].Get());
+    attachments_[i] = ID3D12Image::CreateAttachmentView(device_, images_[i].Get());
     if (!attachments_[i])
       return false;
   }

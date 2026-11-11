@@ -53,7 +53,7 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
     std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
     auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
-    blit->copyFromTexture(static_cast<MetalImage *>(image)->NativeImage(), 0, 0, MTL::Origin::Make(x, y, 0),
+    blit->copyFromTexture(static_cast<IMetalImage *>(image)->NativeImage(), 0, 0, MTL::Origin::Make(x, y, 0),
                           MTL::Size::Make(1, 1, 1), readback.get(), 0, 256, 256);
     blit->endEncoding();
     commands->commit();
@@ -70,7 +70,7 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
     auto owner = static_cast<ID3D12Device *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
     auto native_queue = static_cast<ID3D12Queue *>(queue_owner.Get());
-    auto source = static_cast<D3D12Image *>(image)->NativeImage();
+    auto source = static_cast<ID3D12Image *>(image)->NativeImage();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_READBACK;
@@ -131,7 +131,7 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
     auto native_queue = static_cast<IVulkanQueue *>(queue_owner.Get());
     auto native = owner->NativeDevice();
-    auto source = static_cast<VulkanImage *>(image)->NativeImage();
+    auto source = static_cast<IVulkanImage *>(image)->NativeImage();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     desc.size = sizeof(output);
     desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -347,7 +347,7 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
       continue;
     ObjPtr<IImage> image = device->CreateImage({16, 16, format});
     ASSERT_TRUE(image);
-    const auto native = static_cast<backend::Image *>(image.Get());
+    const auto native = static_cast<backend::IBackendImage *>(image.Get());
     bool supported = false;
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
@@ -389,7 +389,7 @@ TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
   ObjPtr<IImage> color = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> depth = device->CreateImage({8, 8, IMAGE_FORMAT_D32_SFLOAT});
   ASSERT_TRUE(color && depth);
-  auto handle = static_cast<backend::d3d12::D3D12Image *>(color.Get())->AttachmentView().ptr;
+  auto handle = static_cast<backend::d3d12::ID3D12Image *>(color.Get())->AttachmentView().ptr;
   EXPECT_NE(handle, 0u);
   EXPECT_EQ(owner->RTVPool().GetPageCounts().second, 1u);
   EXPECT_EQ(owner->DSVPool().GetPageCounts().second, 1u);
@@ -402,7 +402,7 @@ TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
   rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
   ASSERT_TRUE(commands->CmdBeginRendering(rendering));
   ASSERT_TRUE(commands->CmdEndRendering());
-  EXPECT_EQ(static_cast<backend::d3d12::D3D12Image *>(color.Get())->AttachmentView().ptr, handle);
+  EXPECT_EQ(static_cast<backend::d3d12::ID3D12Image *>(color.Get())->AttachmentView().ptr, handle);
   color.Release();
   depth.Release();
   EXPECT_EQ(owner->RTVPool().GetPageCounts().second, 1u);
@@ -455,7 +455,7 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
-  backend::ImagePresenter presenter(static_cast<backend::Device *>(device.Get()));
+  backend::ImagePresenter presenter(static_cast<backend::IBackendDevice *>(device.Get()));
   ObjPtr<IImage> input = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> encoded = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> converted = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
@@ -680,7 +680,7 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
   const uint32_t green = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), &green, 4));
-  ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+  ASSERT_TRUE(static_cast<backend::IBackendWindow *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
   ASSERT_TRUE(window->EnableImGui(false));
   texture.Release();
   ObjPtr<ISubmissionToken> done = commands->Submit();
@@ -711,8 +711,8 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "HDR UI color verification"});
   ASSERT_TRUE(window);
-  auto ui =
-      backend::WindowImGui::Create(static_cast<backend::Device *>(device.Get()), window->GLFWWindow(), nullptr, 13);
+  auto ui = backend::WindowImGui::Create(static_cast<backend::IBackendDevice *>(device.Get()), window->GLFWWindow(),
+                                         nullptr, 13);
   ASSERT_TRUE(ui);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
@@ -844,14 +844,14 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
       return;
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, ImGui::GetIO().DisplaySize, IM_COL32_WHITE);
   };
-  auto original_context = static_cast<backend::Window *>(window.Get())->GetImGuiContext();
+  auto original_context = static_cast<backend::IBackendWindow *>(window.Get())->GetImGuiContext();
   for (bool visible : {true, false, false, true, false}) {
     record_ui = visible;
     ASSERT_TRUE(window->UpdateImGui(draw_window));
     ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
-    ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+    ASSERT_TRUE(static_cast<backend::IBackendWindow *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
     ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     ASSERT_TRUE(done->WaitHost());
@@ -859,7 +859,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
     ReadPixel(device.Get(), target.Get(), GetParam(), 20, 20, pixel);
     const uint8_t channel = visible ? 255 : 0;
     EXPECT_EQ(pixel, (std::array<uint8_t, 4>{channel, channel, 255, 255}));
-    EXPECT_EQ(static_cast<backend::Window *>(window.Get())->GetImGuiContext(), original_context);
+    EXPECT_EQ(static_cast<backend::IBackendWindow *>(window.Get())->GetImGuiContext(), original_context);
   }
 }
 
@@ -889,7 +889,7 @@ TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
     ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
-    ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+    ASSERT_TRUE(static_cast<backend::IBackendWindow *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
     targets.push_back(target);
     recordings.push_back(commands);
   }
@@ -946,7 +946,7 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
     ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), background));
-    ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+    ASSERT_TRUE(static_cast<backend::IBackendWindow *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
     EXPECT_EQ(updates, before);  // Recording must not run UI logic.
     ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done && done->WaitHost());
@@ -1359,10 +1359,10 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 16, 16}}));
   // Fork only the buffer binding, then destroy the source version. Copied image
   // and sampler descriptors must keep their native handles valid for GPU use.
-  auto original = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(
-      static_cast<backend::BindingGroup *>(material.Get())->CurrentVersion());
+  auto original = backend::ObjectPtr<backend::IBackendBindingVersion>::Retain(
+      static_cast<backend::IBackendBindingGroup *>(material.Get())->CurrentVersion());
   ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}}, 0));
-  EXPECT_NE(static_cast<backend::BindingGroup *>(material.Get())->CurrentVersion(), original.Get());
+  EXPECT_NE(static_cast<backend::IBackendBindingGroup *>(material.Get())->CurrentVersion(), original.Get());
   original.Reset();
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   const uint32_t red_pixel = 0xff0000ff, green_pixel = 0xff00ff00;

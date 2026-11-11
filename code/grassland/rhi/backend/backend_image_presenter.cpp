@@ -69,7 +69,7 @@ float4 PSMain(Varying input) : SV_Target0 {
 )";
 }
 
-ImagePresenter::ImagePresenter(Device *device) : device_(device) {
+ImagePresenter::ImagePresenter(IBackendDevice *device) : device_(device) {
 }
 
 bool ImagePresenter::Record(ICommandContext *commands,

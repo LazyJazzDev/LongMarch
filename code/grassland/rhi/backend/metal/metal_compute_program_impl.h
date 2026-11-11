@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/rhi/backend/backend_compute_program_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_program_base_state.h"
 
@@ -8,9 +9,9 @@ class MetalComputeProgramImpl final : public Object<IMetalComputeProgram> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IComputeProgram,
                             IMetalComputeProgram,
-                            ComputeProgram,
+                            IBackendComputeProgram,
                             IComputeProgram,
-                            MetalProgramBase,
+                            IMetalProgramBase,
                             IObject)
   static IMetalComputeProgram *Create(IMetalDevice *device, const ComputeProgramDesc &desc);
   MTL::ComputePipelineState *NativePipeline() const;
@@ -45,6 +46,11 @@ class MetalComputeProgramImpl final : public Object<IMetalComputeProgram> {
 
   const MetalProgramBaseState &StateMetalProgramBase() const override {
     return state_MetalProgramBase_;
+  }
+
+ public:
+  const ComputeProgramDesc &GetDesc() const override {
+    return IBackendComputeProgram::CommonGetDesc();
   }
 };
 }  // namespace grassland::rhi::backend::metal

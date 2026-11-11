@@ -1,13 +1,12 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
 
 namespace grassland::rhi::backend {
-class Device;
-
 // All ImGui and GLFW operations run on the window thread. Restore the caller's
 // context, including when routing input to a different window.
-class ImGuiContextScope {
+class ImGuiContextScope final {
  public:
   explicit ImGuiContextScope(ImGuiContext *context) : previous_(ImGui::GetCurrentContext()) {
     ImGui::SetCurrentContext(context);
@@ -21,9 +20,9 @@ class ImGuiContextScope {
   ImGuiContext *previous_;
 };
 
-class WindowImGui {
+class WindowImGui final {
  public:
-  static std::unique_ptr<WindowImGui> Create(Device *device,
+  static std::unique_ptr<WindowImGui> Create(IBackendDevice *device,
                                              GLFWwindow *window,
                                              const char *font_file_path,
                                              float font_size);
@@ -40,7 +39,7 @@ class WindowImGui {
               float reference_white_scale = 1.0f);
 
  private:
-  explicit WindowImGui(Device *device) : device_(device) {
+  explicit WindowImGui(IBackendDevice *device) : device_(device) {
   }
 
   bool Initialize(GLFWwindow *window, const char *font_file_path, float font_size);
@@ -49,7 +48,7 @@ class WindowImGui {
               ImDrawData *data,
               ColorSpace color_space,
               float reference_white_scale);
-  Device *device_;
+  IBackendDevice *device_;
   ImGuiContext *context_{};
   bool platform_initialized_{};
   bool draw_data_ready_{};

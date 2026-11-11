@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class IVulkanCommandContext;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanCommandContext)
 #include <vector>
 
@@ -11,16 +9,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanCommandContex
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanQueue;
-class VulkanImage;
-class IVulkanBuffer;
-class IVulkanProgram;
-class IVulkanRayTracingProgram;
-class VulkanProgramBase;
-class IVulkanWindow;
-class IVulkanTopLevelAccelerationStructure;
-
-class IVulkanCommandContext : public CommandContext {
+class IVulkanCommandContext : public IBackendCommandContext {
  public:
   static IVulkanCommandContext *Create(IVulkanQueue *queue);
   virtual bool CmdBindRayTracingProgram(IRayTracingProgram *program) = 0;

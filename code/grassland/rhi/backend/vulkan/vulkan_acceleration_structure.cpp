@@ -7,28 +7,28 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-void VulkanAccelerationStructure::InitializeVulkanAccelerationStructure(IVulkanDevice *device) {
+void IVulkanAccelerationStructure::InitializeVulkanAccelerationStructure(IVulkanDevice *device) {
   StateVulkanAccelerationStructure().device_ = device;
 }
 
-IVulkanDevice *VulkanAccelerationStructure::Owner() const {
+IVulkanDevice *IVulkanAccelerationStructure::Owner() const {
   return StateVulkanAccelerationStructure().device_;
 }
 
-uint64_t VulkanAccelerationStructure::ScratchSize(AccelerationStructureBuildMode mode) const {
+uint64_t IVulkanAccelerationStructure::ScratchSize(AccelerationStructureBuildMode mode) const {
   return mode == ACCELERATION_STRUCTURE_UPDATE ? StateVulkanAccelerationStructure().update_scratch_
                                                : StateVulkanAccelerationStructure().build_scratch_;
 }
 
-bool VulkanAccelerationStructure::AllowsUpdate() const {
+bool IVulkanAccelerationStructure::AllowsUpdate() const {
   return StateVulkanAccelerationStructure().allow_update_;
 }
 
-bool VulkanAccelerationStructure::AllowsCompaction() const {
+bool IVulkanAccelerationStructure::AllowsCompaction() const {
   return StateVulkanAccelerationStructure().allow_compaction_;
 }
 
-bool VulkanAccelerationStructure::IsCompactStorage() const {
+bool IVulkanAccelerationStructure::IsCompactStorage() const {
   return StateVulkanAccelerationStructure().compact_;
 }
 
@@ -80,7 +80,7 @@ void VulkanTopLevelAccelerationStructureImpl::CommitDependencies(
   bottom_levels_ = std::move(references);
 }
 
-void VulkanAccelerationStructure::DestroyVulkanAccelerationStructure() {
+void IVulkanAccelerationStructure::DestroyVulkanAccelerationStructure() {
   auto device = StateVulkanAccelerationStructure().device_->NativeDevice();
   if (StateVulkanAccelerationStructure().query_)
     vkDestroyQueryPool(device, StateVulkanAccelerationStructure().query_, nullptr);
@@ -92,23 +92,23 @@ void VulkanAccelerationStructure::DestroyVulkanAccelerationStructure() {
                      StateVulkanAccelerationStructure().buffer_, StateVulkanAccelerationStructure().allocation_);
 }
 
-VkAccelerationStructureKHR VulkanAccelerationStructure::NativeStructure() const {
+VkAccelerationStructureKHR IVulkanAccelerationStructure::NativeStructure() const {
   return StateVulkanAccelerationStructure().structure_;
 }
 
-VkQueryPool VulkanAccelerationStructure::CompactionQuery() const {
+VkQueryPool IVulkanAccelerationStructure::CompactionQuery() const {
   return StateVulkanAccelerationStructure().query_;
 }
 
-VkBuildAccelerationStructureFlagsKHR VulkanAccelerationStructure::BuildFlags() const {
+VkBuildAccelerationStructureFlagsKHR IVulkanAccelerationStructure::BuildFlags() const {
   return StateVulkanAccelerationStructure().flags_;
 }
 
-uint64_t VulkanAccelerationStructure::Address() const {
+uint64_t IVulkanAccelerationStructure::Address() const {
   return StateVulkanAccelerationStructure().address_;
 }
 
-uint64_t VulkanAccelerationStructure::ReadCompactedSize() const {
+uint64_t IVulkanAccelerationStructure::ReadCompactedSize() const {
   uint64_t result{};
   if (!StateVulkanAccelerationStructure().query_)
     return 0;
@@ -118,9 +118,9 @@ uint64_t VulkanAccelerationStructure::ReadCompactedSize() const {
   return status == VK_SUCCESS ? result : 0;
 }
 
-bool VulkanAccelerationStructure::Allocate(const VkAccelerationStructureBuildGeometryInfoKHR &info,
-                                           const std::vector<uint32_t> &counts,
-                                           uint64_t compacted_size) {
+bool IVulkanAccelerationStructure::Allocate(const VkAccelerationStructureBuildGeometryInfoKHR &info,
+                                            const std::vector<uint32_t> &counts,
+                                            uint64_t compacted_size) {
   auto device = StateVulkanAccelerationStructure().device_->NativeDevice();
   VkPhysicalDeviceAccelerationStructurePropertiesKHR properties{
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR};
@@ -291,7 +291,8 @@ LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanBottomLevelAccelerati
 LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanTopLevelAccelerationStructure,
                    "e2af066b-da31-4c27-93ea-c2e1e39f8499")
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanAccelerationStructure, "8fd412fc-9636-4f9b-8c14-f6b47ac173db")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanAccelerationStructure,
+                   "8fd412fc-9636-4f9b-8c14-f6b47ac173db")
 
 namespace grassland::rhi::backend::vulkan {
 VulkanAccelerationStructureState::VulkanAccelerationStructureState() = default;

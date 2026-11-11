@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_queue_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12QueueImpl final : public Object<ID3D12Queue> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, ID3D12Queue, Queue, rhi::IQueue)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, ID3D12Queue, IBackendQueue, rhi::IQueue)
   rhi::ICommandContext *CreateCommandContext() override;
   static ID3D12Queue *Create(ID3D12Device *device, QueueType type);
   ID3D12CommandQueue *NativeQueue() const;
@@ -30,6 +31,11 @@ class D3D12QueueImpl final : public Object<ID3D12Queue> {
 
   const QueueState &StateQueue() const override {
     return state_Queue_;
+  }
+
+ public:
+  QueueType GetType() const override {
+    return IBackendQueue::CommonGetType();
   }
 };
 }  // namespace grassland::rhi::backend::d3d12

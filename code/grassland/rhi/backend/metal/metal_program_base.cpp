@@ -49,8 +49,8 @@ static bool CompileMetal(const IShader *shader,
         binding.msl_buffer = binding.msl_texture = binding.msl_sampler = index;
         // Unused AS slots pad as 64-bit buffer handles; active AS types come from SPIR-V.
         binding.basetype = b.type == BINDING_ACCELERATION_STRUCTURE ? spirv_cross::SPIRType::Void
-                           : b.type == BINDING_SAMPLER              ? spirv_cross::SPIRType::Sampler
-                           : b.type >= BINDING_TEXTURE2D            ? spirv_cross::SPIRType::Image
+                           : b.type == BINDING_SAMPLER              ? spirv_cross::SPIRType::IBackendSampler
+                           : b.type >= BINDING_TEXTURE2D            ? spirv_cross::SPIRType::IBackendImage
                                                                     : spirv_cross::SPIRType::Void;
         compiler.add_msl_resource_binding(binding);
         index += b.count;
@@ -80,23 +80,23 @@ static bool CompileMetal(const IShader *shader,
   }
 }
 
-void MetalProgramBase::InitializeMetalProgramBase(MTL::Device *device, const PipelineLayoutDesc &layout) {
+void IMetalProgramBase::InitializeMetalProgramBase(MTL::Device *device, const PipelineLayoutDesc &layout) {
   StateMetalProgramBase().native_device_ = device;
   StateMetalProgramBase().layout_ = &(layout);
 }
 
-const PipelineLayoutDesc &MetalProgramBase::BindingLayout() const {
-  return StateMetalProgramBase().layout_;
+const PipelineLayoutDesc &IMetalProgramBase::BindingLayout() const {
+  return *StateMetalProgramBase().layout_;
 }
 
-NS::SharedPtr<MTL::Function> MetalProgramBase::CompileFunction(const IShader *shader,
-                                                               const std::vector<InputAttributeDesc> &attributes,
-                                                               std::array<uint32_t, 3> *threads) const {
+NS::SharedPtr<MTL::Function> IMetalProgramBase::CompileFunction(const IShader *shader,
+                                                                const std::vector<InputAttributeDesc> &attributes,
+                                                                std::array<uint32_t, 3> *threads) const {
   for (const auto &group : (*StateMetalProgramBase().layout_).groups)
     if (!ValidateMetalBindingLayout(StateMetalProgramBase().native_device_, group))
       return {};
   std::string code, entry;
-  if (!CompileMetal(shader, StateMetalProgramBase().layout_, attributes, code, entry, threads))
+  if (!CompileMetal(shader, *StateMetalProgramBase().layout_, attributes, code, entry, threads))
     return {};
   NS::Error *error = nullptr;
   auto library = NS::TransferPtr(StateMetalProgramBase().native_device_->newLibrary(
@@ -112,7 +112,7 @@ NS::SharedPtr<MTL::Function> MetalProgramBase::CompileFunction(const IShader *sh
 }
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalProgramBase, "48d78e4c-57e0-4ad1-9dc1-254d12006fc6")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalProgramBase, "48d78e4c-57e0-4ad1-9dc1-254d12006fc6")
 
 namespace grassland::rhi::backend::metal {
 MetalProgramBaseState::MetalProgramBaseState() = default;

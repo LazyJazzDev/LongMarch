@@ -3,34 +3,34 @@
 #include "grassland/rhi/backend/backend_download_token_state.h"
 
 namespace grassland::rhi::backend {
-void DownloadToken::InitializeDownloadToken(uint64_t size) {
+void IBackendDownloadToken::InitializeDownloadToken(uint64_t size) {
   StateDownloadToken().size_ = size;
 }
 
-SubmissionStatus DownloadToken::GetStatus() const {
+SubmissionStatus IBackendDownloadToken::CommonGetStatus() const {
   return StateDownloadToken().submission_ ? StateDownloadToken().submission_->GetStatus() : SUBMISSION_STATUS_PENDING;
 }
 
-bool DownloadToken::WaitHost() const {
+bool IBackendDownloadToken::CommonWaitHost() const {
   return StateDownloadToken().submission_ && StateDownloadToken().submission_->WaitHost();
 }
 
-uint64_t DownloadToken::GetSize() const {
+uint64_t IBackendDownloadToken::CommonGetSize() const {
   return StateDownloadToken().size_;
 }
 
-bool DownloadToken::CopyTo(void *destination, uint64_t size) const {
+bool IBackendDownloadToken::CommonCopyTo(void *destination, uint64_t size) const {
   if (!destination || size < StateDownloadToken().size_)
     return false;
   return CopyData(destination);
 }
 
-void DownloadToken::BindSubmission(SubmissionToken *submission) {
-  StateDownloadToken().submission_ = ObjectPtr<SubmissionToken>::Retain(submission);
+void IBackendDownloadToken::BindSubmission(IBackendSubmissionToken *submission) {
+  StateDownloadToken().submission_ = ObjectPtr<IBackendSubmissionToken>::Retain(submission);
 }
 }  // namespace grassland::rhi::backend
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::DownloadToken, "ed7d2ceb-b722-4881-ad53-9d19894b4bb2")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendDownloadToken, "ed7d2ceb-b722-4881-ad53-9d19894b4bb2")
 
 namespace grassland::rhi::backend {
 DownloadTokenState::DownloadTokenState() = default;

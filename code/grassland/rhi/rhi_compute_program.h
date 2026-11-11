@@ -3,6 +3,8 @@
 #include "grassland/rhi/rhi_interface_id.h"
 #include "grassland/rhi/rhi_shader.h"
 
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IComputeProgram)
+
 namespace grassland::rhi {
 struct ComputeProgramDesc {
   IShader *compute_shader{};

@@ -23,7 +23,7 @@ VkPipeline VulkanRayTracingProgramImpl::NativePipeline() const {
   return pipeline_;
 }
 
-const ShaderBindingTable *VulkanRayTracingProgramImpl::DefaultShaderBindingTable() const {
+const IBackendShaderBindingTable *VulkanRayTracingProgramImpl::DefaultShaderBindingTable() const {
   return table_.Get();
 }
 
@@ -151,14 +151,14 @@ IVulkanRayTracingProgram *VulkanRayTracingProgramImpl::Create(IVulkanDevice *own
     object->identifiers_[t].assign(handles.begin() + offset, handles.begin() + offset + size);
     offset += size;
   }
-  object->table_ =
-      ObjectPtr<ShaderBindingTable>::Adopt(object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc()));
+  object->table_ = ObjectPtr<IBackendShaderBindingTable>::Adopt(
+      object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc()));
   if (!object->table_)
     return nullptr;
   return object.release();
 }
 
-ShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
+IBackendShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
   const std::vector<uint32_t> raygen{0};
   const std::vector<uint32_t> *indices[] = {&raygen, &desc.miss_shader_indices, &desc.hit_group_indices,
                                             &desc.callable_shader_indices};
@@ -173,7 +173,7 @@ ShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable(const S
   info.buffer = buffer->NativeBuffer();
   auto address = vkGetBufferDeviceAddress(owner->NativeDevice(), &info);
   std::vector<uint8_t> data(capacity);
-  std::array<ShaderBindingTable::Region, 4> regions{};
+  std::array<IBackendShaderBindingTable::Region, 4> regions{};
   uint64_t offset = 0;
   for (size_t t = 0; t < 4; ++t) {
     if (indices[t]->empty())
@@ -187,7 +187,7 @@ ShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable(const S
   }
   if (!buffer->Write(data.data(), data.size()))
     return nullptr;
-  return new ShaderBindingTable(this, desc, std::move(buffer), regions);
+  return IBackendShaderBindingTable::Create(this, desc, std::move(buffer), regions);
 }
 
 }  // namespace grassland::rhi::backend::vulkan

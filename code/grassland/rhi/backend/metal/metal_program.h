@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class IMetalProgram;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalProgram)
 #include <Metal/Metal.hpp>
 
@@ -11,9 +9,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalProgram)
 #include "grassland/rhi/backend/metal/metal_program_base.h"
 
 namespace grassland::rhi::backend::metal {
-class IMetalDevice;
-
-class IMetalProgram : public Program, public MetalProgramBase {
+class IMetalProgram : public IBackendProgram, public IMetalProgramBase {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;

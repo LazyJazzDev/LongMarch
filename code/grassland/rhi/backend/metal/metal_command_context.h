@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class IMetalCommandContext;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalCommandContext)
 #include <unordered_map>
 
@@ -13,16 +11,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalCommandContext)
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-class IMetalQueue;
-class IMetalProgram;
-class IMetalComputeProgram;
-class MetalProgramBase;
-class IMetalBuffer;
-class MetalImage;
-class IMetalWindow;
-class IMetalSwapChainImage;
-
-class IMetalCommandContext : public CommandContext {
+class IMetalCommandContext : public IBackendCommandContext {
  public:
   static IMetalCommandContext *Create(IMetalQueue *queue);
   virtual bool CmdBuildBottomLevelAccelerationStructure(

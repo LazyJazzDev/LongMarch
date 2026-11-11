@@ -1,32 +1,21 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class D3D12AccelerationStructure;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12AccelerationStructure)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12AccelerationStructure)
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12TopLevelAccelerationStructure;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12TopLevelAccelerationStructure)
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12BottomLevelAccelerationStructure;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12BottomLevelAccelerationStructure)
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class ID3D12Device;
-
 struct D3D12AccelerationStructureState;
 
-class D3D12AccelerationStructure : public IObject {
+class ID3D12AccelerationStructure : public IObject {
  public:
   ID3D12Device *Owner() const;
   ID3D12Resource *NativeResource() const;
@@ -49,7 +38,7 @@ class D3D12AccelerationStructure : public IObject {
 };
 
 class ID3D12BottomLevelAccelerationStructure : public IBottomLevelAccelerationStructure,
-                                               public D3D12AccelerationStructure {
+                                               public ID3D12AccelerationStructure {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;
@@ -71,7 +60,7 @@ class ID3D12BottomLevelAccelerationStructure : public IBottomLevelAccelerationSt
 
 ;
 
-class ID3D12TopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public D3D12AccelerationStructure {
+class ID3D12TopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public ID3D12AccelerationStructure {
  public:
   virtual void AddRef() noexcept override = 0;
   virtual void Release() noexcept override = 0;

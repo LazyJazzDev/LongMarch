@@ -3,24 +3,17 @@
 #include <vk_mem_alloc.h>
 
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
-#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
-#include "grassland/rhi/backend/vulkan/vulkan_allocated_image_impl.h"
+#include "grassland/rhi/backend/vulkan/vulkan_binding_group_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
-#include "grassland/rhi/backend/vulkan/vulkan_compute_program_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
-#include "grassland/rhi/backend/vulkan/vulkan_program_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
-#include "grassland/rhi/backend/vulkan/vulkan_queue_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
-#include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
-#include "grassland/rhi/backend/vulkan/vulkan_sampler_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
-#include "grassland/rhi/backend/vulkan/vulkan_window_impl.h"
 
 namespace grassland::rhi::backend::vulkan {
 bool VulkanDeviceImpl::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
@@ -106,7 +99,7 @@ void VulkanDeviceImpl::RecycleCommandResources(VkCommandPool pool, VkCommandBuff
   vkDestroyCommandPool(device_, pool, nullptr);
 }
 
-VulkanDeviceImpl::VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, Core *core)
+VulkanDeviceImpl::VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, IBackendCore *core)
     : upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
       download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
       scratch_pool_(this) {
@@ -136,7 +129,7 @@ VulkanDeviceImpl::~VulkanDeviceImpl() {
 }
 
 IVulkanDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                    Core *core,
+                                                    IBackendCore *core,
                                                     VkPhysicalDevice physical_device,
                                                     uint32_t api_version) {
   auto device = std::unique_ptr<VulkanDeviceImpl>(new VulkanDeviceImpl(std::move(info), core));
@@ -215,7 +208,7 @@ IVulkanDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevi
     VkQueue queue;
     vkGetDeviceQueue(device->device_, queue_family, native_index, &queue);
     auto mutex = native_index == 0 ? main_mutex : std::make_shared<std::mutex>();
-    device->StateDevice().queues_[index] = ObjectPtr<Queue>::Adopt(
+    device->StateDevice().queues_[index] = ObjectPtr<IBackendQueue>::Adopt(
         IVulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue, std::move(mutex)));
     if (!device->StateDevice().queues_[index])
       return nullptr;
@@ -240,7 +233,7 @@ ISampler *VulkanDeviceImpl::CreateSampler(const SamplerDesc &desc) {
 }
 
 IBindingGroup *VulkanDeviceImpl::CreateBindingGroup(const BindingLayoutDesc &layout) {
-  return VulkanBindingGroup::Create(this, layout);
+  return IVulkanBindingGroup::Create(this, layout);
 }
 
 VulkanDescriptorPool &VulkanDeviceImpl::DescriptorPool() {
@@ -333,7 +326,7 @@ LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanDevice, "96a1c412-20e
 
 namespace grassland::rhi::backend::vulkan {
 IVulkanDevice *IVulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                 Core *core,
+                                                 IBackendCore *core,
                                                  VkPhysicalDevice physical_device,
                                                  uint32_t api_version) {
   return VulkanDeviceImpl::CreateVulkanDevice(info, core, physical_device, api_version);

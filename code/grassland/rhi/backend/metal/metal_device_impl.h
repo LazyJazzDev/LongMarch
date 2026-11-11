@@ -1,12 +1,13 @@
 #pragma once
 #include "grassland/rhi/backend/backend_device_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalDeviceImpl final : public Object<IMetalDevice> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, IMetalDevice, Device, rhi::IDevice)
-  static IMetalDevice *Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, IMetalDevice, IBackendDevice, rhi::IDevice)
+  static IMetalDevice *Create(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device);
   ~MetalDeviceImpl() override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
@@ -30,7 +31,7 @@ class MetalDeviceImpl final : public Object<IMetalDevice> {
   void InterruptCollector() override;
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
   void WaitForProgress(const std::vector<Event> &next) override;
-  MetalDeviceImpl(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
+  MetalDeviceImpl(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device);
   NS::SharedPtr<MTL::Device> device_;
 
   struct WaitState {
@@ -54,6 +55,39 @@ class MetalDeviceImpl final : public Object<IMetalDevice> {
 
   const DeviceState &StateDevice() const override {
     return state_Device_;
+  }
+
+ public:
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override {
+    return IBackendDevice::CommonCreateRayTracingProgram(desc);
+  }
+
+  std::string Name() const override {
+    return IBackendDevice::CommonName();
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return IBackendDevice::CommonSupportRayTracingPipeline();
+  }
+
+  bool SupportRayQuery() const override {
+    return IBackendDevice::CommonSupportRayQuery();
+  }
+
+  bool SupportGeometryShader() const override {
+    return IBackendDevice::CommonSupportGeometryShader();
+  }
+
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
+    return IBackendDevice::CommonCreateShader(desc);
+  }
+
+  rhi::IQueue *GetQueue(QueueType type) override {
+    return IBackendDevice::CommonGetQueue(type);
+  }
+
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override {
+    return IBackendDevice::CommonWaitEvents(events, wait_all);
   }
 };
 }  // namespace grassland::rhi::backend::metal

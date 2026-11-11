@@ -1,20 +1,17 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class D3D12ProgramBase;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12ProgramBase)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12ProgramBase)
 #include <array>
 
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
 // Layout ownership only; object identity and reference counting belong to the concrete Program.
 struct D3D12ProgramBaseState;
 
-class D3D12ProgramBase : public IObject {
+class ID3D12ProgramBase : public IObject {
  public:
   ID3D12RootSignature *NativeRootSignature() const;
   uint32_t RootParameter(uint32_t group, bool sampler) const;

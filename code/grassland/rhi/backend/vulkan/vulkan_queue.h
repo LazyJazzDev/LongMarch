@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class IVulkanQueue;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanQueue)
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
@@ -11,7 +9,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanQueue)
 
 namespace grassland::rhi::backend::vulkan {
 
-class IVulkanQueue : public Queue {
+class IVulkanQueue : public IBackendQueue {
  public:
   static IVulkanQueue *Create(IVulkanDevice *device, QueueType type, VkQueue queue, std::shared_ptr<std::mutex> mutex);
   virtual rhi::ICommandContext *CreateCommandContext() = 0;

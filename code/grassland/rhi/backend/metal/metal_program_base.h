@@ -1,21 +1,18 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class MetalProgramBase;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalProgramBase)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalProgramBase)
 #include <Metal/Metal.hpp>
 #include <array>
 
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_program.h"
 
 namespace grassland::rhi::backend::metal {
 // Shared argument-buffer layout and shader translation; no IObject/refcount base.
 struct MetalProgramBaseState;
 
-class MetalProgramBase : public IObject {
+class IMetalProgramBase : public IObject {
  protected:
   void InitializeMetalProgramBase(MTL::Device *device, const PipelineLayoutDesc &layout);
 

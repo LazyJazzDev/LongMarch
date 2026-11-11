@@ -37,9 +37,9 @@ struct Calls {
   bool device_destroyed_before_core{};
 };
 
-class TestDevice final : public backend::Object<backend::Device> {
+class TestDevice final : public backend::Object<backend::IBackendDevice> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::Device, rhi::IDevice)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::IBackendDevice, rhi::IDevice)
 
  public:
   bool WaitNativeEvents(const std::vector<Event> &, bool) const override {
@@ -55,7 +55,7 @@ class TestDevice final : public backend::Object<backend::Device> {
     ADD_FAILURE();
   }
 
-  TestDevice(PhysicalDevice info, backend::Core *core, Calls &calls) : calls_(calls) {
+  TestDevice(PhysicalDevice info, backend::IBackendCore *core, Calls &calls) : calls_(calls) {
     InitializeDevice(std::move(info), core);
   }
 
@@ -78,11 +78,82 @@ class TestDevice final : public backend::Object<backend::Device> {
   const backend::DeviceState &StateDevice() const override {
     return state_;
   }
+
+ public:
+  IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
+      const BottomLevelAccelerationStructureDesc &desc) override {
+    return backend::IBackendDevice::CommonCreateBottomLevelAccelerationStructure(desc);
+  }
+
+  ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
+      const TopLevelAccelerationStructureDesc &desc) override {
+    return backend::IBackendDevice::CommonCreateTopLevelAccelerationStructure(desc);
+  }
+
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override {
+    return backend::IBackendDevice::CommonCreateRayTracingProgram(desc);
+  }
+
+  std::string Name() const override {
+    return backend::IBackendDevice::CommonName();
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return backend::IBackendDevice::CommonSupportRayTracingPipeline();
+  }
+
+  bool SupportRayQuery() const override {
+    return backend::IBackendDevice::CommonSupportRayQuery();
+  }
+
+  bool SupportGeometryShader() const override {
+    return backend::IBackendDevice::CommonSupportGeometryShader();
+  }
+
+  rhi::IImage *CreateImage(const ImageDesc &desc) override {
+    return backend::IBackendDevice::CommonCreateImage(desc);
+  }
+
+  ISampler *CreateSampler(const SamplerDesc &desc = {}) override {
+    return backend::IBackendDevice::CommonCreateSampler(desc);
+  }
+
+  rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override {
+    return backend::IBackendDevice::CommonCreateBindingGroup(layout);
+  }
+
+  rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override {
+    return backend::IBackendDevice::CommonCreateBuffer(desc);
+  }
+
+  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override {
+    return backend::IBackendDevice::CommonCreateComputeProgram(desc);
+  }
+
+  rhi::IProgram *CreateProgram(const ProgramDesc &desc) override {
+    return backend::IBackendDevice::CommonCreateProgram(desc);
+  }
+
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
+    return backend::IBackendDevice::CommonCreateShader(desc);
+  }
+
+  rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override {
+    return backend::IBackendDevice::CommonCreateGLFWWindow(desc);
+  }
+
+  rhi::IQueue *GetQueue(QueueType type) override {
+    return backend::IBackendDevice::CommonGetQueue(type);
+  }
+
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override {
+    return backend::IBackendDevice::CommonWaitEvents(events, wait_all);
+  }
 };
 
-class TestCore final : public backend::Object<backend::Core> {
+class TestCore final : public backend::Object<backend::IBackendCore> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, backend::Core, rhi::ICore)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, backend::IBackendCore, rhi::ICore)
 
  public:
   TestCore(std::vector<PhysicalDevice> devices, Calls &calls, bool fail = false)
@@ -115,6 +186,11 @@ class TestCore final : public backend::Object<backend::Core> {
   std::vector<PhysicalDevice> devices_;
   Calls &calls_;
   bool fail_;
+
+ public:
+  rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
+    return backend::IBackendCore::CommonCreateDeviceByAutoSelection(requirement);
+  }
 };
 
 TEST(RhiSelection, RequirementsAreIndependentFilters) {

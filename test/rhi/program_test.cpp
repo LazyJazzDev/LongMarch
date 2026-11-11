@@ -203,8 +203,8 @@ TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
   ASSERT_TRUE(other);
   ASSERT_TRUE(group->BindResource(0, std::vector<ISampler *>{first.Get(), second.Get()}));
   ASSERT_TRUE(other->BindResource(0, first.Get()));
-  auto native = static_cast<backend::BindingGroup *>(group.Get());
-  auto captured = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(native->CurrentVersion());
+  auto native = static_cast<backend::IBackendBindingGroup *>(group.Get());
+  auto captured = backend::ObjectPtr<backend::IBackendBindingVersion>::Retain(native->CurrentVersion());
   auto first_ptr = first.Get();
   auto second_ptr = second.Get();
   first.Release();
@@ -532,7 +532,7 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   BindingLayoutDesc layout{{{2, BINDING_UNIFORM_BUFFER, 2}, {7, BINDING_TEXTURE2D}, {9, BINDING_SAMPLER}}};
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(group);
-  auto native = static_cast<backend::BindingGroup *>(group.Get());
+  auto native = static_cast<backend::IBackendBindingGroup *>(group.Get());
   auto initial = native->CurrentVersion();
   const auto *stable_layout = &group->GetLayout();
   EXPECT_FALSE(initial->IsComplete());
@@ -550,7 +550,7 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   EXPECT_FALSE(group->BindResource(2, image.Get()));
   EXPECT_FALSE(group->BindResource(9, CreateSamplers(device.Get(), {{static_cast<SamplerFilter>(-1)}})));
   // A command's use-reference is the only reason to fork.
-  auto captured = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(initial);
+  auto captured = backend::ObjectPtr<backend::IBackendBindingVersion>::Retain(initial);
   EXPECT_FALSE(group->BindResource(2, BufferView{a.Get(), 1, 256}));
   EXPECT_EQ(native->CurrentVersion(), initial);
   ASSERT_TRUE(group->BindResource(2, BufferView{a.Get(), 256, 256}));
@@ -566,7 +566,7 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   ASSERT_EQ(captured->GetReferences()[2].size(), 1u);
   EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[2][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
   // Capture of the unchanged version shares all descriptors and resources.
-  auto again = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(next);
+  auto again = backend::ObjectPtr<backend::IBackendBindingVersion>::Retain(next);
   EXPECT_EQ(again.Get(), next);
   again.Reset();
   ASSERT_TRUE(group->BindResource(2, BufferView{a.Get(), 0, 256}));
@@ -608,11 +608,11 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(
       {{{9, BINDING_SAMPLER, 3}, {2, BINDING_UNIFORM_BUFFER, 3}, {7, BINDING_TEXTURE2D, 3}}});
   ASSERT_TRUE(group);
-  auto native = static_cast<backend::BindingGroup *>(group.Get());
+  auto native = static_cast<backend::IBackendBindingGroup *>(group.Get());
   ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 256, 0}}, 1));
   ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{first.Get()}, 2));
   ASSERT_TRUE(group->BindResource(9, CreateSamplers(device.Get(), {{SAMPLER_FILTER_NEAREST}}), 1));
-  auto sparse = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(native->CurrentVersion());
+  auto sparse = backend::ObjectPtr<backend::IBackendBindingVersion>::Retain(native->CurrentVersion());
   ASSERT_FALSE(sparse->IsComplete());
   ASSERT_TRUE(
       group->BindResource(9, CreateSamplers(device.Get(), {{SAMPLER_FILTER_LINEAR}, {SAMPLER_FILTER_NEAREST}}), 1));
@@ -761,7 +761,7 @@ TEST_P(RhiProgram, StructuredLayoutStrideControlsCompatibilityAndRanges) {
 }
 
 #if defined(LONGMARCH_D3D12_ENABLED)
-TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
+TEST(ID3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   using namespace backend::d3d12;
   ObjPtr<ICore> core = CreateCore(BACKEND_API_D3D12);
   ASSERT_TRUE(core);
@@ -796,8 +796,8 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, buffer.Get()));
   ASSERT_TRUE(group->BindResource(1, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
-  auto native = static_cast<D3D12BindingGroup *>(group.Get());
-  auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
+  auto native = static_cast<ID3D12BindingGroup *>(group.Get());
+  auto version = static_cast<ID3D12BindingVersion *>(native->CurrentVersion());
   auto a = version->ResourceDescriptors();
   ASSERT_TRUE(a);
   EXPECT_EQ(a->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
@@ -816,7 +816,7 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   EXPECT_EQ(version->SamplerDescriptors()->CPU().ptr, sampler);
   ASSERT_TRUE(
       group->BindResource(1, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{SAMPLER_FILTER_NEAREST})).Get()));
-  auto replacement = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
+  auto replacement = static_cast<ID3D12BindingVersion *>(native->CurrentVersion());
   EXPECT_NE(replacement, version);
   EXPECT_NE(replacement->SamplerDescriptors()->CPU().ptr, sampler);
   EXPECT_EQ(version->ResourceDescriptors(), a);

@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/rhi/backend/backend_compute_program_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program_base_state.h"
 
@@ -8,9 +9,9 @@ class VulkanComputeProgramImpl final : public Object<IVulkanComputeProgram> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IComputeProgram,
                             IVulkanComputeProgram,
-                            ComputeProgram,
+                            IBackendComputeProgram,
                             IComputeProgram,
-                            VulkanProgramBase,
+                            IVulkanProgramBase,
                             IObject)
   static IVulkanComputeProgram *Create(IVulkanDevice *device, const ComputeProgramDesc &desc);
   ~VulkanComputeProgramImpl() override;
@@ -40,6 +41,11 @@ class VulkanComputeProgramImpl final : public Object<IVulkanComputeProgram> {
 
   const VulkanProgramBaseState &StateVulkanProgramBase() const override {
     return state_VulkanProgramBase_;
+  }
+
+ public:
+  const ComputeProgramDesc &GetDesc() const override {
+    return IBackendComputeProgram::CommonGetDesc();
   }
 };
 }  // namespace grassland::rhi::backend::vulkan

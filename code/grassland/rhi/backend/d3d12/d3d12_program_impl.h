@@ -1,12 +1,13 @@
 #pragma once
 #include "grassland/rhi/backend/backend_program_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program_base_state.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12ProgramImpl final : public Object<ID3D12Program> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IProgram, ID3D12Program, Program, IProgram, D3D12ProgramBase, IObject)
+  LONGMARCH_RHI_FINAL_QUERY(IProgram, ID3D12Program, IBackendProgram, IProgram, ID3D12ProgramBase, IObject)
   static ID3D12Program *Create(ID3D12Device *device, const ProgramDesc &desc);
   ID3D12PipelineState *NativePipeline() const;
 
@@ -38,6 +39,11 @@ class D3D12ProgramImpl final : public Object<ID3D12Program> {
 
   const D3D12ProgramBaseState &StateD3D12ProgramBase() const override {
     return state_D3D12ProgramBase_;
+  }
+
+ public:
+  const ProgramDesc &GetDesc() const override {
+    return IBackendProgram::CommonGetDesc();
   }
 };
 }  // namespace grassland::rhi::backend::d3d12

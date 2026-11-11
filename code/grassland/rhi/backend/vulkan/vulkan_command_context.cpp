@@ -59,7 +59,7 @@ IVulkanCommandContext *VulkanCommandContextImpl::Create(IVulkanQueue *queue) {
   return object.release();
 }
 
-bool VulkanCommandContextImpl::TransitionImage(VulkanImage *image,
+bool VulkanCommandContextImpl::TransitionImage(IVulkanImage *image,
                                                VkImageLayout layout,
                                                VkPipelineStageFlags stages,
                                                VkAccessFlags access) {
@@ -98,7 +98,7 @@ bool VulkanCommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValu
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  const auto native = rhi::QueryInterfacePtr<VulkanImage>(image).Get();
+  const auto native = rhi::QueryInterfacePtr<IVulkanImage>(image).Get();
   if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     StateCommandContext().recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
@@ -185,7 +185,7 @@ bool VulkanCommandContextImpl::EndRecording() {
   return Check(vkEndCommandBuffer(command_), "End command buffer");
 }
 
-CommandContext::SubmitResult VulkanCommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
+IBackendCommandContext::SubmitResult VulkanCommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
   auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
@@ -408,17 +408,17 @@ bool VulkanCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
   for (uint32_t i = 0; i < groups_.size(); ++i)
     if (program_ && groups_[i] && !BindGroupVersion(i, groups_[i]))
       return false;
-  std::vector<VulkanImage *> images;
+  std::vector<IVulkanImage *> images;
   std::vector<ImageFormat> formats;
   for (const auto &color : StateCommandContext().rendering_.color_attachments) {
-    auto image = rhi::QueryInterfacePtr<VulkanImage>(color.color_attachment).Get();
+    auto image = rhi::QueryInterfacePtr<IVulkanImage>(color.color_attachment).Get();
     if (!TransitionImage(image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))
       return false;
     images.push_back(image);
     formats.push_back(image->GetDesc().format);
   }
-  auto depth = rhi::QueryInterfacePtr<VulkanImage>(StateCommandContext().rendering_.depth_stencil.image).Get();
+  auto depth = rhi::QueryInterfacePtr<IVulkanImage>(StateCommandContext().rendering_.depth_stencil.image).Get();
   if (depth) {
     if (!TransitionImage(depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
@@ -646,7 +646,7 @@ bool VulkanCommandContextImpl::CmdEndRendering() {
                        0, nullptr, 0, nullptr);
   render_target_ = nullptr;
   for (auto color : StateCommandContext().rendering_.color_attachments) {
-    auto image = rhi::QueryInterfacePtr<VulkanImage>(color.color_attachment).Get();
+    auto image = rhi::QueryInterfacePtr<IVulkanImage>(color.color_attachment).Get();
     if (!TransitionImage(image, image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                          VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT))
       return false;
@@ -686,7 +686,7 @@ bool VulkanCommandContextImpl::TransitionBuffer(IVulkanBuffer *buffer,
 }
 
 bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
-  auto native = rhi::QueryInterfacePtr<VulkanImage>(image).Get();
+  auto native = rhi::QueryInterfacePtr<IVulkanImage>(image).Get();
   if (StateCommandContext().sealed_ || render_target_ || !native || !native->IsValid() ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
       IsDepthFormat(native->GetDesc().format) ||
@@ -720,14 +720,14 @@ bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, u
 }
 
 bool VulkanCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group) {
-  auto native = rhi::QueryInterfacePtr<VulkanBindingGroup>(group).Get();
+  auto native = rhi::QueryInterfacePtr<IVulkanBindingGroup>(group).Get();
   if (StateCommandContext().sealed_ || !binding_layout_ || !native || native->Owner() != device_ ||
       index >= groups_.size() || !SameBindingLayout(native->GetLayout(), binding_layout_->groups[index]) ||
       !native->CurrentVersion()->IsComplete()) {
     StateCommandContext().recording_failed_ = true;
     return false;
   }
-  auto version = rhi::QueryInterfacePtr<VulkanBindingGroup::Version>(native->CurrentVersion()).Get();
+  auto version = rhi::QueryInterfacePtr<IVulkanBindingVersion>(native->CurrentVersion()).Get();
   if (!RetainResource(version))
     return false;
   if (compute_active_) {
@@ -737,7 +737,7 @@ bool VulkanCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group
   return BindGroupVersion(index, version);
 }
 
-bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *native) {
+bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, IVulkanBindingVersion *native) {
   const VkPipelineStageFlags stages = ray_program_      ? VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR
                                       : compute_active_ ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
                                                         : VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
@@ -763,7 +763,7 @@ bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, VulkanBindingGro
           return false;
       }
       if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
-        auto image = rhi::QueryInterfacePtr<VulkanImage>(native->GetReferences()[binding_index][i].Get()).Get();
+        auto image = rhi::QueryInterfacePtr<IVulkanImage>(native->GetReferences()[binding_index][i].Get()).Get();
         if (render_target_) {
           auto known = image_states_.find(image);
           if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||
@@ -856,12 +856,12 @@ bool VulkanCommandContextImpl::CmdDispatchRays(uint32_t width,
       if (!BindGroupVersion(i, groups_[i]))
         return false;
     }
-  const ShaderBindingTable *table = ray_program_->DefaultShaderBindingTable();
+  const IBackendShaderBindingTable *table = ray_program_->DefaultShaderBindingTable();
   if (sbt) {
 #ifndef NDEBUG
-    auto custom = rhi::QueryInterfacePtr<ShaderBindingTable>(sbt).Get();
+    auto custom = rhi::QueryInterfacePtr<IBackendShaderBindingTable>(sbt).Get();
 #else
-    auto custom = rhi::QueryInterfacePtr<ShaderBindingTable>(sbt).Get();
+    auto custom = rhi::QueryInterfacePtr<IBackendShaderBindingTable>(sbt).Get();
 #endif
     if (!custom || custom->GetProgram() != ray_program_) {
       StateCommandContext().recording_failed_ = true;
@@ -898,11 +898,12 @@ IDownloadToken *VulkanCommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uin
   }
   if (!TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
     return nullptr;
-  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(IVulkanDownloadToken::Create(std::move(lease), size)));
+  return RegisterDownload(
+      ObjectPtr<IBackendDownloadToken>::Adopt(IVulkanDownloadToken::Create(std::move(lease), size)));
 }
 
 IDownloadToken *VulkanCommandContextImpl::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
-  auto native = rhi::QueryInterfacePtr<VulkanImage>(image).Get();
+  auto native = rhi::QueryInterfacePtr<IVulkanImage>(image).Get();
   if (StateCommandContext().sealed_ || render_target_ || !native ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     StateCommandContext().recording_failed_ = true;
@@ -956,7 +957,7 @@ IDownloadToken *VulkanCommandContextImpl::CmdDownloadImage(IImage *image, const 
   }
   if (!TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
     return nullptr;
-  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(IVulkanDownloadToken::Create(
+  return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(IVulkanDownloadToken::Create(
       std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 }  // namespace grassland::rhi::backend::vulkan

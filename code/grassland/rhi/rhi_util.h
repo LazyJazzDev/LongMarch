@@ -24,27 +24,6 @@ class ISubmissionToken;
 class ITimeline;
 class IWindow;
 }  // namespace grassland::rhi
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IAccelerationStructure)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IBottomLevelAccelerationStructure)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ITopLevelAccelerationStructure)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IBindingGroup)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IBuffer)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ICommandContext)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IComputeProgram)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ICore)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IDevice)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IDownloadToken)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IImage)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IObject)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IProgram)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IQueue)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IShaderBindingTable)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IRayTracingProgram)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ISampler)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IShader)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ISubmissionToken)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ITimeline)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IWindow)
 
 #include <array>
 #include <cstdint>

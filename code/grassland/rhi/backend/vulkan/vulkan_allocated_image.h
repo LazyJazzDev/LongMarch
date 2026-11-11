@@ -1,17 +1,13 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::vulkan {
-class IVulkanAllocatedImage;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanAllocatedImage)
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
 typedef struct VmaAllocation_T *VmaAllocation;
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanDevice;
-
-class IVulkanAllocatedImage : public VulkanImage {
+class IVulkanAllocatedImage : public IVulkanImage {
  public:
   static IVulkanAllocatedImage *Create(IVulkanDevice *device, const ImageDesc &desc);
   virtual bool IsValid() const = 0;

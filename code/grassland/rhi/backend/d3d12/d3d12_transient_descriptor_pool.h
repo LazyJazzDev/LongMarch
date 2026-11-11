@@ -5,31 +5,25 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
 // Device-owned, shader-visible whole heaps. A context retains each lease until
 // its recorded commands are discarded or GPU work has completed.
-class D3D12TransientDescriptorPool {
+class D3D12TransientDescriptorPool final {
+  class LeaseImpl;
+
  public:
-  class Lease final : public Object<IObject> {
+  class ILease : public IObject {
    public:
-    using Object<IObject>::QueryInterface;
-    bool QueryInterface(InterfaceID id, void **output) noexcept override;
-
-    Lease(D3D12TransientDescriptorPool *pool, ID3D12DescriptorHeap *heap, size_t level);
-    ~Lease() override;
-    ID3D12DescriptorHeap *Heap() const;
-    uint32_t Count() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE CPU(uint32_t index = 0) const;
-    D3D12_GPU_DESCRIPTOR_HANDLE GPU(uint32_t index = 0) const;
-
-   private:
-    D3D12TransientDescriptorPool *pool_;
-    ID3D12DescriptorHeap *heap_;
-    size_t level_;
-    uint32_t count_;
+    virtual ID3D12DescriptorHeap *Heap() const = 0;
+    virtual uint32_t Count() const = 0;
+    virtual D3D12_CPU_DESCRIPTOR_HANDLE CPU(uint32_t index = 0) const = 0;
+    virtual D3D12_GPU_DESCRIPTOR_HANDLE GPU(uint32_t index = 0) const = 0;
   };
+
+  using Lease = ILease;
 
   D3D12TransientDescriptorPool(::ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type);
   // Round to a power-of-two class, with a final class at the native heap limit.
@@ -58,17 +52,4 @@ class D3D12TransientDescriptorPool {
 };
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12TransientDescriptorPool::Lease)
-
-inline bool grassland::rhi::backend::d3d12::D3D12TransientDescriptorPool::Lease::QueryInterface(
-    InterfaceID id,
-    void **output) noexcept {
-  if (!output)
-    return false;
-  if (auto result = MatchInterface<Lease>(id, this)) {
-    *output = result;
-    AddRef();
-    return true;
-  }
-  return Object<IObject>::QueryInterface(id, output);
-}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12TransientDescriptorPool::ILease)

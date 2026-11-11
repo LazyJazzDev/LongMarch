@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/rhi/backend/backend_sampler.h"
+#include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
 struct SamplerState final {

@@ -1,63 +1,31 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class D3D12BindingGroup;
-}
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12BindingGroup)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12BindingGroup)
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class ID3D12Device;
-
-class D3D12BindingGroup final : public BindingGroup {
+class ID3D12BindingVersion : public IBackendBindingVersion {
  public:
-  LONGMARCH_RHI_QUERY(D3D12BindingGroup, BindingGroup)
-
-  static D3D12BindingGroup *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
-
-  class Version final : public BindingGroup::Version {
-   public:
-    using BindingGroup::Version::QueryInterface;
-    bool QueryInterface(InterfaceID id, void **output) noexcept override;
-
-    static Version *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
-    ObjectPtr<BindingGroup::Version> Clone() const override;
-    bool IsInitialized(size_t binding_index, uint32_t element) const override;
-    uint32_t ResourceCount() const;
-    D3D12DescriptorPool::Lease *ResourceDescriptors() const;
-    D3D12DescriptorPool::Lease *SamplerDescriptors() const;
-
-   private:
-    ID3D12Device *device_;
-    bool WriteDescriptors(size_t binding_index,
-                          uint32_t first_element,
-                          const std::vector<ITopLevelAccelerationStructure *> &values) override;
-    Version(ID3D12Device *device, const BindingLayoutDesc &layout);
-    bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
-    bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
-    bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) override;
-    std::vector<uint32_t> offsets_;
-    std::vector<std::vector<bool>> initialized_;
-    ObjectPtr<D3D12DescriptorPool::Lease> resources_, samplers_;
-  };
-
- private:
-  D3D12BindingGroup(ID3D12Device *device, ObjectPtr<Version> version);
+  static ID3D12BindingVersion *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
+  virtual ObjectPtr<IBackendBindingVersion> Clone() const = 0;
+  virtual bool IsInitialized(size_t binding_index, uint32_t element) const = 0;
+  virtual uint32_t ResourceCount() const = 0;
+  virtual D3D12DescriptorPool::Lease *ResourceDescriptors() const = 0;
+  virtual D3D12DescriptorPool::Lease *SamplerDescriptors() const = 0;
 };
+
+;
+
+class ID3D12BindingGroup : public IBackendBindingGroup {
+ public:
+  static ID3D12BindingGroup *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
+  using Version = ID3D12BindingVersion;
+};
+
+;
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12BindingGroup::Version)
-
-inline bool grassland::rhi::backend::d3d12::D3D12BindingGroup::Version::QueryInterface(InterfaceID id,
-                                                                                       void **output) noexcept {
-  if (!output)
-    return false;
-  if (auto result = MatchInterface<Version>(id, this)) {
-    *output = result;
-    AddRef();
-    return true;
-  }
-  return BindingGroup::Version::QueryInterface(id, output);
-}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12BindingVersion)

@@ -209,7 +209,7 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   auto check = [&](const Image &image, std::array<int, 4> expected) {
     auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
-    auto texture = static_cast<backend::metal::MetalImage *>(image.Get())->NativeImage();
+    auto texture = static_cast<backend::metal::IMetalImage *>(image.Get())->NativeImage();
     blit->copyFromTexture(texture, 0, 0, MTL::Origin::Make(0, 0, 0), MTL::Size::Make(1, 1, 1), readback.get(), 0, 256,
                           256);
     blit->endEncoding();

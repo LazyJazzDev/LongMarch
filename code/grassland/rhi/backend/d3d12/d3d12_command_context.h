@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12CommandContext;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12CommandContext)
 #include <vector>
 
@@ -12,17 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12CommandContext)
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class ID3D12Queue;
-class D3D12Image;
-class ID3D12Buffer;
-class ID3D12Program;
-class ID3D12RayTracingProgram;
-class D3D12ProgramBase;
-class ID3D12Window;
-class ID3D12TopLevelAccelerationStructure;
-class ID3D12SwapChainImage;
-
-class ID3D12CommandContext : public CommandContext {
+class ID3D12CommandContext : public IBackendCommandContext {
  public:
   static ID3D12CommandContext *Create(ID3D12Queue *queue);
   virtual bool CmdBindRayTracingProgram(IRayTracingProgram *program) = 0;

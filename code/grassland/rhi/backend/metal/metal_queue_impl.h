@@ -1,11 +1,12 @@
 #pragma once
 #include "grassland/rhi/backend/backend_queue_state.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalQueueImpl final : public Object<IMetalQueue> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, IMetalQueue, Queue, rhi::IQueue)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, IMetalQueue, IBackendQueue, rhi::IQueue)
   rhi::ICommandContext *CreateCommandContext() override;
   static IMetalQueue *Create(IMetalDevice *device, QueueType type, MTL::CommandBufferDescriptor *descriptor);
   MTL::CommandQueue *NativeQueue() const;
@@ -32,6 +33,11 @@ class MetalQueueImpl final : public Object<IMetalQueue> {
 
   const QueueState &StateQueue() const override {
     return state_Queue_;
+  }
+
+ public:
+  QueueType GetType() const override {
+    return IBackendQueue::CommonGetType();
   }
 };
 }  // namespace grassland::rhi::backend::metal

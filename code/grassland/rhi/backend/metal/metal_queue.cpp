@@ -1,10 +1,8 @@
 ﻿#include "grassland/rhi/backend/metal/metal_queue.h"
 
 #include "grassland/rhi/backend/metal/metal_command_context.h"
-#include "grassland/rhi/backend/metal/metal_command_context_impl.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_queue_impl.h"
-#include "grassland/rhi/backend/metal/metal_timeline_impl.h"
 
 namespace grassland::rhi::backend::metal {
 

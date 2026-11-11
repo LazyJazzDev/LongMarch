@@ -11,6 +11,8 @@
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/util/event_manager.h"
 
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IWindow)
+
 namespace grassland::rhi {
 class IImage;
 class ICommandContext;

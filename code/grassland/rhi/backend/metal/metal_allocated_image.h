@@ -1,16 +1,12 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::metal {
-class IMetalAllocatedImage;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalAllocatedImage)
 #include "grassland/rhi/backend/metal/metal_image.h"
 
 namespace grassland::rhi::backend::metal {
-class IMetalDevice;
-
-class IMetalAllocatedImage : public MetalImage {
+class IMetalAllocatedImage : public IMetalImage {
  public:
   static IMetalAllocatedImage *Create(IMetalDevice *device, const ImageDesc &desc);
   virtual bool IsValid() const = 0;

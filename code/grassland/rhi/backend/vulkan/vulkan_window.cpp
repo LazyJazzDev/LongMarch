@@ -1,6 +1,6 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_window_impl.h"
+﻿#define GLFW_INCLUDE_VULKAN
+#include "grassland/rhi/backend/vulkan/vulkan_window_impl.h"
 // Include Vulkan before GLFW declares its surface functions.
-#define GLFW_INCLUDE_VULKAN
 #include <cstdlib>
 #include <optional>
 
@@ -75,7 +75,7 @@ IVulkanWindow *VulkanWindowImpl::Create(IVulkanDevice *device, const WindowDesc 
   return object.release();
 }
 
-ObjectPtr<Image> VulkanWindowImpl::AcquireNativeFrame() {
+ObjectPtr<IBackendImage> VulkanWindowImpl::AcquireNativeFrame() {
   auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
@@ -201,7 +201,7 @@ ObjectPtr<Image> VulkanWindowImpl::AcquireNativeFrame() {
     Check(result, "vkAcquireNextImageKHR");
     return {};
   }
-  return ObjectPtr<Image>::Adopt(
+  return ObjectPtr<IBackendImage>::Adopt(
       IVulkanSwapChainImage::Create(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
 }
 

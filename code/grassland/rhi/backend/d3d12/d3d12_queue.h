@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12Queue;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Queue)
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
@@ -11,7 +9,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Queue)
 
 namespace grassland::rhi::backend::d3d12 {
 
-class ID3D12Queue : public Queue {
+class ID3D12Queue : public IBackendQueue {
  public:
   static ID3D12Queue *Create(ID3D12Device *device, QueueType type);
   virtual rhi::ICommandContext *CreateCommandContext() = 0;

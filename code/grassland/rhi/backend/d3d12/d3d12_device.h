@@ -1,9 +1,7 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_interface_id.h"
 
-namespace grassland::rhi::backend::d3d12 {
-class ID3D12Device;
-}
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Device)
 #include <d3d12sdklayers.h>
 
@@ -17,9 +15,9 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Device)
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class ID3D12Device : public Device {
+class ID3D12Device : public IBackendDevice {
  public:
-  static ID3D12Device *Create(PhysicalDevice info, Core *core, ComPtr<::ID3D12Device> device);
+  static ID3D12Device *Create(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device);
   virtual IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) = 0;
   virtual IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) = 0;

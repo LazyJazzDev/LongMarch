@@ -1,4 +1,5 @@
 #pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 
 namespace grassland::rhi::backend::vulkan {

@@ -5,7 +5,6 @@
 
 #include "grassland/rhi/backend/metal/metal_core_impl.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
-#include "grassland/rhi/backend/metal/metal_device_impl.h"
 
 namespace grassland::rhi::backend::metal {
 

@@ -4,7 +4,7 @@
 #include "grassland/rhi/backend/backend_ray_tracing_program_state.h"
 
 namespace grassland::rhi::backend {
-void RayTracingProgram::InitializeRayTracingProgram(Device *device, const RayTracingProgramDesc &desc) {
+void IBackendRayTracingProgram::InitializeRayTracingProgram(IBackendDevice *device, const RayTracingProgramDesc &desc) {
   StateRayTracingProgram().device_ = device;
   StateRayTracingProgram().desc_ = desc;
 
@@ -24,15 +24,15 @@ void RayTracingProgram::InitializeRayTracingProgram(Device *device, const RayTra
     retain(shader);
 }
 
-const RayTracingProgramDesc &RayTracingProgram::GetDesc() const {
+const RayTracingProgramDesc &IBackendRayTracingProgram::CommonGetDesc() const {
   return StateRayTracingProgram().desc_;
 }
 
-Device *RayTracingProgram::Owner() const {
+IBackendDevice *IBackendRayTracingProgram::Owner() const {
   return StateRayTracingProgram().device_;
 }
 
-bool RayTracingProgram::ValidateLayout() const {
+bool IBackendRayTracingProgram::ValidateLayout() const {
   auto stage = [](IShader *shader, ShaderStage expected) { return shader && shader->GetStage() == expected; };
   if (!stage(StateRayTracingProgram().desc_.ray_generation, SHADER_STAGE_RAY_GENERATION) ||
       !StateRayTracingProgram().desc_.max_recursion_depth ||
@@ -60,7 +60,7 @@ bool RayTracingProgram::ValidateLayout() const {
   return true;
 }
 
-bool RayTracingProgram::ValidateShaderBindingTable(const ShaderBindingTableDesc &desc) const {
+bool IBackendRayTracingProgram::ValidateShaderBindingTable(const ShaderBindingTableDesc &desc) const {
   for (auto index : desc.miss_shader_indices)
     if (index >= StateRayTracingProgram().desc_.miss_shaders.size())
       return false;
@@ -73,7 +73,7 @@ bool RayTracingProgram::ValidateShaderBindingTable(const ShaderBindingTableDesc 
   return true;
 }
 
-ShaderBindingTableDesc RayTracingProgram::DefaultShaderBindingTableDesc() const {
+ShaderBindingTableDesc IBackendRayTracingProgram::DefaultShaderBindingTableDesc() const {
   ShaderBindingTableDesc result;
   auto fill = [](auto &indices, size_t count) {
     for (size_t i = 0; i < count; ++i)
@@ -87,7 +87,7 @@ ShaderBindingTableDesc RayTracingProgram::DefaultShaderBindingTableDesc() const 
 
 }  // namespace grassland::rhi::backend
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::RayTracingProgram, "e0b9733f-8a37-4702-800c-3022865d522c")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendRayTracingProgram, "e0b9733f-8a37-4702-800c-3022865d522c")
 
 namespace grassland::rhi::backend {
 RayTracingProgramState::RayTracingProgramState() = default;

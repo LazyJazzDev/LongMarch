@@ -48,7 +48,7 @@ bool EnumerateList(Enumerate enumerate, std::vector<T> &values) {
 }
 
 // Rebuild the chain in place; its pointers must never be copied to another object.
-class DeviceFeatures {
+class DeviceFeatures final {
  public:
   DeviceFeatures(VkPhysicalDevice device, uint32_t api_version);
   DeviceFeatures(const DeviceFeatures &) = delete;
