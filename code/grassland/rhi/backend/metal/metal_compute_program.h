@@ -1,10 +1,9 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalComputeProgram)
 #include "grassland/rhi/backend/backend_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_program_base.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalComputeProgram)
 
 namespace grassland::rhi::backend::metal {
 class IMetalComputeProgram : public IBackendComputeProgram, public IMetalProgramBase {

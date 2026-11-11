@@ -1,8 +1,8 @@
 #pragma once
 #include "grassland/rhi/backend/backend_binding_group_bindinggroup_state.h"
 #include "grassland/rhi/backend/backend_binding_group_bindingversion_state.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {

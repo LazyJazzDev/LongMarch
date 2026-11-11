@@ -1,14 +1,13 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalCommandContext)
 #include <unordered_map>
 
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalCommandContext)
 
 namespace grassland::rhi::backend::metal {
 class IMetalCommandContext : public IBackendCommandContext {

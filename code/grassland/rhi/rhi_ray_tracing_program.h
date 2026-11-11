@@ -1,9 +1,7 @@
 ﻿#pragma once
-#include "grassland/rhi/rhi_interface_id.h"
 #include "grassland/rhi/rhi_program.h"
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IRayTracingProgram)
-
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IShaderBindingTable)
 
 namespace grassland::rhi {

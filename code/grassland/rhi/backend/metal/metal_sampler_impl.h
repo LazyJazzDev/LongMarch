@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/rhi/backend/backend_sampler_state.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalSamplerImpl final : public Object<IMetalSampler> {

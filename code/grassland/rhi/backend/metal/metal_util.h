@@ -4,6 +4,29 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::metal {
+class IMetalAccelerationStructure;
+class IMetalAllocatedBuffer;
+class IMetalAllocatedImage;
+class IMetalBindingGroup;
+class IMetalBindingVersion;
+class IMetalBottomLevelAccelerationStructure;
+class IMetalBuffer;
+class IMetalCommandContext;
+class IMetalComputeProgram;
+class IMetalCore;
+class IMetalDevice;
+class IMetalDownloadToken;
+class IMetalImage;
+class IMetalProgram;
+class IMetalProgramBase;
+class IMetalQueue;
+class IMetalSampler;
+class IMetalSwapChainImage;
+class IMetalTemporalBufferLease;
+class IMetalTimeline;
+class IMetalTopLevelAccelerationStructure;
+class IMetalWindow;
+
 MTL::PrimitiveType NativePrimitiveTopology(PrimitiveTopology topology);
 
 MTL::BlendFactor NativeBlendFactor(BlendFactor factor, bool alpha = false);

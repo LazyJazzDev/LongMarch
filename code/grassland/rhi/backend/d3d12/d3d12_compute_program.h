@@ -1,10 +1,9 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12ComputeProgram)
 #include "grassland/rhi/backend/backend_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12ComputeProgram)
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12ComputeProgram : public IBackendComputeProgram, public ID3D12ProgramBase {

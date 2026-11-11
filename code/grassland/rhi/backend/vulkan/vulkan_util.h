@@ -8,6 +8,30 @@
 #include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend::vulkan {
+class IVulkanAccelerationStructure;
+class IVulkanAllocatedBuffer;
+class IVulkanAllocatedImage;
+class IVulkanBindingGroup;
+class IVulkanBindingVersion;
+class IVulkanBottomLevelAccelerationStructure;
+class IVulkanBuffer;
+class IVulkanCommandContext;
+class IVulkanComputeProgram;
+class IVulkanCore;
+class IVulkanDevice;
+class IVulkanDownloadToken;
+class IVulkanImage;
+class IVulkanProgram;
+class IVulkanProgramBase;
+class IVulkanQueue;
+class IVulkanRayTracingProgram;
+class IVulkanSampler;
+class IVulkanSwapChainImage;
+class IVulkanTemporalBufferLease;
+class IVulkanTimeline;
+class IVulkanTopLevelAccelerationStructure;
+class IVulkanWindow;
+
 VkPrimitiveTopology NativePrimitiveTopology(PrimitiveTopology topology);
 
 VkBlendFactor NativeBlendFactor(BlendFactor factor, bool alpha = false);

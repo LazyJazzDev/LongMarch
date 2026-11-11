@@ -2,12 +2,9 @@
 #include <array>
 
 #include "grassland/rhi/rhi_binding_group.h"
-#include "grassland/rhi/rhi_interface_id.h"
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ITopLevelAccelerationStructure)
-
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IBottomLevelAccelerationStructure)
-
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IAccelerationStructure)
 
 namespace grassland::rhi {

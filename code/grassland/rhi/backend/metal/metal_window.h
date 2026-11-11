@@ -1,12 +1,11 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalWindow)
 #include <QuartzCore/QuartzCore.hpp>
 
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalWindow)
 
 namespace grassland::rhi::backend::metal {
 

@@ -1,8 +1,8 @@
 #pragma once
 #include "grassland/rhi/backend/backend_binding_group_bindinggroup_state.h"
 #include "grassland/rhi/backend/backend_binding_group_bindingversion_state.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12BindingVersionImpl final : public Object<ID3D12BindingVersion> {

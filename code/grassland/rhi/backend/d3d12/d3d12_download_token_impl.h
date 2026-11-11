@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/rhi/backend/backend_download_token_state.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_download_token.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12DownloadTokenImpl final : public Object<ID3D12DownloadToken> {

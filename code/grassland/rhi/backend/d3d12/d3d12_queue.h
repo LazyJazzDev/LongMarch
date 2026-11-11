@@ -1,11 +1,10 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Queue)
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_timeline.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Queue)
 
 namespace grassland::rhi::backend::d3d12 {
 

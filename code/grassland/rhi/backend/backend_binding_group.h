@@ -1,9 +1,8 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
+#include "grassland/rhi/rhi_binding_group.h"
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendBindingGroup)
-#include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend {
 struct BindingVersionState;

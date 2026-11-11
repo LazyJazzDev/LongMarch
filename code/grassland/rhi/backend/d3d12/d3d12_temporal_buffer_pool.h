@@ -1,10 +1,9 @@
 #pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12TemporalBufferLease)
 #include "grassland/rhi/backend/backend_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12TemporalBufferLease)
 
 namespace grassland::rhi::backend::d3d12 {
 using D3D12TemporalBufferPool = TemporalBufferPool<ID3D12Device, ID3D12AllocatedBuffer, ID3D12TemporalBufferLease>;

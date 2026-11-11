@@ -9,6 +9,30 @@
 #include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend::d3d12 {
+class ID3D12AccelerationStructure;
+class ID3D12AllocatedBuffer;
+class ID3D12AllocatedImage;
+class ID3D12BindingGroup;
+class ID3D12BindingVersion;
+class ID3D12BottomLevelAccelerationStructure;
+class ID3D12Buffer;
+class ID3D12CommandContext;
+class ID3D12ComputeProgram;
+class ID3D12Core;
+class ID3D12Device;
+class ID3D12DownloadToken;
+class ID3D12Image;
+class ID3D12Program;
+class ID3D12ProgramBase;
+class ID3D12Queue;
+class ID3D12RayTracingProgram;
+class ID3D12Sampler;
+class ID3D12SwapChainImage;
+class ID3D12TemporalBufferLease;
+class ID3D12Timeline;
+class ID3D12TopLevelAccelerationStructure;
+class ID3D12Window;
+
 D3D12_PRIMITIVE_TOPOLOGY NativePrimitiveTopology(PrimitiveTopology topology);
 
 D3D12_BLEND NativeBlendFactor(BlendFactor factor, bool alpha = false);

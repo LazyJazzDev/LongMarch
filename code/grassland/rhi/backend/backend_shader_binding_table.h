@@ -1,12 +1,11 @@
 #pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendShaderBindingTable)
 #include <array>
 
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_buffer.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendShaderBindingTable)
 
 namespace grassland::rhi::backend {
 class IBackendShaderBindingTable : public IShaderBindingTable {

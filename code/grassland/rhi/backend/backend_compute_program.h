@@ -1,9 +1,8 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
+#include "grassland/rhi/rhi_compute_program.h"
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendComputeProgram)
-#include "grassland/rhi/rhi_compute_program.h"
 
 namespace grassland::rhi::backend {
 struct ComputeProgramState;

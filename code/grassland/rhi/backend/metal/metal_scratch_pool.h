@@ -3,8 +3,8 @@
 #include <deque>
 #include <mutex>
 
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_allocated_buffer.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
 // All users must submit to the same physical queue and synchronize scratch accesses.

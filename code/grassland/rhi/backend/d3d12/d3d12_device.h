@@ -1,8 +1,4 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Device)
 #include <d3d12sdklayers.h>
 
 #include <tuple>
@@ -13,6 +9,8 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Device)
 #include "grassland/rhi/backend/d3d12/d3d12_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_transient_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Device)
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12Device : public IBackendDevice {

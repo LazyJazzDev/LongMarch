@@ -1,11 +1,9 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12ProgramBase)
 #include <array>
 
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12ProgramBase)
 
 namespace grassland::rhi::backend::d3d12 {
 // Layout ownership only; object identity and reference counting belong to the concrete Program.

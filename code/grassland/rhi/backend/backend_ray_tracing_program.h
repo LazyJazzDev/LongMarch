@@ -1,9 +1,8 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendRayTracingProgram)
-#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend {
 struct RayTracingProgramState;

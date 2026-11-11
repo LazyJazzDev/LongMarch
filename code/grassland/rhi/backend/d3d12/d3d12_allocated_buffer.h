@@ -1,9 +1,8 @@
 #pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
+#include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12AllocatedBuffer)
-#include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 
 namespace D3D12MA {
 class Allocation;

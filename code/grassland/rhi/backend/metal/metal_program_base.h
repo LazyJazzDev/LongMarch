@@ -1,12 +1,11 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalProgramBase)
 #include <Metal/Metal.hpp>
 #include <array>
 
+#include "grassland/rhi/backend/metal/metal_util.h"
 #include "grassland/rhi/rhi_program.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalProgramBase)
 
 namespace grassland::rhi::backend::metal {
 // Shared argument-buffer layout and shader translation; no IObject/refcount base.

@@ -5,7 +5,6 @@
 #include <mutex>
 #include <unordered_map>
 
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {

@@ -1,13 +1,12 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12CommandContext)
 #include <vector>
 
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12CommandContext)
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12CommandContext : public IBackendCommandContext {

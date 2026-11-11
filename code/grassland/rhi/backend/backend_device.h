@@ -1,16 +1,15 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendDevice)
 #include <array>
 #include <atomic>
 #include <mutex>
 #include <thread>
 
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendDevice)
 
 namespace grassland::rhi::backend {
 

@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/rhi/backend/backend_download_token_state.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_download_token.h"
+#include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanDownloadTokenImpl final : public Object<IVulkanDownloadToken> {

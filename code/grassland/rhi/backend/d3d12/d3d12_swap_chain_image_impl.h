@@ -1,8 +1,8 @@
 #pragma once
 #include "grassland/rhi/backend/backend_image_state.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_image_state.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12SwapChainImageImpl final : public Object<ID3D12SwapChainImage> {

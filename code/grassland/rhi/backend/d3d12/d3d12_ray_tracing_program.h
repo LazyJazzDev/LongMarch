@@ -1,12 +1,11 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12RayTracingProgram)
 #include "grassland/rhi/backend/backend_ray_tracing_program.h"
 #include "grassland/rhi/backend/backend_shader_binding_table.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12RayTracingProgram)
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12RayTracingProgram : public IBackendRayTracingProgram, public ID3D12ProgramBase {

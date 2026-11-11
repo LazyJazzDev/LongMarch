@@ -4,7 +4,6 @@
 #include <mutex>
 #include <unordered_map>
 
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 #include "grassland/rhi/rhi_binding_group.h"
 

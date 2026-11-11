@@ -1,11 +1,9 @@
 #pragma once
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
+#include "grassland/rhi/rhi_download_token.h"
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendDownloadToken)
-
-#include "grassland/rhi/backend/backend_submission_token.h"
-#include "grassland/rhi/rhi_download_token.h"
 
 namespace grassland::rhi::backend {
 // Describes the CPU copy from a native readback allocation. A nonzero stencil

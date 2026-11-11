@@ -1,7 +1,7 @@
 #pragma once
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure_state.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalBottomLevelAccelerationStructureImpl final : public Object<IMetalBottomLevelAccelerationStructure> {

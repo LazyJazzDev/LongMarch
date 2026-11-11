@@ -1,10 +1,9 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
-
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanBindingGroup)
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_descriptor_pool.h"
+#include "grassland/rhi/backend/vulkan/vulkan_util.h"
+
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanBindingGroup)
 
 namespace grassland::rhi::backend::vulkan {
 bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc &layout);

@@ -1,9 +1,8 @@
 #pragma once
 #include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_interface_id.h"
+#include "grassland/rhi/rhi_sampler.h"
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendSampler)
-#include "grassland/rhi/rhi_sampler.h"
 
 namespace grassland::rhi::backend {
 struct SamplerState;

@@ -1,8 +1,8 @@
 #pragma once
 #include "grassland/rhi/backend/backend_image_state.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
 #include "grassland/rhi/backend/metal/metal_image_state.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalAllocatedImageImpl final : public Object<IMetalAllocatedImage> {

@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/rhi/backend/backend_sampler_state.h"
-#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
+#include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanSamplerImpl final : public Object<IVulkanSampler> {
