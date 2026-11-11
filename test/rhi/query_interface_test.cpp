@@ -11,12 +11,19 @@ class IRight : public grassland::rhi::IObject {};
 
 class IExtended : public ILeft {};
 
+class ILeaf : public IExtended {};
+
+class ISibling : public ILeft {};
+
 }  // namespace query_test
 
-LONGMARCH_RHI_UUID(query_test::ILeft, "523d719e-fb75-41e8-addc-fc6abcf4575f")
-LONGMARCH_RHI_UUID(query_test::IRight, "0ae16d45-31b1-4981-bba0-90a7df182c7e")
+LONGMARCH_RHI_INTERFACE(query_test::ILeft, grassland::rhi::IObject, "523d719e-fb75-41e8-addc-fc6abcf4575f")
+LONGMARCH_RHI_INTERFACE(query_test::IRight, grassland::rhi::IObject, "0ae16d45-31b1-4981-bba0-90a7df182c7e")
 
-LONGMARCH_RHI_UUID(query_test::IExtended, "beff92a1-db2c-47cb-80d9-0abff454b583")
+LONGMARCH_RHI_INTERFACE(query_test::IExtended, query_test::ILeft, "beff92a1-db2c-47cb-80d9-0abff454b583")
+
+LONGMARCH_RHI_INTERFACE(query_test::ILeaf, query_test::IExtended, "8cd4baff-b971-4c51-8001-2ca20a777261")
+LONGMARCH_RHI_INTERFACE(query_test::ISibling, query_test::ILeft, "34328aa3-b1fb-4968-9073-886157bbffb4")
 
 namespace query_test {
 using namespace grassland::rhi;
@@ -24,8 +31,6 @@ using namespace grassland::rhi::backend;
 
 class Diamond final : public Object<IExtended, IRight> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IExtended, IExtended, ILeft, IRight)
-
   explicit Diamond(bool &destroyed) : destroyed_(destroyed) {
   }
 
@@ -37,15 +42,12 @@ class Diamond final : public Object<IExtended, IRight> {
   bool &destroyed_;
 };
 
-class Extended final : public Object<IExtended> {
+class Extended final : public Object<ILeaf> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ILeft, IExtended, ILeft)
 };
 
 class SideBuffer final : public Object<ILeft, IBuffer> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ILeft, ILeft, IBuffer)
-
   BufferDesc GetDesc() const override {
     return {4096};
   }
@@ -73,7 +75,7 @@ TEST(RhiQueryInterface, TypedWrapperPreservesNoncanonicalInterfaceThroughCopyMov
   EXPECT_TRUE(object->IsUniquelyOwned());
 }
 
-static_assert(std::is_abstract_v<Object<ILeft>>);
+static_assert(std::is_abstract_v<IExtended>);
 static_assert(std::is_final_v<Diamond>);
 static_assert(sizeof(IExtended) == sizeof(ILeft));
 
@@ -83,6 +85,25 @@ static_assert(parsed->high == 0x523d719efb7541e8ULL);
 static_assert(parsed->low == 0xaddcfc6abcf4575fULL);
 
 static_assert(!ParseInterfaceID("523d719e-fb75-41e8-addc-fc6abcf4575x"));
+
+class Branches final : public Object<ILeaf, ISibling> {};
+
+TEST(RhiQueryInterface, SharedAncestorsUseTheFirstDeclaredInterfaceChain) {
+  ObjPtr<Branches> object = new Branches;
+  ObjPtr<ISibling> sibling = object->QueryInterface<ISibling>();
+  ObjPtr<ILeft> ancestor = sibling->QueryInterface<ILeft>();
+  EXPECT_EQ(ancestor.Get(), static_cast<ILeft *>(static_cast<ILeaf *>(object.Get())));
+  EXPECT_NE(ancestor.Get(), static_cast<ILeft *>(sibling.Get()));
+  ObjPtr<IExtended> middle = sibling->QueryInterface<IExtended>();
+  EXPECT_EQ(middle.Get(), static_cast<IExtended *>(static_cast<ILeaf *>(object.Get())));
+  ObjPtr<IObject> identity = sibling->QueryInterface<IObject>();
+  EXPECT_EQ(identity.Get(), static_cast<IObject *>(static_cast<ILeaf *>(object.Get())));
+  sibling.Release();
+  ancestor.Release();
+  middle.Release();
+  identity.Release();
+  EXPECT_TRUE(object->IsUniquelyOwned());
+}
 
 TEST(RhiQueryInterface, UUIDParsingIsStrictAndCaseIndependent) {
   EXPECT_EQ(ParseInterfaceID("523D719E-FB75-41E8-ADDC-FC6ABCF4575F"), parsed);

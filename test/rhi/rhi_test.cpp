@@ -12,8 +12,6 @@
 #include "grassland/rhi/backend/backend_shader_impl.h"
 #include "grassland/rhi/rhix/rhix.h"
 
-using grassland::rhi::backend::MatchInterfaces;
-
 namespace grassland::rhix {
 using namespace rhi;
 namespace backend = rhi::backend;
@@ -45,8 +43,6 @@ struct Calls {
 
 class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendDevice> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::IBackendDevice, rhi::IDevice)
-
   bool WaitNativeEvents(const std::vector<Event> &, bool) const override {
     ADD_FAILURE();
     return false;
@@ -246,8 +242,6 @@ class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendD
 
 class TestCore final : public backend::Object<rhi::ICore> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, rhi::ICore)
-
   TestCore(std::vector<PhysicalDevice> devices, Calls &calls, bool fail = false)
       : devices_(std::move(devices)),
         calls_(calls),

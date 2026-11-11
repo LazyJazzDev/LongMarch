@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanCoreImpl final : public Object<rhi::ICore, IVulkanCore> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, IVulkanCore, rhi::ICore)
   static rhi::ICore *CreateVulkanCore(const CoreDesc &desc);
   ~VulkanCoreImpl() override;
   VkInstance Instance() const;

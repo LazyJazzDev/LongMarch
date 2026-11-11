@@ -6,12 +6,6 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanComputeProgramImpl final
     : public Object<rhi::IComputeProgram, IVulkanComputeProgram, IBackendComputeProgram> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IComputeProgram,
-                            IVulkanComputeProgram,
-                            IBackendComputeProgram,
-                            IComputeProgram,
-                            IVulkanProgramBase)
-
   static rhi::IComputeProgram *Create(IVulkanDevice *device, const ComputeProgramDesc &desc);
 
   ~VulkanComputeProgramImpl() override;

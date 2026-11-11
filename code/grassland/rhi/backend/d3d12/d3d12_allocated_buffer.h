@@ -2,7 +2,9 @@
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12AllocatedBuffer, "f17438f1-4828-4dc2-943d-11e8afe77444")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12AllocatedBuffer,
+                        grassland::rhi::backend::d3d12::ID3D12Buffer,
+                        "f17438f1-4828-4dc2-943d-11e8afe77444")
 
 namespace D3D12MA {
 class Allocation;

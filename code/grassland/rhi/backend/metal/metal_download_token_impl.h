@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackendDownloadToken> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, IBackendDownloadToken, IDownloadToken)
-
   MetalDownloadTokenImpl(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size);
 
   MetalDownloadTokenImpl(ObjectPtr<IMetalTemporalBufferLease> lease, const DownloadLayout &layout);

@@ -18,4 +18,6 @@ IBindingGroup *CreateVulkanBindingGroup(IVulkanDevice *device, const BindingLayo
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanBindingVersion, "fe3339ef-20d4-4c9c-b124-60c9431ce9b8")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanBindingVersion,
+                        grassland::rhi::backend::IBackendBindingVersion,
+                        "fe3339ef-20d4-4c9c-b124-60c9431ce9b8")

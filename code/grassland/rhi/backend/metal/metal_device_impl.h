@@ -6,7 +6,6 @@ namespace grassland::rhi::backend::metal {
 class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
  public:
   IMetalQueue *GetNativeQueue(QueueType type) const override;
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, IMetalDevice, IBackendDevice, rhi::IDevice)
   static rhi::IDevice *Create(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device);
   ~MetalDeviceImpl() override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;

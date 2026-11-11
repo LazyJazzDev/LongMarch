@@ -6,11 +6,6 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanBottomLevelAccelerationStructureImpl final
     : public Object<rhi::IBottomLevelAccelerationStructure, IVulkanAccelerationStructure> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IBottomLevelAccelerationStructure,
-                            IBottomLevelAccelerationStructure,
-                            IAccelerationStructure,
-                            IVulkanAccelerationStructure)
-
   static IBottomLevelAccelerationStructure *Create(IVulkanDevice *device,
                                                    const BottomLevelAccelerationStructureDesc &desc);
 
@@ -77,12 +72,6 @@ class VulkanBottomLevelAccelerationStructureImpl final
 class VulkanTopLevelAccelerationStructureImpl final
     : public Object<rhi::ITopLevelAccelerationStructure, IVulkanTopLevelAccelerationStructure> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ITopLevelAccelerationStructure,
-                            IVulkanTopLevelAccelerationStructure,
-                            ITopLevelAccelerationStructure,
-                            IAccelerationStructure,
-                            IVulkanAccelerationStructure)
-
   static ITopLevelAccelerationStructure *Create(IVulkanDevice *device, const TopLevelAccelerationStructureDesc &desc);
 
   AccelerationStructureType GetType() const override;

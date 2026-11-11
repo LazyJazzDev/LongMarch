@@ -10,7 +10,9 @@
 #include "grassland/rhi/backend/d3d12/d3d12_transient_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Device, "d258bd31-2295-4f22-9c98-bd0133662c47")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12Device,
+                        grassland::rhi::backend::IBackendDevice,
+                        "d258bd31-2295-4f22-9c98-bd0133662c47")
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12Device : public IBackendDevice {

@@ -3,7 +3,9 @@
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Image, "85eb3c59-b643-4c32-b41f-66ed7e262a3e")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12Image,
+                        grassland::rhi::backend::IBackendImage,
+                        "85eb3c59-b643-4c32-b41f-66ed7e262a3e")
 
 namespace grassland::rhi::backend::d3d12 {
 

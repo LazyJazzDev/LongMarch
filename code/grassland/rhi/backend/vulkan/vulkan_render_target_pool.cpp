@@ -7,8 +7,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanRenderTargetPool::LeaseImpl final : public Object<VulkanRenderTargetPool::ILease> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IObject, VulkanRenderTargetPool::ILease)
-
   LeaseImpl(VulkanRenderTargetPool *pool, Entry *entry, const std::vector<IVulkanImage *> &images);
   ~LeaseImpl() override;
   const std::vector<VkImageView> &VulkanImageViews() const;

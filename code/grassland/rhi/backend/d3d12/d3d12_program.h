@@ -3,7 +3,9 @@
 #include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Program, "2919454c-7ff9-4ce3-b919-40901e038398")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12Program,
+                        grassland::rhi::backend::d3d12::ID3D12ProgramBase,
+                        "2919454c-7ff9-4ce3-b919-40901e038398")
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12Program : public ID3D12ProgramBase {

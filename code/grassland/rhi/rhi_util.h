@@ -51,6 +51,9 @@ constexpr std::optional<InterfaceID> ParseInterfaceID(std::string_view text) noe
 
 template <typename T>
 InterfaceID uuid() = delete;
+
+template <typename T>
+struct InterfaceTraits;
 class IAccelerationStructure;
 class IBottomLevelAccelerationStructure;
 class ITopLevelAccelerationStructure;
@@ -406,9 +409,13 @@ std::string to_string(AccelerationStructureBuildMode value);
 }  // namespace grassland::rhi
 
 // Register in the owning interface header at global namespace scope.
-#define LONGMARCH_RHI_UUID(Type, Text)                                                               \
+#define LONGMARCH_RHI_INTERFACE(Type, Parent, Text)                                                  \
   template <>                                                                                        \
   inline grassland::rhi::InterfaceID grassland::rhi::uuid<Type>() {                                  \
     static_assert(grassland::rhi::ParseInterfaceID(Text).has_value(), "Invalid RHI interface UUID"); \
     return *grassland::rhi::ParseInterfaceID(Text);                                                  \
-  }
+  }                                                                                                  \
+  template <>                                                                                        \
+  struct grassland::rhi::InterfaceTraits<Type> {                                                     \
+    using Base = Parent;                                                                             \
+  };

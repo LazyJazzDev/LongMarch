@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12SwapChainImageImpl final : public Object<rhi::IImage, ID3D12SwapChainImage> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, ID3D12SwapChainImage, ID3D12Image, IBackendImage, rhi::IImage)
   D3D12SwapChainImageImpl(ImageDesc desc,
                           ID3D12Window *window,
                           uint64_t generation,

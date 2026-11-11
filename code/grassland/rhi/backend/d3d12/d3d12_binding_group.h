@@ -17,4 +17,6 @@ IBindingGroup *CreateD3D12BindingGroup(ID3D12Device *device, const BindingLayout
 
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BindingVersion, "1e82b239-9a3f-4e32-aeab-b2fdaba168ff")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12BindingVersion,
+                        grassland::rhi::backend::IBackendBindingVersion,
+                        "1e82b239-9a3f-4e32-aeab-b2fdaba168ff")

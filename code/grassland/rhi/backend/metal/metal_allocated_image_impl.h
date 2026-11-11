@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalAllocatedImageImpl final : public Object<rhi::IImage, IMetalImage> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IMetalImage, IBackendImage, rhi::IImage)
   static IImage *Create(IMetalDevice *device, const ImageDesc &desc);
   bool IsValid() const override;
 

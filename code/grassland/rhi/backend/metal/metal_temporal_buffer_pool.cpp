@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalTemporalBufferLeaseImpl final : public Object<rhi::IBuffer, IMetalTemporalBufferLease> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IBuffer, IMetalTemporalBufferLease, IBuffer, IBackendBuffer, IMetalBuffer)
-
   MetalTemporalBufferLeaseImpl(MetalTemporalBufferPool *pool, IMetalAllocatedBuffer *buffer, size_t level);
   ~MetalTemporalBufferLeaseImpl() override;
   BufferDesc GetDesc() const override;

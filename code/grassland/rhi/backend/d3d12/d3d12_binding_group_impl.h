@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12BindingVersionImpl final : public Object<ID3D12BindingVersion> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IObject, ID3D12BindingVersion, IBackendBindingVersion)
   static D3D12BindingVersionImpl *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
   ObjectPtr<IBackendBindingVersion> Clone() const override;
   bool IsInitialized(size_t binding_index, uint32_t element) const override;
@@ -58,7 +57,6 @@ class D3D12BindingVersionImpl final : public Object<ID3D12BindingVersion> {
 class D3D12BindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBindingGroup> {
  public:
   using Version = ID3D12BindingVersion;
-  LONGMARCH_RHI_FINAL_QUERY(IBindingGroup, IBackendBindingGroup, IBindingGroup)
   static IBindingGroup *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
 
  private:

@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12ProgramImpl final : public Object<rhi::IProgram, ID3D12Program, IBackendProgram> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IProgram, ID3D12Program, IBackendProgram, IProgram, ID3D12ProgramBase)
-
   static rhi::IProgram *Create(ID3D12Device *device, const ProgramDesc &desc);
 
   ID3D12PipelineState *NativePipeline() const;

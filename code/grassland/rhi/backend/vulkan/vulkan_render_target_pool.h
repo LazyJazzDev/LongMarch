@@ -47,5 +47,6 @@ class VulkanRenderTargetPool final {
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanRenderTargetPool::ILease,
-                   "0954731d-c668-4aca-af2c-c3099abc20f4")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::VulkanRenderTargetPool::ILease,
+                        grassland::rhi::IObject,
+                        "0954731d-c668-4aca-af2c-c3099abc20f4")

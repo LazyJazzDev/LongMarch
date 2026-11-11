@@ -46,5 +46,6 @@ class VulkanDescriptorPool final {
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanDescriptorPool::ILease,
-                   "4eacb408-4ddb-4df5-9846-c7fd2101efb2")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::VulkanDescriptorPool::ILease,
+                        grassland::rhi::IObject,
+                        "4eacb408-4ddb-4df5-9846-c7fd2101efb2")

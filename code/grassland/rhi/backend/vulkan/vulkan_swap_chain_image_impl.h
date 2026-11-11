@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanSwapChainImageImpl final : public Object<rhi::IImage, IVulkanSwapChainImage> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IVulkanSwapChainImage, IVulkanImage, IBackendImage, rhi::IImage)
   VulkanSwapChainImageImpl(ImageDesc desc, IVulkanWindow *window, VkImage image, VkImageView attachment);
   ~VulkanSwapChainImageImpl() override;
   bool IsValid() const override;

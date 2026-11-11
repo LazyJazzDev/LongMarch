@@ -4,7 +4,9 @@
 typedef struct VmaAllocation_T *VmaAllocation;
 typedef struct VmaAllocator_T *VmaAllocator;
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanAllocatedBuffer, "0e429c4d-302f-421e-90d8-b29a6593b7d3")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanAllocatedBuffer,
+                        grassland::rhi::backend::vulkan::IVulkanBuffer,
+                        "0e429c4d-302f-421e-90d8-b29a6593b7d3")
 
 namespace grassland::rhi::backend::vulkan {
 class IVulkanAllocatedBuffer : public IVulkanBuffer {

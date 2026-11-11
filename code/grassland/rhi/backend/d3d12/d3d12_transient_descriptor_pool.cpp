@@ -6,8 +6,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12TransientDescriptorPool::LeaseImpl final : public Object<D3D12TransientDescriptorPool::ILease> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IObject, D3D12TransientDescriptorPool::ILease)
-
   LeaseImpl(D3D12TransientDescriptorPool *pool, ID3D12DescriptorHeap *heap, size_t level);
   ~LeaseImpl() override;
   ID3D12DescriptorHeap *Heap() const;

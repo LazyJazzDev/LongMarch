@@ -36,8 +36,6 @@
 #include "grassland/rhi/rhi_program.h"
 #include "grassland/rhi/rhix/rhix.h"
 
-using grassland::rhi::backend::MatchInterfaces;
-
 namespace grassland::rhix {
 using namespace rhi;
 namespace backend = rhi::backend;
@@ -63,8 +61,6 @@ struct Gate {
 
 class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendWindow> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IWindow, backend::IBackendWindow, rhi::IWindow)
-
   explicit TestWindow(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
   }
 
@@ -471,8 +467,6 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendW
 
 class TestImage final : public backend::Object<rhi::IImage, backend::IBackendImage> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, backend::IBackendImage, rhi::IImage)
-
   explicit TestImage(std::shared_ptr<Gate> gate, backend::IBackendWindow *window = nullptr)
       : gate_(std::move(gate)),
         window_(window) {
@@ -525,8 +519,6 @@ class TestImage final : public backend::Object<rhi::IImage, backend::IBackendIma
 
 class TestResource final : public backend::Object<rhi::IObject> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IObject, rhi::IObject)
-
   explicit TestResource(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
   }
 
@@ -541,8 +533,6 @@ class TestResource final : public backend::Object<rhi::IObject> {
 
 class TestTimeline final : public backend::Object<rhi::ITimeline, backend::IBackendTimeline> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ITimeline, backend::IBackendTimeline, ITimeline)
-
   TestTimeline(backend::IBackendDevice *device, std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
     InitializeTimeline(device);
   }
@@ -584,8 +574,6 @@ class TestTimeline final : public backend::Object<rhi::ITimeline, backend::IBack
 
 class TestCommandContext final : public backend::Object<rhi::ICommandContext, backend::IBackendCommandContext> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, backend::IBackendCommandContext, rhi::ICommandContext)
-
   TestCommandContext(rhi::IQueue *queue, std::shared_ptr<Gate> gate, bool fail_after_submit = false)
       : gate_(std::move(gate)),
         fail_after_submit_(fail_after_submit) {
@@ -999,8 +987,6 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
 
 class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQueue> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, backend::IBackendQueue, rhi::IQueue)
-
   TestTimeline *GetTimeline() const override {
     return timeline_.get();
   }
@@ -1140,8 +1126,6 @@ class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQue
 
 class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendDevice> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::IBackendDevice, rhi::IDevice)
-
   explicit TestDevice(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
     InitializeDevice({}, {});
 

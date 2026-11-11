@@ -4,7 +4,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "grassland/rhi/backend/backend_query_interface.h"
 #include "grassland/rhi/rhi_obj_ptr.h"
 
 namespace grassland::rhi::backend {
@@ -29,21 +28,20 @@ class IBackendWindow;
 namespace grassland::rhi::backend {
 void ReportError(int32_t error_code, const std::string &error_message);
 
-// Pointer adjustments stay in the query implementation, never at call sites.
-template <typename Interface, typename Source>
-void *MatchInterface(InterfaceID id, Source *source) noexcept {
-  if constexpr (std::is_convertible_v<Source *, Interface *>) {
-    if (id == uuid<Interface>())
-      return static_cast<Interface *>(source);
+// Search each registered chain ancestor-first. IObject identity is handled by Object.
+template <typename Interface>
+void *MatchInterface(InterfaceID id, Interface *source) noexcept {
+  if constexpr (std::is_same_v<Interface, IObject>) {
+    return nullptr;
+  } else {
+    using Base = typename InterfaceTraits<Interface>::Base;
+    static_assert(!std::is_same_v<Interface, Base> && std::is_convertible_v<Interface *, Base *> &&
+                      std::is_base_of_v<IObject, Base>,
+                  "Registered parent must be an unambiguous IObject-derived base.");
+    if (auto result = MatchInterface<Base>(id, static_cast<Base *>(source)))
+      return result;
+    return id == uuid<Interface>() ? source : nullptr;
   }
-  return nullptr;
-}
-
-template <typename... Interfaces, typename Source>
-void *MatchInterfaces(InterfaceID id, Source *source) noexcept {
-  void *result = nullptr;
-  ((result = MatchInterface<Interfaces>(id, source)) || ...);
-  return result;
 }
 
 // One intrusive counter per native implementation, with no public state layout.
@@ -59,7 +57,22 @@ class Object : public Primary, public Interfaces... {
     return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
   }
 
-  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
+  bool QueryInterface(InterfaceID id, void **output) noexcept final {
+    if (!output)
+      return false;
+    if (id == uuid<IObject>()) {
+      *output = static_cast<IObject *>(static_cast<Primary *>(this));
+    } else {
+      void *result = MatchInterface<Primary>(id, static_cast<Primary *>(this));
+      if (!result)
+        static_cast<void>(((result = MatchInterface<Interfaces>(id, static_cast<Interfaces *>(this))) || ...));
+      *output = result;
+    }
+    if (!*output)
+      return false;
+    AddRef();
+    return true;
+  }
 
   void AddRef() noexcept final {
     references_.fetch_add(1, std::memory_order_relaxed);

@@ -4,7 +4,9 @@
 #include "grassland/rhi/backend/vulkan/vulkan_timeline.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanQueue, "09666973-0b3a-4165-bb7f-0faf38e0f01a")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanQueue,
+                        grassland::rhi::backend::IBackendQueue,
+                        "09666973-0b3a-4165-bb7f-0faf38e0f01a")
 
 namespace grassland::rhi::backend::vulkan {
 

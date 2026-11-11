@@ -6,7 +6,6 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
  public:
   IVulkanQueue *GetNativeQueue(QueueType type) const override;
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, IVulkanDevice, IBackendDevice, rhi::IDevice)
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override;

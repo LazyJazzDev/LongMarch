@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackendDownloadToken> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, IBackendDownloadToken, IDownloadToken)
-
   VulkanDownloadTokenImpl(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size);
 
   VulkanDownloadTokenImpl(ObjectPtr<IVulkanTemporalBufferLease> lease, const DownloadLayout &layout);

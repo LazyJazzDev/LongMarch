@@ -6,12 +6,6 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanRayTracingProgramImpl final
     : public Object<rhi::IRayTracingProgram, IVulkanRayTracingProgram, IBackendRayTracingProgram> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IRayTracingProgram,
-                            IVulkanRayTracingProgram,
-                            IBackendRayTracingProgram,
-                            IRayTracingProgram,
-                            IVulkanProgramBase)
-
   static rhi::IRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
 
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;

@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalProgramImpl final : public Object<rhi::IProgram, IMetalProgram, IBackendProgram> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IProgram, IMetalProgram, IBackendProgram, IProgram, IMetalProgramBase)
-
   static rhi::IProgram *Create(IMetalDevice *device, const ProgramDesc &desc);
 
   MTL::RenderPipelineState *NativePipeline() const;

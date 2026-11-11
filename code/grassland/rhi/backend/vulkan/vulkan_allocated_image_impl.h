@@ -6,7 +6,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanAllocatedImageImpl final : public Object<rhi::IImage, IVulkanImage> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IVulkanImage, IBackendImage, rhi::IImage)
   static IImage *Create(IVulkanDevice *device, const ImageDesc &desc);
   ~VulkanAllocatedImageImpl() override;
   bool IsValid() const override;

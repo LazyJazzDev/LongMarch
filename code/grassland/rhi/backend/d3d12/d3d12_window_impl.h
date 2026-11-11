@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IWindow, ID3D12Window, IBackendWindow, rhi::IWindow)
   ~D3D12WindowImpl() override;
   static rhi::IWindow *Create(ID3D12Device *device, const WindowDesc &desc);
   ObjectPtr<IBackendImage> AcquireNativeFrame() override;

@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12AllocatedImageImpl final : public Object<rhi::IImage, ID3D12Image> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, ID3D12Image, IBackendImage, rhi::IImage)
   static IImage *Create(ID3D12Device *device, const ImageDesc &desc);
   ~D3D12AllocatedImageImpl() override;
   bool IsValid() const override;

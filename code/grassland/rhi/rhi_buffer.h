@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi_object.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::IBuffer, "57217c65-4df9-4f6c-b6a6-0d177729b168")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IBuffer, grassland::rhi::IObject, "57217c65-4df9-4f6c-b6a6-0d177729b168")
 
 namespace grassland::rhi {
 struct BufferDesc {

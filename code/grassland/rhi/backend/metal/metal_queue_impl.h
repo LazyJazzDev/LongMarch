@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalQueueImpl final : public Object<rhi::IQueue, IMetalQueue> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, IMetalQueue, IBackendQueue, rhi::IQueue)
   rhi::ICommandContext *CreateCommandContext() override;
   static IMetalQueue *Create(IMetalDevice *device, QueueType type, MTL::CommandBufferDescriptor *descriptor);
   MTL::CommandQueue *NativeQueue() const;

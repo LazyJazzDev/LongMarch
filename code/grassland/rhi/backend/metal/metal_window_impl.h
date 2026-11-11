@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalWindowImpl final : public Object<rhi::IWindow, IMetalWindow> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IWindow, IMetalWindow, IBackendWindow, rhi::IWindow)
   ~MetalWindowImpl() override;
   static rhi::IWindow *Create(IMetalDevice *device, const WindowDesc &desc);
   ObjectPtr<IBackendImage> AcquireNativeFrame() override;

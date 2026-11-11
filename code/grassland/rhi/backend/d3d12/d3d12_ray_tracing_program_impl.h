@@ -6,12 +6,6 @@ namespace grassland::rhi::backend::d3d12 {
 class D3D12RayTracingProgramImpl final
     : public Object<rhi::IRayTracingProgram, ID3D12RayTracingProgram, IBackendRayTracingProgram> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IRayTracingProgram,
-                            ID3D12RayTracingProgram,
-                            IBackendRayTracingProgram,
-                            IRayTracingProgram,
-                            ID3D12ProgramBase)
-
   static rhi::IRayTracingProgram *Create(ID3D12Device *device, const RayTracingProgramDesc &desc);
 
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;

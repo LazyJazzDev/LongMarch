@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12TimelineImpl final : public Object<rhi::ITimeline, ID3D12Timeline> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ITimeline, ID3D12Timeline, IBackendTimeline, ITimeline)
-
   static ObjectPtr<ID3D12Timeline> Create(ID3D12Device *device);
 
   bool GetCompletedValue(uint64_t &value) const override;

@@ -6,11 +6,6 @@ namespace grassland::rhi::backend::d3d12 {
 class D3D12BottomLevelAccelerationStructureImpl final
     : public Object<rhi::IBottomLevelAccelerationStructure, ID3D12AccelerationStructure> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IBottomLevelAccelerationStructure,
-                            IBottomLevelAccelerationStructure,
-                            IAccelerationStructure,
-                            ID3D12AccelerationStructure)
-
   static IBottomLevelAccelerationStructure *Create(ID3D12Device *device,
                                                    const BottomLevelAccelerationStructureDesc &desc);
 
@@ -71,12 +66,6 @@ class D3D12BottomLevelAccelerationStructureImpl final
 class D3D12TopLevelAccelerationStructureImpl final
     : public Object<rhi::ITopLevelAccelerationStructure, ID3D12TopLevelAccelerationStructure> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ITopLevelAccelerationStructure,
-                            ID3D12TopLevelAccelerationStructure,
-                            ITopLevelAccelerationStructure,
-                            IAccelerationStructure,
-                            ID3D12AccelerationStructure)
-
   static ITopLevelAccelerationStructure *Create(ID3D12Device *device, const TopLevelAccelerationStructureDesc &desc);
 
   AccelerationStructureType GetType() const override;

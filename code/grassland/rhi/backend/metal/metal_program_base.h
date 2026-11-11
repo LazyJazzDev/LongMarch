@@ -5,7 +5,9 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 #include "grassland/rhi/rhi_program.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalProgramBase, "48d78e4c-57e0-4ad1-9dc1-254d12006fc6")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::metal::IMetalProgramBase,
+                        grassland::rhi::IObject,
+                        "48d78e4c-57e0-4ad1-9dc1-254d12006fc6")
 
 namespace grassland::rhi::backend::metal {
 // Shared argument-buffer layout and shader translation; no IObject/refcount base.

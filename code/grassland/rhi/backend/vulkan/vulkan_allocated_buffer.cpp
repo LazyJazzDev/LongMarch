@@ -7,8 +7,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanAllocatedBufferImpl final : public Object<rhi::IBuffer, IVulkanAllocatedBuffer> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IBuffer, IVulkanAllocatedBuffer, IBuffer, IBackendBuffer, IVulkanBuffer)
-
   ~VulkanAllocatedBufferImpl() override;
   static IVulkanAllocatedBuffer *Create(IVulkanDevice *device,
                                         const BufferDesc &desc,

@@ -2,7 +2,7 @@
 #include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_shader.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::IProgram, "e46c35f6-fa66-4977-9f4b-4b9d7f8e7b00")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IProgram, grassland::rhi::IObject, "e46c35f6-fa66-4977-9f4b-4b9d7f8e7b00")
 
 namespace grassland::rhi {
 struct VertexBindingDesc {

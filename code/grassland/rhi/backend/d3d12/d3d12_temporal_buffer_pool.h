@@ -3,7 +3,9 @@
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12TemporalBufferLease, "47d93f8f-2736-4b79-87e7-7cadabcf4f7a")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12TemporalBufferLease,
+                        grassland::rhi::backend::d3d12::ID3D12Buffer,
+                        "47d93f8f-2736-4b79-87e7-7cadabcf4f7a")
 
 namespace grassland::rhi::backend::d3d12 {
 using D3D12TemporalBufferPool = TemporalBufferPool<ID3D12Device, ID3D12AllocatedBuffer, ID3D12TemporalBufferLease>;

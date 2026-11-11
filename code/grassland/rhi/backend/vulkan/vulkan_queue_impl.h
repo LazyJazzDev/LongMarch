@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanQueueImpl final : public Object<rhi::IQueue, IVulkanQueue> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, IVulkanQueue, IBackendQueue, rhi::IQueue)
   rhi::ICommandContext *CreateCommandContext() override;
   static IVulkanQueue *Create(IVulkanDevice *device, QueueType type, VkQueue queue, std::shared_ptr<std::mutex> mutex);
   VkQueue NativeQueue() const;

@@ -9,7 +9,9 @@
 #include "grassland/rhi/backend/vulkan/vulkan_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanDevice, "96a1c412-20e1-40bc-b542-d515f9a41965")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanDevice,
+                        grassland::rhi::backend::IBackendDevice,
+                        "96a1c412-20e1-40bc-b542-d515f9a41965")
 
 namespace grassland::rhi::backend::vulkan {
 class IVulkanDevice : public IBackendDevice {

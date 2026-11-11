@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend {
 class ShaderBindingTableImpl final : public Object<rhi::IShaderBindingTable, IBackendShaderBindingTable> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IShaderBindingTable, IBackendShaderBindingTable, IShaderBindingTable)
   ShaderBindingTableImpl(IRayTracingProgram *program,
                          const ShaderBindingTableDesc &desc,
                          ObjectPtr<IBuffer> buffer,

@@ -11,8 +11,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12AllocatedBufferImpl final : public Object<rhi::IBuffer, ID3D12AllocatedBuffer> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IBuffer, ID3D12AllocatedBuffer, IBuffer, IBackendBuffer, ID3D12Buffer)
-
   ~D3D12AllocatedBufferImpl() override;
   static ID3D12AllocatedBuffer *Create(ID3D12Device *device,
                                        const BufferDesc &desc,

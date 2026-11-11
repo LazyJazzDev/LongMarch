@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend {
 class ShaderImpl final : public Object<rhi::IShader> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IShader, IShader)
   static rhi::IShader *Create(const ShaderDesc &desc, BackendAPI api);
   ShaderStage GetStage() const override;
   const std::string &GetEntry() const override;

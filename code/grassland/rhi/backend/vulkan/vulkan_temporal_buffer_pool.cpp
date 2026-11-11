@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanTemporalBufferLeaseImpl final : public Object<rhi::IBuffer, IVulkanTemporalBufferLease> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IBuffer, IVulkanTemporalBufferLease, IBuffer, IBackendBuffer, IVulkanBuffer)
-
   VulkanTemporalBufferLeaseImpl(VulkanTemporalBufferPool *pool, IVulkanAllocatedBuffer *buffer, size_t level);
   ~VulkanTemporalBufferLeaseImpl() override;
   BufferDesc GetDesc() const override;

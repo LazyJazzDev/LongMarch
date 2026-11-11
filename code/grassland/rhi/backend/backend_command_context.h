@@ -8,7 +8,9 @@
 #include "grassland/rhi/rhi_command_context.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendCommandContext, "4a13943e-6f88-4739-91c4-0eb6b6a04a0c")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::IBackendCommandContext,
+                        grassland::rhi::IObject,
+                        "4a13943e-6f88-4739-91c4-0eb6b6a04a0c")
 
 namespace grassland::rhi::backend {
 class IBackendCommandContext : public IObject {

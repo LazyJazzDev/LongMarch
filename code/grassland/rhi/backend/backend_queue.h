@@ -7,7 +7,9 @@
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_queue.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendQueue, "5b1b277a-1b68-4947-bf02-14449939898d")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::IBackendQueue,
+                        grassland::rhi::IObject,
+                        "5b1b277a-1b68-4947-bf02-14449939898d")
 
 namespace grassland::rhi::backend {
 

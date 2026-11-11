@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanSamplerImpl final : public Object<rhi::ISampler, IVulkanSampler> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ISampler, IVulkanSampler, IBackendSampler, ISampler)
-
   static rhi::ISampler *Create(IVulkanDevice *device, const SamplerDesc &desc);
 
   ~VulkanSamplerImpl() override;

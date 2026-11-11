@@ -29,8 +29,9 @@ order, independent of host endianness. They are not the Windows GUID memory layo
 forward declarations. `backend_util.h` declares only shared backend interfaces;
 native backend declarations belong to `vulkan_util.h`, `d3d12_util.h`, and
 `metal_util.h`. Each interface header defines its `uuid<T>()` specialization with
-`LONGMARCH_RHI_UUID(Type, Text)` at global namespace scope. The specialization
-is inline, so including the header in multiple translation units does not create
+`LONGMARCH_RHI_INTERFACE(Type, Parent, Text)` at global namespace scope. The specialization
+is inline, and `InterfaceTraits<Type>::Base` records the direct parent (`void`
+for the root IObject). Including the header in multiple translation units does not create
 multiple-definition errors. No separate declaration macro or `.cpp` registration
 is needed. Parsing remains constexpr and invalid UUID literals fail at compile
 time. Unregistered
@@ -65,7 +66,7 @@ struct ID3D12AllocatedBuffer : ID3D12Buffer { /* host access */ };
 
 class D3D12AllocatedBufferImpl final
     : public Object<IBuffer, ID3D12AllocatedBuffer> {
-  // Owns data and explicitly implements all supported interface queries.
+  // Owns data and implements business methods; Object supplies interface queries.
 };
 ```
 
@@ -79,10 +80,14 @@ public-facing factories return the relevant public interface.
 `Object<Primary, Interfaces...>` introduces exactly one atomic reference count
 and final `AddRef`/`Release` implementations. Each template argument must have
 one unambiguous path to `IObject`; interface diamonds are rejected at compile
-time. The template remains abstract. Each final implementation explicitly lists
-its supported interfaces and their ancestors, and chooses the canonical
-`IObject` path. Querying `IObject` through any supported interface returns the
-same canonical identity pointer. Implementation classes are never inherited.
+time. The template implements final `QueryInterface` automatically. It checks
+registered ancestors before the interface itself, visiting chains in template
+argument order. Interfaces remain data-free and pure virtual; final classes no
+longer declare query maps or repeat ancestors. Registered parents are checked
+for a valid unambiguous conversion when the chain is instantiated. Querying
+`IObject` uses the Primary chain, regardless of the entry interface. A successful
+query adds exactly one reference; failed queries clear the output. Implementation
+classes are never inherited.
 
 Objects communicate through hidden interfaces rather than implementation
 layouts. Final definitions remain in their `.cpp` or internal `*_impl.h` files.
@@ -217,10 +222,9 @@ the backing allocation can change during build/compaction.
 The following checks apply to the implementation with parallel interface chains.
 The performance measurements above apply only to the older implementation.
 
-- Windows Release: 218 passed, two Debug-only queue-diagnostic tests skipped
+- Windows Release: 220 passed, two Debug-only queue-diagnostic tests skipped
   (`--gtest_filter=-*RayTracing*`, `LONGMARCH_RHI_WINDOW_TESTS=1`).
-- After the final descriptor/GLFW/RHIX changes, Windows Release targeted
-  regression: 60 passed, two Debug-only checks skipped. Windows Debug: 47
+- Windows Debug: 48
   interface, timeline, offscreen, window, ImGui, and scratch-pool tests passed.
 - Main versus final Release: ten raw color/depth outputs are byte-identical
   across Vulkan/D3D12 cube, texture, ray_query, and raytracing demos (nine frames
@@ -228,16 +232,16 @@ The performance measurements above apply only to the older implementation.
   of the previously identified DXR compressed-BLAS validation issue; both
   backends' ray-tracing pipeline demos were explicitly exercised instead.
 - Meshy-PC-3090: GCC Release build passed; isolated regression runs yielded
-  104 passed, nine skipped, and no failures. Each test runs in a fresh process
+  105 passed, nine skipped, and no failures. Each test runs in a fresh process
   to avoid the previously observed repeated-Vulkan-load/static-TLS problem.
-- Clang syntax checks passed for 88 RHI/test translation units. Five interface
+- Clang syntax checks passed for 88 RHI/test translation units. Six interface
   tests executed successfully with both GCC and Clang with RTTI disabled.
 - Audit: 93 surviving library UUID registrations remain unique and unchanged.
   RHI contains no `dynamic_cast` or virtual inheritance. All 22 former state
   wrappers/accessors are absent. The audit checked 88 non-root named interfaces
   plus four nested lease interfaces and 63 final `Object<...>` implementations.
   All interface chains are single-inheritance and frontend/backend chains are
-  separate. Query maps cover the full interface ancestry without duplicate
+  separate. Registered parent chains cover the full interface ancestry without duplicate
   inheritance paths (except the intentional independent `IObject` roots). The IDs are
   unchanged. Members and implementation methods belong to final classes.
 - Metal source was migrated, but no macOS build or runtime validation was

@@ -3,7 +3,9 @@
 #include "grassland/rhi/backend/vulkan/vulkan_program_base.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanProgram, "d24a9c9f-6f6f-4489-a840-064c2a4309c1")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanProgram,
+                        grassland::rhi::backend::vulkan::IVulkanProgramBase,
+                        "d24a9c9f-6f6f-4489-a840-064c2a4309c1")
 
 namespace grassland::rhi::backend::vulkan {
 class IVulkanProgram : public IVulkanProgramBase {

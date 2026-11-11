@@ -2,7 +2,9 @@
 #include "grassland/rhi/backend/d3d12/d3d12_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12SwapChainImage, "f03d8d79-9e19-41ca-b585-8f6f5bd64143")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12SwapChainImage,
+                        grassland::rhi::backend::d3d12::ID3D12Image,
+                        "f03d8d79-9e19-41ca-b585-8f6f5bd64143")
 
 namespace grassland::rhi::backend::d3d12 {
 

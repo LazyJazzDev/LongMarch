@@ -3,7 +3,9 @@
 #include "grassland/rhi/backend/metal/metal_program_base.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalComputeProgram, "848b485d-2208-4d1d-86ae-cadee6182bfe")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::metal::IMetalComputeProgram,
+                        grassland::rhi::backend::metal::IMetalProgramBase,
+                        "848b485d-2208-4d1d-86ae-cadee6182bfe")
 
 namespace grassland::rhi::backend::metal {
 class IMetalComputeProgram : public IMetalProgramBase {

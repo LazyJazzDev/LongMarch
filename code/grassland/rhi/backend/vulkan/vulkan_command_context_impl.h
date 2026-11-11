@@ -5,7 +5,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBackendCommandContext> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IBackendCommandContext, rhi::ICommandContext)
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,

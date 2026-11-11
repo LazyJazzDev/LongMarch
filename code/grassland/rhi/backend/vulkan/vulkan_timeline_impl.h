@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanTimelineImpl final : public Object<rhi::ITimeline, IVulkanTimeline> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ITimeline, IVulkanTimeline, IBackendTimeline, ITimeline)
-
   static ObjectPtr<IVulkanTimeline> Create(IVulkanDevice *device);
 
   ~VulkanTimelineImpl() override;

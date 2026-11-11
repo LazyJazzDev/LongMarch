@@ -6,11 +6,6 @@ namespace grassland::rhi::backend::metal {
 class MetalBottomLevelAccelerationStructureImpl final
     : public Object<rhi::IBottomLevelAccelerationStructure, IMetalAccelerationStructure> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IBottomLevelAccelerationStructure,
-                            IBottomLevelAccelerationStructure,
-                            IAccelerationStructure,
-                            IMetalAccelerationStructure)
-
   static IBottomLevelAccelerationStructure *Create(IMetalDevice *device,
                                                    const BottomLevelAccelerationStructureDesc &desc);
 
@@ -64,12 +59,6 @@ class MetalBottomLevelAccelerationStructureImpl final
 class MetalTopLevelAccelerationStructureImpl final
     : public Object<rhi::ITopLevelAccelerationStructure, IMetalTopLevelAccelerationStructure> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ITopLevelAccelerationStructure,
-                            IMetalTopLevelAccelerationStructure,
-                            ITopLevelAccelerationStructure,
-                            IAccelerationStructure,
-                            IMetalAccelerationStructure)
-
   static ITopLevelAccelerationStructure *Create(IMetalDevice *device, const TopLevelAccelerationStructureDesc &desc);
 
   AccelerationStructureType GetType() const override;

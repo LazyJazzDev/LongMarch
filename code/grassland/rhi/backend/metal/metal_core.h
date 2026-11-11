@@ -4,7 +4,9 @@
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalCore, "30ef4d7e-ae80-4882-b15d-023c44be58cf")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::metal::IMetalCore,
+                        grassland::rhi::IObject,
+                        "30ef4d7e-ae80-4882-b15d-023c44be58cf")
 
 namespace grassland::rhi::backend::metal {
 

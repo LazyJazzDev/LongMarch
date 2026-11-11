@@ -11,8 +11,6 @@ namespace {
 
 class TextObject final : public Object<IObject> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IObject, IObject)
-
   explicit TextObject(std::atomic<int> &destructions) : destructions_(destructions) {
   }
 

@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12SamplerImpl final : public Object<rhi::ISampler, ID3D12Sampler> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ISampler, ID3D12Sampler, IBackendSampler, ISampler)
-
   static rhi::ISampler *Create(ID3D12Device *device, const SamplerDesc &desc);
 
   const D3D12_SAMPLER_DESC &NativeDesc() const {

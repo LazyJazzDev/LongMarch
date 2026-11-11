@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi_util.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::IObject, "898187ec-5050-4d89-b818-ceedf1a2d067")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IObject, void, "898187ec-5050-4d89-b818-ceedf1a2d067")
 
 namespace grassland::rhi {
 // Factories return one owned reference. Ordinary object arguments are borrowed.

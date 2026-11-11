@@ -6,8 +6,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanDescriptorPool::LeaseImpl final : public Object<VulkanDescriptorPool::ILease> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IObject, VulkanDescriptorPool::ILease)
-
   LeaseImpl(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set);
   ~LeaseImpl() override;
   VkDescriptorSet Set() const;

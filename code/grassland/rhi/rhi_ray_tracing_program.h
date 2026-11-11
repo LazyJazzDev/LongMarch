@@ -1,8 +1,12 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi_program.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::IRayTracingProgram, "cc23cbda-1b3c-4fb6-9bf6-c04dd82f6f6d")
-LONGMARCH_RHI_UUID(grassland::rhi::IShaderBindingTable, "50687db6-c26d-4f57-82c9-7bd6ae21d68e")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IRayTracingProgram,
+                        grassland::rhi::IObject,
+                        "cc23cbda-1b3c-4fb6-9bf6-c04dd82f6f6d")
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IShaderBindingTable,
+                        grassland::rhi::IObject,
+                        "50687db6-c26d-4f57-82c9-7bd6ae21d68e")
 
 namespace grassland::rhi {
 struct RayTracingHitGroup {

@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalSamplerImpl final : public Object<rhi::ISampler, IMetalSampler> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ISampler, IMetalSampler, IBackendSampler, ISampler)
-
   static rhi::ISampler *Create(IMetalDevice *device, const SamplerDesc &desc);
 
   MTL::SamplerState *NativeSampler() const;

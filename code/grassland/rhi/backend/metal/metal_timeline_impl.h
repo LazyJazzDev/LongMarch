@@ -5,8 +5,6 @@
 namespace grassland::rhi::backend::metal {
 class MetalTimelineImpl final : public Object<rhi::ITimeline, IMetalTimeline> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(ITimeline, IMetalTimeline, IBackendTimeline, ITimeline)
-
   static ObjectPtr<IMetalTimeline> Create(IMetalDevice *device);
 
   bool GetCompletedValue(uint64_t &value) const override;
