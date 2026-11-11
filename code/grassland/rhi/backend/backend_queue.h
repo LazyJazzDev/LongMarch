@@ -11,30 +11,29 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendQueue)
 
 namespace grassland::rhi::backend {
 
-struct QueueState;
-
 class IBackendQueue : public rhi::IQueue {
  protected:
-  void InitializeQueue(IBackendDevice *device,
-                       QueueType type,
-                       std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
   void DestroyQueue();
 
  public:
-  IBackendDevice *Owner() const;
-  virtual IBackendTimeline *GetTimeline() const = 0;
-  QueueType GetType() const override = 0;
-  QueueType CommonGetType() const;
-  std::mutex &QueueMutex();
-  // Called under QueueMutex, in native submission order.
-  uint64_t NextSerial();
-  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IBackendCommandContext> &commands, const SubmitInfo &info);
-  // Called only by the device collector; returns whether this queue is drained.
-  bool CollectCompleted(uint64_t completed, bool timeline_valid);
+  virtual IBackendDevice *Owner() const = 0;
 
- protected:
-  virtual QueueState &StateQueue() = 0;
-  virtual const QueueState &StateQueue() const = 0;
+  virtual IBackendTimeline *GetTimeline() const = 0;
+
+  QueueType GetType() const override = 0;
+
+  virtual std::mutex &QueueMutex() = 0;
+
+  virtual  // Called under QueueMutex, in native submission order.
+      uint64_t
+      NextSerial() = 0;
+
+  virtual ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IBackendCommandContext> &commands,
+                                                    const SubmitInfo &info) = 0;
+
+  virtual  // Called only by the device collector; returns whether this queue is drained.
+      bool
+      CollectCompleted(uint64_t completed, bool timeline_valid) = 0;
 };
 
 }  // namespace grassland::rhi::backend

@@ -36,11 +36,7 @@ bool D3D12DownloadTokenImpl::CopyData(void *destination) const {
   }
   return true;
 }
-}  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12DownloadToken, "c5315cf9-1ed2-46ac-b619-f12be68cb0ae")
-
-namespace grassland::rhi::backend::d3d12 {
 ID3D12DownloadToken *ID3D12DownloadToken::Create(ObjectPtr<ID3D12TemporalBufferLease> lease, uint64_t size) {
   return new D3D12DownloadTokenImpl(lease, size);
 }
@@ -50,3 +46,5 @@ ID3D12DownloadToken *ID3D12DownloadToken::Create(ObjectPtr<ID3D12TemporalBufferL
   return new D3D12DownloadTokenImpl(lease, layout);
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12DownloadToken, "c5315cf9-1ed2-46ac-b619-f12be68cb0ae")

@@ -30,7 +30,6 @@ class ShaderBindingTableImpl final : public Object<IBackendShaderBindingTable> {
   std::array<Region, 4> regions_;
 
  public:
-  ~ShaderBindingTableImpl() override {
-  }
+  ~ShaderBindingTableImpl() override = default;
 };
 }  // namespace grassland::rhi::backend

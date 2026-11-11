@@ -1,13 +1,20 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 
 #include <algorithm>
+#include <set>
 
+#include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_buffer.h"
+#include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12BindingVersionImpl::D3D12BindingVersionImpl(ID3D12Device *device, const BindingLayoutDesc &layout)
@@ -15,8 +22,8 @@ D3D12BindingVersionImpl::D3D12BindingVersionImpl(ID3D12Device *device, const Bin
   InitializeBindingVersion(layout);
 
   uint32_t resource = 0, sampler = 0;
-  for (size_t i = 0; i < StateBindingVersion().layout_.bindings.size(); ++i) {
-    const auto &binding = StateBindingVersion().layout_.bindings[i];
+  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
+    const auto &binding = layout_.bindings[i];
     auto &offset = binding.type == BINDING_SAMPLER ? sampler : resource;
     offsets_.push_back(offset);
     offset += binding.count;
@@ -49,18 +56,18 @@ D3D12BindingVersionImpl *D3D12BindingVersionImpl::Create(ID3D12Device *device, c
 }
 
 ObjectPtr<IBackendBindingVersion> D3D12BindingVersionImpl::Clone() const {
-  auto copy = ObjectPtr<D3D12BindingVersionImpl>::Adopt(Create(device_, StateBindingVersion().layout_));
+  auto copy = ObjectPtr<D3D12BindingVersionImpl>::Adopt(Create(device_, layout_));
   if (!copy)
     return {};
-  copy->StateBindingVersion().references_ = StateBindingVersion().references_;
+  copy->references_ = references_;
   copy->initialized_ = initialized_;
   auto native = device_->NativeDevice();
-  for (size_t i = 0; i < StateBindingVersion().layout_.bindings.size(); ++i) {
-    const bool sampler = StateBindingVersion().layout_.bindings[i].type == BINDING_SAMPLER;
+  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
+    const bool sampler = layout_.bindings[i].type == BINDING_SAMPLER;
     auto source = sampler ? samplers_.Get() : resources_.Get();
     auto target = sampler ? copy->samplers_.Get() : copy->resources_.Get();
     const auto type = sampler ? D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER : D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    for (uint32_t j = 0; j < StateBindingVersion().layout_.bindings[i].count; ++j)
+    for (uint32_t j = 0; j < layout_.bindings[i].count; ++j)
       if (initialized_[i][j])
         native->CopyDescriptorsSimple(1, target->CPU(offsets_[i] + j), source->CPU(offsets_[i] + j), type);
   }
@@ -82,7 +89,7 @@ D3D12DescriptorPool::Lease *D3D12BindingVersionImpl::SamplerDescriptors() const 
 bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
                                                uint32_t first_element,
                                                const std::vector<BufferView> &buffers) {
-  const auto &binding = StateBindingVersion().layout_.bindings[binding_index];
+  const auto &binding = layout_.bindings[binding_index];
   if (binding.type == BINDING_UNIFORM_BUFFER) {
     for (const auto &view : buffers) {
       if (view.size > 65536)
@@ -158,7 +165,7 @@ bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
 bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
                                                uint32_t first_element,
                                                const std::vector<IImage *> &images) {
-  const auto &binding = StateBindingVersion().layout_.bindings[binding_index];
+  const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
     if (!rhi::QueryInterfacePtr<ID3D12AllocatedImage>(image).Get())
       return false;
@@ -231,20 +238,231 @@ bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
   return true;
 }
 
+ID3D12BindingVersion *ID3D12BindingVersion::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
+  return D3D12BindingVersionImpl::Create(device, layout);
+}
+
+ID3D12BindingGroup *ID3D12BindingGroup::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
+  return D3D12BindingGroupImpl::Create(device, layout);
+}
+
+void D3D12BindingVersionImpl::InitializeBindingVersion(const BindingLayoutDesc &layout) {
+  layout_ = layout;
+
+  std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
+  references_.resize(layout_.bindings.size());
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    references_[i].resize(layout_.bindings[i].count);
+}
+
+const BindingLayoutDesc &D3D12BindingVersionImpl::GetLayout() const {
+  return layout_;
+}
+
+const std::vector<std::vector<ObjectPtr<IObject>>> &D3D12BindingVersionImpl::GetReferences() const {
+  return references_;
+}
+
+bool D3D12BindingVersionImpl::IsComplete() const {
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    for (uint32_t j = 0; j < layout_.bindings[i].count; ++j)
+      if (!IsInitialized(i, j))
+        return false;
+  return true;
+}
+
+bool D3D12BindingVersionImpl::Write(size_t binding_index,
+                                    uint32_t first_element,
+                                    const std::vector<BufferView> &values) {
+  // Retain the entire update before releasing old slots, including resource swaps.
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (const auto &value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value.buffer));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+bool D3D12BindingVersionImpl::Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) {
+  // Retain the entire update before releasing old slots, including resource swaps.
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (const auto &value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+bool D3D12BindingVersionImpl::Write(size_t binding_index,
+                                    uint32_t first_element,
+                                    const std::vector<ISampler *> &values) {
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (auto value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+bool D3D12BindingVersionImpl::Write(size_t binding_index,
+                                    uint32_t first_element,
+                                    const std::vector<ITopLevelAccelerationStructure *> &values) {
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (auto value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+void D3D12BindingGroupImpl::InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version) {
+  device_ = device;
+  layout_ = version->GetLayout();
+  version_ = std::move(version);
+}
+
+const BindingLayoutDesc &D3D12BindingGroupImpl::GetLayout() const {
+  return layout_;
+}
+
+IBackendDevice *D3D12BindingGroupImpl::Owner() const {
+  return device_;
+}
+
+IBackendBindingVersion *D3D12BindingGroupImpl::CurrentVersion() const {
+  return version_.Get();
+}
+
+const BindingDesc *D3D12BindingGroupImpl::FindBinding(uint32_t binding,
+                                                      uint32_t first_element,
+                                                      size_t count,
+                                                      size_t &binding_index) const {
+  for (binding_index = 0; binding_index < layout_.bindings.size(); ++binding_index) {
+    const auto &desc = layout_.bindings[binding_index];
+    if (desc.binding != binding)
+      continue;
+    if (!count || first_element > desc.count || count > desc.count - first_element)
+      return nullptr;
+    return &desc;
+  }
+  return nullptr;
+}
+
+bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
+                                         const std::vector<BufferView> &buffers,
+                                         uint32_t first_element) {
+  size_t binding_index;
+  const auto *desc = FindBinding(binding, first_element, buffers.size(), binding_index);
+  if (!desc)
+    return false;
+  if (desc->type > BINDING_RW_BYTE_ADDRESS_BUFFER)
+    return false;
+  auto values = buffers;
+  for (auto &view : values) {
+    auto buffer = rhi::QueryInterfacePtr<IBackendBuffer>(view.buffer).Get();
+    if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
+      return false;
+    if (!view.size)
+      view.size = buffer->GetDesc().size - view.offset;
+    if (view.size > buffer->GetDesc().size - view.offset)
+      return false;
+    if (desc->type == BINDING_STRUCTURED_BUFFER || desc->type == BINDING_RW_STRUCTURED_BUFFER) {
+      if (view.offset % desc->stride || view.size % desc->stride)
+        return false;
+    } else if (desc->type == BINDING_BYTE_ADDRESS_BUFFER || desc->type == BINDING_RW_BYTE_ADDRESS_BUFFER) {
+      if (view.offset % 4 || view.size % 4)
+        return false;
+    }
+  }
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, values))
+    return false;
+  version_ = std::move(next);
+  return true;
+}
+
+bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
+                                         const std::vector<IImage *> &images,
+                                         uint32_t first_element) {
+  size_t binding_index;
+  const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
+  if (!desc)
+    return false;
+  if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
+    return false;
+  for (auto value : images) {
+    auto image = rhi::QueryInterfacePtr<IBackendImage>(value).Get();
+    if (!image || !image->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(image->GetDesc().format))
+      return false;
+    if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
+      return false;
+  }
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, images))
+    return false;
+  version_ = std::move(next);
+  return true;
+}
+
+bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
+                                         const std::vector<ISampler *> &samplers,
+                                         uint32_t first_element) {
+  size_t binding_index;
+  const auto *desc = FindBinding(binding, first_element, samplers.size(), binding_index);
+  if (!desc)
+    return false;
+  if (desc->type != BINDING_SAMPLER)
+    return false;
+  for (auto sampler : samplers) {
+    auto native = rhi::QueryInterfacePtr<IBackendSampler>(sampler).Get();
+    if (!native || native->DeviceIdentity() != device_)
+      return false;
+  }
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, samplers))
+    return false;
+  version_ = std::move(next);
+  return true;
+}
+
+bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
+                                         const std::vector<ITopLevelAccelerationStructure *> &structures,
+                                         uint32_t first_element) {
+  size_t binding_index;
+  auto desc = FindBinding(binding, first_element, structures.size(), binding_index);
+  if (!desc || desc->type != BINDING_ACCELERATION_STRUCTURE)
+    return false;
+  for (auto structure : structures)
+    if (!structure)
+      return false;
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, structures))
+    return false;
+  version_ = std::move(next);
+  return true;
+}
 }  // namespace grassland::rhi::backend::d3d12
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BindingGroup, "b827b0e0-c57d-4316-b632-77a41d222ae7")
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BindingVersion, "1e82b239-9a3f-4e32-aeab-b2fdaba168ff")
-
-namespace grassland::rhi::backend::d3d12 {
-ID3D12BindingVersion *ID3D12BindingVersion::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
-  return D3D12BindingVersionImpl::Create(device, layout);
-}
-}  // namespace grassland::rhi::backend::d3d12
-
-namespace grassland::rhi::backend::d3d12 {
-ID3D12BindingGroup *ID3D12BindingGroup::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
-  return D3D12BindingGroupImpl::Create(device, layout);
-}
-}  // namespace grassland::rhi::backend::d3d12

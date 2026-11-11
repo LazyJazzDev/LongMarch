@@ -19,6 +19,4 @@ class IMetalWindow : public IBackendWindow {
   virtual bool IsFrameValid(uint64_t generation) const = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::metal

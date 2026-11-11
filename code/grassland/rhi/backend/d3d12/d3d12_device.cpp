@@ -20,6 +20,14 @@
 #include <D3D12MemAlloc.h>
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
+#include <algorithm>
+
+#include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_shader.h"
+#include "grassland/rhi/backend/backend_shader_impl.h"
+
 namespace grassland::rhi::backend::d3d12 {
 bool D3D12DeviceImpl::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
   std::vector<ID3D12Fence *> fences;
@@ -47,8 +55,8 @@ void D3D12DeviceImpl::WaitForProgress(const std::vector<Event> &next) {
   std::array<HANDLE, 3> handles{collector_shutdown_};
   DWORD count = 1;
   for (const auto &event : next) {
-    for (size_t index = 0; index < StateDevice().queues_.size(); ++index) {
-      if (!StateDevice().queues_[index] || StateDevice().queues_[index]->GetTimeline() != event.timeline)
+    for (size_t index = 0; index < queues_.size(); ++index) {
+      if (!queues_[index] || queues_[index]->GetTimeline() != event.timeline)
         continue;
       auto &handle = progress_events_[index];
       if (progress_values_[index] != event.value) {
@@ -139,8 +147,8 @@ ID3D12Device *D3D12DeviceImpl::Create(PhysicalDevice info, IBackendCore *core, C
       SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
     object->tearing_ = tearing;
   for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
-    object->StateDevice().queues_[type] = ObjectPtr<IBackendQueue>::Adopt(ID3D12Queue::Create(object.get(), type));
-    if (!object->StateDevice().queues_[type])
+    object->queues_[type] = ObjectPtr<IBackendQueue>::Adopt(ID3D12Queue::Create(object.get(), type));
+    if (!object->queues_[type])
       return nullptr;
   }
   object->collector_shutdown_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
@@ -219,7 +227,7 @@ D3D12DeviceImpl::~D3D12DeviceImpl() {
   download_pool_.Clear();
   scratch_pool_.Clear();
   command_pool_.clear();
-  for (auto &queue : StateDevice().queues_)
+  for (auto &queue : queues_)
     queue.Reset();
   for (auto event : progress_events_)
     if (event)
@@ -264,15 +272,10 @@ IBindingGroup *D3D12DeviceImpl::CreateBindingGroup(const BindingLayoutDesc &layo
   return ID3D12BindingGroup::Create(this, layout);
 }
 
-}  // namespace grassland::rhi::backend::d3d12
-
-namespace grassland::rhi::backend::d3d12 {
 D3D12ScratchPool &D3D12DeviceImpl::ScratchPool() {
   return scratch_pool_;
 }
-}  // namespace grassland::rhi::backend::d3d12
 
-namespace grassland::rhi::backend::d3d12 {
 IBottomLevelAccelerationStructure *D3D12DeviceImpl::CreateBottomLevelAccelerationStructure(
     const BottomLevelAccelerationStructureDesc &desc) {
   return ID3D12BottomLevelAccelerationStructure::Create(this, desc);
@@ -292,12 +295,112 @@ IRayTracingProgram *D3D12DeviceImpl::CreateRayTracingProgram(const RayTracingPro
 D3D12TemporalBufferPool &D3D12DeviceImpl::DownloadPool() {
   return download_pool_;
 }
-}  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Device, "d258bd31-2295-4f22-9c98-bd0133662c47")
-
-namespace grassland::rhi::backend::d3d12 {
 ID3D12Device *ID3D12Device::Create(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device) {
   return D3D12DeviceImpl::Create(info, core, device);
 }
+
+void D3D12DeviceImpl::InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api) {
+  api_ = api;
+  core_ = core;
+  info_ = std::move(info);
+}
+
+rhi::IShader *D3D12DeviceImpl::CreateShader(const ShaderDesc &desc) {
+  if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+      desc.stage > SHADER_STAGE_CALLABLE)
+    return nullptr;
+  return IBackendShader::Create(desc, api_);
+}
+
+void D3D12DeviceImpl::DestroyDevice() {
+  ShutdownQueues();
+}
+
+std::string D3D12DeviceImpl::Name() const {
+  return info_.name;
+}
+
+bool D3D12DeviceImpl::SupportRayTracingPipeline() const {
+  return info_.ray_tracing_pipeline_feature;
+}
+
+bool D3D12DeviceImpl::SupportRayQuery() const {
+  return info_.ray_query_feature;
+}
+
+bool D3D12DeviceImpl::SupportGeometryShader() const {
+  return info_.geometry_shader_feature;
+}
+
+rhi::IQueue *D3D12DeviceImpl::GetQueue(QueueType type) {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
+}
+
+const PhysicalDevice &D3D12DeviceImpl::GetPhysicalDevice() const noexcept {
+  return info_;
+}
+
+IBackendCore *D3D12DeviceImpl::OwnerCore() const {
+  return core_;
+}
+
+void D3D12DeviceImpl::StartCollector() {
+  collector_ = std::thread([this] { Collect(); });
+}
+
+bool D3D12DeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
+  if (events.empty())
+    return wait_all;
+  std::vector<Event> unique;
+  unique.reserve(events.size());
+  for (const auto &event : events) {
+    auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+    if (!timeline || timeline->Owner() != this) {
+      ReportError(-1, "Host waits require timelines from this device.");
+      return false;
+    }
+    auto found = std::find_if(unique.begin(), unique.end(),
+                              [&](const Event &other) { return other.timeline == event.timeline; });
+    if (found == unique.end())
+      unique.push_back(event);
+    else
+      found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
+  }
+  return WaitNativeEvents(unique, wait_all);
+}
+
+void D3D12DeviceImpl::Collect() {
+  std::vector<Event> next;
+  next.reserve(queues_.size());
+  for (;;) {
+    next.clear();
+    bool empty = true;
+    for (const auto &queue : queues_) {
+      if (!queue)
+        continue;
+      uint64_t completed = 0;
+      const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+      if (timeline_valid && completed != UINT64_MAX)
+        next.push_back({queue->GetTimeline(), completed + 1});
+      if (!queue->CollectCompleted(completed, timeline_valid))
+        empty = false;
+    }
+    if (stopping_ && empty)
+      return;
+    WaitForProgress(next);
+  }
+}
+
+void D3D12DeviceImpl::ShutdownQueues() {
+  if (!collector_.joinable())
+    return;
+  stopping_ = true;
+  InterruptCollector();
+  collector_.join();
+}
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Device, "d258bd31-2295-4f22-9c98-bd0133662c47")

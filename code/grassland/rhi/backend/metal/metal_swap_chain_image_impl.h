@@ -1,6 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_image_state.h"
-#include "grassland/rhi/backend/metal/metal_image_state.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
@@ -22,42 +20,31 @@ class MetalSwapChainImageImpl final : public Object<IMetalSwapChainImage> {
 #endif
 
  public:
-  ~MetalSwapChainImageImpl() override {
-  }
+  ~MetalSwapChainImageImpl() override = default;
 
  private:
-  MetalImageState state_MetalImage_;
-
-  MetalImageState &StateMetalImage() override {
-    return state_MetalImage_;
-  }
-
-  const MetalImageState &StateMetalImage() const override {
-    return state_MetalImage_;
-  }
-
- private:
-  ImageState state_Image_;
-
-  ImageState &StateImage() override {
-    return state_Image_;
-  }
-
-  const ImageState &StateImage() const override {
-    return state_Image_;
-  }
+  void InitializeImage(ImageDesc desc, IBackendQueue *queue = nullptr);
 
  public:
-  bool SupportsStorage() const override {
-    return IMetalImage::CommonSupportsStorage();
-  }
+  bool SupportsQueue(const IBackendQueue *queue) const override;
 
-  const void *DeviceIdentity() const override {
-    return IMetalImage::CommonDeviceIdentity();
-  }
+  const ImageDesc &GetDesc() const override;
 
-  const ImageDesc &GetDesc() const override {
-    return IBackendImage::CommonGetDesc();
-  }
+ private:
+  ImageDesc desc_{};
+  IBackendQueue *queue_{};
+
+  void InitializeMetalImage(ImageDesc desc, const void *device, MTL::Texture *image, IBackendQueue *queue = nullptr);
+
+ public:
+  bool SupportsStorage() const override;
+
+  const void *DeviceIdentity() const override;
+
+  MTL::Texture *NativeImage() const override;
+
+ private:
+  const void *device_{};
+  MTL::Texture *image_{};
 };
 }  // namespace grassland::rhi::backend::metal

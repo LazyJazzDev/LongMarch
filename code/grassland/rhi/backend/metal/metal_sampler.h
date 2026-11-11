@@ -13,5 +13,4 @@ class IMetalSampler : public IBackendSampler {
   virtual MTL::SamplerState *NativeSampler() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::metal

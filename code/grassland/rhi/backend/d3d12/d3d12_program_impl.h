@@ -1,49 +1,46 @@
 #pragma once
-#include "grassland/rhi/backend/backend_program_state.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
-#include "grassland/rhi/backend/d3d12/d3d12_program_base_state.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12ProgramImpl final : public Object<ID3D12Program> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IProgram, ID3D12Program, IBackendProgram, IProgram, ID3D12ProgramBase, IObject)
+
   static ID3D12Program *Create(ID3D12Device *device, const ProgramDesc &desc);
+
   ID3D12PipelineState *NativePipeline() const;
+
+  ~D3D12ProgramImpl() override = default;
+
+  const ProgramDesc &GetDesc() const override;
+
+  IBackendDevice *Owner() const override;
+
+  ID3D12RootSignature *NativeRootSignature() const override;
+
+  uint32_t RootParameter(uint32_t group, bool sampler) const override;
 
  private:
   D3D12ProgramImpl(ID3D12Device *device, const ProgramDesc &desc);
+
   ComPtr<ID3D12PipelineState> pipeline_;
 
- public:
-  ~D3D12ProgramImpl() override {
-  }
+  void InitializeProgram(IBackendDevice *device, const ProgramDesc &desc);
 
- private:
-  ProgramState state_Program_;
+  bool ValidateLayout() const;
 
-  ProgramState &StateProgram() override {
-    return state_Program_;
-  }
+  IBackendDevice *device_{};
 
-  const ProgramState &StateProgram() const override {
-    return state_Program_;
-  }
+  ProgramDesc desc_{};
 
- private:
-  D3D12ProgramBaseState state_D3D12ProgramBase_;
+  ObjectPtr<IShader> vertex_shader_{};
 
-  D3D12ProgramBaseState &StateD3D12ProgramBase() override {
-    return state_D3D12ProgramBase_;
-  }
+  ObjectPtr<IShader> fragment_shader_{};
 
-  const D3D12ProgramBaseState &StateD3D12ProgramBase() const override {
-    return state_D3D12ProgramBase_;
-  }
+  bool CreateLayout(::ID3D12Device *device, const PipelineLayoutDesc &layout, D3D12_ROOT_SIGNATURE_FLAGS flags);
 
- public:
-  const ProgramDesc &GetDesc() const override {
-    return IBackendProgram::CommonGetDesc();
-  }
+  std::vector<std::array<uint32_t, 2>> root_parameters_{};
+  ComPtr<ID3D12RootSignature> root_signature_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

@@ -28,12 +28,9 @@ const std::string &ShaderImpl::GetPreprocessedCode() const {
   return preprocessed_code_;
 }
 
-}  // namespace grassland::rhi::backend
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendShader, "74166d66-39c8-4b6f-b9bc-1721e275a3c2")
-
-namespace grassland::rhi::backend {
 IBackendShader *IBackendShader::Create(const ShaderDesc &desc, BackendAPI api) {
   return ShaderImpl::Create(desc, api);
 }
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendShader, "74166d66-39c8-4b6f-b9bc-1721e275a3c2")

@@ -20,11 +20,9 @@ class IMetalProgram : public IBackendProgram, public IMetalProgramBase {
     return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
   }
 
- public:
   static IMetalProgram *Create(IMetalDevice *device, const ProgramDesc &desc);
   virtual MTL::RenderPipelineState *NativePipeline() const = 0;
   virtual MTL::DepthStencilState *NativeDepthStencil() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::metal

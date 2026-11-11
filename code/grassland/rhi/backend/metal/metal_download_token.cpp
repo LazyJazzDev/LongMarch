@@ -42,11 +42,7 @@ bool MetalDownloadTokenImpl::CopyData(void *destination) const {
   }
   return true;
 }
-}  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalDownloadToken, "cb7cec7d-cb18-4503-8444-82a8cde172f9")
-
-namespace grassland::rhi::backend::metal {
 IMetalDownloadToken *IMetalDownloadToken::Create(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size) {
   return new MetalDownloadTokenImpl(lease, size);
 }
@@ -56,3 +52,5 @@ IMetalDownloadToken *IMetalDownloadToken::Create(ObjectPtr<IMetalTemporalBufferL
   return new MetalDownloadTokenImpl(lease, layout);
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalDownloadToken, "cb7cec7d-cb18-4503-8444-82a8cde172f9")

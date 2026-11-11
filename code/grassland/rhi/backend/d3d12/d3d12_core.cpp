@@ -109,12 +109,9 @@ rhi::IDevice *D3D12CoreImpl::CreateDevice(int32_t device_idx) {
   return ID3D12Device::Create(std::move(info), this, std::move(device));
 }
 
-}  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Core, "0ff7c9ac-b8cc-4d2c-b5ec-9995a69b861d")
-
-namespace grassland::rhi::backend::d3d12 {
 ID3D12Core *ID3D12Core::CreateD3D12Core(const CoreDesc &desc) {
   return D3D12CoreImpl::CreateD3D12Core(desc);
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Core, "0ff7c9ac-b8cc-4d2c-b5ec-9995a69b861d")

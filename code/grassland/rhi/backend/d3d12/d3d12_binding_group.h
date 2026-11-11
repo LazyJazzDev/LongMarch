@@ -16,15 +16,12 @@ class ID3D12BindingVersion : public IBackendBindingVersion {
   virtual D3D12DescriptorPool::Lease *SamplerDescriptors() const = 0;
 };
 
-;
-
 class ID3D12BindingGroup : public IBackendBindingGroup {
  public:
   static ID3D12BindingGroup *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
   using Version = ID3D12BindingVersion;
 };
 
-;
 }  // namespace grassland::rhi::backend::d3d12
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12BindingVersion)

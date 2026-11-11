@@ -61,6 +61,4 @@ class IVulkanCommandContext : public IBackendCommandContext {
   virtual SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::vulkan

@@ -14,6 +14,4 @@ class IVulkanCore : public IBackendCore {
   virtual rhi::IDevice *CreateDevice(int32_t device_idx) = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::vulkan

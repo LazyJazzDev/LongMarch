@@ -18,6 +18,4 @@ class IVulkanWindow : public IBackendWindow {
   virtual VkResult PresentFrame() = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::vulkan

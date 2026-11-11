@@ -1,20 +1,39 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+
+#include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_image_presenter.h"
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_window.h"
+#include "grassland/rhi/backend/backend_window_imgui.h"
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#include <dxgi1_6.h>
+#include <wrl/client.h>
+#endif
+
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <future>
+#include <system_error>
 #include <type_traits>
 
-#include "grassland/rhi/backend/backend_command_context_state.h"
+#include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_device_state.h"
-#include "grassland/rhi/backend/backend_image_state.h"
-#include "grassland/rhi/backend/backend_queue.h"
-#include "grassland/rhi/backend/backend_queue_state.h"
-#include "grassland/rhi/backend/backend_timeline_state.h"
-#include "grassland/rhi/backend/backend_window.h"
-#include "grassland/rhi/backend/backend_window_state.h"
+#include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/backend/backend_shader.h"
+#include "grassland/rhi/backend/backend_shader_impl.h"
+#include "grassland/rhi/rhi_program.h"
 #include "grassland/rhi/rhix/rhix.h"
 
 using grassland::rhi::backend::MatchInterfaces;
@@ -24,7 +43,7 @@ using namespace rhi;
 namespace backend = rhi::backend;
 
 namespace {
-using backend::ObjectPtr;
+using namespace backend;
 
 struct Gate {
   std::mutex mutex;
@@ -46,7 +65,6 @@ class TestWindow final : public backend::Object<backend::IBackendWindow> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IWindow, backend::IBackendWindow, rhi::IWindow)
 
- public:
   explicit TestWindow(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
   }
 
@@ -80,124 +98,379 @@ class TestWindow final : public backend::Object<backend::IBackendWindow> {
  private:
   std::shared_ptr<Gate> gate_;
 
- private:
-  backend::WindowState state_;
-
-  backend::WindowState &StateWindow() override {
-    return state_;
-  }
-
-  const backend::WindowState &StateWindow() const override {
-    return state_;
+  void InitializeWindow() {
   }
 
  public:
-  bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override {
-    return backend::IBackendWindow::CommonEnableImGui(enabled, font_file_path, font_size);
+  bool EnableImGui(bool enabled, const char *font_file_path, float font_size) override {
+    if (!glfw::IsWindowThread() || processing_imgui_)
+      return false;
+    if (!enabled) {
+      imgui_.reset();
+      return true;
+    }
+    if (!imgui_)
+      imgui_ = WindowImGui::Create(device_, window_, font_file_path, font_size);
+    return bool(imgui_);
+  }
+
+  ImGuiContext *GetImGuiContext() const override {
+    return imgui_ ? imgui_->Context() : nullptr;
   }
 
   bool UpdateImGui(const std::function<void()> &callback) override {
-    return backend::IBackendWindow::CommonUpdateImGui(callback);
+    if (!imgui_)
+      return true;
+    if (!glfw::IsWindowThread() || processing_imgui_)
+      return false;
+
+    struct ProcessingScope {
+      bool &flag;
+
+      ProcessingScope(bool &value) : flag(value) {
+        flag = true;
+      }
+
+      ~ProcessingScope() {
+        flag = false;
+      }
+    } scope(processing_imgui_);
+
+    return imgui_->Update(callback);
   }
 
-  EventManager<void(int, int)> &ResizeEvent() override {
-    return backend::IBackendWindow::CommonResizeEvent();
+  const void *DeviceIdentity() const override {
+    return device_;
   }
 
-  EventManager<void(int, int)> &FramebufferResizeEvent() override {
-    return backend::IBackendWindow::CommonFramebufferResizeEvent();
+  bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) override {
+    ObjPtr<IImage> frame = GetNextImage();
+    if (!frame)
+      return false;
+    if (!presenter_)
+      presenter_ = std::make_unique<ImagePresenter>(device_);
+    return presenter_->Record(commands, image, frame.Get(), color_space, GetColorSpace(), GetHDRReferenceWhiteScale());
   }
 
-  EventManager<void(bool)> &CursorEnterEvent() override {
-    return backend::IBackendWindow::CommonCursorEnterEvent();
+  bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) override {
+    return RecordImGui(commands, image, GetColorSpace(), GetHDRReferenceWhiteScale());
   }
 
-  EventManager<void(bool)> &FocusEvent() override {
-    return backend::IBackendWindow::CommonFocusEvent();
-  }
+  bool RecordImGui(rhi::ICommandContext *commands,
+                   rhi::IImage *image,
+                   ColorSpace color_space,
+                   float white_scale) override {
+    if (!imgui_)
+      return true;
+    if (!glfw::IsWindowThread() || processing_imgui_)
+      return false;
 
-  EventManager<void(double, double)> &MouseMoveEvent() override {
-    return backend::IBackendWindow::CommonMouseMoveEvent();
-  }
+    struct ProcessingScope {
+      bool &flag;
 
-  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override {
-    return backend::IBackendWindow::CommonMouseButtonEvent();
-  }
+      ProcessingScope(bool &value) : flag(value) {
+        flag = true;
+      }
 
-  EventManager<void(double, double)> &ScrollEvent() override {
-    return backend::IBackendWindow::CommonScrollEvent();
-  }
+      ~ProcessingScope() {
+        flag = false;
+      }
+    } scope(processing_imgui_);
 
-  EventManager<void(int, int, int, int)> &KeyEvent() override {
-    return backend::IBackendWindow::CommonKeyEvent();
-  }
-
-  EventManager<void(uint32_t)> &CharEvent() override {
-    return backend::IBackendWindow::CommonCharEvent();
-  }
-
-  EventManager<void(int, const char **)> &DropEvent() override {
-    return backend::IBackendWindow::CommonDropEvent();
+    return imgui_->Record(commands, image, color_space, white_scale);
   }
 
   rhi::IImage *GetNextImage() override {
-    return backend::IBackendWindow::CommonGetNextImage();
+#if !defined(NDEBUG)
+    if (!glfw::IsWindowThread()) {
+      ReportError(-1, "GetNextImage must run on the window thread.");
+      std::abort();
+    }
+#endif
+    if (invalid_)
+      return nullptr;
+    int width, height;
+    glfwGetFramebufferSize(window_, &width, &height);
+    if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+      return nullptr;
+    std::lock_guard<std::mutex> lock(next_image_mutex_);
+#if !defined(NDEBUG)
+    if (!next_image_) {
+      ReportError(-1, "No prepared swapchain image for a drawable window.");
+      std::abort();
+    }
+#endif
+    return ObjectPtr<IBackendImage>(next_image_).Detach();
+  }
+
+  IBackendQueue *OwnerQueue() const override {
+    return queue_;
+  }
+
+  void ReleaseNextImage() override {
+    std::lock_guard<std::mutex> lock(next_image_mutex_);
+    next_image_.Reset();
   }
 
   bool IsSwapChainInvalid() const override {
-    return backend::IBackendWindow::CommonIsSwapChainInvalid();
+    return invalid_;
   }
 
   bool RebuildSwapChain() override {
-    return backend::IBackendWindow::CommonRebuildSwapChain();
+#if !defined(NDEBUG)
+    if (!glfw::IsWindowThread())
+      return false;
+#endif
+    const auto options = GetSupportedPresentationOptions();
+    if (std::none_of(options.begin(), options.end(),
+                     [&](const auto &option) { return option.color_space == requested_color_space_; })) {
+      ReportError(-1, "Requested swapchain color space is unavailable.");
+      return false;
+    }
+    invalid_ = true;
+    ReleaseNextImage();
+    if (!RebuildNativeSwapChain(requested_mode_))
+      return false;
+    int width, height;
+    glfwGetFramebufferSize(window_, &width, &height);
+    if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+      return true;
+    color_space_ = requested_color_space_;
+    invalid_ = false;
+    if (UpdateNextImage())
+      return true;
+    invalid_ = true;
+    return false;
   }
 
   bool SetPresentMode(PresentMode mode) override {
-    return backend::IBackendWindow::CommonSetPresentMode(mode);
+#if !defined(NDEBUG)
+    if (!glfw::IsWindowThread())
+      return false;
+#endif
+    requested_mode_ = mode;
+    return RebuildSwapChain();
   }
 
   bool SetColorSpace(ColorSpace color_space) override {
-    return backend::IBackendWindow::CommonSetColorSpace(color_space);
+#if !defined(NDEBUG)
+    if (!glfw::IsWindowThread())
+      return false;
+#endif
+    const auto options = GetSupportedPresentationOptions();
+    if (std::none_of(options.begin(), options.end(),
+                     [&](const auto &option) { return option.color_space == color_space; }))
+      return false;
+    const auto previous = requested_color_space_;
+    requested_color_space_ = color_space;
+    if (RebuildSwapChain())
+      return true;
+    requested_color_space_ = previous;
+    return false;
   }
 
   ColorSpace GetColorSpace() const override {
-    return backend::IBackendWindow::CommonGetColorSpace();
-  }
-
-  bool GetHDRReferenceWhiteNits(float &nits) const override {
-    return backend::IBackendWindow::CommonGetHDRReferenceWhiteNits(nits);
+    return color_space_;
   }
 
   float GetHDRReferenceWhiteScale() const override {
-    return backend::IBackendWindow::CommonGetHDRReferenceWhiteScale();
+#ifdef _WIN32
+    float nits;
+    return GetHDRReferenceWhiteNits(nits) ? nits / 80.0f : 1.0f;
+#else
+    // Linux uses fixed source encoding parameters; macOS uses relative EDR.
+    return 1.0f;
+#endif
   }
 
   float GetHDRHeadroom() const override {
-    return backend::IBackendWindow::CommonGetHDRHeadroom();
+#ifdef _WIN32
+    float white;
+    if (!GetHDRReferenceWhiteNits(white))
+      return 10.0f;
+    const auto monitor = MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST);
+    Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+      return 10.0f;
+    for (UINT a = 0;; ++a) {
+      Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+      if (factory->EnumAdapters1(a, &adapter) != S_OK)
+        break;
+      for (UINT o = 0;; ++o) {
+        Microsoft::WRL::ComPtr<IDXGIOutput> output;
+        if (adapter->EnumOutputs(o, &output) != S_OK)
+          break;
+        Microsoft::WRL::ComPtr<IDXGIOutput6> output6;
+        DXGI_OUTPUT_DESC1 desc{};
+        if (FAILED(output.As(&output6)) || FAILED(output6->GetDesc1(&desc)) || desc.Monitor != monitor)
+          continue;
+        const float ratio = desc.MaxLuminance / white;
+        return std::isfinite(ratio) && ratio > 0.0f ? std::max(1.0f, ratio) : 10.0f;
+      }
+    }
+#endif
+    return 10.0f;
   }
 
+  bool GetHDRReferenceWhiteNits(float &nits) const override {
+    if (!glfw::IsWindowThread())
+      return false;
+#ifdef _WIN32
+    MONITORINFOEXW monitor{};
+    monitor.cbSize = sizeof(monitor);
+    if (!GetMonitorInfoW(MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST), &monitor))
+      return false;
+    UINT32 path_count{}, mode_count{};
+    if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count) != ERROR_SUCCESS)
+      return false;
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+    if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &path_count, paths.data(), &mode_count, modes.data(), nullptr) !=
+        ERROR_SUCCESS)
+      return false;
+    for (UINT32 i = 0; i < path_count; ++i) {
+      const auto &path = paths[i];
+      DISPLAYCONFIG_SOURCE_DEVICE_NAME source{};
+      source.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, sizeof(source), path.sourceInfo.adapterId,
+                       path.sourceInfo.id};
+      if (DisplayConfigGetDeviceInfo(&source.header) != ERROR_SUCCESS ||
+          wcscmp(source.viewGdiDeviceName, monitor.szDevice))
+        continue;
+      DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO color{};
+      color.header = {DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO, sizeof(color), path.targetInfo.adapterId,
+                      path.targetInfo.id};
+      if (DisplayConfigGetDeviceInfo(&color.header) != ERROR_SUCCESS || !color.advancedColorEnabled)
+        return false;
+      DISPLAYCONFIG_SDR_WHITE_LEVEL white{};
+      white.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, sizeof(white), path.targetInfo.adapterId,
+                      path.targetInfo.id};
+      if (DisplayConfigGetDeviceInfo(&white.header) != ERROR_SUCCESS || !white.SDRWhiteLevel)
+        return false;
+      nits = 80.0f * (white.SDRWhiteLevel / 1000.0f);
+      return true;
+    }
+#endif
+    return false;
+  }
+
+ private:
+  ColorSpace RequestedColorSpace() const {
+    return requested_color_space_;
+  }
+
+  void DestroyWindow() {
+    imgui_.reset();
+    glfw::UnregisterWindow(window_);
+    glfw::DestroyWindow(window_);
+  }
+
+  bool InitializeWindow(IBackendDevice *device, const WindowDesc &desc) {
+    device_ = device;
+    queue_ =
+        rhi::QueryInterfacePtr<IBackendQueue>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get()).Get();
+    requested_mode_ = desc.present_mode;
+    requested_color_space_ = desc.color_space;
+    window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
+    if (!window_)
+      return false;
+    glfw::RegisterWindow(this);
+    return true;
+  }
+
+ public:
   GLFWwindow *GLFWWindow() const override {
-    return backend::IBackendWindow::CommonGLFWWindow();
+    return window_;
   }
 
   bool ShouldClose() const override {
-    return backend::IBackendWindow::CommonShouldClose();
+#if !defined(NDEBUG)
+    if (!glfw::IsWindowThread())
+      return true;
+#endif
+    return glfwWindowShouldClose(window_);
   }
 
   bool IsKeyDown(int key) const override {
-    return backend::IBackendWindow::CommonIsKeyDown(key);
+#if !defined(NDEBUG)
+    if (!glfw::IsWindowThread())
+      return false;
+#endif
+    return glfwGetKey(window_, key) == GLFW_PRESS;
   }
 
   bool SetTitle(const std::string &title) override {
-    return backend::IBackendWindow::CommonSetTitle(title);
+    return glfw::SetWindowTitle(window_, title.c_str());
   }
+
+  EventManager<void(int, int)> &ResizeEvent() override {
+    return resize_event_;
+  }
+
+  EventManager<void(int, int)> &FramebufferResizeEvent() override {
+    return framebufferresize_event_;
+  }
+
+  EventManager<void(bool)> &CursorEnterEvent() override {
+    return cursorenter_event_;
+  }
+
+  EventManager<void(bool)> &FocusEvent() override {
+    return focus_event_;
+  }
+
+  EventManager<void(double, double)> &MouseMoveEvent() override {
+    return mousemove_event_;
+  }
+
+  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override {
+    return mousebutton_event_;
+  }
+
+  EventManager<void(double, double)> &ScrollEvent() override {
+    return scroll_event_;
+  }
+
+  EventManager<void(int, int, int, int)> &KeyEvent() override {
+    return key_event_;
+  }
+
+  EventManager<void(uint32_t)> &CharEvent() override {
+    return char_event_;
+  }
+
+  EventManager<void(int, const char **)> &DropEvent() override {
+    return drop_event_;
+  }
+
+ private:
+  bool invalid_{true};
+  IBackendDevice *device_{};
+  IBackendQueue *queue_{};
+  std::unique_ptr<WindowImGui> imgui_{};
+  std::unique_ptr<ImagePresenter> presenter_{};
+  bool processing_imgui_{};
+  EventManager<void(int, int)> resize_event_{};
+  EventManager<void(int, int)> framebufferresize_event_{};
+  EventManager<void(bool)> cursorenter_event_{};
+  EventManager<void(bool)> focus_event_{};
+  EventManager<void(double, double)> mousemove_event_{};
+  EventManager<void(int, int, int, double, double)> mousebutton_event_{};
+  EventManager<void(double, double)> scroll_event_{};
+  EventManager<void(int, int, int, int)> key_event_{};
+  EventManager<void(uint32_t)> char_event_{};
+  EventManager<void(int, const char **)> drop_event_{};
+  PresentMode requested_mode_{PRESENT_MODE_VSYNC};
+  ColorSpace requested_color_space_{COLOR_SPACE_SRGB_NONLINEAR};
+  ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
+  GLFWwindow *window_{};
+  std::mutex next_image_mutex_{};
+  ObjectPtr<IBackendImage> next_image_{};
 };
 
 class TestImage final : public backend::Object<backend::IBackendImage> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, backend::IBackendImage, rhi::IImage)
 
- public:
   explicit TestImage(std::shared_ptr<Gate> gate, backend::IBackendWindow *window = nullptr)
       : gate_(std::move(gate)),
         window_(window) {
@@ -226,24 +499,25 @@ class TestImage final : public backend::Object<backend::IBackendImage> {
   std::shared_ptr<Gate> gate_;
   backend::IBackendWindow *window_;
 
- private:
-  backend::ImageState state_;
+  ImageDesc desc_{};
+  backend::IBackendQueue *queue_{};
 
-  backend::ImageState &StateImage() override {
-    return state_;
-  }
-
-  const backend::ImageState &StateImage() const override {
-    return state_;
+  void InitializeImage(ImageDesc desc, backend::IBackendQueue *queue = nullptr) {
+    desc_ = desc;
+    queue_ = queue;
   }
 
  public:
   const ImageDesc &GetDesc() const override {
-    return backend::IBackendImage::CommonGetDesc();
+    return desc_;
   }
 
   bool SupportsStorage() const override {
-    return backend::IBackendImage::CommonSupportsStorage();
+    return false;
+  }
+
+  bool SupportsQueue(const backend::IBackendQueue *queue) const override {
+    return !queue_ || queue_ == queue;
   }
 };
 
@@ -267,7 +541,6 @@ class TestTimeline final : public backend::Object<backend::IBackendTimeline> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ITimeline, backend::IBackendTimeline, ITimeline)
 
- public:
   TestTimeline(backend::IBackendDevice *device, std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
     InitializeTimeline(device);
   }
@@ -291,27 +564,26 @@ class TestTimeline final : public backend::Object<backend::IBackendTimeline> {
     gate_->changed.notify_all();
   }
 
+  backend::IBackendDevice *Owner() const override {
+    return owner_;
+  }
+
  private:
   uint64_t value_{};
+
   std::shared_ptr<Gate> gate_;
 
- private:
-  backend::TimelineState state_;
-
-  backend::TimelineState &StateTimeline() override {
-    return state_;
+  void InitializeTimeline(backend::IBackendDevice *device) {
+    owner_ = device;
   }
 
-  const backend::TimelineState &StateTimeline() const override {
-    return state_;
-  }
+  backend::IBackendDevice *owner_{};
 };
 
 class TestCommandContext final : public backend::Object<backend::IBackendCommandContext> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, backend::IBackendCommandContext, rhi::ICommandContext)
 
- public:
   TestCommandContext(rhi::IQueue *queue, std::shared_ptr<Gate> gate, bool fail_after_submit = false)
       : gate_(std::move(gate)),
         fail_after_submit_(fail_after_submit) {
@@ -329,7 +601,7 @@ class TestCommandContext final : public backend::Object<backend::IBackendCommand
   bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override {
 #if !defined(NDEBUG)
     if (!image) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
 #endif
@@ -341,10 +613,10 @@ class TestCommandContext final : public backend::Object<backend::IBackendCommand
 
   bool CmdPresent(rhi::IWindow *window) override {
 #if !defined(NDEBUG)
-    if (StateCommandContext().sealed_ || !window)
+    if (sealed_ || !window)
       return false;
 #endif
-    if (StateCommandContext().recording_failed_)
+    if (recording_failed_)
       return false;
     ++recorded_presents;
     return true;
@@ -389,66 +661,246 @@ class TestCommandContext final : public backend::Object<backend::IBackendCommand
   std::shared_ptr<Gate> gate_;
   bool fail_after_submit_;
 
- private:
-  backend::CommandContextState state_;
-
-  backend::CommandContextState &StateCommandContext() override {
-    return state_;
-  }
-
-  const backend::CommandContextState &StateCommandContext() const override {
-    return state_;
-  }
-
  public:
   bool CmdDrawImGui(IWindow *window, IImage *target) override {
-    return backend::IBackendCommandContext::CommonCmdDrawImGui(window, target);
+    auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
+    auto image = rhi::QueryInterfacePtr<IBackendImage>(target).Get();
+    if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
+        (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) ||
+        !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+      recording_failed_ = true;
+      ReportError(-1,
+                  "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
+      return false;
+    }
+    const auto format = target->GetDesc().format;
+    if (!IsColorFormat(format) || IsSignedIntegerFormat(format) || IsUnsignedIntegerFormat(format)) {
+      recording_failed_ = true;
+      ReportError(-1, "CmdDrawImGui requires a non-integer color target.");
+      return false;
+    }
+    if (!RetainResource(target))
+      return false;
+    if (!native->RecordImGui(this, target, COLOR_SPACE_BT709_LINEAR, 1.0f)) {
+      recording_failed_ = true;
+      return false;
+    }
+    return true;
   }
 
   bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override {
-    return backend::IBackendCommandContext::CommonCmdPresentImage(window, frame_img, frame_color_space);
+    auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
+    auto image = rhi::QueryInterfacePtr<IBackendImage>(frame_img).Get();
+    if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
+        (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) ||
+        !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+      recording_failed_ = true;
+      ReportError(
+          -1, "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");
+      return false;
+    }
+    if (!RetainResource(frame_img))
+      return false;
+    if (!native->RecordPresentImage(this, frame_img, frame_color_space)) {
+      recording_failed_ = true;
+      return false;
+    }
+    return CmdPresent(window);
   }
 
-  bool CmdQueryCompactedSize(IAccelerationStructure *structure) override {
-    return backend::IBackendCommandContext::CommonCmdQueryCompactedSize(structure);
+  bool CmdBuildBottomLevelAccelerationStructure(IBottomLevelAccelerationStructure *,
+                                                const std::vector<rhi::AccelerationStructureGeometryBuffers> &,
+                                                AccelerationStructureBuildMode) override {
+    recording_failed_ = true;
+    return false;
   }
 
-  bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override {
-    return backend::IBackendCommandContext::CommonCmdCompactAccelerationStructure(source, destination);
+  bool CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *,
+                                             const std::vector<rhi::RayTracingInstance> &,
+                                             AccelerationStructureBuildMode) override {
+    recording_failed_ = true;
+    return false;
   }
 
-  bool CmdBuildBottomLevelAccelerationStructure(
-      IBottomLevelAccelerationStructure *destination,
-      const std::vector<rhi::AccelerationStructureGeometryBuffers> &geometries,
-      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override {
-    return backend::IBackendCommandContext::CommonCmdBuildBottomLevelAccelerationStructure(destination, geometries,
-                                                                                           mode);
+  bool CmdBindRayTracingProgram(IRayTracingProgram *) override {
+    recording_failed_ = true;
+    return false;
   }
 
-  bool CmdBuildTopLevelAccelerationStructure(
-      ITopLevelAccelerationStructure *destination,
-      const std::vector<rhi::RayTracingInstance> &instances,
-      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override {
-    return backend::IBackendCommandContext::CommonCmdBuildTopLevelAccelerationStructure(destination, instances, mode);
+  bool CmdDispatchRays(uint32_t, uint32_t, uint32_t, IShaderBindingTable *) override {
+    recording_failed_ = true;
+    return false;
   }
 
-  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override {
-    return backend::IBackendCommandContext::CommonCmdBindRayTracingProgram(program);
+  bool CmdBindComputeProgram(IComputeProgram *) override {
+    recording_failed_ = true;
+    return false;
   }
 
-  bool CmdDispatchRays(uint32_t width,
-                       uint32_t height,
-                       uint32_t depth = 1,
-                       IShaderBindingTable *sbt = nullptr) override {
-    return backend::IBackendCommandContext::CommonCmdDispatchRays(width, height, depth, sbt);
+  bool CmdDispatch(uint32_t, uint32_t, uint32_t) override {
+    recording_failed_ = true;
+    return false;
   }
 
+  bool CmdBindGroup(uint32_t, IBindingGroup *) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+  bool CmdUploadImage(IImage *, const void *, uint64_t) override {
+    recording_failed_ = true;
+    return false;
+  }
+
+ private:
+  bool PrepareRendering(const rhi::RenderingInfo &info) {
+    auto next = info;
+    if (next.color_attachments.size() > 8 || (next.color_attachments.empty() && !next.depth_stencil.image)) {
+      recording_failed_ = true;
+      return false;
+    }
+    std::vector<IImage *> images;
+    auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
+      auto native = rhi::QueryInterfacePtr<IBackendImage>(image).Get();
+      if (!native || !native->IsValid() ||
+          (native->DeviceIdentity() != DeviceIdentity() || !native->SupportsQueue(OwnerQueue())) ||
+          IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
+          load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE || store > ATTACHMENT_STORE_OP_DISCARD)
+        return false;
+      for (auto previous : images)
+        if (previous == image || previous->GetDesc().width != image->GetDesc().width ||
+            previous->GetDesc().height != image->GetDesc().height)
+          return false;
+      images.push_back(image);
+      return RetainResource(image);
+    };
+    for (auto color : next.color_attachments)
+      if (!validate(color.color_attachment, false, color.load_op, color.store_op)) {
+        recording_failed_ = true;
+        return false;
+      }
+    const auto &ds = next.depth_stencil;
+    if (ds.image &&
+        (!validate(ds.image, true, ds.depth_load_op, ds.depth_store_op) ||
+         ds.stencil_load_op < ATTACHMENT_LOAD_OP_LOAD || ds.stencil_load_op > ATTACHMENT_LOAD_OP_DISCARD ||
+         ds.stencil_store_op < ATTACHMENT_STORE_OP_STORE || ds.stencil_store_op > ATTACHMENT_STORE_OP_DISCARD ||
+         !(ds.clear_value.depth >= 0 && ds.clear_value.depth <= 1))) {
+      recording_failed_ = true;
+      return false;
+    }
+    rendering_ = std::move(next);
+    return true;
+  }
+
+  bool RenderingMatches(const IProgram *program) const {
+    const auto &desc = program->GetDesc();
+    if (desc.color_formats.size() != rendering_.color_attachments.size())
+      return false;
+    for (size_t i = 0; i < desc.color_formats.size(); ++i)
+      if (desc.color_formats[i] != rendering_.color_attachments[i].color_attachment->GetDesc().format)
+        return false;
+    return desc.depth_stencil.format ==
+           (rendering_.depth_stencil.image ? rendering_.depth_stencil.image->GetDesc().format : IMAGE_FORMAT_UNKNOWN);
+  }
+
+  void InitializeCommandContext(IBackendQueue *queue) {
+    queue_ = queue;
+  }
+
+ public:
   rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override {
-    return backend::IBackendCommandContext::CommonSubmit(info);
+    try {
+      return queue_->Submit(ObjectPtr<IBackendCommandContext>::Retain(this), info).Detach();
+    } catch (const std::system_error &error) {
+      ReportError(error.code().value(), error.what());
+    }
+    return nullptr;
+  }
+
+  void BindDownloads(IBackendSubmissionToken *submission) override {
+    for (const auto &token : downloads_)
+      token->BindSubmission(submission);
+  }
+
+  void ReleaseDownloads() override {
+    downloads_.clear();
+  }
+
+ private:
+  IDownloadToken *RegisterDownload(ObjectPtr<IBackendDownloadToken> token) {
+    downloads_.push_back(token);
+    return token.Detach();
+  }
+
+ public:
+  IDownloadToken *CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t) override {
+    recording_failed_ = true;
+    return nullptr;
+  }
+
+  IDownloadToken *CmdDownloadImage(IImage *, const ImageDownloadRegion &) override {
+    recording_failed_ = true;
+    return nullptr;
+  }
+
+ private:
+  template <typename T, std::enable_if_t<!std::is_convertible_v<T *, rhi::IObject *>, int> = 0>
+  bool RetainResource(T *resource) {
+    return RetainResource(rhi::QueryInterfacePtr<rhi::IObject>(resource).Get());
+  }
+
+  bool RetainResource(rhi::IObject *resource) {
+#if !defined(NDEBUG)
+    if (sealed_)
+      return false;
+#endif
+    if (recording_failed_)
+      return false;
+    if (resources_.find(resource) != resources_.end())
+      return true;
+    resources_.emplace(resource, ObjectPtr<rhi::IObject>::Retain(resource));
+
+    return true;
+  }
+
+ public:
+  bool Seal() override {
+    if (recording_failed_)
+      return false;
+#if !defined(NDEBUG)
+    if (sealed_) {
+      ReportError(-1, "Cannot submit a command context twice.");
+      return false;
+    }
+#endif
+    sealed_ = true;
+    if (!EndRecording()) {
+      recording_failed_ = true;
+      return false;
+    }
+    return true;
+  }
+
+  IBackendQueue *OwnerQueue() const override {
+    return queue_;
+  }
+
+  const void *DeviceIdentity() const override {
+    return queue_->Owner();
+  }
+
+  void MarkSubmitted() override {
+    submitted_ = true;
+  }
+
+  bool WasSubmitted() const override {
+    return submitted_;
   }
 
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override {
-    return backend::IBackendCommandContext::CommonCmdUploadBuffer(buffer, offset, data, size);
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
   bool CmdCopyBuffer(IBuffer *source,
@@ -456,84 +908,96 @@ class TestCommandContext final : public backend::Object<backend::IBackendCommand
                      IBuffer *destination,
                      uint64_t destination_offset,
                      uint64_t size) override {
-    return backend::IBackendCommandContext::CommonCmdCopyBuffer(source, source_offset, destination, destination_offset,
-                                                                size);
-  }
-
-  bool CmdBindGroup(uint32_t index, IBindingGroup *group) override {
-    return backend::IBackendCommandContext::CommonCmdBindGroup(index, group);
-  }
-
-  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override {
-    return backend::IBackendCommandContext::CommonCmdUploadImage(image, data, row_pitch);
-  }
-
-  bool CmdBindComputeProgram(IComputeProgram *program) override {
-    return backend::IBackendCommandContext::CommonCmdBindComputeProgram(program);
-  }
-
-  bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override {
-    return backend::IBackendCommandContext::CommonCmdDispatch(x, y, z);
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
   bool CmdBindProgram(IProgram *program) override {
-    return backend::IBackendCommandContext::CommonCmdBindProgram(program);
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
   bool CmdBeginRendering(const rhi::RenderingInfo &info) override {
-    return backend::IBackendCommandContext::CommonCmdBeginRendering(info);
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
   bool CmdEndRendering() override {
-    return backend::IBackendCommandContext::CommonCmdEndRendering();
+    recording_failed_ = true;
+    ReportError(-1, "Drawing is not implemented for this backend.");
+    return false;
   }
 
-  bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) override {
-    return backend::IBackendCommandContext::CommonCmdBindVertexBuffer(binding, buffer, offset);
+  bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) override {
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
-  bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) override {
-    return backend::IBackendCommandContext::CommonCmdBindIndexBuffer(buffer, format, offset);
+  bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) override {
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
   bool CmdSetViewport(const Viewport &viewport) override {
-    return backend::IBackendCommandContext::CommonCmdSetViewport(viewport);
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
   bool CmdSetScissor(const Scissor &scissor) override {
-    return backend::IBackendCommandContext::CommonCmdSetScissor(scissor);
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
   bool CmdDraw(uint32_t vertex_count,
-               uint32_t instance_count = 1,
-               uint32_t first_vertex = 0,
-               uint32_t first_instance = 0) override {
-    return backend::IBackendCommandContext::CommonCmdDraw(vertex_count, instance_count, first_vertex, first_instance);
+               uint32_t instance_count,
+               uint32_t first_vertex,
+               uint32_t first_instance) override {
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
   bool CmdDrawIndexed(uint32_t index_count,
-                      uint32_t instance_count = 1,
-                      uint32_t first_index = 0,
-                      int32_t vertex_offset = 0,
-                      uint32_t first_instance = 0) override {
-    return backend::IBackendCommandContext::CommonCmdDrawIndexed(index_count, instance_count, first_index,
-                                                                 vertex_offset, first_instance);
+                      uint32_t instance_count,
+                      uint32_t first_index,
+                      int32_t vertex_offset,
+                      uint32_t first_instance) override {
+    recording_failed_ = true;
+    ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+    return false;
   }
 
-  IDownloadToken *CmdDownloadBuffer(IBuffer *argument0, uint64_t argument1, uint64_t argument2) override {
-    return backend::IBackendCommandContext::CommonCmdDownloadBuffer(argument0, argument1, argument2);
+  bool CmdQueryCompactedSize(IAccelerationStructure *) override {
+    recording_failed_ = true;
+    return false;
   }
 
-  IDownloadToken *CmdDownloadImage(IImage *argument0, const ImageDownloadRegion &argument1) override {
-    return backend::IBackendCommandContext::CommonCmdDownloadImage(argument0, argument1);
+  bool CmdCompactAccelerationStructure(IAccelerationStructure *, IAccelerationStructure *) override {
+    recording_failed_ = true;
+    return false;
   }
+
+ private:
+  rhi::RenderingInfo rendering_{};
+  bool recording_failed_{};
+  bool sealed_{};
+  IBackendQueue *queue_{};
+  std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
+  bool submitted_{};
+  std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};
 };
 
 class TestQueue final : public backend::Object<backend::IBackendQueue> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, backend::IBackendQueue, rhi::IQueue)
 
- public:
   TestTimeline *GetTimeline() const override {
     return timeline_.get();
   }
@@ -552,33 +1016,133 @@ class TestQueue final : public backend::Object<backend::IBackendQueue> {
   std::shared_ptr<Gate> gate_;
   std::unique_ptr<TestTimeline> timeline_;
 
- private:
-  backend::QueueState state_;
-
-  backend::QueueState &StateQueue() override {
-    return state_;
+ public:
+  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IBackendCommandContext> &commands,
+                                            const SubmitInfo &info) override {
+    if (!commands->Seal())
+      return {};
+    SubmitInfo native_info;
+    native_info.waits.reserve(info.waits.size());
+    for (const auto &wait : info.waits) {
+      auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(wait.timeline).Get();
+      if (!timeline || timeline->Owner() != device_) {
+        ReportError(-1, "Submission waits require a timeline from this device.");
+        return {};
+      }
+      // A submit waits for all dependencies; Vulkan requires unique semaphore handles.
+      auto existing = std::find_if(native_info.waits.begin(), native_info.waits.end(),
+                                   [&](const Event &event) { return event.timeline == wait.timeline; });
+      if (existing == native_info.waits.end())
+        native_info.waits.push_back(wait);
+      else
+        existing->value = std::max(existing->value, wait.value);
+    }
+    std::unique_lock<std::mutex> queue_lock(*mutex_);
+    const Event signal{GetTimeline(), NextSerial()};
+    auto completion = ObjectPtr<IBackendSubmissionToken>::Adopt(IBackendSubmissionToken::Create(signal));
+    // Register before native submission, while the collector cannot take the list.
+    auto entry = pending_.insert(pending_.end(), {commands, completion});
+    IBackendCommandContext::SubmitResult result;
+    try {
+      commands->BindDownloads(completion.Get());
+      result = commands->SubmitNative(native_info, signal);
+      if (result == IBackendCommandContext::SUBMIT_RESULT_REJECTED) {
+        pending_.erase(entry);
+        completion->Complete(SUBMISSION_STATUS_FAILED);
+        commands->ReleaseDownloads();
+        return {};
+      }
+      commands->MarkSubmitted();
+    } catch (...) {
+      if (!commands->WasSubmitted()) {
+        pending_.erase(entry);
+        completion->Complete(SUBMISSION_STATUS_FAILED);
+        commands->ReleaseDownloads();
+      }
+      throw;
+    }
+    queue_lock.unlock();
+    // The caller's context reference keeps it alive while the collector retires it.
+    // Next-frame preparation belongs to the Window, not this submission's result.
+    if (result == IBackendCommandContext::SUBMIT_RESULT_SUBMITTED)
+      commands->UpdatePresentedImages();
+    return result == IBackendCommandContext::SUBMIT_RESULT_SUBMITTED ? completion
+                                                                     : ObjectPtr<IBackendSubmissionToken>{};
   }
 
-  const backend::QueueState &StateQueue() const override {
-    return state_;
+  bool CollectCompleted(uint64_t completed, bool timeline_valid) override {
+    std::list<Submission> work;
+    {
+      std::lock_guard<std::mutex> lock(*mutex_);
+      work.splice(work.end(), pending_);
+    }
+    // Polling may submit a recovery signal; releasing resources may acquire other
+    // backend locks. Neither operation runs under the submission mutex.
+    for (auto it = work.begin(); it != work.end();) {
+      const auto status = it->commands->PollCompletion(it->completion->GetEvent(), completed, timeline_valid);
+      if (status == SUBMISSION_STATUS_PENDING) {
+        ++it;
+        continue;
+      }
+      it->commands->ReleaseDownloads();
+      it->commands.Reset();
+      it->completion->Complete(status);
+      it = work.erase(it);
+    }
+    std::lock_guard<std::mutex> lock(*mutex_);
+    pending_.splice(pending_.begin(), work);
+    return pending_.empty();
+  }
+
+ private:
+  void InitializeQueue(IBackendDevice *device,
+                       QueueType type,
+                       std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>()) {
+    device_ = device;
+    type_ = type;
+    mutex_ = std::move(mutex);
   }
 
  public:
-  QueueType GetType() const override {
-    return backend::IBackendQueue::CommonGetType();
+  std::mutex &QueueMutex() override {
+    return *mutex_;
   }
+
+  uint64_t NextSerial() override {
+    return ++serial_;
+  }
+
+  IBackendDevice *Owner() const override {
+    return device_;
+  }
+
+  QueueType GetType() const override {
+    return type_;
+  }
+
+ private:
+  struct Submission {
+    ObjectPtr<IBackendCommandContext> commands;
+    ObjectPtr<IBackendSubmissionToken> completion;
+  };
+
+  std::list<Submission> pending_{};
+  IBackendDevice *device_{};
+  QueueType type_{};
+  // Logical queues that share a native queue also share its host synchronization.
+  std::shared_ptr<std::mutex> mutex_{};
+  uint64_t serial_{};
 };
 
 class TestDevice final : public backend::Object<backend::IBackendDevice> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::IBackendDevice, rhi::IDevice)
 
- public:
   explicit TestDevice(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
     InitializeDevice({}, {});
 
     for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
-      StateDevice().queues_[type] = ObjectPtr<backend::IBackendQueue>::Adopt(new TestQueue(this, type, gate_));
+      queues_[type] = ObjectPtr<backend::IBackendQueue>::Adopt(new TestQueue(this, type, gate_));
     StartCollector();
   }
 
@@ -634,87 +1198,174 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
 
   std::shared_ptr<Gate> gate_;
 
- private:
-  backend::DeviceState state_;
-
-  backend::DeviceState &StateDevice() override {
-    return state_;
-  }
-
-  const backend::DeviceState &StateDevice() const override {
-    return state_;
-  }
-
  public:
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
-      const BottomLevelAccelerationStructureDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateBottomLevelAccelerationStructure(desc);
+      const BottomLevelAccelerationStructureDesc &) override {
+    ReportError(-1, "Acceleration structures are unavailable for this backend.");
+    return nullptr;
   }
 
   ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
-      const TopLevelAccelerationStructureDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateTopLevelAccelerationStructure(desc);
+      const TopLevelAccelerationStructureDesc &) override {
+    ReportError(-1, "Acceleration structures are unavailable for this backend.");
+    return nullptr;
   }
 
-  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateRayTracingProgram(desc);
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &) override {
+    ReportError(-1, "Ray tracing pipelines are unavailable for this backend.");
+    return nullptr;
   }
 
-  std::string Name() const override {
-    return backend::IBackendDevice::CommonName();
+ private:
+  void InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api = BACKEND_API_DEFAULT) {
+    api_ = api;
+    core_ = core;
+    info_ = std::move(info);
   }
 
-  bool SupportRayTracingPipeline() const override {
-    return backend::IBackendDevice::CommonSupportRayTracingPipeline();
+ public:
+  rhi::IImage *CreateImage(const ImageDesc &) override {
+    ReportError(-1, "Independent images are not implemented for this backend.");
+    return nullptr;
   }
 
-  bool SupportRayQuery() const override {
-    return backend::IBackendDevice::CommonSupportRayQuery();
+  rhi::IBuffer *CreateBuffer(const BufferDesc &) override {
+    ReportError(-1, "Buffers are not implemented for this backend.");
+    return nullptr;
   }
 
-  bool SupportGeometryShader() const override {
-    return backend::IBackendDevice::CommonSupportGeometryShader();
+  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &) override {
+    ReportError(-1, "Compute programs are not implemented for this backend.");
+    return nullptr;
   }
 
-  rhi::IImage *CreateImage(const ImageDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateImage(desc);
-  }
-
-  ISampler *CreateSampler(const SamplerDesc &desc = {}) override {
-    return backend::IBackendDevice::CommonCreateSampler(desc);
-  }
-
-  rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override {
-    return backend::IBackendDevice::CommonCreateBindingGroup(layout);
-  }
-
-  rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateBuffer(desc);
-  }
-
-  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateComputeProgram(desc);
-  }
-
-  rhi::IProgram *CreateProgram(const ProgramDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateProgram(desc);
+  rhi::IProgram *CreateProgram(const ProgramDesc &) override {
+    ReportError(-1, "Graphics programs are not implemented for this backend.");
+    return nullptr;
   }
 
   rhi::IShader *CreateShader(const ShaderDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateShader(desc);
+    if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+        desc.stage > SHADER_STAGE_CALLABLE)
+      return nullptr;
+    return IBackendShader::Create(desc, api_);
   }
 
-  rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override {
-    return backend::IBackendDevice::CommonCreateGLFWWindow(desc);
+  ISampler *CreateSampler(const SamplerDesc &) override {
+    ReportError(-1, "Samplers are not implemented for this backend.");
+    return nullptr;
+  }
+
+  IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &) override {
+    ReportError(-1, "Binding groups are not implemented for this backend.");
+    return nullptr;
+  }
+
+ private:
+  void DestroyDevice() {
+    ShutdownQueues();
+  }
+
+ public:
+  std::string Name() const override {
+    return info_.name;
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return info_.ray_tracing_pipeline_feature;
+  }
+
+  bool SupportRayQuery() const override {
+    return info_.ray_query_feature;
+  }
+
+  bool SupportGeometryShader() const override {
+    return info_.geometry_shader_feature;
+  }
+
+  rhi::IWindow *CreateGLFWWindow(const WindowDesc &) override {
+    ReportError(-1, "Window creation is unavailable.");
+    return nullptr;
   }
 
   rhi::IQueue *GetQueue(QueueType type) override {
-    return backend::IBackendDevice::CommonGetQueue(type);
+    if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+      return nullptr;
+    return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
   }
 
-  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override {
-    return backend::IBackendDevice::CommonWaitEvents(events, wait_all);
+  const PhysicalDevice &GetPhysicalDevice() const noexcept override {
+    return info_;
   }
+
+ private:
+  IBackendCore *OwnerCore() const {
+    return core_;
+  }
+
+  void StartCollector() {
+    collector_ = std::thread([this] { Collect(); });
+  }
+
+ public:
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all) const override {
+    if (events.empty())
+      return wait_all;
+    std::vector<Event> unique;
+    unique.reserve(events.size());
+    for (const auto &event : events) {
+      auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+      if (!timeline || timeline->Owner() != this) {
+        ReportError(-1, "Host waits require timelines from this device.");
+        return false;
+      }
+      auto found = std::find_if(unique.begin(), unique.end(),
+                                [&](const Event &other) { return other.timeline == event.timeline; });
+      if (found == unique.end())
+        unique.push_back(event);
+      else
+        found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
+    }
+    return WaitNativeEvents(unique, wait_all);
+  }
+
+ private:
+  void Collect() {
+    std::vector<Event> next;
+    next.reserve(queues_.size());
+    for (;;) {
+      next.clear();
+      bool empty = true;
+      for (const auto &queue : queues_) {
+        if (!queue)
+          continue;
+        uint64_t completed = 0;
+        const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+        if (timeline_valid && completed != UINT64_MAX)
+          next.push_back({queue->GetTimeline(), completed + 1});
+        if (!queue->CollectCompleted(completed, timeline_valid))
+          empty = false;
+      }
+      if (stopping_ && empty)
+        return;
+      WaitForProgress(next);
+    }
+  }
+
+  void ShutdownQueues() {
+    if (!collector_.joinable())
+      return;
+    stopping_ = true;
+    InterruptCollector();
+    collector_.join();
+  }
+
+  std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
+  std::atomic<bool> stopping_{};
+  BackendAPI api_{};
+  IBackendCore *core_{};
+  PhysicalDevice info_{};
+  std::thread collector_{};
 };
 
 TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {

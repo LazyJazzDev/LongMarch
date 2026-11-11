@@ -182,12 +182,9 @@ rhi::IDevice *VulkanCoreImpl::CreateDevice(int32_t device_idx) {
   return IVulkanDevice::CreateVulkanDevice(adapter.info, this, adapter.native, adapter.api_version);
 }
 
-}  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanCore, "38b5aac6-db8d-4fe0-86ac-ed06f0b3c970")
-
-namespace grassland::rhi::backend::vulkan {
 IVulkanCore *IVulkanCore::CreateVulkanCore(const CoreDesc &desc) {
   return VulkanCoreImpl::CreateVulkanCore(desc);
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanCore, "38b5aac6-db8d-4fe0-86ac-ed06f0b3c970")

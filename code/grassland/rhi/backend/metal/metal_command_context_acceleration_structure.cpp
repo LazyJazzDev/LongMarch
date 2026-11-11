@@ -11,12 +11,12 @@ bool MetalCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     const std::vector<AccelerationStructureGeometryBuffers> &geometries,
     AccelerationStructureBuildMode mode) {
   auto target = rhi::QueryInterfacePtr<IMetalBottomLevelAccelerationStructure>(destination).Get();
-  if (StateCommandContext().sealed_ || encoder_ || !target || target->Owner() != device_ ||
+  if (sealed_ || encoder_ || !target || target->Owner() != device_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
       !ValidateGeometryBuffers(target->GetDesc(), geometries, device_)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
@@ -30,7 +30,7 @@ bool MetalCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
   auto descriptor = NativeGeometries(target->GetDesc(), geometries);
   auto encoder = commands_->accelerationStructureCommandEncoder();
   if (!encoder) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   // Buffers and AS use tracked storage. Serial encoders declare all scratch and
@@ -49,19 +49,19 @@ bool MetalCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
                                                                     const std::vector<RayTracingInstance> &instances,
                                                                     AccelerationStructureBuildMode mode) {
   auto target = rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(destination).Get();
-  if (StateCommandContext().sealed_ || encoder_ || !target || target->Owner() != device_ ||
+  if (sealed_ || encoder_ || !target || target->Owner() != device_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
       !ValidateInstances(target->GetDesc(), instances)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (mode == ACCELERATION_STRUCTURE_UPDATE) {
     auto pending = as_dependencies_.find(target);
     auto count = pending == as_dependencies_.end() ? target->BottomLevels().size() : pending->second.size();
     if (count != instances.size()) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
   }
@@ -75,14 +75,14 @@ bool MetalCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
     const auto &instance = instances[i];
     auto blas = rhi::QueryInterfacePtr<IMetalBottomLevelAccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
     for (int c = 0; c < 4; ++c)
       for (int r = 0; r < 3; ++r) {
         auto value = instance.transform[r * 4 + c];
         if (!std::isfinite(value)) {
-          StateCommandContext().recording_failed_ = true;
+          recording_failed_ = true;
           return false;
         }
         native[i].transformationMatrix.columns[c][r] = value;
@@ -123,7 +123,7 @@ bool MetalCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
   as_dependencies_[target] = std::move(dependencies);
   auto encoder = commands_->accelerationStructureCommandEncoder();
   if (!encoder) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   encoder->useResource(scratch->NativeBuffer(), MTL::ResourceUsageRead | MTL::ResourceUsageWrite);
@@ -140,9 +140,8 @@ bool MetalCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
 
 bool MetalCommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *structure) {
   auto target = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(structure).Get();
-  if (StateCommandContext().sealed_ || encoder_ || !target || target->Owner() != device_ ||
-      !target->AllowsCompaction()) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || encoder_ || !target || target->Owner() != device_ || !target->AllowsCompaction()) {
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(structure))
@@ -150,7 +149,7 @@ bool MetalCommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *stru
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto encoder = commands_->accelerationStructureCommandEncoder();
   if (!encoder) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   encoder->writeCompactedAccelerationStructureSize(target->NativeStructure(), target->CompactionQuery(), 0,
@@ -163,10 +162,9 @@ bool MetalCommandContextImpl::CmdCompactAccelerationStructure(IAccelerationStruc
                                                               IAccelerationStructure *destination) {
   auto from = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(source).Get();
   auto to = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(destination).Get();
-  if (StateCommandContext().sealed_ || encoder_ || !from || !to || from == to || from->Owner() != device_ ||
-      to->Owner() != device_ || !from->AllowsCompaction() || !to->IsCompactStorage() ||
-      source->GetType() != destination->GetType()) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || encoder_ || !from || !to || from == to || from->Owner() != device_ || to->Owner() != device_ ||
+      !from->AllowsCompaction() || !to->IsCompactStorage() || source->GetType() != destination->GetType()) {
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(source) || !RetainResource(destination))
@@ -186,7 +184,7 @@ bool MetalCommandContextImpl::CmdCompactAccelerationStructure(IAccelerationStruc
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto encoder = commands_->accelerationStructureCommandEncoder();
   if (!encoder) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   encoder->copyAndCompactAccelerationStructure(from->NativeStructure(), to->NativeStructure());

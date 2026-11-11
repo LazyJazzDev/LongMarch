@@ -9,27 +9,16 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTopLevelAcceler
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalBottomLevelAccelerationStructure)
 
 namespace grassland::rhi::backend::metal {
-struct MetalAccelerationStructureState;
-
 class IMetalAccelerationStructure : public IObject {
  public:
-  IMetalDevice *Owner() const;
-  MTL::AccelerationStructure *NativeStructure() const;
-  MTL::Buffer *CompactionQuery() const;
-  uint64_t ScratchSize(AccelerationStructureBuildMode mode) const;
-  uint64_t ReadCompactedSize() const;
-  bool AllowsUpdate() const;
-  bool AllowsCompaction() const;
-  bool IsCompactStorage() const;
-
- protected:
-  void InitializeMetalAccelerationStructure(IMetalDevice *device);
-  bool Allocate(MTL::AccelerationStructureDescriptor *descriptor,
-                bool update,
-                bool compaction,
-                uint64_t compacted_size);
-  virtual MetalAccelerationStructureState &StateMetalAccelerationStructure() = 0;
-  virtual const MetalAccelerationStructureState &StateMetalAccelerationStructure() const = 0;
+  virtual IMetalDevice *Owner() const = 0;
+  virtual MTL::AccelerationStructure *NativeStructure() const = 0;
+  virtual MTL::Buffer *CompactionQuery() const = 0;
+  virtual uint64_t ScratchSize(AccelerationStructureBuildMode mode) const = 0;
+  virtual uint64_t ReadCompactedSize() const = 0;
+  virtual bool AllowsUpdate() const = 0;
+  virtual bool AllowsCompaction() const = 0;
+  virtual bool IsCompactStorage() const = 0;
 };
 
 class IMetalBottomLevelAccelerationStructure : public IBottomLevelAccelerationStructure,
@@ -45,15 +34,12 @@ class IMetalBottomLevelAccelerationStructure : public IBottomLevelAccelerationSt
     return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
   }
 
- public:
   static IMetalBottomLevelAccelerationStructure *Create(IMetalDevice *device,
                                                         const BottomLevelAccelerationStructureDesc &desc);
   virtual AccelerationStructureType GetType() const = 0;
   virtual uint64_t GetCompactedSize() const = 0;
   virtual const BottomLevelAccelerationStructureDesc &GetDesc() const = 0;
 };
-
-;
 
 class IMetalTopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public IMetalAccelerationStructure {
  public:
@@ -67,7 +53,6 @@ class IMetalTopLevelAccelerationStructure : public ITopLevelAccelerationStructur
     return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
   }
 
- public:
   static IMetalTopLevelAccelerationStructure *Create(IMetalDevice *device,
                                                      const TopLevelAccelerationStructureDesc &desc);
   virtual AccelerationStructureType GetType() const = 0;
@@ -76,8 +61,6 @@ class IMetalTopLevelAccelerationStructure : public ITopLevelAccelerationStructur
   virtual const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &BottomLevels() const = 0;
   virtual void CommitDependencies(std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references) = 0;
 };
-
-;
 
 MTL::PrimitiveAccelerationStructureDescriptor *NativeGeometries(
     const BottomLevelAccelerationStructureDesc &desc,

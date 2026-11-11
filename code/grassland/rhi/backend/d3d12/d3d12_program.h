@@ -18,10 +18,8 @@ class ID3D12Program : public IBackendProgram, public ID3D12ProgramBase {
     return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
   }
 
- public:
   static ID3D12Program *Create(ID3D12Device *device, const ProgramDesc &desc);
   virtual ID3D12PipelineState *NativePipeline() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::d3d12

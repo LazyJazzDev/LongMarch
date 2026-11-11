@@ -1,7 +1,5 @@
 #pragma once
-#include "grassland/rhi/backend/backend_image_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
-#include "grassland/rhi/backend/vulkan/vulkan_image_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
@@ -25,35 +23,28 @@ class VulkanAllocatedImageImpl final : public Object<IVulkanAllocatedImage> {
   bool storage_{};
   VmaAllocation allocation_{};
 
- private:
-  VulkanImageState state_VulkanImage_;
-
-  VulkanImageState &StateVulkanImage() override {
-    return state_VulkanImage_;
-  }
-
-  const VulkanImageState &StateVulkanImage() const override {
-    return state_VulkanImage_;
-  }
-
- private:
-  ImageState state_Image_;
-
-  ImageState &StateImage() override {
-    return state_Image_;
-  }
-
-  const ImageState &StateImage() const override {
-    return state_Image_;
-  }
+  void InitializeImage(ImageDesc desc, IBackendQueue *queue = nullptr);
 
  public:
-  const void *DeviceIdentity() const override {
-    return IVulkanImage::CommonDeviceIdentity();
-  }
+  bool SupportsQueue(const IBackendQueue *queue) const override;
 
-  const ImageDesc &GetDesc() const override {
-    return IBackendImage::CommonGetDesc();
-  }
+  const ImageDesc &GetDesc() const override;
+
+ private:
+  ImageDesc desc_{};
+  IBackendQueue *queue_{};
+
+  void InitializeVulkanImage(ImageDesc desc,
+                             const void *device,
+                             VkImageLayout default_layout,
+                             IBackendQueue *queue = nullptr);
+
+ public:
+  VkImageLayout DefaultLayout() const override;
+
+  const void *DeviceIdentity() const override;
+
+ private:
+  VkImageLayout default_layout_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

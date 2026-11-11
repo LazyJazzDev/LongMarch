@@ -31,7 +31,6 @@ class D3D12AllocatedBufferImpl final : public Object<ID3D12AllocatedBuffer> {
   void *mapped_{};
   bool download_{};
 
- private:
   ID3D12Device *device_;
   BufferDesc desc_;
 

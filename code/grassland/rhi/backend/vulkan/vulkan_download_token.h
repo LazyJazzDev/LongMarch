@@ -12,5 +12,4 @@ class IVulkanDownloadToken : public IBackendDownloadToken {
   static IVulkanDownloadToken *Create(ObjectPtr<IVulkanTemporalBufferLease> lease, const DownloadLayout &layout);
 };
 
-;
 }  // namespace grassland::rhi::backend::vulkan

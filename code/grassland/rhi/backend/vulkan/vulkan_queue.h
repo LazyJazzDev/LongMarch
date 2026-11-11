@@ -17,6 +17,4 @@ class IVulkanQueue : public IBackendQueue {
   virtual VkResult Wait(uint64_t value, uint64_t timeout = UINT64_MAX) const = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::vulkan

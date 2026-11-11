@@ -18,10 +18,8 @@ class IVulkanComputeProgram : public IBackendComputeProgram, public IVulkanProgr
     return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
   }
 
- public:
   static IVulkanComputeProgram *Create(IVulkanDevice *device, const ComputeProgramDesc &desc);
   virtual VkPipeline NativePipeline() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::vulkan

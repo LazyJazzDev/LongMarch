@@ -17,6 +17,4 @@ class ID3D12SwapChainImage : public ID3D12Image {
   virtual HRESULT Present() = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::d3d12

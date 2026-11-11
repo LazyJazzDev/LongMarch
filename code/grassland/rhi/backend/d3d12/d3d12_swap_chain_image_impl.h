@@ -1,6 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_image_state.h"
-#include "grassland/rhi/backend/d3d12/d3d12_image_state.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
@@ -24,39 +22,39 @@ class D3D12SwapChainImageImpl final : public Object<ID3D12SwapChainImage> {
   bool present_requested_{};
 #endif
 
- private:
-  D3D12ImageState state_D3D12Image_;
-
-  D3D12ImageState &StateD3D12Image() override {
-    return state_D3D12Image_;
-  }
-
-  const D3D12ImageState &StateD3D12Image() const override {
-    return state_D3D12Image_;
-  }
-
- private:
-  ImageState state_Image_;
-
-  ImageState &StateImage() override {
-    return state_Image_;
-  }
-
-  const ImageState &StateImage() const override {
-    return state_Image_;
-  }
+  void InitializeImage(ImageDesc desc, IBackendQueue *queue = nullptr);
 
  public:
-  bool SupportsStorage() const override {
-    return ID3D12Image::CommonSupportsStorage();
-  }
+  bool SupportsQueue(const IBackendQueue *queue) const override;
 
-  const void *DeviceIdentity() const override {
-    return ID3D12Image::CommonDeviceIdentity();
-  }
+  const ImageDesc &GetDesc() const override;
 
-  const ImageDesc &GetDesc() const override {
-    return IBackendImage::CommonGetDesc();
-  }
+ private:
+  ImageDesc desc_{};
+  IBackendQueue *queue_{};
+
+  void InitializeD3D12Image(ImageDesc desc,
+                            const void *device,
+                            ID3D12Resource *image,
+                            ObjectPtr<D3D12DescriptorPool::Lease> attachment,
+                            D3D12_RESOURCE_STATES default_state = D3D12_RESOURCE_STATE_COMMON,
+                            IBackendQueue *queue = nullptr);
+
+ public:
+  D3D12_CPU_DESCRIPTOR_HANDLE AttachmentView() const override;
+
+  bool SupportsStorage() const override;
+
+  const void *DeviceIdentity() const override;
+
+  ID3D12Resource *NativeImage() const override;
+
+  D3D12_RESOURCE_STATES DefaultState() const override;
+
+ private:
+  ObjectPtr<D3D12DescriptorPool::Lease> attachment_{};
+  const void *device_{};
+  ID3D12Resource *image_{};
+  D3D12_RESOURCE_STATES default_state_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

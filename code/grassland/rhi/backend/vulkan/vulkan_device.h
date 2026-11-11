@@ -49,5 +49,4 @@ class IVulkanDevice : public IBackendDevice {
   virtual void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command) = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::vulkan

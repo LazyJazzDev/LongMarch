@@ -1,12 +1,20 @@
 ﻿#include "grassland/rhi/backend/metal/metal_binding_group.h"
 
+#include <algorithm>
 #include <cstring>
+#include <set>
 
+#include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_buffer.h"
+#include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_binding_group_impl.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
 
 namespace grassland::rhi::backend::metal {
 uint32_t MetalArgumentCount(const BindingLayoutDesc &layout) {
@@ -46,7 +54,7 @@ MetalBindingVersionImpl *MetalBindingVersionImpl::Create(IMetalDevice *device, c
   auto result = std::unique_ptr<MetalBindingVersionImpl>(new MetalBindingVersionImpl(device, layout));
   std::vector<MTL::ArgumentDescriptor *> descriptors;
   uint32_t offset = 0;
-  for (auto b : result->StateBindingVersion().layout_.bindings) {
+  for (auto b : result->layout_.bindings) {
     auto d = MTL::ArgumentDescriptor::argumentDescriptor();
     d->setIndex(offset);
     d->setArrayLength(b.count);
@@ -89,14 +97,14 @@ MetalBindingVersionImpl *MetalBindingVersionImpl::Create(IMetalDevice *device, c
 }
 
 ObjectPtr<IBackendBindingVersion> MetalBindingVersionImpl::Clone() const {
-  auto copy = ObjectPtr<MetalBindingVersionImpl>::Adopt(Create(device_, StateBindingVersion().layout_));
+  auto copy = ObjectPtr<MetalBindingVersionImpl>::Adopt(Create(device_, layout_));
   if (!copy)
     return {};
-  copy->StateBindingVersion().references_ = StateBindingVersion().references_;
+  copy->references_ = references_;
   copy->initialized_ = initialized_;
   std::memcpy(copy->arguments_->contents(), arguments_->contents(), arguments_->length());
   std::memcpy(copy->sizes_->contents(), sizes_->contents(), sizes_->length());
-  copy->encoder_->setBuffer(copy->sizes_.get(), 0, MetalArgumentCount(StateBindingVersion().layout_));
+  copy->encoder_->setBuffer(copy->sizes_.get(), 0, MetalArgumentCount(layout_));
   return ObjectPtr<IBackendBindingVersion>::Retain(copy.Get());
 }
 
@@ -106,8 +114,7 @@ bool MetalBindingVersionImpl::IsInitialized(size_t b, uint32_t e) const {
 
 bool MetalBindingVersionImpl::WriteDescriptors(size_t b, uint32_t first, const std::vector<BufferView> &values) {
   for (auto v : values)
-    if (v.offset % (StateBindingVersion().layout_.bindings[b].type == BINDING_UNIFORM_BUFFER ? 256 : 4) ||
-        v.size > UINT32_MAX)
+    if (v.offset % (layout_.bindings[b].type == BINDING_UNIFORM_BUFFER ? 256 : 4) || v.size > UINT32_MAX)
       return false;
   for (size_t i = 0; i < values.size(); ++i) {
     auto v = values[i];
@@ -157,8 +164,8 @@ void MetalBindingVersionImpl::Bind(MTL::RenderCommandEncoder *encoder, uint32_t 
   encoder->setVertexBuffer(arguments_.get(), 0, group);
   encoder->setFragmentBuffer(arguments_.get(), 0, group);
   encoder->useResource(sizes_.get(), MTL::ResourceUsageRead, MTL::RenderStageVertex | MTL::RenderStageFragment);
-  for (size_t b = 0; b < StateBindingVersion().layout_.bindings.size(); ++b) {
-    auto desc = StateBindingVersion().layout_.bindings[b];
+  for (size_t b = 0; b < layout_.bindings.size(); ++b) {
+    auto desc = layout_.bindings[b];
     if (desc.type == BINDING_SAMPLER)
       continue;  // Samplers are retained objects, not MTL::Resource residency entries.
     MTL::ResourceUsage usage = MTL::ResourceUsageRead;
@@ -172,7 +179,7 @@ void MetalBindingVersionImpl::Bind(MTL::RenderCommandEncoder *encoder, uint32_t 
       stages |= MTL::RenderStageFragment;
     if (!stages)
       continue;
-    for (auto &resource : StateBindingVersion().references_[b]) {
+    for (auto &resource : references_[b]) {
       MTL::Resource *native =
           desc.type == BINDING_ACCELERATION_STRUCTURE
               ? static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(resource.Get())
@@ -189,8 +196,8 @@ void MetalBindingVersionImpl::Bind(MTL::RenderCommandEncoder *encoder, uint32_t 
 void MetalBindingVersionImpl::Bind(MTL::ComputeCommandEncoder *encoder, uint32_t group) const {
   encoder->setBuffer(arguments_.get(), 0, group);
   encoder->useResource(sizes_.get(), MTL::ResourceUsageRead);
-  for (size_t b = 0; b < StateBindingVersion().layout_.bindings.size(); ++b) {
-    auto desc = StateBindingVersion().layout_.bindings[b];
+  for (size_t b = 0; b < layout_.bindings.size(); ++b) {
+    auto desc = layout_.bindings[b];
     if (desc.type == BINDING_SAMPLER)
       continue;  // Samplers are retained objects, not MTL::Resource residency entries.
     MTL::ResourceUsage usage = MTL::ResourceUsageRead;
@@ -199,7 +206,7 @@ void MetalBindingVersionImpl::Bind(MTL::ComputeCommandEncoder *encoder, uint32_t
       usage |= MTL::ResourceUsageWrite;
     if (!(desc.visibility & SHADER_VISIBILITY_COMPUTE))
       continue;
-    for (auto &resource : StateBindingVersion().references_[b]) {
+    for (auto &resource : references_[b]) {
       MTL::Resource *native =
           desc.type == BINDING_ACCELERATION_STRUCTURE
               ? static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(resource.Get())
@@ -221,20 +228,232 @@ IMetalBindingGroup *MetalBindingGroupImpl::Create(IMetalDevice *device, const Bi
   auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
   return version ? new MetalBindingGroupImpl(device, std::move(version)) : nullptr;
 }
+
+IMetalBindingVersion *IMetalBindingVersion::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
+  return MetalBindingVersionImpl::Create(device, layout);
+}
+
+IMetalBindingGroup *IMetalBindingGroup::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
+  return MetalBindingGroupImpl::Create(device, layout);
+}
+
+void MetalBindingVersionImpl::InitializeBindingVersion(const BindingLayoutDesc &layout) {
+  layout_ = layout;
+
+  std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
+  references_.resize(layout_.bindings.size());
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    references_[i].resize(layout_.bindings[i].count);
+}
+
+const BindingLayoutDesc &MetalBindingVersionImpl::GetLayout() const {
+  return layout_;
+}
+
+const std::vector<std::vector<ObjectPtr<IObject>>> &MetalBindingVersionImpl::GetReferences() const {
+  return references_;
+}
+
+bool MetalBindingVersionImpl::IsComplete() const {
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    for (uint32_t j = 0; j < layout_.bindings[i].count; ++j)
+      if (!IsInitialized(i, j))
+        return false;
+  return true;
+}
+
+bool MetalBindingVersionImpl::Write(size_t binding_index,
+                                    uint32_t first_element,
+                                    const std::vector<BufferView> &values) {
+  // Retain the entire update before releasing old slots, including resource swaps.
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (const auto &value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value.buffer));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+bool MetalBindingVersionImpl::Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) {
+  // Retain the entire update before releasing old slots, including resource swaps.
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (const auto &value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+bool MetalBindingVersionImpl::Write(size_t binding_index,
+                                    uint32_t first_element,
+                                    const std::vector<ISampler *> &values) {
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (auto value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+bool MetalBindingVersionImpl::Write(size_t binding_index,
+                                    uint32_t first_element,
+                                    const std::vector<ITopLevelAccelerationStructure *> &values) {
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (auto value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+void MetalBindingGroupImpl::InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version) {
+  device_ = device;
+  layout_ = version->GetLayout();
+  version_ = std::move(version);
+}
+
+const BindingLayoutDesc &MetalBindingGroupImpl::GetLayout() const {
+  return layout_;
+}
+
+IBackendDevice *MetalBindingGroupImpl::Owner() const {
+  return device_;
+}
+
+IBackendBindingVersion *MetalBindingGroupImpl::CurrentVersion() const {
+  return version_.Get();
+}
+
+const BindingDesc *MetalBindingGroupImpl::FindBinding(uint32_t binding,
+                                                      uint32_t first_element,
+                                                      size_t count,
+                                                      size_t &binding_index) const {
+  for (binding_index = 0; binding_index < layout_.bindings.size(); ++binding_index) {
+    const auto &desc = layout_.bindings[binding_index];
+    if (desc.binding != binding)
+      continue;
+    if (!count || first_element > desc.count || count > desc.count - first_element)
+      return nullptr;
+    return &desc;
+  }
+  return nullptr;
+}
+
+bool MetalBindingGroupImpl::BindResource(uint32_t binding,
+                                         const std::vector<BufferView> &buffers,
+                                         uint32_t first_element) {
+  size_t binding_index;
+  const auto *desc = FindBinding(binding, first_element, buffers.size(), binding_index);
+  if (!desc)
+    return false;
+  if (desc->type > BINDING_RW_BYTE_ADDRESS_BUFFER)
+    return false;
+  auto values = buffers;
+  for (auto &view : values) {
+    auto buffer = rhi::QueryInterfacePtr<IBackendBuffer>(view.buffer).Get();
+    if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
+      return false;
+    if (!view.size)
+      view.size = buffer->GetDesc().size - view.offset;
+    if (view.size > buffer->GetDesc().size - view.offset)
+      return false;
+    if (desc->type == BINDING_STRUCTURED_BUFFER || desc->type == BINDING_RW_STRUCTURED_BUFFER) {
+      if (view.offset % desc->stride || view.size % desc->stride)
+        return false;
+    } else if (desc->type == BINDING_BYTE_ADDRESS_BUFFER || desc->type == BINDING_RW_BYTE_ADDRESS_BUFFER) {
+      if (view.offset % 4 || view.size % 4)
+        return false;
+    }
+  }
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, values))
+    return false;
+  version_ = std::move(next);
+  return true;
+}
+
+bool MetalBindingGroupImpl::BindResource(uint32_t binding,
+                                         const std::vector<IImage *> &images,
+                                         uint32_t first_element) {
+  size_t binding_index;
+  const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
+  if (!desc)
+    return false;
+  if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
+    return false;
+  for (auto value : images) {
+    auto image = rhi::QueryInterfacePtr<IBackendImage>(value).Get();
+    if (!image || !image->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(image->GetDesc().format))
+      return false;
+    if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
+      return false;
+  }
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, images))
+    return false;
+  version_ = std::move(next);
+  return true;
+}
+
+bool MetalBindingGroupImpl::BindResource(uint32_t binding,
+                                         const std::vector<ISampler *> &samplers,
+                                         uint32_t first_element) {
+  size_t binding_index;
+  const auto *desc = FindBinding(binding, first_element, samplers.size(), binding_index);
+  if (!desc)
+    return false;
+  if (desc->type != BINDING_SAMPLER)
+    return false;
+  for (auto sampler : samplers) {
+    auto native = rhi::QueryInterfacePtr<IBackendSampler>(sampler).Get();
+    if (!native || native->DeviceIdentity() != device_)
+      return false;
+  }
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, samplers))
+    return false;
+  version_ = std::move(next);
+  return true;
+}
+
+bool MetalBindingGroupImpl::BindResource(uint32_t binding,
+                                         const std::vector<ITopLevelAccelerationStructure *> &structures,
+                                         uint32_t first_element) {
+  size_t binding_index;
+  auto desc = FindBinding(binding, first_element, structures.size(), binding_index);
+  if (!desc || desc->type != BINDING_ACCELERATION_STRUCTURE)
+    return false;
+  for (auto structure : structures)
+    if (!structure)
+      return false;
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, structures))
+    return false;
+  version_ = std::move(next);
+  return true;
+}
 }  // namespace grassland::rhi::backend::metal
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalBindingGroup, "cc9ee713-7a82-44a9-9c5d-6b138c2b32bd")
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalBindingVersion, "fcef2422-11d0-4f7f-acb2-f3fcd629a898")
-
-namespace grassland::rhi::backend::metal {
-IMetalBindingVersion *IMetalBindingVersion::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
-  return MetalBindingVersionImpl::Create(device, layout);
-}
-}  // namespace grassland::rhi::backend::metal
-
-namespace grassland::rhi::backend::metal {
-IMetalBindingGroup *IMetalBindingGroup::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
-  return MetalBindingGroupImpl::Create(device, layout);
-}
-}  // namespace grassland::rhi::backend::metal

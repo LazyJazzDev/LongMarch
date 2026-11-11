@@ -15,6 +15,4 @@ class ID3D12Core : public IBackendCore {
   virtual rhi::IDevice *CreateDevice(int32_t device_idx) = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::d3d12

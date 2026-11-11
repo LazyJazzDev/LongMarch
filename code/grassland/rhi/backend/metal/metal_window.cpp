@@ -1,11 +1,383 @@
 #include "grassland/rhi/backend/metal/metal_window.h"
 
-#include "grassland/rhi/backend/metal/metal_window_impl.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalWindow, "e074a51b-c30d-43f4-8b6c-2d8fd1540424")
+#include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_image_presenter.h"
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_window.h"
+#include "grassland/rhi/backend/backend_window_imgui.h"
+#include "grassland/rhi/backend/metal/metal_window_impl.h"
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#include <dxgi1_6.h>
+#include <wrl/client.h>
+#endif
 
 namespace grassland::rhi::backend::metal {
 IMetalWindow *IMetalWindow::Create(IMetalDevice *device, const WindowDesc &desc) {
   return MetalWindowImpl::Create(device, desc);
 }
+
+bool MetalWindowImpl::EnableImGui(bool enabled, const char *font_file_path, float font_size) {
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+  if (!enabled) {
+    imgui_.reset();
+    return true;
+  }
+  if (!imgui_)
+    imgui_ = WindowImGui::Create(device_, window_, font_file_path, font_size);
+  return bool(imgui_);
+}
+
+ImGuiContext *MetalWindowImpl::GetImGuiContext() const {
+  return imgui_ ? imgui_->Context() : nullptr;
+}
+
+bool MetalWindowImpl::UpdateImGui(const std::function<void()> &callback) {
+  if (!imgui_)
+    return true;
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+
+  struct ProcessingScope {
+    bool &flag;
+
+    ProcessingScope(bool &value) : flag(value) {
+      flag = true;
+    }
+
+    ~ProcessingScope() {
+      flag = false;
+    }
+  } scope(processing_imgui_);
+
+  return imgui_->Update(callback);
+}
+
+const void *MetalWindowImpl::DeviceIdentity() const {
+  return device_;
+}
+
+bool MetalWindowImpl::RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) {
+  ObjPtr<IImage> frame = GetNextImage();
+  if (!frame)
+    return false;
+  if (!presenter_)
+    presenter_ = std::make_unique<ImagePresenter>(device_);
+  return presenter_->Record(commands, image, frame.Get(), color_space, GetColorSpace(), GetHDRReferenceWhiteScale());
+}
+
+bool MetalWindowImpl::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
+  return RecordImGui(commands, image, GetColorSpace(), GetHDRReferenceWhiteScale());
+}
+
+bool MetalWindowImpl::RecordImGui(rhi::ICommandContext *commands,
+                                  rhi::IImage *image,
+                                  ColorSpace color_space,
+                                  float white_scale) {
+  if (!imgui_)
+    return true;
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+
+  struct ProcessingScope {
+    bool &flag;
+
+    ProcessingScope(bool &value) : flag(value) {
+      flag = true;
+    }
+
+    ~ProcessingScope() {
+      flag = false;
+    }
+  } scope(processing_imgui_);
+
+  return imgui_->Record(commands, image, color_space, white_scale);
+}
+
+rhi::IImage *MetalWindowImpl::GetNextImage() {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread()) {
+    ReportError(-1, "GetNextImage must run on the window thread.");
+    std::abort();
+  }
+#endif
+  if (invalid_)
+    return nullptr;
+  int width, height;
+  glfwGetFramebufferSize(window_, &width, &height);
+  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+    return nullptr;
+  std::lock_guard<std::mutex> lock(next_image_mutex_);
+#if !defined(NDEBUG)
+  if (!next_image_) {
+    ReportError(-1, "No prepared swapchain image for a drawable window.");
+    std::abort();
+  }
+#endif
+  return ObjectPtr<IBackendImage>(next_image_).Detach();
+}
+
+IBackendQueue *MetalWindowImpl::OwnerQueue() const {
+  return queue_;
+}
+
+bool MetalWindowImpl::UpdateNextImage() {
+  auto image = AcquireNativeFrame();
+  std::lock_guard<std::mutex> lock(next_image_mutex_);
+  next_image_ = std::move(image);
+  int width, height;
+  glfwGetFramebufferSize(window_, &width, &height);
+  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+    return true;
+  // A native OUT_OF_DATE result defers recovery to an explicit rebuild.
+  if (next_image_ || invalid_)
+    return true;
+  invalid_ = true;
+  return false;
+}
+
+void MetalWindowImpl::ReleaseNextImage() {
+  std::lock_guard<std::mutex> lock(next_image_mutex_);
+  next_image_.Reset();
+}
+
+bool MetalWindowImpl::IsSwapChainInvalid() const {
+  return invalid_;
+}
+
+bool MetalWindowImpl::RebuildSwapChain() {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  const auto options = GetSupportedPresentationOptions();
+  if (std::none_of(options.begin(), options.end(),
+                   [&](const auto &option) { return option.color_space == requested_color_space_; })) {
+    ReportError(-1, "Requested swapchain color space is unavailable.");
+    return false;
+  }
+  invalid_ = true;
+  ReleaseNextImage();
+  if (!RebuildNativeSwapChain(requested_mode_))
+    return false;
+  int width, height;
+  glfwGetFramebufferSize(window_, &width, &height);
+  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+    return true;
+  color_space_ = requested_color_space_;
+  invalid_ = false;
+  if (UpdateNextImage())
+    return true;
+  invalid_ = true;
+  return false;
+}
+
+bool MetalWindowImpl::SetPresentMode(PresentMode mode) {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  requested_mode_ = mode;
+  return RebuildSwapChain();
+}
+
+bool MetalWindowImpl::SetColorSpace(ColorSpace color_space) {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  const auto options = GetSupportedPresentationOptions();
+  if (std::none_of(options.begin(), options.end(),
+                   [&](const auto &option) { return option.color_space == color_space; }))
+    return false;
+  const auto previous = requested_color_space_;
+  requested_color_space_ = color_space;
+  if (RebuildSwapChain())
+    return true;
+  requested_color_space_ = previous;
+  return false;
+}
+
+ColorSpace MetalWindowImpl::GetColorSpace() const {
+  return color_space_;
+}
+
+float MetalWindowImpl::GetHDRReferenceWhiteScale() const {
+#ifdef _WIN32
+  float nits;
+  return GetHDRReferenceWhiteNits(nits) ? nits / 80.0f : 1.0f;
+#else
+  // Linux uses fixed source encoding parameters; macOS uses relative EDR.
+  return 1.0f;
+#endif
+}
+
+float MetalWindowImpl::GetHDRHeadroom() const {
+#ifdef __APPLE__
+  return CocoaHDRHeadroom(GLFWWindow());
+#endif
+#ifdef _WIN32
+  float white;
+  if (!GetHDRReferenceWhiteNits(white))
+    return 10.0f;
+  const auto monitor = MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST);
+  Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+  if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+    return 10.0f;
+  for (UINT a = 0;; ++a) {
+    Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+    if (factory->EnumAdapters1(a, &adapter) != S_OK)
+      break;
+    for (UINT o = 0;; ++o) {
+      Microsoft::WRL::ComPtr<IDXGIOutput> output;
+      if (adapter->EnumOutputs(o, &output) != S_OK)
+        break;
+      Microsoft::WRL::ComPtr<IDXGIOutput6> output6;
+      DXGI_OUTPUT_DESC1 desc{};
+      if (FAILED(output.As(&output6)) || FAILED(output6->GetDesc1(&desc)) || desc.Monitor != monitor)
+        continue;
+      const float ratio = desc.MaxLuminance / white;
+      return std::isfinite(ratio) && ratio > 0.0f ? std::max(1.0f, ratio) : 10.0f;
+    }
+  }
+#endif
+  return 10.0f;
+}
+
+bool MetalWindowImpl::GetHDRReferenceWhiteNits(float &nits) const {
+  if (!glfw::IsWindowThread())
+    return false;
+#ifdef _WIN32
+  MONITORINFOEXW monitor{};
+  monitor.cbSize = sizeof(monitor);
+  if (!GetMonitorInfoW(MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST), &monitor))
+    return false;
+  UINT32 path_count{}, mode_count{};
+  if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count) != ERROR_SUCCESS)
+    return false;
+  std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+  std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+  if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &path_count, paths.data(), &mode_count, modes.data(), nullptr) !=
+      ERROR_SUCCESS)
+    return false;
+  for (UINT32 i = 0; i < path_count; ++i) {
+    const auto &path = paths[i];
+    DISPLAYCONFIG_SOURCE_DEVICE_NAME source{};
+    source.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, sizeof(source), path.sourceInfo.adapterId,
+                     path.sourceInfo.id};
+    if (DisplayConfigGetDeviceInfo(&source.header) != ERROR_SUCCESS ||
+        wcscmp(source.viewGdiDeviceName, monitor.szDevice))
+      continue;
+    DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO color{};
+    color.header = {DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO, sizeof(color), path.targetInfo.adapterId,
+                    path.targetInfo.id};
+    if (DisplayConfigGetDeviceInfo(&color.header) != ERROR_SUCCESS || !color.advancedColorEnabled)
+      return false;
+    DISPLAYCONFIG_SDR_WHITE_LEVEL white{};
+    white.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, sizeof(white), path.targetInfo.adapterId,
+                    path.targetInfo.id};
+    if (DisplayConfigGetDeviceInfo(&white.header) != ERROR_SUCCESS || !white.SDRWhiteLevel)
+      return false;
+    nits = 80.0f * (white.SDRWhiteLevel / 1000.0f);
+    return true;
+  }
+#endif
+  return false;
+}
+
+ColorSpace MetalWindowImpl::RequestedColorSpace() const {
+  return requested_color_space_;
+}
+
+void MetalWindowImpl::DestroyWindow() {
+  imgui_.reset();
+  glfw::UnregisterWindow(window_);
+  glfw::DestroyWindow(window_);
+}
+
+bool MetalWindowImpl::InitializeWindow(IBackendDevice *device, const WindowDesc &desc) {
+  queue_ =
+      rhi::QueryInterfacePtr<IBackendQueue>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get()).Get();
+  requested_mode_ = desc.present_mode;
+  requested_color_space_ = desc.color_space;
+  window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
+  if (!window_)
+    return false;
+  glfw::RegisterWindow(this);
+  return true;
+}
+
+GLFWwindow *MetalWindowImpl::GLFWWindow() const {
+  return window_;
+}
+
+bool MetalWindowImpl::ShouldClose() const {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return true;
+#endif
+  return glfwWindowShouldClose(window_);
+}
+
+bool MetalWindowImpl::IsKeyDown(int key) const {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  return glfwGetKey(window_, key) == GLFW_PRESS;
+}
+
+bool MetalWindowImpl::SetTitle(const std::string &title) {
+  return glfw::SetWindowTitle(window_, title.c_str());
+}
+
+EventManager<void(int, int)> &MetalWindowImpl::ResizeEvent() {
+  return resize_event_;
+}
+
+EventManager<void(int, int)> &MetalWindowImpl::FramebufferResizeEvent() {
+  return framebufferresize_event_;
+}
+
+EventManager<void(bool)> &MetalWindowImpl::CursorEnterEvent() {
+  return cursorenter_event_;
+}
+
+EventManager<void(bool)> &MetalWindowImpl::FocusEvent() {
+  return focus_event_;
+}
+
+EventManager<void(double, double)> &MetalWindowImpl::MouseMoveEvent() {
+  return mousemove_event_;
+}
+
+EventManager<void(int, int, int, double, double)> &MetalWindowImpl::MouseButtonEvent() {
+  return mousebutton_event_;
+}
+
+EventManager<void(double, double)> &MetalWindowImpl::ScrollEvent() {
+  return scroll_event_;
+}
+
+EventManager<void(int, int, int, int)> &MetalWindowImpl::KeyEvent() {
+  return key_event_;
+}
+
+EventManager<void(uint32_t)> &MetalWindowImpl::CharEvent() {
+  return char_event_;
+}
+
+EventManager<void(int, const char **)> &MetalWindowImpl::DropEvent() {
+  return drop_event_;
+}
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalWindow, "e074a51b-c30d-43f4-8b6c-2d8fd1540424")

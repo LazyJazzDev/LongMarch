@@ -37,12 +37,10 @@ IMetalSampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc 
   }
   return new MetalSamplerImpl(device, desc, std::move(sampler));
 }
-}  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalSampler, "c609fe39-6f33-4a10-a4b1-db4fa86332b7")
-
-namespace grassland::rhi::backend::metal {
 IMetalSampler *IMetalSampler::Create(IMetalDevice *device, const SamplerDesc &desc) {
   return MetalSamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalSampler, "c609fe39-6f33-4a10-a4b1-db4fa86332b7")

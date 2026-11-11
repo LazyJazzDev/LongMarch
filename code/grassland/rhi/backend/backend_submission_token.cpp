@@ -30,12 +30,9 @@ void SubmissionTokenImpl::Complete(SubmissionStatus status) {
   changed_.notify_all();
 }
 
-}  // namespace grassland::rhi::backend
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendSubmissionToken, "92c56d21-d1e3-4070-a232-2cc80606c437")
-
-namespace grassland::rhi::backend {
 IBackendSubmissionToken *IBackendSubmissionToken::Create(Event event) {
   return new SubmissionTokenImpl(event);
 }
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendSubmissionToken, "92c56d21-d1e3-4070-a232-2cc80606c437")

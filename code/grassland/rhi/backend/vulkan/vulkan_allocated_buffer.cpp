@@ -25,7 +25,6 @@ class VulkanAllocatedBufferImpl final : public Object<IVulkanAllocatedBuffer> {
   VmaAllocation allocation_{};
   void *mapped_{};
 
- private:
   IVulkanDevice *device_;
   BufferDesc desc_;
 

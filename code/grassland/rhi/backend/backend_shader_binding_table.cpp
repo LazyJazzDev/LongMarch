@@ -2,8 +2,6 @@
 
 #include "grassland/rhi/backend/backend_shader_binding_table_impl.h"
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendShaderBindingTable, "bf62c599-58f1-4e20-b3b8-b9b23eac18bc")
-
 namespace grassland::rhi::backend {
 ShaderBindingTableImpl::ShaderBindingTableImpl(IRayTracingProgram *program,
                                                const ShaderBindingTableDesc &desc,
@@ -14,9 +12,7 @@ ShaderBindingTableImpl::ShaderBindingTableImpl(IRayTracingProgram *program,
       buffer_(std::move(buffer)),
       regions_(regions) {
 }
-}  // namespace grassland::rhi::backend
 
-namespace grassland::rhi::backend {
 IBackendShaderBindingTable *IBackendShaderBindingTable::Create(IRayTracingProgram *program,
                                                                const ShaderBindingTableDesc &desc,
                                                                ObjectPtr<IBuffer> buffer,
@@ -24,3 +20,5 @@ IBackendShaderBindingTable *IBackendShaderBindingTable::Create(IRayTracingProgra
   return new ShaderBindingTableImpl(program, desc, buffer, regions);
 }
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendShaderBindingTable, "bf62c599-58f1-4e20-b3b8-b9b23eac18bc")

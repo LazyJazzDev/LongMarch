@@ -1,10 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <type_traits>
 #include <utility>
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_device_state.h"
+#include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_shader.h"
+#include "grassland/rhi/backend/backend_shader_impl.h"
 #include "grassland/rhi/rhix/rhix.h"
 
 using grassland::rhi::backend::MatchInterfaces;
@@ -12,6 +17,7 @@ using grassland::rhi::backend::MatchInterfaces;
 namespace grassland::rhix {
 using namespace rhi;
 namespace backend = rhi::backend;
+using namespace backend;
 
 namespace {
 
@@ -41,7 +47,6 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::IBackendDevice, rhi::IDevice)
 
- public:
   bool WaitNativeEvents(const std::vector<Event> &, bool) const override {
     ADD_FAILURE();
     return false;
@@ -56,7 +61,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
   }
 
   TestDevice(PhysicalDevice info, backend::IBackendCore *core, Calls &calls) : calls_(calls) {
-    InitializeDevice(std::move(info), core);
+    InitializeDevice(std::move(info), core, BACKEND_API_DEFAULT);
   }
 
   ~TestDevice() override {
@@ -68,94 +73,180 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
  private:
   Calls &calls_;
 
- private:
-  backend::DeviceState state_;
-
-  backend::DeviceState &StateDevice() override {
-    return state_;
-  }
-
-  const backend::DeviceState &StateDevice() const override {
-    return state_;
-  }
-
  public:
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
-      const BottomLevelAccelerationStructureDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateBottomLevelAccelerationStructure(desc);
+      const BottomLevelAccelerationStructureDesc &) override {
+    ReportError(-1, "Acceleration structures are unavailable for this backend.");
+    return nullptr;
   }
 
   ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
-      const TopLevelAccelerationStructureDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateTopLevelAccelerationStructure(desc);
+      const TopLevelAccelerationStructureDesc &) override {
+    ReportError(-1, "Acceleration structures are unavailable for this backend.");
+    return nullptr;
   }
 
-  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateRayTracingProgram(desc);
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &) override {
+    ReportError(-1, "Ray tracing pipelines are unavailable for this backend.");
+    return nullptr;
   }
 
-  std::string Name() const override {
-    return backend::IBackendDevice::CommonName();
+ private:
+  void InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api) {
+    api_ = api;
+    core_ = core;
+    info_ = std::move(info);
   }
 
-  bool SupportRayTracingPipeline() const override {
-    return backend::IBackendDevice::CommonSupportRayTracingPipeline();
+ public:
+  rhi::IImage *CreateImage(const ImageDesc &) override {
+    ReportError(-1, "Independent images are not implemented for this backend.");
+    return nullptr;
   }
 
-  bool SupportRayQuery() const override {
-    return backend::IBackendDevice::CommonSupportRayQuery();
+  rhi::IBuffer *CreateBuffer(const BufferDesc &) override {
+    ReportError(-1, "Buffers are not implemented for this backend.");
+    return nullptr;
   }
 
-  bool SupportGeometryShader() const override {
-    return backend::IBackendDevice::CommonSupportGeometryShader();
+  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &) override {
+    ReportError(-1, "Compute programs are not implemented for this backend.");
+    return nullptr;
   }
 
-  rhi::IImage *CreateImage(const ImageDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateImage(desc);
-  }
-
-  ISampler *CreateSampler(const SamplerDesc &desc = {}) override {
-    return backend::IBackendDevice::CommonCreateSampler(desc);
-  }
-
-  rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override {
-    return backend::IBackendDevice::CommonCreateBindingGroup(layout);
-  }
-
-  rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateBuffer(desc);
-  }
-
-  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateComputeProgram(desc);
-  }
-
-  rhi::IProgram *CreateProgram(const ProgramDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateProgram(desc);
+  rhi::IProgram *CreateProgram(const ProgramDesc &) override {
+    ReportError(-1, "Graphics programs are not implemented for this backend.");
+    return nullptr;
   }
 
   rhi::IShader *CreateShader(const ShaderDesc &desc) override {
-    return backend::IBackendDevice::CommonCreateShader(desc);
+    if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+        desc.stage > SHADER_STAGE_CALLABLE)
+      return nullptr;
+    return IBackendShader::Create(desc, api_);
   }
 
-  rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override {
-    return backend::IBackendDevice::CommonCreateGLFWWindow(desc);
+  ISampler *CreateSampler(const SamplerDesc &) override {
+    ReportError(-1, "Samplers are not implemented for this backend.");
+    return nullptr;
+  }
+
+  IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &) override {
+    ReportError(-1, "Binding groups are not implemented for this backend.");
+    return nullptr;
+  }
+
+ private:
+  void DestroyDevice() {
+    ShutdownQueues();
+  }
+
+ public:
+  std::string Name() const override {
+    return info_.name;
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return info_.ray_tracing_pipeline_feature;
+  }
+
+  bool SupportRayQuery() const override {
+    return info_.ray_query_feature;
+  }
+
+  bool SupportGeometryShader() const override {
+    return info_.geometry_shader_feature;
+  }
+
+  rhi::IWindow *CreateGLFWWindow(const WindowDesc &) override {
+    ReportError(-1, "Window creation is unavailable.");
+    return nullptr;
   }
 
   rhi::IQueue *GetQueue(QueueType type) override {
-    return backend::IBackendDevice::CommonGetQueue(type);
+    if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+      return nullptr;
+    return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
   }
 
-  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override {
-    return backend::IBackendDevice::CommonWaitEvents(events, wait_all);
+  const PhysicalDevice &GetPhysicalDevice() const noexcept override {
+    return info_;
   }
+
+ private:
+  IBackendCore *OwnerCore() const {
+    return core_;
+  }
+
+  void StartCollector() {
+    collector_ = std::thread([this] { Collect(); });
+  }
+
+ public:
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all) const override {
+    if (events.empty())
+      return wait_all;
+    std::vector<Event> unique;
+    unique.reserve(events.size());
+    for (const auto &event : events) {
+      auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+      if (!timeline || timeline->Owner() != this) {
+        ReportError(-1, "Host waits require timelines from this device.");
+        return false;
+      }
+      auto found = std::find_if(unique.begin(), unique.end(),
+                                [&](const Event &other) { return other.timeline == event.timeline; });
+      if (found == unique.end())
+        unique.push_back(event);
+      else
+        found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
+    }
+    return WaitNativeEvents(unique, wait_all);
+  }
+
+ private:
+  void Collect() {
+    std::vector<Event> next;
+    next.reserve(queues_.size());
+    for (;;) {
+      next.clear();
+      bool empty = true;
+      for (const auto &queue : queues_) {
+        if (!queue)
+          continue;
+        uint64_t completed = 0;
+        const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+        if (timeline_valid && completed != UINT64_MAX)
+          next.push_back({queue->GetTimeline(), completed + 1});
+        if (!queue->CollectCompleted(completed, timeline_valid))
+          empty = false;
+      }
+      if (stopping_ && empty)
+        return;
+      WaitForProgress(next);
+    }
+  }
+
+  void ShutdownQueues() {
+    if (!collector_.joinable())
+      return;
+    stopping_ = true;
+    InterruptCollector();
+    collector_.join();
+  }
+
+  std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
+  std::atomic<bool> stopping_{};
+  BackendAPI api_{};
+  IBackendCore *core_{};
+  PhysicalDevice info_{};
+  std::thread collector_{};
 };
 
 class TestCore final : public backend::Object<backend::IBackendCore> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, backend::IBackendCore, rhi::ICore)
 
- public:
   TestCore(std::vector<PhysicalDevice> devices, Calls &calls, bool fail = false)
       : devices_(std::move(devices)),
         calls_(calls),

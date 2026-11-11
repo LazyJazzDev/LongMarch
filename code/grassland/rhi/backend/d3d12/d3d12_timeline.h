@@ -13,6 +13,4 @@ class ID3D12Timeline : public IBackendTimeline {
   virtual ID3D12Fence *NativeFence() const = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::d3d12

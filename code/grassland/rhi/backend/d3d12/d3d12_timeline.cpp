@@ -37,12 +37,9 @@ ID3D12Fence *D3D12TimelineImpl::NativeFence() const {
   return fence_.Get();
 }
 
-}  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Timeline, "32d5dccb-60c3-4ca2-af93-4b67d85e7b16")
-
-namespace grassland::rhi::backend::d3d12 {
 ObjectPtr<ID3D12Timeline> ID3D12Timeline::Create(ID3D12Device *device) {
   return D3D12TimelineImpl::Create(device);
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Timeline, "32d5dccb-60c3-4ca2-af93-4b67d85e7b16")

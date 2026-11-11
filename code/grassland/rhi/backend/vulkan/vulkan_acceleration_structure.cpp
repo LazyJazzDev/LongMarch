@@ -3,33 +3,55 @@
 #include <vk_mem_alloc.h>
 
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure_impl.h"
-#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-void IVulkanAccelerationStructure::InitializeVulkanAccelerationStructure(IVulkanDevice *device) {
-  StateVulkanAccelerationStructure().device_ = device;
+void VulkanBottomLevelAccelerationStructureImpl::InitializeVulkanAccelerationStructure(IVulkanDevice *device) {
+  device_ = device;
 }
 
-IVulkanDevice *IVulkanAccelerationStructure::Owner() const {
-  return StateVulkanAccelerationStructure().device_;
+void VulkanTopLevelAccelerationStructureImpl::InitializeVulkanAccelerationStructure(IVulkanDevice *device) {
+  device_ = device;
 }
 
-uint64_t IVulkanAccelerationStructure::ScratchSize(AccelerationStructureBuildMode mode) const {
-  return mode == ACCELERATION_STRUCTURE_UPDATE ? StateVulkanAccelerationStructure().update_scratch_
-                                               : StateVulkanAccelerationStructure().build_scratch_;
+IVulkanDevice *VulkanBottomLevelAccelerationStructureImpl::Owner() const {
+  return device_;
 }
 
-bool IVulkanAccelerationStructure::AllowsUpdate() const {
-  return StateVulkanAccelerationStructure().allow_update_;
+IVulkanDevice *VulkanTopLevelAccelerationStructureImpl::Owner() const {
+  return device_;
 }
 
-bool IVulkanAccelerationStructure::AllowsCompaction() const {
-  return StateVulkanAccelerationStructure().allow_compaction_;
+uint64_t VulkanBottomLevelAccelerationStructureImpl::ScratchSize(AccelerationStructureBuildMode mode) const {
+  return mode == ACCELERATION_STRUCTURE_UPDATE ? update_scratch_ : build_scratch_;
 }
 
-bool IVulkanAccelerationStructure::IsCompactStorage() const {
-  return StateVulkanAccelerationStructure().compact_;
+uint64_t VulkanTopLevelAccelerationStructureImpl::ScratchSize(AccelerationStructureBuildMode mode) const {
+  return mode == ACCELERATION_STRUCTURE_UPDATE ? update_scratch_ : build_scratch_;
+}
+
+bool VulkanBottomLevelAccelerationStructureImpl::AllowsUpdate() const {
+  return allow_update_;
+}
+
+bool VulkanTopLevelAccelerationStructureImpl::AllowsUpdate() const {
+  return allow_update_;
+}
+
+bool VulkanBottomLevelAccelerationStructureImpl::AllowsCompaction() const {
+  return allow_compaction_;
+}
+
+bool VulkanTopLevelAccelerationStructureImpl::AllowsCompaction() const {
+  return allow_compaction_;
+}
+
+bool VulkanBottomLevelAccelerationStructureImpl::IsCompactStorage() const {
+  return compact_;
+}
+
+bool VulkanTopLevelAccelerationStructureImpl::IsCompactStorage() const {
+  return compact_;
 }
 
 VulkanBottomLevelAccelerationStructureImpl::VulkanBottomLevelAccelerationStructureImpl(
@@ -80,52 +102,84 @@ void VulkanTopLevelAccelerationStructureImpl::CommitDependencies(
   bottom_levels_ = std::move(references);
 }
 
-void IVulkanAccelerationStructure::DestroyVulkanAccelerationStructure() {
-  auto device = StateVulkanAccelerationStructure().device_->NativeDevice();
-  if (StateVulkanAccelerationStructure().query_)
-    vkDestroyQueryPool(device, StateVulkanAccelerationStructure().query_, nullptr);
-  if (StateVulkanAccelerationStructure().structure_)
-    StateVulkanAccelerationStructure().device_->Procedures().DestroyAccelerationStructureKHR(
-        device, StateVulkanAccelerationStructure().structure_, nullptr);
-  if (StateVulkanAccelerationStructure().buffer_)
-    vmaDestroyBuffer(StateVulkanAccelerationStructure().device_->Allocator(),
-                     StateVulkanAccelerationStructure().buffer_, StateVulkanAccelerationStructure().allocation_);
+void VulkanBottomLevelAccelerationStructureImpl::DestroyVulkanAccelerationStructure() {
+  auto device = device_->NativeDevice();
+  if (query_)
+    vkDestroyQueryPool(device, query_, nullptr);
+  if (structure_)
+    device_->Procedures().DestroyAccelerationStructureKHR(device, structure_, nullptr);
+  if (buffer_)
+    vmaDestroyBuffer(device_->Allocator(), buffer_, allocation_);
 }
 
-VkAccelerationStructureKHR IVulkanAccelerationStructure::NativeStructure() const {
-  return StateVulkanAccelerationStructure().structure_;
+void VulkanTopLevelAccelerationStructureImpl::DestroyVulkanAccelerationStructure() {
+  auto device = device_->NativeDevice();
+  if (query_)
+    vkDestroyQueryPool(device, query_, nullptr);
+  if (structure_)
+    device_->Procedures().DestroyAccelerationStructureKHR(device, structure_, nullptr);
+  if (buffer_)
+    vmaDestroyBuffer(device_->Allocator(), buffer_, allocation_);
 }
 
-VkQueryPool IVulkanAccelerationStructure::CompactionQuery() const {
-  return StateVulkanAccelerationStructure().query_;
+VkAccelerationStructureKHR VulkanBottomLevelAccelerationStructureImpl::NativeStructure() const {
+  return structure_;
 }
 
-VkBuildAccelerationStructureFlagsKHR IVulkanAccelerationStructure::BuildFlags() const {
-  return StateVulkanAccelerationStructure().flags_;
+VkAccelerationStructureKHR VulkanTopLevelAccelerationStructureImpl::NativeStructure() const {
+  return structure_;
 }
 
-uint64_t IVulkanAccelerationStructure::Address() const {
-  return StateVulkanAccelerationStructure().address_;
+VkQueryPool VulkanBottomLevelAccelerationStructureImpl::CompactionQuery() const {
+  return query_;
 }
 
-uint64_t IVulkanAccelerationStructure::ReadCompactedSize() const {
+VkQueryPool VulkanTopLevelAccelerationStructureImpl::CompactionQuery() const {
+  return query_;
+}
+
+VkBuildAccelerationStructureFlagsKHR VulkanBottomLevelAccelerationStructureImpl::BuildFlags() const {
+  return flags_;
+}
+
+VkBuildAccelerationStructureFlagsKHR VulkanTopLevelAccelerationStructureImpl::BuildFlags() const {
+  return flags_;
+}
+
+uint64_t VulkanBottomLevelAccelerationStructureImpl::Address() const {
+  return address_;
+}
+
+uint64_t VulkanTopLevelAccelerationStructureImpl::Address() const {
+  return address_;
+}
+
+uint64_t VulkanBottomLevelAccelerationStructureImpl::ReadCompactedSize() const {
   uint64_t result{};
-  if (!StateVulkanAccelerationStructure().query_)
+  if (!query_)
     return 0;
-  const auto status = vkGetQueryPoolResults(StateVulkanAccelerationStructure().device_->NativeDevice(),
-                                            StateVulkanAccelerationStructure().query_, 0, 1, sizeof(result), &result,
+  const auto status = vkGetQueryPoolResults(device_->NativeDevice(), query_, 0, 1, sizeof(result), &result,
                                             sizeof(result), VK_QUERY_RESULT_64_BIT);
   return status == VK_SUCCESS ? result : 0;
 }
 
-bool IVulkanAccelerationStructure::Allocate(const VkAccelerationStructureBuildGeometryInfoKHR &info,
-                                            const std::vector<uint32_t> &counts,
-                                            uint64_t compacted_size) {
-  auto device = StateVulkanAccelerationStructure().device_->NativeDevice();
+uint64_t VulkanTopLevelAccelerationStructureImpl::ReadCompactedSize() const {
+  uint64_t result{};
+  if (!query_)
+    return 0;
+  const auto status = vkGetQueryPoolResults(device_->NativeDevice(), query_, 0, 1, sizeof(result), &result,
+                                            sizeof(result), VK_QUERY_RESULT_64_BIT);
+  return status == VK_SUCCESS ? result : 0;
+}
+
+bool VulkanBottomLevelAccelerationStructureImpl::Allocate(const VkAccelerationStructureBuildGeometryInfoKHR &info,
+                                                          const std::vector<uint32_t> &counts,
+                                                          uint64_t compacted_size) {
+  auto device = device_->NativeDevice();
   VkPhysicalDeviceAccelerationStructurePropertiesKHR properties{
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR};
   VkPhysicalDeviceProperties2 physical{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &properties};
-  vkGetPhysicalDeviceProperties2(StateVulkanAccelerationStructure().device_->NativePhysicalDevice(), &physical);
+  vkGetPhysicalDeviceProperties2(device_->NativePhysicalDevice(), &physical);
   uint64_t primitives = 0;
   for (auto count : counts)
     primitives += count;
@@ -137,49 +191,100 @@ bool IVulkanAccelerationStructure::Allocate(const VkAccelerationStructureBuildGe
   } else if (primitives > properties.maxPrimitiveCount)
     return false;
   VkAccelerationStructureBuildSizesInfoKHR sizes{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
-  StateVulkanAccelerationStructure().device_->Procedures().GetAccelerationStructureBuildSizesKHR(
-      device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &info, counts.data(), &sizes);
+  device_->Procedures().GetAccelerationStructureBuildSizesKHR(device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+                                                              &info, counts.data(), &sizes);
   if (!sizes.accelerationStructureSize)
     return false;
-  StateVulkanAccelerationStructure().flags_ = info.flags;
-  StateVulkanAccelerationStructure().allow_update_ =
-      (StateVulkanAccelerationStructure().flags_ & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR) != 0;
-  StateVulkanAccelerationStructure().allow_compaction_ =
-      (StateVulkanAccelerationStructure().flags_ & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR) != 0;
-  StateVulkanAccelerationStructure().compact_ = compacted_size != 0;
-  if (StateVulkanAccelerationStructure().compact_ && !StateVulkanAccelerationStructure().allow_compaction_)
+  flags_ = info.flags;
+  allow_update_ = (flags_ & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR) != 0;
+  allow_compaction_ = (flags_ & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR) != 0;
+  compact_ = compacted_size != 0;
+  if (compact_ && !allow_compaction_)
     return false;
-  StateVulkanAccelerationStructure().build_scratch_ = sizes.buildScratchSize;
-  StateVulkanAccelerationStructure().update_scratch_ = sizes.updateScratchSize;
+  build_scratch_ = sizes.buildScratchSize;
+  update_scratch_ = sizes.updateScratchSize;
   VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   buffer.size = compacted_size ? compacted_size : sizes.accelerationStructureSize;
   buffer.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
   VmaAllocationCreateInfo memory{};
   memory.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-  if (!Check(vmaCreateBuffer(StateVulkanAccelerationStructure().device_->Allocator(), &buffer, &memory,
-                             &StateVulkanAccelerationStructure().buffer_,
-                             &StateVulkanAccelerationStructure().allocation_, nullptr),
+  if (!Check(vmaCreateBuffer(device_->Allocator(), &buffer, &memory, &buffer_, &allocation_, nullptr),
              "Allocate acceleration structure"))
     return false;
   VkAccelerationStructureCreateInfoKHR create{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
   create.type = info.type;
-  create.buffer = StateVulkanAccelerationStructure().buffer_;
+  create.buffer = buffer_;
   create.size = buffer.size;
-  if (!Check(StateVulkanAccelerationStructure().device_->Procedures().CreateAccelerationStructureKHR(
-                 device, &create, nullptr, &StateVulkanAccelerationStructure().structure_),
+  if (!Check(device_->Procedures().CreateAccelerationStructureKHR(device, &create, nullptr, &structure_),
              "Create acceleration structure"))
     return false;
   VkAccelerationStructureDeviceAddressInfoKHR address{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
-  address.accelerationStructure = StateVulkanAccelerationStructure().structure_;
-  StateVulkanAccelerationStructure().address_ =
-      StateVulkanAccelerationStructure().device_->Procedures().GetAccelerationStructureDeviceAddressKHR(device,
-                                                                                                        &address);
-  if (StateVulkanAccelerationStructure().allow_compaction_) {
+  address.accelerationStructure = structure_;
+  address_ = device_->Procedures().GetAccelerationStructureDeviceAddressKHR(device, &address);
+  if (allow_compaction_) {
     VkQueryPoolCreateInfo query{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
     query.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
     query.queryCount = 1;
-    if (!Check(vkCreateQueryPool(device, &query, nullptr, &StateVulkanAccelerationStructure().query_),
-               "Create acceleration structure size query"))
+    if (!Check(vkCreateQueryPool(device, &query, nullptr, &query_), "Create acceleration structure size query"))
+      return false;
+  }
+  return true;
+}
+
+bool VulkanTopLevelAccelerationStructureImpl::Allocate(const VkAccelerationStructureBuildGeometryInfoKHR &info,
+                                                       const std::vector<uint32_t> &counts,
+                                                       uint64_t compacted_size) {
+  auto device = device_->NativeDevice();
+  VkPhysicalDeviceAccelerationStructurePropertiesKHR properties{
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR};
+  VkPhysicalDeviceProperties2 physical{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &properties};
+  vkGetPhysicalDeviceProperties2(device_->NativePhysicalDevice(), &physical);
+  uint64_t primitives = 0;
+  for (auto count : counts)
+    primitives += count;
+  if (info.geometryCount > properties.maxGeometryCount)
+    return false;
+  if (info.type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR) {
+    if (primitives > properties.maxInstanceCount)
+      return false;
+  } else if (primitives > properties.maxPrimitiveCount)
+    return false;
+  VkAccelerationStructureBuildSizesInfoKHR sizes{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
+  device_->Procedures().GetAccelerationStructureBuildSizesKHR(device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+                                                              &info, counts.data(), &sizes);
+  if (!sizes.accelerationStructureSize)
+    return false;
+  flags_ = info.flags;
+  allow_update_ = (flags_ & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR) != 0;
+  allow_compaction_ = (flags_ & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR) != 0;
+  compact_ = compacted_size != 0;
+  if (compact_ && !allow_compaction_)
+    return false;
+  build_scratch_ = sizes.buildScratchSize;
+  update_scratch_ = sizes.updateScratchSize;
+  VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+  buffer.size = compacted_size ? compacted_size : sizes.accelerationStructureSize;
+  buffer.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+  VmaAllocationCreateInfo memory{};
+  memory.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+  if (!Check(vmaCreateBuffer(device_->Allocator(), &buffer, &memory, &buffer_, &allocation_, nullptr),
+             "Allocate acceleration structure"))
+    return false;
+  VkAccelerationStructureCreateInfoKHR create{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
+  create.type = info.type;
+  create.buffer = buffer_;
+  create.size = buffer.size;
+  if (!Check(device_->Procedures().CreateAccelerationStructureKHR(device, &create, nullptr, &structure_),
+             "Create acceleration structure"))
+    return false;
+  VkAccelerationStructureDeviceAddressInfoKHR address{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
+  address.accelerationStructure = structure_;
+  address_ = device_->Procedures().GetAccelerationStructureDeviceAddressKHR(device, &address);
+  if (allow_compaction_) {
+    VkQueryPoolCreateInfo query{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
+    query.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+    query.queryCount = 1;
+    if (!Check(vkCreateQueryPool(device, &query, nullptr, &query_), "Create acceleration structure size query"))
       return false;
   }
   return true;
@@ -283,6 +388,26 @@ IVulkanTopLevelAccelerationStructure *VulkanTopLevelAccelerationStructureImpl::C
     return nullptr;
   return object.release();
 }
+
+IVulkanBottomLevelAccelerationStructure *IVulkanBottomLevelAccelerationStructure::Create(
+    IVulkanDevice *device,
+    const BottomLevelAccelerationStructureDesc &desc) {
+  return VulkanBottomLevelAccelerationStructureImpl::Create(device, desc);
+}
+
+IVulkanTopLevelAccelerationStructure *IVulkanTopLevelAccelerationStructure::Create(
+    IVulkanDevice *device,
+    const TopLevelAccelerationStructureDesc &desc) {
+  return VulkanTopLevelAccelerationStructureImpl::Create(device, desc);
+}
+
+VulkanBottomLevelAccelerationStructureImpl::~VulkanBottomLevelAccelerationStructureImpl() {
+  DestroyVulkanAccelerationStructure();
+}
+
+VulkanTopLevelAccelerationStructureImpl::~VulkanTopLevelAccelerationStructureImpl() {
+  DestroyVulkanAccelerationStructure();
+}
 }  // namespace grassland::rhi::backend::vulkan
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanBottomLevelAccelerationStructure,
@@ -293,24 +418,3 @@ LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanTopLevelAccelerationS
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanAccelerationStructure,
                    "8fd412fc-9636-4f9b-8c14-f6b47ac173db")
-
-namespace grassland::rhi::backend::vulkan {
-VulkanAccelerationStructureState::VulkanAccelerationStructureState() = default;
-VulkanAccelerationStructureState::~VulkanAccelerationStructureState() = default;
-}  // namespace grassland::rhi::backend::vulkan
-
-namespace grassland::rhi::backend::vulkan {
-IVulkanBottomLevelAccelerationStructure *IVulkanBottomLevelAccelerationStructure::Create(
-    IVulkanDevice *device,
-    const BottomLevelAccelerationStructureDesc &desc) {
-  return VulkanBottomLevelAccelerationStructureImpl::Create(device, desc);
-}
-}  // namespace grassland::rhi::backend::vulkan
-
-namespace grassland::rhi::backend::vulkan {
-IVulkanTopLevelAccelerationStructure *IVulkanTopLevelAccelerationStructure::Create(
-    IVulkanDevice *device,
-    const TopLevelAccelerationStructureDesc &desc) {
-  return VulkanTopLevelAccelerationStructureImpl::Create(device, desc);
-}
-}  // namespace grassland::rhi::backend::vulkan

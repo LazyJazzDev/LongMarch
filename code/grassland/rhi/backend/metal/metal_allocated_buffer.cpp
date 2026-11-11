@@ -21,7 +21,6 @@ class MetalAllocatedBufferImpl final : public Object<IMetalAllocatedBuffer> {
   MetalAllocatedBufferImpl(IMetalDevice *device, const BufferDesc &desc);
   NS::SharedPtr<MTL::Buffer> buffer_;
 
- private:
   IMetalDevice *device_;
   BufferDesc desc_;
 

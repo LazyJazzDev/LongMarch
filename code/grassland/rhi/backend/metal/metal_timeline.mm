@@ -8,13 +8,13 @@
 #include "grassland/rhi/backend/metal/metal_timeline.h"
 
 namespace grassland::rhi::backend::metal {
-struct MetalTimelineImpl::State {
+struct MetalTimelineImpl::CompletionState final {
   std::mutex mutex;
   std::condition_variable changed;
   bool failed{};
 };
 
-MetalTimelineImpl::MetalTimelineImpl(IMetalDevice *device) : state_(std::make_shared<State>()) {
+MetalTimelineImpl::MetalTimelineImpl(IMetalDevice *device) : state_(std::make_shared<CompletionState>()) {
   InitializeTimeline(device);
 }
 

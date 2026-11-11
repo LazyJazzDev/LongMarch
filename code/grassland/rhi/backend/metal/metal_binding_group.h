@@ -20,15 +20,12 @@ class IMetalBindingVersion : public IBackendBindingVersion {
   virtual void Bind(MTL::RenderCommandEncoder *encoder, uint32_t group) const = 0;
 };
 
-;
-
 class IMetalBindingGroup : public IBackendBindingGroup {
  public:
   using Version = IMetalBindingVersion;
   static IMetalBindingGroup *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
 };
 
-;
 }  // namespace grassland::rhi::backend::metal
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalBindingVersion)

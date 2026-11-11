@@ -13,6 +13,4 @@ class IVulkanTimeline : public IBackendTimeline {
   virtual VkSemaphore NativeSemaphore() const = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::vulkan

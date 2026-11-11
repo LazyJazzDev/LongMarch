@@ -11,5 +11,4 @@ class IMetalAllocatedImage : public IMetalImage {
   virtual bool IsValid() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::metal

@@ -1,5 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_device_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
@@ -62,44 +61,46 @@ class VulkanDeviceImpl final : public Object<IVulkanDevice> {
   VkSemaphore collector_shutdown_{VK_NULL_HANDLE};
   bool shutdown_consumed_{};
 
- private:
-  DeviceState state_Device_;
-
-  DeviceState &StateDevice() override {
-    return state_Device_;
-  }
-
-  const DeviceState &StateDevice() const override {
-    return state_Device_;
-  }
+  void InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api = BACKEND_API_DEFAULT);
 
  public:
-  std::string Name() const override {
-    return IBackendDevice::CommonName();
-  }
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override;
 
-  bool SupportRayTracingPipeline() const override {
-    return IBackendDevice::CommonSupportRayTracingPipeline();
-  }
+ private:
+  void DestroyDevice();
 
-  bool SupportRayQuery() const override {
-    return IBackendDevice::CommonSupportRayQuery();
-  }
+ public:
+  std::string Name() const override;
 
-  bool SupportGeometryShader() const override {
-    return IBackendDevice::CommonSupportGeometryShader();
-  }
+  bool SupportRayTracingPipeline() const override;
 
-  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
-    return IBackendDevice::CommonCreateShader(desc);
-  }
+  bool SupportRayQuery() const override;
 
-  rhi::IQueue *GetQueue(QueueType type) override {
-    return IBackendDevice::CommonGetQueue(type);
-  }
+  bool SupportGeometryShader() const override;
 
-  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override {
-    return IBackendDevice::CommonWaitEvents(events, wait_all);
-  }
+  rhi::IQueue *GetQueue(QueueType type) override;
+
+  const PhysicalDevice &GetPhysicalDevice() const noexcept override;
+
+ private:
+  IBackendCore *OwnerCore() const;
+
+  // Called once after native device resources and all queues are initialized.
+  void StartCollector();
+
+ public:
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override;
+
+ private:
+  void Collect();
+
+  void ShutdownQueues();
+
+  std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
+  std::atomic<bool> stopping_{};
+  BackendAPI api_{};
+  IBackendCore *core_{};
+  PhysicalDevice info_{};
+  std::thread collector_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

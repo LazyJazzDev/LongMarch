@@ -1,6 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_ray_tracing_program_state.h"
-#include "grassland/rhi/backend/vulkan/vulkan_program_base_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
@@ -13,45 +11,60 @@ class VulkanRayTracingProgramImpl final : public Object<IVulkanRayTracingProgram
                             IRayTracingProgram,
                             IVulkanProgramBase,
                             IObject)
+
   static IVulkanRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
+
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
+
   const IBackendShaderBindingTable *DefaultShaderBindingTable() const;
+
   ~VulkanRayTracingProgramImpl() override;
+
   VkPipeline NativePipeline() const;
+
+  const RayTracingProgramDesc &GetDesc() const override;
+
+  IBackendDevice *Owner() const override;
+
+  VkPipelineLayout NativeLayout() const override;
 
  private:
   VulkanRayTracingProgramImpl(IVulkanDevice *device, const RayTracingProgramDesc &desc);
+
   VkPipeline pipeline_{};
+
   IBackendShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
+
   ObjectPtr<IBackendShaderBindingTable> table_;
+
   std::array<std::vector<uint8_t>, 4> identifiers_;
+
   uint64_t handle_size_{}, stride_{}, alignment_{};
 
- private:
-  RayTracingProgramState state_RayTracingProgram_;
+  void InitializeRayTracingProgram(IBackendDevice *device, const RayTracingProgramDesc &desc);
 
-  RayTracingProgramState &StateRayTracingProgram() override {
-    return state_RayTracingProgram_;
-  }
+  bool ValidateLayout() const;
 
-  const RayTracingProgramState &StateRayTracingProgram() const override {
-    return state_RayTracingProgram_;
-  }
+  bool ValidateShaderBindingTable(const ShaderBindingTableDesc &desc) const;
 
- private:
-  VulkanProgramBaseState state_VulkanProgramBase_;
+  ShaderBindingTableDesc DefaultShaderBindingTableDesc() const;
 
-  VulkanProgramBaseState &StateVulkanProgramBase() override {
-    return state_VulkanProgramBase_;
-  }
+  IBackendDevice *device_{};
 
-  const VulkanProgramBaseState &StateVulkanProgramBase() const override {
-    return state_VulkanProgramBase_;
-  }
+  RayTracingProgramDesc desc_{};
 
- public:
-  const RayTracingProgramDesc &GetDesc() const override {
-    return IBackendRayTracingProgram::CommonGetDesc();
-  }
+  std::vector<ObjectPtr<IShader>> shaders_{};
+
+  void InitializeVulkanProgramBase(VkDevice device);
+
+  void DestroyVulkanProgramBase();
+
+  bool CreateLayout(const PipelineLayoutDesc &desc);
+
+  VkDevice LayoutDevice() const;
+
+  VkDevice layout_device_{};
+  std::vector<VkDescriptorSetLayout> set_layouts_{};
+  VkPipelineLayout layout_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

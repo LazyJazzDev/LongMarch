@@ -36,15 +36,46 @@ void MetalSwapChainImageImpl::DidPresent() {
   drawable_.reset();
 }
 
-}  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalSwapChainImage, "e121e257-92bc-4748-bbe0-2eff7a5af162")
-
-namespace grassland::rhi::backend::metal {
 IMetalSwapChainImage *IMetalSwapChainImage::Create(ImageDesc desc,
                                                    IMetalWindow *window,
                                                    uint64_t generation,
                                                    CA::MetalDrawable *drawable) {
   return new MetalSwapChainImageImpl(desc, window, generation, drawable);
 }
+
+void MetalSwapChainImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+  desc_ = desc;
+  queue_ = queue;
+}
+
+bool MetalSwapChainImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+  return !queue_ || queue_ == queue;
+}
+
+const ImageDesc &MetalSwapChainImageImpl::GetDesc() const {
+  return desc_;
+}
+
+void MetalSwapChainImageImpl::InitializeMetalImage(ImageDesc desc,
+                                                   const void *device,
+                                                   MTL::Texture *image,
+                                                   IBackendQueue *queue) {
+  InitializeImage(desc, queue);
+  device_ = device;
+  image_ = image;
+}
+
+bool MetalSwapChainImageImpl::SupportsStorage() const {
+  return (image_->usage() & MTL::TextureUsageShaderWrite) != 0;
+}
+
+const void *MetalSwapChainImageImpl::DeviceIdentity() const {
+  return device_;
+}
+
+MTL::Texture *MetalSwapChainImageImpl::NativeImage() const {
+  return image_;
+}
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalSwapChainImage, "e121e257-92bc-4748-bbe0-2eff7a5af162")

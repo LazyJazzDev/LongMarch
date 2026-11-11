@@ -1,6 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_binding_group_bindinggroup_state.h"
-#include "grassland/rhi/backend/backend_binding_group_bindingversion_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
@@ -18,25 +16,38 @@ class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
   IVulkanDevice *device_;
   bool WriteDescriptors(size_t binding_index,
                         uint32_t first_element,
-                        const std::vector<ITopLevelAccelerationStructure *> &values) override;
+                        const std::vector<ITopLevelAccelerationStructure *> &values);
   VulkanBindingVersionImpl(IVulkanDevice *device, const BindingLayoutDesc &layout);
-  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
-  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
-  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) override;
+  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values);
+  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values);
+  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values);
   VkDescriptorSetLayout native_layout_{};
   ObjectPtr<VulkanDescriptorPool::Lease> lease_;
   std::vector<std::vector<bool>> initialized_;
 
+  void InitializeBindingVersion(const BindingLayoutDesc &layout);
+
+ public:
+  const BindingLayoutDesc &GetLayout() const override;
+
+  const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const override;
+
+  bool IsComplete() const override;
+
+  bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
+
+  bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
+
+  bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) override;
+
+  bool Write(size_t binding_index,
+             uint32_t first_element,
+             const std::vector<ITopLevelAccelerationStructure *> &values) override;
+
  private:
-  BindingVersionState state_BindingVersion_;
-
-  BindingVersionState &StateBindingVersion() override {
-    return state_BindingVersion_;
-  }
-
-  const BindingVersionState &StateBindingVersion() const override {
-    return state_BindingVersion_;
-  }
+  BindingLayoutDesc layout_;
+  // Indexed by sorted layout binding, then array element.
+  std::vector<std::vector<ObjectPtr<IObject>>> references_;
 };
 
 class VulkanBindingGroupImpl final : public Object<IVulkanBindingGroup> {
@@ -48,41 +59,36 @@ class VulkanBindingGroupImpl final : public Object<IVulkanBindingGroup> {
   VulkanBindingGroupImpl(IVulkanDevice *device, ObjectPtr<Version> version);
 
  public:
-  ~VulkanBindingGroupImpl() override {
-  }
+  ~VulkanBindingGroupImpl() override = default;
 
  private:
-  BindingGroupState state_BindingGroup_;
-
-  BindingGroupState &StateBindingGroup() override {
-    return state_BindingGroup_;
-  }
-
-  const BindingGroupState &StateBindingGroup() const override {
-    return state_BindingGroup_;
-  }
+  void InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version);
 
  public:
+  const BindingLayoutDesc &GetLayout() const override;
+
+  IBackendDevice *Owner() const override;
+
+  // Borrowed until the next mutation; the context retains it before recording use.
+  IBackendBindingVersion *CurrentVersion() const override;
+
+ private:
+  const BindingDesc *FindBinding(uint32_t binding, uint32_t first_element, size_t count, size_t &binding_index) const;
+
+ public:
+  bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override;
+
+  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override;
+
+  bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override;
+
   bool BindResource(uint32_t binding,
                     const std::vector<ITopLevelAccelerationStructure *> &structures,
-                    uint32_t first_element = 0) override {
-    return IBackendBindingGroup::CommonBindResource(binding, structures, first_element);
-  }
+                    uint32_t first_element = 0) override;
 
-  bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override {
-    return IBackendBindingGroup::CommonBindResource(binding, buffers, first_element);
-  }
-
-  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override {
-    return IBackendBindingGroup::CommonBindResource(binding, images, first_element);
-  }
-
-  bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override {
-    return IBackendBindingGroup::CommonBindResource(binding, samplers, first_element);
-  }
-
-  const BindingLayoutDesc &GetLayout() const override {
-    return IBackendBindingGroup::CommonGetLayout();
-  }
+ private:
+  IBackendDevice *device_;
+  BindingLayoutDesc layout_;
+  ObjectPtr<IBackendBindingVersion> version_;
 };
 }  // namespace grassland::rhi::backend::vulkan

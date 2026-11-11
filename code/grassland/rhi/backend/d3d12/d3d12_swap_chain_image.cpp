@@ -1,5 +1,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 
+#include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
@@ -34,11 +35,6 @@ HRESULT D3D12SwapChainImageImpl::Present() {
   return window_->PresentFrame(generation_);
 }
 
-}  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12SwapChainImage, "f03d8d79-9e19-41ca-b585-8f6f5bd64143")
-
-namespace grassland::rhi::backend::d3d12 {
 ID3D12SwapChainImage *ID3D12SwapChainImage::Create(ImageDesc desc,
                                                    ID3D12Window *window,
                                                    uint64_t generation,
@@ -46,4 +42,52 @@ ID3D12SwapChainImage *ID3D12SwapChainImage::Create(ImageDesc desc,
                                                    ObjectPtr<D3D12DescriptorPool::Lease> attachment) {
   return new D3D12SwapChainImageImpl(desc, window, generation, image, attachment);
 }
+
+void D3D12SwapChainImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+  desc_ = desc;
+  queue_ = queue;
+}
+
+bool D3D12SwapChainImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+  return !queue_ || queue_ == queue;
+}
+
+const ImageDesc &D3D12SwapChainImageImpl::GetDesc() const {
+  return desc_;
+}
+
+void D3D12SwapChainImageImpl::InitializeD3D12Image(ImageDesc desc,
+                                                   const void *device,
+                                                   ID3D12Resource *image,
+                                                   ObjectPtr<D3D12DescriptorPool::Lease> attachment,
+                                                   D3D12_RESOURCE_STATES default_state,
+                                                   IBackendQueue *queue) {
+  InitializeImage(desc, queue);
+  attachment_ = std::move(attachment);
+  device_ = device;
+  image_ = image;
+  default_state_ = default_state;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12SwapChainImageImpl::AttachmentView() const {
+  return attachment_->CPU();
+}
+
+bool D3D12SwapChainImageImpl::SupportsStorage() const {
+  return (image_->GetDesc().Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) != 0;
+}
+
+const void *D3D12SwapChainImageImpl::DeviceIdentity() const {
+  return device_;
+}
+
+ID3D12Resource *D3D12SwapChainImageImpl::NativeImage() const {
+  return image_;
+}
+
+D3D12_RESOURCE_STATES D3D12SwapChainImageImpl::DefaultState() const {
+  return default_state_;
+}
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12SwapChainImage, "f03d8d79-9e19-41ca-b585-8f6f5bd64143")

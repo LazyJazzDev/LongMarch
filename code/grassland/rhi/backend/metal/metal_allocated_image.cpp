@@ -35,12 +35,43 @@ IMetalAllocatedImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, cons
 bool MetalAllocatedImageImpl::IsValid() const {
   return bool(texture_);
 }
-}  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalAllocatedImage, "4ab5d857-2e2e-4232-bd99-aca3979a9c87")
-
-namespace grassland::rhi::backend::metal {
 IMetalAllocatedImage *IMetalAllocatedImage::Create(IMetalDevice *device, const ImageDesc &desc) {
   return MetalAllocatedImageImpl::Create(device, desc);
 }
+
+void MetalAllocatedImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+  desc_ = desc;
+  queue_ = queue;
+}
+
+bool MetalAllocatedImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+  return !queue_ || queue_ == queue;
+}
+
+const ImageDesc &MetalAllocatedImageImpl::GetDesc() const {
+  return desc_;
+}
+
+void MetalAllocatedImageImpl::InitializeMetalImage(ImageDesc desc,
+                                                   const void *device,
+                                                   MTL::Texture *image,
+                                                   IBackendQueue *queue) {
+  InitializeImage(desc, queue);
+  device_ = device;
+}
+
+bool MetalAllocatedImageImpl::SupportsStorage() const {
+  return (texture_->usage() & MTL::TextureUsageShaderWrite) != 0;
+}
+
+const void *MetalAllocatedImageImpl::DeviceIdentity() const {
+  return device_;
+}
+
+MTL::Texture *MetalAllocatedImageImpl::NativeImage() const {
+  return texture_.get();
+}
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalAllocatedImage, "4ab5d857-2e2e-4232-bd99-aca3979a9c87")

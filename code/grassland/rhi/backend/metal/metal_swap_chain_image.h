@@ -18,6 +18,4 @@ class IMetalSwapChainImage : public IMetalImage {
   virtual void DidPresent() = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::metal

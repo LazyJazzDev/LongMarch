@@ -1,6 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_ray_tracing_program_state.h"
-#include "grassland/rhi/backend/d3d12/d3d12_program_base_state.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
@@ -13,47 +11,53 @@ class D3D12RayTracingProgramImpl final : public Object<ID3D12RayTracingProgram> 
                             IRayTracingProgram,
                             ID3D12ProgramBase,
                             IObject)
+
   static ID3D12RayTracingProgram *Create(ID3D12Device *device, const RayTracingProgramDesc &desc);
+
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
+
   const IBackendShaderBindingTable *DefaultShaderBindingTable() const;
+
   ID3D12StateObject *NativePipeline() const;
+
+  ~D3D12RayTracingProgramImpl() override = default;
+
+  const RayTracingProgramDesc &GetDesc() const override;
+
+  IBackendDevice *Owner() const override;
+
+  ID3D12RootSignature *NativeRootSignature() const override;
+
+  uint32_t RootParameter(uint32_t group, bool sampler) const override;
 
  private:
   D3D12RayTracingProgramImpl(ID3D12Device *device, const RayTracingProgramDesc &desc);
+
   ComPtr<ID3D12StateObject> pipeline_;
+
   IBackendShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
+
   ObjectPtr<IBackendShaderBindingTable> table_;
+
   std::array<std::vector<uint8_t>, 4> identifiers_;
 
- public:
-  ~D3D12RayTracingProgramImpl() override {
-  }
+  void InitializeRayTracingProgram(IBackendDevice *device, const RayTracingProgramDesc &desc);
 
- private:
-  RayTracingProgramState state_RayTracingProgram_;
+  bool ValidateLayout() const;
 
-  RayTracingProgramState &StateRayTracingProgram() override {
-    return state_RayTracingProgram_;
-  }
+  bool ValidateShaderBindingTable(const ShaderBindingTableDesc &desc) const;
 
-  const RayTracingProgramState &StateRayTracingProgram() const override {
-    return state_RayTracingProgram_;
-  }
+  ShaderBindingTableDesc DefaultShaderBindingTableDesc() const;
 
- private:
-  D3D12ProgramBaseState state_D3D12ProgramBase_;
+  IBackendDevice *device_{};
 
-  D3D12ProgramBaseState &StateD3D12ProgramBase() override {
-    return state_D3D12ProgramBase_;
-  }
+  RayTracingProgramDesc desc_{};
 
-  const D3D12ProgramBaseState &StateD3D12ProgramBase() const override {
-    return state_D3D12ProgramBase_;
-  }
+  std::vector<ObjectPtr<IShader>> shaders_{};
 
- public:
-  const RayTracingProgramDesc &GetDesc() const override {
-    return IBackendRayTracingProgram::CommonGetDesc();
-  }
+  bool CreateLayout(::ID3D12Device *device, const PipelineLayoutDesc &layout, D3D12_ROOT_SIGNATURE_FLAGS flags);
+
+  std::vector<std::array<uint32_t, 2>> root_parameters_{};
+  ComPtr<ID3D12RootSignature> root_signature_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

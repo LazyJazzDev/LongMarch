@@ -37,11 +37,7 @@ bool VulkanDownloadTokenImpl::CopyData(void *destination) const {
   }
   return true;
 }
-}  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanDownloadToken, "1f0619cd-eb9a-4ecc-8260-c1737da81a3b")
-
-namespace grassland::rhi::backend::vulkan {
 IVulkanDownloadToken *IVulkanDownloadToken::Create(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size) {
   return new VulkanDownloadTokenImpl(lease, size);
 }
@@ -51,3 +47,5 @@ IVulkanDownloadToken *IVulkanDownloadToken::Create(ObjectPtr<IVulkanTemporalBuff
   return new VulkanDownloadTokenImpl(lease, layout);
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanDownloadToken, "1f0619cd-eb9a-4ecc-8260-c1737da81a3b")

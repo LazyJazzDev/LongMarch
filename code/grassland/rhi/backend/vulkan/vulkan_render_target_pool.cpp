@@ -9,7 +9,6 @@ class VulkanRenderTargetPool::LeaseImpl final : public Object<VulkanRenderTarget
  public:
   LONGMARCH_RHI_FINAL_QUERY(IObject, VulkanRenderTargetPool::ILease)
 
- public:
   LeaseImpl(VulkanRenderTargetPool *pool, Entry *entry, const std::vector<IVulkanImage *> &images);
   ~LeaseImpl() override;
   const std::vector<VkImageView> &VulkanImageViews() const;

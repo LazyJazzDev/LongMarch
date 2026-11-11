@@ -41,12 +41,9 @@ VkSemaphore VulkanTimelineImpl::NativeSemaphore() const {
   return semaphore_;
 }
 
-}  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanTimeline, "30a1e28a-4bf1-4d83-a693-bc60f95ec95b")
-
-namespace grassland::rhi::backend::vulkan {
 ObjectPtr<IVulkanTimeline> IVulkanTimeline::Create(IVulkanDevice *device) {
   return VulkanTimelineImpl::Create(device);
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanTimeline, "30a1e28a-4bf1-4d83-a693-bc60f95ec95b")

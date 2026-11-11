@@ -1,5 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_queue_state.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
@@ -21,23 +20,40 @@ class MetalQueueImpl final : public Object<IMetalQueue> {
   NS::SharedPtr<MTL::CommandBufferDescriptor> descriptor_;
 
  public:
-  ~MetalQueueImpl() override {
-  }
+  ~MetalQueueImpl() override = default;
+
+  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IBackendCommandContext> &commands,
+                                            const SubmitInfo &info) override;
+
+  // Called only by the device collector; returns whether this queue is drained.
+  bool CollectCompleted(uint64_t completed, bool timeline_valid) override;
 
  private:
-  QueueState state_Queue_;
-
-  QueueState &StateQueue() override {
-    return state_Queue_;
-  }
-
-  const QueueState &StateQueue() const override {
-    return state_Queue_;
-  }
+  void InitializeQueue(IBackendDevice *device,
+                       QueueType type,
+                       std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
 
  public:
-  QueueType GetType() const override {
-    return IBackendQueue::CommonGetType();
-  }
+  std::mutex &QueueMutex() override;
+
+  // Called under QueueMutex, in native submission order.
+  uint64_t NextSerial() override;
+
+  IBackendDevice *Owner() const override;
+
+  QueueType GetType() const override;
+
+ private:
+  struct Submission {
+    ObjectPtr<IBackendCommandContext> commands;
+    ObjectPtr<IBackendSubmissionToken> completion;
+  };
+
+  std::list<Submission> pending_{};
+  IBackendDevice *device_{};
+  QueueType type_{};
+  // Logical queues that share a native queue also share its host synchronization.
+  std::shared_ptr<std::mutex> mutex_{};
+  uint64_t serial_{};
 };
 }  // namespace grassland::rhi::backend::metal

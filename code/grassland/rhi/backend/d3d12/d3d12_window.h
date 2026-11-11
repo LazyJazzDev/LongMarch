@@ -20,6 +20,4 @@ class ID3D12Window : public IBackendWindow {
   virtual HRESULT PresentFrame(uint64_t generation) = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::d3d12

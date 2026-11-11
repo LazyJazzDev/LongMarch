@@ -13,5 +13,4 @@ class IBackendShader : public IShader {
   virtual const std::string &GetPreprocessedCode() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend

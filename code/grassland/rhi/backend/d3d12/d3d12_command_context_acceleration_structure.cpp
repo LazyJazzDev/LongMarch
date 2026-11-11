@@ -15,12 +15,12 @@ bool D3D12CommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage())) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
 #if !defined(NDEBUG)
   if (!ValidateGeometryBuffers(target->GetDesc(), geometries, device_)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
 #endif
@@ -76,7 +76,7 @@ bool D3D12CommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
       !ValidateInstances(target->GetDesc(), instances)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (mode == ACCELERATION_STRUCTURE_UPDATE) {
@@ -84,7 +84,7 @@ bool D3D12CommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
     const size_t previous_count =
         pending == as_dependencies_.end() ? target->BottomLevels().size() : pending->second.size();
     if (instances.size() != previous_count) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
   }
@@ -93,7 +93,7 @@ bool D3D12CommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
     const auto &instance = instances[i];
     auto blas = rhi::QueryInterfacePtr<ID3D12BottomLevelAccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
     if (!RetainResource(blas))
@@ -161,7 +161,7 @@ bool D3D12CommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
 bool D3D12CommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *structure) {
   auto target = rhi::QueryInterfacePtr<ID3D12AccelerationStructure>(structure).Get();
   if (!ray_list_ || !target || target->Owner() != device_ || !target->AllowsCompaction() || rendering_active_) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(structure))
@@ -186,7 +186,7 @@ bool D3D12CommandContextImpl::CmdCompactAccelerationStructure(IAccelerationStruc
   if (!ray_list_ || !from || !to || from == to || from->Owner() != device_ || to->Owner() != device_ ||
       !from->AllowsCompaction() || !to->IsCompactStorage() || source->GetType() != destination->GetType() ||
       rendering_active_) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(source))

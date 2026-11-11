@@ -38,11 +38,20 @@ types cannot instantiate it. There is no runtime registration map, allocation,
 RTTI, or compiler-specific UUID extension. All 111 library IDs were randomly
 generated UUIDv4 values and remain stable for the same interface.
 
-Every inheritable RHI object layer is a data-free interface. Shared operations
-are nonvirtual helper functions; virtual contracts remain pure. Shared state
-is composed into the final implementation, accessed by shared helpers through
-protected pure virtual accessors. No intermediate interface owns state or a
-reference counter.
+Every inheritable RHI object layer is a data-free interface. Virtual contracts
+remain pure. The final implementation directly declares its members and
+implements operations on them. There are no interface backing-state structs or
+virtual state accessors. Similar implementations may repeat straightforward
+code; they do not introduce a state indirection to avoid that repetition.
+Stateless algorithms may remain ordinary helpers with explicit inputs.
+
+This applies to acceleration structures, images, programs and native layouts,
+binding groups and versions, samplers, downloads, timelines, devices, queues,
+command contexts, and windows. The former 22 backing-state headers are removed.
+Queue submission records and resource transition records still represent actual
+work/data. Metal completion callbacks retain a separate `CompletionState` for
+their asynchronous lifetime; it is private to the final timeline implementation,
+not a backing store accessed through an interface.
 
 For example, `IBuffer -> IBackendBuffer -> ID3D12Buffer ->
 ID3D12AllocatedBuffer` describes the interface chain. The allocation is a
@@ -148,7 +157,7 @@ Metal performance or Linux performance.
 
 ## Validation
 
-The following checks apply to the interface/state separation at `015e960a`.
+The following checks apply to the final implementation with direct members.
 The performance measurements above apply only to the older implementation.
 
 - Windows Release: 218 passed, two Debug-only queue-diagnostic tests skipped
@@ -167,8 +176,8 @@ The performance measurements above apply only to the older implementation.
   tests executed successfully with both GCC and Clang with RTTI disabled.
 - Audit: 111 library UUID registrations are unique UUIDv4 values and match the
   random generator's output. RHI contains no remaining `dynamic_cast`.
-  Intermediate interfaces have no state; final implementations introduce their
-  single reference counter through `Object<Interface>`. Shared state is composed
-  into those final implementations rather than inherited.
+  All 22 former state wrappers/accessors are absent. The audit checked 90 backend
+  interfaces and 63 final `Object<Interface>` implementations; the 111 UUIDs are
+  unchanged. Members and implementation methods belong to final classes.
 - Metal source was migrated, but no macOS build or runtime validation was
   available. Windows/Linux checks do not substitute for that validation.

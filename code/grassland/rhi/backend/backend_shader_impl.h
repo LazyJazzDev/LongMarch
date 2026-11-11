@@ -18,7 +18,6 @@ class ShaderImpl final : public Object<IBackendShader> {
   std::string preprocessed_code_;
 
  public:
-  ~ShaderImpl() override {
-  }
+  ~ShaderImpl() override = default;
 };
 }  // namespace grassland::rhi::backend

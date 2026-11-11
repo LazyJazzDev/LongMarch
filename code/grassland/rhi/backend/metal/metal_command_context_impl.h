@@ -1,5 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_command_context_state.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
@@ -82,39 +81,61 @@ class MetalCommandContextImpl final : public Object<IMetalCommandContext> {
   NS::SharedPtr<MTL::CommandBuffer> commands_;
   std::vector<std::pair<IMetalWindow *, IMetalSwapChainImage *>> presents_;
 
- private:
-  CommandContextState state_CommandContext_;
-
-  CommandContextState &StateCommandContext() override {
-    return state_CommandContext_;
-  }
-
-  const CommandContextState &StateCommandContext() const override {
-    return state_CommandContext_;
-  }
-
  public:
-  bool CmdDrawImGui(IWindow *window, IImage *target) override {
-    return IBackendCommandContext::CommonCmdDrawImGui(window, target);
-  }
+  bool CmdDrawImGui(IWindow *window, IImage *target) override;
 
-  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override {
-    return IBackendCommandContext::CommonCmdPresentImage(window, frame_img, frame_color_space);
-  }
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override;
 
-  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override {
-    return IBackendCommandContext::CommonCmdBindRayTracingProgram(program);
-  }
+  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
 
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,
                        uint32_t depth = 1,
-                       IShaderBindingTable *sbt = nullptr) override {
-    return IBackendCommandContext::CommonCmdDispatchRays(width, height, depth, sbt);
+                       IShaderBindingTable *sbt = nullptr) override;
+
+ private:
+  bool PrepareRendering(const RenderingInfo &info);
+
+  bool RenderingMatches(const IProgram *program) const;
+
+  void InitializeCommandContext(IBackendQueue *queue);
+
+ public:
+  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
+
+  void BindDownloads(IBackendSubmissionToken *submission) override;
+
+  void ReleaseDownloads() override;
+
+ private:
+  // Call before encoding each resource use. Retains each exact object once.
+  IDownloadToken *RegisterDownload(ObjectPtr<IBackendDownloadToken> token);
+
+  template <typename T, std::enable_if_t<!std::is_convertible_v<T *, rhi::IObject *>, int> = 0>
+  bool RetainResource(T *resource) {
+    return RetainResource(rhi::QueryInterfacePtr<rhi::IObject>(resource).Get());
   }
 
-  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override {
-    return IBackendCommandContext::CommonSubmit(info);
-  }
+  bool RetainResource(rhi::IObject *resource);
+
+ public:
+  bool Seal() override;
+
+  IBackendQueue *OwnerQueue() const override;
+
+  const void *DeviceIdentity() const override;
+
+  void MarkSubmitted() override;
+
+  bool WasSubmitted() const override;
+
+ private:
+  RenderingInfo rendering_{};
+  bool recording_failed_{};
+  bool sealed_{};
+  IBackendQueue *queue_{};
+  std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
+  bool submitted_{};
+  std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};
 };
 }  // namespace grassland::rhi::backend::metal

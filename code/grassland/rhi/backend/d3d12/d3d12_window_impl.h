@@ -1,5 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_window_state.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
@@ -28,120 +27,106 @@ class D3D12WindowImpl final : public Object<ID3D12Window> {
   bool valid_{};
   PresentMode mode_{PRESENT_MODE_VSYNC};
 
+ public:
+  bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
+
+  ImGuiContext *GetImGuiContext() const override;
+
+  bool UpdateImGui(const std::function<void()> &callback) override;
+
+  const void *DeviceIdentity() const override;
+
+  bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) override;
+
+  bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) override;
+
+  bool RecordImGui(rhi::ICommandContext *commands,
+                   rhi::IImage *image,
+                   ColorSpace color_space,
+                   float white_scale) override;
+
+  rhi::IImage *GetNextImage() override;
+
+  IBackendQueue *OwnerQueue() const override;
+
+  bool UpdateNextImage() override;
+
+  void ReleaseNextImage() override;
+
+  bool IsSwapChainInvalid() const override;
+
+  bool RebuildSwapChain() override;
+
+  bool SetPresentMode(PresentMode mode) override;
+
+  bool SetColorSpace(ColorSpace color_space) override;
+
+  ColorSpace GetColorSpace() const override;
+
+  float GetHDRReferenceWhiteScale() const override;
+
+  float GetHDRHeadroom() const override;
+
+  bool GetHDRReferenceWhiteNits(float &nits) const override;
+
  private:
-  WindowState state_Window_;
+  ColorSpace RequestedColorSpace() const;
 
-  WindowState &StateWindow() override {
-    return state_Window_;
-  }
+  void DestroyWindow();
 
-  const WindowState &StateWindow() const override {
-    return state_Window_;
-  }
+  bool InitializeWindow(IBackendDevice *device, const WindowDesc &desc);
 
  public:
-  bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override {
-    return IBackendWindow::CommonEnableImGui(enabled, font_file_path, font_size);
-  }
+  GLFWwindow *GLFWWindow() const override;
 
-  bool UpdateImGui(const std::function<void()> &callback) override {
-    return IBackendWindow::CommonUpdateImGui(callback);
-  }
+  bool ShouldClose() const override;
 
-  EventManager<void(int, int)> &ResizeEvent() override {
-    return IBackendWindow::CommonResizeEvent();
-  }
+  bool IsKeyDown(int key) const override;
 
-  EventManager<void(int, int)> &FramebufferResizeEvent() override {
-    return IBackendWindow::CommonFramebufferResizeEvent();
-  }
+  bool SetTitle(const std::string &title) override;
 
-  EventManager<void(bool)> &CursorEnterEvent() override {
-    return IBackendWindow::CommonCursorEnterEvent();
-  }
+  EventManager<void(int, int)> &ResizeEvent() override;
 
-  EventManager<void(bool)> &FocusEvent() override {
-    return IBackendWindow::CommonFocusEvent();
-  }
+  EventManager<void(int, int)> &FramebufferResizeEvent() override;
 
-  EventManager<void(double, double)> &MouseMoveEvent() override {
-    return IBackendWindow::CommonMouseMoveEvent();
-  }
+  EventManager<void(bool)> &CursorEnterEvent() override;
 
-  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override {
-    return IBackendWindow::CommonMouseButtonEvent();
-  }
+  EventManager<void(bool)> &FocusEvent() override;
 
-  EventManager<void(double, double)> &ScrollEvent() override {
-    return IBackendWindow::CommonScrollEvent();
-  }
+  EventManager<void(double, double)> &MouseMoveEvent() override;
 
-  EventManager<void(int, int, int, int)> &KeyEvent() override {
-    return IBackendWindow::CommonKeyEvent();
-  }
+  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override;
 
-  EventManager<void(uint32_t)> &CharEvent() override {
-    return IBackendWindow::CommonCharEvent();
-  }
+  EventManager<void(double, double)> &ScrollEvent() override;
 
-  EventManager<void(int, const char **)> &DropEvent() override {
-    return IBackendWindow::CommonDropEvent();
-  }
+  EventManager<void(int, int, int, int)> &KeyEvent() override;
 
-  rhi::IImage *GetNextImage() override {
-    return IBackendWindow::CommonGetNextImage();
-  }
+  EventManager<void(uint32_t)> &CharEvent() override;
 
-  bool IsSwapChainInvalid() const override {
-    return IBackendWindow::CommonIsSwapChainInvalid();
-  }
+  EventManager<void(int, const char **)> &DropEvent() override;
 
-  bool RebuildSwapChain() override {
-    return IBackendWindow::CommonRebuildSwapChain();
-  }
+ private:
+  bool invalid_{true};
 
-  bool UpdateNextImage() override {
-    return IBackendWindow::CommonUpdateNextImage();
-  }
-
-  bool SetPresentMode(PresentMode mode) override {
-    return IBackendWindow::CommonSetPresentMode(mode);
-  }
-
-  bool SetColorSpace(ColorSpace color_space) override {
-    return IBackendWindow::CommonSetColorSpace(color_space);
-  }
-
-  ColorSpace GetColorSpace() const override {
-    return IBackendWindow::CommonGetColorSpace();
-  }
-
-  bool GetHDRReferenceWhiteNits(float &nits) const override {
-    return IBackendWindow::CommonGetHDRReferenceWhiteNits(nits);
-  }
-
-  float GetHDRReferenceWhiteScale() const override {
-    return IBackendWindow::CommonGetHDRReferenceWhiteScale();
-  }
-
-  float GetHDRHeadroom() const override {
-    return IBackendWindow::CommonGetHDRHeadroom();
-  }
-
-  GLFWwindow *GLFWWindow() const override {
-    return IBackendWindow::CommonGLFWWindow();
-  }
-
-  bool ShouldClose() const override {
-    return IBackendWindow::CommonShouldClose();
-  }
-
-  bool IsKeyDown(int key) const override {
-    return IBackendWindow::CommonIsKeyDown(key);
-  }
-
-  bool SetTitle(const std::string &title) override {
-    return IBackendWindow::CommonSetTitle(title);
-  }
+  IBackendQueue *queue_{};
+  std::unique_ptr<WindowImGui> imgui_{};
+  std::unique_ptr<ImagePresenter> presenter_{};
+  bool processing_imgui_{};
+  EventManager<void(int, int)> resize_event_{};
+  EventManager<void(int, int)> framebufferresize_event_{};
+  EventManager<void(bool)> cursorenter_event_{};
+  EventManager<void(bool)> focus_event_{};
+  EventManager<void(double, double)> mousemove_event_{};
+  EventManager<void(int, int, int, double, double)> mousebutton_event_{};
+  EventManager<void(double, double)> scroll_event_{};
+  EventManager<void(int, int, int, int)> key_event_{};
+  EventManager<void(uint32_t)> char_event_{};
+  EventManager<void(int, const char **)> drop_event_{};
+  PresentMode requested_mode_{PRESENT_MODE_VSYNC};
+  ColorSpace requested_color_space_{COLOR_SPACE_SRGB_NONLINEAR};
+  ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
+  GLFWwindow *window_{};
+  std::mutex next_image_mutex_{};
+  ObjectPtr<IBackendImage> next_image_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

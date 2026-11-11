@@ -14,27 +14,19 @@ struct DownloadLayout {
   uint64_t stencil_offset{}, stencil_pitch{};
 };
 
-struct DownloadTokenState;
-
 class IBackendDownloadToken : public IDownloadToken {
- protected:
-  void InitializeDownloadToken(uint64_t size);
-  void DestroyDownloadToken();
-
  public:
   SubmissionStatus GetStatus() const override = 0;
-  SubmissionStatus CommonGetStatus() const;
+
   bool WaitHost() const override = 0;
-  bool CommonWaitHost() const;
+
   uint64_t GetSize() const override = 0;
-  uint64_t CommonGetSize() const;
+
   bool CopyTo(void *destination, uint64_t size) const override = 0;
-  bool CommonCopyTo(void *destination, uint64_t size) const;
-  void BindSubmission(IBackendSubmissionToken *submission);
+
+  virtual void BindSubmission(IBackendSubmissionToken *submission) = 0;
 
  protected:
   virtual bool CopyData(void *destination) const = 0;
-  virtual DownloadTokenState &StateDownloadToken() = 0;
-  virtual const DownloadTokenState &StateDownloadToken() const = 0;
 };
 }  // namespace grassland::rhi::backend

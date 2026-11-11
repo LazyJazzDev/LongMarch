@@ -19,7 +19,6 @@ class SubmissionTokenImpl final : public Object<IBackendSubmissionToken> {
   const Event event_;
 
  public:
-  ~SubmissionTokenImpl() override {
-  }
+  ~SubmissionTokenImpl() override = default;
 };
 }  // namespace grassland::rhi::backend

@@ -17,15 +17,12 @@ class IVulkanBindingVersion : public IBackendBindingVersion {
   virtual VkDescriptorSet Set() const = 0;
 };
 
-;
-
 class IVulkanBindingGroup : public IBackendBindingGroup {
  public:
   using Version = IVulkanBindingVersion;
   static IVulkanBindingGroup *Create(IVulkanDevice *device, const BindingLayoutDesc &layout);
 };
 
-;
 }  // namespace grassland::rhi::backend::vulkan
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanBindingVersion)

@@ -16,6 +16,4 @@ class IVulkanSwapChainImage : public IVulkanImage {
   virtual IVulkanWindow *Owner() const = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::vulkan

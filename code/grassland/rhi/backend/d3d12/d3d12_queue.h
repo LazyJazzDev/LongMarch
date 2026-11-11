@@ -17,6 +17,4 @@ class ID3D12Queue : public IBackendQueue {
   virtual bool WaitIdle() = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::d3d12

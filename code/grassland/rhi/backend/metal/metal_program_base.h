@@ -9,20 +9,15 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalProgramBase)
 
 namespace grassland::rhi::backend::metal {
 // Shared argument-buffer layout and shader translation; no IObject/refcount base.
-struct MetalProgramBaseState;
-
 class IMetalProgramBase : public IObject {
- protected:
-  void InitializeMetalProgramBase(MTL::Device *device, const PipelineLayoutDesc &layout);
-
  public:
-  const PipelineLayoutDesc &BindingLayout() const;
-
- protected:
-  NS::SharedPtr<MTL::Function> CompileFunction(const IShader *shader,
-                                               const std::vector<InputAttributeDesc> &attributes = {},
-                                               std::array<uint32_t, 3> *threads = nullptr) const;
-  virtual MetalProgramBaseState &StateMetalProgramBase() = 0;
-  virtual const MetalProgramBaseState &StateMetalProgramBase() const = 0;
+  virtual const PipelineLayoutDesc &BindingLayout() const = 0;
 };
+
+bool CompileMetal(const IShader *shader,
+                  const PipelineLayoutDesc &layout,
+                  const std::vector<InputAttributeDesc> &attributes,
+                  std::string &source,
+                  std::string &entry,
+                  std::array<uint32_t, 3> *threads);
 }  // namespace grassland::rhi::backend::metal

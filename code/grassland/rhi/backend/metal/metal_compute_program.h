@@ -18,11 +18,9 @@ class IMetalComputeProgram : public IBackendComputeProgram, public IMetalProgram
     return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
   }
 
- public:
   static IMetalComputeProgram *Create(IMetalDevice *device, const ComputeProgramDesc &desc);
   virtual MTL::ComputePipelineState *NativePipeline() const = 0;
   virtual MTL::Size ThreadGroupSize() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::metal

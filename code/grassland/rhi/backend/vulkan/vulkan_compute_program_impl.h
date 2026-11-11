@@ -1,7 +1,5 @@
 #pragma once
-#include "grassland/rhi/backend/backend_compute_program_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
-#include "grassland/rhi/backend/vulkan/vulkan_program_base_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
@@ -13,39 +11,44 @@ class VulkanComputeProgramImpl final : public Object<IVulkanComputeProgram> {
                             IComputeProgram,
                             IVulkanProgramBase,
                             IObject)
+
   static IVulkanComputeProgram *Create(IVulkanDevice *device, const ComputeProgramDesc &desc);
+
   ~VulkanComputeProgramImpl() override;
+
   VkPipeline NativePipeline() const;
+
+  const ComputeProgramDesc &GetDesc() const override;
+
+  IBackendDevice *Owner() const override;
+
+  VkPipelineLayout NativeLayout() const override;
 
  private:
   VulkanComputeProgramImpl(IVulkanDevice *device, const ComputeProgramDesc &desc);
+
   VkPipeline pipeline_{};
 
- private:
-  ComputeProgramState state_ComputeProgram_;
+  void InitializeComputeProgram(IBackendDevice *device, const ComputeProgramDesc &desc);
 
-  ComputeProgramState &StateComputeProgram() override {
-    return state_ComputeProgram_;
-  }
+  bool ValidateLayout() const;
 
-  const ComputeProgramState &StateComputeProgram() const override {
-    return state_ComputeProgram_;
-  }
+  IBackendDevice *device_{};
 
- private:
-  VulkanProgramBaseState state_VulkanProgramBase_;
+  ComputeProgramDesc desc_{};
 
-  VulkanProgramBaseState &StateVulkanProgramBase() override {
-    return state_VulkanProgramBase_;
-  }
+  ObjectPtr<IShader> shader_{};
 
-  const VulkanProgramBaseState &StateVulkanProgramBase() const override {
-    return state_VulkanProgramBase_;
-  }
+  void InitializeVulkanProgramBase(VkDevice device);
 
- public:
-  const ComputeProgramDesc &GetDesc() const override {
-    return IBackendComputeProgram::CommonGetDesc();
-  }
+  void DestroyVulkanProgramBase();
+
+  bool CreateLayout(const PipelineLayoutDesc &desc);
+
+  VkDevice LayoutDevice() const;
+
+  VkDevice layout_device_{};
+  std::vector<VkDescriptorSetLayout> set_layouts_{};
+  VkPipelineLayout layout_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

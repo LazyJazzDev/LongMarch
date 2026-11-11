@@ -1,5 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_command_context_state.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
@@ -98,28 +97,54 @@ class VulkanCommandContextImpl final : public Object<IVulkanCommandContext> {
   bool submission_failed_{};
   bool reusable_{};
 
+ public:
+  bool CmdDrawImGui(IWindow *window, IImage *target) override;
+
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override;
+
  private:
-  CommandContextState state_CommandContext_;
+  bool PrepareRendering(const RenderingInfo &info);
 
-  CommandContextState &StateCommandContext() override {
-    return state_CommandContext_;
-  }
+  bool RenderingMatches(const IProgram *program) const;
 
-  const CommandContextState &StateCommandContext() const override {
-    return state_CommandContext_;
-  }
+  void InitializeCommandContext(IBackendQueue *queue);
 
  public:
-  bool CmdDrawImGui(IWindow *window, IImage *target) override {
-    return IBackendCommandContext::CommonCmdDrawImGui(window, target);
+  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
+
+  void BindDownloads(IBackendSubmissionToken *submission) override;
+
+  void ReleaseDownloads() override;
+
+ private:
+  // Call before encoding each resource use. Retains each exact object once.
+  IDownloadToken *RegisterDownload(ObjectPtr<IBackendDownloadToken> token);
+
+  template <typename T, std::enable_if_t<!std::is_convertible_v<T *, rhi::IObject *>, int> = 0>
+  bool RetainResource(T *resource) {
+    return RetainResource(rhi::QueryInterfacePtr<rhi::IObject>(resource).Get());
   }
 
-  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override {
-    return IBackendCommandContext::CommonCmdPresentImage(window, frame_img, frame_color_space);
-  }
+  bool RetainResource(rhi::IObject *resource);
 
-  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override {
-    return IBackendCommandContext::CommonSubmit(info);
-  }
+ public:
+  bool Seal() override;
+
+  IBackendQueue *OwnerQueue() const override;
+
+  const void *DeviceIdentity() const override;
+
+  void MarkSubmitted() override;
+
+  bool WasSubmitted() const override;
+
+ private:
+  RenderingInfo rendering_{};
+  bool recording_failed_{};
+  bool sealed_{};
+  IBackendQueue *queue_{};
+  std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
+  bool submitted_{};
+  std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

@@ -29,12 +29,10 @@ IVulkanSampler *VulkanSamplerImpl::Create(IVulkanDevice *device, const SamplerDe
     return nullptr;
   return sampler.Detach();
 }
-}  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanSampler, "cbdfdbcb-a546-480b-a5d0-a86e1d181b71")
-
-namespace grassland::rhi::backend::vulkan {
 IVulkanSampler *IVulkanSampler::Create(IVulkanDevice *device, const SamplerDesc &desc) {
   return VulkanSamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanSampler, "cbdfdbcb-a546-480b-a5d0-a86e1d181b71")

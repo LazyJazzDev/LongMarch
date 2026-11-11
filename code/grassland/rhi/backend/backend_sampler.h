@@ -5,20 +5,12 @@
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendSampler)
 
 namespace grassland::rhi::backend {
-struct SamplerState;
-
 class IBackendSampler : public ISampler {
- protected:
-  void InitializeSampler(const SamplerDesc &desc, const void *device);
-
  public:
   const SamplerDesc &GetDesc() const override = 0;
-  const SamplerDesc &CommonGetDesc() const;
-  const void *DeviceIdentity() const;
-  static bool Validate(const SamplerDesc &desc);
 
- protected:
-  virtual SamplerState &StateSampler() = 0;
-  virtual const SamplerState &StateSampler() const = 0;
+  virtual const void *DeviceIdentity() const = 0;
+
+  static bool Validate(const SamplerDesc &desc);
 };
 }  // namespace grassland::rhi::backend

@@ -20,6 +20,4 @@ class IMetalTimeline : public IBackendTimeline {
   virtual void ObserveCompletion(MTL::CommandBuffer *commands, uint64_t value, std::function<void()> notify) = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::metal

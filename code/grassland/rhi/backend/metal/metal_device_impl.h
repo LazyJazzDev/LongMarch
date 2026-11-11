@@ -1,5 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_device_state.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
@@ -46,48 +45,50 @@ class MetalDeviceImpl final : public Object<IMetalDevice> {
   MetalTemporalBufferPool temporal_buffers_;
   MetalScratchPool scratch_{this};
 
+ public:
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
+
  private:
-  DeviceState state_Device_;
-
-  DeviceState &StateDevice() override {
-    return state_Device_;
-  }
-
-  const DeviceState &StateDevice() const override {
-    return state_Device_;
-  }
+  void InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api = BACKEND_API_DEFAULT);
 
  public:
-  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override {
-    return IBackendDevice::CommonCreateRayTracingProgram(desc);
-  }
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override;
 
-  std::string Name() const override {
-    return IBackendDevice::CommonName();
-  }
+ private:
+  void DestroyDevice();
 
-  bool SupportRayTracingPipeline() const override {
-    return IBackendDevice::CommonSupportRayTracingPipeline();
-  }
+ public:
+  std::string Name() const override;
 
-  bool SupportRayQuery() const override {
-    return IBackendDevice::CommonSupportRayQuery();
-  }
+  bool SupportRayTracingPipeline() const override;
 
-  bool SupportGeometryShader() const override {
-    return IBackendDevice::CommonSupportGeometryShader();
-  }
+  bool SupportRayQuery() const override;
 
-  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
-    return IBackendDevice::CommonCreateShader(desc);
-  }
+  bool SupportGeometryShader() const override;
 
-  rhi::IQueue *GetQueue(QueueType type) override {
-    return IBackendDevice::CommonGetQueue(type);
-  }
+  rhi::IQueue *GetQueue(QueueType type) override;
 
-  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override {
-    return IBackendDevice::CommonWaitEvents(events, wait_all);
-  }
+  const PhysicalDevice &GetPhysicalDevice() const noexcept override;
+
+ private:
+  IBackendCore *OwnerCore() const;
+
+  // Called once after native device resources and all queues are initialized.
+  void StartCollector();
+
+ public:
+  bool WaitEvents(const std::vector<Event> &events, bool wait_all = true) const override;
+
+ private:
+  void Collect();
+
+  void ShutdownQueues();
+
+  std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
+  std::atomic<bool> stopping_{};
+  BackendAPI api_{};
+  IBackendCore *core_{};
+  PhysicalDevice info_{};
+  std::thread collector_{};
 };
 }  // namespace grassland::rhi::backend::metal

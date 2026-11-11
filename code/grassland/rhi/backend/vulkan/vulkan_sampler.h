@@ -11,5 +11,4 @@ class IVulkanSampler : public IBackendSampler {
   virtual VkSampler NativeSampler() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::vulkan

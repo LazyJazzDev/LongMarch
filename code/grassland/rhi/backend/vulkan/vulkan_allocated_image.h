@@ -16,5 +16,4 @@ class IVulkanAllocatedImage : public IVulkanImage {
   virtual VkImageView BindingView() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::vulkan

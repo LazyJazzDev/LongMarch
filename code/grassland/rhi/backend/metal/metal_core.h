@@ -16,6 +16,4 @@ class IMetalCore : public IBackendCore {
   virtual bool DebugEnabled() const = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::metal

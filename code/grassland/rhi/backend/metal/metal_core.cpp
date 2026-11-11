@@ -84,12 +84,9 @@ rhi::IDevice *MetalCoreImpl::CreateDevice(int32_t device_idx) {
   return IMetalDevice::Create(adapter.info, this, adapter.native);
 }
 
-}  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalCore, "30ef4d7e-ae80-4882-b15d-023c44be58cf")
-
-namespace grassland::rhi::backend::metal {
 IMetalCore *IMetalCore::CreateMetalCore(const CoreDesc &desc) {
   return MetalCoreImpl::CreateMetalCore(desc);
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalCore, "30ef4d7e-ae80-4882-b15d-023c44be58cf")

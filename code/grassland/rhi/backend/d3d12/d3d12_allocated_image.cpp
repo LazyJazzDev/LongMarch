@@ -62,12 +62,55 @@ ID3D12AllocatedImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, cons
     return nullptr;
   return new D3D12AllocatedImageImpl(device, desc, std::move(image), std::move(allocation), std::move(attachment));
 }
-}  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12AllocatedImage, "3d5647bf-0a89-4f7f-bce8-dd9e99c879a1")
-
-namespace grassland::rhi::backend::d3d12 {
 ID3D12AllocatedImage *ID3D12AllocatedImage::Create(ID3D12Device *device, const ImageDesc &desc) {
   return D3D12AllocatedImageImpl::Create(device, desc);
 }
+
+void D3D12AllocatedImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+  desc_ = desc;
+  queue_ = queue;
+}
+
+bool D3D12AllocatedImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+  return !queue_ || queue_ == queue;
+}
+
+const ImageDesc &D3D12AllocatedImageImpl::GetDesc() const {
+  return desc_;
+}
+
+void D3D12AllocatedImageImpl::InitializeD3D12Image(ImageDesc desc,
+                                                   const void *device,
+                                                   ID3D12Resource *image,
+                                                   ObjectPtr<D3D12DescriptorPool::Lease> attachment,
+                                                   D3D12_RESOURCE_STATES default_state,
+                                                   IBackendQueue *queue) {
+  InitializeImage(desc, queue);
+  attachment_ = std::move(attachment);
+  device_ = device;
+  default_state_ = default_state;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12AllocatedImageImpl::AttachmentView() const {
+  return attachment_->CPU();
+}
+
+bool D3D12AllocatedImageImpl::SupportsStorage() const {
+  return (image_->GetDesc().Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) != 0;
+}
+
+const void *D3D12AllocatedImageImpl::DeviceIdentity() const {
+  return device_;
+}
+
+ID3D12Resource *D3D12AllocatedImageImpl::NativeImage() const {
+  return image_.Get();
+}
+
+D3D12_RESOURCE_STATES D3D12AllocatedImageImpl::DefaultState() const {
+  return default_state_;
+}
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12AllocatedImage, "3d5647bf-0a89-4f7f-bce8-dd9e99c879a1")

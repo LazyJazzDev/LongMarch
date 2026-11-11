@@ -1,6 +1,4 @@
 #pragma once
-#include "grassland/rhi/backend/backend_binding_group_bindinggroup_state.h"
-#include "grassland/rhi/backend/backend_binding_group_bindingversion_state.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
@@ -17,31 +15,42 @@ class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
  private:
   IMetalDevice *device_;
   MetalBindingVersionImpl(IMetalDevice *device, const BindingLayoutDesc &layout);
-  bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<BufferView> &values) override;
-  bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<IImage *> &values) override;
-  bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<ISampler *> &values) override;
-  bool WriteDescriptors(size_t binding,
-                        uint32_t first,
-                        const std::vector<ITopLevelAccelerationStructure *> &values) override;
+  bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<BufferView> &values);
+  bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<IImage *> &values);
+  bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<ISampler *> &values);
+  bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<ITopLevelAccelerationStructure *> &values);
   std::vector<uint32_t> offsets_;
   std::vector<std::vector<bool>> initialized_;
   NS::SharedPtr<MTL::ArgumentEncoder> encoder_;
   NS::SharedPtr<MTL::Buffer> arguments_, sizes_;
 
  public:
-  ~MetalBindingVersionImpl() override {
-  }
+  ~MetalBindingVersionImpl() override = default;
 
  private:
-  BindingVersionState state_BindingVersion_;
+  void InitializeBindingVersion(const BindingLayoutDesc &layout);
 
-  BindingVersionState &StateBindingVersion() override {
-    return state_BindingVersion_;
-  }
+ public:
+  const BindingLayoutDesc &GetLayout() const override;
 
-  const BindingVersionState &StateBindingVersion() const override {
-    return state_BindingVersion_;
-  }
+  const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const override;
+
+  bool IsComplete() const override;
+
+  bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
+
+  bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
+
+  bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) override;
+
+  bool Write(size_t binding_index,
+             uint32_t first_element,
+             const std::vector<ITopLevelAccelerationStructure *> &values) override;
+
+ private:
+  BindingLayoutDesc layout_;
+  // Indexed by sorted layout binding, then array element.
+  std::vector<std::vector<ObjectPtr<IObject>>> references_;
 };
 
 class MetalBindingGroupImpl final : public Object<IMetalBindingGroup> {
@@ -53,41 +62,36 @@ class MetalBindingGroupImpl final : public Object<IMetalBindingGroup> {
   MetalBindingGroupImpl(IMetalDevice *device, ObjectPtr<Version> version);
 
  public:
-  ~MetalBindingGroupImpl() override {
-  }
+  ~MetalBindingGroupImpl() override = default;
 
  private:
-  BindingGroupState state_BindingGroup_;
-
-  BindingGroupState &StateBindingGroup() override {
-    return state_BindingGroup_;
-  }
-
-  const BindingGroupState &StateBindingGroup() const override {
-    return state_BindingGroup_;
-  }
+  void InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version);
 
  public:
+  const BindingLayoutDesc &GetLayout() const override;
+
+  IBackendDevice *Owner() const override;
+
+  // Borrowed until the next mutation; the context retains it before recording use.
+  IBackendBindingVersion *CurrentVersion() const override;
+
+ private:
+  const BindingDesc *FindBinding(uint32_t binding, uint32_t first_element, size_t count, size_t &binding_index) const;
+
+ public:
+  bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override;
+
+  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override;
+
+  bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override;
+
   bool BindResource(uint32_t binding,
                     const std::vector<ITopLevelAccelerationStructure *> &structures,
-                    uint32_t first_element = 0) override {
-    return IBackendBindingGroup::CommonBindResource(binding, structures, first_element);
-  }
+                    uint32_t first_element = 0) override;
 
-  bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override {
-    return IBackendBindingGroup::CommonBindResource(binding, buffers, first_element);
-  }
-
-  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override {
-    return IBackendBindingGroup::CommonBindResource(binding, images, first_element);
-  }
-
-  bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override {
-    return IBackendBindingGroup::CommonBindResource(binding, samplers, first_element);
-  }
-
-  const BindingLayoutDesc &GetLayout() const override {
-    return IBackendBindingGroup::CommonGetLayout();
-  }
+ private:
+  IBackendDevice *device_;
+  BindingLayoutDesc layout_;
+  ObjectPtr<IBackendBindingVersion> version_;
 };
 }  // namespace grassland::rhi::backend::metal

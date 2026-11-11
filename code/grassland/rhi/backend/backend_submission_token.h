@@ -19,6 +19,4 @@ class IBackendSubmissionToken : public rhi::ISubmissionToken {
   virtual void Complete(SubmissionStatus status) = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend

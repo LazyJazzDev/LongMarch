@@ -1,5 +1,13 @@
 ﻿#include "grassland/rhi/backend/metal/metal_device.h"
 
+#include <algorithm>
+
+#include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_shader.h"
+#include "grassland/rhi/backend/backend_shader_impl.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
@@ -30,9 +38,8 @@ IMetalDevice *MetalDeviceImpl::Create(PhysicalDevice info, IBackendCore *core, N
                                   ? MTL::CommandBufferErrorOptionEncoderExecutionStatus
                                   : MTL::CommandBufferErrorOptionNone);
   for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
-    object->StateDevice().queues_[type] =
-        ObjectPtr<IBackendQueue>::Adopt(IMetalQueue::Create(object.get(), type, descriptor.get()));
-    if (!object->StateDevice().queues_[type])
+    object->queues_[type] = ObjectPtr<IBackendQueue>::Adopt(IMetalQueue::Create(object.get(), type, descriptor.get()));
+    if (!object->queues_[type])
       return nullptr;
   }
   object->StartCollector();
@@ -49,7 +56,7 @@ MetalDeviceImpl::~MetalDeviceImpl() {
   ShutdownQueues();
   temporal_buffers_.Clear();
   scratch_.Clear();
-  for (auto &queue : StateDevice().queues_)
+  for (auto &queue : queues_)
     queue.Reset();
 
   DestroyDevice();
@@ -108,12 +115,117 @@ MetalTemporalBufferPool &MetalDeviceImpl::UploadPool() {
 MetalTemporalBufferPool &MetalDeviceImpl::DownloadPool() {
   return temporal_buffers_;
 }
-}  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalDevice, "0edf854d-4ccc-4b02-8c0c-030ded3b67dc")
-
-namespace grassland::rhi::backend::metal {
 IMetalDevice *IMetalDevice::Create(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device) {
   return MetalDeviceImpl::Create(info, core, device);
 }
+
+IRayTracingProgram *MetalDeviceImpl::CreateRayTracingProgram(const RayTracingProgramDesc &) {
+  ReportError(-1, "Ray tracing pipelines are unavailable for this backend.");
+  return nullptr;
+}
+
+void MetalDeviceImpl::InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api) {
+  api_ = api;
+  core_ = core;
+  info_ = std::move(info);
+}
+
+rhi::IShader *MetalDeviceImpl::CreateShader(const ShaderDesc &desc) {
+  if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+      desc.stage > SHADER_STAGE_CALLABLE)
+    return nullptr;
+  return IBackendShader::Create(desc, api_);
+}
+
+void MetalDeviceImpl::DestroyDevice() {
+  ShutdownQueues();
+}
+
+std::string MetalDeviceImpl::Name() const {
+  return info_.name;
+}
+
+bool MetalDeviceImpl::SupportRayTracingPipeline() const {
+  return info_.ray_tracing_pipeline_feature;
+}
+
+bool MetalDeviceImpl::SupportRayQuery() const {
+  return info_.ray_query_feature;
+}
+
+bool MetalDeviceImpl::SupportGeometryShader() const {
+  return info_.geometry_shader_feature;
+}
+
+rhi::IQueue *MetalDeviceImpl::GetQueue(QueueType type) {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
+}
+
+const PhysicalDevice &MetalDeviceImpl::GetPhysicalDevice() const noexcept {
+  return info_;
+}
+
+IBackendCore *MetalDeviceImpl::OwnerCore() const {
+  return core_;
+}
+
+void MetalDeviceImpl::StartCollector() {
+  collector_ = std::thread([this] { Collect(); });
+}
+
+bool MetalDeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
+  if (events.empty())
+    return wait_all;
+  std::vector<Event> unique;
+  unique.reserve(events.size());
+  for (const auto &event : events) {
+    auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+    if (!timeline || timeline->Owner() != this) {
+      ReportError(-1, "Host waits require timelines from this device.");
+      return false;
+    }
+    auto found = std::find_if(unique.begin(), unique.end(),
+                              [&](const Event &other) { return other.timeline == event.timeline; });
+    if (found == unique.end())
+      unique.push_back(event);
+    else
+      found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
+  }
+  return WaitNativeEvents(unique, wait_all);
+}
+
+void MetalDeviceImpl::Collect() {
+  std::vector<Event> next;
+  next.reserve(queues_.size());
+  for (;;) {
+    next.clear();
+    bool empty = true;
+    for (const auto &queue : queues_) {
+      if (!queue)
+        continue;
+      uint64_t completed = 0;
+      const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+      if (timeline_valid && completed != UINT64_MAX)
+        next.push_back({queue->GetTimeline(), completed + 1});
+      if (!queue->CollectCompleted(completed, timeline_valid))
+        empty = false;
+    }
+    if (stopping_ && empty)
+      return;
+    WaitForProgress(next);
+  }
+}
+
+void MetalDeviceImpl::ShutdownQueues() {
+  if (!collector_.joinable())
+    return;
+  stopping_ = true;
+  InterruptCollector();
+  collector_.join();
+}
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalDevice, "0edf854d-4ccc-4b02-8c0c-030ded3b67dc")

@@ -1,5 +1,8 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 
+#include <utility>
+
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
@@ -38,15 +41,46 @@ IVulkanWindow *VulkanSwapChainImageImpl::Owner() const {
   return window_;
 }
 
-}  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanSwapChainImage, "f9decc34-658f-4a62-bf5b-e7a749c2c44e")
-
-namespace grassland::rhi::backend::vulkan {
 IVulkanSwapChainImage *IVulkanSwapChainImage::Create(ImageDesc desc,
                                                      IVulkanWindow *window,
                                                      VkImage image,
                                                      VkImageView attachment) {
   return new VulkanSwapChainImageImpl(desc, window, image, attachment);
 }
+
+void VulkanSwapChainImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+  desc_ = desc;
+  queue_ = queue;
+}
+
+bool VulkanSwapChainImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+  return !queue_ || queue_ == queue;
+}
+
+bool VulkanSwapChainImageImpl::SupportsStorage() const {
+  return false;
+}
+
+const ImageDesc &VulkanSwapChainImageImpl::GetDesc() const {
+  return desc_;
+}
+
+void VulkanSwapChainImageImpl::InitializeVulkanImage(ImageDesc desc,
+                                                     const void *device,
+                                                     VkImageLayout default_layout,
+                                                     IBackendQueue *queue) {
+  InitializeImage(desc, queue);
+  device_ = device;
+  default_layout_ = default_layout;
+}
+
+VkImageLayout VulkanSwapChainImageImpl::DefaultLayout() const {
+  return default_layout_;
+}
+
+const void *VulkanSwapChainImageImpl::DeviceIdentity() const {
+  return device_;
+}
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanSwapChainImage, "f9decc34-658f-4a62-bf5b-e7a749c2c44e")

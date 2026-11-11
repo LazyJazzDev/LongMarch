@@ -2,6 +2,14 @@
 
 #include <vk_mem_alloc.h>
 
+#include <algorithm>
+
+#include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_shader.h"
+#include "grassland/rhi/backend/backend_shader_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_binding_group_impl.h"
@@ -57,7 +65,7 @@ void VulkanDeviceImpl::WaitForProgress(const std::vector<Event> &next) {
   info.pValues = values.data();
   vkWaitSemaphores(device_, &info, UINT64_MAX);
   // Consume the one-shot shutdown notification, then drain real GPU work.
-  shutdown_consumed_ = StateDevice().stopping_;
+  shutdown_consumed_ = stopping_;
 }
 
 bool VulkanDeviceImpl::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command) {
@@ -116,7 +124,7 @@ VulkanDeviceImpl::~VulkanDeviceImpl() {
   for (const auto &entry : command_pool_) {
     vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
   }
-  for (auto &queue : StateDevice().queues_)
+  for (auto &queue : queues_)
     queue.Reset();
   if (collector_shutdown_)
     vkDestroySemaphore(device_, collector_shutdown_, nullptr);
@@ -208,9 +216,9 @@ IVulkanDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevi
     VkQueue queue;
     vkGetDeviceQueue(device->device_, queue_family, native_index, &queue);
     auto mutex = native_index == 0 ? main_mutex : std::make_shared<std::mutex>();
-    device->StateDevice().queues_[index] = ObjectPtr<IBackendQueue>::Adopt(
+    device->queues_[index] = ObjectPtr<IBackendQueue>::Adopt(
         IVulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue, std::move(mutex)));
-    if (!device->StateDevice().queues_[index])
+    if (!device->queues_[index])
       return nullptr;
   }
   VkSemaphoreTypeCreateInfo shutdown_type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
@@ -292,15 +300,10 @@ rhi::IWindow *VulkanDeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
   return IVulkanWindow::Create(this, desc);
 }
 
-}  // namespace grassland::rhi::backend::vulkan
-
-namespace grassland::rhi::backend::vulkan {
 VulkanScratchPool &VulkanDeviceImpl::ScratchPool() {
   return scratch_pool_;
 }
-}  // namespace grassland::rhi::backend::vulkan
 
-namespace grassland::rhi::backend::vulkan {
 IBottomLevelAccelerationStructure *VulkanDeviceImpl::CreateBottomLevelAccelerationStructure(
     const BottomLevelAccelerationStructureDesc &desc) {
   return IVulkanBottomLevelAccelerationStructure::Create(this, desc);
@@ -320,15 +323,115 @@ IRayTracingProgram *VulkanDeviceImpl::CreateRayTracingProgram(const RayTracingPr
 VulkanTemporalBufferPool &VulkanDeviceImpl::DownloadPool() {
   return download_pool_;
 }
-}  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanDevice, "96a1c412-20e1-40bc-b542-d515f9a41965")
-
-namespace grassland::rhi::backend::vulkan {
 IVulkanDevice *IVulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
                                                  IBackendCore *core,
                                                  VkPhysicalDevice physical_device,
                                                  uint32_t api_version) {
   return VulkanDeviceImpl::CreateVulkanDevice(info, core, physical_device, api_version);
 }
+
+void VulkanDeviceImpl::InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api) {
+  api_ = api;
+  core_ = core;
+  info_ = std::move(info);
+}
+
+rhi::IShader *VulkanDeviceImpl::CreateShader(const ShaderDesc &desc) {
+  if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+      desc.stage > SHADER_STAGE_CALLABLE)
+    return nullptr;
+  return IBackendShader::Create(desc, api_);
+}
+
+void VulkanDeviceImpl::DestroyDevice() {
+  ShutdownQueues();
+}
+
+std::string VulkanDeviceImpl::Name() const {
+  return info_.name;
+}
+
+bool VulkanDeviceImpl::SupportRayTracingPipeline() const {
+  return info_.ray_tracing_pipeline_feature;
+}
+
+bool VulkanDeviceImpl::SupportRayQuery() const {
+  return info_.ray_query_feature;
+}
+
+bool VulkanDeviceImpl::SupportGeometryShader() const {
+  return info_.geometry_shader_feature;
+}
+
+rhi::IQueue *VulkanDeviceImpl::GetQueue(QueueType type) {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
+}
+
+const PhysicalDevice &VulkanDeviceImpl::GetPhysicalDevice() const noexcept {
+  return info_;
+}
+
+IBackendCore *VulkanDeviceImpl::OwnerCore() const {
+  return core_;
+}
+
+void VulkanDeviceImpl::StartCollector() {
+  collector_ = std::thread([this] { Collect(); });
+}
+
+bool VulkanDeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
+  if (events.empty())
+    return wait_all;
+  std::vector<Event> unique;
+  unique.reserve(events.size());
+  for (const auto &event : events) {
+    auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+    if (!timeline || timeline->Owner() != this) {
+      ReportError(-1, "Host waits require timelines from this device.");
+      return false;
+    }
+    auto found = std::find_if(unique.begin(), unique.end(),
+                              [&](const Event &other) { return other.timeline == event.timeline; });
+    if (found == unique.end())
+      unique.push_back(event);
+    else
+      found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
+  }
+  return WaitNativeEvents(unique, wait_all);
+}
+
+void VulkanDeviceImpl::Collect() {
+  std::vector<Event> next;
+  next.reserve(queues_.size());
+  for (;;) {
+    next.clear();
+    bool empty = true;
+    for (const auto &queue : queues_) {
+      if (!queue)
+        continue;
+      uint64_t completed = 0;
+      const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+      if (timeline_valid && completed != UINT64_MAX)
+        next.push_back({queue->GetTimeline(), completed + 1});
+      if (!queue->CollectCompleted(completed, timeline_valid))
+        empty = false;
+    }
+    if (stopping_ && empty)
+      return;
+    WaitForProgress(next);
+  }
+}
+
+void VulkanDeviceImpl::ShutdownQueues() {
+  if (!collector_.joinable())
+    return;
+  stopping_ = true;
+  InterruptCollector();
+  collector_.join();
+}
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanDevice, "96a1c412-20e1-40bc-b542-d515f9a41965")

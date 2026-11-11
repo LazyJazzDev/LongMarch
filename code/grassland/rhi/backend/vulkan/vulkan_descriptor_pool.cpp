@@ -8,7 +8,6 @@ class VulkanDescriptorPool::LeaseImpl final : public Object<VulkanDescriptorPool
  public:
   LONGMARCH_RHI_FINAL_QUERY(IObject, VulkanDescriptorPool::ILease)
 
- public:
   LeaseImpl(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set);
   ~LeaseImpl() override;
   VkDescriptorSet Set() const;

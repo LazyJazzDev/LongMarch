@@ -18,6 +18,4 @@ class IMetalQueue : public IBackendQueue {
   virtual IMetalTimeline *GetTimeline() const = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::metal

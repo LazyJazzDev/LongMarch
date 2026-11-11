@@ -3,9 +3,11 @@
 #include <vk_mem_alloc.h>
 
 #include <cstdlib>
+#include <utility>
 
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 
 namespace grassland::rhi::backend::vulkan {
@@ -140,12 +142,39 @@ IVulkanAllocatedImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, c
     return nullptr;
   return image.release();
 }
-}  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanAllocatedImage, "cc7d23e5-e7de-45ae-a4d6-2f954645a1ab")
-
-namespace grassland::rhi::backend::vulkan {
 IVulkanAllocatedImage *IVulkanAllocatedImage::Create(IVulkanDevice *device, const ImageDesc &desc) {
   return VulkanAllocatedImageImpl::Create(device, desc);
 }
+
+void VulkanAllocatedImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+  desc_ = desc;
+  queue_ = queue;
+}
+
+bool VulkanAllocatedImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+  return !queue_ || queue_ == queue;
+}
+
+const ImageDesc &VulkanAllocatedImageImpl::GetDesc() const {
+  return desc_;
+}
+
+void VulkanAllocatedImageImpl::InitializeVulkanImage(ImageDesc desc,
+                                                     const void *device,
+                                                     VkImageLayout default_layout,
+                                                     IBackendQueue *queue) {
+  InitializeImage(desc, queue);
+  default_layout_ = default_layout;
+}
+
+VkImageLayout VulkanAllocatedImageImpl::DefaultLayout() const {
+  return default_layout_;
+}
+
+const void *VulkanAllocatedImageImpl::DeviceIdentity() const {
+  return device_;
+}
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanAllocatedImage, "cc7d23e5-e7de-45ae-a4d6-2f954645a1ab")

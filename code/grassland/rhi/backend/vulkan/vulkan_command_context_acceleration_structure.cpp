@@ -39,12 +39,12 @@ bool VulkanCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage())) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
 #if !defined(NDEBUG)
   if (!ValidateGeometryBuffers(target->GetDesc(), geometries, device_)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
 #endif
@@ -106,7 +106,7 @@ bool VulkanCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAc
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
       !ValidateInstances(target->GetDesc(), instances)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (mode == ACCELERATION_STRUCTURE_UPDATE) {
@@ -114,7 +114,7 @@ bool VulkanCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAc
     const size_t previous_count =
         pending == as_dependencies_.end() ? target->BottomLevels().size() : pending->second.size();
     if (instances.size() != previous_count) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
   }
@@ -123,7 +123,7 @@ bool VulkanCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAc
     const auto &instance = instances[i];
     auto blas = rhi::QueryInterfacePtr<IVulkanBottomLevelAccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
     if (!RetainResource(blas))
@@ -198,7 +198,7 @@ bool VulkanCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAc
 bool VulkanCommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *structure) {
   auto target = rhi::QueryInterfacePtr<IVulkanAccelerationStructure>(structure).Get();
   if (!target || target->Owner() != device_ || !target->AllowsCompaction() || render_target_) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(structure))
@@ -217,7 +217,7 @@ bool VulkanCommandContextImpl::CmdCompactAccelerationStructure(IAccelerationStru
   auto to = rhi::QueryInterfacePtr<IVulkanAccelerationStructure>(destination).Get();
   if (!from || !to || from == to || from->Owner() != device_ || to->Owner() != device_ || !from->AllowsCompaction() ||
       !to->IsCompactStorage() || source->GetType() != destination->GetType() || render_target_) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(source))

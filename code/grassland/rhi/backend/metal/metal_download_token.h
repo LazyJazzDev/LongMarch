@@ -12,5 +12,4 @@ class IMetalDownloadToken : public IBackendDownloadToken {
   static IMetalDownloadToken *Create(ObjectPtr<IMetalTemporalBufferLease> lease, const DownloadLayout &layout);
 };
 
-;
 }  // namespace grassland::rhi::backend::metal

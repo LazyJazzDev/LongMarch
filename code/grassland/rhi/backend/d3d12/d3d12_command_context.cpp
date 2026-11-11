@@ -3,9 +3,14 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <system_error>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_glfw_helper.h"
+#include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context_impl.h"
@@ -17,6 +22,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
+#include "grassland/rhi/rhi_program.h"
 
 namespace grassland::rhi::backend::d3d12 {
 
@@ -55,7 +61,7 @@ bool D3D12CommandContextImpl::TransitionResource(ID3D12Resource *resource,
   if (default_state == D3D12_RESOURCE_STATE_GENERIC_READ) {
 #if !defined(NDEBUG)
     if ((state & default_state) != state) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       ReportError(-1, "Upload buffers only support GPU read usages.");
       return false;
     }
@@ -79,13 +85,13 @@ bool D3D12CommandContextImpl::TransitionResource(ID3D12Resource *resource,
 
 bool D3D12CommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
   if (rendering_active_) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
   const auto native = rhi::QueryInterfacePtr<ID3D12Image>(image).Get();
   if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
   }
@@ -115,7 +121,7 @@ bool D3D12CommandContextImpl::ClearColor(ID3D12Image *image, const ClearColorVal
     return true;
   }
   if (!image->SupportsStorage()) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     ReportError(-1, "D3D12 integer image clears require UAV support.");
     return false;
   }
@@ -133,7 +139,7 @@ bool D3D12CommandContextImpl::ClearColor(ID3D12Image *image, const ClearColorVal
   auto storage = device_->ResourceDescriptorStorage().Acquire(1);
   auto visible = device_->ResourceDescriptors().Acquire(1);
   if (!storage || !visible) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(storage.Get()) || !RetainResource(visible.Get()) ||
@@ -168,20 +174,20 @@ bool D3D12CommandContextImpl::ClearColor(ID3D12Image *image, const ClearColorVal
 
 bool D3D12CommandContextImpl::CmdPresent(rhi::IWindow *window) {
   if (rendering_active_) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
   const auto target = rhi::QueryInterfacePtr<ID3D12Window>(window).Get();
   if (!target || target->DeviceIdentity() != device_ || target->OwnerQueue() != OwnerQueue() ||
       !glfw::IsWindowThread()) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     ReportError(-1, "CmdPresent requires a window from this device on the window thread.");
     return false;
   }
   for (const auto &present : presents_) {
     if (present.first == target) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       ReportError(-1, "A context can present each window only once.");
       return false;
     }
@@ -193,7 +199,7 @@ bool D3D12CommandContextImpl::CmdPresent(rhi::IWindow *window) {
   if (!RetainResource(frame.Get()))
     return false;
   if (!target->RecordImGui(this, frame.Get())) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   presents_.emplace_back(target, frame.Get());
@@ -204,7 +210,7 @@ bool D3D12CommandContextImpl::CmdPresent(rhi::IWindow *window) {
 bool D3D12CommandContextImpl::EndRecording() {
 #if !defined(NDEBUG)
   if (rendering_active_) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
@@ -287,29 +293,29 @@ SubmissionStatus D3D12CommandContextImpl::PollCompletion(Event signal, uint64_t 
 
 bool D3D12CommandContextImpl::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
   if (rendering_active_) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || StateCommandContext().sealed_) {
-    StateCommandContext().recording_failed_ = true;
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(native))
     return false;
 
   if (!data || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   auto upload = device_->UploadPool().Acquire(size);
   if (!upload) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!upload->Write(data, size)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(upload.Get()))
@@ -326,19 +332,19 @@ bool D3D12CommandContextImpl::CmdCopyBuffer(IBuffer *source,
                                             uint64_t destination_offset,
                                             uint64_t size) {
   if (rendering_active_) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
   auto src = rhi::QueryInterfacePtr<ID3D12Buffer>(source).Get();
   auto dst = rhi::QueryInterfacePtr<ID3D12Buffer>(destination).Get();
-  if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || StateCommandContext().sealed_) {
-    StateCommandContext().recording_failed_ = true;
+  if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
     return false;
   }
   if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
       destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(src))
@@ -355,8 +361,8 @@ bool D3D12CommandContextImpl::CmdCopyBuffer(IBuffer *source,
 
 bool D3D12CommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
   auto native = rhi::QueryInterfacePtr<ID3D12ComputeProgram>(program).Get();
-  if (StateCommandContext().sealed_ || rendering_active_ || !native || native->Owner() != device_) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(native))
@@ -375,16 +381,16 @@ bool D3D12CommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
 
 bool D3D12CommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 #if !defined(NDEBUG)
-  if (StateCommandContext().sealed_ || rendering_active_ || !compute_active_ || ray_program_) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || rendering_active_ || !compute_active_ || ray_program_) {
+    recording_failed_ = true;
     return false;
   }
   if (x > 65535 || y > 65535 || z > 65535) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
 #endif
-  if (StateCommandContext().recording_failed_)
+  if (recording_failed_)
     return false;
   if (!PrepareGroups())
     return false;
@@ -394,8 +400,8 @@ bool D3D12CommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 
 bool D3D12CommandContextImpl::CmdBindProgram(IProgram *program) {
   auto native = rhi::QueryInterfacePtr<ID3D12Program>(program).Get();
-  if (!native || native->Owner() != device_ || StateCommandContext().sealed_) {
-    StateCommandContext().recording_failed_ = true;
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(native))
@@ -418,14 +424,14 @@ bool D3D12CommandContextImpl::CmdBindProgram(IProgram *program) {
 }
 
 bool D3D12CommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
-  if (StateCommandContext().sealed_ || rendering_active_ || !PrepareRendering(info)) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || rendering_active_ || !PrepareRendering(info)) {
+    recording_failed_ = true;
     return false;
   }
   std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 8> colors{};
-  auto count = static_cast<UINT>(StateCommandContext().rendering_.color_attachments.size());
+  auto count = static_cast<UINT>(rendering_.color_attachments.size());
   for (UINT i = 0; i < count; ++i) {
-    const auto &attachment = StateCommandContext().rendering_.color_attachments[i];
+    const auto &attachment = rendering_.color_attachments[i];
     auto image = rhi::QueryInterfacePtr<ID3D12Image>(attachment.color_attachment).Get();
     if (attachment.load_op == ATTACHMENT_LOAD_OP_CLEAR) {
       if (!ClearColor(image, attachment.clear_value))
@@ -438,13 +444,13 @@ bool D3D12CommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
     }
     colors[i] = image->AttachmentView();
   }
-  auto depth = rhi::QueryInterfacePtr<ID3D12Image>(StateCommandContext().rendering_.depth_stencil.image).Get();
+  auto depth = rhi::QueryInterfacePtr<ID3D12Image>(rendering_.depth_stencil.image).Get();
   D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
   if (depth) {
     dsv = depth->AttachmentView();
     if (!TransitionResource(depth->NativeImage(), D3D12_RESOURCE_STATE_DEPTH_WRITE, depth->DefaultState()))
       return false;
-    const auto &ds = StateCommandContext().rendering_.depth_stencil;
+    const auto &ds = rendering_.depth_stencil;
     UINT flags = ds.depth_load_op == ATTACHMENT_LOAD_OP_CLEAR ? D3D12_CLEAR_FLAG_DEPTH : 0;
     if (HasStencil(depth->GetDesc().format) && ds.stencil_load_op == ATTACHMENT_LOAD_OP_CLEAR)
       flags |= D3D12_CLEAR_FLAG_STENCIL;
@@ -458,33 +464,33 @@ bool D3D12CommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
 }
 
 bool D3D12CommandContextImpl::CmdEndRendering() {
-  if (StateCommandContext().sealed_ || !rendering_active_ || StateCommandContext().recording_failed_) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || !rendering_active_ || recording_failed_) {
+    recording_failed_ = true;
     return false;
   }
-  for (const auto &color : StateCommandContext().rendering_.color_attachments)
+  for (const auto &color : rendering_.color_attachments)
     if (color.store_op == ATTACHMENT_STORE_OP_DISCARD)
       list_->DiscardResource(rhi::QueryInterfacePtr<ID3D12Image>(color.color_attachment).Get()->NativeImage(), nullptr);
   list_->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
   rendering_active_ = false;
-  StateCommandContext().rendering_ = {};
+  rendering_ = {};
   return true;
 }
 
 bool D3D12CommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || StateCommandContext().sealed_) {
-    StateCommandContext().recording_failed_ = true;
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(native))
     return false;
   if (!program_ || binding >= program_->GetDesc().vertex_bindings.size() || offset >= native->GetDesc().size) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (native->GetDesc().size - offset > UINT_MAX) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
@@ -500,23 +506,23 @@ bool D3D12CommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buf
 
 bool D3D12CommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || StateCommandContext().sealed_) {
-    StateCommandContext().recording_failed_ = true;
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(native))
     return false;
   if (format != INDEX_FORMAT_UINT16 && format != INDEX_FORMAT_UINT32) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   auto alignment = format == INDEX_FORMAT_UINT16 ? 2u : 4u;
   if (offset >= native->GetDesc().size || offset % alignment) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (native->GetDesc().size - offset > UINT_MAX) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_INDEX_BUFFER, native->DefaultState()))
@@ -532,12 +538,12 @@ bool D3D12CommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat fo
 
 bool D3D12CommandContextImpl::CmdSetViewport(const Viewport &viewport) {
 #if !defined(NDEBUG)
-  if (StateCommandContext().sealed_ || viewport.width <= 0 || viewport.height <= 0) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || viewport.width <= 0 || viewport.height <= 0) {
+    recording_failed_ = true;
     return false;
   }
 #endif
-  if (StateCommandContext().recording_failed_)
+  if (recording_failed_)
     return false;
   D3D12_VIEWPORT native{viewport.x,      viewport.y,         viewport.width,
                         viewport.height, viewport.min_depth, viewport.max_depth};
@@ -548,12 +554,12 @@ bool D3D12CommandContextImpl::CmdSetViewport(const Viewport &viewport) {
 
 bool D3D12CommandContextImpl::CmdSetScissor(const Scissor &scissor) {
 #if !defined(NDEBUG)
-  if (StateCommandContext().sealed_ || !scissor.width || !scissor.height) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || !scissor.width || !scissor.height) {
+    recording_failed_ = true;
     return false;
   }
 #endif
-  if (StateCommandContext().recording_failed_)
+  if (recording_failed_)
     return false;
   D3D12_RECT native{scissor.x, scissor.y, scissor.x + static_cast<LONG>(scissor.width),
                     scissor.y + static_cast<LONG>(scissor.height)};
@@ -567,16 +573,16 @@ bool D3D12CommandContextImpl::CmdDraw(uint32_t vertex_count,
                                       uint32_t first_vertex,
                                       uint32_t first_instance) {
 #if !defined(NDEBUG)
-  if (StateCommandContext().sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_) {
+    recording_failed_ = true;
     return false;
   }
   if (!RenderingMatches(program_)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
 #endif
-  if (StateCommandContext().recording_failed_)
+  if (recording_failed_)
     return false;
   if (!PrepareDrawBuffers(false))
     return false;
@@ -592,17 +598,16 @@ bool D3D12CommandContextImpl::CmdDrawIndexed(uint32_t index_count,
                                              int32_t vertex_offset,
                                              uint32_t first_instance) {
 #if !defined(NDEBUG)
-  if (StateCommandContext().sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_ ||
-      !index_bound_) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_ || !index_bound_) {
+    recording_failed_ = true;
     return false;
   }
   if (!RenderingMatches(program_)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
 #endif
-  if (StateCommandContext().recording_failed_)
+  if (recording_failed_)
     return false;
   if (!PrepareDrawBuffers(true))
     return false;
@@ -616,7 +621,7 @@ bool D3D12CommandContextImpl::PrepareDrawBuffers(bool indexed) {
   for (auto buffer : vertex_buffers_) {
 #if !defined(NDEBUG)
     if (!buffer) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
 #endif
@@ -633,7 +638,7 @@ bool D3D12CommandContextImpl::PrepareDrawBuffers(bool indexed) {
     if (!TransitionResource(index_buffer_->NativeBuffer(), state, index_buffer_->DefaultState()))
       return false;
   }
-  for (const auto &color : StateCommandContext().rendering_.color_attachments) {
+  for (const auto &color : rendering_.color_attachments) {
     auto image = rhi::QueryInterfacePtr<ID3D12Image>(color.color_attachment).Get();
     if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
       return false;
@@ -643,16 +648,16 @@ bool D3D12CommandContextImpl::PrepareDrawBuffers(bool indexed) {
 
 bool D3D12CommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   auto native = rhi::QueryInterfacePtr<ID3D12BindingGroup>(group).Get();
-  if (StateCommandContext().sealed_ || !binding_layout_ || !native || native->Owner() != device_ ||
-      index >= groups_.size() || !SameBindingLayout(binding_layout_->groups[index], group->GetLayout()) ||
+  if (sealed_ || !binding_layout_ || !native || native->Owner() != device_ || index >= groups_.size() ||
+      !SameBindingLayout(binding_layout_->groups[index], group->GetLayout()) ||
       !native->CurrentVersion()->IsComplete()) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   auto version = rhi::QueryInterfacePtr<ID3D12BindingVersion>(native->CurrentVersion()).Get();
   auto resources = version->ResourceDescriptors();
   if (version->ResourceCount() && !resources) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(version))
@@ -676,7 +681,7 @@ bool D3D12CommandContextImpl::PrepareGroups() {
     const auto version = groups_[i].version;
     if (!version) {
       if (!binding_layout_->groups[i].bindings.empty()) {
-        StateCommandContext().recording_failed_ = true;
+        recording_failed_ = true;
         return false;
       }
       continue;
@@ -706,9 +711,9 @@ bool D3D12CommandContextImpl::PrepareGroups() {
         } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
           auto image = rhi::QueryInterfacePtr<ID3D12Image>(version->GetReferences()[binding_index][j].Get()).Get();
           resource = image->NativeImage();
-          for (auto color : StateCommandContext().rendering_.color_attachments)
+          for (auto color : rendering_.color_attachments)
             if (color.color_attachment == image) {
-              StateCommandContext().recording_failed_ = true;
+              recording_failed_ = true;
               return false;
             }
           if (!TransitionResource(resource,
@@ -746,7 +751,7 @@ bool D3D12CommandContextImpl::PrepareGroups() {
     if (needed > available) {
       const uint32_t limit = kind ? 2048 : 1000000;
       if (total > limit) {
-        StateCommandContext().recording_failed_ = true;
+        recording_failed_ = true;
         return false;
       }
       auto &pool = kind ? device_->SamplerDescriptors() : device_->ResourceDescriptors();
@@ -756,7 +761,7 @@ bool D3D12CommandContextImpl::PrepareGroups() {
       const uint32_t minimum = std::max(uint32_t(total), std::min(previous * 2, limit));
       auto page = pool.Acquire(minimum);
       if (!page) {
-        StateCommandContext().recording_failed_ = true;
+        recording_failed_ = true;
         return false;
       }
       if (!RetainResource(page.Get()))
@@ -810,11 +815,11 @@ bool D3D12CommandContextImpl::PrepareGroups() {
 bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
   auto native = rhi::QueryInterfacePtr<ID3D12Image>(image).Get();
   if (!native || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !native->IsValid() ||
-      !data || StateCommandContext().sealed_ || rendering_active_ || IsDepthFormat(image->GetDesc().format) ||
+      !data || sealed_ || rendering_active_ || IsDepthFormat(image->GetDesc().format) ||
       row_pitch < uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) ||
       (image->GetDesc().height - 1) >
           (SIZE_MAX - uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format)) / row_pitch) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   auto desc = native->NativeImage()->GetDesc();
@@ -824,13 +829,13 @@ bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
   device_->NativeDevice()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &rows, &bytes, &total);
   auto upload = device_->UploadPool().Acquire(total);
   if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   for (UINT y = 0; y < rows; ++y) {
     if (!upload->Write(static_cast<const uint8_t *>(data) + size_t(y) * row_pitch, bytes,
                        footprint.Offset + uint64_t(y) * footprint.Footprint.RowPitch)) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
   }
@@ -848,8 +853,8 @@ bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
 
 bool D3D12CommandContextImpl::CmdBindRayTracingProgram(IRayTracingProgram *program) {
   auto native = rhi::QueryInterfacePtr<ID3D12RayTracingProgram>(program).Get();
-  if (StateCommandContext().sealed_ || rendering_active_ || !native || native->Owner() != device_) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
     return false;
   }
   if (!RetainResource(native))
@@ -870,14 +875,14 @@ bool D3D12CommandContextImpl::CmdDispatchRays(uint32_t width,
                                               uint32_t height,
                                               uint32_t depth,
                                               IShaderBindingTable *sbt) {
-  if (StateCommandContext().sealed_ || rendering_active_ || !ray_program_ || !width || !height || !depth) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || rendering_active_ || !ray_program_ || !width || !height || !depth) {
+    recording_failed_ = true;
     return false;
   }
-  if (StateCommandContext().recording_failed_)
+  if (recording_failed_)
     return false;
   if (uint64_t(width) * height > (1ull << 30) / depth) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return false;
   }
   const IBackendShaderBindingTable *table = ray_program_->DefaultShaderBindingTable();
@@ -888,7 +893,7 @@ bool D3D12CommandContextImpl::CmdDispatchRays(uint32_t width,
     auto custom = rhi::QueryInterfacePtr<IBackendShaderBindingTable>(sbt).Get();
 #endif
     if (!custom || custom->GetProgram() != ray_program_) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return false;
     }
     if (!RetainResource(custom))
@@ -912,18 +917,17 @@ bool D3D12CommandContextImpl::CmdDispatchRays(uint32_t width,
 
 IDownloadToken *D3D12CommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
-  if (StateCommandContext().sealed_ || rendering_active_ || !native || native->Owner() != device_) {
-    StateCommandContext().recording_failed_ = true;
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
     return nullptr;
   }
-  if (StateCommandContext().recording_failed_ || !size || offset > native->GetDesc().size ||
-      size > native->GetDesc().size - offset) {
-    StateCommandContext().recording_failed_ = true;
+  if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+    recording_failed_ = true;
     return nullptr;
   }
   auto lease = device_->DownloadPool().Acquire(size);
   if (!lease || !CmdCopyBuffer(native, offset, lease.Get(), 0, size)) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return nullptr;
   }
   return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(ID3D12DownloadToken::Create(std::move(lease), size)));
@@ -931,30 +935,30 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uint
 
 IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
   auto native = rhi::QueryInterfacePtr<ID3D12Image>(image).Get();
-  if (StateCommandContext().sealed_ || rendering_active_ || !native ||
+  if (sealed_ || rendering_active_ || !native ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return nullptr;
   }
   if (native->GetDesc().format == IMAGE_FORMAT_D24_UNORM_S8_UINT) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     ReportError(-1, "CmdDownloadImage does not support D24S8 readback; use a depth-only or color image.");
     return nullptr;
   }
-  if (StateCommandContext().recording_failed_ || !native->IsValid()) {
-    StateCommandContext().recording_failed_ = true;
+  if (recording_failed_ || !native->IsValid()) {
+    recording_failed_ = true;
     return nullptr;
   }
   const auto desc = native->GetDesc();
   if (region.x >= desc.width || region.y >= desc.height) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return nullptr;
   }
   const uint32_t width = region.width ? region.width : desc.width - region.x;
   const uint32_t height = region.height ? region.height : desc.height - region.y;
   const uint64_t packed = uint64_t(width) * ImageFormatSize(desc.format);
   if (width > desc.width - region.x || height > desc.height - region.y || !packed || height > SIZE_MAX / packed) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return nullptr;
   }
   if (IsDepthFormat(desc.format)) {
@@ -966,7 +970,7 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const I
     device_->NativeDevice()->GetCopyableFootprints(&native_desc, 0, planes, 0, footprints, rows, row_bytes, &total);
     auto lease = device_->DownloadPool().Acquire(total);
     if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
-      StateCommandContext().recording_failed_ = true;
+      recording_failed_ = true;
       return nullptr;
     }
     if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState()))
@@ -998,12 +1002,12 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const I
   const uint64_t pitch =
       (packed + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) & ~(uint64_t(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) - 1);
   if (pitch > UINT32_MAX || height > SIZE_MAX / pitch) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return nullptr;
   }
   auto lease = device_->DownloadPool().Acquire(pitch * height);
   if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
-    StateCommandContext().recording_failed_ = true;
+    recording_failed_ = true;
     return nullptr;
   }
   if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState()))
@@ -1019,12 +1023,180 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const I
   return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(
       ID3D12DownloadToken::Create(std::move(lease), DownloadLayout{0, pitch, packed, height})));
 }
-}  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12CommandContext, "5962a78a-e01d-4cc1-9f13-4544d7232c63")
-
-namespace grassland::rhi::backend::d3d12 {
 ID3D12CommandContext *ID3D12CommandContext::Create(ID3D12Queue *queue) {
   return D3D12CommandContextImpl::Create(queue);
 }
+
+bool D3D12CommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
+  auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
+  auto image = rhi::QueryInterfacePtr<IBackendImage>(target).Get();
+  if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
+      (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
+      sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+    recording_failed_ = true;
+    ReportError(-1,
+                "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
+    return false;
+  }
+  const auto format = target->GetDesc().format;
+  if (!IsColorFormat(format) || IsSignedIntegerFormat(format) || IsUnsignedIntegerFormat(format)) {
+    recording_failed_ = true;
+    ReportError(-1, "CmdDrawImGui requires a non-integer color target.");
+    return false;
+  }
+  if (!RetainResource(target))
+    return false;
+  if (!native->RecordImGui(this, target, COLOR_SPACE_BT709_LINEAR, 1.0f)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return true;
+}
+
+bool D3D12CommandContextImpl::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) {
+  auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
+  auto image = rhi::QueryInterfacePtr<IBackendImage>(frame_img).Get();
+  if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
+      (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
+      sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
+    recording_failed_ = true;
+    ReportError(-1,
+                "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");
+    return false;
+  }
+  if (!RetainResource(frame_img))
+    return false;
+  if (!native->RecordPresentImage(this, frame_img, frame_color_space)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return CmdPresent(window);
+}
+
+bool D3D12CommandContextImpl::PrepareRendering(const RenderingInfo &info) {
+  auto next = info;
+  if (next.color_attachments.size() > 8 || (next.color_attachments.empty() && !next.depth_stencil.image)) {
+    recording_failed_ = true;
+    return false;
+  }
+  std::vector<IImage *> images;
+  auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
+    auto native = rhi::QueryInterfacePtr<IBackendImage>(image).Get();
+    if (!native || !native->IsValid() ||
+        (native->DeviceIdentity() != DeviceIdentity() || !native->SupportsQueue(OwnerQueue())) ||
+        IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
+        load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE || store > ATTACHMENT_STORE_OP_DISCARD)
+      return false;
+    for (auto previous : images)
+      if (previous == image || previous->GetDesc().width != image->GetDesc().width ||
+          previous->GetDesc().height != image->GetDesc().height)
+        return false;
+    images.push_back(image);
+    return RetainResource(image);
+  };
+  for (auto color : next.color_attachments)
+    if (!validate(color.color_attachment, false, color.load_op, color.store_op)) {
+      recording_failed_ = true;
+      return false;
+    }
+  const auto &ds = next.depth_stencil;
+  if (ds.image &&
+      (!validate(ds.image, true, ds.depth_load_op, ds.depth_store_op) || ds.stencil_load_op < ATTACHMENT_LOAD_OP_LOAD ||
+       ds.stencil_load_op > ATTACHMENT_LOAD_OP_DISCARD || ds.stencil_store_op < ATTACHMENT_STORE_OP_STORE ||
+       ds.stencil_store_op > ATTACHMENT_STORE_OP_DISCARD ||
+       !(ds.clear_value.depth >= 0 && ds.clear_value.depth <= 1))) {
+    recording_failed_ = true;
+    return false;
+  }
+  rendering_ = std::move(next);
+  return true;
+}
+
+bool D3D12CommandContextImpl::RenderingMatches(const IProgram *program) const {
+  const auto &desc = program->GetDesc();
+  if (desc.color_formats.size() != rendering_.color_attachments.size())
+    return false;
+  for (size_t i = 0; i < desc.color_formats.size(); ++i)
+    if (desc.color_formats[i] != rendering_.color_attachments[i].color_attachment->GetDesc().format)
+      return false;
+  return desc.depth_stencil.format ==
+         (rendering_.depth_stencil.image ? rendering_.depth_stencil.image->GetDesc().format : IMAGE_FORMAT_UNKNOWN);
+}
+
+void D3D12CommandContextImpl::InitializeCommandContext(IBackendQueue *queue) {
+  queue_ = queue;
+}
+
+rhi::ISubmissionToken *D3D12CommandContextImpl::Submit(const rhi::SubmitInfo &info) {
+  try {
+    return queue_->Submit(ObjectPtr<IBackendCommandContext>::Retain(this), info).Detach();
+  } catch (const std::system_error &error) {
+    ReportError(error.code().value(), error.what());
+  }
+  return nullptr;
+}
+
+void D3D12CommandContextImpl::BindDownloads(IBackendSubmissionToken *submission) {
+  for (const auto &token : downloads_)
+    token->BindSubmission(submission);
+}
+
+void D3D12CommandContextImpl::ReleaseDownloads() {
+  downloads_.clear();
+}
+
+IDownloadToken *D3D12CommandContextImpl::RegisterDownload(ObjectPtr<IBackendDownloadToken> token) {
+  downloads_.push_back(token);
+  return token.Detach();
+}
+
+bool D3D12CommandContextImpl::RetainResource(rhi::IObject *resource) {
+#if !defined(NDEBUG)
+  if (sealed_)
+    return false;
+#endif
+  if (recording_failed_)
+    return false;
+  if (resources_.find(resource) != resources_.end())
+    return true;
+  resources_.emplace(resource, ObjectPtr<rhi::IObject>::Retain(resource));
+
+  return true;
+}
+
+bool D3D12CommandContextImpl::Seal() {
+  if (recording_failed_)
+    return false;
+#if !defined(NDEBUG)
+  if (sealed_) {
+    ReportError(-1, "Cannot submit a command context twice.");
+    return false;
+  }
+#endif
+  sealed_ = true;
+  if (!EndRecording()) {
+    recording_failed_ = true;
+    return false;
+  }
+  return true;
+}
+
+IBackendQueue *D3D12CommandContextImpl::OwnerQueue() const {
+  return queue_;
+}
+
+const void *D3D12CommandContextImpl::DeviceIdentity() const {
+  return queue_->Owner();
+}
+
+void D3D12CommandContextImpl::MarkSubmitted() {
+  submitted_ = true;
+}
+
+bool D3D12CommandContextImpl::WasSubmitted() const {
+  return submitted_;
+}
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12CommandContext, "5962a78a-e01d-4cc1-9f13-4544d7232c63")

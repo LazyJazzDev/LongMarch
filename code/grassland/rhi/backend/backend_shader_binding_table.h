@@ -23,5 +23,4 @@ class IBackendShaderBindingTable : public IShaderBindingTable {
   virtual const std::array<Region, 4> &Regions() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend

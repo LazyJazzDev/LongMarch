@@ -33,6 +33,4 @@ class IMetalDevice : public IBackendDevice {
   virtual void NotifyTimelineFailure() = 0;
 };
 
-;
-
 }  // namespace grassland::rhi::backend::metal

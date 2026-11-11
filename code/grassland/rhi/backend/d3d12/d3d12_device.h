@@ -49,5 +49,4 @@ class ID3D12Device : public IBackendDevice {
                                        ComPtr<ID3D12GraphicsCommandList> list) = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::d3d12

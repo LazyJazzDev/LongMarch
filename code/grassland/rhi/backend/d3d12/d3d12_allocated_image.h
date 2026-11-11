@@ -15,5 +15,4 @@ class ID3D12AllocatedImage : public ID3D12Image {
   virtual bool IsValid() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::d3d12

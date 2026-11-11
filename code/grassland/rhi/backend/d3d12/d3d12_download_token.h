@@ -12,5 +12,4 @@ class ID3D12DownloadToken : public IBackendDownloadToken {
   static ID3D12DownloadToken *Create(ObjectPtr<ID3D12TemporalBufferLease> lease, const DownloadLayout &layout);
 };
 
-;
 }  // namespace grassland::rhi::backend::d3d12

@@ -20,12 +20,10 @@ class ID3D12RayTracingProgram : public IBackendRayTracingProgram, public ID3D12P
     return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
   }
 
- public:
   static ID3D12RayTracingProgram *Create(ID3D12Device *device, const RayTracingProgramDesc &desc);
   virtual IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) = 0;
   virtual const IBackendShaderBindingTable *DefaultShaderBindingTable() const = 0;
   virtual ID3D12StateObject *NativePipeline() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::d3d12

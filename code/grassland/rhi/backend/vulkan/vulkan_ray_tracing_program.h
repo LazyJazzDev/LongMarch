@@ -22,12 +22,10 @@ class IVulkanRayTracingProgram : public IBackendRayTracingProgram, public IVulka
     return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
   }
 
- public:
   static IVulkanRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
   virtual IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) = 0;
   virtual const IBackendShaderBindingTable *DefaultShaderBindingTable() const = 0;
   virtual VkPipeline NativePipeline() const = 0;
 };
 
-;
 }  // namespace grassland::rhi::backend::vulkan

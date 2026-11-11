@@ -1,7 +1,5 @@
 #pragma once
-#include "grassland/rhi/backend/backend_compute_program_state.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
-#include "grassland/rhi/backend/metal/metal_program_base_state.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
@@ -13,44 +11,44 @@ class MetalComputeProgramImpl final : public Object<IMetalComputeProgram> {
                             IComputeProgram,
                             IMetalProgramBase,
                             IObject)
+
   static IMetalComputeProgram *Create(IMetalDevice *device, const ComputeProgramDesc &desc);
+
   MTL::ComputePipelineState *NativePipeline() const;
+
   MTL::Size ThreadGroupSize() const;
+
+  ~MetalComputeProgramImpl() override = default;
+
+  const ComputeProgramDesc &GetDesc() const override;
+
+  IBackendDevice *Owner() const override;
+
+  const PipelineLayoutDesc &BindingLayout() const override;
 
  private:
   MetalComputeProgramImpl(IMetalDevice *device, const ComputeProgramDesc &desc);
+
   NS::SharedPtr<MTL::ComputePipelineState> pipeline_;
+
   MTL::Size threads_{};
 
- public:
-  ~MetalComputeProgramImpl() override {
-  }
+  void InitializeComputeProgram(IBackendDevice *device, const ComputeProgramDesc &desc);
 
- private:
-  ComputeProgramState state_ComputeProgram_;
+  bool ValidateLayout() const;
 
-  ComputeProgramState &StateComputeProgram() override {
-    return state_ComputeProgram_;
-  }
+  IBackendDevice *device_{};
 
-  const ComputeProgramState &StateComputeProgram() const override {
-    return state_ComputeProgram_;
-  }
+  ComputeProgramDesc desc_{};
 
- private:
-  MetalProgramBaseState state_MetalProgramBase_;
+  ObjectPtr<IShader> shader_{};
 
-  MetalProgramBaseState &StateMetalProgramBase() override {
-    return state_MetalProgramBase_;
-  }
+  void InitializeMetalProgramBase(MTL::Device *device);
 
-  const MetalProgramBaseState &StateMetalProgramBase() const override {
-    return state_MetalProgramBase_;
-  }
+  NS::SharedPtr<MTL::Function> CompileFunction(const IShader *shader,
+                                               const std::vector<InputAttributeDesc> &attributes = {},
+                                               std::array<uint32_t, 3> *threads = nullptr) const;
 
- public:
-  const ComputeProgramDesc &GetDesc() const override {
-    return IBackendComputeProgram::CommonGetDesc();
-  }
+  MTL::Device *native_device_{};
 };
 }  // namespace grassland::rhi::backend::metal

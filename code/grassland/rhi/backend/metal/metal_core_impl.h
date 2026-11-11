@@ -23,10 +23,8 @@ class MetalCoreImpl final : public Object<IMetalCore> {
   std::vector<Adapter> adapters_;
 
  public:
-  ~MetalCoreImpl() override {
-  }
+  ~MetalCoreImpl() override = default;
 
- public:
   rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
     return IBackendCore::CommonCreateDeviceByAutoSelection(requirement);
   }
