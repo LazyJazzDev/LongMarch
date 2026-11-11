@@ -3,6 +3,9 @@
 #include "grassland/rhi/rhi_acceleration_structure.h"
 
 namespace grassland::rhi::backend {
+template <typename Interface>
+using AccelerationStructureObject = Object<Interface, IAccelerationStructure>;
+
 class Device;
 bool ValidateBottomLevelDesc(const BottomLevelAccelerationStructureDesc &desc);
 bool ValidateGeometryBuffers(const BottomLevelAccelerationStructureDesc &desc,

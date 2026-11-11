@@ -38,11 +38,12 @@ class VulkanAccelerationStructure : public IObject {
   bool allow_update_{}, allow_compaction_{}, compact_{};
 };
 
-class VulkanBottomLevelAccelerationStructure final : public Object<IBottomLevelAccelerationStructure>,
-                                                     public VulkanAccelerationStructure {
+class VulkanBottomLevelAccelerationStructure final
+    : public AccelerationStructureObject<IBottomLevelAccelerationStructure>,
+      public VulkanAccelerationStructure {
  public:
   LONGMARCH_RHI_QUERY_MULTIPLE(VulkanBottomLevelAccelerationStructure,
-                               Object<IBottomLevelAccelerationStructure>,
+                               AccelerationStructureObject<IBottomLevelAccelerationStructure>,
                                VulkanAccelerationStructure)
 
   static VulkanBottomLevelAccelerationStructure *Create(VulkanDevice *device,
@@ -56,11 +57,11 @@ class VulkanBottomLevelAccelerationStructure final : public Object<IBottomLevelA
   BottomLevelAccelerationStructureDesc desc_;
 };
 
-class VulkanTopLevelAccelerationStructure final : public Object<ITopLevelAccelerationStructure>,
+class VulkanTopLevelAccelerationStructure final : public AccelerationStructureObject<ITopLevelAccelerationStructure>,
                                                   public VulkanAccelerationStructure {
  public:
   LONGMARCH_RHI_QUERY_MULTIPLE(VulkanTopLevelAccelerationStructure,
-                               Object<ITopLevelAccelerationStructure>,
+                               AccelerationStructureObject<ITopLevelAccelerationStructure>,
                                VulkanAccelerationStructure)
 
   static VulkanTopLevelAccelerationStructure *Create(VulkanDevice *device,

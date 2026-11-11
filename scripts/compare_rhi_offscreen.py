@@ -46,8 +46,8 @@ def main():
     parser.add_argument("--backends", nargs="+", default=["vulkan", "d3d12"])
     parser.add_argument("--scenes", nargs="+", default=["cube", "texture", "ray_query"])
     args = parser.parse_args()
-    if min(args.frames, args.pairs, args.control_pairs) < 1:
-        parser.error("frames and pair counts must be positive")
+    if min(args.frames, args.pairs) < 1 or args.control_pairs < 0:
+        parser.error("frames and comparison pairs must be positive; control pairs may be zero")
     args.baseline = args.baseline.resolve()
     args.candidate = args.candidate.resolve()
     args.output.mkdir(parents=True, exist_ok=False)

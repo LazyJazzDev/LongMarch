@@ -34,11 +34,12 @@ class D3D12AccelerationStructure : public IObject {
   bool allow_update_{}, allow_compaction_{}, compact_{};
 };
 
-class D3D12BottomLevelAccelerationStructure final : public Object<IBottomLevelAccelerationStructure>,
-                                                    public D3D12AccelerationStructure {
+class D3D12BottomLevelAccelerationStructure final
+    : public AccelerationStructureObject<IBottomLevelAccelerationStructure>,
+      public D3D12AccelerationStructure {
  public:
   LONGMARCH_RHI_QUERY_MULTIPLE(D3D12BottomLevelAccelerationStructure,
-                               Object<IBottomLevelAccelerationStructure>,
+                               AccelerationStructureObject<IBottomLevelAccelerationStructure>,
                                D3D12AccelerationStructure)
 
   static D3D12BottomLevelAccelerationStructure *Create(D3D12Device *device,
@@ -52,11 +53,11 @@ class D3D12BottomLevelAccelerationStructure final : public Object<IBottomLevelAc
   BottomLevelAccelerationStructureDesc desc_;
 };
 
-class D3D12TopLevelAccelerationStructure final : public Object<ITopLevelAccelerationStructure>,
+class D3D12TopLevelAccelerationStructure final : public AccelerationStructureObject<ITopLevelAccelerationStructure>,
                                                  public D3D12AccelerationStructure {
  public:
   LONGMARCH_RHI_QUERY_MULTIPLE(D3D12TopLevelAccelerationStructure,
-                               Object<ITopLevelAccelerationStructure>,
+                               AccelerationStructureObject<ITopLevelAccelerationStructure>,
                                D3D12AccelerationStructure)
 
   static D3D12TopLevelAccelerationStructure *Create(D3D12Device *device, const TopLevelAccelerationStructureDesc &desc);

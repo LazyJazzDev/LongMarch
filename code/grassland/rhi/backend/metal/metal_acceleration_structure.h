@@ -33,11 +33,12 @@ class MetalAccelerationStructure : public IObject {
   bool allow_update_{}, allow_compaction_{}, compact_{};
 };
 
-class MetalBottomLevelAccelerationStructure final : public Object<IBottomLevelAccelerationStructure>,
-                                                    public MetalAccelerationStructure {
+class MetalBottomLevelAccelerationStructure final
+    : public AccelerationStructureObject<IBottomLevelAccelerationStructure>,
+      public MetalAccelerationStructure {
  public:
   LONGMARCH_RHI_QUERY_MULTIPLE(MetalBottomLevelAccelerationStructure,
-                               Object<IBottomLevelAccelerationStructure>,
+                               AccelerationStructureObject<IBottomLevelAccelerationStructure>,
                                MetalAccelerationStructure)
 
   static MetalBottomLevelAccelerationStructure *Create(MetalDevice *device,
@@ -51,11 +52,11 @@ class MetalBottomLevelAccelerationStructure final : public Object<IBottomLevelAc
   BottomLevelAccelerationStructureDesc desc_;
 };
 
-class MetalTopLevelAccelerationStructure final : public Object<ITopLevelAccelerationStructure>,
+class MetalTopLevelAccelerationStructure final : public AccelerationStructureObject<ITopLevelAccelerationStructure>,
                                                  public MetalAccelerationStructure {
  public:
   LONGMARCH_RHI_QUERY_MULTIPLE(MetalTopLevelAccelerationStructure,
-                               Object<ITopLevelAccelerationStructure>,
+                               AccelerationStructureObject<ITopLevelAccelerationStructure>,
                                MetalAccelerationStructure)
 
   static MetalTopLevelAccelerationStructure *Create(MetalDevice *device, const TopLevelAccelerationStructureDesc &desc);

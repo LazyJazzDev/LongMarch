@@ -6,7 +6,7 @@
 
 #include "grassland/rhi/backend/backend_interface_ids.h"
 #include "grassland/rhi/backend/backend_query_interface.h"
-#include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhi_obj_ptr.h"
 
 namespace grassland::rhi::backend {
 void ReportError(int32_t error_code, const std::string &error_message);
@@ -29,7 +29,7 @@ void *MatchInterfaces(InterfaceID id, Source *source) noexcept {
 }
 
 // One intrusive counter per native implementation, with no public state layout.
-template <typename Interface>
+template <typename Interface, typename... Bases>
 class Object : public Interface {
  public:
   using Interface::QueryInterface;
@@ -37,7 +37,7 @@ class Object : public Interface {
   bool QueryInterface(InterfaceID id, void **output) noexcept override {
     if (!output)
       return false;
-    *output = MatchInterfaces<Interface, IObject, IAccelerationStructure>(id, this);
+    *output = MatchInterfaces<Interface, IObject, Bases...>(id, this);
     if (!*output)
       return false;
     AddRef();

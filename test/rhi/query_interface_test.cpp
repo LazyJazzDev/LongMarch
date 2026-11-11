@@ -6,12 +6,16 @@ namespace query_test {
 class ILeft : public grassland::rhi::IObject {};
 
 class IRight : public grassland::rhi::IObject {};
+
+class IExtended : public ILeft {};
 class Diamond;
 }  // namespace query_test
 
 LONGMARCH_RHI_UUID(query_test::ILeft, "523d719e-fb75-41e8-addc-fc6abcf4575f")
 LONGMARCH_RHI_UUID(query_test::IRight, "0ae16d45-31b1-4981-bba0-90a7df182c7e")
 LONGMARCH_RHI_UUID(query_test::Diamond, "31feaf71-6632-45be-94a3-d3c82599c9d2")
+
+LONGMARCH_RHI_UUID(query_test::IExtended, "beff92a1-db2c-47cb-80d9-0abff454b583")
 
 namespace query_test {
 using namespace grassland::rhi;
@@ -70,6 +74,17 @@ TEST(RhiQueryInterface, DiamondHasOneCounterAndCanonicalObjectIdentity) {
   EXPECT_FALSE(destroyed);
   from_side.Release();
   EXPECT_TRUE(destroyed);
+}
+
+TEST(RhiQueryInterface, ExtendedInterfacesExposeTheirDeclaredAncestors) {
+  ObjPtr<IExtended> extended = new Object<IExtended, ILeft>;
+  ObjPtr<ILeft> left = extended->QueryInterface<ILeft>();
+  ASSERT_TRUE(left);
+  ObjPtr<IExtended> roundtrip = left->QueryInterface<IExtended>();
+  EXPECT_EQ(roundtrip.Get(), extended.Get());
+  ObjPtr<IObject> identity = left->QueryInterface<IObject>();
+  ASSERT_TRUE(identity);
+  EXPECT_EQ(identity->QueryInterface<IRight>(), nullptr);
 }
 
 TEST(RhiQueryInterface, FailureClearsOutputAndDoesNotRetain) {
