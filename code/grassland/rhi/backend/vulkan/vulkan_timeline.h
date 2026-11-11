@@ -7,7 +7,9 @@ class VulkanDevice;
 
 class VulkanTimeline final : public Timeline {
  public:
-  static std::unique_ptr<VulkanTimeline> Create(VulkanDevice *device);
+  LONGMARCH_RHI_QUERY(VulkanTimeline, Timeline)
+
+  static ObjectPtr<VulkanTimeline> Create(VulkanDevice *device);
   ~VulkanTimeline() override;
   bool GetCompletedValue(uint64_t &value) const override;
   bool WaitHost(uint64_t value) const override;

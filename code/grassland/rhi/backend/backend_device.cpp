@@ -113,13 +113,11 @@ bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
   std::vector<Event> unique;
   unique.reserve(events.size());
   for (const auto &event : events) {
-#if !defined(NDEBUG)
-    auto timeline = dynamic_cast<Timeline *>(event.timeline);
+    auto timeline = rhi::QueryInterfacePtr<Timeline>(event.timeline).Get();
     if (!timeline || timeline->Owner() != this) {
       ReportError(-1, "Host waits require timelines from this device.");
       return false;
     }
-#endif
     auto found = std::find_if(unique.begin(), unique.end(),
                               [&](const Event &other) { return other.timeline == event.timeline; });
     if (found == unique.end())

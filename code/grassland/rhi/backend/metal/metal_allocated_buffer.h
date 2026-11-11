@@ -4,6 +4,8 @@
 namespace grassland::rhi::backend::metal {
 class MetalAllocatedBuffer final : public MetalBuffer {
  public:
+  LONGMARCH_RHI_QUERY(MetalAllocatedBuffer, MetalBuffer)
+
   static MetalAllocatedBuffer *Create(MetalDevice *device,
                                       const BufferDesc &desc,
                                       bool upload = false,

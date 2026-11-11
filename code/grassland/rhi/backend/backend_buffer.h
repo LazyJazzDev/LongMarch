@@ -7,12 +7,13 @@ class Device;
 
 class Buffer : public Object<IBuffer> {
  public:
+  LONGMARCH_RHI_QUERY(Buffer, Object<IBuffer>)
+
   BufferDesc GetDesc() const override;
-  Device *Owner() const;
+  virtual Device *Owner() const = 0;
 
  protected:
-  Buffer(Device *device, const BufferDesc &desc);
-  Device *device_;
+  explicit Buffer(const BufferDesc &desc);
   BufferDesc desc_;
 };
 }  // namespace grassland::rhi::backend

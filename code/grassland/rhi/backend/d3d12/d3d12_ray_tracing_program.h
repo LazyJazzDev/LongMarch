@@ -9,6 +9,8 @@ class D3D12Device;
 
 class D3D12RayTracingProgram final : public RayTracingProgram, public D3D12ProgramBase {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(D3D12RayTracingProgram, RayTracingProgram, D3D12ProgramBase)
+
   static D3D12RayTracingProgram *Create(D3D12Device *device, const RayTracingProgramDesc &desc);
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
   const ShaderBindingTable *DefaultShaderBindingTable() const;

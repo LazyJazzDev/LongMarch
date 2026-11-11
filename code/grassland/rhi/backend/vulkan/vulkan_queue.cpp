@@ -25,7 +25,7 @@ VkQueue VulkanQueue::NativeQueue() const {
 }
 
 VulkanTimeline *VulkanQueue::GetTimeline() const {
-  return timeline_.get();
+  return timeline_.Get();
 }
 
 VkResult VulkanQueue::Wait(uint64_t value, uint64_t timeout) const {
@@ -34,7 +34,7 @@ VkResult VulkanQueue::Wait(uint64_t value, uint64_t timeout) const {
   info.semaphoreCount = 1;
   info.pSemaphores = &semaphore;
   info.pValues = &value;
-  return vkWaitSemaphores(static_cast<VulkanDevice *>(Owner())->NativeDevice(), &info, timeout);
+  return vkWaitSemaphores(rhi::QueryInterfacePtr<VulkanDevice>(Owner()).Get()->NativeDevice(), &info, timeout);
 }
 
 VulkanQueue::VulkanQueue(VulkanDevice *device, QueueType type, VkQueue queue, std::shared_ptr<std::mutex> mutex)

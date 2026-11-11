@@ -7,6 +7,8 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanQueue final : public Queue {
  public:
+  LONGMARCH_RHI_QUERY(VulkanQueue, Queue)
+
   rhi::ICommandContext *CreateCommandContext() override;
   static VulkanQueue *Create(VulkanDevice *device, QueueType type, VkQueue queue, std::shared_ptr<std::mutex> mutex);
   VkQueue NativeQueue() const;
@@ -16,7 +18,7 @@ class VulkanQueue final : public Queue {
  private:
   VulkanQueue(VulkanDevice *device, QueueType type, VkQueue queue, std::shared_ptr<std::mutex> mutex);
   VkQueue queue_{};
-  std::unique_ptr<VulkanTimeline> timeline_;
+  ObjectPtr<VulkanTimeline> timeline_;
 };
 
 }  // namespace grassland::rhi::backend::vulkan

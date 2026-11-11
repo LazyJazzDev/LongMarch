@@ -13,6 +13,8 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Device final : public Device {
  public:
+  LONGMARCH_RHI_QUERY(D3D12Device, Device)
+
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override;

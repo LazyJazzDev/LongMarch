@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::d3d12 {
 D3D12TemporalBufferLease::D3D12TemporalBufferLease(D3D12TemporalBufferPool *pool,
                                                    D3D12AllocatedBuffer *buffer,
                                                    size_t level)
-    : D3D12Buffer(static_cast<D3D12Device *>(buffer->Owner()), buffer->GetDesc()),
+    : D3D12Buffer(rhi::QueryInterfacePtr<D3D12Device>(buffer->Owner()).Get(), buffer->GetDesc()),
       pool_(pool),
       buffer_(buffer),
       level_(level) {

@@ -8,6 +8,8 @@ class Device;
 
 class Program : public Object<IProgram> {
  public:
+  LONGMARCH_RHI_QUERY(Program, Object<IProgram>)
+
   Program(Device *device, const ProgramDesc &desc);
   ~Program() override;
   const ProgramDesc &GetDesc() const override;

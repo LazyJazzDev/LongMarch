@@ -7,6 +7,8 @@ class Device;
 
 class ComputeProgram : public Object<IComputeProgram> {
  public:
+  LONGMARCH_RHI_QUERY(ComputeProgram, Object<IComputeProgram>)
+
   ComputeProgram(Device *device, const ComputeProgramDesc &desc);
   const ComputeProgramDesc &GetDesc() const override;
   Device *Owner() const;

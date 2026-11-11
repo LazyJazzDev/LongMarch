@@ -21,7 +21,7 @@ namespace grassland::rhi::backend::d3d12 {
 
 D3D12CommandContext::D3D12CommandContext(D3D12Queue *queue)
     : CommandContext(queue),
-      device_(static_cast<D3D12Device *>(queue->Owner())) {
+      device_(rhi::QueryInterfacePtr<D3D12Device>(queue->Owner()).Get()) {
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
@@ -77,21 +77,17 @@ bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
 }
 
 bool D3D12CommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
-#if !defined(NDEBUG)
   if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  const auto native = dynamic_cast<D3D12Image *>(image);
+  const auto native = rhi::QueryInterfacePtr<D3D12Image>(image).Get();
   if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
   }
-#else
-  const auto native = static_cast<D3D12Image *>(image);
-#endif
   if (!RetainResource(native))
     return false;
   const auto format = native->GetDesc().format;
@@ -170,13 +166,12 @@ bool D3D12CommandContext::ClearColor(D3D12Image *image, const ClearColorValue &v
 }
 
 bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
-#if !defined(NDEBUG)
   if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  const auto target = dynamic_cast<D3D12Window *>(window);
+  const auto target = rhi::QueryInterfacePtr<D3D12Window>(window).Get();
   if (!target || target->DeviceIdentity() != device_ || target->OwnerQueue() != OwnerQueue() ||
       !glfw::IsWindowThread()) {
     recording_failed_ = true;
@@ -190,10 +185,8 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
       return false;
     }
   }
-#else
-  const auto target = static_cast<D3D12Window *>(window);
-#endif
-  auto frame = ObjectPtr<D3D12SwapChainImage>::Adopt(static_cast<D3D12SwapChainImage *>(target->GetNextImage()));
+  auto frame =
+      ObjectPtr<D3D12SwapChainImage>::Adopt(rhi::QueryInterfacePtr<D3D12SwapChainImage>(target->GetNextImage()).Get());
   if (!frame)
     return false;
   if (!RetainResource(frame.Get()))
@@ -226,7 +219,7 @@ bool D3D12CommandContext::EndRecording() {
 }
 
 CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const SubmitInfo &info, Event signal) {
-  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
+  auto queue = rhi::QueryInterfacePtr<D3D12Queue>(OwnerQueue()).Get();
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -239,7 +232,7 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative(const SubmitInfo 
 #endif
   {
     for (const auto &wait : info.waits) {
-      auto timeline = static_cast<D3D12Timeline *>(wait.timeline);
+      auto timeline = rhi::QueryInterfacePtr<D3D12Timeline>(wait.timeline).Get();
       if (!Check(queue->NativeQueue()->Wait(timeline->NativeFence(), wait.value), "Queue::Wait"))
         return SUBMIT_RESULT_REJECTED;
     }
@@ -274,7 +267,7 @@ void D3D12CommandContext::UpdatePresentedImages() {
 }
 
 SubmissionStatus D3D12CommandContext::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {
-  auto queue = static_cast<D3D12Queue *>(OwnerQueue());
+  auto queue = rhi::QueryInterfacePtr<D3D12Queue>(OwnerQueue()).Get();
   if (!timeline_valid)
     return SUBMISSION_STATUS_FAILED;
   if (completed >= signal.value)
@@ -292,20 +285,16 @@ SubmissionStatus D3D12CommandContext::PollCompletion(Event signal, uint64_t comp
 }
 
 bool D3D12CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
-#if !defined(NDEBUG)
   if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  auto native = rhi::QueryInterfacePtr<D3D12Buffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<D3D12Buffer *>(buffer);
-#endif
   if (!RetainResource(native))
     return false;
 
@@ -335,22 +324,17 @@ bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
                                         IBuffer *destination,
                                         uint64_t destination_offset,
                                         uint64_t size) {
-#if !defined(NDEBUG)
   if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  auto src = dynamic_cast<D3D12Buffer *>(source);
-  auto dst = dynamic_cast<D3D12Buffer *>(destination);
+  auto src = rhi::QueryInterfacePtr<D3D12Buffer>(source).Get();
+  auto dst = rhi::QueryInterfacePtr<D3D12Buffer>(destination).Get();
   if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto src = static_cast<D3D12Buffer *>(source);
-  auto dst = static_cast<D3D12Buffer *>(destination);
-#endif
   if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
       destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
     recording_failed_ = true;
@@ -369,15 +353,11 @@ bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
 }
 
 bool D3D12CommandContext::CmdBindComputeProgram(IComputeProgram *program) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<D3D12ComputeProgram *>(program);
+  auto native = rhi::QueryInterfacePtr<D3D12ComputeProgram>(program).Get();
   if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<D3D12ComputeProgram *>(program);
-#endif
   if (!RetainResource(native))
     return false;
   native_program_ = native;
@@ -412,15 +392,11 @@ bool D3D12CommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 }
 
 bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<D3D12Program *>(program);
+  auto native = rhi::QueryInterfacePtr<D3D12Program>(program).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<D3D12Program *>(program);
-#endif
   if (!RetainResource(native))
     return false;
   vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
@@ -449,7 +425,7 @@ bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
   auto count = static_cast<UINT>(rendering_.color_attachments.size());
   for (UINT i = 0; i < count; ++i) {
     const auto &attachment = rendering_.color_attachments[i];
-    auto image = static_cast<D3D12Image *>(attachment.color_attachment);
+    auto image = rhi::QueryInterfacePtr<D3D12Image>(attachment.color_attachment).Get();
     if (attachment.load_op == ATTACHMENT_LOAD_OP_CLEAR) {
       if (!ClearColor(image, attachment.clear_value))
         return false;
@@ -461,7 +437,7 @@ bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
     }
     colors[i] = image->AttachmentView();
   }
-  auto depth = static_cast<D3D12Image *>(rendering_.depth_stencil.image);
+  auto depth = rhi::QueryInterfacePtr<D3D12Image>(rendering_.depth_stencil.image).Get();
   D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
   if (depth) {
     dsv = depth->AttachmentView();
@@ -487,7 +463,7 @@ bool D3D12CommandContext::CmdEndRendering() {
   }
   for (const auto &color : rendering_.color_attachments)
     if (color.store_op == ATTACHMENT_STORE_OP_DISCARD)
-      list_->DiscardResource(static_cast<D3D12Image *>(color.color_attachment)->NativeImage(), nullptr);
+      list_->DiscardResource(rhi::QueryInterfacePtr<D3D12Image>(color.color_attachment).Get()->NativeImage(), nullptr);
   list_->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
   rendering_active_ = false;
   rendering_ = {};
@@ -495,15 +471,11 @@ bool D3D12CommandContext::CmdEndRendering() {
 }
 
 bool D3D12CommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  auto native = rhi::QueryInterfacePtr<D3D12Buffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<D3D12Buffer *>(buffer);
-#endif
   if (!RetainResource(native))
     return false;
   if (!program_ || binding >= program_->GetDesc().vertex_bindings.size() || offset >= native->GetDesc().size) {
@@ -526,15 +498,11 @@ bool D3D12CommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer,
 }
 
 bool D3D12CommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  auto native = rhi::QueryInterfacePtr<D3D12Buffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<D3D12Buffer *>(buffer);
-#endif
   if (!RetainResource(native))
     return false;
   if (format != INDEX_FORMAT_UINT16 && format != INDEX_FORMAT_UINT32) {
@@ -664,7 +632,7 @@ bool D3D12CommandContext::PrepareDrawBuffers(bool indexed) {
       return false;
   }
   for (const auto &color : rendering_.color_attachments) {
-    auto image = static_cast<D3D12Image *>(color.color_attachment);
+    auto image = rhi::QueryInterfacePtr<D3D12Image>(color.color_attachment).Get();
     if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
       return false;
   }
@@ -672,14 +640,14 @@ bool D3D12CommandContext::PrepareDrawBuffers(bool indexed) {
 }
 
 bool D3D12CommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
-  auto native = dynamic_cast<D3D12BindingGroup *>(group);
+  auto native = rhi::QueryInterfacePtr<D3D12BindingGroup>(group).Get();
   if (sealed_ || !binding_layout_ || !native || native->Owner() != device_ || index >= groups_.size() ||
       !SameBindingLayout(binding_layout_->groups[index], group->GetLayout()) ||
       !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
   }
-  auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
+  auto version = rhi::QueryInterfacePtr<D3D12BindingGroup::Version>(native->CurrentVersion()).Get();
   auto resources = version->ResourceDescriptors();
   if (version->ResourceCount() && !resources) {
     recording_failed_ = true;
@@ -717,14 +685,15 @@ bool D3D12CommandContext::PrepareGroups() {
         auto type = binding.type;
         ID3D12Resource *resource = nullptr;
         if (type == BINDING_ACCELERATION_STRUCTURE) {
-          auto top =
-              static_cast<D3D12TopLevelAccelerationStructure *>(version->GetReferences()[binding_index][j].Get());
+          auto top = rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(
+                         version->GetReferences()[binding_index][j].Get())
+                         .Get();
           for (const auto &blas : top->BottomLevels())
             if (!RetainResource(blas.Get()))
               return false;
         }
         if (type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
-          auto buffer = static_cast<D3D12Buffer *>(version->GetReferences()[binding_index][j].Get());
+          auto buffer = rhi::QueryInterfacePtr<D3D12Buffer>(version->GetReferences()[binding_index][j].Get()).Get();
           resource = buffer->NativeBuffer();
           if (!TransitionResource(resource,
                                   (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER)
@@ -733,7 +702,7 @@ bool D3D12CommandContext::PrepareGroups() {
                                   buffer->DefaultState()))
             return false;
         } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
-          auto image = static_cast<D3D12Image *>(version->GetReferences()[binding_index][j].Get());
+          auto image = rhi::QueryInterfacePtr<D3D12Image>(version->GetReferences()[binding_index][j].Get()).Get();
           resource = image->NativeImage();
           for (auto color : rendering_.color_attachments)
             if (color.color_attachment == image) {
@@ -837,7 +806,7 @@ bool D3D12CommandContext::PrepareGroups() {
 }
 
 bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
-  auto native = dynamic_cast<D3D12Image *>(image);
+  auto native = rhi::QueryInterfacePtr<D3D12Image>(image).Get();
   if (!native || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !native->IsValid() ||
       !data || sealed_ || rendering_active_ || IsDepthFormat(image->GetDesc().format) ||
       row_pitch < uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) ||
@@ -876,7 +845,7 @@ bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64
 }
 
 bool D3D12CommandContext::CmdBindRayTracingProgram(IRayTracingProgram *program) {
-  auto native = dynamic_cast<D3D12RayTracingProgram *>(program);
+  auto native = rhi::QueryInterfacePtr<D3D12RayTracingProgram>(program).Get();
   if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
@@ -909,9 +878,9 @@ bool D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint3
   const ShaderBindingTable *table = ray_program_->DefaultShaderBindingTable();
   if (sbt) {
 #ifndef NDEBUG
-    auto custom = dynamic_cast<ShaderBindingTable *>(sbt);
+    auto custom = rhi::QueryInterfacePtr<ShaderBindingTable>(sbt).Get();
 #else
-    auto custom = static_cast<ShaderBindingTable *>(sbt);
+    auto custom = rhi::QueryInterfacePtr<ShaderBindingTable>(sbt).Get();
 #endif
     if (!custom || custom->GetProgram() != ray_program_) {
       recording_failed_ = true;
@@ -937,15 +906,11 @@ bool D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint3
 }
 
 IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  auto native = rhi::QueryInterfacePtr<D3D12Buffer>(buffer).Get();
   if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return nullptr;
   }
-#else
-  auto native = static_cast<D3D12Buffer *>(buffer);
-#endif
   if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;
     return nullptr;
@@ -959,8 +924,7 @@ IDownloadToken *D3D12CommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t
 }
 
 IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<D3D12Image *>(image);
+  auto native = rhi::QueryInterfacePtr<D3D12Image>(image).Get();
   if (sealed_ || rendering_active_ || !native ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
@@ -971,9 +935,6 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
     ReportError(-1, "CmdDownloadImage does not support D24S8 readback; use a depth-only or color image.");
     return nullptr;
   }
-#else
-  auto native = static_cast<D3D12Image *>(image);
-#endif
   if (recording_failed_ || !native->IsValid()) {
     recording_failed_ = true;
     return nullptr;

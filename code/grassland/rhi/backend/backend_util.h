@@ -4,20 +4,51 @@
 #include <type_traits>
 #include <utility>
 
-#include "grassland/rhi/rhi_object.h"
+#include "grassland/rhi/backend/backend_interface_ids.h"
+#include "grassland/rhi/backend/backend_query_interface.h"
+#include "grassland/rhi/rhi.h"
 
 namespace grassland::rhi::backend {
 void ReportError(int32_t error_code, const std::string &error_message);
+
+// Pointer adjustments stay in the query implementation, never at call sites.
+template <typename Interface, typename Source>
+void *MatchInterface(InterfaceID id, Source *source) noexcept {
+  if constexpr (std::is_convertible_v<Source *, Interface *>) {
+    if (id == uuid<Interface>())
+      return static_cast<Interface *>(source);
+  }
+  return nullptr;
+}
+
+template <typename... Interfaces, typename Source>
+void *MatchInterfaces(InterfaceID id, Source *source) noexcept {
+  void *result = nullptr;
+  ((result = MatchInterface<Interfaces>(id, source)) || ...);
+  return result;
+}
 
 // One intrusive counter per native implementation, with no public state layout.
 template <typename Interface>
 class Object : public Interface {
  public:
-  void AddRef() noexcept final {
+  using Interface::QueryInterface;
+
+  bool QueryInterface(InterfaceID id, void **output) noexcept override {
+    if (!output)
+      return false;
+    *output = MatchInterfaces<Interface, IObject, IAccelerationStructure>(id, this);
+    if (!*output)
+      return false;
+    AddRef();
+    return true;
+  }
+
+  void AddRef() noexcept override {
     references_.fetch_add(1, std::memory_order_relaxed);
   }
 
-  void Release() noexcept final {
+  void Release() noexcept override {
     if (references_.fetch_sub(1, std::memory_order_acq_rel) == 1)
       delete this;
   }

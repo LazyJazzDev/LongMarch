@@ -7,7 +7,7 @@ Buffer::Buffer(rhi::IBuffer *object) noexcept : ObjectContainer(object) {
 }
 
 rhi::IBuffer *Buffer::Get() const noexcept {
-  return static_cast<rhi::IBuffer *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::IBuffer>(GetObject()).Get();
 }
 
 rhi::BufferDesc Buffer::GetDesc() const {

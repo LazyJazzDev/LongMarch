@@ -16,9 +16,9 @@ struct MetalTimeline::State {
 MetalTimeline::MetalTimeline(MetalDevice *device) : Timeline(device), state_(std::make_shared<State>()) {
 }
 
-std::unique_ptr<MetalTimeline> MetalTimeline::Create(MetalDevice *device) {
+ObjectPtr<MetalTimeline> MetalTimeline::Create(MetalDevice *device) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto result = std::unique_ptr<MetalTimeline>(new MetalTimeline(device));
+  auto result = ObjectPtr<MetalTimeline>::Adopt(new MetalTimeline(device));
   result->gpu_event_ = NS::TransferPtr(device->NativeDevice()->newEvent());
   result->event_ = NS::TransferPtr(device->NativeDevice()->newSharedEvent());
   if (!result->gpu_event_ || !result->event_) {

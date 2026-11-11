@@ -7,6 +7,8 @@ class VulkanDevice;
 
 class VulkanAllocatedImage final : public VulkanImage {
  public:
+  LONGMARCH_RHI_QUERY(VulkanAllocatedImage, VulkanImage)
+
   static VulkanAllocatedImage *Create(VulkanDevice *device, const ImageDesc &desc);
   ~VulkanAllocatedImage() override;
   bool IsValid() const override;

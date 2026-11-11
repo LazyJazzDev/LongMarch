@@ -8,6 +8,8 @@ class MetalDevice;
 
 class MetalSampler final : public Sampler {
  public:
+  LONGMARCH_RHI_QUERY(MetalSampler, Sampler)
+
   static MetalSampler *Create(MetalDevice *device, const SamplerDesc &desc);
   MTL::SamplerState *NativeSampler() const;
 

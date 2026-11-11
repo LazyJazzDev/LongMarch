@@ -10,6 +10,8 @@ namespace grassland::rhi::backend {
 
 class Queue : public Object<rhi::IQueue> {
  public:
+  LONGMARCH_RHI_QUERY(Queue, Object<rhi::IQueue>)
+
   Queue(Device *device, QueueType type, std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
   ~Queue() override;
   Device *Owner() const;

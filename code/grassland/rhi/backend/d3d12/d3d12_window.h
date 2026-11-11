@@ -8,6 +8,8 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12Window final : public Window {
  public:
+  LONGMARCH_RHI_QUERY(D3D12Window, Window)
+
   ~D3D12Window() override;
   static D3D12Window *Create(D3D12Device *device, const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;

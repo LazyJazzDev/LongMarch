@@ -11,8 +11,13 @@ bool ValidateMetalBindingLayout(MTL::Device *device, const BindingLayoutDesc &la
 
 class MetalBindingGroup final : public BindingGroup {
  public:
+  LONGMARCH_RHI_QUERY(MetalBindingGroup, BindingGroup)
+
   class Version final : public BindingGroup::Version {
    public:
+    using BindingGroup::Version::QueryInterface;
+    bool QueryInterface(InterfaceID id, void **output) noexcept override;
+
     static Version *Create(MetalDevice *device, const BindingLayoutDesc &layout);
     ObjectPtr<BindingGroup::Version> Clone() const override;
     bool IsInitialized(size_t binding, uint32_t element) const override;
@@ -20,6 +25,7 @@ class MetalBindingGroup final : public BindingGroup {
     void Bind(MTL::RenderCommandEncoder *encoder, uint32_t group) const;
 
    private:
+    MetalDevice *device_;
     Version(MetalDevice *device, const BindingLayoutDesc &layout);
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<BufferView> &values) override;
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<IImage *> &values) override;
@@ -39,3 +45,17 @@ class MetalBindingGroup final : public BindingGroup {
   MetalBindingGroup(MetalDevice *device, ObjectPtr<Version> version);
 };
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalBindingGroup::Version, "fcef2422-11d0-4f7f-acb2-f3fcd629a898")
+
+inline bool grassland::rhi::backend::metal::MetalBindingGroup::Version::QueryInterface(InterfaceID id,
+                                                                                       void **output) noexcept {
+  if (!output)
+    return false;
+  if (auto result = MatchInterface<Version>(id, this)) {
+    *output = result;
+    AddRef();
+    return true;
+  }
+  return BindingGroup::Version::QueryInterface(id, output);
+}

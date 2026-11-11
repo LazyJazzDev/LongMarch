@@ -59,7 +59,7 @@ bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b) {
   return true;
 }
 
-BindingGroup::Version::Version(Device *device, const BindingLayoutDesc &layout) : device_(device), layout_(layout) {
+BindingGroup::Version::Version(const BindingLayoutDesc &layout) : layout_(layout) {
   std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
   references_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i)
@@ -162,7 +162,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
     return false;
   auto values = buffers;
   for (auto &view : values) {
-    auto buffer = dynamic_cast<Buffer *>(view.buffer);
+    auto buffer = rhi::QueryInterfacePtr<Buffer>(view.buffer).Get();
     if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
       return false;
     if (!view.size)
@@ -194,7 +194,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &i
   if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
     return false;
   for (auto value : images) {
-    auto image = dynamic_cast<Image *>(value);
+    auto image = rhi::QueryInterfacePtr<Image>(value).Get();
     if (!image || !image->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(image->GetDesc().format))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
@@ -217,7 +217,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<ISampler *> 
   if (desc->type != BINDING_SAMPLER)
     return false;
   for (auto sampler : samplers) {
-    auto native = dynamic_cast<Sampler *>(sampler);
+    auto native = rhi::QueryInterfacePtr<Sampler>(sampler).Get();
     if (!native || native->DeviceIdentity() != device_)
       return false;
   }

@@ -10,7 +10,7 @@ VulkanProgram::VulkanProgram(VulkanDevice *device, const ProgramDesc &desc)
 }
 
 VulkanProgram::~VulkanProgram() {
-  auto device = static_cast<VulkanDevice *>(device_)->NativeDevice();
+  auto device = LayoutDevice();
   if (pipeline_)
     vkDestroyPipeline(device, pipeline_, nullptr);
 }

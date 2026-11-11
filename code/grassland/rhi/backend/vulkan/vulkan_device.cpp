@@ -18,7 +18,7 @@ bool VulkanDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_
   std::vector<VkSemaphore> semaphores;
   std::vector<uint64_t> values;
   for (const auto &event : events) {
-    semaphores.push_back(static_cast<VulkanTimeline *>(event.timeline)->NativeSemaphore());
+    semaphores.push_back(rhi::QueryInterfacePtr<VulkanTimeline>(event.timeline).Get()->NativeSemaphore());
     values.push_back(event.value);
   }
   VkSemaphoreWaitInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
@@ -40,7 +40,7 @@ void VulkanDevice::WaitForProgress(const std::vector<Event> &next) {
   std::array<VkSemaphore, 3> semaphores{};
   std::array<uint64_t, 3> values{};
   for (size_t index = 0; index < next.size(); ++index) {
-    semaphores[index] = static_cast<VulkanTimeline *>(next[index].timeline)->NativeSemaphore();
+    semaphores[index] = rhi::QueryInterfacePtr<VulkanTimeline>(next[index].timeline).Get()->NativeSemaphore();
     values[index] = next[index].value;
   }
   size_t count = next.size();
@@ -188,7 +188,7 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     memory.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
   memory.physicalDevice = physical_device;
   memory.device = device->device_;
-  memory.instance = static_cast<VulkanCore *>(core)->Instance();
+  memory.instance = rhi::QueryInterfacePtr<VulkanCore>(core).Get()->Instance();
   memory.vulkanApiVersion = VK_API_VERSION_1_2;
   if (!Check(vmaCreateAllocator(&memory, &device->allocator_), "Create VMA allocator"))
     return {};
@@ -253,7 +253,7 @@ VkPhysicalDevice VulkanDevice::NativePhysicalDevice() const {
 }
 
 VkInstance VulkanDevice::Instance() const {
-  return static_cast<VulkanCore *>(OwnerCore())->Instance();
+  return rhi::QueryInterfacePtr<VulkanCore>(OwnerCore()).Get()->Instance();
 }
 
 uint32_t VulkanDevice::QueueFamily() const {

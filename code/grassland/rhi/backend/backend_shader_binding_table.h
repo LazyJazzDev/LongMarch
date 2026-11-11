@@ -8,6 +8,8 @@
 namespace grassland::rhi::backend {
 class ShaderBindingTable final : public Object<IShaderBindingTable> {
  public:
+  LONGMARCH_RHI_QUERY(ShaderBindingTable, Object<IShaderBindingTable>)
+
   struct Region {
     uint64_t address{}, size{}, stride{};
   };

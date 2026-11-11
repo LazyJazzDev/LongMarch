@@ -8,6 +8,8 @@ namespace grassland::rhi::backend::metal {
 
 class MetalWindow final : public Window {
  public:
+  LONGMARCH_RHI_QUERY(MetalWindow, Window)
+
   ~MetalWindow() override;
   static MetalWindow *Create(MetalDevice *device, const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;

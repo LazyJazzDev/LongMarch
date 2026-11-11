@@ -21,6 +21,9 @@ class D3D12DescriptorPool {
  public:
   class Lease final : public Object<IObject> {
    public:
+    using Object<IObject>::QueryInterface;
+    bool QueryInterface(InterfaceID id, void **output) noexcept override;
+
     Lease(D3D12DescriptorPool *pool, Page *page, uint32_t offset, uint32_t count);
     ~Lease() override;
     ID3D12DescriptorHeap *Heap() const;
@@ -46,3 +49,17 @@ class D3D12DescriptorPool {
   std::vector<std::unique_ptr<Page>> pages_;
 };
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12DescriptorPool::Lease, "376aa279-89ab-4240-81b5-da312dda344c")
+
+inline bool grassland::rhi::backend::d3d12::D3D12DescriptorPool::Lease::QueryInterface(InterfaceID id,
+                                                                                       void **output) noexcept {
+  if (!output)
+    return false;
+  if (auto result = MatchInterface<Lease>(id, this)) {
+    *output = result;
+    AddRef();
+    return true;
+  }
+  return Object<IObject>::QueryInterface(id, output);
+}

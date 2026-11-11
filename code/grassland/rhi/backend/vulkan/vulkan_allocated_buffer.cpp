@@ -11,7 +11,7 @@ VulkanAllocatedBuffer::VulkanAllocatedBuffer(VulkanDevice *device, const BufferD
 
 VulkanAllocatedBuffer::~VulkanAllocatedBuffer() {
   if (buffer_)
-    vmaDestroyBuffer(static_cast<VulkanDevice *>(device_)->Allocator(), buffer_, allocation_);
+    vmaDestroyBuffer(device_->Allocator(), buffer_, allocation_);
 }
 
 VkBuffer VulkanAllocatedBuffer::NativeBuffer() const {
@@ -45,8 +45,8 @@ VulkanAllocatedBuffer *VulkanAllocatedBuffer::Create(VulkanDevice *device,
   if (download)
     memory.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
   VmaAllocationInfo allocation{};
-  if (!Check(vmaCreateBuffer(static_cast<VulkanDevice *>(object->device_)->Allocator(), &info, &memory,
-                             &object->buffer_, &object->allocation_, &allocation),
+  if (!Check(vmaCreateBuffer(object->device_->Allocator(), &info, &memory, &object->buffer_, &object->allocation_,
+                             &allocation),
              "Allocate buffer"))
     return nullptr;
   object->mapped_ = allocation.pMappedData;
@@ -57,15 +57,13 @@ bool VulkanAllocatedBuffer::Write(const void *data, uint64_t size) {
   if (!mapped_ || size > desc_.size)
     return false;
   std::memcpy(mapped_, data, static_cast<size_t>(size));
-  return Check(vmaFlushAllocation(static_cast<VulkanDevice *>(device_)->Allocator(), allocation_, 0, size),
-               "Flush upload buffer");
+  return Check(vmaFlushAllocation(device_->Allocator(), allocation_, 0, size), "Flush upload buffer");
 }
 
 bool VulkanAllocatedBuffer::Read(void *data, uint64_t size, uint64_t offset) {
   if (!mapped_ || !data || offset > desc_.size || size > desc_.size - offset)
     return false;
-  if (!Check(vmaInvalidateAllocation(static_cast<VulkanDevice *>(device_)->Allocator(), allocation_, offset, size),
-             "Invalidate readback buffer"))
+  if (!Check(vmaInvalidateAllocation(device_->Allocator(), allocation_, offset, size), "Invalidate readback buffer"))
     return false;
   std::memcpy(data, static_cast<const uint8_t *>(mapped_) + offset, static_cast<size_t>(size));
   return true;

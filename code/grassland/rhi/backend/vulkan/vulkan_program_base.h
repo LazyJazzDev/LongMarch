@@ -1,13 +1,18 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
 // Layout ownership only; the owning Device must outlive the Program.
-class VulkanProgramBase {
+class VulkanProgramBase : public IObject {
  public:
   VkPipelineLayout NativeLayout() const;
 
  protected:
+  VkDevice LayoutDevice() const {
+    return layout_device_;
+  }
+
   explicit VulkanProgramBase(VkDevice device);
   ~VulkanProgramBase();
   VulkanProgramBase(const VulkanProgramBase &) = delete;

@@ -10,13 +10,11 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
   SubmitInfo native_info;
   native_info.waits.reserve(info.waits.size());
   for (const auto &wait : info.waits) {
-#if !defined(NDEBUG)
-    auto timeline = dynamic_cast<Timeline *>(wait.timeline);
+    auto timeline = rhi::QueryInterfacePtr<Timeline>(wait.timeline).Get();
     if (!timeline || timeline->Owner() != device_) {
       ReportError(-1, "Submission waits require a timeline from this device.");
       return {};
     }
-#endif
     // A submit waits for all dependencies; Vulkan requires unique semaphore handles.
     auto existing = std::find_if(native_info.waits.begin(), native_info.waits.end(),
                                  [&](const Event &event) { return event.timeline == wait.timeline; });

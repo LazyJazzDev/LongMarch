@@ -6,6 +6,8 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanWindow final : public Window {
  public:
+  LONGMARCH_RHI_QUERY(VulkanWindow, Window)
+
   ~VulkanWindow() override;
   static VulkanWindow *Create(VulkanDevice *device, const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;

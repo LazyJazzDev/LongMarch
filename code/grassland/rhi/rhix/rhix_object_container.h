@@ -4,6 +4,20 @@
 namespace grassland::rhix {
 class ObjectContainer {
  public:
+  // Query the wrapped RHI object; success transfers one owned reference.
+  bool QueryInterface(rhi::InterfaceID id, void **output) const noexcept {
+    if (object_)
+      return object_->QueryInterface(id, output);
+    if (output)
+      *output = nullptr;
+    return false;
+  }
+
+  template <typename Interface>
+  Interface *QueryInterface() const noexcept {
+    return object_ ? object_->QueryInterface<Interface>() : nullptr;
+  }
+
   void Release();
   explicit operator bool() const noexcept;
 

@@ -17,6 +17,9 @@ class VulkanRenderTargetPool {
  public:
   class Lease final : public Object<IObject> {
    public:
+    using Object<IObject>::QueryInterface;
+    bool QueryInterface(InterfaceID id, void **output) noexcept override;
+
     Lease(VulkanRenderTargetPool *pool, Entry *entry, const std::vector<VulkanImage *> &images);
     ~Lease() override;
     const std::vector<VkImageView> &Views() const;
@@ -47,3 +50,18 @@ class VulkanRenderTargetPool {
 };
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanRenderTargetPool::Lease,
+                   "0954731d-c668-4aca-af2c-c3099abc20f4")
+
+inline bool grassland::rhi::backend::vulkan::VulkanRenderTargetPool::Lease::QueryInterface(InterfaceID id,
+                                                                                           void **output) noexcept {
+  if (!output)
+    return false;
+  if (auto result = MatchInterface<Lease>(id, this)) {
+    *output = result;
+    AddRef();
+    return true;
+  }
+  return Object<IObject>::QueryInterface(id, output);
+}

@@ -8,10 +8,15 @@ class D3D12Device;
 // Resource access only. Derived classes define allocation ownership (standalone or future pool leases).
 class D3D12Buffer : public Buffer {
  public:
+  LONGMARCH_RHI_QUERY(D3D12Buffer, Buffer)
+
   virtual ID3D12Resource *NativeBuffer() const = 0;
   virtual D3D12_RESOURCE_STATES DefaultState() const = 0;
 
+  Device *Owner() const override;
+
  protected:
+  D3D12Device *device_;
   D3D12Buffer(D3D12Device *device, const BufferDesc &desc);
 };
 }  // namespace grassland::rhi::backend::d3d12

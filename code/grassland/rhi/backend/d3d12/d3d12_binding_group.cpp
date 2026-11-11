@@ -10,7 +10,8 @@
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12BindingGroup::Version::Version(D3D12Device *device, const BindingLayoutDesc &layout)
-    : BindingGroup::Version(device, layout) {
+    : BindingGroup::Version(layout),
+      device_(device) {
   uint32_t resource = 0, sampler = 0;
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
     const auto &binding = layout_.bindings[i];
@@ -46,7 +47,7 @@ D3D12BindingGroup::Version *D3D12BindingGroup::Version::Create(D3D12Device *devi
 }
 
 ObjectPtr<BindingGroup::Version> D3D12BindingGroup::Version::Clone() const {
-  auto device = static_cast<D3D12Device *>(device_);
+  auto device = device_;
   auto copy = ObjectPtr<Version>::Adopt(Create(device, layout_));
   if (!copy)
     return {};
@@ -90,12 +91,12 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
         return false;
     }
   }
-  auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
+  auto native = device_->NativeDevice();
   switch (binding.type) {
     case BINDING_UNIFORM_BUFFER:
       for (size_t i = 0; i < buffers.size(); ++i) {
         const auto &view = buffers[i];
-        auto buffer = static_cast<D3D12Buffer *>(view.buffer);
+        auto buffer = rhi::QueryInterfacePtr<D3D12Buffer>(view.buffer).Get();
         D3D12_CONSTANT_BUFFER_VIEW_DESC desc{buffer->NativeBuffer()->GetGPUVirtualAddress() + view.offset,
                                              UINT((view.size + 255) & ~uint64_t(255))};
         native->CreateConstantBufferView(&desc, resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
@@ -118,7 +119,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
         desc.Buffer.NumElements = UINT(view.size / stride);
         desc.Buffer.StructureByteStride = raw ? 0 : stride;
         desc.Buffer.Flags = raw ? D3D12_BUFFER_SRV_FLAG_RAW : D3D12_BUFFER_SRV_FLAG_NONE;
-        native->CreateShaderResourceView(static_cast<D3D12Buffer *>(view.buffer)->NativeBuffer(), &desc,
+        native->CreateShaderResourceView(rhi::QueryInterfacePtr<D3D12Buffer>(view.buffer).Get()->NativeBuffer(), &desc,
                                          resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
       }
       break;
@@ -139,7 +140,8 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
         desc.Buffer.NumElements = UINT(view.size / stride);
         desc.Buffer.StructureByteStride = raw ? 0 : stride;
         desc.Buffer.Flags = raw ? D3D12_BUFFER_UAV_FLAG_RAW : D3D12_BUFFER_UAV_FLAG_NONE;
-        native->CreateUnorderedAccessView(static_cast<D3D12Buffer *>(view.buffer)->NativeBuffer(), nullptr, &desc,
+        native->CreateUnorderedAccessView(rhi::QueryInterfacePtr<D3D12Buffer>(view.buffer).Get()->NativeBuffer(),
+                                          nullptr, &desc,
                                           resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
       }
       break;
@@ -157,16 +159,17 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                   const std::vector<IImage *> &images) {
   const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
-    if (!dynamic_cast<D3D12AllocatedImage *>(image))
+    if (!rhi::QueryInterfacePtr<D3D12AllocatedImage>(image).Get())
       return false;
-  auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
+  auto native = device_->NativeDevice();
   if (binding.type == BINDING_TEXTURE2D) {
     for (size_t i = 0; i < images.size(); ++i)
-      native->CreateShaderResourceView(static_cast<D3D12Image *>(images[i])->NativeImage(), nullptr,
+      native->CreateShaderResourceView(rhi::QueryInterfacePtr<D3D12Image>(images[i]).Get()->NativeImage(), nullptr,
                                        resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
   } else {
     for (size_t i = 0; i < images.size(); ++i)
-      native->CreateUnorderedAccessView(static_cast<D3D12Image *>(images[i])->NativeImage(), nullptr, nullptr,
+      native->CreateUnorderedAccessView(rhi::QueryInterfacePtr<D3D12Image>(images[i]).Get()->NativeImage(), nullptr,
+                                        nullptr,
                                         resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
   }
   for (size_t i = 0; i < images.size(); ++i)
@@ -177,10 +180,10 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
 bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                   uint32_t first_element,
                                                   const std::vector<ISampler *> &samplers) {
-  auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
+  auto native = device_->NativeDevice();
   for (size_t i = 0; i < samplers.size(); ++i)
     native->CopyDescriptorsSimple(1, samplers_->CPU(offsets_[binding_index] + first_element + uint32_t(i)),
-                                  static_cast<D3D12Sampler *>(samplers[i])->Descriptor(),
+                                  rhi::QueryInterfacePtr<D3D12Sampler>(samplers[i]).Get()->Descriptor(),
                                   D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
   for (size_t i = 0; i < samplers.size(); ++i)
     initialized_[binding_index][first_element + i] = true;
@@ -208,17 +211,17 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                   uint32_t first_element,
                                                   const std::vector<ITopLevelAccelerationStructure *> &values) {
   for (auto value : values) {
-    auto native = dynamic_cast<D3D12TopLevelAccelerationStructure *>(value);
+    auto native = rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
       return false;
   }
-  auto device = static_cast<D3D12Device *>(device_)->NativeDevice();
+  auto device = device_->NativeDevice();
   for (size_t i = 0; i < values.size(); ++i) {
     D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
     desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
     desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     desc.RaytracingAccelerationStructure.Location =
-        static_cast<D3D12TopLevelAccelerationStructure *>(values[i])->Address();
+        rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(values[i]).Get()->Address();
     device->CreateShaderResourceView(nullptr, &desc,
                                      resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
   }

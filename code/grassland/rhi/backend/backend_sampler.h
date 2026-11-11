@@ -5,6 +5,8 @@
 namespace grassland::rhi::backend {
 class Sampler : public Object<ISampler> {
  public:
+  LONGMARCH_RHI_QUERY(Sampler, Object<ISampler>)
+
   Sampler(const SamplerDesc &desc, const void *device) : desc_(desc), device_(device) {
   }
 

@@ -37,7 +37,7 @@ VkClearValue NativeClearValue(ImageFormat format, const ClearValue &value) {
 
 VulkanCommandContext::VulkanCommandContext(VulkanQueue *queue)
     : CommandContext(queue),
-      device_(static_cast<VulkanDevice *>(queue->Owner())) {
+      device_(rhi::QueryInterfacePtr<VulkanDevice>(queue->Owner()).Get()) {
 }
 
 VulkanCommandContext::~VulkanCommandContext() {
@@ -91,21 +91,17 @@ bool VulkanCommandContext::TransitionImage(VulkanImage *image,
 }
 
 bool VulkanCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
-#if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  const auto native = dynamic_cast<VulkanImage *>(image);
+  const auto native = rhi::QueryInterfacePtr<VulkanImage>(image).Get();
   if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
   }
-#else
-  const auto native = static_cast<VulkanImage *>(image);
-#endif
   if (!RetainResource(native))
     return false;
   if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -127,13 +123,12 @@ bool VulkanCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &v
 }
 
 bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
-#if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  const auto target = dynamic_cast<VulkanWindow *>(window);
+  const auto target = rhi::QueryInterfacePtr<VulkanWindow>(window).Get();
   if (!target || target->DeviceIdentity() != device_ || target->OwnerQueue() != OwnerQueue() ||
       !glfw::IsWindowThread()) {
     recording_failed_ = true;
@@ -147,10 +142,8 @@ bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
       return false;
     }
   }
-#else
-  const auto target = static_cast<VulkanWindow *>(window);
-#endif
-  auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(static_cast<VulkanSwapChainImage *>(target->GetNextImage()));
+  auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(
+      rhi::QueryInterfacePtr<VulkanSwapChainImage>(target->GetNextImage()).Get());
   if (!frame)
     return false;
   if (!RetainResource(frame.Get()))
@@ -191,7 +184,7 @@ bool VulkanCommandContext::EndRecording() {
 }
 
 CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const SubmitInfo &info, Event signal) {
-  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
+  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(OwnerQueue()).Get();
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -209,7 +202,7 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative(const SubmitInfo
   rendered.push_back(queue->GetTimeline()->NativeSemaphore());
   std::vector<uint64_t> wait_values(waited.size(), 0);
   for (const auto &wait : info.waits) {
-    waited.push_back(static_cast<VulkanTimeline *>(wait.timeline)->NativeSemaphore());
+    waited.push_back(rhi::QueryInterfacePtr<VulkanTimeline>(wait.timeline).Get()->NativeSemaphore());
     stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     wait_values.push_back(wait.value);
   }
@@ -273,20 +266,16 @@ SubmissionStatus VulkanCommandContext::PollCompletion(Event signal, uint64_t com
 }
 
 bool VulkanCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
-#if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  auto native = dynamic_cast<VulkanBuffer *>(buffer);
+  auto native = rhi::QueryInterfacePtr<VulkanBuffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<VulkanBuffer *>(buffer);
-#endif
   if (!RetainResource(native))
     return false;
 
@@ -317,22 +306,17 @@ bool VulkanCommandContext::CmdCopyBuffer(IBuffer *source,
                                          IBuffer *destination,
                                          uint64_t destination_offset,
                                          uint64_t size) {
-#if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
   }
-  auto src = dynamic_cast<VulkanBuffer *>(source);
-  auto dst = dynamic_cast<VulkanBuffer *>(destination);
+  auto src = rhi::QueryInterfacePtr<VulkanBuffer>(source).Get();
+  auto dst = rhi::QueryInterfacePtr<VulkanBuffer>(destination).Get();
   if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto src = static_cast<VulkanBuffer *>(source);
-  auto dst = static_cast<VulkanBuffer *>(destination);
-#endif
   if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
       destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
     recording_failed_ = true;
@@ -352,15 +336,11 @@ bool VulkanCommandContext::CmdCopyBuffer(IBuffer *source,
 }
 
 bool VulkanCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<VulkanComputeProgram *>(program);
+  auto native = rhi::QueryInterfacePtr<VulkanComputeProgram>(program).Get();
   if (sealed_ || render_target_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<VulkanComputeProgram *>(program);
-#endif
   if (!RetainResource(native))
     return false;
   native_program_ = native;
@@ -399,15 +379,11 @@ bool VulkanCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 }
 
 bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<VulkanProgram *>(program);
+  auto native = rhi::QueryInterfacePtr<VulkanProgram>(program).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<VulkanProgram *>(program);
-#endif
   if (!RetainResource(native))
     return false;
   vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
@@ -433,14 +409,14 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   std::vector<VulkanImage *> images;
   std::vector<ImageFormat> formats;
   for (const auto &color : rendering_.color_attachments) {
-    auto image = static_cast<VulkanImage *>(color.color_attachment);
+    auto image = rhi::QueryInterfacePtr<VulkanImage>(color.color_attachment).Get();
     if (!TransitionImage(image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))
       return false;
     images.push_back(image);
     formats.push_back(image->GetDesc().format);
   }
-  auto depth = static_cast<VulkanImage *>(rendering_.depth_stencil.image);
+  auto depth = rhi::QueryInterfacePtr<VulkanImage>(rendering_.depth_stencil.image).Get();
   if (depth) {
     if (!TransitionImage(depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
@@ -521,15 +497,11 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
 }
 
 bool VulkanCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<VulkanBuffer *>(buffer);
+  auto native = rhi::QueryInterfacePtr<VulkanBuffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<VulkanBuffer *>(buffer);
-#endif
   if (!RetainResource(native))
     return false;
   if (!program_ || binding >= program_->GetDesc().vertex_bindings.size() || offset >= native->GetDesc().size) {
@@ -546,15 +518,11 @@ bool VulkanCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer
 }
 
 bool VulkanCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<VulkanBuffer *>(buffer);
+  auto native = rhi::QueryInterfacePtr<VulkanBuffer>(buffer).Get();
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<VulkanBuffer *>(buffer);
-#endif
   if (!RetainResource(native))
     return false;
   if (format != INDEX_FORMAT_UINT16 && format != INDEX_FORMAT_UINT32) {
@@ -675,7 +643,7 @@ bool VulkanCommandContext::CmdEndRendering() {
                        0, nullptr, 0, nullptr);
   render_target_ = nullptr;
   for (auto color : rendering_.color_attachments) {
-    auto image = static_cast<VulkanImage *>(color.color_attachment);
+    auto image = rhi::QueryInterfacePtr<VulkanImage>(color.color_attachment).Get();
     if (!TransitionImage(image, image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                          VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT))
       return false;
@@ -713,7 +681,7 @@ bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStag
 }
 
 bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
-  auto native = dynamic_cast<VulkanImage *>(image);
+  auto native = rhi::QueryInterfacePtr<VulkanImage>(image).Get();
   if (sealed_ || render_target_ || !native || !native->IsValid() ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
       IsDepthFormat(native->GetDesc().format) ||
@@ -747,14 +715,14 @@ bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint6
 }
 
 bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
-  auto native = dynamic_cast<VulkanBindingGroup *>(group);
+  auto native = rhi::QueryInterfacePtr<VulkanBindingGroup>(group).Get();
   if (sealed_ || !binding_layout_ || !native || native->Owner() != device_ || index >= groups_.size() ||
       !SameBindingLayout(native->GetLayout(), binding_layout_->groups[index]) ||
       !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
   }
-  auto version = static_cast<VulkanBindingGroup::Version *>(native->CurrentVersion());
+  auto version = rhi::QueryInterfacePtr<VulkanBindingGroup::Version>(native->CurrentVersion()).Get();
   if (!RetainResource(version))
     return false;
   if (compute_active_) {
@@ -777,18 +745,20 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
                                            ? VK_ACCESS_SHADER_WRITE_BIT
                                            : 0);
       if (b.type == BINDING_ACCELERATION_STRUCTURE) {
-        auto top = static_cast<VulkanTopLevelAccelerationStructure *>(native->GetReferences()[binding_index][i].Get());
+        auto top =
+            rhi::QueryInterfacePtr<VulkanTopLevelAccelerationStructure>(native->GetReferences()[binding_index][i].Get())
+                .Get();
         for (const auto &blas : top->BottomLevels())
           if (!RetainResource(blas.Get()))
             return false;
       }
       if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
-        auto buffer = static_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
+        auto buffer = rhi::QueryInterfacePtr<VulkanBuffer>(native->GetReferences()[binding_index][i].Get()).Get();
         if (!TransitionBuffer(buffer, stages, b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
           return false;
       }
       if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
-        auto image = static_cast<VulkanImage *>(native->GetReferences()[binding_index][i].Get());
+        auto image = rhi::QueryInterfacePtr<VulkanImage>(native->GetReferences()[binding_index][i].Get()).Get();
         if (render_target_) {
           auto known = image_states_.find(image);
           if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||
@@ -839,7 +809,7 @@ bool VulkanCommandContext::ValidateGroups() {
 }
 
 bool VulkanCommandContext::CmdBindRayTracingProgram(IRayTracingProgram *program) {
-  auto native = dynamic_cast<VulkanRayTracingProgram *>(program);
+  auto native = rhi::QueryInterfacePtr<VulkanRayTracingProgram>(program).Get();
   if (sealed_ || render_target_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
@@ -881,9 +851,9 @@ bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint
   const ShaderBindingTable *table = ray_program_->DefaultShaderBindingTable();
   if (sbt) {
 #ifndef NDEBUG
-    auto custom = dynamic_cast<ShaderBindingTable *>(sbt);
+    auto custom = rhi::QueryInterfacePtr<ShaderBindingTable>(sbt).Get();
 #else
-    auto custom = static_cast<ShaderBindingTable *>(sbt);
+    auto custom = rhi::QueryInterfacePtr<ShaderBindingTable>(sbt).Get();
 #endif
     if (!custom || custom->GetProgram() != ray_program_) {
       recording_failed_ = true;
@@ -903,15 +873,11 @@ bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint
 }
 
 IDownloadToken *VulkanCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<VulkanBuffer *>(buffer);
+  auto native = rhi::QueryInterfacePtr<VulkanBuffer>(buffer).Get();
   if (sealed_ || render_target_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return nullptr;
   }
-#else
-  auto native = static_cast<VulkanBuffer *>(buffer);
-#endif
   if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
     recording_failed_ = true;
     return nullptr;
@@ -927,8 +893,7 @@ IDownloadToken *VulkanCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_
 }
 
 IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<VulkanImage *>(image);
+  auto native = rhi::QueryInterfacePtr<VulkanImage>(image).Get();
   if (sealed_ || render_target_ || !native ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
@@ -939,9 +904,6 @@ IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const Imag
     ReportError(-1, "CmdDownloadImage does not support D24S8 readback; use a depth-only or color image.");
     return nullptr;
   }
-#else
-  auto native = static_cast<VulkanImage *>(image);
-#endif
   if (recording_failed_ || !native->IsValid()) {
     recording_failed_ = true;
     return nullptr;

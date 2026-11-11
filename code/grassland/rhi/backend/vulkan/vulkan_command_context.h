@@ -16,6 +16,8 @@ class VulkanTopLevelAccelerationStructure;
 
 class VulkanCommandContext final : public CommandContext {
  public:
+  LONGMARCH_RHI_QUERY(VulkanCommandContext, CommandContext)
+
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,

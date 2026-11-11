@@ -6,6 +6,8 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanCore final : public Core {
  public:
+  LONGMARCH_RHI_QUERY(VulkanCore, Core)
+
   static VulkanCore *CreateVulkanCore(const CoreDesc &desc);
   ~VulkanCore() override;
   VkInstance Instance() const;

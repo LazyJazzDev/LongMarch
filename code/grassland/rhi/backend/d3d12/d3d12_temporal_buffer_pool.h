@@ -8,6 +8,8 @@ using D3D12TemporalBufferPool = TemporalBufferPool<D3D12Device, D3D12AllocatedBu
 
 class D3D12TemporalBufferLease final : public D3D12Buffer {
  public:
+  LONGMARCH_RHI_QUERY(D3D12TemporalBufferLease, D3D12Buffer)
+
   D3D12TemporalBufferLease(D3D12TemporalBufferPool *pool, D3D12AllocatedBuffer *buffer, size_t level);
   ~D3D12TemporalBufferLease() override;
   BufferDesc GetDesc() const override;

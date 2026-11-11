@@ -8,6 +8,8 @@ class D3D12Window;
 
 class D3D12SwapChainImage final : public D3D12Image {
  public:
+  LONGMARCH_RHI_QUERY(D3D12SwapChainImage, D3D12Image)
+
   D3D12SwapChainImage(ImageDesc desc,
                       D3D12Window *window,
                       uint64_t generation,

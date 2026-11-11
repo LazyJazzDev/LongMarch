@@ -15,6 +15,8 @@ class Queue;
 
 class Device : public Object<rhi::IDevice> {
  public:
+  LONGMARCH_RHI_QUERY(Device, Object<rhi::IDevice>)
+
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override;
   ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(

@@ -8,6 +8,8 @@ using MetalTemporalBufferPool = TemporalBufferPool<MetalDevice, MetalAllocatedBu
 
 class MetalTemporalBufferLease final : public MetalBuffer {
  public:
+  LONGMARCH_RHI_QUERY(MetalTemporalBufferLease, MetalBuffer)
+
   MetalTemporalBufferLease(MetalTemporalBufferPool *pool, MetalAllocatedBuffer *buffer, size_t level);
   ~MetalTemporalBufferLease() override;
   BufferDesc GetDesc() const override;

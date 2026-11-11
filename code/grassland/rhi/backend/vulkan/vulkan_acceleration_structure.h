@@ -1,11 +1,12 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanDevice;
 
-class VulkanAccelerationStructure {
+class VulkanAccelerationStructure : public IObject {
  public:
   VulkanDevice *Owner() const;
   VkAccelerationStructureKHR NativeStructure() const;
@@ -40,6 +41,10 @@ class VulkanAccelerationStructure {
 class VulkanBottomLevelAccelerationStructure final : public Object<IBottomLevelAccelerationStructure>,
                                                      public VulkanAccelerationStructure {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(VulkanBottomLevelAccelerationStructure,
+                               Object<IBottomLevelAccelerationStructure>,
+                               VulkanAccelerationStructure)
+
   static VulkanBottomLevelAccelerationStructure *Create(VulkanDevice *device,
                                                         const BottomLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
@@ -54,6 +59,10 @@ class VulkanBottomLevelAccelerationStructure final : public Object<IBottomLevelA
 class VulkanTopLevelAccelerationStructure final : public Object<ITopLevelAccelerationStructure>,
                                                   public VulkanAccelerationStructure {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(VulkanTopLevelAccelerationStructure,
+                               Object<ITopLevelAccelerationStructure>,
+                               VulkanAccelerationStructure)
+
   static VulkanTopLevelAccelerationStructure *Create(VulkanDevice *device,
                                                      const TopLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;

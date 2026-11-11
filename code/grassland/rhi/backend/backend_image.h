@@ -7,6 +7,8 @@ class Queue;
 
 class Image : public Object<rhi::IImage> {
  public:
+  LONGMARCH_RHI_QUERY(Image, Object<rhi::IImage>)
+
   explicit Image(ImageDesc desc, Queue *queue = nullptr);
   bool SupportsQueue(const Queue *queue) const;
   const ImageDesc &GetDesc() const override;

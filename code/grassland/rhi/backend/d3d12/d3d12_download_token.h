@@ -5,6 +5,8 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12DownloadToken final : public DownloadToken {
  public:
+  LONGMARCH_RHI_QUERY(D3D12DownloadToken, DownloadToken)
+
   D3D12DownloadToken(ObjectPtr<D3D12TemporalBufferLease> lease, uint64_t size);
   D3D12DownloadToken(ObjectPtr<D3D12TemporalBufferLease> lease, const DownloadLayout &layout);
   ~D3D12DownloadToken() override;

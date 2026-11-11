@@ -39,7 +39,7 @@ VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
 }
 
 VulkanWindow::~VulkanWindow() {
-  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
+  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(OwnerQueue()).Get();
   glfw::UnregisterWindow(GLFWWindow());
   std::lock_guard<std::mutex> lock(queue->QueueMutex());
   vkQueueWaitIdle(queue->NativeQueue());
@@ -74,7 +74,7 @@ VulkanWindow *VulkanWindow::Create(VulkanDevice *device, const WindowDesc &desc)
 }
 
 ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
-  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
+  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(OwnerQueue()).Get();
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
@@ -208,7 +208,7 @@ VkSemaphore VulkanWindow::RenderSemaphore() const {
 }
 
 VkResult VulkanWindow::PresentFrame() {
-  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
+  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(OwnerQueue()).Get();
   const auto rendered = RenderSemaphore();
   VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
   present.waitSemaphoreCount = 1;
@@ -298,7 +298,7 @@ void VulkanWindow::DestroySwapchain() {
 }
 
 bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
-  auto queue = static_cast<VulkanQueue *>(OwnerQueue());
+  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(OwnerQueue()).Get();
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
   int width, height;

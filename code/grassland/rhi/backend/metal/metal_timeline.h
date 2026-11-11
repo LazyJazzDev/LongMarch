@@ -10,7 +10,9 @@ class MetalDevice;
 
 class MetalTimeline final : public Timeline {
  public:
-  static std::unique_ptr<MetalTimeline> Create(MetalDevice *device);
+  LONGMARCH_RHI_QUERY(MetalTimeline, Timeline)
+
+  static ObjectPtr<MetalTimeline> Create(MetalDevice *device);
   bool GetCompletedValue(uint64_t &value) const override;
   bool WaitHost(uint64_t value) const override;
   MTL::Event *NativeEvent() const;

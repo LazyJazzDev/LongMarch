@@ -68,7 +68,8 @@ VulkanBindingGroup *VulkanBindingGroup::Create(VulkanDevice *device, const Bindi
 }
 
 VulkanBindingGroup::Version::Version(VulkanDevice *device, const BindingLayoutDesc &layout)
-    : BindingGroup::Version(device, layout) {
+    : BindingGroup::Version(layout),
+      device_(device) {
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
     const auto &binding = layout_.bindings[i];
     initialized_.emplace_back(binding.count, false);
@@ -76,7 +77,7 @@ VulkanBindingGroup::Version::Version(VulkanDevice *device, const BindingLayoutDe
 }
 
 VulkanBindingGroup::Version::~Version() {
-  auto device = static_cast<VulkanDevice *>(device_)->NativeDevice();
+  auto device = device_->NativeDevice();
   lease_ = {};
   if (native_layout_)
     vkDestroyDescriptorSetLayout(device, native_layout_, nullptr);
@@ -99,7 +100,7 @@ VulkanBindingGroup::Version *VulkanBindingGroup::Version::Create(VulkanDevice *d
 }
 
 ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::Clone() const {
-  auto device = static_cast<VulkanDevice *>(device_);
+  auto device = device_;
   auto copy = ObjectPtr<Version>::Adopt(Create(device, layout_));
   if (!copy)
     return {};
@@ -138,7 +139,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                    uint32_t first_element,
                                                    const std::vector<BufferView> &buffers) {
   const auto &binding = layout_.bindings[binding_index];
-  auto device = static_cast<VulkanDevice *>(device_);
+  auto device = device_;
   VkPhysicalDeviceProperties properties{};
   vkGetPhysicalDeviceProperties(device->NativePhysicalDevice(), &properties);
   const bool uniform = binding.type == BINDING_UNIFORM_BUFFER;
@@ -150,7 +151,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   for (const auto &view : buffers) {
     if (view.offset % alignment || view.size > limit)
       return false;
-    infos.push_back({static_cast<VulkanBuffer *>(view.buffer)->NativeBuffer(), view.offset, view.size});
+    infos.push_back({rhi::QueryInterfacePtr<VulkanBuffer>(view.buffer).Get()->NativeBuffer(), view.offset, view.size});
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
@@ -170,12 +171,12 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                    const std::vector<IImage *> &images) {
   const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
-    if (!dynamic_cast<VulkanAllocatedImage *>(image))
+    if (!rhi::QueryInterfacePtr<VulkanAllocatedImage>(image).Get())
       return false;
-  auto native = static_cast<VulkanDevice *>(device_)->NativeDevice();
+  auto native = device_->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(images.size());
   for (size_t i = 0; i < images.size(); ++i) {
-    infos[i].imageView = static_cast<VulkanImage *>(images[i])->BindingView();
+    infos[i].imageView = rhi::QueryInterfacePtr<VulkanImage>(images[i]).Get()->BindingView();
     infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
@@ -197,10 +198,10 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                    uint32_t first_element,
                                                    const std::vector<ISampler *> &samplers) {
   const auto &binding = layout_.bindings[binding_index];
-  auto native = static_cast<VulkanDevice *>(device_)->NativeDevice();
+  auto native = device_->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(samplers.size());
   for (size_t i = 0; i < samplers.size(); ++i)
-    infos[i].sampler = static_cast<VulkanSampler *>(samplers[i])->NativeSampler();
+    infos[i].sampler = rhi::QueryInterfacePtr<VulkanSampler>(samplers[i]).Get()->NativeSampler();
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
   write.dstBinding = binding.binding;
@@ -269,13 +270,13 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                    uint32_t first_element,
                                                    const std::vector<ITopLevelAccelerationStructure *> &values) {
   for (auto value : values) {
-    auto native = dynamic_cast<VulkanTopLevelAccelerationStructure *>(value);
+    auto native = rhi::QueryInterfacePtr<VulkanTopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
       return false;
   }
   std::vector<VkAccelerationStructureKHR> handles;
   for (auto value : values)
-    handles.push_back(static_cast<VulkanTopLevelAccelerationStructure *>(value)->NativeStructure());
+    handles.push_back(rhi::QueryInterfacePtr<VulkanTopLevelAccelerationStructure>(value).Get()->NativeStructure());
   VkWriteDescriptorSetAccelerationStructureKHR as{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
   as.accelerationStructureCount = uint32_t(handles.size());
   as.pAccelerationStructures = handles.data();
@@ -285,7 +286,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   write.dstArrayElement = first_element;
   write.descriptorCount = uint32_t(handles.size());
   write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-  vkUpdateDescriptorSets(static_cast<VulkanDevice *>(device_)->NativeDevice(), 1, &write, 0, nullptr);
+  vkUpdateDescriptorSets(device_->NativeDevice(), 1, &write, 0, nullptr);
   for (size_t i = 0; i < values.size(); ++i)
     initialized_[binding_index][first_element + i] = true;
   return true;

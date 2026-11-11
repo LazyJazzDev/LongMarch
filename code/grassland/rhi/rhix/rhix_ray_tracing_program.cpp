@@ -7,7 +7,7 @@ RayTracingProgram::RayTracingProgram(rhi::IRayTracingProgram *object) noexcept :
 }
 
 rhi::IRayTracingProgram *RayTracingProgram::Get() const noexcept {
-  return static_cast<rhi::IRayTracingProgram *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::IRayTracingProgram>(GetObject()).Get();
 }
 
 const rhi::RayTracingProgramDesc &RayTracingProgram::GetDesc() const {

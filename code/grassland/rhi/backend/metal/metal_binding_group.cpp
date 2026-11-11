@@ -33,7 +33,8 @@ bool ValidateMetalBindingLayout(MTL::Device *device, const BindingLayoutDesc &la
 }
 
 MetalBindingGroup::Version::Version(MetalDevice *device, const BindingLayoutDesc &layout)
-    : BindingGroup::Version(device, layout) {
+    : BindingGroup::Version(layout),
+      device_(device) {
 }
 
 MetalBindingGroup::Version *MetalBindingGroup::Version::Create(MetalDevice *device, const BindingLayoutDesc &layout) {
@@ -87,7 +88,7 @@ MetalBindingGroup::Version *MetalBindingGroup::Version::Create(MetalDevice *devi
 }
 
 ObjectPtr<BindingGroup::Version> MetalBindingGroup::Version::Clone() const {
-  auto copy = ObjectPtr<Version>::Adopt(Create(static_cast<MetalDevice *>(device_), layout_));
+  auto copy = ObjectPtr<Version>::Adopt(Create(device_, layout_));
   if (!copy)
     return {};
   copy->references_ = references_;
@@ -109,7 +110,7 @@ bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, cons
   for (size_t i = 0; i < values.size(); ++i) {
     auto v = values[i];
     uint32_t index = offsets_[b] + first + i;
-    encoder_->setBuffer(static_cast<MetalBuffer *>(v.buffer)->NativeBuffer(), v.offset, index);
+    encoder_->setBuffer(rhi::QueryInterfacePtr<MetalBuffer>(v.buffer).Get()->NativeBuffer(), v.offset, index);
     static_cast<uint32_t *>(sizes_->contents())[index] = uint32_t(v.size);
     initialized_[b][first + i] = true;
   }
@@ -118,7 +119,7 @@ bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, cons
 
 bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, const std::vector<IImage *> &values) {
   for (size_t i = 0; i < values.size(); ++i) {
-    encoder_->setTexture(static_cast<MetalImage *>(values[i])->NativeImage(), offsets_[b] + first + i);
+    encoder_->setTexture(rhi::QueryInterfacePtr<MetalImage>(values[i]).Get()->NativeImage(), offsets_[b] + first + i);
     initialized_[b][first + i] = true;
   }
   return true;
@@ -126,7 +127,8 @@ bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, cons
 
 bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, const std::vector<ISampler *> &values) {
   for (size_t i = 0; i < values.size(); ++i) {
-    encoder_->setSamplerState(static_cast<MetalSampler *>(values[i])->NativeSampler(), offsets_[b] + first + i);
+    encoder_->setSamplerState(rhi::QueryInterfacePtr<MetalSampler>(values[i]).Get()->NativeSampler(),
+                              offsets_[b] + first + i);
     initialized_[b][first + i] = true;
   }
   return true;
@@ -136,13 +138,14 @@ bool MetalBindingGroup::Version::WriteDescriptors(size_t b,
                                                   uint32_t first,
                                                   const std::vector<ITopLevelAccelerationStructure *> &values) {
   for (auto value : values) {
-    auto native = dynamic_cast<MetalTopLevelAccelerationStructure *>(value);
+    auto native = rhi::QueryInterfacePtr<MetalTopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
       return false;
   }
   for (size_t i = 0; i < values.size(); ++i) {
-    encoder_->setAccelerationStructure(static_cast<MetalTopLevelAccelerationStructure *>(values[i])->NativeStructure(),
-                                       offsets_[b] + first + i);
+    encoder_->setAccelerationStructure(
+        rhi::QueryInterfacePtr<MetalTopLevelAccelerationStructure>(values[i]).Get()->NativeStructure(),
+        offsets_[b] + first + i);
     initialized_[b][first + i] = true;
   }
   return true;
@@ -171,10 +174,10 @@ void MetalBindingGroup::Version::Bind(MTL::RenderCommandEncoder *encoder, uint32
       MTL::Resource *native =
           desc.type == BINDING_ACCELERATION_STRUCTURE
               ? static_cast<MTL::Resource *>(
-                    static_cast<MetalTopLevelAccelerationStructure *>(resource.Get())->NativeStructure())
+                    rhi::QueryInterfacePtr<MetalTopLevelAccelerationStructure>(resource.Get()).Get()->NativeStructure())
           : desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
-              ? static_cast<MTL::Resource *>(static_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
-              : static_cast<MTL::Resource *>(static_cast<MetalImage *>(resource.Get())->NativeImage());
+              ? static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<MetalBuffer>(resource.Get()).Get()->NativeBuffer())
+              : static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<MetalImage>(resource.Get()).Get()->NativeImage());
       encoder->useResource(native, usage, stages);
     }
   }
@@ -197,10 +200,10 @@ void MetalBindingGroup::Version::Bind(MTL::ComputeCommandEncoder *encoder, uint3
       MTL::Resource *native =
           desc.type == BINDING_ACCELERATION_STRUCTURE
               ? static_cast<MTL::Resource *>(
-                    static_cast<MetalTopLevelAccelerationStructure *>(resource.Get())->NativeStructure())
+                    rhi::QueryInterfacePtr<MetalTopLevelAccelerationStructure>(resource.Get()).Get()->NativeStructure())
           : desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
-              ? static_cast<MTL::Resource *>(static_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
-              : static_cast<MTL::Resource *>(static_cast<MetalImage *>(resource.Get())->NativeImage());
+              ? static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<MetalBuffer>(resource.Get()).Get()->NativeBuffer())
+              : static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<MetalImage>(resource.Get()).Get()->NativeImage());
       encoder->useResource(native, usage);
     }
   }

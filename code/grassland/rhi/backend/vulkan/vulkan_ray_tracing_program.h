@@ -11,6 +11,8 @@ class VulkanDevice;
 
 class VulkanRayTracingProgram final : public RayTracingProgram, public VulkanProgramBase {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(VulkanRayTracingProgram, RayTracingProgram, VulkanProgramBase)
+
   static VulkanRayTracingProgram *Create(VulkanDevice *device, const RayTracingProgramDesc &desc);
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
   const ShaderBindingTable *DefaultShaderBindingTable() const;

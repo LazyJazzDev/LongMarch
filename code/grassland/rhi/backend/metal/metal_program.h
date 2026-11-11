@@ -9,6 +9,8 @@ class MetalDevice;
 
 class MetalProgram final : public Program, public MetalProgramBase {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(MetalProgram, Program, MetalProgramBase)
+
   static MetalProgram *Create(MetalDevice *device, const ProgramDesc &desc);
   MTL::RenderPipelineState *NativePipeline() const;
   MTL::DepthStencilState *NativeDepthStencil() const;

@@ -13,7 +13,7 @@ VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanDevice *device, const Ray
 
 VulkanRayTracingProgram::~VulkanRayTracingProgram() {
   if (pipeline_)
-    vkDestroyPipeline(static_cast<VulkanDevice *>(device_)->NativeDevice(), pipeline_, nullptr);
+    vkDestroyPipeline(LayoutDevice(), pipeline_, nullptr);
 }
 
 VkPipeline VulkanRayTracingProgram::NativePipeline() const {
@@ -160,7 +160,7 @@ ShaderBindingTable *VulkanRayTracingProgram::BuildShaderBindingTable(const Shade
   uint64_t capacity = alignment_;
   for (auto table : indices)
     capacity += table->size() * stride_ + alignment_;
-  auto owner = static_cast<VulkanDevice *>(device_);
+  auto owner = rhi::QueryInterfacePtr<VulkanDevice>(device_).Get();
   auto buffer = ObjectPtr<VulkanAllocatedBuffer>::Adopt(VulkanAllocatedBuffer::Create(owner, {capacity}, true));
   if (!buffer)
     return nullptr;

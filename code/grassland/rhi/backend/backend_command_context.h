@@ -13,6 +13,8 @@ class Queue;
 
 class CommandContext : public Object<rhi::ICommandContext> {
  public:
+  LONGMARCH_RHI_QUERY(CommandContext, Object<rhi::ICommandContext>)
+
   bool CmdDrawImGui(IWindow *window, IImage *target) override;
   bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override;
   bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
@@ -83,6 +85,12 @@ class CommandContext : public Object<rhi::ICommandContext> {
   // Call before encoding each resource use. Retains each exact object once.
   IDownloadToken *RegisterDownload(ObjectPtr<DownloadToken> token);
   bool RetainResource(rhi::IObject *resource);
+
+  template <typename T, std::enable_if_t<!std::is_convertible_v<T *, IObject *>, int> = 0>
+  bool RetainResource(T *resource) {
+    return RetainResource(rhi::QueryInterfacePtr<IObject>(resource).Get());
+  }
+
   virtual bool EndRecording() = 0;
   bool PrepareRendering(const RenderingInfo &info);
   bool RenderingMatches(const IProgram *program) const;

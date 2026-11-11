@@ -26,7 +26,7 @@ ID3D12CommandQueue *D3D12Queue::NativeQueue() const {
 }
 
 D3D12Timeline *D3D12Queue::GetTimeline() const {
-  return timeline_.get();
+  return timeline_.Get();
 }
 
 bool D3D12Queue::WaitIdle() {

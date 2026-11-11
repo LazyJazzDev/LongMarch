@@ -9,6 +9,8 @@ class D3D12Device;
 // Common resource access; derived classes define ownership and validity.
 class D3D12Image : public Image {
  public:
+  LONGMARCH_RHI_QUERY(D3D12Image, Image)
+
   static ObjectPtr<D3D12DescriptorPool::Lease> CreateAttachmentView(D3D12Device *device, ID3D12Resource *image);
   D3D12_CPU_DESCRIPTOR_HANDLE AttachmentView() const;
   bool SupportsStorage() const override;

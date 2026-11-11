@@ -7,6 +7,8 @@ class VulkanDevice;
 
 class VulkanSampler final : public Sampler {
  public:
+  LONGMARCH_RHI_QUERY(VulkanSampler, Sampler)
+
   static VulkanSampler *Create(VulkanDevice *device, const SamplerDesc &desc);
   ~VulkanSampler() override;
 

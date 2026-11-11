@@ -14,6 +14,8 @@ struct DownloadLayout {
 
 class DownloadToken : public Object<IDownloadToken> {
  public:
+  LONGMARCH_RHI_QUERY(DownloadToken, Object<IDownloadToken>)
+
   explicit DownloadToken(uint64_t size);
   ~DownloadToken() override;
   SubmissionStatus GetStatus() const override;

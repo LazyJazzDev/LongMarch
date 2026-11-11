@@ -10,6 +10,8 @@ class D3D12Device;
 
 class D3D12AllocatedImage final : public D3D12Image {
  public:
+  LONGMARCH_RHI_QUERY(D3D12AllocatedImage, D3D12Image)
+
   static D3D12AllocatedImage *Create(D3D12Device *device, const ImageDesc &desc);
   ~D3D12AllocatedImage() override;
   bool IsValid() const override;

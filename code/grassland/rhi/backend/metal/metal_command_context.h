@@ -18,6 +18,8 @@ class MetalSwapChainImage;
 
 class MetalCommandContext final : public CommandContext {
  public:
+  LONGMARCH_RHI_QUERY(MetalCommandContext, CommandContext)
+
   static MetalCommandContext *Create(MetalQueue *queue);
   ~MetalCommandContext() override;
   bool CmdBuildBottomLevelAccelerationStructure(

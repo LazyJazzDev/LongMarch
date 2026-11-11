@@ -7,6 +7,8 @@ class Device;
 
 class RayTracingProgram : public Object<IRayTracingProgram> {
  public:
+  LONGMARCH_RHI_QUERY(RayTracingProgram, Object<IRayTracingProgram>)
+
   RayTracingProgram(Device *device, const RayTracingProgramDesc &desc);
   const RayTracingProgramDesc &GetDesc() const override;
   Device *Owner() const;

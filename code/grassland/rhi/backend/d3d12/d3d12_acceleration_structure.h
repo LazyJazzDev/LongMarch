@@ -1,11 +1,12 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Device;
 
-class D3D12AccelerationStructure {
+class D3D12AccelerationStructure : public IObject {
  public:
   D3D12Device *Owner() const;
   ID3D12Resource *NativeResource() const;
@@ -36,6 +37,10 @@ class D3D12AccelerationStructure {
 class D3D12BottomLevelAccelerationStructure final : public Object<IBottomLevelAccelerationStructure>,
                                                     public D3D12AccelerationStructure {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(D3D12BottomLevelAccelerationStructure,
+                               Object<IBottomLevelAccelerationStructure>,
+                               D3D12AccelerationStructure)
+
   static D3D12BottomLevelAccelerationStructure *Create(D3D12Device *device,
                                                        const BottomLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
@@ -50,6 +55,10 @@ class D3D12BottomLevelAccelerationStructure final : public Object<IBottomLevelAc
 class D3D12TopLevelAccelerationStructure final : public Object<ITopLevelAccelerationStructure>,
                                                  public D3D12AccelerationStructure {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(D3D12TopLevelAccelerationStructure,
+                               Object<ITopLevelAccelerationStructure>,
+                               D3D12AccelerationStructure)
+
   static D3D12TopLevelAccelerationStructure *Create(D3D12Device *device, const TopLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
   uint64_t GetCompactedSize() const override;

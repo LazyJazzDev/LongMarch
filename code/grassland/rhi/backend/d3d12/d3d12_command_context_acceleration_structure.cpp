@@ -9,7 +9,7 @@ bool D3D12CommandContext::CmdBuildBottomLevelAccelerationStructure(
     IBottomLevelAccelerationStructure *destination,
     const std::vector<AccelerationStructureGeometryBuffers> &geometries,
     AccelerationStructureBuildMode mode) {
-  auto target = dynamic_cast<D3D12BottomLevelAccelerationStructure *>(destination);
+  auto target = rhi::QueryInterfacePtr<D3D12BottomLevelAccelerationStructure>(destination).Get();
   if (!ray_list_ || !target || target->Owner() != device_ || rendering_active_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
@@ -36,7 +36,7 @@ bool D3D12CommandContext::CmdBuildBottomLevelAccelerationStructure(
     for (const auto &view : {geometry.data, geometry.indices}) {
       if (!view.buffer)
         continue;
-      auto buffer = static_cast<D3D12Buffer *>(view.buffer);
+      auto buffer = rhi::QueryInterfacePtr<D3D12Buffer>(view.buffer).Get();
       if (!RetainResource(buffer))
         return false;
       if (!TransitionResource(buffer->NativeBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
@@ -69,7 +69,7 @@ bool D3D12CommandContext::CmdBuildBottomLevelAccelerationStructure(
 bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *destination,
                                                                 const std::vector<RayTracingInstance> &instances,
                                                                 AccelerationStructureBuildMode mode) {
-  auto target = dynamic_cast<D3D12TopLevelAccelerationStructure *>(destination);
+  auto target = rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(destination).Get();
   if (!ray_list_ || !target || target->Owner() != device_ || rendering_active_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
@@ -90,15 +90,11 @@ bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
   std::vector<D3D12_RAYTRACING_INSTANCE_DESC> native(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
-#if !defined(NDEBUG)
-    auto blas = dynamic_cast<D3D12BottomLevelAccelerationStructure *>(instance.blas);
+    auto blas = rhi::QueryInterfacePtr<D3D12BottomLevelAccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
       recording_failed_ = true;
       return false;
     }
-#else
-    auto blas = static_cast<D3D12BottomLevelAccelerationStructure *>(instance.blas);
-#endif
     if (!RetainResource(blas))
       return false;
     std::memcpy(native[i].Transform, instance.transform.data(), sizeof(native[i].Transform));
@@ -162,7 +158,7 @@ bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
 }
 
 bool D3D12CommandContext::CmdQueryCompactedSize(IAccelerationStructure *structure) {
-  auto target = dynamic_cast<D3D12AccelerationStructure *>(structure);
+  auto target = rhi::QueryInterfacePtr<D3D12AccelerationStructure>(structure).Get();
   if (!ray_list_ || !target || target->Owner() != device_ || !target->AllowsCompaction() || rendering_active_) {
     recording_failed_ = true;
     return false;
@@ -184,8 +180,8 @@ bool D3D12CommandContext::CmdQueryCompactedSize(IAccelerationStructure *structur
 
 bool D3D12CommandContext::CmdCompactAccelerationStructure(IAccelerationStructure *source,
                                                           IAccelerationStructure *destination) {
-  auto from = dynamic_cast<D3D12AccelerationStructure *>(source);
-  auto to = dynamic_cast<D3D12AccelerationStructure *>(destination);
+  auto from = rhi::QueryInterfacePtr<D3D12AccelerationStructure>(source).Get();
+  auto to = rhi::QueryInterfacePtr<D3D12AccelerationStructure>(destination).Get();
   if (!ray_list_ || !from || !to || from == to || from->Owner() != device_ || to->Owner() != device_ ||
       !from->AllowsCompaction() || !to->IsCompactStorage() || source->GetType() != destination->GetType() ||
       rendering_active_) {
@@ -196,13 +192,13 @@ bool D3D12CommandContext::CmdCompactAccelerationStructure(IAccelerationStructure
     return false;
   if (!RetainResource(destination))
     return false;
-  if (auto top = dynamic_cast<D3D12TopLevelAccelerationStructure *>(source)) {
+  if (auto top = rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(source).Get()) {
     auto pending = as_dependencies_.find(top);
     auto dependencies = pending == as_dependencies_.end() ? top->BottomLevels() : pending->second;
     for (const auto &blas : dependencies)
       if (!RetainResource(blas.Get()))
         return false;
-    auto target = static_cast<D3D12TopLevelAccelerationStructure *>(destination);
+    auto target = rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(destination).Get();
     for (const auto &blas : target->BottomLevels())
       if (!RetainResource(blas.Get()))
         return false;

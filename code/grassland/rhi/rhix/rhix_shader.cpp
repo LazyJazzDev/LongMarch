@@ -7,7 +7,7 @@ Shader::Shader(rhi::IShader *object) noexcept : ObjectContainer(object) {
 }
 
 rhi::IShader *Shader::Get() const noexcept {
-  return static_cast<rhi::IShader *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::IShader>(GetObject()).Get();
 }
 
 rhi::ShaderStage Shader::GetStage() const {

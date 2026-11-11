@@ -10,8 +10,13 @@ VkDescriptorSetLayout CreateBindingLayout(VkDevice device, const BindingLayoutDe
 
 class VulkanBindingGroup final : public BindingGroup {
  public:
+  LONGMARCH_RHI_QUERY(VulkanBindingGroup, BindingGroup)
+
   class Version final : public BindingGroup::Version {
    public:
+    using BindingGroup::Version::QueryInterface;
+    bool QueryInterface(InterfaceID id, void **output) noexcept override;
+
     static Version *Create(VulkanDevice *device, const BindingLayoutDesc &layout);
     ObjectPtr<BindingGroup::Version> Clone() const override;
     bool IsInitialized(size_t binding_index, uint32_t element) const override;
@@ -19,6 +24,7 @@ class VulkanBindingGroup final : public BindingGroup {
     VkDescriptorSet Set() const;
 
    private:
+    VulkanDevice *device_;
     bool WriteDescriptors(size_t binding_index,
                           uint32_t first_element,
                           const std::vector<ITopLevelAccelerationStructure *> &values) override;
@@ -37,3 +43,17 @@ class VulkanBindingGroup final : public BindingGroup {
   VulkanBindingGroup(VulkanDevice *device, ObjectPtr<Version> version);
 };
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanBindingGroup::Version, "fe3339ef-20d4-4c9c-b124-60c9431ce9b8")
+
+inline bool grassland::rhi::backend::vulkan::VulkanBindingGroup::Version::QueryInterface(InterfaceID id,
+                                                                                         void **output) noexcept {
+  if (!output)
+    return false;
+  if (auto result = MatchInterface<Version>(id, this)) {
+    *output = result;
+    AddRef();
+    return true;
+  }
+  return BindingGroup::Version::QueryInterface(id, output);
+}

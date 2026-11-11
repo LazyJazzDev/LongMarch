@@ -11,7 +11,7 @@ SubmissionToken::SubmissionToken(rhi::ISubmissionToken *object) noexcept : Objec
 }
 
 rhi::ISubmissionToken *SubmissionToken::Get() const noexcept {
-  return static_cast<rhi::ISubmissionToken *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::ISubmissionToken>(GetObject()).Get();
 }
 
 rhi::SubmissionStatus SubmissionToken::GetStatus() const {

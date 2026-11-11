@@ -137,7 +137,7 @@ ShaderBindingTable *D3D12RayTracingProgram::BuildShaderBindingTable(const Shader
     for (size_t i = 0; i < indices[t]->size(); ++i)
       std::memcpy(data.data() + offset + i * stride, identifiers_[t].data() + (*indices[t])[i] * stride, stride);
   }
-  auto owner = static_cast<D3D12Device *>(device_);
+  auto owner = rhi::QueryInterfacePtr<D3D12Device>(device_).Get();
   auto buffer =
       ObjectPtr<D3D12AllocatedBuffer>::Adopt(D3D12AllocatedBuffer::Create(owner, {uint64_t(data.size())}, true));
   if (!buffer || !buffer->Write(data.data(), data.size()))

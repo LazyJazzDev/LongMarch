@@ -7,9 +7,14 @@ class Device;
 
 class BindingGroup : public Object<IBindingGroup> {
  public:
+  LONGMARCH_RHI_QUERY(BindingGroup, Object<IBindingGroup>)
+
   class Version : public Object<IObject> {
    public:
-    Version(Device *device, const BindingLayoutDesc &layout);
+    using Object<IObject>::QueryInterface;
+    bool QueryInterface(InterfaceID id, void **output) noexcept override;
+
+    explicit Version(const BindingLayoutDesc &layout);
     const BindingLayoutDesc &GetLayout() const;
     const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const;
     virtual bool IsInitialized(size_t binding_index, uint32_t element) const = 0;
@@ -35,7 +40,6 @@ class BindingGroup : public Object<IBindingGroup> {
     virtual bool WriteDescriptors(size_t binding_index,
                                   uint32_t first_element,
                                   const std::vector<ISampler *> &values) = 0;
-    Device *device_;
     BindingLayoutDesc layout_;
     // Indexed by sorted layout binding, then array element.
     std::vector<std::vector<ObjectPtr<IObject>>> references_;
@@ -70,3 +74,16 @@ std::vector<MappedBinding> MapBindings(const PipelineLayoutDesc &layout, Backend
 bool ValidateBindingLayout(const BindingLayoutDesc &layout);
 bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b);
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::BindingGroup::Version, "8b356457-129b-40a7-ab14-51c6b2565805")
+
+inline bool grassland::rhi::backend::BindingGroup::Version::QueryInterface(InterfaceID id, void **output) noexcept {
+  if (!output)
+    return false;
+  if (auto result = MatchInterface<Version>(id, this)) {
+    *output = result;
+    AddRef();
+    return true;
+  }
+  return Object<IObject>::QueryInterface(id, output);
+}

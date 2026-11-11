@@ -6,6 +6,8 @@ class MetalDevice;
 
 class MetalAllocatedImage final : public MetalImage {
  public:
+  LONGMARCH_RHI_QUERY(MetalAllocatedImage, MetalImage)
+
   static MetalAllocatedImage *Create(MetalDevice *device, const ImageDesc &desc);
   bool IsValid() const override;
 

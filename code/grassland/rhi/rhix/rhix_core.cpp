@@ -7,7 +7,7 @@ Core::Core(rhi::ICore *object) noexcept : ObjectContainer(object) {
 }
 
 rhi::ICore *Core::Get() const noexcept {
-  return static_cast<rhi::ICore *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::ICore>(GetObject()).Get();
 }
 
 Core CreateCore(rhi::BackendAPI api, const rhi::CoreDesc &desc) {

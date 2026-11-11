@@ -7,6 +7,8 @@ class VulkanDevice;
 
 class VulkanComputeProgram final : public ComputeProgram, public VulkanProgramBase {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(VulkanComputeProgram, ComputeProgram, VulkanProgramBase)
+
   static VulkanComputeProgram *Create(VulkanDevice *device, const ComputeProgramDesc &desc);
   ~VulkanComputeProgram() override;
   VkPipeline NativePipeline() const;

@@ -24,7 +24,7 @@ MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<
   }
   auto descriptor = NS::TransferPtr(MTL::CommandBufferDescriptor::alloc()->init());
   descriptor->setRetainedReferences(true);
-  descriptor->setErrorOptions(static_cast<MetalCore *>(core)->DebugEnabled()
+  descriptor->setErrorOptions(rhi::QueryInterfacePtr<MetalCore>(core).Get()->DebugEnabled()
                                   ? MTL::CommandBufferErrorOptionEncoderExecutionStatus
                                   : MTL::CommandBufferErrorOptionNone);
   for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {

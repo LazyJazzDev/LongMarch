@@ -6,6 +6,8 @@ typedef struct VmaAllocator_T *VmaAllocator;
 namespace grassland::rhi::backend::vulkan {
 class VulkanAllocatedBuffer final : public VulkanBuffer {
  public:
+  LONGMARCH_RHI_QUERY(VulkanAllocatedBuffer, VulkanBuffer)
+
   ~VulkanAllocatedBuffer() override;
   static VulkanAllocatedBuffer *Create(VulkanDevice *device,
                                        const BufferDesc &desc,

@@ -5,6 +5,8 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanDownloadToken final : public DownloadToken {
  public:
+  LONGMARCH_RHI_QUERY(VulkanDownloadToken, DownloadToken)
+
   VulkanDownloadToken(ObjectPtr<VulkanTemporalBufferLease> lease, uint64_t size);
   VulkanDownloadToken(ObjectPtr<VulkanTemporalBufferLease> lease, const DownloadLayout &layout);
   ~VulkanDownloadToken() override;

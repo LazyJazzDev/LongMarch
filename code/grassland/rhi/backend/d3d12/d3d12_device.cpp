@@ -23,7 +23,7 @@ bool D3D12Device::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
   std::vector<ID3D12Fence *> fences;
   std::vector<uint64_t> values;
   for (const auto &event : events) {
-    fences.push_back(static_cast<D3D12Timeline *>(event.timeline)->NativeFence());
+    fences.push_back(rhi::QueryInterfacePtr<D3D12Timeline>(event.timeline).Get()->NativeFence());
     values.push_back(event.value);
   }
   ComPtr<ID3D12Device1> device;
@@ -51,9 +51,11 @@ void D3D12Device::WaitForProgress(const std::vector<Event> &next) {
       auto &handle = progress_events_[index];
       if (progress_values_[index] != event.value) {
         ResetEvent(handle);
-        if (!Check(
-                static_cast<D3D12Timeline *>(event.timeline)->NativeFence()->SetEventOnCompletion(event.value, handle),
-                "Listen for queue progress")) {
+        if (!Check(rhi::QueryInterfacePtr<D3D12Timeline>(event.timeline)
+                       .Get()
+                       ->NativeFence()
+                       ->SetEventOnCompletion(event.value, handle),
+                   "Listen for queue progress")) {
           return;
         }
         progress_values_[index] = event.value;

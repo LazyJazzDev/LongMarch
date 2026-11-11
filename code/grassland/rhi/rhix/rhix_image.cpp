@@ -7,7 +7,7 @@ Image::Image(rhi::IImage *object) noexcept : ObjectContainer(object) {
 }
 
 rhi::IImage *Image::Get() const noexcept {
-  return static_cast<rhi::IImage *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::IImage>(GetObject()).Get();
 }
 
 rhi::ImageDesc Image::GetDesc() const {

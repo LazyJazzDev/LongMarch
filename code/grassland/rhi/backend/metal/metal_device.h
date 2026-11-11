@@ -10,6 +10,8 @@ namespace grassland::rhi::backend::metal {
 
 class MetalDevice final : public Device {
  public:
+  LONGMARCH_RHI_QUERY(MetalDevice, Device)
+
   static MetalDevice *Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
   ~MetalDevice() override;
 

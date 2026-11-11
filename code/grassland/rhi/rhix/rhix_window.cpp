@@ -7,7 +7,7 @@ Window::Window(rhi::IWindow *object) noexcept : ObjectContainer(object) {
 }
 
 rhi::IWindow *Window::Get() const noexcept {
-  return static_cast<rhi::IWindow *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::IWindow>(GetObject()).Get();
 }
 
 bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_size) const {

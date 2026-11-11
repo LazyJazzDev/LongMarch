@@ -2,11 +2,12 @@
 #include <Metal/Metal.hpp>
 #include <array>
 
+#include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_program.h"
 
 namespace grassland::rhi::backend::metal {
 // Shared argument-buffer layout and shader translation; no IObject/refcount base.
-class MetalProgramBase {
+class MetalProgramBase : public IObject {
  public:
   MetalProgramBase(MTL::Device *device, const PipelineLayoutDesc &layout);
   const PipelineLayoutDesc &BindingLayout() const;

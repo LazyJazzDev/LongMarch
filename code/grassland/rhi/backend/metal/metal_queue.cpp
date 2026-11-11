@@ -24,7 +24,7 @@ MetalQueue *MetalQueue::Create(MetalDevice *device, QueueType type, MTL::Command
 }
 
 MetalTimeline *MetalQueue::GetTimeline() const {
-  return timeline_.get();
+  return timeline_.Get();
 }
 
 MTL::CommandQueue *MetalQueue::NativeQueue() const {

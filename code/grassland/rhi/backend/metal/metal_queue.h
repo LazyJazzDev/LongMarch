@@ -7,6 +7,8 @@ namespace grassland::rhi::backend::metal {
 
 class MetalQueue final : public Queue {
  public:
+  LONGMARCH_RHI_QUERY(MetalQueue, Queue)
+
   rhi::ICommandContext *CreateCommandContext() override;
   static MetalQueue *Create(MetalDevice *device, QueueType type, MTL::CommandBufferDescriptor *descriptor);
   MTL::CommandQueue *NativeQueue() const;
@@ -17,7 +19,7 @@ class MetalQueue final : public Queue {
  private:
   MetalQueue(MetalDevice *device, QueueType type);
   NS::SharedPtr<MTL::CommandQueue> queue_;
-  std::unique_ptr<MetalTimeline> timeline_;
+  ObjectPtr<MetalTimeline> timeline_;
   NS::SharedPtr<MTL::CommandBufferDescriptor> descriptor_;
 };
 

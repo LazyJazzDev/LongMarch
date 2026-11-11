@@ -18,7 +18,7 @@ void MetalDevice::NotifyTimelineFailure() {
 
 void MetalDevice::ObserveCompletion(MTL::CommandBuffer *commands, Event signal) {
   auto state = wait_state_;
-  static_cast<MetalTimeline *>(signal.timeline)->ObserveCompletion(commands, signal.value, [state] {
+  rhi::QueryInterfacePtr<MetalTimeline>(signal.timeline).Get()->ObserveCompletion(commands, signal.value, [state] {
     std::lock_guard<std::mutex> lock(state->mutex);
     state->notified = true;
     state->changed.notify_all();
@@ -29,7 +29,8 @@ bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto state = wait_state_;
   for (const auto &event : events) {
-    auto native = (__bridge id<MTLSharedEvent>)(void *)static_cast<MetalTimeline *>(event.timeline)->HostEvent();
+    auto native =
+        (__bridge id<MTLSharedEvent>)(void *)rhi::QueryInterfacePtr<MetalTimeline>(event.timeline).Get()->HostEvent();
     std::weak_ptr<WaitState> weak = state;
     [native notifyListener:(__bridge MTLSharedEventListener *)(void *)state->listener.get()
                    atValue:event.value

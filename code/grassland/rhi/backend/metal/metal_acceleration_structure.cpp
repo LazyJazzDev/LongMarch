@@ -82,10 +82,10 @@ MTL::PrimitiveAccelerationStructureDescriptor *NativeGeometries(
     native->setTriangleCount((g.index_count ? g.index_count : g.vertex_count) / 3);
     native->setOpaque(g.opaque);
     if (!buffers.empty()) {
-      native->setVertexBuffer(static_cast<MetalBuffer *>(buffers[i].data.buffer)->NativeBuffer());
+      native->setVertexBuffer(rhi::QueryInterfacePtr<MetalBuffer>(buffers[i].data.buffer).Get()->NativeBuffer());
       native->setVertexBufferOffset(buffers[i].data.offset);
       if (g.index_count) {
-        native->setIndexBuffer(static_cast<MetalBuffer *>(buffers[i].indices.buffer)->NativeBuffer());
+        native->setIndexBuffer(rhi::QueryInterfacePtr<MetalBuffer>(buffers[i].indices.buffer).Get()->NativeBuffer());
         native->setIndexBufferOffset(buffers[i].indices.offset);
       }
     }
@@ -98,7 +98,7 @@ MTL::PrimitiveAccelerationStructureDescriptor *NativeGeometries(
     native->setBoundingBoxCount(g.count);
     native->setOpaque(g.opaque);
     if (!buffers.empty()) {
-      native->setBoundingBoxBuffer(static_cast<MetalBuffer *>(buffers[i].data.buffer)->NativeBuffer());
+      native->setBoundingBoxBuffer(rhi::QueryInterfacePtr<MetalBuffer>(buffers[i].data.buffer).Get()->NativeBuffer());
       native->setBoundingBoxBufferOffset(buffers[i].data.offset);
     }
     geometries.push_back(native);

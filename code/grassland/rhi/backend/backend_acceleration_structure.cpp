@@ -27,7 +27,7 @@ bool ValidateGeometryBuffers(const BottomLevelAccelerationStructureDesc &desc,
   if (buffers.size() != desc.geometries.size() + desc.aabbs.size())
     return false;
   auto valid = [device](const BufferView &view, uint64_t required, uint64_t alignment) {
-    auto buffer = dynamic_cast<Buffer *>(view.buffer);
+    auto buffer = rhi::QueryInterfacePtr<Buffer>(view.buffer).Get();
     if (!buffer || buffer->Owner() != device || view.offset % alignment)
       return false;
     auto size = buffer->GetDesc().size;

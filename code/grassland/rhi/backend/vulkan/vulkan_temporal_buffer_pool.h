@@ -8,6 +8,8 @@ using VulkanTemporalBufferPool = TemporalBufferPool<VulkanDevice, VulkanAllocate
 
 class VulkanTemporalBufferLease final : public VulkanBuffer {
  public:
+  LONGMARCH_RHI_QUERY(VulkanTemporalBufferLease, VulkanBuffer)
+
   VulkanTemporalBufferLease(VulkanTemporalBufferPool *pool, VulkanAllocatedBuffer *buffer, size_t level);
   ~VulkanTemporalBufferLease() override;
   BufferDesc GetDesc() const override;

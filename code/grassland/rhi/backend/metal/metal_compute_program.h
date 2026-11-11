@@ -7,6 +7,8 @@ class MetalDevice;
 
 class MetalComputeProgram final : public ComputeProgram, public MetalProgramBase {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(MetalComputeProgram, ComputeProgram, MetalProgramBase)
+
   static MetalComputeProgram *Create(MetalDevice *device, const ComputeProgramDesc &desc);
   MTL::ComputePipelineState *NativePipeline() const;
   MTL::Size ThreadGroupSize() const;

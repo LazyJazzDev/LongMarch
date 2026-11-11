@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::metal {
 MetalTemporalBufferLease::MetalTemporalBufferLease(MetalTemporalBufferPool *pool,
                                                    MetalAllocatedBuffer *buffer,
                                                    size_t level)
-    : MetalBuffer(static_cast<MetalDevice *>(buffer->Owner()), buffer->GetDesc()),
+    : MetalBuffer(rhi::QueryInterfacePtr<MetalDevice>(buffer->Owner()).Get(), buffer->GetDesc()),
       pool_(pool),
       buffer_(buffer),
       level_(level) {

@@ -7,8 +7,8 @@ namespace grassland::rhi::backend::d3d12 {
 D3D12Timeline::D3D12Timeline(D3D12Device *device) : Timeline(device) {
 }
 
-std::unique_ptr<D3D12Timeline> D3D12Timeline::Create(D3D12Device *device) {
-  auto result = std::unique_ptr<D3D12Timeline>(new D3D12Timeline(device));
+ObjectPtr<D3D12Timeline> D3D12Timeline::Create(D3D12Device *device) {
+  auto result = ObjectPtr<D3D12Timeline>::Adopt(new D3D12Timeline(device));
   if (!Check(device->NativeDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&result->fence_)),
              "Create queue timeline"))
     return {};

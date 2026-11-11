@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 VulkanTemporalBufferLease::VulkanTemporalBufferLease(VulkanTemporalBufferPool *pool,
                                                      VulkanAllocatedBuffer *buffer,
                                                      size_t level)
-    : VulkanBuffer(static_cast<VulkanDevice *>(buffer->Owner()), buffer->GetDesc()),
+    : VulkanBuffer(rhi::QueryInterfacePtr<VulkanDevice>(buffer->Owner()).Get(), buffer->GetDesc()),
       pool_(pool),
       buffer_(buffer),
       level_(level) {

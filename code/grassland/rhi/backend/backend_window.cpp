@@ -302,7 +302,7 @@ Window::~Window() {
 
 bool Window::InitializeWindow(Device *device, const WindowDesc &desc) {
   device_ = device;
-  queue_ = static_cast<Queue *>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get());
+  queue_ = rhi::QueryInterfacePtr<Queue>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get()).Get();
   requested_mode_ = desc.present_mode;
   requested_color_space_ = desc.color_space;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());

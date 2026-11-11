@@ -11,7 +11,7 @@ Device::Device(rhi::IDevice *object) noexcept : ObjectContainer(object) {
 }
 
 rhi::IDevice *Device::Get() const noexcept {
-  return static_cast<rhi::IDevice *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::IDevice>(GetObject()).Get();
 }
 
 std::string Device::Name() const {

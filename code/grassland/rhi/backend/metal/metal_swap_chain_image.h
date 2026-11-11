@@ -8,6 +8,8 @@ class MetalWindow;
 
 class MetalSwapChainImage final : public MetalImage {
  public:
+  LONGMARCH_RHI_QUERY(MetalSwapChainImage, MetalImage)
+
   MetalSwapChainImage(ImageDesc desc, MetalWindow *window, uint64_t generation, CA::MetalDrawable *drawable);
   bool IsValid() const override;
   CA::MetalDrawable *NativeDrawable() const;

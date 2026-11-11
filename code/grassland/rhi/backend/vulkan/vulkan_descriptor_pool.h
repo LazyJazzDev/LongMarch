@@ -26,6 +26,9 @@ class VulkanDescriptorPool {
  public:
   class Lease final : public Object<IObject> {
    public:
+    using Object<IObject>::QueryInterface;
+    bool QueryInterface(InterfaceID id, void **output) noexcept override;
+
     Lease(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set);
     ~Lease() override;
     VkDescriptorSet Set() const;
@@ -49,3 +52,17 @@ class VulkanDescriptorPool {
 };
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanDescriptorPool::Lease, "4eacb408-4ddb-4df5-9846-c7fd2101efb2")
+
+inline bool grassland::rhi::backend::vulkan::VulkanDescriptorPool::Lease::QueryInterface(InterfaceID id,
+                                                                                         void **output) noexcept {
+  if (!output)
+    return false;
+  if (auto result = MatchInterface<Lease>(id, this)) {
+    *output = result;
+    AddRef();
+    return true;
+  }
+  return Object<IObject>::QueryInterface(id, output);
+}

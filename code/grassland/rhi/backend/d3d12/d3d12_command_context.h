@@ -18,6 +18,8 @@ class D3D12SwapChainImage;
 
 class D3D12CommandContext final : public CommandContext {
  public:
+  LONGMARCH_RHI_QUERY(D3D12CommandContext, CommandContext)
+
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,

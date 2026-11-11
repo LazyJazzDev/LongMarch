@@ -12,6 +12,8 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanDevice final : public Device {
  public:
+  LONGMARCH_RHI_QUERY(VulkanDevice, Device)
+
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override;

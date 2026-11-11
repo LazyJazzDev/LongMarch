@@ -8,6 +8,8 @@ class VulkanWindow;
 
 class VulkanSwapChainImage final : public VulkanImage {
  public:
+  LONGMARCH_RHI_QUERY(VulkanSwapChainImage, VulkanImage)
+
   VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image, VkImageView attachment);
   ~VulkanSwapChainImage() override;
   bool IsValid() const override;

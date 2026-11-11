@@ -7,8 +7,8 @@ namespace grassland::rhi::backend::vulkan {
 VulkanTimeline::VulkanTimeline(VulkanDevice *device) : Timeline(device), device_(device->NativeDevice()) {
 }
 
-std::unique_ptr<VulkanTimeline> VulkanTimeline::Create(VulkanDevice *device) {
-  auto result = std::unique_ptr<VulkanTimeline>(new VulkanTimeline(device));
+ObjectPtr<VulkanTimeline> VulkanTimeline::Create(VulkanDevice *device) {
+  auto result = ObjectPtr<VulkanTimeline>::Adopt(new VulkanTimeline(device));
   VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
   type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
   VkSemaphoreCreateInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};

@@ -2,11 +2,12 @@
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
+#include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalDevice;
 
-class MetalAccelerationStructure {
+class MetalAccelerationStructure : public IObject {
  public:
   MetalDevice *Owner() const;
   MTL::AccelerationStructure *NativeStructure() const;
@@ -35,6 +36,10 @@ class MetalAccelerationStructure {
 class MetalBottomLevelAccelerationStructure final : public Object<IBottomLevelAccelerationStructure>,
                                                     public MetalAccelerationStructure {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(MetalBottomLevelAccelerationStructure,
+                               Object<IBottomLevelAccelerationStructure>,
+                               MetalAccelerationStructure)
+
   static MetalBottomLevelAccelerationStructure *Create(MetalDevice *device,
                                                        const BottomLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
@@ -49,6 +54,10 @@ class MetalBottomLevelAccelerationStructure final : public Object<IBottomLevelAc
 class MetalTopLevelAccelerationStructure final : public Object<ITopLevelAccelerationStructure>,
                                                  public MetalAccelerationStructure {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(MetalTopLevelAccelerationStructure,
+                               Object<ITopLevelAccelerationStructure>,
+                               MetalAccelerationStructure)
+
   static MetalTopLevelAccelerationStructure *Create(MetalDevice *device, const TopLevelAccelerationStructureDesc &desc);
   AccelerationStructureType GetType() const override;
   uint64_t GetCompactedSize() const override;

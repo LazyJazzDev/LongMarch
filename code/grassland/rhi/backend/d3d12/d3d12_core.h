@@ -8,6 +8,8 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12Core final : public Core {
  public:
+  LONGMARCH_RHI_QUERY(D3D12Core, Core)
+
   static D3D12Core *CreateD3D12Core(const CoreDesc &desc);
   ~D3D12Core() override;
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;

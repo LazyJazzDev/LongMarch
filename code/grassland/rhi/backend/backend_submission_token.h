@@ -10,6 +10,8 @@ namespace grassland::rhi::backend {
 // Completion state borrows its timeline; it owns no native resources or commands.
 class SubmissionToken final : public Object<rhi::ISubmissionToken> {
  public:
+  LONGMARCH_RHI_QUERY(SubmissionToken, Object<rhi::ISubmissionToken>)
+
   explicit SubmissionToken(Event event);
   Event GetEvent() const override;
   SubmissionStatus GetStatus() const override;

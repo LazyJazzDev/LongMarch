@@ -7,6 +7,8 @@ class D3D12Device;
 
 class D3D12ComputeProgram final : public ComputeProgram, public D3D12ProgramBase {
  public:
+  LONGMARCH_RHI_QUERY_MULTIPLE(D3D12ComputeProgram, ComputeProgram, D3D12ProgramBase)
+
   static D3D12ComputeProgram *Create(D3D12Device *device, const ComputeProgramDesc &desc);
   ID3D12PipelineState *NativePipeline() const;
 

@@ -82,7 +82,7 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
   // Temporary initialization commands are outside the rendering loop.
   const auto native = device->NativeDevice();
   auto queue_owner = ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN));
-  auto queue = static_cast<VulkanQueue *>(queue_owner.Get());
+  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(queue_owner.Get()).Get();
   std::lock_guard<std::mutex> lock(queue->QueueMutex());
   VkCommandPool pool{};
   const auto status = [&]() -> VkResult {

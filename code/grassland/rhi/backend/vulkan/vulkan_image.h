@@ -7,6 +7,8 @@ namespace grassland::rhi::backend::vulkan {
 // Common resource access; derived classes define ownership and validity.
 class VulkanImage : public Image {
  public:
+  LONGMARCH_RHI_QUERY(VulkanImage, Image)
+
   class Views {
    public:
     Views() = default;

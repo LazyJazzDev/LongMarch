@@ -15,6 +15,8 @@ class Device;
 
 class Window : public Object<rhi::IWindow> {
  public:
+  LONGMARCH_RHI_QUERY(Window, Object<rhi::IWindow>)
+
   Window();
   Queue *OwnerQueue() const;
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;

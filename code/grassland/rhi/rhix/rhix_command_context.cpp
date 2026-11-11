@@ -29,7 +29,7 @@ CommandContext::CommandContext(rhi::ICommandContext *object) noexcept : ObjectCo
 }
 
 rhi::ICommandContext *CommandContext::Get() const noexcept {
-  return static_cast<rhi::ICommandContext *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::ICommandContext>(GetObject()).Get();
 }
 
 bool CommandContext::CmdClearImage(const Image &image, const rhi::ClearValue &value) {

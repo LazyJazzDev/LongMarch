@@ -14,6 +14,9 @@ class D3D12TransientDescriptorPool {
  public:
   class Lease final : public Object<IObject> {
    public:
+    using Object<IObject>::QueryInterface;
+    bool QueryInterface(InterfaceID id, void **output) noexcept override;
+
     Lease(D3D12TransientDescriptorPool *pool, ID3D12DescriptorHeap *heap, size_t level);
     ~Lease() override;
     ID3D12DescriptorHeap *Heap() const;
@@ -54,3 +57,19 @@ class D3D12TransientDescriptorPool {
   std::array<Bucket, 16> buckets_;
 };
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12TransientDescriptorPool::Lease,
+                   "edcbe9c2-3d76-4843-9aee-2beaa73f8a15")
+
+inline bool grassland::rhi::backend::d3d12::D3D12TransientDescriptorPool::Lease::QueryInterface(
+    InterfaceID id,
+    void **output) noexcept {
+  if (!output)
+    return false;
+  if (auto result = MatchInterface<Lease>(id, this)) {
+    *output = result;
+    AddRef();
+    return true;
+  }
+  return Object<IObject>::QueryInterface(id, output);
+}

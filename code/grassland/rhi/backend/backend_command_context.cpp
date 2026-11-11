@@ -9,9 +9,8 @@
 
 namespace grassland::rhi::backend {
 bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<Window *>(window);
-  auto image = dynamic_cast<Image *>(target);
+  auto native = rhi::QueryInterfacePtr<Window>(window).Get();
+  auto image = rhi::QueryInterfacePtr<Image>(target).Get();
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
       (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
       sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
@@ -20,9 +19,6 @@ bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
                 "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
     return false;
   }
-#else
-  auto native = static_cast<Window *>(window);
-#endif
   const auto format = target->GetDesc().format;
   if (!IsColorFormat(format) || IsSignedIntegerFormat(format) || IsUnsignedIntegerFormat(format)) {
     recording_failed_ = true;
@@ -39,9 +35,8 @@ bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
 }
 
 bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) {
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<Window *>(window);
-  auto image = dynamic_cast<Image *>(frame_img);
+  auto native = rhi::QueryInterfacePtr<Window>(window).Get();
+  auto image = rhi::QueryInterfacePtr<Image>(frame_img).Get();
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
       (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
       sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
@@ -50,9 +45,6 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
                 "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");
     return false;
   }
-#else
-  auto native = static_cast<Window *>(window);
-#endif
   if (!RetainResource(frame_img))
     return false;
   if (!native->RecordPresentImage(this, frame_img, frame_color_space)) {
@@ -114,7 +106,7 @@ bool CommandContext::PrepareRendering(const RenderingInfo &info) {
   }
   std::vector<IImage *> images;
   auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
-    auto native = dynamic_cast<Image *>(image);
+    auto native = rhi::QueryInterfacePtr<Image>(image).Get();
     if (!native || !native->IsValid() ||
         (native->DeviceIdentity() != DeviceIdentity() || !native->SupportsQueue(OwnerQueue())) ||
         IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||

@@ -38,7 +38,7 @@ void CheckIndependentRetirement(BackendAPI api) {
                                        static_cast<backend::vulkan::VulkanQueue *>(assist.Get())->NativeQueue())
     GTEST_SKIP() << "Independent GPU progress requires distinct native queues.";
 #endif
-  std::unique_ptr<backend::Timeline> gate;
+  backend::ObjectPtr<backend::Timeline> gate;
 
   struct GateRelease {
     std::function<void()> open;
@@ -105,7 +105,7 @@ void CheckIndependentRetirement(BackendAPI api) {
   ASSERT_TRUE(gate);
   ObjPtr<ICommandContext> blocked = assist->CreateCommandContext();
   ASSERT_TRUE(blocked);
-  ObjPtr<ISubmissionToken> assist_done = blocked->Submit({{{gate.get(), 1}}});
+  ObjPtr<ISubmissionToken> assist_done = blocked->Submit({{{gate.Get(), 1}}});
   ASSERT_TRUE(assist_done);
   release.pending = ObjPtr<ISubmissionToken>::Retain(assist_done.Get());
   blocked.Release();

@@ -7,7 +7,7 @@ ComputeProgram::ComputeProgram(rhi::IComputeProgram *object) noexcept : ObjectCo
 }
 
 rhi::IComputeProgram *ComputeProgram::Get() const noexcept {
-  return static_cast<rhi::IComputeProgram *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::IComputeProgram>(GetObject()).Get();
 }
 
 const rhi::ComputeProgramDesc &ComputeProgram::GetDesc() const {
