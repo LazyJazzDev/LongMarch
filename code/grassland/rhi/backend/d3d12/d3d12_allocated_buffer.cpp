@@ -47,15 +47,13 @@ D3D12AllocatedBuffer *D3D12AllocatedBuffer::Create(D3D12Device *device,
   D3D12MA::ALLOCATION_DESC memory{};
   object->download_ = download;
   memory.HeapType = download ? D3D12_HEAP_TYPE_READBACK : upload ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_DEFAULT;
-  if (!Check(rhi::QueryInterfacePtr<D3D12Device>(object->device_)
-                 .Get()
-                 ->Allocator()
-                 ->CreateResource(&memory, &info,
-                                  download ? D3D12_RESOURCE_STATE_COPY_DEST
-                                  : upload ? D3D12_RESOURCE_STATE_GENERIC_READ
-                                           : D3D12_RESOURCE_STATE_COMMON,
-                                  nullptr, &object->allocation_, IID_PPV_ARGS(&object->buffer_)),
-             "Allocate buffer"))
+  if (!Check(
+          object->device_->Allocator()->CreateResource(&memory, &info,
+                                                       download ? D3D12_RESOURCE_STATE_COPY_DEST
+                                                       : upload ? D3D12_RESOURCE_STATE_GENERIC_READ
+                                                                : D3D12_RESOURCE_STATE_COMMON,
+                                                       nullptr, &object->allocation_, IID_PPV_ARGS(&object->buffer_)),
+          "Allocate buffer"))
     return nullptr;
   if (upload || download) {
     D3D12_RANGE read{0, download ? static_cast<SIZE_T>(desc.size) : 0};

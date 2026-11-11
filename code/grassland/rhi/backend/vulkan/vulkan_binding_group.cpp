@@ -100,8 +100,7 @@ VulkanBindingGroup::Version *VulkanBindingGroup::Version::Create(VulkanDevice *d
 }
 
 ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::Clone() const {
-  auto device = device_;
-  auto copy = ObjectPtr<Version>::Adopt(Create(device, layout_));
+  auto copy = ObjectPtr<Version>::Adopt(Create(device_, layout_));
   if (!copy)
     return {};
   copy->references_ = references_;
@@ -127,7 +126,7 @@ ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::Clone() const {
       copies.push_back(range);
     }
   }
-  vkUpdateDescriptorSets(device->NativeDevice(), 0, nullptr, uint32_t(copies.size()), copies.data());
+  vkUpdateDescriptorSets(device_->NativeDevice(), 0, nullptr, uint32_t(copies.size()), copies.data());
   return copy;
 }
 
@@ -139,9 +138,8 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                    uint32_t first_element,
                                                    const std::vector<BufferView> &buffers) {
   const auto &binding = layout_.bindings[binding_index];
-  auto device = device_;
   VkPhysicalDeviceProperties properties{};
-  vkGetPhysicalDeviceProperties(device->NativePhysicalDevice(), &properties);
+  vkGetPhysicalDeviceProperties(device_->NativePhysicalDevice(), &properties);
   const bool uniform = binding.type == BINDING_UNIFORM_BUFFER;
   const auto alignment =
       uniform ? properties.limits.minUniformBufferOffsetAlignment : properties.limits.minStorageBufferOffsetAlignment;
@@ -160,7 +158,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   write.descriptorCount = uint32_t(infos.size());
   write.descriptorType = uniform ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   write.pBufferInfo = infos.data();
-  vkUpdateDescriptorSets(device->NativeDevice(), 1, &write, 0, nullptr);
+  vkUpdateDescriptorSets(device_->NativeDevice(), 1, &write, 0, nullptr);
   for (size_t i = 0; i < buffers.size(); ++i)
     initialized_[binding_index][first_element + i] = true;
   return true;

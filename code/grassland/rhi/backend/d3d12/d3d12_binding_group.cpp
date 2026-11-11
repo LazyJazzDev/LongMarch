@@ -47,13 +47,12 @@ D3D12BindingGroup::Version *D3D12BindingGroup::Version::Create(D3D12Device *devi
 }
 
 ObjectPtr<BindingGroup::Version> D3D12BindingGroup::Version::Clone() const {
-  auto device = device_;
-  auto copy = ObjectPtr<Version>::Adopt(Create(device, layout_));
+  auto copy = ObjectPtr<Version>::Adopt(Create(device_, layout_));
   if (!copy)
     return {};
   copy->references_ = references_;
   copy->initialized_ = initialized_;
-  auto native = device->NativeDevice();
+  auto native = device_->NativeDevice();
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
     const bool sampler = layout_.bindings[i].type == BINDING_SAMPLER;
     auto source = sampler ? samplers_.Get() : resources_.Get();
