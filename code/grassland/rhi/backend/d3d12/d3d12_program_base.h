@@ -3,7 +3,7 @@
 
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12ProgramBase)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12ProgramBase, "1a8ecd83-21dd-483c-bd0b-6efba7356e93")
 
 namespace grassland::rhi::backend::d3d12 {
 // Layout ownership only; object identity and reference counting belong to the concrete Program.

@@ -82,5 +82,3 @@ const void *VulkanSwapChainImageImpl::DeviceIdentity() const {
   return device_;
 }
 }  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanSwapChainImage, "f9decc34-658f-4a62-bf5b-e7a749c2c44e")

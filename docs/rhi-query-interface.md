@@ -28,12 +28,12 @@ order, independent of host endianness. They are not the Windows GUID memory layo
 `rhi_util.h` defines the ID, parser, UUID templates/macros, and public interface
 forward declarations. `backend_util.h` declares only shared backend interfaces;
 native backend declarations belong to `vulkan_util.h`, `d3d12_util.h`, and
-`metal_util.h`. Each interface header declares its `uuid<T>()` specialization
-with `LONGMARCH_RHI_DECLARE_UUID(Type)`. Its corresponding `.cpp` defines that
-specialization with `LONGMARCH_RHI_UUID(Type, Text)`, at global namespace scope.
-UUID definitions are neither inline nor collected in a registry header.
-Parsing remains constexpr, so invalid definition literals fail at compile time;
-`uuid<T>()` itself is an ordinary externally defined function. Unregistered
+`metal_util.h`. Each interface header defines its `uuid<T>()` specialization with
+`LONGMARCH_RHI_UUID(Type, Text)` at global namespace scope. The specialization
+is inline, so including the header in multiple translation units does not create
+multiple-definition errors. No separate declaration macro or `.cpp` registration
+is needed. Parsing remains constexpr and invalid UUID literals fail at compile
+time. Unregistered
 types cannot instantiate it. There is no runtime registration map, allocation,
 RTTI, or compiler-specific UUID extension. The 93 remaining library IDs are UUIDv4 values and remain unchanged for the
 same interfaces. The 18 removed aggregate/factory-only interfaces no longer

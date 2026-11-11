@@ -6,7 +6,7 @@
 #include "grassland/rhi/backend/backend_timeline.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTimeline)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalTimeline, "ca12a3b9-c2c2-4f0b-b396-324edaa7e96c")
 
 namespace grassland::rhi::backend::metal {
 class IMetalTimeline : public IBackendTimeline {

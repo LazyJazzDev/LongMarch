@@ -136,5 +136,3 @@ std::pair<size_t, size_t> D3D12DescriptorPool::GetPageCounts() const {
           size_t(std::count_if(pages_.begin(), pages_.end(), [](const auto &page) { return page->occupied != 0; }))};
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12DescriptorPool::ILease, "376aa279-89ab-4240-81b5-da312dda344c")

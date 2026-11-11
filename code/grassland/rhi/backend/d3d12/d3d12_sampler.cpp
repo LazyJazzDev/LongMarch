@@ -33,5 +33,3 @@ rhi::ISampler *ID3D12Sampler::Create(ID3D12Device *device, const SamplerDesc &de
   return D3D12SamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Sampler, "d1e384fa-d35c-42e0-8d5f-110c64fe99d0")

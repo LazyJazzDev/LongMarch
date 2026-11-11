@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_program_base.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanComputeProgram)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanComputeProgram, "3ce12e7b-3db2-461e-b7d0-9ec0f172ebd1")
 
 namespace grassland::rhi::backend::vulkan {
 class IVulkanComputeProgram : public IVulkanProgramBase {

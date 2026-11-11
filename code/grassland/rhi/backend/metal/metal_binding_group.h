@@ -22,4 +22,4 @@ IBindingGroup *CreateMetalBindingGroup(IMetalDevice *device, const BindingLayout
 
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalBindingVersion)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalBindingVersion, "fcef2422-11d0-4f7f-acb2-f3fcd629a898")

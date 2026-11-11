@@ -270,8 +270,3 @@ ITopLevelAccelerationStructure *IMetalTopLevelAccelerationStructure::Create(
   return MetalTopLevelAccelerationStructureImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalTopLevelAccelerationStructure,
-                   "240cc2a8-c334-4c86-b106-32c7fcc0f439")
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalAccelerationStructure, "15b08793-ad90-4431-b925-abab83480476")

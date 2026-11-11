@@ -5,7 +5,7 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalWindow)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalWindow, "e074a51b-c30d-43f4-8b6c-2d8fd1540424")
 
 namespace grassland::rhi::backend::metal {
 

@@ -146,5 +146,3 @@ QueueType D3D12QueueImpl::GetType() const {
   return type_;
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Queue, "46194ddb-7a1a-4d51-b878-0e51d212d642")

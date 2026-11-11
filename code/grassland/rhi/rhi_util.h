@@ -405,14 +405,10 @@ std::string to_string(AccelerationStructureBuildMode value);
 
 }  // namespace grassland::rhi
 
-// Declare in the interface header; define once in its implementation file.
-#define LONGMARCH_RHI_DECLARE_UUID(Type) \
-  template <>                            \
-  grassland::rhi::InterfaceID grassland::rhi::uuid<Type>();
-
+// Register in the owning interface header at global namespace scope.
 #define LONGMARCH_RHI_UUID(Type, Text)                                                               \
   template <>                                                                                        \
-  grassland::rhi::InterfaceID grassland::rhi::uuid<Type>() {                                         \
+  inline grassland::rhi::InterfaceID grassland::rhi::uuid<Type>() {                                  \
     static_assert(grassland::rhi::ParseInterfaceID(Text).has_value(), "Invalid RHI interface UUID"); \
     return *grassland::rhi::ParseInterfaceID(Text);                                                  \
   }

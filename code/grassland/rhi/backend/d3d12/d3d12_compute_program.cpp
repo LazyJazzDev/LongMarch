@@ -120,5 +120,3 @@ bool D3D12ComputeProgramImpl::CreateLayout(::ID3D12Device *device,
   return true;
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12ComputeProgram, "f0ee363d-3b36-4a53-8e17-b8a0ea11bf0a")

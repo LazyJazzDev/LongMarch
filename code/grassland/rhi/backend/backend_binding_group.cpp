@@ -60,7 +60,3 @@ bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b) {
 }
 
 }  // namespace grassland::rhi::backend
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendBindingVersion, "8b356457-129b-40a7-ab14-51c6b2565805")
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendBindingGroup, "84d77c02-7724-4c23-ab73-333b6878b5aa")

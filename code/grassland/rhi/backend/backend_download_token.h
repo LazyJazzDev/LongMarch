@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_download_token.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendDownloadToken)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendDownloadToken, "ed7d2ceb-b722-4881-ad53-9d19894b4bb2")
 
 namespace grassland::rhi::backend {
 // Describes the CPU copy from a native readback allocation. A nonzero stencil

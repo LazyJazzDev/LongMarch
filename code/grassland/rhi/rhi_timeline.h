@@ -3,7 +3,7 @@
 
 #include "grassland/rhi/rhi_object.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ITimeline)
+LONGMARCH_RHI_UUID(grassland::rhi::ITimeline, "92b5493b-5283-4f50-827f-6c5b4f5562a2")
 
 namespace grassland::rhi {
 

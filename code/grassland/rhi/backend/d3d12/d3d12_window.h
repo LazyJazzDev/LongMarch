@@ -5,7 +5,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Window)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Window, "1babd07b-773d-4d2b-9392-ec5113e23fdf")
 
 namespace grassland::rhi::backend::d3d12 {
 

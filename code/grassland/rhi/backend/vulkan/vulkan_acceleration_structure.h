@@ -3,8 +3,10 @@
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanAccelerationStructure)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTopLevelAccelerationStructure)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanAccelerationStructure,
+                   "8fd412fc-9636-4f9b-8c14-f6b47ac173db")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanTopLevelAccelerationStructure,
+                   "e2af066b-da31-4c27-93ea-c2e1e39f8499")
 
 namespace grassland::rhi::backend::vulkan {
 class IVulkanAccelerationStructure : public IObject {

@@ -462,5 +462,3 @@ bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
   return true;
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BindingVersion, "1e82b239-9a3f-4e32-aeab-b2fdaba168ff")

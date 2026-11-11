@@ -163,5 +163,3 @@ QueueType MetalQueueImpl::GetType() const {
   return type_;
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalQueue, "b34deab1-e42d-43f3-b6c4-f47dc7638e30")

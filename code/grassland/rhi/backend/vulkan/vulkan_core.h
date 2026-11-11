@@ -2,7 +2,7 @@
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanCore)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanCore, "38b5aac6-db8d-4fe0-86ac-ed06f0b3c970")
 
 namespace grassland::rhi::backend::vulkan {
 

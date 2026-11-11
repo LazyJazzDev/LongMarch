@@ -44,4 +44,4 @@ class D3D12DescriptorPool final {
 };
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12DescriptorPool::ILease)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12DescriptorPool::ILease, "376aa279-89ab-4240-81b5-da312dda344c")

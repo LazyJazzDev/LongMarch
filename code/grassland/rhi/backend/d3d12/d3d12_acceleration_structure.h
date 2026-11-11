@@ -3,8 +3,9 @@
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12AccelerationStructure)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12TopLevelAccelerationStructure)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12AccelerationStructure, "c8f939f7-1266-44ee-ad3e-f0efb8e7007c")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12TopLevelAccelerationStructure,
+                   "4755c2d8-b4b6-477e-809f-939fc3683688")
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12AccelerationStructure : public IObject {

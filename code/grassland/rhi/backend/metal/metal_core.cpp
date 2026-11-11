@@ -88,5 +88,3 @@ rhi::ICore *IMetalCore::CreateMetalCore(const CoreDesc &desc) {
   return MetalCoreImpl::CreateMetalCore(desc);
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalCore, "30ef4d7e-ae80-4882-b15d-023c44be58cf")

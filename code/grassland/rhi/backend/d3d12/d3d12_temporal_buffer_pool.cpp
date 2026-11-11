@@ -70,5 +70,3 @@ bool D3D12TemporalBufferLeaseImpl::Read(void *data, uint64_t size, uint64_t offs
   return buffer_->Read(data, size, offset);
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12TemporalBufferLease, "47d93f8f-2736-4b79-87e7-7cadabcf4f7a")

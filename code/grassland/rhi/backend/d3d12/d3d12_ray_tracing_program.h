@@ -5,7 +5,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12RayTracingProgram)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12RayTracingProgram, "5d1da804-a5b3-4469-a380-9d7a44cee916")
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12RayTracingProgram : public ID3D12ProgramBase {

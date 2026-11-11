@@ -245,5 +245,3 @@ NS::SharedPtr<MTL::Function> MetalProgramImpl::CompileFunction(const IShader *sh
   return function;
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalProgram, "26dfc710-560c-4dff-bfbd-2adc53cd3739")

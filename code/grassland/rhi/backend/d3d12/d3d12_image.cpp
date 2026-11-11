@@ -17,5 +17,3 @@ ObjectPtr<D3D12DescriptorPool::Lease> ID3D12Image::CreateAttachmentView(ID3D12De
 }
 
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Image, "85eb3c59-b643-4c32-b41f-66ed7e262a3e")

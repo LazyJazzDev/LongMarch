@@ -4,7 +4,7 @@
 #include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalSampler)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalSampler, "c609fe39-6f33-4a10-a4b1-db4fa86332b7")
 
 namespace grassland::rhi::backend::metal {
 class IMetalSampler : public IBackendSampler {

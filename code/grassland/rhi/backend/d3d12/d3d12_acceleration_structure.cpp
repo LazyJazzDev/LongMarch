@@ -404,8 +404,3 @@ D3D12TopLevelAccelerationStructureImpl::~D3D12TopLevelAccelerationStructureImpl(
   DestroyD3D12AccelerationStructure();
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12TopLevelAccelerationStructure,
-                   "4755c2d8-b4b6-477e-809f-939fc3683688")
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12AccelerationStructure, "c8f939f7-1266-44ee-ad3e-f0efb8e7007c")

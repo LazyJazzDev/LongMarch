@@ -5,7 +5,7 @@
 #include "grassland/rhi/rhi_buffer.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendShaderBindingTable)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendShaderBindingTable, "bf62c599-58f1-4e20-b3b8-b9b23eac18bc")
 
 namespace grassland::rhi::backend {
 class IBackendShaderBindingTable : public IObject {

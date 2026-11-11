@@ -84,5 +84,3 @@ bool MetalAllocatedBufferImpl::Read(void *data, uint64_t size, uint64_t offset) 
   return true;
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalAllocatedBuffer, "19d20694-8b38-47a4-a88f-56d5828c0e9d")

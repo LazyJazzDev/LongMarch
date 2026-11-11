@@ -155,5 +155,3 @@ QueueType VulkanQueueImpl::GetType() const {
   return type_;
 }
 }  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanQueue, "09666973-0b3a-4165-bb7f-0faf38e0f01a")

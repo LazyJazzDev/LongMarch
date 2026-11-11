@@ -403,5 +403,3 @@ void D3D12DeviceImpl::ShutdownQueues() {
   collector_.join();
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Device, "d258bd31-2295-4f22-9c98-bd0133662c47")

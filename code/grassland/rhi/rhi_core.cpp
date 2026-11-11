@@ -9,5 +9,3 @@ ICore *CreateCore(BackendAPI api, const CoreDesc &desc) {
   return backend::CreateCore(api, desc);
 }
 }  // namespace grassland::rhi
-
-LONGMARCH_RHI_UUID(grassland::rhi::ICore, "299e58a8-f58c-4cea-9df2-7ba69bc52d75")

@@ -2,7 +2,7 @@
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_binding_group.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendBindingGroup)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendBindingGroup, "84d77c02-7724-4c23-ab73-333b6878b5aa")
 
 namespace grassland::rhi::backend {
 class IBackendBindingVersion : public IObject {
@@ -40,4 +40,4 @@ bool ValidateBindingLayout(const BindingLayoutDesc &layout);
 bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b);
 }  // namespace grassland::rhi::backend
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendBindingVersion)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendBindingVersion, "8b356457-129b-40a7-ab14-51c6b2565805")

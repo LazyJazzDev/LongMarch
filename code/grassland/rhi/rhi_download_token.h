@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/rhi/rhi_object.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IDownloadToken)
+LONGMARCH_RHI_UUID(grassland::rhi::IDownloadToken, "5cd02111-0a3a-48fb-8b49-81ed1fcf6f75")
 
 namespace grassland::rhi {
 // A zero width/height extends to the corresponding edge of the image.

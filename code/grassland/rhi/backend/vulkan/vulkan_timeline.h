@@ -2,7 +2,7 @@
 #include "grassland/rhi/backend/backend_timeline.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTimeline)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanTimeline, "30a1e28a-4bf1-4d83-a693-bc60f95ec95b")
 
 namespace grassland::rhi::backend::vulkan {
 class IVulkanTimeline : public IBackendTimeline {

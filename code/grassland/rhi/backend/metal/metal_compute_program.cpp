@@ -110,5 +110,3 @@ NS::SharedPtr<MTL::Function> MetalComputeProgramImpl::CompileFunction(const ISha
   return function;
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalComputeProgram, "848b485d-2208-4d1d-86ae-cadee6182bfe")

@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanWindow)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanWindow, "2bd587e1-b088-4f5c-8138-3fd885407013")
 
 namespace grassland::rhi::backend::vulkan {
 

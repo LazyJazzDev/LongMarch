@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Sampler)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Sampler, "d1e384fa-d35c-42e0-8d5f-110c64fe99d0")
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12Sampler : public IBackendSampler {

@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/rhi/rhi_object.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::ISampler)
+LONGMARCH_RHI_UUID(grassland::rhi::ISampler, "1686d5c9-e228-4896-a8db-fd1ee89e98d2")
 
 namespace grassland::rhi {
 enum SamplerFilter { SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR };

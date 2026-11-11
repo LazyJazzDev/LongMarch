@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_allocated_buffer.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTemporalBufferLease)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalTemporalBufferLease, "d8febe53-823a-4731-847d-f2f1766778c8")
 
 namespace grassland::rhi::backend::metal {
 using MetalTemporalBufferPool = TemporalBufferPool<IMetalDevice, IMetalAllocatedBuffer, IMetalTemporalBufferLease>;

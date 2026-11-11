@@ -10,7 +10,7 @@
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/util/event_manager.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IWindow)
+LONGMARCH_RHI_UUID(grassland::rhi::IWindow, "49b2b063-75db-4ba6-96ae-48d94b3a2022")
 
 namespace grassland::rhi {
 class IImage;

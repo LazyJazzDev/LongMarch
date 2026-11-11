@@ -2,7 +2,7 @@
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_sampler.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IBindingGroup)
+LONGMARCH_RHI_UUID(grassland::rhi::IBindingGroup, "a243da26-9b4a-49c3-8ec5-b00ed6ff1b79")
 
 namespace grassland::rhi {
 class IBuffer;

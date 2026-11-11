@@ -6,7 +6,7 @@
 #include "grassland/rhi/rhi_timeline.h"
 #include "grassland/util/file_system.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::IDevice)
+LONGMARCH_RHI_UUID(grassland::rhi::IDevice, "7a97161c-7adc-4201-a4f0-53f40b94b527")
 
 namespace grassland::rhi {
 class IImage;

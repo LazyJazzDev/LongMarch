@@ -80,5 +80,3 @@ bool CompileMetal(const IShader *shader,
 }
 
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalProgramBase, "48d78e4c-57e0-4ad1-9dc1-254d12006fc6")

@@ -453,5 +453,3 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
   return true;
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalBindingVersion, "fcef2422-11d0-4f7f-acb2-f3fcd629a898")

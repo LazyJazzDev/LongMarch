@@ -2,7 +2,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanSwapChainImage)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanSwapChainImage, "f9decc34-658f-4a62-bf5b-e7a749c2c44e")
 
 namespace grassland::rhi::backend::vulkan {
 

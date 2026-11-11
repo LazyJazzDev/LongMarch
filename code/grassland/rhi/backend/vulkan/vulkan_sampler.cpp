@@ -34,5 +34,3 @@ rhi::ISampler *IVulkanSampler::Create(IVulkanDevice *device, const SamplerDesc &
   return VulkanSamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanSampler, "cbdfdbcb-a546-480b-a5d0-a86e1d181b71")

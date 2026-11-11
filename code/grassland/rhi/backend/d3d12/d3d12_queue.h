@@ -4,7 +4,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_timeline.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Queue)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Queue, "46194ddb-7a1a-4d51-b878-0e51d212d642")
 
 namespace grassland::rhi::backend::d3d12 {
 

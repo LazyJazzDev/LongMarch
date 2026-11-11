@@ -125,5 +125,3 @@ VkDevice VulkanComputeProgramImpl::LayoutDevice() const {
   return layout_device_;
 }
 }  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanComputeProgram, "3ce12e7b-3db2-461e-b7d0-9ec0f172ebd1")

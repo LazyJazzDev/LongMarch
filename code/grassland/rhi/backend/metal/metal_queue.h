@@ -4,7 +4,7 @@
 #include "grassland/rhi/backend/metal/metal_timeline.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalQueue)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalQueue, "b34deab1-e42d-43f3-b6c4-f47dc7638e30")
 
 namespace grassland::rhi::backend::metal {
 

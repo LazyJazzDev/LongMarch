@@ -4,7 +4,7 @@
 #include "grassland/rhi/backend/metal/metal_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalSwapChainImage)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalSwapChainImage, "e121e257-92bc-4748-bbe0-2eff7a5af162")
 
 namespace grassland::rhi::backend::metal {
 class IMetalSwapChainImage : public IMetalImage {

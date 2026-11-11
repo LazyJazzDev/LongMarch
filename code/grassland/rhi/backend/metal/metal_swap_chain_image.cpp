@@ -77,5 +77,3 @@ MTL::Texture *MetalSwapChainImageImpl::NativeImage() const {
   return image_;
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalSwapChainImage, "e121e257-92bc-4748-bbe0-2eff7a5af162")

@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTemporalBufferLease)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanTemporalBufferLease, "b8b91e0e-bc72-4ea2-b918-d6135648577f")
 
 namespace grassland::rhi::backend::vulkan {
 using VulkanTemporalBufferPool = TemporalBufferPool<IVulkanDevice, IVulkanAllocatedBuffer, IVulkanTemporalBufferLease>;

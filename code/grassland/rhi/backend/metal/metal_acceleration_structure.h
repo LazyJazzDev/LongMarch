@@ -4,8 +4,9 @@
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalAccelerationStructure)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTopLevelAccelerationStructure)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalAccelerationStructure, "15b08793-ad90-4431-b925-abab83480476")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalTopLevelAccelerationStructure,
+                   "240cc2a8-c334-4c86-b106-32c7fcc0f439")
 
 namespace grassland::rhi::backend::metal {
 class IMetalAccelerationStructure : public IObject {

@@ -7,7 +7,7 @@
 #include "grassland/rhi/backend/metal/metal_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalDevice)
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalDevice, "0edf854d-4ccc-4b02-8c0c-030ded3b67dc")
 
 namespace grassland::rhi::backend::metal {
 

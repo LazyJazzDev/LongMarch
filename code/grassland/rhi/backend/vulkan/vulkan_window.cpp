@@ -788,5 +788,3 @@ EventManager<void(int, const char **)> &VulkanWindowImpl::DropEvent() {
   return drop_event_;
 }
 }  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanWindow, "2bd587e1-b088-4f5c-8138-3fd885407013")

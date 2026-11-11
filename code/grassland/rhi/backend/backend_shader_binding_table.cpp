@@ -20,5 +20,3 @@ rhi::IShaderBindingTable *IBackendShaderBindingTable::Create(IRayTracingProgram 
   return new ShaderBindingTableImpl(program, desc, buffer, regions);
 }
 }  // namespace grassland::rhi::backend
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendShaderBindingTable, "bf62c599-58f1-4e20-b3b8-b9b23eac18bc")
