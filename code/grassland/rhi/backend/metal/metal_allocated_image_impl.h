@@ -3,10 +3,10 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalAllocatedImageImpl final : public Object<IMetalAllocatedImage> {
+class MetalAllocatedImageImpl final : public Object<rhi::IImage, IMetalImage> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IMetalAllocatedImage, IMetalImage, IBackendImage, rhi::IImage)
-  static IMetalAllocatedImage *Create(IMetalDevice *device, const ImageDesc &desc);
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IMetalImage, IBackendImage, rhi::IImage)
+  static IImage *Create(IMetalDevice *device, const ImageDesc &desc);
   bool IsValid() const override;
 
  private:

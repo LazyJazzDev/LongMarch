@@ -46,8 +46,9 @@ class RhiRasterizer : public testing::TestWithParam<BackendAPI> {
 #if defined(LONGMARCH_VULKAN_ENABLED)
     if (GetParam() == BACKEND_API_VULKAN) {
       VkPhysicalDeviceFeatures features{};
-      vkGetPhysicalDeviceFeatures(static_cast<backend::vulkan::IVulkanDevice *>(device.Get())->NativePhysicalDevice(),
-                                  &features);
+      vkGetPhysicalDeviceFeatures(
+          rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get()->NativePhysicalDevice(),
+          &features);
       return features.fillModeNonSolid;
     }
 #endif

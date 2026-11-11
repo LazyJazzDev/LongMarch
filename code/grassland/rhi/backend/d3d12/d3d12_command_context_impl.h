@@ -3,9 +3,9 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12CommandContextImpl final : public Object<ID3D12CommandContext> {
+class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBackendCommandContext> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, ID3D12CommandContext, IBackendCommandContext, rhi::ICommandContext)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IBackendCommandContext, rhi::ICommandContext)
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,
@@ -22,7 +22,7 @@ class D3D12CommandContextImpl final : public Object<ID3D12CommandContext> {
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   ~D3D12CommandContextImpl() override;
-  static ID3D12CommandContext *Create(ID3D12Queue *queue);
+  static ICommandContext *Create(ID3D12Queue *queue);
   IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
   IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;

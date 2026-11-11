@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalTimelineImpl final : public Object<IMetalTimeline> {
+class MetalTimelineImpl final : public Object<rhi::ITimeline, IMetalTimeline> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ITimeline, IMetalTimeline, IBackendTimeline, ITimeline)
 

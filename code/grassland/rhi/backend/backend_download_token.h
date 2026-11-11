@@ -14,16 +14,8 @@ struct DownloadLayout {
   uint64_t stencil_offset{}, stencil_pitch{};
 };
 
-class IBackendDownloadToken : public IDownloadToken {
+class IBackendDownloadToken : public IObject {
  public:
-  SubmissionStatus GetStatus() const override = 0;
-
-  bool WaitHost() const override = 0;
-
-  uint64_t GetSize() const override = 0;
-
-  bool CopyTo(void *destination, uint64_t size) const override = 0;
-
   virtual void BindSubmission(IBackendSubmissionToken *submission) = 0;
 
  protected:

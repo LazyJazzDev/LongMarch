@@ -24,7 +24,7 @@
 
 namespace grassland::rhi::backend::metal {
 
-IMetalDevice *MetalDeviceImpl::Create(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device) {
+rhi::IDevice *MetalDeviceImpl::Create(PhysicalDevice info, ICore *core, NS::SharedPtr<MTL::Device> device) {
   auto object = std::unique_ptr<MetalDeviceImpl>(new MetalDeviceImpl(std::move(info), core, std::move(device)));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   object->wait_state_->listener = NS::TransferPtr(MTL::SharedEventListener::alloc()->init());
@@ -46,7 +46,7 @@ IMetalDevice *MetalDeviceImpl::Create(PhysicalDevice info, IBackendCore *core, N
   return object.release();
 }
 
-MetalDeviceImpl::MetalDeviceImpl(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device)
+MetalDeviceImpl::MetalDeviceImpl(PhysicalDevice info, ICore *core, NS::SharedPtr<MTL::Device> device)
     : device_(std::move(device)),
       temporal_buffers_(this, TEMPORAL_BUFFER_UPLOAD) {
   InitializeDevice(std::move(info), core, BACKEND_API_METAL);
@@ -68,7 +68,7 @@ MetalScratchPool &MetalDeviceImpl::ScratchPool() {
 
 IBottomLevelAccelerationStructure *MetalDeviceImpl::CreateBottomLevelAccelerationStructure(
     const BottomLevelAccelerationStructureDesc &desc) {
-  return IMetalBottomLevelAccelerationStructure::Create(this, desc);
+  return CreateMetalBottomLevelAccelerationStructure(this, desc);
 }
 
 ITopLevelAccelerationStructure *MetalDeviceImpl::CreateTopLevelAccelerationStructure(
@@ -85,11 +85,12 @@ rhi::IWindow *MetalDeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
 }
 
 rhi::IBuffer *MetalDeviceImpl::CreateBuffer(const BufferDesc &desc) {
-  return IMetalAllocatedBuffer::Create(this, desc);
+  auto buffer = ObjectPtr<IMetalAllocatedBuffer>::Adopt(IMetalAllocatedBuffer::Create(this, desc));
+  return rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach();
 }
 
 rhi::IImage *MetalDeviceImpl::CreateImage(const ImageDesc &desc) {
-  return IMetalAllocatedImage::Create(this, desc);
+  return CreateMetalAllocatedImage(this, desc);
 }
 
 IComputeProgram *MetalDeviceImpl::CreateComputeProgram(const ComputeProgramDesc &desc) {
@@ -101,7 +102,7 @@ rhi::IProgram *MetalDeviceImpl::CreateProgram(const ProgramDesc &desc) {
 }
 
 rhi::IBindingGroup *MetalDeviceImpl::CreateBindingGroup(const BindingLayoutDesc &layout) {
-  return IMetalBindingGroup::Create(this, layout);
+  return CreateMetalBindingGroup(this, layout);
 }
 
 ISampler *MetalDeviceImpl::CreateSampler(const SamplerDesc &desc) {
@@ -116,7 +117,7 @@ MetalTemporalBufferPool &MetalDeviceImpl::DownloadPool() {
   return temporal_buffers_;
 }
 
-IMetalDevice *IMetalDevice::Create(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device) {
+rhi::IDevice *IMetalDevice::Create(PhysicalDevice info, ICore *core, NS::SharedPtr<MTL::Device> device) {
   return MetalDeviceImpl::Create(info, core, device);
 }
 
@@ -125,7 +126,7 @@ IRayTracingProgram *MetalDeviceImpl::CreateRayTracingProgram(const RayTracingPro
   return nullptr;
 }
 
-void MetalDeviceImpl::InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api) {
+void MetalDeviceImpl::InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api) {
   api_ = api;
   core_ = core;
   info_ = std::move(info);
@@ -135,7 +136,7 @@ rhi::IShader *MetalDeviceImpl::CreateShader(const ShaderDesc &desc) {
   if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
       desc.stage > SHADER_STAGE_CALLABLE)
     return nullptr;
-  return IBackendShader::Create(desc, api_);
+  return backend::CreateShader(desc, api_);
 }
 
 void MetalDeviceImpl::DestroyDevice() {
@@ -161,14 +162,14 @@ bool MetalDeviceImpl::SupportGeometryShader() const {
 rhi::IQueue *MetalDeviceImpl::GetQueue(QueueType type) {
   if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
     return nullptr;
-  return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
+  return rhi::QueryInterfacePtr<IQueue>(queues_[type].Get()).Detach();
 }
 
 const PhysicalDevice &MetalDeviceImpl::GetPhysicalDevice() const noexcept {
   return info_;
 }
 
-IBackendCore *MetalDeviceImpl::OwnerCore() const {
+ICore *MetalDeviceImpl::OwnerCore() const {
   return core_;
 }
 
@@ -207,9 +208,9 @@ void MetalDeviceImpl::Collect() {
       if (!queue)
         continue;
       uint64_t completed = 0;
-      const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+      const bool timeline_valid = rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline())->GetCompletedValue(completed);
       if (timeline_valid && completed != UINT64_MAX)
-        next.push_back({queue->GetTimeline(), completed + 1});
+        next.push_back({rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline()).Get(), completed + 1});
       if (!queue->CollectCompleted(completed, timeline_valid))
         empty = false;
     }

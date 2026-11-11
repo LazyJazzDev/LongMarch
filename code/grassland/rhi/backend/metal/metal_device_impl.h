@@ -3,10 +3,10 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDeviceImpl final : public Object<IMetalDevice> {
+class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, IMetalDevice, IBackendDevice, rhi::IDevice)
-  static IMetalDevice *Create(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device);
+  static rhi::IDevice *Create(PhysicalDevice info, ICore *core, NS::SharedPtr<MTL::Device> device);
   ~MetalDeviceImpl() override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
@@ -30,7 +30,7 @@ class MetalDeviceImpl final : public Object<IMetalDevice> {
   void InterruptCollector() override;
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
   void WaitForProgress(const std::vector<Event> &next) override;
-  MetalDeviceImpl(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device);
+  MetalDeviceImpl(PhysicalDevice info, ICore *core, NS::SharedPtr<MTL::Device> device);
   NS::SharedPtr<MTL::Device> device_;
 
   struct WaitState {
@@ -49,7 +49,7 @@ class MetalDeviceImpl final : public Object<IMetalDevice> {
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
 
  private:
-  void InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api = BACKEND_API_DEFAULT);
+  void InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api = BACKEND_API_DEFAULT);
 
  public:
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;
@@ -71,7 +71,7 @@ class MetalDeviceImpl final : public Object<IMetalDevice> {
   const PhysicalDevice &GetPhysicalDevice() const noexcept override;
 
  private:
-  IBackendCore *OwnerCore() const;
+  ICore *OwnerCore() const;
 
   // Called once after native device resources and all queues are initialized.
   void StartCollector();
@@ -87,7 +87,7 @@ class MetalDeviceImpl final : public Object<IMetalDevice> {
   std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
-  IBackendCore *core_{};
+  ICore *core_{};
   PhysicalDevice info_{};
   std::thread collector_{};
 };

@@ -4,10 +4,10 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanAllocatedImageImpl final : public Object<IVulkanAllocatedImage> {
+class VulkanAllocatedImageImpl final : public Object<rhi::IImage, IVulkanImage> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IVulkanAllocatedImage, IVulkanImage, IBackendImage, rhi::IImage)
-  static IVulkanAllocatedImage *Create(IVulkanDevice *device, const ImageDesc &desc);
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IVulkanImage, IBackendImage, rhi::IImage)
+  static IImage *Create(IVulkanDevice *device, const ImageDesc &desc);
   ~VulkanAllocatedImageImpl() override;
   bool IsValid() const override;
   bool SupportsStorage() const override;

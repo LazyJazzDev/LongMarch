@@ -100,8 +100,10 @@ bool ImagePresenter::Record(ICommandContext *commands,
   if (!program) {
     const auto code = "#define SOURCE_COLOR_SPACE " + std::to_string(int(source_space)) +
                       "\n#define TARGET_COLOR_SPACE " + std::to_string(int(target_space)) + "\n" + shader;
-    ObjPtr<IShader> vs = device_->CreateShaderFromSource(code, "VSMain", SHADER_STAGE_VERTEX);
-    ObjPtr<IShader> ps = device_->CreateShaderFromSource(code, "PSMain", SHADER_STAGE_FRAGMENT);
+    ObjPtr<IShader> vs =
+        rhi::QueryInterfacePtr<IDevice>(device_)->CreateShaderFromSource(code, "VSMain", SHADER_STAGE_VERTEX);
+    ObjPtr<IShader> ps =
+        rhi::QueryInterfacePtr<IDevice>(device_)->CreateShaderFromSource(code, "PSMain", SHADER_STAGE_FRAGMENT);
     if (!vs || !ps)
       return false;
     ProgramDesc desc;
@@ -111,16 +113,17 @@ bool ImagePresenter::Record(ICommandContext *commands,
     desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
                                      {1, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT},
                                      {2, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
-    program = device_->CreateProgram(desc);
+    program = rhi::QueryInterfacePtr<IDevice>(device_)->CreateProgram(desc);
     if (!program)
       return false;
   }
   if (!settings_)
-    settings_ = device_->CreateBuffer({256});
+    settings_ = rhi::QueryInterfacePtr<IDevice>(device_)->CreateBuffer({256});
   if (!sampler_)
-    sampler_ =
-        device_->CreateSampler({SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_CLAMP_TO_EDGE});
-  ObjPtr<IBindingGroup> group = device_->CreateBindingGroup(program->GetDesc().pipeline_layout.groups[0]);
+    sampler_ = rhi::QueryInterfacePtr<IDevice>(device_)->CreateSampler(
+        {SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_CLAMP_TO_EDGE});
+  ObjPtr<IBindingGroup> group =
+      rhi::QueryInterfacePtr<IDevice>(device_)->CreateBindingGroup(program->GetDesc().pipeline_layout.groups[0]);
   const float settings[] = {white_scale, 0, 0, 0};
   return settings_ && sampler_ && group && group->BindResource(0, settings_.Get()) && group->BindResource(1, source) &&
          group->BindResource(2, sampler_.Get()) &&

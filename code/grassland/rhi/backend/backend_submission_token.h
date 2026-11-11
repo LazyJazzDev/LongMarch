@@ -10,12 +10,9 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendSubmissionToken)
 namespace grassland::rhi::backend {
 
 // Completion state borrows its timeline; it owns no native resources or commands.
-class IBackendSubmissionToken : public rhi::ISubmissionToken {
+class IBackendSubmissionToken : public IObject {
  public:
   static IBackendSubmissionToken *Create(Event event);
-  virtual Event GetEvent() const = 0;
-  virtual SubmissionStatus GetStatus() const = 0;
-  virtual bool WaitHost() const = 0;
   virtual void Complete(SubmissionStatus status) = 0;
 };
 

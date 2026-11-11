@@ -13,22 +13,11 @@ namespace grassland::rhi::backend::metal {
 
 class IMetalDevice : public IBackendDevice {
  public:
-  static IMetalDevice *Create(PhysicalDevice info, IBackendCore *core, NS::SharedPtr<MTL::Device> device);
-  virtual rhi::IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
-  virtual rhi::IImage *CreateImage(const ImageDesc &desc) = 0;
-  virtual IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;
-  virtual rhi::IProgram *CreateProgram(const ProgramDesc &desc) = 0;
-  virtual rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) = 0;
-  virtual ISampler *CreateSampler(const SamplerDesc &desc = {}) = 0;
+  static rhi::IDevice *Create(PhysicalDevice info, ICore *core, NS::SharedPtr<MTL::Device> device);
   virtual MetalTemporalBufferPool &UploadPool() = 0;
   virtual MetalTemporalBufferPool &DownloadPool() = 0;
   virtual MetalScratchPool &ScratchPool() = 0;
-  virtual IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
-      const BottomLevelAccelerationStructureDesc &desc) = 0;
-  virtual ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
-      const TopLevelAccelerationStructureDesc &desc) = 0;
   virtual MTL::Device *NativeDevice() const noexcept = 0;
-  virtual rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   virtual void ObserveCompletion(MTL::CommandBuffer *commands, Event signal) = 0;
   virtual void NotifyTimelineFailure() = 0;
 };

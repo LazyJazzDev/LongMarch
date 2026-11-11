@@ -3,17 +3,16 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12BottomLevelAccelerationStructureImpl final : public Object<ID3D12BottomLevelAccelerationStructure> {
+class D3D12BottomLevelAccelerationStructureImpl final
+    : public Object<rhi::IBottomLevelAccelerationStructure, ID3D12AccelerationStructure> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IBottomLevelAccelerationStructure,
-                            ID3D12BottomLevelAccelerationStructure,
                             IBottomLevelAccelerationStructure,
                             IAccelerationStructure,
-                            ID3D12AccelerationStructure,
-                            IObject)
+                            ID3D12AccelerationStructure)
 
-  static ID3D12BottomLevelAccelerationStructure *Create(ID3D12Device *device,
-                                                        const BottomLevelAccelerationStructureDesc &desc);
+  static IBottomLevelAccelerationStructure *Create(ID3D12Device *device,
+                                                   const BottomLevelAccelerationStructureDesc &desc);
 
   AccelerationStructureType GetType() const override;
 
@@ -69,17 +68,16 @@ class D3D12BottomLevelAccelerationStructureImpl final : public Object<ID3D12Bott
   bool Allocate(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &inputs, uint64_t compacted_size);
 };
 
-class D3D12TopLevelAccelerationStructureImpl final : public Object<ID3D12TopLevelAccelerationStructure> {
+class D3D12TopLevelAccelerationStructureImpl final
+    : public Object<rhi::ITopLevelAccelerationStructure, ID3D12TopLevelAccelerationStructure> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ITopLevelAccelerationStructure,
                             ID3D12TopLevelAccelerationStructure,
                             ITopLevelAccelerationStructure,
                             IAccelerationStructure,
-                            ID3D12AccelerationStructure,
-                            IObject)
+                            ID3D12AccelerationStructure)
 
-  static ID3D12TopLevelAccelerationStructure *Create(ID3D12Device *device,
-                                                     const TopLevelAccelerationStructureDesc &desc);
+  static ITopLevelAccelerationStructure *Create(ID3D12Device *device, const TopLevelAccelerationStructureDesc &desc);
 
   AccelerationStructureType GetType() const override;
 

@@ -24,7 +24,7 @@ bool D3D12AllocatedImageImpl::IsValid() const {
   return true;
 }
 
-ID3D12AllocatedImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &desc) {
+IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &desc) {
   if (!desc.width || !desc.height)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
@@ -63,7 +63,7 @@ ID3D12AllocatedImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, cons
   return new D3D12AllocatedImageImpl(device, desc, std::move(image), std::move(allocation), std::move(attachment));
 }
 
-ID3D12AllocatedImage *ID3D12AllocatedImage::Create(ID3D12Device *device, const ImageDesc &desc) {
+IImage *CreateD3D12AllocatedImage(ID3D12Device *device, const ImageDesc &desc) {
   return D3D12AllocatedImageImpl::Create(device, desc);
 }
 
@@ -112,5 +112,3 @@ D3D12_RESOURCE_STATES D3D12AllocatedImageImpl::DefaultState() const {
   return default_state_;
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12AllocatedImage, "3d5647bf-0a89-4f7f-bce8-dd9e99c879a1")

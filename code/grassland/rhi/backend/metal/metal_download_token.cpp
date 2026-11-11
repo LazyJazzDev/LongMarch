@@ -43,14 +43,12 @@ bool MetalDownloadTokenImpl::CopyData(void *destination) const {
   return true;
 }
 
-IMetalDownloadToken *IMetalDownloadToken::Create(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size) {
+IBackendDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size) {
   return new MetalDownloadTokenImpl(lease, size);
 }
 
-IMetalDownloadToken *IMetalDownloadToken::Create(ObjectPtr<IMetalTemporalBufferLease> lease,
-                                                 const DownloadLayout &layout) {
+IBackendDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease,
+                                                const DownloadLayout &layout) {
   return new MetalDownloadTokenImpl(lease, layout);
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalDownloadToken, "cb7cec7d-cb18-4503-8444-82a8cde172f9")

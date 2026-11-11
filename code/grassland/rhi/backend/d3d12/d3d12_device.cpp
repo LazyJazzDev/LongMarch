@@ -56,7 +56,7 @@ void D3D12DeviceImpl::WaitForProgress(const std::vector<Event> &next) {
   DWORD count = 1;
   for (const auto &event : next) {
     for (size_t index = 0; index < queues_.size(); ++index) {
-      if (!queues_[index] || queues_[index]->GetTimeline() != event.timeline)
+      if (!queues_[index] || rhi::QueryInterfacePtr<ITimeline>(queues_[index]->GetTimeline()).Get() != event.timeline)
         continue;
       auto &handle = progress_events_[index];
       if (progress_values_[index] != event.value) {
@@ -110,7 +110,7 @@ void D3D12DeviceImpl::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> all
   }
 }
 
-ID3D12Device *D3D12DeviceImpl::Create(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device) {
+rhi::IDevice *D3D12DeviceImpl::Create(PhysicalDevice info, ICore *core, ComPtr<::ID3D12Device> device) {
   auto object = std::unique_ptr<D3D12DeviceImpl>(new D3D12DeviceImpl(std::move(info), core, std::move(device)));
   if (SUCCEEDED(object->device_.As(&object->debug_messages_))) {
     auto callback = [](D3D12_MESSAGE_CATEGORY, D3D12_MESSAGE_SEVERITY severity, D3D12_MESSAGE_ID id, LPCSTR description,
@@ -207,7 +207,7 @@ bool D3D12DeviceImpl::SupportsTearing() const {
   return tearing_;
 }
 
-D3D12DeviceImpl::D3D12DeviceImpl(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device)
+D3D12DeviceImpl::D3D12DeviceImpl(PhysicalDevice info, ICore *core, ComPtr<::ID3D12Device> device)
     : upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
       download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
       scratch_pool_(this),
@@ -253,11 +253,12 @@ D3D12TemporalBufferPool &D3D12DeviceImpl::UploadPool() {
 }
 
 rhi::IImage *D3D12DeviceImpl::CreateImage(const ImageDesc &desc) {
-  return ID3D12AllocatedImage::Create(this, desc);
+  return CreateD3D12AllocatedImage(this, desc);
 }
 
 rhi::IBuffer *D3D12DeviceImpl::CreateBuffer(const BufferDesc &desc) {
-  return ID3D12AllocatedBuffer::Create(this, desc);
+  auto buffer = ObjectPtr<ID3D12AllocatedBuffer>::Adopt(ID3D12AllocatedBuffer::Create(this, desc));
+  return rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach();
 }
 
 rhi::IWindow *D3D12DeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
@@ -269,7 +270,7 @@ ISampler *D3D12DeviceImpl::CreateSampler(const SamplerDesc &desc) {
 }
 
 IBindingGroup *D3D12DeviceImpl::CreateBindingGroup(const BindingLayoutDesc &layout) {
-  return ID3D12BindingGroup::Create(this, layout);
+  return CreateD3D12BindingGroup(this, layout);
 }
 
 D3D12ScratchPool &D3D12DeviceImpl::ScratchPool() {
@@ -278,7 +279,7 @@ D3D12ScratchPool &D3D12DeviceImpl::ScratchPool() {
 
 IBottomLevelAccelerationStructure *D3D12DeviceImpl::CreateBottomLevelAccelerationStructure(
     const BottomLevelAccelerationStructureDesc &desc) {
-  return ID3D12BottomLevelAccelerationStructure::Create(this, desc);
+  return CreateD3D12BottomLevelAccelerationStructure(this, desc);
 }
 
 ITopLevelAccelerationStructure *D3D12DeviceImpl::CreateTopLevelAccelerationStructure(
@@ -296,11 +297,11 @@ D3D12TemporalBufferPool &D3D12DeviceImpl::DownloadPool() {
   return download_pool_;
 }
 
-ID3D12Device *ID3D12Device::Create(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device) {
+rhi::IDevice *ID3D12Device::Create(PhysicalDevice info, ICore *core, ComPtr<::ID3D12Device> device) {
   return D3D12DeviceImpl::Create(info, core, device);
 }
 
-void D3D12DeviceImpl::InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api) {
+void D3D12DeviceImpl::InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api) {
   api_ = api;
   core_ = core;
   info_ = std::move(info);
@@ -310,7 +311,7 @@ rhi::IShader *D3D12DeviceImpl::CreateShader(const ShaderDesc &desc) {
   if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
       desc.stage > SHADER_STAGE_CALLABLE)
     return nullptr;
-  return IBackendShader::Create(desc, api_);
+  return backend::CreateShader(desc, api_);
 }
 
 void D3D12DeviceImpl::DestroyDevice() {
@@ -336,14 +337,14 @@ bool D3D12DeviceImpl::SupportGeometryShader() const {
 rhi::IQueue *D3D12DeviceImpl::GetQueue(QueueType type) {
   if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
     return nullptr;
-  return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
+  return rhi::QueryInterfacePtr<IQueue>(queues_[type].Get()).Detach();
 }
 
 const PhysicalDevice &D3D12DeviceImpl::GetPhysicalDevice() const noexcept {
   return info_;
 }
 
-IBackendCore *D3D12DeviceImpl::OwnerCore() const {
+ICore *D3D12DeviceImpl::OwnerCore() const {
   return core_;
 }
 
@@ -382,9 +383,9 @@ void D3D12DeviceImpl::Collect() {
       if (!queue)
         continue;
       uint64_t completed = 0;
-      const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+      const bool timeline_valid = rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline())->GetCompletedValue(completed);
       if (timeline_valid && completed != UINT64_MAX)
-        next.push_back({queue->GetTimeline(), completed + 1});
+        next.push_back({rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline()).Get(), completed + 1});
       if (!queue->CollectCompleted(completed, timeline_valid))
         empty = false;
     }

@@ -15,7 +15,7 @@ const std::string &ShaderImpl::GetEntry() const {
   return entry_;
 }
 
-IBackendShader *ShaderImpl::Create(const ShaderDesc &desc, BackendAPI api) {
+rhi::IShader *ShaderImpl::Create(const ShaderDesc &desc, BackendAPI api) {
   auto shader = new ShaderImpl(desc);
   if (!PreprocessShader(desc, api, shader->preprocessed_code_)) {
     delete shader;
@@ -28,9 +28,7 @@ const std::string &ShaderImpl::GetPreprocessedCode() const {
   return preprocessed_code_;
 }
 
-IBackendShader *IBackendShader::Create(const ShaderDesc &desc, BackendAPI api) {
+rhi::IShader *CreateShader(const ShaderDesc &desc, BackendAPI api) {
   return ShaderImpl::Create(desc, api);
 }
 }  // namespace grassland::rhi::backend
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendShader, "74166d66-39c8-4b6f-b9bc-1721e275a3c2")

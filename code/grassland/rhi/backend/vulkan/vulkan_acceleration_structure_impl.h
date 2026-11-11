@@ -3,17 +3,16 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanBottomLevelAccelerationStructureImpl final : public Object<IVulkanBottomLevelAccelerationStructure> {
+class VulkanBottomLevelAccelerationStructureImpl final
+    : public Object<rhi::IBottomLevelAccelerationStructure, IVulkanAccelerationStructure> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IBottomLevelAccelerationStructure,
-                            IVulkanBottomLevelAccelerationStructure,
                             IBottomLevelAccelerationStructure,
                             IAccelerationStructure,
-                            IVulkanAccelerationStructure,
-                            IObject)
+                            IVulkanAccelerationStructure)
 
-  static IVulkanBottomLevelAccelerationStructure *Create(IVulkanDevice *device,
-                                                         const BottomLevelAccelerationStructureDesc &desc);
+  static IBottomLevelAccelerationStructure *Create(IVulkanDevice *device,
+                                                   const BottomLevelAccelerationStructureDesc &desc);
 
   AccelerationStructureType GetType() const override;
 
@@ -75,17 +74,16 @@ class VulkanBottomLevelAccelerationStructureImpl final : public Object<IVulkanBo
                 uint64_t compacted_size);
 };
 
-class VulkanTopLevelAccelerationStructureImpl final : public Object<IVulkanTopLevelAccelerationStructure> {
+class VulkanTopLevelAccelerationStructureImpl final
+    : public Object<rhi::ITopLevelAccelerationStructure, IVulkanTopLevelAccelerationStructure> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ITopLevelAccelerationStructure,
                             IVulkanTopLevelAccelerationStructure,
                             ITopLevelAccelerationStructure,
                             IAccelerationStructure,
-                            IVulkanAccelerationStructure,
-                            IObject)
+                            IVulkanAccelerationStructure)
 
-  static IVulkanTopLevelAccelerationStructure *Create(IVulkanDevice *device,
-                                                      const TopLevelAccelerationStructureDesc &desc);
+  static ITopLevelAccelerationStructure *Create(IVulkanDevice *device, const TopLevelAccelerationStructureDesc &desc);
 
   AccelerationStructureType GetType() const override;
 

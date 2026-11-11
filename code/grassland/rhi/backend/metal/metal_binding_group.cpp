@@ -224,7 +224,7 @@ MetalBindingGroupImpl::MetalBindingGroupImpl(IMetalDevice *device, ObjectPtr<Ver
   InitializeBindingGroup(device, ObjectPtr<IBackendBindingVersion>::Retain(version.Get()));
 }
 
-IMetalBindingGroup *MetalBindingGroupImpl::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
+IBindingGroup *MetalBindingGroupImpl::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
   auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
   return version ? new MetalBindingGroupImpl(device, std::move(version)) : nullptr;
 }
@@ -233,7 +233,7 @@ IMetalBindingVersion *IMetalBindingVersion::Create(IMetalDevice *device, const B
   return MetalBindingVersionImpl::Create(device, layout);
 }
 
-IMetalBindingGroup *IMetalBindingGroup::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
+IBindingGroup *CreateMetalBindingGroup(IMetalDevice *device, const BindingLayoutDesc &layout) {
   return MetalBindingGroupImpl::Create(device, layout);
 }
 
@@ -363,11 +363,11 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
   auto values = buffers;
   for (auto &view : values) {
     auto buffer = rhi::QueryInterfacePtr<IBackendBuffer>(view.buffer).Get();
-    if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
+    if (!buffer || buffer->Owner() != device_ || view.offset >= view.buffer->GetDesc().size)
       return false;
     if (!view.size)
-      view.size = buffer->GetDesc().size - view.offset;
-    if (view.size > buffer->GetDesc().size - view.offset)
+      view.size = view.buffer->GetDesc().size - view.offset;
+    if (view.size > view.buffer->GetDesc().size - view.offset)
       return false;
     if (desc->type == BINDING_STRUCTURED_BUFFER || desc->type == BINDING_RW_STRUCTURED_BUFFER) {
       if (view.offset % desc->stride || view.size % desc->stride)
@@ -397,7 +397,7 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
     return false;
   for (auto value : images) {
     auto image = rhi::QueryInterfacePtr<IBackendImage>(value).Get();
-    if (!image || !image->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(image->GetDesc().format))
+    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;
@@ -453,7 +453,5 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
   return true;
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalBindingGroup, "cc9ee713-7a82-44a9-9c5d-6b138c2b32bd")
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalBindingVersion, "fcef2422-11d0-4f7f-acb2-f3fcd629a898")

@@ -10,7 +10,7 @@ bool D3D12CommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     IBottomLevelAccelerationStructure *destination,
     const std::vector<AccelerationStructureGeometryBuffers> &geometries,
     AccelerationStructureBuildMode mode) {
-  auto target = rhi::QueryInterfacePtr<ID3D12BottomLevelAccelerationStructure>(destination).Get();
+  auto target = rhi::QueryInterfacePtr<ID3D12AccelerationStructure>(destination).Get();
   if (!ray_list_ || !target || target->Owner() != device_ || rendering_active_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
@@ -19,7 +19,7 @@ bool D3D12CommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     return false;
   }
 #if !defined(NDEBUG)
-  if (!ValidateGeometryBuffers(target->GetDesc(), geometries, device_)) {
+  if (!ValidateGeometryBuffers(destination->GetDesc(), geometries, device_)) {
     recording_failed_ = true;
     return false;
   }
@@ -45,7 +45,7 @@ bool D3D12CommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
         return false;
     }
   }
-  auto native = NativeGeometries(device_, target->GetDesc(), geometries);
+  auto native = NativeGeometries(device_, destination->GetDesc(), geometries);
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC build{};
   build.Inputs = target->NativeInputs();
   build.Inputs.pGeometryDescs = native.data();
@@ -75,7 +75,7 @@ bool D3D12CommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
-      !ValidateInstances(target->GetDesc(), instances)) {
+      !ValidateInstances(destination->GetDesc(), instances)) {
     recording_failed_ = true;
     return false;
   }
@@ -91,7 +91,7 @@ bool D3D12CommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
   std::vector<D3D12_RAYTRACING_INSTANCE_DESC> native(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
-    auto blas = rhi::QueryInterfacePtr<ID3D12BottomLevelAccelerationStructure>(instance.blas).Get();
+    auto blas = rhi::QueryInterfacePtr<ID3D12AccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
       recording_failed_ = true;
       return false;

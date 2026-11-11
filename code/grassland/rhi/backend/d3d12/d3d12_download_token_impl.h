@@ -3,9 +3,9 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12DownloadTokenImpl final : public Object<ID3D12DownloadToken> {
+class D3D12DownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackendDownloadToken> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, ID3D12DownloadToken, IBackendDownloadToken, IDownloadToken)
+  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, IBackendDownloadToken, IDownloadToken)
 
   D3D12DownloadTokenImpl(ObjectPtr<ID3D12TemporalBufferLease> lease, uint64_t size);
 
@@ -14,11 +14,12 @@ class D3D12DownloadTokenImpl final : public Object<ID3D12DownloadToken> {
   ~D3D12DownloadTokenImpl() override;
 
   SubmissionStatus GetStatus() const override {
-    return submission_ ? submission_->GetStatus() : SUBMISSION_STATUS_PENDING;
+    return submission_ ? rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->GetStatus()
+                       : SUBMISSION_STATUS_PENDING;
   }
 
   bool WaitHost() const override {
-    return submission_ && submission_->WaitHost();
+    return submission_ && rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->WaitHost();
   }
 
   uint64_t GetSize() const override {

@@ -64,7 +64,7 @@ VulkanBindingGroupImpl::VulkanBindingGroupImpl(IVulkanDevice *device, ObjectPtr<
   InitializeBindingGroup(device, std::move(version));
 }
 
-IVulkanBindingGroup *VulkanBindingGroupImpl::Create(IVulkanDevice *device, const BindingLayoutDesc &layout) {
+IBindingGroup *VulkanBindingGroupImpl::Create(IVulkanDevice *device, const BindingLayoutDesc &layout) {
   if (!ValidateBindingLayout(layout))
     return nullptr;
   if (!ValidatePipelineBindings(device->NativePhysicalDevice(), {{layout}}))
@@ -177,7 +177,7 @@ bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
                                                 const std::vector<IImage *> &images) {
   const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
-    if (!rhi::QueryInterfacePtr<IVulkanAllocatedImage>(image).Get())
+    if (!rhi::QueryInterfacePtr<IVulkanImage>(image).Get())
       return false;
   auto native = device_->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(images.size());
@@ -302,7 +302,7 @@ IVulkanBindingVersion *IVulkanBindingVersion::Create(IVulkanDevice *device, cons
   return VulkanBindingVersionImpl::Create(device, layout);
 }
 
-IVulkanBindingGroup *IVulkanBindingGroup::Create(IVulkanDevice *device, const BindingLayoutDesc &layout) {
+IBindingGroup *CreateVulkanBindingGroup(IVulkanDevice *device, const BindingLayoutDesc &layout) {
   return VulkanBindingGroupImpl::Create(device, layout);
 }
 
@@ -434,11 +434,11 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
   auto values = buffers;
   for (auto &view : values) {
     auto buffer = rhi::QueryInterfacePtr<IBackendBuffer>(view.buffer).Get();
-    if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
+    if (!buffer || buffer->Owner() != device_ || view.offset >= view.buffer->GetDesc().size)
       return false;
     if (!view.size)
-      view.size = buffer->GetDesc().size - view.offset;
-    if (view.size > buffer->GetDesc().size - view.offset)
+      view.size = view.buffer->GetDesc().size - view.offset;
+    if (view.size > view.buffer->GetDesc().size - view.offset)
       return false;
     if (desc->type == BINDING_STRUCTURED_BUFFER || desc->type == BINDING_RW_STRUCTURED_BUFFER) {
       if (view.offset % desc->stride || view.size % desc->stride)
@@ -468,7 +468,7 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
     return false;
   for (auto value : images) {
     auto image = rhi::QueryInterfacePtr<IBackendImage>(value).Get();
-    if (!image || !image->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(image->GetDesc().format))
+    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;
@@ -524,7 +524,5 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
   return true;
 }
 }  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanBindingGroup, "d572985f-e699-4c7c-b9da-2c57af2e528c")
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanBindingVersion, "fe3339ef-20d4-4c9c-b124-60c9431ce9b8")

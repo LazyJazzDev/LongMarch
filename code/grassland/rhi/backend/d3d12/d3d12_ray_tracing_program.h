@@ -8,20 +8,9 @@
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12RayTracingProgram)
 
 namespace grassland::rhi::backend::d3d12 {
-class ID3D12RayTracingProgram : public IBackendRayTracingProgram, public ID3D12ProgramBase {
+class ID3D12RayTracingProgram : public ID3D12ProgramBase {
  public:
-  virtual void AddRef() noexcept override = 0;
-  virtual void Release() noexcept override = 0;
-  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
-
-  template <typename T>
-  T *QueryInterface() noexcept {
-    void *result = nullptr;
-    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
-  }
-
-  static ID3D12RayTracingProgram *Create(ID3D12Device *device, const RayTracingProgramDesc &desc);
-  virtual IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) = 0;
+  static rhi::IRayTracingProgram *Create(ID3D12Device *device, const RayTracingProgramDesc &desc);
   virtual const IBackendShaderBindingTable *DefaultShaderBindingTable() const = 0;
   virtual ID3D12StateObject *NativePipeline() const = 0;
 };

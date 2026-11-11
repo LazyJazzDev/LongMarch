@@ -13,7 +13,6 @@ class IMetalSwapChainImage : public IMetalImage {
                                       IMetalWindow *window,
                                       uint64_t generation,
                                       CA::MetalDrawable *drawable);
-  virtual bool IsValid() const = 0;
   virtual CA::MetalDrawable *NativeDrawable() const = 0;
   virtual void DidPresent() = 0;
 };

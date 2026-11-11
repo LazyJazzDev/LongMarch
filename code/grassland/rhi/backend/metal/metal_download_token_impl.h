@@ -3,9 +3,9 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDownloadTokenImpl final : public Object<IMetalDownloadToken> {
+class MetalDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackendDownloadToken> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, IMetalDownloadToken, IBackendDownloadToken, IDownloadToken)
+  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, IBackendDownloadToken, IDownloadToken)
 
   MetalDownloadTokenImpl(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size);
 
@@ -14,11 +14,12 @@ class MetalDownloadTokenImpl final : public Object<IMetalDownloadToken> {
   ~MetalDownloadTokenImpl() override;
 
   SubmissionStatus GetStatus() const override {
-    return submission_ ? submission_->GetStatus() : SUBMISSION_STATUS_PENDING;
+    return submission_ ? rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->GetStatus()
+                       : SUBMISSION_STATUS_PENDING;
   }
 
   bool WaitHost() const override {
-    return submission_ && submission_->WaitHost();
+    return submission_ && rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->WaitHost();
   }
 
   uint64_t GetSize() const override {

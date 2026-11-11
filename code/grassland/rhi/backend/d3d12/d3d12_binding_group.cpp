@@ -167,7 +167,7 @@ bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
                                                const std::vector<IImage *> &images) {
   const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
-    if (!rhi::QueryInterfacePtr<ID3D12AllocatedImage>(image).Get())
+    if (!rhi::QueryInterfacePtr<ID3D12Image>(image).Get())
       return false;
   auto native = device_->NativeDevice();
   if (binding.type == BINDING_TEXTURE2D) {
@@ -206,7 +206,7 @@ D3D12BindingGroupImpl::D3D12BindingGroupImpl(ID3D12Device *device, ObjectPtr<Ver
   InitializeBindingGroup(device, std::move(version));
 }
 
-ID3D12BindingGroup *D3D12BindingGroupImpl::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
+IBindingGroup *D3D12BindingGroupImpl::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
   if (!ValidateBindingLayout(layout))
     return nullptr;
   auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
@@ -242,7 +242,7 @@ ID3D12BindingVersion *ID3D12BindingVersion::Create(ID3D12Device *device, const B
   return D3D12BindingVersionImpl::Create(device, layout);
 }
 
-ID3D12BindingGroup *ID3D12BindingGroup::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
+IBindingGroup *CreateD3D12BindingGroup(ID3D12Device *device, const BindingLayoutDesc &layout) {
   return D3D12BindingGroupImpl::Create(device, layout);
 }
 
@@ -372,11 +372,11 @@ bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
   auto values = buffers;
   for (auto &view : values) {
     auto buffer = rhi::QueryInterfacePtr<IBackendBuffer>(view.buffer).Get();
-    if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
+    if (!buffer || buffer->Owner() != device_ || view.offset >= view.buffer->GetDesc().size)
       return false;
     if (!view.size)
-      view.size = buffer->GetDesc().size - view.offset;
-    if (view.size > buffer->GetDesc().size - view.offset)
+      view.size = view.buffer->GetDesc().size - view.offset;
+    if (view.size > view.buffer->GetDesc().size - view.offset)
       return false;
     if (desc->type == BINDING_STRUCTURED_BUFFER || desc->type == BINDING_RW_STRUCTURED_BUFFER) {
       if (view.offset % desc->stride || view.size % desc->stride)
@@ -406,7 +406,7 @@ bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
     return false;
   for (auto value : images) {
     auto image = rhi::QueryInterfacePtr<IBackendImage>(value).Get();
-    if (!image || !image->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(image->GetDesc().format))
+    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;
@@ -462,7 +462,5 @@ bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
   return true;
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BindingGroup, "b827b0e0-c57d-4316-b632-77a41d222ae7")
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BindingVersion, "1e82b239-9a3f-4e32-aeab-b2fdaba168ff")

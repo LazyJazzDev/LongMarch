@@ -13,7 +13,7 @@ VkInstance VulkanCoreImpl::Instance() const {
   return instance_;
 }
 
-IVulkanCore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
+rhi::ICore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
   uint32_t loader_version = VK_API_VERSION_1_0;
   const auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
       vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
@@ -182,7 +182,7 @@ rhi::IDevice *VulkanCoreImpl::CreateDevice(int32_t device_idx) {
   return IVulkanDevice::CreateVulkanDevice(adapter.info, this, adapter.native, adapter.api_version);
 }
 
-IVulkanCore *IVulkanCore::CreateVulkanCore(const CoreDesc &desc) {
+rhi::ICore *IVulkanCore::CreateVulkanCore(const CoreDesc &desc) {
   return VulkanCoreImpl::CreateVulkanCore(desc);
 }
 }  // namespace grassland::rhi::backend::vulkan

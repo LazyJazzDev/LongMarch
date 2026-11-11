@@ -15,12 +15,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Device)
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12Device : public IBackendDevice {
  public:
-  static ID3D12Device *Create(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device);
-  virtual IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) = 0;
-  virtual IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
-      const BottomLevelAccelerationStructureDesc &desc) = 0;
-  virtual ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
-      const TopLevelAccelerationStructureDesc &desc) = 0;
+  static rhi::IDevice *Create(PhysicalDevice info, ICore *core, ComPtr<::ID3D12Device> device);
   virtual ::ID3D12Device *NativeDevice() const = 0;
   virtual D3D12MA::Allocator *Allocator() const = 0;
   virtual D3D12DescriptorPool &RTVPool() = 0;
@@ -31,16 +26,9 @@ class ID3D12Device : public IBackendDevice {
   virtual D3D12DescriptorPool &SamplerDescriptorStorage() = 0;
   virtual IDXGIFactory4 *Factory() const = 0;
   virtual bool SupportsTearing() const = 0;
-  virtual rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;
-  virtual rhi::IProgram *CreateProgram(const ProgramDesc &desc) = 0;
-  virtual rhi::IImage *CreateImage(const ImageDesc &desc) = 0;
-  virtual ISampler *CreateSampler(const SamplerDesc &desc = {}) = 0;
-  virtual rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) = 0;
-  virtual rhi::IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
   virtual D3D12TemporalBufferPool &UploadPool() = 0;
   virtual D3D12TemporalBufferPool &DownloadPool() = 0;
   virtual D3D12ScratchPool &ScratchPool() = 0;
-  virtual rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   virtual  // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
       // The pool grows on demand, independently of swapchain image count.
       bool

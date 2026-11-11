@@ -13,7 +13,6 @@ class IBackendBindingVersion;
 class IBackendBuffer;
 class IBackendCommandContext;
 class IBackendComputeProgram;
-class IBackendCore;
 class IBackendDevice;
 class IBackendDownloadToken;
 class IBackendImage;
@@ -21,7 +20,6 @@ class IBackendProgram;
 class IBackendQueue;
 class IBackendRayTracingProgram;
 class IBackendSampler;
-class IBackendShader;
 class IBackendShaderBindingTable;
 class IBackendSubmissionToken;
 class IBackendTimeline;
@@ -49,8 +47,11 @@ void *MatchInterfaces(InterfaceID id, Source *source) noexcept {
 }
 
 // One intrusive counter per native implementation, with no public state layout.
-template <typename Interface>
-class Object : public Interface {
+template <typename Primary, typename... Interfaces>
+class Object : public Primary, public Interfaces... {
+  static_assert(std::is_convertible_v<Primary *, IObject *> && (std::is_convertible_v<Interfaces *, IObject *> && ...),
+                "Each interface must have one unambiguous IObject inheritance path.");
+
  public:
   template <typename T>
   T *QueryInterface() noexcept {
@@ -160,7 +161,6 @@ class ObjectPtr final {
   T *ptr_{nullptr};
 };
 
-class IBackendCore;
 class IBackendDevice;
 
 }  // namespace grassland::rhi::backend

@@ -3,11 +3,11 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalProgramImpl final : public Object<IMetalProgram> {
+class MetalProgramImpl final : public Object<rhi::IProgram, IMetalProgram, IBackendProgram> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IProgram, IMetalProgram, IBackendProgram, IProgram, IMetalProgramBase, IObject)
+  LONGMARCH_RHI_FINAL_QUERY(IProgram, IMetalProgram, IBackendProgram, IProgram, IMetalProgramBase)
 
-  static IMetalProgram *Create(IMetalDevice *device, const ProgramDesc &desc);
+  static rhi::IProgram *Create(IMetalDevice *device, const ProgramDesc &desc);
 
   MTL::RenderPipelineState *NativePipeline() const;
 

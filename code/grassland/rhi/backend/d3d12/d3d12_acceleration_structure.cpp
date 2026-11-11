@@ -336,10 +336,11 @@ std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> NativeGeometries(
   return result;
 }
 
-ID3D12BottomLevelAccelerationStructure *D3D12BottomLevelAccelerationStructureImpl::Create(
+IBottomLevelAccelerationStructure *D3D12BottomLevelAccelerationStructureImpl::Create(
     ID3D12Device *device,
     const BottomLevelAccelerationStructureDesc &desc) {
-  if (!device->SupportRayTracingPipeline() && !device->SupportRayQuery())
+  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() &&
+      !rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery())
     return nullptr;
   if (!ValidateBottomLevelDesc(desc))
     return nullptr;
@@ -361,10 +362,11 @@ ID3D12BottomLevelAccelerationStructure *D3D12BottomLevelAccelerationStructureImp
   return object.release();
 }
 
-ID3D12TopLevelAccelerationStructure *D3D12TopLevelAccelerationStructureImpl::Create(
+ITopLevelAccelerationStructure *D3D12TopLevelAccelerationStructureImpl::Create(
     ID3D12Device *device,
     const TopLevelAccelerationStructureDesc &desc) {
-  if (!device->SupportRayTracingPipeline() && !device->SupportRayQuery())
+  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() &&
+      !rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery())
     return nullptr;
   auto object =
       std::unique_ptr<D3D12TopLevelAccelerationStructureImpl>(new D3D12TopLevelAccelerationStructureImpl(device, desc));
@@ -382,13 +384,13 @@ ID3D12TopLevelAccelerationStructure *D3D12TopLevelAccelerationStructureImpl::Cre
   return object.release();
 }
 
-ID3D12BottomLevelAccelerationStructure *ID3D12BottomLevelAccelerationStructure::Create(
+IBottomLevelAccelerationStructure *CreateD3D12BottomLevelAccelerationStructure(
     ID3D12Device *device,
     const BottomLevelAccelerationStructureDesc &desc) {
   return D3D12BottomLevelAccelerationStructureImpl::Create(device, desc);
 }
 
-ID3D12TopLevelAccelerationStructure *ID3D12TopLevelAccelerationStructure::Create(
+ITopLevelAccelerationStructure *ID3D12TopLevelAccelerationStructure::Create(
     ID3D12Device *device,
     const TopLevelAccelerationStructureDesc &desc) {
   return D3D12TopLevelAccelerationStructureImpl::Create(device, desc);
@@ -402,9 +404,6 @@ D3D12TopLevelAccelerationStructureImpl::~D3D12TopLevelAccelerationStructureImpl(
   DestroyD3D12AccelerationStructure();
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12BottomLevelAccelerationStructure,
-                   "5531d910-c7c4-412a-b787-1d220ae37cdb")
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12TopLevelAccelerationStructure,
                    "4755c2d8-b4b6-477e-809f-939fc3683688")

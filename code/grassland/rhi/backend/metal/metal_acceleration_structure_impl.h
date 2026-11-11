@@ -3,17 +3,16 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalBottomLevelAccelerationStructureImpl final : public Object<IMetalBottomLevelAccelerationStructure> {
+class MetalBottomLevelAccelerationStructureImpl final
+    : public Object<rhi::IBottomLevelAccelerationStructure, IMetalAccelerationStructure> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IBottomLevelAccelerationStructure,
-                            IMetalBottomLevelAccelerationStructure,
                             IBottomLevelAccelerationStructure,
                             IAccelerationStructure,
-                            IMetalAccelerationStructure,
-                            IObject)
+                            IMetalAccelerationStructure)
 
-  static IMetalBottomLevelAccelerationStructure *Create(IMetalDevice *device,
-                                                        const BottomLevelAccelerationStructureDesc &desc);
+  static IBottomLevelAccelerationStructure *Create(IMetalDevice *device,
+                                                   const BottomLevelAccelerationStructureDesc &desc);
 
   AccelerationStructureType GetType() const override;
 
@@ -62,17 +61,16 @@ class MetalBottomLevelAccelerationStructureImpl final : public Object<IMetalBott
                 uint64_t compacted_size);
 };
 
-class MetalTopLevelAccelerationStructureImpl final : public Object<IMetalTopLevelAccelerationStructure> {
+class MetalTopLevelAccelerationStructureImpl final
+    : public Object<rhi::ITopLevelAccelerationStructure, IMetalTopLevelAccelerationStructure> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ITopLevelAccelerationStructure,
                             IMetalTopLevelAccelerationStructure,
                             ITopLevelAccelerationStructure,
                             IAccelerationStructure,
-                            IMetalAccelerationStructure,
-                            IObject)
+                            IMetalAccelerationStructure)
 
-  static IMetalTopLevelAccelerationStructure *Create(IMetalDevice *device,
-                                                     const TopLevelAccelerationStructureDesc &desc);
+  static ITopLevelAccelerationStructure *Create(IMetalDevice *device, const TopLevelAccelerationStructureDesc &desc);
 
   AccelerationStructureType GetType() const override;
 

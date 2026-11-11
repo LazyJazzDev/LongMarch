@@ -35,8 +35,8 @@ IShaderBindingTable *VulkanRayTracingProgramImpl::CreateShaderBindingTable(const
   return BuildShaderBindingTable(desc);
 }
 
-IVulkanRayTracingProgram *VulkanRayTracingProgramImpl::Create(IVulkanDevice *owner_device,
-                                                              const RayTracingProgramDesc &desc) {
+rhi::IRayTracingProgram *VulkanRayTracingProgramImpl::Create(IVulkanDevice *owner_device,
+                                                             const RayTracingProgramDesc &desc) {
   auto object = std::unique_ptr<VulkanRayTracingProgramImpl>(new VulkanRayTracingProgramImpl(owner_device, desc));
   auto device = owner_device->NativeDevice();
   if (!object->ValidateLayout() ||
@@ -151,14 +151,15 @@ IVulkanRayTracingProgram *VulkanRayTracingProgramImpl::Create(IVulkanDevice *own
     object->identifiers_[t].assign(handles.begin() + offset, handles.begin() + offset + size);
     offset += size;
   }
+  ObjPtr<IShaderBindingTable> table = object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc());
   object->table_ = ObjectPtr<IBackendShaderBindingTable>::Adopt(
-      object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc()));
+      rhi::QueryInterfacePtr<IBackendShaderBindingTable>(table.Get()).Detach());
   if (!object->table_)
     return nullptr;
   return object.release();
 }
 
-IBackendShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
+IShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
   const std::vector<uint32_t> raygen{0};
   const std::vector<uint32_t> *indices[] = {&raygen, &desc.miss_shader_indices, &desc.hit_group_indices,
                                             &desc.callable_shader_indices};
@@ -187,10 +188,11 @@ IBackendShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable
   }
   if (!buffer->Write(data.data(), data.size()))
     return nullptr;
-  return IBackendShaderBindingTable::Create(this, desc, std::move(buffer), regions);
+  return IBackendShaderBindingTable::Create(
+      this, desc, ObjectPtr<IBuffer>::Adopt(rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach()), regions);
 }
 
-IVulkanRayTracingProgram *IVulkanRayTracingProgram::Create(IVulkanDevice *device, const RayTracingProgramDesc &desc) {
+rhi::IRayTracingProgram *IVulkanRayTracingProgram::Create(IVulkanDevice *device, const RayTracingProgramDesc &desc) {
   return VulkanRayTracingProgramImpl::Create(device, desc);
 }
 

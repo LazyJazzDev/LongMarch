@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12DeviceImpl final : public Object<ID3D12Device> {
+class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, ID3D12Device, IBackendDevice, rhi::IDevice)
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
@@ -11,7 +11,7 @@ class D3D12DeviceImpl final : public Object<ID3D12Device> {
       const BottomLevelAccelerationStructureDesc &desc) override;
   ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
       const TopLevelAccelerationStructureDesc &desc) override;
-  static ID3D12Device *Create(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device);
+  static rhi::IDevice *Create(PhysicalDevice info, ICore *core, ComPtr<::ID3D12Device> device);
   ~D3D12DeviceImpl() override;
   ::ID3D12Device *NativeDevice() const;
   D3D12MA::Allocator *Allocator() const;
@@ -42,7 +42,7 @@ class D3D12DeviceImpl final : public Object<ID3D12Device> {
   void InterruptCollector() override;
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
   void WaitForProgress(const std::vector<Event> &next) override;
-  D3D12DeviceImpl(PhysicalDevice info, IBackendCore *core, ComPtr<::ID3D12Device> device);
+  D3D12DeviceImpl(PhysicalDevice info, ICore *core, ComPtr<::ID3D12Device> device);
   D3D12TemporalBufferPool upload_pool_;
   D3D12TemporalBufferPool download_pool_;
   D3D12ScratchPool scratch_pool_;
@@ -62,7 +62,7 @@ class D3D12DeviceImpl final : public Object<ID3D12Device> {
   std::array<HANDLE, 2> progress_events_{};
   std::array<uint64_t, 2> progress_values_{};
 
-  void InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api = BACKEND_API_DEFAULT);
+  void InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api = BACKEND_API_DEFAULT);
 
  public:
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;
@@ -84,7 +84,7 @@ class D3D12DeviceImpl final : public Object<ID3D12Device> {
   const PhysicalDevice &GetPhysicalDevice() const noexcept override;
 
  private:
-  IBackendCore *OwnerCore() const;
+  ICore *OwnerCore() const;
 
   // Called once after native device resources and all queues are initialized.
   void StartCollector();
@@ -100,7 +100,7 @@ class D3D12DeviceImpl final : public Object<ID3D12Device> {
   std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
-  IBackendCore *core_{};
+  ICore *core_{};
   PhysicalDevice info_{};
   std::thread collector_{};
 };

@@ -6,7 +6,6 @@
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalAccelerationStructure)
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTopLevelAccelerationStructure)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalBottomLevelAccelerationStructure)
 
 namespace grassland::rhi::backend::metal {
 class IMetalAccelerationStructure : public IObject {
@@ -21,43 +20,13 @@ class IMetalAccelerationStructure : public IObject {
   virtual bool IsCompactStorage() const = 0;
 };
 
-class IMetalBottomLevelAccelerationStructure : public IBottomLevelAccelerationStructure,
-                                               public IMetalAccelerationStructure {
+IBottomLevelAccelerationStructure *CreateMetalBottomLevelAccelerationStructure(
+    IMetalDevice *device,
+    const BottomLevelAccelerationStructureDesc &desc);
+
+class IMetalTopLevelAccelerationStructure : public IMetalAccelerationStructure {
  public:
-  virtual void AddRef() noexcept override = 0;
-  virtual void Release() noexcept override = 0;
-  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
-
-  template <typename T>
-  T *QueryInterface() noexcept {
-    void *result = nullptr;
-    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
-  }
-
-  static IMetalBottomLevelAccelerationStructure *Create(IMetalDevice *device,
-                                                        const BottomLevelAccelerationStructureDesc &desc);
-  virtual AccelerationStructureType GetType() const = 0;
-  virtual uint64_t GetCompactedSize() const = 0;
-  virtual const BottomLevelAccelerationStructureDesc &GetDesc() const = 0;
-};
-
-class IMetalTopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public IMetalAccelerationStructure {
- public:
-  virtual void AddRef() noexcept override = 0;
-  virtual void Release() noexcept override = 0;
-  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
-
-  template <typename T>
-  T *QueryInterface() noexcept {
-    void *result = nullptr;
-    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
-  }
-
-  static IMetalTopLevelAccelerationStructure *Create(IMetalDevice *device,
-                                                     const TopLevelAccelerationStructureDesc &desc);
-  virtual AccelerationStructureType GetType() const = 0;
-  virtual uint64_t GetCompactedSize() const = 0;
-  virtual const TopLevelAccelerationStructureDesc &GetDesc() const = 0;
+  static ITopLevelAccelerationStructure *Create(IMetalDevice *device, const TopLevelAccelerationStructureDesc &desc);
   virtual const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &BottomLevels() const = 0;
   virtual void CommitDependencies(std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references) = 0;
 };

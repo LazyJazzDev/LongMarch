@@ -5,7 +5,6 @@
 
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanAccelerationStructure)
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTopLevelAccelerationStructure)
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanBottomLevelAccelerationStructure)
 
 namespace grassland::rhi::backend::vulkan {
 class IVulkanAccelerationStructure : public IObject {
@@ -22,44 +21,13 @@ class IVulkanAccelerationStructure : public IObject {
   virtual bool IsCompactStorage() const = 0;
 };
 
-class IVulkanBottomLevelAccelerationStructure : public IBottomLevelAccelerationStructure,
-                                                public IVulkanAccelerationStructure {
+IBottomLevelAccelerationStructure *CreateVulkanBottomLevelAccelerationStructure(
+    IVulkanDevice *device,
+    const BottomLevelAccelerationStructureDesc &desc);
+
+class IVulkanTopLevelAccelerationStructure : public IVulkanAccelerationStructure {
  public:
-  virtual void AddRef() noexcept override = 0;
-  virtual void Release() noexcept override = 0;
-  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
-
-  template <typename T>
-  T *QueryInterface() noexcept {
-    void *result = nullptr;
-    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
-  }
-
-  static IVulkanBottomLevelAccelerationStructure *Create(IVulkanDevice *device,
-                                                         const BottomLevelAccelerationStructureDesc &desc);
-  virtual AccelerationStructureType GetType() const = 0;
-  virtual uint64_t GetCompactedSize() const = 0;
-  virtual const BottomLevelAccelerationStructureDesc &GetDesc() const = 0;
-};
-
-class IVulkanTopLevelAccelerationStructure : public ITopLevelAccelerationStructure,
-                                             public IVulkanAccelerationStructure {
- public:
-  virtual void AddRef() noexcept override = 0;
-  virtual void Release() noexcept override = 0;
-  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
-
-  template <typename T>
-  T *QueryInterface() noexcept {
-    void *result = nullptr;
-    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
-  }
-
-  static IVulkanTopLevelAccelerationStructure *Create(IVulkanDevice *device,
-                                                      const TopLevelAccelerationStructureDesc &desc);
-  virtual AccelerationStructureType GetType() const = 0;
-  virtual uint64_t GetCompactedSize() const = 0;
-  virtual const TopLevelAccelerationStructureDesc &GetDesc() const = 0;
+  static ITopLevelAccelerationStructure *Create(IVulkanDevice *device, const TopLevelAccelerationStructureDesc &desc);
   virtual const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &BottomLevels() const = 0;
   virtual void CommitDependencies(std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references) = 0;
 };

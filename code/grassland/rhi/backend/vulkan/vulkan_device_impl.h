@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDeviceImpl final : public Object<IVulkanDevice> {
+class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, IVulkanDevice, IBackendDevice, rhi::IDevice)
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
@@ -11,10 +11,10 @@ class VulkanDeviceImpl final : public Object<IVulkanDevice> {
       const BottomLevelAccelerationStructureDesc &desc) override;
   ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
       const TopLevelAccelerationStructureDesc &desc) override;
-  static IVulkanDevice *CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                           IBackendCore *core,
-                                           VkPhysicalDevice physical_device,
-                                           uint32_t api_version);
+  static rhi::IDevice *CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                          ICore *core,
+                                          VkPhysicalDevice physical_device,
+                                          uint32_t api_version);
   ~VulkanDeviceImpl() override;
   VkDevice NativeDevice() const;
   VulkanRenderTargetPool &RenderTargets();
@@ -49,7 +49,7 @@ class VulkanDeviceImpl final : public Object<IVulkanDevice> {
   VulkanScratchPool scratch_pool_;
   std::mutex resource_pool_mutex_;
   std::vector<std::tuple<VkCommandPool, VkCommandBuffer>> command_pool_;
-  VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, IBackendCore *core);
+  VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, ICore *core);
   std::unique_ptr<VulkanRenderTargetPool> render_targets_;
   std::unique_ptr<VulkanDescriptorPool> descriptor_pool_;
   VmaAllocator allocator_{};
@@ -61,7 +61,7 @@ class VulkanDeviceImpl final : public Object<IVulkanDevice> {
   VkSemaphore collector_shutdown_{VK_NULL_HANDLE};
   bool shutdown_consumed_{};
 
-  void InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api = BACKEND_API_DEFAULT);
+  void InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api = BACKEND_API_DEFAULT);
 
  public:
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;
@@ -83,7 +83,7 @@ class VulkanDeviceImpl final : public Object<IVulkanDevice> {
   const PhysicalDevice &GetPhysicalDevice() const noexcept override;
 
  private:
-  IBackendCore *OwnerCore() const;
+  ICore *OwnerCore() const;
 
   // Called once after native device resources and all queues are initialized.
   void StartCollector();
@@ -99,7 +99,7 @@ class VulkanDeviceImpl final : public Object<IVulkanDevice> {
   std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
-  IBackendCore *core_{};
+  ICore *core_{};
   PhysicalDevice info_{};
   std::thread collector_{};
 };

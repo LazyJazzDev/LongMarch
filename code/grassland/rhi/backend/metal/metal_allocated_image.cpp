@@ -12,7 +12,7 @@ MetalAllocatedImageImpl::MetalAllocatedImageImpl(IMetalDevice *device,
   InitializeMetalImage(desc, device, texture_.get());
 }
 
-IMetalAllocatedImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &desc) {
+IImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &desc) {
   const auto format = NativeImageFormat(desc.format);
   if (!desc.width || !desc.height || desc.width > 16384 || desc.height > 16384 || format == MTL::PixelFormatInvalid)
     return nullptr;
@@ -36,7 +36,7 @@ bool MetalAllocatedImageImpl::IsValid() const {
   return bool(texture_);
 }
 
-IMetalAllocatedImage *IMetalAllocatedImage::Create(IMetalDevice *device, const ImageDesc &desc) {
+IImage *CreateMetalAllocatedImage(IMetalDevice *device, const ImageDesc &desc) {
   return MetalAllocatedImageImpl::Create(device, desc);
 }
 
@@ -73,5 +73,3 @@ MTL::Texture *MetalAllocatedImageImpl::NativeImage() const {
   return texture_.get();
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalAllocatedImage, "4ab5d857-2e2e-4232-bd99-aca3979a9c87")

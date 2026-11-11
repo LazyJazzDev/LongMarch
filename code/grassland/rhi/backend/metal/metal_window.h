@@ -11,11 +11,8 @@ namespace grassland::rhi::backend::metal {
 
 class IMetalWindow : public IBackendWindow {
  public:
-  static IMetalWindow *Create(IMetalDevice *device, const WindowDesc &desc);
-  virtual ObjectPtr<IBackendImage> AcquireNativeFrame() = 0;
-  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
-  virtual PresentMode GetPresentMode() const = 0;
-  virtual std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const = 0;
+  static rhi::IWindow *Create(IMetalDevice *device, const WindowDesc &desc);
+
   virtual bool IsFrameValid(uint64_t generation) const = 0;
 };
 

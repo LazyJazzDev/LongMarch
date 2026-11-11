@@ -24,7 +24,7 @@ VkPipeline VulkanComputeProgramImpl::NativePipeline() const {
   return pipeline_;
 }
 
-IVulkanComputeProgram *VulkanComputeProgramImpl::Create(IVulkanDevice *owner_device, const ComputeProgramDesc &desc) {
+rhi::IComputeProgram *VulkanComputeProgramImpl::Create(IVulkanDevice *owner_device, const ComputeProgramDesc &desc) {
   auto object = std::unique_ptr<VulkanComputeProgramImpl>(new VulkanComputeProgramImpl(owner_device, desc));
   auto device = owner_device->NativeDevice();
   if (!object->ValidateLayout() ||
@@ -64,7 +64,7 @@ IVulkanComputeProgram *VulkanComputeProgramImpl::Create(IVulkanDevice *owner_dev
   return object.release();
 }
 
-IVulkanComputeProgram *IVulkanComputeProgram::Create(IVulkanDevice *device, const ComputeProgramDesc &desc) {
+rhi::IComputeProgram *IVulkanComputeProgram::Create(IVulkanDevice *device, const ComputeProgramDesc &desc) {
   return VulkanComputeProgramImpl::Create(device, desc);
 }
 

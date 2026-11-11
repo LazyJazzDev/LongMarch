@@ -5,7 +5,7 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalAllocatedBufferImpl final : public Object<IMetalAllocatedBuffer> {
+class MetalAllocatedBufferImpl final : public Object<rhi::IBuffer, IMetalAllocatedBuffer> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IBuffer, IMetalAllocatedBuffer, IBuffer, IBackendBuffer, IMetalBuffer)
 

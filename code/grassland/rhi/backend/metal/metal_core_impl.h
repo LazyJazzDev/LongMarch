@@ -3,10 +3,10 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalCoreImpl final : public Object<IMetalCore> {
+class MetalCoreImpl final : public Object<rhi::ICore, IMetalCore> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, IMetalCore, IBackendCore, rhi::ICore)
-  static IMetalCore *CreateMetalCore(const CoreDesc &desc);
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, IMetalCore, rhi::ICore)
+  static rhi::ICore *CreateMetalCore(const CoreDesc &desc);
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
   rhi::IDevice *CreateDevice(int32_t device_idx) override;
   bool DebugEnabled() const;
@@ -26,7 +26,7 @@ class MetalCoreImpl final : public Object<IMetalCore> {
   ~MetalCoreImpl() override = default;
 
   rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
-    return IBackendCore::CommonCreateDeviceByAutoSelection(requirement);
+    return backend::CreateDeviceByAutoSelection(this, requirement);
   }
 };
 }  // namespace grassland::rhi::backend::metal

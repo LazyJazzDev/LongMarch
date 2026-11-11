@@ -9,7 +9,7 @@
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12AllocatedBufferImpl final : public Object<ID3D12AllocatedBuffer> {
+class D3D12AllocatedBufferImpl final : public Object<rhi::IBuffer, ID3D12AllocatedBuffer> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IBuffer, ID3D12AllocatedBuffer, IBuffer, IBackendBuffer, ID3D12Buffer)
 

@@ -10,12 +10,12 @@ bool MetalCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     IBottomLevelAccelerationStructure *destination,
     const std::vector<AccelerationStructureGeometryBuffers> &geometries,
     AccelerationStructureBuildMode mode) {
-  auto target = rhi::QueryInterfacePtr<IMetalBottomLevelAccelerationStructure>(destination).Get();
+  auto target = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(destination).Get();
   if (sealed_ || encoder_ || !target || target->Owner() != device_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
-      !ValidateGeometryBuffers(target->GetDesc(), geometries, device_)) {
+      !ValidateGeometryBuffers(destination->GetDesc(), geometries, device_)) {
     recording_failed_ = true;
     return false;
   }
@@ -27,7 +27,7 @@ bool MetalCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     for (const auto &v : {g.data, g.indices})
       if (v.buffer && !RetainResource(v.buffer))
         return false;
-  auto descriptor = NativeGeometries(target->GetDesc(), geometries);
+  auto descriptor = NativeGeometries(destination->GetDesc(), geometries);
   auto encoder = commands_->accelerationStructureCommandEncoder();
   if (!encoder) {
     recording_failed_ = true;
@@ -53,7 +53,7 @@ bool MetalCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
-      !ValidateInstances(target->GetDesc(), instances)) {
+      !ValidateInstances(destination->GetDesc(), instances)) {
     recording_failed_ = true;
     return false;
   }
@@ -73,7 +73,7 @@ bool MetalCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
   dependencies.reserve(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
-    auto blas = rhi::QueryInterfacePtr<IMetalBottomLevelAccelerationStructure>(instance.blas).Get();
+    auto blas = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
       recording_failed_ = true;
       return false;
@@ -115,7 +115,7 @@ bool MetalCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
   for (const auto &blas : target->BottomLevels())
     if (!RetainResource(blas.Get()))
       return false;
-  auto descriptor = NativeInstances(target->GetDesc());
+  auto descriptor = NativeInstances(destination->GetDesc());
   descriptor->setInstanceCount(instances.size());
   descriptor->setInstanceDescriptorBuffer(upload->NativeBuffer());
   descriptor->setInstancedAccelerationStructures(NS::Array::array(children.data(), children.size()));
@@ -209,7 +209,7 @@ std::vector<MTL::Resource *> MetalCommandContextImpl::AccelerationResources() {
           if (seen.insert(blas.Get()).second) {
             RetainResource(blas.Get());
             resources.push_back(
-                rhi::QueryInterfacePtr<IMetalBottomLevelAccelerationStructure>(blas.Get()).Get()->NativeStructure());
+                rhi::QueryInterfacePtr<IMetalAccelerationStructure>(blas.Get()).Get()->NativeStructure());
           }
       }
     }

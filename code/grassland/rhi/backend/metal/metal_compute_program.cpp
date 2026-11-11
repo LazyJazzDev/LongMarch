@@ -24,7 +24,7 @@ MTL::Size MetalComputeProgramImpl::ThreadGroupSize() const {
   return threads_;
 }
 
-IMetalComputeProgram *MetalComputeProgramImpl::Create(IMetalDevice *owner_device, const ComputeProgramDesc &desc) {
+rhi::IComputeProgram *MetalComputeProgramImpl::Create(IMetalDevice *owner_device, const ComputeProgramDesc &desc) {
   auto object = std::unique_ptr<MetalComputeProgramImpl>(new MetalComputeProgramImpl(owner_device, desc));
   if (!object->ValidateLayout())
     return nullptr;
@@ -52,7 +52,7 @@ IMetalComputeProgram *MetalComputeProgramImpl::Create(IMetalDevice *owner_device
   return object.release();
 }
 
-IMetalComputeProgram *IMetalComputeProgram::Create(IMetalDevice *device, const ComputeProgramDesc &desc) {
+rhi::IComputeProgram *IMetalComputeProgram::Create(IMetalDevice *device, const ComputeProgramDesc &desc) {
   return MetalComputeProgramImpl::Create(device, desc);
 }
 

@@ -3,10 +3,10 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanCoreImpl final : public Object<IVulkanCore> {
+class VulkanCoreImpl final : public Object<rhi::ICore, IVulkanCore> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, IVulkanCore, IBackendCore, rhi::ICore)
-  static IVulkanCore *CreateVulkanCore(const CoreDesc &desc);
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, IVulkanCore, rhi::ICore)
+  static rhi::ICore *CreateVulkanCore(const CoreDesc &desc);
   ~VulkanCoreImpl() override;
   VkInstance Instance() const;
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
@@ -27,7 +27,7 @@ class VulkanCoreImpl final : public Object<IVulkanCore> {
 
  public:
   rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
-    return IBackendCore::CommonCreateDeviceByAutoSelection(requirement);
+    return backend::CreateDeviceByAutoSelection(this, requirement);
   }
 };
 }  // namespace grassland::rhi::backend::vulkan

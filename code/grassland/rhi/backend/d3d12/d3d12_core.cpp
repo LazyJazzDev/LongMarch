@@ -49,7 +49,7 @@ D3D12CoreImpl::~D3D12CoreImpl() {
   }
 }
 
-ID3D12Core *D3D12CoreImpl::CreateD3D12Core(const CoreDesc &desc) {
+ICore *D3D12CoreImpl::CreateD3D12Core(const CoreDesc &desc) {
   auto core = std::unique_ptr<D3D12CoreImpl>(new D3D12CoreImpl());
   if (desc.enable_debug) {
     if (!Check(D3D12GetDebugInterface(IID_PPV_ARGS(&core->debug_controller_)), "Get D3D12 debug interface"))
@@ -109,9 +109,7 @@ rhi::IDevice *D3D12CoreImpl::CreateDevice(int32_t device_idx) {
   return ID3D12Device::Create(std::move(info), this, std::move(device));
 }
 
-ID3D12Core *ID3D12Core::CreateD3D12Core(const CoreDesc &desc) {
+ICore *CreateD3D12Core(const CoreDesc &desc) {
   return D3D12CoreImpl::CreateD3D12Core(desc);
 }
 }  // namespace grassland::rhi::backend::d3d12
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Core, "0ff7c9ac-b8cc-4d2c-b5ec-9995a69b861d")

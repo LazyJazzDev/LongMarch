@@ -3,11 +3,11 @@
 #include "grassland/rhi/backend/metal/metal_window.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalWindowImpl final : public Object<IMetalWindow> {
+class MetalWindowImpl final : public Object<rhi::IWindow, IMetalWindow> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IWindow, IMetalWindow, IBackendWindow, rhi::IWindow)
   ~MetalWindowImpl() override;
-  static IMetalWindow *Create(IMetalDevice *device, const WindowDesc &desc);
+  static rhi::IWindow *Create(IMetalDevice *device, const WindowDesc &desc);
   ObjectPtr<IBackendImage> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;

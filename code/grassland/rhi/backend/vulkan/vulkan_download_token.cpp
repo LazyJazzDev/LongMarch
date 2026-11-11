@@ -38,14 +38,12 @@ bool VulkanDownloadTokenImpl::CopyData(void *destination) const {
   return true;
 }
 
-IVulkanDownloadToken *IVulkanDownloadToken::Create(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size) {
+IBackendDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size) {
   return new VulkanDownloadTokenImpl(lease, size);
 }
 
-IVulkanDownloadToken *IVulkanDownloadToken::Create(ObjectPtr<IVulkanTemporalBufferLease> lease,
-                                                   const DownloadLayout &layout) {
+IBackendDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease,
+                                                 const DownloadLayout &layout) {
   return new VulkanDownloadTokenImpl(lease, layout);
 }
 }  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanDownloadToken, "1f0619cd-eb9a-4ecc-8260-c1737da81a3b")

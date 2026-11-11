@@ -5,7 +5,7 @@
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendBuffer)
 
 namespace grassland::rhi::backend {
-class IBackendBuffer : public IBuffer {
+class IBackendBuffer : public IObject {
  public:
   virtual IBackendDevice *Owner() const = 0;
 };

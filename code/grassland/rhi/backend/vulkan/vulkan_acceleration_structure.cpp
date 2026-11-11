@@ -334,10 +334,11 @@ std::vector<VkAccelerationStructureGeometryKHR> NativeGeometries(
   return result;
 }
 
-IVulkanBottomLevelAccelerationStructure *VulkanBottomLevelAccelerationStructureImpl::Create(
+IBottomLevelAccelerationStructure *VulkanBottomLevelAccelerationStructureImpl::Create(
     IVulkanDevice *device,
     const BottomLevelAccelerationStructureDesc &desc) {
-  if (!device->SupportRayTracingPipeline() && !device->SupportRayQuery())
+  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() &&
+      !rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery())
     return nullptr;
   if (!ValidateBottomLevelDesc(desc))
     return nullptr;
@@ -363,10 +364,11 @@ IVulkanBottomLevelAccelerationStructure *VulkanBottomLevelAccelerationStructureI
   return object.release();
 }
 
-IVulkanTopLevelAccelerationStructure *VulkanTopLevelAccelerationStructureImpl::Create(
+ITopLevelAccelerationStructure *VulkanTopLevelAccelerationStructureImpl::Create(
     IVulkanDevice *device,
     const TopLevelAccelerationStructureDesc &desc) {
-  if (!device->SupportRayTracingPipeline() && !device->SupportRayQuery())
+  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() &&
+      !rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery())
     return nullptr;
   VkAccelerationStructureGeometryKHR geometry{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
   geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
@@ -389,13 +391,13 @@ IVulkanTopLevelAccelerationStructure *VulkanTopLevelAccelerationStructureImpl::C
   return object.release();
 }
 
-IVulkanBottomLevelAccelerationStructure *IVulkanBottomLevelAccelerationStructure::Create(
+IBottomLevelAccelerationStructure *CreateVulkanBottomLevelAccelerationStructure(
     IVulkanDevice *device,
     const BottomLevelAccelerationStructureDesc &desc) {
   return VulkanBottomLevelAccelerationStructureImpl::Create(device, desc);
 }
 
-IVulkanTopLevelAccelerationStructure *IVulkanTopLevelAccelerationStructure::Create(
+ITopLevelAccelerationStructure *IVulkanTopLevelAccelerationStructure::Create(
     IVulkanDevice *device,
     const TopLevelAccelerationStructureDesc &desc) {
   return VulkanTopLevelAccelerationStructureImpl::Create(device, desc);
@@ -409,9 +411,6 @@ VulkanTopLevelAccelerationStructureImpl::~VulkanTopLevelAccelerationStructureImp
   DestroyVulkanAccelerationStructure();
 }
 }  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanBottomLevelAccelerationStructure,
-                   "addcc51e-67e0-412d-befb-88c713400587")
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanTopLevelAccelerationStructure,
                    "e2af066b-da31-4c27-93ea-c2e1e39f8499")

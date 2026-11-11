@@ -6,19 +6,9 @@
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12ComputeProgram)
 
 namespace grassland::rhi::backend::d3d12 {
-class ID3D12ComputeProgram : public IBackendComputeProgram, public ID3D12ProgramBase {
+class ID3D12ComputeProgram : public ID3D12ProgramBase {
  public:
-  virtual void AddRef() noexcept override = 0;
-  virtual void Release() noexcept override = 0;
-  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
-
-  template <typename T>
-  T *QueryInterface() noexcept {
-    void *result = nullptr;
-    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
-  }
-
-  static ID3D12ComputeProgram *Create(ID3D12Device *device, const ComputeProgramDesc &desc);
+  static rhi::IComputeProgram *Create(ID3D12Device *device, const ComputeProgramDesc &desc);
   virtual ID3D12PipelineState *NativePipeline() const = 0;
 };
 

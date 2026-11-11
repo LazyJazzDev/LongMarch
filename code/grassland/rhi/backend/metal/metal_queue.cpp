@@ -10,7 +10,7 @@
 namespace grassland::rhi::backend::metal {
 
 rhi::ICommandContext *MetalQueueImpl::CreateCommandContext() {
-  return IMetalCommandContext::Create(this);
+  return CreateMetalCommandContext(this);
 }
 
 IMetalQueue *MetalQueueImpl::Create(IMetalDevice *device, QueueType type, MTL::CommandBufferDescriptor *descriptor) {
@@ -85,7 +85,7 @@ ObjectPtr<IBackendSubmissionToken> MetalQueueImpl::Submit(const ObjectPtr<IBacke
       existing->value = std::max(existing->value, wait.value);
   }
   std::unique_lock<std::mutex> queue_lock(*mutex_);
-  const Event signal{GetTimeline(), NextSerial()};
+  const Event signal{rhi::QueryInterfacePtr<ITimeline>(GetTimeline()).Get(), NextSerial()};
   auto completion = ObjectPtr<IBackendSubmissionToken>::Adopt(IBackendSubmissionToken::Create(signal));
   // Register before native submission, while the collector cannot take the list.
   auto entry = pending_.insert(pending_.end(), {commands, completion});
@@ -125,7 +125,8 @@ bool MetalQueueImpl::CollectCompleted(uint64_t completed, bool timeline_valid) {
   // Polling may submit a recovery signal; releasing resources may acquire other
   // backend locks. Neither operation runs under the submission mutex.
   for (auto it = work.begin(); it != work.end();) {
-    const auto status = it->commands->PollCompletion(it->completion->GetEvent(), completed, timeline_valid);
+    const auto status = it->commands->PollCompletion(
+        rhi::QueryInterfacePtr<ISubmissionToken>(it->completion.Get())->GetEvent(), completed, timeline_valid);
     if (status == SUBMISSION_STATUS_PENDING) {
       ++it;
       continue;

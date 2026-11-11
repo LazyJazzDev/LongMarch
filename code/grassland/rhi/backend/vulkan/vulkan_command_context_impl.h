@@ -3,9 +3,9 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanCommandContextImpl final : public Object<IVulkanCommandContext> {
+class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBackendCommandContext> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IVulkanCommandContext, IBackendCommandContext, rhi::ICommandContext)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IBackendCommandContext, rhi::ICommandContext)
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,
@@ -22,7 +22,7 @@ class VulkanCommandContextImpl final : public Object<IVulkanCommandContext> {
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   ~VulkanCommandContextImpl() override;
-  static IVulkanCommandContext *Create(IVulkanQueue *queue);
+  static ICommandContext *Create(IVulkanQueue *queue);
   IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
   IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;

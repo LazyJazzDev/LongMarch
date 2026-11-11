@@ -21,7 +21,7 @@ ObjectPtr<IMetalAllocatedBuffer> MetalScratchPool::Acquire(uint64_t size) {
     peaks_.pop_front();
 
   const auto demand = peaks_.front().first;
-  const auto current = buffer_ ? buffer_->GetDesc().size : 0;
+  const auto current = buffer_ ? rhi::QueryInterfacePtr<IBuffer>(buffer_.Get())->GetDesc().size : 0;
   if (!buffer_ || size > current || demand < current / 2) {
     uint64_t capacity = 65536;
     while (capacity < demand)

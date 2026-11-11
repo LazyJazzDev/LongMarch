@@ -6,19 +6,9 @@
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanProgram)
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanProgram : public IBackendProgram, public IVulkanProgramBase {
+class IVulkanProgram : public IVulkanProgramBase {
  public:
-  virtual void AddRef() noexcept override = 0;
-  virtual void Release() noexcept override = 0;
-  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
-
-  template <typename T>
-  T *QueryInterface() noexcept {
-    void *result = nullptr;
-    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
-  }
-
-  static IVulkanProgram *Create(IVulkanDevice *device, const ProgramDesc &desc);
+  static rhi::IProgram *Create(IVulkanDevice *device, const ProgramDesc &desc);
   virtual VkPipeline NativePipeline() const = 0;
 };
 

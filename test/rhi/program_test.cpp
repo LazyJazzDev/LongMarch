@@ -203,7 +203,7 @@ TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
   ASSERT_TRUE(other);
   ASSERT_TRUE(group->BindResource(0, std::vector<ISampler *>{first.Get(), second.Get()}));
   ASSERT_TRUE(other->BindResource(0, first.Get()));
-  auto native = static_cast<backend::IBackendBindingGroup *>(group.Get());
+  auto native = rhi::QueryInterfacePtr<backend::IBackendBindingGroup>(group.Get()).Get();
   auto captured = backend::ObjectPtr<backend::IBackendBindingVersion>::Retain(native->CurrentVersion());
   auto first_ptr = first.Get();
   auto second_ptr = second.Get();
@@ -282,7 +282,8 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
 #if defined(LONGMARCH_D3D12_ENABLED)
   backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
   if (GetParam() == BACKEND_API_D3D12) {
-    ASSERT_TRUE(SUCCEEDED(static_cast<backend::d3d12::ID3D12Device *>(device.Get())
+    ASSERT_TRUE(SUCCEEDED(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get())
+                              .Get()
                               ->NativeDevice()
                               ->QueryInterface(IID_PPV_ARGS(&messages))));
   }
@@ -532,7 +533,7 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   BindingLayoutDesc layout{{{2, BINDING_UNIFORM_BUFFER, 2}, {7, BINDING_TEXTURE2D}, {9, BINDING_SAMPLER}}};
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(group);
-  auto native = static_cast<backend::IBackendBindingGroup *>(group.Get());
+  auto native = rhi::QueryInterfacePtr<backend::IBackendBindingGroup>(group.Get()).Get();
   auto initial = native->CurrentVersion();
   const auto *stable_layout = &group->GetLayout();
   EXPECT_FALSE(initial->IsComplete());
@@ -608,7 +609,7 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(
       {{{9, BINDING_SAMPLER, 3}, {2, BINDING_UNIFORM_BUFFER, 3}, {7, BINDING_TEXTURE2D, 3}}});
   ASSERT_TRUE(group);
-  auto native = static_cast<backend::IBackendBindingGroup *>(group.Get());
+  auto native = rhi::QueryInterfacePtr<backend::IBackendBindingGroup>(group.Get()).Get();
   ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 256, 0}}, 1));
   ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{first.Get()}, 2));
   ASSERT_TRUE(group->BindResource(9, CreateSamplers(device.Get(), {{SAMPLER_FILTER_NEAREST}}), 1));
@@ -761,7 +762,7 @@ TEST_P(RhiProgram, StructuredLayoutStrideControlsCompatibilityAndRanges) {
 }
 
 #if defined(LONGMARCH_D3D12_ENABLED)
-TEST(ID3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
+TEST(IBindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   using namespace backend::d3d12;
   ObjPtr<ICore> core = CreateCore(BACKEND_API_D3D12);
   ASSERT_TRUE(core);
@@ -796,8 +797,8 @@ TEST(ID3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, buffer.Get()));
   ASSERT_TRUE(group->BindResource(1, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
-  auto native = static_cast<ID3D12BindingGroup *>(group.Get());
-  auto version = static_cast<ID3D12BindingVersion *>(native->CurrentVersion());
+  auto native = rhi::QueryInterfacePtr<backend::IBackendBindingGroup>(group.Get()).Get();
+  auto version = rhi::QueryInterfacePtr<ID3D12BindingVersion>(native->CurrentVersion()).Get();
   auto a = version->ResourceDescriptors();
   ASSERT_TRUE(a);
   EXPECT_EQ(a->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
@@ -816,7 +817,7 @@ TEST(ID3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   EXPECT_EQ(version->SamplerDescriptors()->CPU().ptr, sampler);
   ASSERT_TRUE(
       group->BindResource(1, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{SAMPLER_FILTER_NEAREST})).Get()));
-  auto replacement = static_cast<ID3D12BindingVersion *>(native->CurrentVersion());
+  auto replacement = rhi::QueryInterfacePtr<ID3D12BindingVersion>(native->CurrentVersion()).Get();
   EXPECT_NE(replacement, version);
   EXPECT_NE(replacement->SamplerDescriptors()->CPU().ptr, sampler);
   EXPECT_EQ(version->ResourceDescriptors(), a);

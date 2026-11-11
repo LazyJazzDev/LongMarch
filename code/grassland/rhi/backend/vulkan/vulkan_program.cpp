@@ -26,7 +26,7 @@ VkPipeline VulkanProgramImpl::NativePipeline() const {
   return pipeline_;
 }
 
-IVulkanProgram *VulkanProgramImpl::Create(IVulkanDevice *owner_device, const ProgramDesc &desc) {
+rhi::IProgram *VulkanProgramImpl::Create(IVulkanDevice *owner_device, const ProgramDesc &desc) {
   auto object = std::unique_ptr<VulkanProgramImpl>(new VulkanProgramImpl(owner_device, desc));
   auto device = owner_device->NativeDevice();
 
@@ -194,7 +194,7 @@ IVulkanProgram *VulkanProgramImpl::Create(IVulkanDevice *owner_device, const Pro
   return object.release();
 }
 
-IVulkanProgram *IVulkanProgram::Create(IVulkanDevice *device, const ProgramDesc &desc) {
+rhi::IProgram *IVulkanProgram::Create(IVulkanDevice *device, const ProgramDesc &desc) {
   return VulkanProgramImpl::Create(device, desc);
 }
 

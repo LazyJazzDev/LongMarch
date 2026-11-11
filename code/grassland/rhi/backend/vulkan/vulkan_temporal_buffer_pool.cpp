@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanTemporalBufferLeaseImpl final : public Object<IVulkanTemporalBufferLease> {
+class VulkanTemporalBufferLeaseImpl final : public Object<rhi::IBuffer, IVulkanTemporalBufferLease> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IBuffer, IVulkanTemporalBufferLease, IBuffer, IBackendBuffer, IVulkanBuffer)
 
@@ -50,7 +50,7 @@ VulkanTemporalBufferLeaseImpl::~VulkanTemporalBufferLeaseImpl() {
 }
 
 BufferDesc VulkanTemporalBufferLeaseImpl::GetDesc() const {
-  return buffer_->GetDesc();
+  return rhi::QueryInterfacePtr<IBuffer>(buffer_)->GetDesc();
 }
 
 VkBuffer VulkanTemporalBufferLeaseImpl::NativeBuffer() const {

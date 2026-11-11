@@ -26,7 +26,7 @@ MTL::DepthStencilState *MetalProgramImpl::NativeDepthStencil() const {
   return depth_stencil_.get();
 }
 
-IMetalProgram *MetalProgramImpl::Create(IMetalDevice *owner_device, const ProgramDesc &desc) {
+rhi::IProgram *MetalProgramImpl::Create(IMetalDevice *owner_device, const ProgramDesc &desc) {
   auto object = std::unique_ptr<MetalProgramImpl>(new MetalProgramImpl(owner_device, desc));
 
   if (!object->ValidateLayout() || object->desc_.vertex_bindings.size() > 31 - VertexBufferBase) {
@@ -128,7 +128,7 @@ IMetalProgram *MetalProgramImpl::Create(IMetalDevice *owner_device, const Progra
   return object.release();
 }
 
-IMetalProgram *IMetalProgram::Create(IMetalDevice *device, const ProgramDesc &desc) {
+rhi::IProgram *IMetalProgram::Create(IMetalDevice *device, const ProgramDesc &desc) {
   return MetalProgramImpl::Create(device, desc);
 }
 

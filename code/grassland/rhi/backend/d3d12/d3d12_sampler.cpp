@@ -8,7 +8,7 @@ D3D12SamplerImpl::D3D12SamplerImpl(ID3D12Device *device, const SamplerDesc &desc
   InitializeSampler(desc, device);
 }
 
-ID3D12Sampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc &desc) {
+rhi::ISampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc &desc) {
   if (!Validate(desc))
     return nullptr;
   auto sampler = ObjectPtr<D3D12SamplerImpl>::Adopt(new D3D12SamplerImpl(device, desc));
@@ -29,7 +29,7 @@ ID3D12Sampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc 
   return sampler.Detach();
 }
 
-ID3D12Sampler *ID3D12Sampler::Create(ID3D12Device *device, const SamplerDesc &desc) {
+rhi::ISampler *ID3D12Sampler::Create(ID3D12Device *device, const SamplerDesc &desc) {
   return D3D12SamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::d3d12

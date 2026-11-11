@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalTemporalBufferLeaseImpl final : public Object<IMetalTemporalBufferLease> {
+class MetalTemporalBufferLeaseImpl final : public Object<rhi::IBuffer, IMetalTemporalBufferLease> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IBuffer, IMetalTemporalBufferLease, IBuffer, IBackendBuffer, IMetalBuffer)
 
@@ -50,7 +50,7 @@ MetalTemporalBufferLeaseImpl::~MetalTemporalBufferLeaseImpl() {
 }
 
 BufferDesc MetalTemporalBufferLeaseImpl::GetDesc() const {
-  return buffer_->GetDesc();
+  return rhi::QueryInterfacePtr<IBuffer>(buffer_)->GetDesc();
 }
 
 MTL::Buffer *MetalTemporalBufferLeaseImpl::NativeBuffer() const {

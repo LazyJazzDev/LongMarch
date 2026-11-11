@@ -11,7 +11,6 @@ namespace grassland::rhi::backend::metal {
 class IMetalQueue : public IBackendQueue {
  public:
   static IMetalQueue *Create(IMetalDevice *device, QueueType type, MTL::CommandBufferDescriptor *descriptor);
-  virtual rhi::ICommandContext *CreateCommandContext() = 0;
   virtual MTL::CommandQueue *NativeQueue() const = 0;
   virtual NS::SharedPtr<MTL::CommandBuffer> CreateCommandBuffer() = 0;
   virtual bool WaitIdle() = 0;

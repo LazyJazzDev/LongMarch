@@ -45,7 +45,7 @@ ObjectPtr<IBackendWindow> FindWindow(GLFWwindow *native) {
 }  // namespace
 
 void RegisterWindow(IBackendWindow *window) {
-  auto native = window->GLFWWindow();
+  auto native = rhi::QueryInterfacePtr<IWindow>(window)->GLFWWindow();
   {
     std::lock_guard<std::mutex> lock(Get().mutex);
     Get().windows.emplace(native, window);
@@ -54,20 +54,20 @@ void RegisterWindow(IBackendWindow *window) {
     auto window = FindWindow(native);
     if (!window)
       return;
-    if (!window->RebuildSwapChain())
+    if (!rhi::QueryInterfacePtr<IWindow>(window.Get())->RebuildSwapChain())
       Get().resize_failed = true;
-    window->FramebufferResizeEvent().InvokeCallbacks(width, height);
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->FramebufferResizeEvent().InvokeCallbacks(width, height);
   });
   glfwSetWindowIconifyCallback(native, [](GLFWwindow *native, int iconified) {
     auto window = FindWindow(native);
-    if (window && !iconified && !window->RebuildSwapChain())
+    if (window && !iconified && !rhi::QueryInterfacePtr<IWindow>(window.Get())->RebuildSwapChain())
       Get().resize_failed = true;
   });
   glfwSetWindowSizeCallback(native, [](GLFWwindow *native, int width, int height) {
     auto window = FindWindow(native);
     if (!window)
       return;
-    window->ResizeEvent().InvokeCallbacks(width, height);
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->ResizeEvent().InvokeCallbacks(width, height);
   });
   glfwSetCursorEnterCallback(native, [](GLFWwindow *native, int entered) {
     auto window = FindWindow(native);
@@ -77,7 +77,7 @@ void RegisterWindow(IBackendWindow *window) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_CursorEnterCallback(native, entered);
     }
-    window->CursorEnterEvent().InvokeCallbacks(bool(entered));
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->CursorEnterEvent().InvokeCallbacks(bool(entered));
   });
   glfwSetWindowFocusCallback(native, [](GLFWwindow *native, int focused) {
     auto window = FindWindow(native);
@@ -87,7 +87,7 @@ void RegisterWindow(IBackendWindow *window) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_WindowFocusCallback(native, focused);
     }
-    window->FocusEvent().InvokeCallbacks(bool(focused));
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->FocusEvent().InvokeCallbacks(bool(focused));
   });
   glfwSetCursorPosCallback(native, [](GLFWwindow *native, double x, double y) {
     auto window = FindWindow(native);
@@ -97,7 +97,7 @@ void RegisterWindow(IBackendWindow *window) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_CursorPosCallback(native, x, y);
     }
-    window->MouseMoveEvent().InvokeCallbacks(x, y);
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->MouseMoveEvent().InvokeCallbacks(x, y);
   });
   glfwSetMouseButtonCallback(native, [](GLFWwindow *native, int button, int action, int mods) {
     auto window = FindWindow(native);
@@ -109,7 +109,7 @@ void RegisterWindow(IBackendWindow *window) {
     }
     double x, y;
     glfwGetCursorPos(native, &x, &y);
-    window->MouseButtonEvent().InvokeCallbacks(button, action, mods, x, y);
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->MouseButtonEvent().InvokeCallbacks(button, action, mods, x, y);
   });
   glfwSetScrollCallback(native, [](GLFWwindow *native, double x, double y) {
     auto window = FindWindow(native);
@@ -119,7 +119,7 @@ void RegisterWindow(IBackendWindow *window) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_ScrollCallback(native, x, y);
     }
-    window->ScrollEvent().InvokeCallbacks(x, y);
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->ScrollEvent().InvokeCallbacks(x, y);
   });
   glfwSetKeyCallback(native, [](GLFWwindow *native, int key, int scancode, int action, int mods) {
     auto window = FindWindow(native);
@@ -129,7 +129,7 @@ void RegisterWindow(IBackendWindow *window) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_KeyCallback(native, key, scancode, action, mods);
     }
-    window->KeyEvent().InvokeCallbacks(key, scancode, action, mods);
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->KeyEvent().InvokeCallbacks(key, scancode, action, mods);
   });
   glfwSetCharCallback(native, [](GLFWwindow *native, unsigned int codepoint) {
     auto window = FindWindow(native);
@@ -139,13 +139,13 @@ void RegisterWindow(IBackendWindow *window) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_CharCallback(native, codepoint);
     }
-    window->CharEvent().InvokeCallbacks(codepoint);
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->CharEvent().InvokeCallbacks(codepoint);
   });
   glfwSetDropCallback(native, [](GLFWwindow *native, int count, const char **paths) {
     auto window = FindWindow(native);
     if (!window)
       return;
-    window->DropEvent().InvokeCallbacks(count, paths);
+    rhi::QueryInterfacePtr<IWindow>(window.Get())->DropEvent().InvokeCallbacks(count, paths);
   });
 }
 

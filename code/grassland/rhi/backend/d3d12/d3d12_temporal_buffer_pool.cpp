@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12TemporalBufferLeaseImpl final : public Object<ID3D12TemporalBufferLease> {
+class D3D12TemporalBufferLeaseImpl final : public Object<rhi::IBuffer, ID3D12TemporalBufferLease> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IBuffer, ID3D12TemporalBufferLease, IBuffer, IBackendBuffer, ID3D12Buffer)
 
@@ -51,7 +51,7 @@ D3D12TemporalBufferLeaseImpl::~D3D12TemporalBufferLeaseImpl() {
 }
 
 BufferDesc D3D12TemporalBufferLeaseImpl::GetDesc() const {
-  return buffer_->GetDesc();
+  return rhi::QueryInterfacePtr<IBuffer>(buffer_)->GetDesc();
 }
 
 ID3D12Resource *D3D12TemporalBufferLeaseImpl::NativeBuffer() const {

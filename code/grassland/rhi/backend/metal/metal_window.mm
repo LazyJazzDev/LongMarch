@@ -56,7 +56,7 @@ MetalWindowImpl::~MetalWindowImpl() {
   DestroyWindow();
 }
 
-IMetalWindow *MetalWindowImpl::Create(IMetalDevice *device, const WindowDesc &desc) {
+rhi::IWindow *MetalWindowImpl::Create(IMetalDevice *device, const WindowDesc &desc) {
   auto object = std::unique_ptr<MetalWindowImpl>(new MetalWindowImpl(device));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   if (!object->InitializeWindow(device, desc))

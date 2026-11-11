@@ -13,7 +13,7 @@ VulkanSamplerImpl::~VulkanSamplerImpl() {
     vkDestroySampler(device_, sampler_, nullptr);
 }
 
-IVulkanSampler *VulkanSamplerImpl::Create(IVulkanDevice *device, const SamplerDesc &desc) {
+rhi::ISampler *VulkanSamplerImpl::Create(IVulkanDevice *device, const SamplerDesc &desc) {
   if (!Validate(desc))
     return nullptr;
   auto sampler = ObjectPtr<VulkanSamplerImpl>::Adopt(new VulkanSamplerImpl(device, desc));
@@ -30,7 +30,7 @@ IVulkanSampler *VulkanSamplerImpl::Create(IVulkanDevice *device, const SamplerDe
   return sampler.Detach();
 }
 
-IVulkanSampler *IVulkanSampler::Create(IVulkanDevice *device, const SamplerDesc &desc) {
+rhi::ISampler *IVulkanSampler::Create(IVulkanDevice *device, const SamplerDesc &desc) {
   return VulkanSamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::vulkan

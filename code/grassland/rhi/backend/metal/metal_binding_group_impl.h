@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::metal {
 class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IObject, IMetalBindingVersion, IBackendBindingVersion, IObject)
+  LONGMARCH_RHI_FINAL_QUERY(IObject, IMetalBindingVersion, IBackendBindingVersion)
   static MetalBindingVersionImpl *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
   ObjectPtr<IBackendBindingVersion> Clone() const override;
   bool IsInitialized(size_t binding, uint32_t element) const override;
@@ -53,10 +53,11 @@ class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
 };
 
-class MetalBindingGroupImpl final : public Object<IMetalBindingGroup> {
+class MetalBindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBindingGroup> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IBindingGroup, IMetalBindingGroup, IBackendBindingGroup, IBindingGroup)
-  static IMetalBindingGroup *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
+  using Version = IMetalBindingVersion;
+  LONGMARCH_RHI_FINAL_QUERY(IBindingGroup, IBackendBindingGroup, IBindingGroup)
+  static IBindingGroup *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
 
  private:
   MetalBindingGroupImpl(IMetalDevice *device, ObjectPtr<Version> version);

@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
-class SubmissionTokenImpl final : public Object<IBackendSubmissionToken> {
+class SubmissionTokenImpl final : public Object<rhi::ISubmissionToken, IBackendSubmissionToken> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::ISubmissionToken, IBackendSubmissionToken, rhi::ISubmissionToken)
   explicit SubmissionTokenImpl(Event event);

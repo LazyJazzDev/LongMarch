@@ -3,10 +3,10 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12CoreImpl final : public Object<ID3D12Core> {
+class D3D12CoreImpl final : public Object<rhi::ICore> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, ID3D12Core, IBackendCore, rhi::ICore)
-  static ID3D12Core *CreateD3D12Core(const CoreDesc &desc);
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, rhi::ICore)
+  static ICore *CreateD3D12Core(const CoreDesc &desc);
   ~D3D12CoreImpl() override;
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
   rhi::IDevice *CreateDevice(int32_t device_idx) override;
@@ -25,7 +25,7 @@ class D3D12CoreImpl final : public Object<ID3D12Core> {
 
  public:
   rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
-    return IBackendCore::CommonCreateDeviceByAutoSelection(requirement);
+    return backend::CreateDeviceByAutoSelection(this, requirement);
   }
 };
 }  // namespace grassland::rhi::backend::d3d12

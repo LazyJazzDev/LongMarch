@@ -67,7 +67,7 @@ VulkanWindowImpl::~VulkanWindowImpl() {
   DestroyWindow();
 }
 
-IVulkanWindow *VulkanWindowImpl::Create(IVulkanDevice *device, const WindowDesc &desc) {
+rhi::IWindow *VulkanWindowImpl::Create(IVulkanDevice *device, const WindowDesc &desc) {
   auto object = std::unique_ptr<VulkanWindowImpl>(new VulkanWindowImpl(device));
   if (!object->device_->SupportsSwapchain()) {
     ReportError(-1, "VK_KHR_swapchain is unavailable.");
@@ -428,7 +428,7 @@ bool VulkanWindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
   return true;
 }
 
-IVulkanWindow *IVulkanWindow::Create(IVulkanDevice *device, const WindowDesc &desc) {
+rhi::IWindow *IVulkanWindow::Create(IVulkanDevice *device, const WindowDesc &desc) {
   return VulkanWindowImpl::Create(device, desc);
 }
 
@@ -530,7 +530,7 @@ rhi::IImage *VulkanWindowImpl::GetNextImage() {
     std::abort();
   }
 #endif
-  return ObjectPtr<IBackendImage>(next_image_).Detach();
+  return rhi::QueryInterfacePtr<IImage>(next_image_.Get()).Detach();
 }
 
 IBackendQueue *VulkanWindowImpl::OwnerQueue() const {
@@ -712,8 +712,9 @@ void VulkanWindowImpl::DestroyWindow() {
 }
 
 bool VulkanWindowImpl::InitializeWindow(IBackendDevice *device, const WindowDesc &desc) {
-  queue_ =
-      rhi::QueryInterfacePtr<IBackendQueue>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get()).Get();
+  queue_ = rhi::QueryInterfacePtr<IBackendQueue>(
+               ObjectPtr<IQueue>::Adopt(rhi::QueryInterfacePtr<IDevice>(device)->GetQueue(QUEUE_TYPE_MAIN)).Get())
+               .Get();
   requested_mode_ = desc.present_mode;
   requested_color_space_ = desc.color_space;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());

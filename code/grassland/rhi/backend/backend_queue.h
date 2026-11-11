@@ -11,26 +11,19 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendQueue)
 
 namespace grassland::rhi::backend {
 
-class IBackendQueue : public rhi::IQueue {
+class IBackendQueue : public IObject {
  protected:
   void DestroyQueue();
 
  public:
   virtual IBackendDevice *Owner() const = 0;
-
   virtual IBackendTimeline *GetTimeline() const = 0;
-
-  QueueType GetType() const override = 0;
-
   virtual std::mutex &QueueMutex() = 0;
-
   virtual  // Called under QueueMutex, in native submission order.
       uint64_t
       NextSerial() = 0;
-
   virtual ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IBackendCommandContext> &commands,
                                                     const SubmitInfo &info) = 0;
-
   virtual  // Called only by the device collector; returns whether this queue is drained.
       bool
       CollectCompleted(uint64_t completed, bool timeline_valid) = 0;

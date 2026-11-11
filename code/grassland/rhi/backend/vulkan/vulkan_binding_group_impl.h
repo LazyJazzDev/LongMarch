@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IObject, IVulkanBindingVersion, IBackendBindingVersion, IObject)
+  LONGMARCH_RHI_FINAL_QUERY(IObject, IVulkanBindingVersion, IBackendBindingVersion)
   static VulkanBindingVersionImpl *Create(IVulkanDevice *device, const BindingLayoutDesc &layout);
   ObjectPtr<IBackendBindingVersion> Clone() const override;
   bool IsInitialized(size_t binding_index, uint32_t element) const override;
@@ -50,10 +50,11 @@ class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
 };
 
-class VulkanBindingGroupImpl final : public Object<IVulkanBindingGroup> {
+class VulkanBindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBindingGroup> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IBindingGroup, IVulkanBindingGroup, IBackendBindingGroup, IBindingGroup)
-  static IVulkanBindingGroup *Create(IVulkanDevice *device, const BindingLayoutDesc &layout);
+  using Version = IVulkanBindingVersion;
+  LONGMARCH_RHI_FINAL_QUERY(IBindingGroup, IBackendBindingGroup, IBindingGroup)
+  static IBindingGroup *Create(IVulkanDevice *device, const BindingLayoutDesc &layout);
 
  private:
   VulkanBindingGroupImpl(IVulkanDevice *device, ObjectPtr<Version> version);

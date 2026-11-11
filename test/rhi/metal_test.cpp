@@ -23,7 +23,7 @@ TEST(RhiMetal, NativeCompilationErrorsReachConsole) {
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto native = static_cast<backend::metal::IMetalDevice *>(device.Get());
+  auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get();
   NS::Error *error = nullptr;
   auto library = NS::TransferPtr(native->NativeDevice()->newLibrary(
       NS::String::string("#error RHI_Metal_console_probe", NS::UTF8StringEncoding), nullptr, &error));
@@ -47,9 +47,9 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     ASSERT_TRUE(core);
     auto device = core.CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
-    auto native = static_cast<backend::metal::IMetalDevice *>(device.Get());
+    auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get();
     ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<backend::metal::IMetalQueue *>(queue_owner.Get());
+    auto native_queue = rhi::QueryInterfacePtr<backend::metal::IMetalQueue>(queue_owner.Get()).Get();
     auto commands = native_queue->CreateCommandBuffer();
     ASSERT_TRUE(commands);
     EXPECT_EQ(commands->errorOptions(),
@@ -85,7 +85,7 @@ TEST(RhiMetal, CapabilitiesMatchNativeDeviceAndEnumerationRemainsStable) {
   for (size_t id = 0; id < devices.size(); ++id) {
     auto device = core.CreateDevice(static_cast<int32_t>(id));
     ASSERT_TRUE(device);
-    auto native = (*static_cast<backend::metal::IMetalDevice *>((device).Get())).NativeDevice();
+    auto native = QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get())->NativeDevice();
     ASSERT_NE(native, nullptr);
     EXPECT_EQ(devices[id].name, native->name()->utf8String());
     EXPECT_EQ(devices[id].ray_query_feature, native->supportsRaytracing());
@@ -115,7 +115,7 @@ TEST(RhiMetal, NativeDeviceExecutesWorkBeforeParentRelease) {
   ASSERT_TRUE(first);
   ASSERT_TRUE(device);
   first = {};
-  auto native = (*static_cast<backend::metal::IMetalDevice *>((device).Get())).NativeDevice();
+  auto native = QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get())->NativeDevice();
   auto queue = NS::TransferPtr(native->newCommandQueue());
   ASSERT_TRUE(queue);
   auto buffer = NS::TransferPtr(native->newBuffer(256, MTL::ResourceStorageModeShared));
@@ -201,15 +201,15 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
     auto abandoned = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
     ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   }
-  auto native = static_cast<backend::metal::IMetalDevice *>(device.Get());
+  auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get();
   ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
-  auto native_queue = static_cast<backend::metal::IMetalQueue *>(queue_owner.Get());
+  auto native_queue = rhi::QueryInterfacePtr<backend::metal::IMetalQueue>(queue_owner.Get()).Get();
   auto readback = NS::TransferPtr(native->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
   ASSERT_TRUE(readback);
   auto check = [&](const Image &image, std::array<int, 4> expected) {
     auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
-    auto texture = static_cast<backend::metal::IMetalImage *>(image.Get())->NativeImage();
+    auto texture = rhi::QueryInterfacePtr<backend::metal::IMetalImage>(image.Get()).Get()->NativeImage();
     blit->copyFromTexture(texture, 0, 0, MTL::Origin::Make(0, 0, 0), MTL::Size::Make(1, 1, 1), readback.get(), 0, 256,
                           256);
     blit->endEncoding();

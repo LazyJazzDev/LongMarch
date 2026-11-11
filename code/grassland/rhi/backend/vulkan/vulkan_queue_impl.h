@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanQueueImpl final : public Object<IVulkanQueue> {
+class VulkanQueueImpl final : public Object<rhi::IQueue, IVulkanQueue> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, IVulkanQueue, IBackendQueue, rhi::IQueue)
   rhi::ICommandContext *CreateCommandContext() override;

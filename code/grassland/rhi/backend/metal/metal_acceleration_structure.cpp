@@ -191,10 +191,10 @@ MetalBottomLevelAccelerationStructureImpl::MetalBottomLevelAccelerationStructure
   InitializeMetalAccelerationStructure(device);
 }
 
-IMetalBottomLevelAccelerationStructure *MetalBottomLevelAccelerationStructureImpl::Create(
+IBottomLevelAccelerationStructure *MetalBottomLevelAccelerationStructureImpl::Create(
     IMetalDevice *device,
     const BottomLevelAccelerationStructureDesc &desc) {
-  if (!device->SupportRayQuery() || !ValidateBottomLevelDesc(desc))
+  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery() || !ValidateBottomLevelDesc(desc))
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto result = std::unique_ptr<MetalBottomLevelAccelerationStructureImpl>(
@@ -223,10 +223,10 @@ MetalTopLevelAccelerationStructureImpl::MetalTopLevelAccelerationStructureImpl(
   InitializeMetalAccelerationStructure(device);
 }
 
-IMetalTopLevelAccelerationStructure *MetalTopLevelAccelerationStructureImpl::Create(
+ITopLevelAccelerationStructure *MetalTopLevelAccelerationStructureImpl::Create(
     IMetalDevice *device,
     const TopLevelAccelerationStructureDesc &desc) {
-  if (!device->SupportRayQuery() || !desc.instance_count)
+  if (!rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery() || !desc.instance_count)
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto result =
@@ -258,21 +258,18 @@ void MetalTopLevelAccelerationStructureImpl::CommitDependencies(
   bottom_levels_ = std::move(refs);
 }
 
-IMetalBottomLevelAccelerationStructure *IMetalBottomLevelAccelerationStructure::Create(
+IBottomLevelAccelerationStructure *CreateMetalBottomLevelAccelerationStructure(
     IMetalDevice *device,
     const BottomLevelAccelerationStructureDesc &desc) {
   return MetalBottomLevelAccelerationStructureImpl::Create(device, desc);
 }
 
-IMetalTopLevelAccelerationStructure *IMetalTopLevelAccelerationStructure::Create(
+ITopLevelAccelerationStructure *IMetalTopLevelAccelerationStructure::Create(
     IMetalDevice *device,
     const TopLevelAccelerationStructureDesc &desc) {
   return MetalTopLevelAccelerationStructureImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::metal
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalBottomLevelAccelerationStructure,
-                   "5efa0e0c-89c2-4fdf-8295-1b1e502f6363")
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalTopLevelAccelerationStructure,
                    "240cc2a8-c334-4c86-b106-32c7fcc0f439")

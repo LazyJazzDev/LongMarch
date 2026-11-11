@@ -3,9 +3,9 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDownloadTokenImpl final : public Object<IVulkanDownloadToken> {
+class VulkanDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackendDownloadToken> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, IVulkanDownloadToken, IBackendDownloadToken, IDownloadToken)
+  LONGMARCH_RHI_FINAL_QUERY(IDownloadToken, IBackendDownloadToken, IDownloadToken)
 
   VulkanDownloadTokenImpl(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size);
 
@@ -14,11 +14,12 @@ class VulkanDownloadTokenImpl final : public Object<IVulkanDownloadToken> {
   ~VulkanDownloadTokenImpl() override;
 
   SubmissionStatus GetStatus() const override {
-    return submission_ ? submission_->GetStatus() : SUBMISSION_STATUS_PENDING;
+    return submission_ ? rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->GetStatus()
+                       : SUBMISSION_STATUS_PENDING;
   }
 
   bool WaitHost() const override {
-    return submission_ && submission_->WaitHost();
+    return submission_ && rhi::QueryInterfacePtr<ISubmissionToken>(submission_.Get())->WaitHost();
   }
 
   uint64_t GetSize() const override {

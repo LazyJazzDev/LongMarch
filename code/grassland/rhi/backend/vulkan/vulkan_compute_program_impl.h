@@ -3,16 +3,16 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanComputeProgramImpl final : public Object<IVulkanComputeProgram> {
+class VulkanComputeProgramImpl final
+    : public Object<rhi::IComputeProgram, IVulkanComputeProgram, IBackendComputeProgram> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IComputeProgram,
                             IVulkanComputeProgram,
                             IBackendComputeProgram,
                             IComputeProgram,
-                            IVulkanProgramBase,
-                            IObject)
+                            IVulkanProgramBase)
 
-  static IVulkanComputeProgram *Create(IVulkanDevice *device, const ComputeProgramDesc &desc);
+  static rhi::IComputeProgram *Create(IVulkanDevice *device, const ComputeProgramDesc &desc);
 
   ~VulkanComputeProgramImpl() override;
 

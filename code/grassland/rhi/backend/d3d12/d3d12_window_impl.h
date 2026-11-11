@@ -3,11 +3,11 @@
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12WindowImpl final : public Object<ID3D12Window> {
+class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IWindow, ID3D12Window, IBackendWindow, rhi::IWindow)
   ~D3D12WindowImpl() override;
-  static ID3D12Window *Create(ID3D12Device *device, const WindowDesc &desc);
+  static rhi::IWindow *Create(ID3D12Device *device, const WindowDesc &desc);
   ObjectPtr<IBackendImage> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;

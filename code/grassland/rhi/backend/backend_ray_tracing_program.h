@@ -5,9 +5,8 @@
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendRayTracingProgram)
 
 namespace grassland::rhi::backend {
-class IBackendRayTracingProgram : public IRayTracingProgram {
+class IBackendRayTracingProgram : public IObject {
  public:
-  const RayTracingProgramDesc &GetDesc() const override = 0;
   virtual IBackendDevice *Owner() const = 0;
 };
 }  // namespace grassland::rhi::backend

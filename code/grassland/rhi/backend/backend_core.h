@@ -3,17 +3,11 @@
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_core.h"
 
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendCore)
-
 namespace grassland::rhi::backend {
 
-class IBackendCore : public rhi::ICore {
- public:
-  rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override = 0;
-  rhi::IDevice *CommonCreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {});
-};
+IDevice *CreateDeviceByAutoSelection(ICore *core, DeviceFeatureRequirement requirement = {});
 
-IBackendCore *CreateCore(BackendAPI api, const CoreDesc &desc);
+ICore *CreateCore(BackendAPI api, const CoreDesc &desc);
 
 // Returns a stable vector index, or -1 when no device satisfies the filters.
 int32_t SelectPhysicalDevice(const std::vector<PhysicalDevice> &devices, DeviceFeatureRequirement requirement);

@@ -8,11 +8,9 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalCore)
 
 namespace grassland::rhi::backend::metal {
 
-class IMetalCore : public IBackendCore {
+class IMetalCore : public IObject {
  public:
-  static IMetalCore *CreateMetalCore(const CoreDesc &desc);
-  virtual std::vector<PhysicalDevice> GetPhysicalDevices() const = 0;
-  virtual rhi::IDevice *CreateDevice(int32_t device_idx) = 0;
+  static rhi::ICore *CreateMetalCore(const CoreDesc &desc);
   virtual bool DebugEnabled() const = 0;
 };
 

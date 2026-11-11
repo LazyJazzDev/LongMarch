@@ -15,7 +15,7 @@ MTL::SamplerState *MetalSamplerImpl::NativeSampler() const {
   return sampler_.get();
 }
 
-IMetalSampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc &desc) {
+rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc &desc) {
   if (!Validate(desc))
     return nullptr;
 
@@ -38,7 +38,7 @@ IMetalSampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc 
   return new MetalSamplerImpl(device, desc, std::move(sampler));
 }
 
-IMetalSampler *IMetalSampler::Create(IMetalDevice *device, const SamplerDesc &desc) {
+rhi::ISampler *IMetalSampler::Create(IMetalDevice *device, const SamplerDesc &desc) {
   return MetalSamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::metal

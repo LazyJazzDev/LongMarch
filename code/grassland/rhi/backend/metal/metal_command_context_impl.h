@@ -3,10 +3,10 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalCommandContextImpl final : public Object<IMetalCommandContext> {
+class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IBackendCommandContext> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IMetalCommandContext, IBackendCommandContext, rhi::ICommandContext)
-  static IMetalCommandContext *Create(IMetalQueue *queue);
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, IBackendCommandContext, rhi::ICommandContext)
+  static ICommandContext *Create(IMetalQueue *queue);
   ~MetalCommandContextImpl() override;
   bool CmdBuildBottomLevelAccelerationStructure(
       IBottomLevelAccelerationStructure *destination,

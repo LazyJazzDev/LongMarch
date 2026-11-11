@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12TimelineImpl final : public Object<ID3D12Timeline> {
+class D3D12TimelineImpl final : public Object<rhi::ITimeline, ID3D12Timeline> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ITimeline, ID3D12Timeline, IBackendTimeline, ITimeline)
 

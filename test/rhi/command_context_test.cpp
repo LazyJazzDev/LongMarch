@@ -61,7 +61,7 @@ struct Gate {
   int windows_destroyed{};
 };
 
-class TestWindow final : public backend::Object<backend::IBackendWindow> {
+class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendWindow> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IWindow, backend::IBackendWindow, rhi::IWindow)
 
@@ -200,7 +200,7 @@ class TestWindow final : public backend::Object<backend::IBackendWindow> {
       std::abort();
     }
 #endif
-    return ObjectPtr<IBackendImage>(next_image_).Detach();
+    return rhi::QueryInterfacePtr<rhi::IImage>(next_image_.Get()).Detach();
   }
 
   IBackendQueue *OwnerQueue() const override {
@@ -366,8 +366,9 @@ class TestWindow final : public backend::Object<backend::IBackendWindow> {
 
   bool InitializeWindow(IBackendDevice *device, const WindowDesc &desc) {
     device_ = device;
-    queue_ =
-        rhi::QueryInterfacePtr<IBackendQueue>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get()).Get();
+    queue_ = rhi::QueryInterfacePtr<IBackendQueue>(
+                 ObjectPtr<IQueue>::Adopt(rhi::QueryInterfacePtr<IDevice>(device)->GetQueue(QUEUE_TYPE_MAIN)).Get())
+                 .Get();
     requested_mode_ = desc.present_mode;
     requested_color_space_ = desc.color_space;
     window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
@@ -467,7 +468,7 @@ class TestWindow final : public backend::Object<backend::IBackendWindow> {
   ObjectPtr<IBackendImage> next_image_{};
 };
 
-class TestImage final : public backend::Object<backend::IBackendImage> {
+class TestImage final : public backend::Object<rhi::IImage, backend::IBackendImage> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, backend::IBackendImage, rhi::IImage)
 
@@ -537,7 +538,7 @@ class TestResource final : public backend::Object<rhi::IObject> {
   std::shared_ptr<Gate> gate_;
 };
 
-class TestTimeline final : public backend::Object<backend::IBackendTimeline> {
+class TestTimeline final : public backend::Object<rhi::ITimeline, backend::IBackendTimeline> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ITimeline, backend::IBackendTimeline, ITimeline)
 
@@ -580,14 +581,14 @@ class TestTimeline final : public backend::Object<backend::IBackendTimeline> {
   backend::IBackendDevice *owner_{};
 };
 
-class TestCommandContext final : public backend::Object<backend::IBackendCommandContext> {
+class TestCommandContext final : public backend::Object<rhi::ICommandContext, backend::IBackendCommandContext> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, backend::IBackendCommandContext, rhi::ICommandContext)
 
   TestCommandContext(rhi::IQueue *queue, std::shared_ptr<Gate> gate, bool fail_after_submit = false)
       : gate_(std::move(gate)),
         fail_after_submit_(fail_after_submit) {
-    InitializeCommandContext(static_cast<backend::IBackendQueue *>(queue));
+    InitializeCommandContext(rhi::QueryInterfacePtr<backend::IBackendQueue>(queue).Get());
   }
 
   std::vector<ClearValue> recorded_values;
@@ -762,7 +763,7 @@ class TestCommandContext final : public backend::Object<backend::IBackendCommand
     std::vector<IImage *> images;
     auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
       auto native = rhi::QueryInterfacePtr<IBackendImage>(image).Get();
-      if (!native || !native->IsValid() ||
+      if (!native || !rhi::QueryInterfacePtr<IImage>(native)->IsValid() ||
           (native->DeviceIdentity() != DeviceIdentity() || !native->SupportsQueue(OwnerQueue())) ||
           IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
           load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE || store > ATTACHMENT_STORE_OP_DISCARD)
@@ -810,7 +811,8 @@ class TestCommandContext final : public backend::Object<backend::IBackendCommand
  public:
   rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override {
     try {
-      return queue_->Submit(ObjectPtr<IBackendCommandContext>::Retain(this), info).Detach();
+      auto submission = queue_->Submit(ObjectPtr<IBackendCommandContext>::Retain(this), info);
+      return rhi::QueryInterfacePtr<rhi::ISubmissionToken>(submission.Get()).Detach();
     } catch (const std::system_error &error) {
       ReportError(error.code().value(), error.what());
     }
@@ -829,7 +831,7 @@ class TestCommandContext final : public backend::Object<backend::IBackendCommand
  private:
   IDownloadToken *RegisterDownload(ObjectPtr<IBackendDownloadToken> token) {
     downloads_.push_back(token);
-    return token.Detach();
+    return rhi::QueryInterfacePtr<rhi::IDownloadToken>(token.Get()).Detach();
   }
 
  public:
@@ -994,7 +996,7 @@ class TestCommandContext final : public backend::Object<backend::IBackendCommand
   std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};
 };
 
-class TestQueue final : public backend::Object<backend::IBackendQueue> {
+class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQueue> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, backend::IBackendQueue, rhi::IQueue)
 
@@ -1079,7 +1081,8 @@ class TestQueue final : public backend::Object<backend::IBackendQueue> {
     // Polling may submit a recovery signal; releasing resources may acquire other
     // backend locks. Neither operation runs under the submission mutex.
     for (auto it = work.begin(); it != work.end();) {
-      const auto status = it->commands->PollCompletion(it->completion->GetEvent(), completed, timeline_valid);
+      const auto status = it->commands->PollCompletion(
+          rhi::QueryInterfacePtr<ISubmissionToken>(it->completion.Get())->GetEvent(), completed, timeline_valid);
       if (status == SUBMISSION_STATUS_PENDING) {
         ++it;
         continue;
@@ -1134,7 +1137,7 @@ class TestQueue final : public backend::Object<backend::IBackendQueue> {
   uint64_t serial_{};
 };
 
-class TestDevice final : public backend::Object<backend::IBackendDevice> {
+class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendDevice> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::IBackendDevice, rhi::IDevice)
 
@@ -1217,7 +1220,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
   }
 
  private:
-  void InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api = BACKEND_API_DEFAULT) {
+  void InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api = BACKEND_API_DEFAULT) {
     api_ = api;
     core_ = core;
     info_ = std::move(info);
@@ -1248,7 +1251,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
     if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
         desc.stage > SHADER_STAGE_CALLABLE)
       return nullptr;
-    return IBackendShader::Create(desc, api_);
+    return backend::CreateShader(desc, api_);
   }
 
   ISampler *CreateSampler(const SamplerDesc &) override {
@@ -1291,7 +1294,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
   rhi::IQueue *GetQueue(QueueType type) override {
     if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
       return nullptr;
-    return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
+    return rhi::QueryInterfacePtr<rhi::IQueue>(queues_[type].Get()).Detach();
   }
 
   const PhysicalDevice &GetPhysicalDevice() const noexcept override {
@@ -1299,7 +1302,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
   }
 
  private:
-  IBackendCore *OwnerCore() const {
+  ICore *OwnerCore() const {
     return core_;
   }
 
@@ -1340,9 +1343,10 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
         if (!queue)
           continue;
         uint64_t completed = 0;
-        const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+        const bool timeline_valid =
+            rhi::QueryInterfacePtr<rhi::ITimeline>(queue->GetTimeline())->GetCompletedValue(completed);
         if (timeline_valid && completed != UINT64_MAX)
-          next.push_back({queue->GetTimeline(), completed + 1});
+          next.push_back({rhi::QueryInterfacePtr<rhi::ITimeline>(queue->GetTimeline()).Get(), completed + 1});
         if (!queue->CollectCompleted(completed, timeline_valid))
           empty = false;
       }
@@ -1363,7 +1367,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
   std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
-  IBackendCore *core_{};
+  ICore *core_{};
   PhysicalDevice info_{};
   std::thread collector_{};
 };
@@ -1417,7 +1421,7 @@ TEST(RhiCommands, DifferentResourceTypesAreRetainedOnceUntilSubmissionCompletes)
   ASSERT_TRUE(native->CmdClearImage(image.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
   ASSERT_TRUE(native->CmdUseResource(another.Get()));
   ASSERT_TRUE(native->CmdUseResource(resource.Get()));
-  ASSERT_TRUE(native->CmdUseResource(image.Get()));
+  ASSERT_TRUE(native->CmdUseResource(rhi::QueryInterfacePtr<rhi::IObject>(image.Get()).Get()));
   auto *borrowed_image = image.Get();
   auto *borrowed_resource = resource.Get();
   auto *borrowed_another = another.Get();
@@ -1450,7 +1454,7 @@ TEST(RhiCommands, UnsubmittedContextReleasesAllResourceTypes) {
   auto context = ObjectPtr<TestCommandContext>::Adopt(new TestCommandContext(queue.Get(), gate));
   auto image = ObjectPtr<TestImage>::Adopt(new TestImage(gate));
   auto resource = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
-  ASSERT_TRUE(context->CmdUseResource(image.Get()));
+  ASSERT_TRUE(context->CmdUseResource(rhi::QueryInterfacePtr<rhi::IObject>(image.Get()).Get()));
   ASSERT_TRUE(context->CmdUseResource(resource.Get()));
   image.Reset();
   resource.Reset();

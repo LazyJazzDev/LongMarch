@@ -5,7 +5,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanAllocatedBufferImpl final : public Object<IVulkanAllocatedBuffer> {
+class VulkanAllocatedBufferImpl final : public Object<rhi::IBuffer, IVulkanAllocatedBuffer> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IBuffer, IVulkanAllocatedBuffer, IBuffer, IBackendBuffer, IVulkanBuffer)
 
@@ -75,10 +75,11 @@ IVulkanAllocatedBuffer *VulkanAllocatedBufferImpl::Create(IVulkanDevice *device,
                         : VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                               VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-  if (device->SupportRayTracingPipeline() || device->SupportRayQuery()) {
+  if (rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline() ||
+      rhi::QueryInterfacePtr<IDevice>(device)->SupportRayQuery()) {
     info.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-    if (device->SupportRayTracingPipeline())
+    if (rhi::QueryInterfacePtr<IDevice>(device)->SupportRayTracingPipeline())
       info.usage |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
   }
   VmaAllocationCreateInfo memory{};

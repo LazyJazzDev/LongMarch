@@ -35,8 +35,9 @@ UUID definitions are neither inline nor collected in a registry header.
 Parsing remains constexpr, so invalid definition literals fail at compile time;
 `uuid<T>()` itself is an ordinary externally defined function. Unregistered
 types cannot instantiate it. There is no runtime registration map, allocation,
-RTTI, or compiler-specific UUID extension. All 111 library IDs were randomly
-generated UUIDv4 values and remain stable for the same interface.
+RTTI, or compiler-specific UUID extension. The 93 remaining library IDs are UUIDv4 values and remain unchanged for the
+same interfaces. The 18 removed aggregate/factory-only interfaces no longer
+have UUID registrations.
 
 Every inheritable RHI object layer is a data-free interface. Virtual contracts
 remain pure. The final implementation directly declares its members and
@@ -53,21 +54,38 @@ work/data. Metal completion callbacks retain a separate `CompletionState` for
 their asynchronous lifetime; it is private to the final timeline implementation,
 not a backing store accessed through an interface.
 
-For example, `IBuffer -> IBackendBuffer -> ID3D12Buffer ->
-ID3D12AllocatedBuffer` describes the interface chain. The allocation is a
-`D3D12AllocatedBufferImpl final : Object<ID3D12AllocatedBuffer>`, defined only
-in its `.cpp`. Other backend implementations are similarly private to their
-translation units or internal `*_impl.h` headers used by their defining sources.
-Objects communicate through the hidden interfaces, not final implementation
-layouts. Static interface factories return those interface pointers.
+Interfaces use single inheritance. Frontend and native capabilities evolve on
+separate chains, joined only by a final implementation:
 
-`Object<Interface>` supplies exactly one atomic reference count and final
-`AddRef`/`Release` implementations. It remains abstract and does not decide
-which interfaces are supported. The final implementation explicitly lists its
-query interfaces and chooses a canonical `IObject` path. Ordinary multiple
-inheritance may combine interfaces, but the counter is introduced only once,
-after those interfaces are combined. Querying `IObject` through any supported
-interface returns the same canonical identity pointer.
+```cpp
+struct IBuffer : IObject { /* frontend contract */ };
+struct IBackendBuffer : IObject { /* owner capability */ };
+struct ID3D12Buffer : IBackendBuffer { /* native resource */ };
+struct ID3D12AllocatedBuffer : ID3D12Buffer { /* host access */ };
+
+class D3D12AllocatedBufferImpl final
+    : public Object<IBuffer, ID3D12AllocatedBuffer> {
+  // Owns data and explicitly implements all supported interface queries.
+};
+```
+
+There are no aggregate interfaces joining those chains. Backend interfaces do
+not inherit frontend interfaces or redeclare their methods. Cross-capability
+access uses `QueryInterface`; public operations use an existing public pointer
+when one is available. Native interfaces remain only where they add internal
+capabilities. Factories formerly housed in empty interfaces are free functions;
+public-facing factories return the relevant public interface.
+
+`Object<Primary, Interfaces...>` introduces exactly one atomic reference count
+and final `AddRef`/`Release` implementations. Each template argument must have
+one unambiguous path to `IObject`; interface diamonds are rejected at compile
+time. The template remains abstract. Each final implementation explicitly lists
+its supported interfaces and their ancestors, and chooses the canonical
+`IObject` path. Querying `IObject` through any supported interface returns the
+same canonical identity pointer. Implementation classes are never inherited.
+
+Objects communicate through hidden interfaces rather than implementation
+layouts. Final definitions remain in their `.cpp` or internal `*_impl.h` files.
 
 No additional type tag, query table, cached interface pointer, or second
 reference count is stored per object. UUID comparisons and pointer adjustments
@@ -157,7 +175,7 @@ Metal performance or Linux performance.
 
 ## Validation
 
-The following checks apply to the final implementation with direct members.
+The following checks apply to the implementation with parallel interface chains.
 The performance measurements above apply only to the older implementation.
 
 - Windows Release: 218 passed, two Debug-only queue-diagnostic tests skipped
@@ -174,10 +192,13 @@ The performance measurements above apply only to the older implementation.
   to avoid the previously observed repeated-Vulkan-load/static-TLS problem.
 - Clang syntax checks passed for 88 RHI/test translation units. Four interface
   tests executed successfully with both GCC and Clang with RTTI disabled.
-- Audit: 111 library UUID registrations are unique UUIDv4 values and match the
-  random generator's output. RHI contains no remaining `dynamic_cast`.
-  All 22 former state wrappers/accessors are absent. The audit checked 90 backend
-  interfaces and 63 final `Object<Interface>` implementations; the 111 UUIDs are
+- Audit: 93 surviving library UUID registrations remain unique and unchanged.
+  RHI contains no `dynamic_cast` or virtual inheritance. All 22 former state
+  wrappers/accessors are absent. The audit checked 88 non-root named interfaces
+  plus four nested lease interfaces and 63 final `Object<...>` implementations.
+  All interface chains are single-inheritance and frontend/backend chains are
+  separate. Query maps cover the full interface ancestry without duplicate
+  inheritance paths (except the intentional independent `IObject` roots). The IDs are
   unchanged. Members and implementation methods belong to final classes.
 - Metal source was migrated, but no macOS build or runtime validation was
   available. Windows/Linux checks do not substitute for that validation.

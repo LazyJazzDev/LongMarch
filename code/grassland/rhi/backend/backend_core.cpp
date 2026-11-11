@@ -15,20 +15,20 @@
 
 namespace grassland::rhi::backend {
 
-rhi::IDevice *IBackendCore::CommonCreateDeviceByAutoSelection(DeviceFeatureRequirement requirement) {
-  const auto id = SelectPhysicalDevice(GetPhysicalDevices(), requirement);
+rhi::IDevice *CreateDeviceByAutoSelection(ICore *core, DeviceFeatureRequirement requirement) {
+  const auto id = SelectPhysicalDevice(core->GetPhysicalDevices(), requirement);
   if (id < 0) {
     ReportError(-1, "No physical device satisfies the requested RHI features.");
     return nullptr;
   }
-  return CreateDevice(id);
+  return core->CreateDevice(id);
 }
 
-IBackendCore *CreateCore(BackendAPI api, const CoreDesc &desc) {
+ICore *CreateCore(BackendAPI api, const CoreDesc &desc) {
   switch (api) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     case BACKEND_API_D3D12:
-      return d3d12::ID3D12Core::CreateD3D12Core(desc);
+      return d3d12::CreateD3D12Core(desc);
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     case BACKEND_API_VULKAN:
@@ -73,5 +73,3 @@ int32_t SelectPhysicalDevice(const std::vector<PhysicalDevice> &devices, DeviceF
 }
 
 }  // namespace grassland::rhi::backend
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::IBackendCore, "e4b44f28-4fd0-428a-927d-19a615be66fc")

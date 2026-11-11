@@ -34,7 +34,7 @@ bool VulkanCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     IBottomLevelAccelerationStructure *destination,
     const std::vector<AccelerationStructureGeometryBuffers> &geometries,
     AccelerationStructureBuildMode mode) {
-  auto target = rhi::QueryInterfacePtr<IVulkanBottomLevelAccelerationStructure>(destination).Get();
+  auto target = rhi::QueryInterfacePtr<IVulkanAccelerationStructure>(destination).Get();
   if (!target || target->Owner() != device_ || render_target_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
@@ -43,7 +43,7 @@ bool VulkanCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     return false;
   }
 #if !defined(NDEBUG)
-  if (!ValidateGeometryBuffers(target->GetDesc(), geometries, device_)) {
+  if (!ValidateGeometryBuffers(destination->GetDesc(), geometries, device_)) {
     recording_failed_ = true;
     return false;
   }
@@ -70,14 +70,14 @@ bool VulkanCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
         return false;
     }
   }
-  auto native = NativeGeometries(device_, target->GetDesc(), geometries);
+  auto native = NativeGeometries(device_, destination->GetDesc(), geometries);
   std::vector<VkAccelerationStructureBuildRangeInfoKHR> ranges(native.size());
   for (size_t i = 0; i < ranges.size(); ++i) {
-    if (target->GetDesc().aabbs.empty()) {
-      const auto &g = target->GetDesc().geometries[i];
+    if (destination->GetDesc().aabbs.empty()) {
+      const auto &g = destination->GetDesc().geometries[i];
       ranges[i].primitiveCount = (g.index_count ? g.index_count : g.vertex_count) / 3;
     } else
-      ranges[i].primitiveCount = target->GetDesc().aabbs[i].count;
+      ranges[i].primitiveCount = destination->GetDesc().aabbs[i].count;
   }
   VkAccelerationStructureBuildGeometryInfoKHR build{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
   build.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
@@ -105,7 +105,7 @@ bool VulkanCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAc
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
-      !ValidateInstances(target->GetDesc(), instances)) {
+      !ValidateInstances(rhi::QueryInterfacePtr<ITopLevelAccelerationStructure>(target)->GetDesc(), instances)) {
     recording_failed_ = true;
     return false;
   }
@@ -121,7 +121,7 @@ bool VulkanCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAc
   std::vector<VkAccelerationStructureInstanceKHR> native(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
-    auto blas = rhi::QueryInterfacePtr<IVulkanBottomLevelAccelerationStructure>(instance.blas).Get();
+    auto blas = rhi::QueryInterfacePtr<IVulkanAccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
       recording_failed_ = true;
       return false;

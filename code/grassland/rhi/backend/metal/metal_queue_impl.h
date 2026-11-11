@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalQueueImpl final : public Object<IMetalQueue> {
+class MetalQueueImpl final : public Object<rhi::IQueue, IMetalQueue> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, IMetalQueue, IBackendQueue, rhi::IQueue)
   rhi::ICommandContext *CreateCommandContext() override;

@@ -4,11 +4,11 @@
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanWindowImpl final : public Object<IVulkanWindow> {
+class VulkanWindowImpl final : public Object<rhi::IWindow, IVulkanWindow> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IWindow, IVulkanWindow, IBackendWindow, rhi::IWindow)
   ~VulkanWindowImpl() override;
-  static IVulkanWindow *Create(IVulkanDevice *device, const WindowDesc &desc);
+  static rhi::IWindow *Create(IVulkanDevice *device, const WindowDesc &desc);
   ObjectPtr<IBackendImage> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;

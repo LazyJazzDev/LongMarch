@@ -11,7 +11,6 @@ namespace grassland::rhi::backend::d3d12 {
 class ID3D12Queue : public IBackendQueue {
  public:
   static ID3D12Queue *Create(ID3D12Device *device, QueueType type);
-  virtual rhi::ICommandContext *CreateCommandContext() = 0;
   virtual ID3D12CommandQueue *NativeQueue() const = 0;
   virtual ID3D12Timeline *GetTimeline() const = 0;
   virtual bool WaitIdle() = 0;

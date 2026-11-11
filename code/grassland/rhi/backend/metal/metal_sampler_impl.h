@@ -3,11 +3,11 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalSamplerImpl final : public Object<IMetalSampler> {
+class MetalSamplerImpl final : public Object<rhi::ISampler, IMetalSampler> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ISampler, IMetalSampler, IBackendSampler, ISampler)
 
-  static IMetalSampler *Create(IMetalDevice *device, const SamplerDesc &desc);
+  static rhi::ISampler *Create(IMetalDevice *device, const SamplerDesc &desc);
 
   MTL::SamplerState *NativeSampler() const;
 

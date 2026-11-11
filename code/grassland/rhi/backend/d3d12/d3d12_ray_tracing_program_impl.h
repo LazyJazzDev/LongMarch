@@ -3,16 +3,16 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12RayTracingProgramImpl final : public Object<ID3D12RayTracingProgram> {
+class D3D12RayTracingProgramImpl final
+    : public Object<rhi::IRayTracingProgram, ID3D12RayTracingProgram, IBackendRayTracingProgram> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IRayTracingProgram,
                             ID3D12RayTracingProgram,
                             IBackendRayTracingProgram,
                             IRayTracingProgram,
-                            ID3D12ProgramBase,
-                            IObject)
+                            ID3D12ProgramBase)
 
-  static ID3D12RayTracingProgram *Create(ID3D12Device *device, const RayTracingProgramDesc &desc);
+  static rhi::IRayTracingProgram *Create(ID3D12Device *device, const RayTracingProgramDesc &desc);
 
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
 
@@ -35,7 +35,7 @@ class D3D12RayTracingProgramImpl final : public Object<ID3D12RayTracingProgram> 
 
   ComPtr<ID3D12StateObject> pipeline_;
 
-  IBackendShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
+  IShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
 
   ObjectPtr<IBackendShaderBindingTable> table_;
 

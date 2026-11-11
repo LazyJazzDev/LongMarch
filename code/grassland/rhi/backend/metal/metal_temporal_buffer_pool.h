@@ -11,8 +11,7 @@ using MetalTemporalBufferPool = TemporalBufferPool<IMetalDevice, IMetalAllocated
 class IMetalTemporalBufferLease : public IMetalBuffer {
  public:
   static IMetalTemporalBufferLease *Create(MetalTemporalBufferPool *pool, IMetalAllocatedBuffer *buffer, size_t level);
-  virtual BufferDesc GetDesc() const = 0;
-  virtual MTL::Buffer *NativeBuffer() const = 0;
+
   virtual bool Read(void *data, uint64_t size, uint64_t offset = 0) = 0;
   virtual bool Write(const void *data, uint64_t size) = 0;
 

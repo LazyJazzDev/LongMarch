@@ -14,7 +14,7 @@ ID3D12PipelineState *D3D12ComputeProgramImpl::NativePipeline() const {
   return pipeline_.Get();
 }
 
-ID3D12ComputeProgram *D3D12ComputeProgramImpl::Create(ID3D12Device *owner_device, const ComputeProgramDesc &desc) {
+rhi::IComputeProgram *D3D12ComputeProgramImpl::Create(ID3D12Device *owner_device, const ComputeProgramDesc &desc) {
   auto object = std::unique_ptr<D3D12ComputeProgramImpl>(new D3D12ComputeProgramImpl(owner_device, desc));
   if (!object->ValidateLayout())
     return nullptr;
@@ -39,7 +39,7 @@ ID3D12ComputeProgram *D3D12ComputeProgramImpl::Create(ID3D12Device *owner_device
   return object.release();
 }
 
-ID3D12ComputeProgram *ID3D12ComputeProgram::Create(ID3D12Device *device, const ComputeProgramDesc &desc) {
+rhi::IComputeProgram *ID3D12ComputeProgram::Create(ID3D12Device *device, const ComputeProgramDesc &desc) {
   return D3D12ComputeProgramImpl::Create(device, desc);
 }
 

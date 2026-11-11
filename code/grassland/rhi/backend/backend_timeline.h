@@ -5,7 +5,7 @@
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendTimeline)
 
 namespace grassland::rhi::backend {
-class IBackendTimeline : public ITimeline {
+class IBackendTimeline : public IObject {
  public:
   virtual IBackendDevice *Owner() const = 0;
 };

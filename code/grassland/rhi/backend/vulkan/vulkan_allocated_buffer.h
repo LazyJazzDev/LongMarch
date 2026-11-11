@@ -13,7 +13,7 @@ class IVulkanAllocatedBuffer : public IVulkanBuffer {
                                         const BufferDesc &desc,
                                         bool upload = false,
                                         bool download = false);
-  virtual VkBuffer NativeBuffer() const = 0;
+
   virtual bool Read(void *data, uint64_t size, uint64_t offset = 0) = 0;
   virtual bool Write(const void *data, uint64_t size) = 0;
 };

@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanSwapChainImageImpl final : public Object<IVulkanSwapChainImage> {
+class VulkanSwapChainImageImpl final : public Object<rhi::IImage, IVulkanSwapChainImage> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IVulkanSwapChainImage, IVulkanImage, IBackendImage, rhi::IImage)
   VulkanSwapChainImageImpl(ImageDesc desc, IVulkanWindow *window, VkImage image, VkImageView attachment);

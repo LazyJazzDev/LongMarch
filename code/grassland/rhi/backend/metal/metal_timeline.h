@@ -12,8 +12,6 @@ namespace grassland::rhi::backend::metal {
 class IMetalTimeline : public IBackendTimeline {
  public:
   static ObjectPtr<IMetalTimeline> Create(IMetalDevice *device);
-  virtual bool GetCompletedValue(uint64_t &value) const = 0;
-  virtual bool WaitHost(uint64_t value) const = 0;
   virtual MTL::Event *NativeEvent() const = 0;
   virtual MTL::SharedEvent *HostEvent() const = 0;
   virtual void MarkFailed() = 0;

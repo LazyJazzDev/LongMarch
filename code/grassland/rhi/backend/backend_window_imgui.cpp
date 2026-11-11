@@ -161,13 +161,15 @@ bool WindowImGui::Initialize(GLFWwindow *window, const char *font_file_path, flo
   unsigned char *pixels;
   int width, height;
   io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-  font_ = device_->CreateImage({uint32_t(width), uint32_t(height), IMAGE_FORMAT_R8G8B8A8_UNORM});
-  sampler_ =
-      device_->CreateSampler({SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_CLAMP_TO_EDGE});
+  font_ = rhi::QueryInterfacePtr<IDevice>(device_)->CreateImage(
+      {uint32_t(width), uint32_t(height), IMAGE_FORMAT_R8G8B8A8_UNORM});
+  sampler_ = rhi::QueryInterfacePtr<IDevice>(device_)->CreateSampler(
+      {SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_CLAMP_TO_EDGE});
   if (!font_ || !sampler_)
     return false;
-  ObjPtr<ICommandContext> upload = ObjPtr<IQueue>(device_->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
-  ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<ICommandContext> upload =
+      ObjPtr<IQueue>(rhi::QueryInterfacePtr<IDevice>(device_)->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+  ObjPtr<IQueue> queue = rhi::QueryInterfacePtr<IDevice>(device_)->GetQueue(QUEUE_TYPE_MAIN);
   if (!upload || !queue || !upload->CmdUploadImage(font_.Get(), pixels, uint64_t(width) * 4))
     return false;
   ObjPtr<ISubmissionToken> token = upload->Submit();
@@ -240,8 +242,10 @@ bool WindowImGui::Render(ICommandContext *commands,
   const auto extent = image->GetDesc();
   if (!program_ || program_->GetDesc().color_formats[0] != extent.format || program_color_space_ != color_space) {
     const auto source_code = "#define OUTPUT_COLOR_SPACE " + std::to_string(int(color_space)) + "\n" + shader;
-    ObjPtr<IShader> vs = device_->CreateShaderFromSource(source_code, "VSMain", SHADER_STAGE_VERTEX);
-    ObjPtr<IShader> ps = device_->CreateShaderFromSource(source_code, "PSMain", SHADER_STAGE_FRAGMENT);
+    ObjPtr<IShader> vs =
+        rhi::QueryInterfacePtr<IDevice>(device_)->CreateShaderFromSource(source_code, "VSMain", SHADER_STAGE_VERTEX);
+    ObjPtr<IShader> ps =
+        rhi::QueryInterfacePtr<IDevice>(device_)->CreateShaderFromSource(source_code, "PSMain", SHADER_STAGE_FRAGMENT);
     if (!vs || !ps)
       return false;
     ProgramDesc desc;
@@ -257,7 +261,7 @@ bool WindowImGui::Render(ICommandContext *commands,
         {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
     if (color_space != COLOR_SPACE_SRGB_NONLINEAR)
       desc.pipeline_layout.groups[0].bindings.push_back({2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT});
-    program_ = device_->CreateProgram(desc);
+    program_ = rhi::QueryInterfacePtr<IDevice>(device_)->CreateProgram(desc);
     program_color_space_ = color_space;
     if (!program_)
       return false;
@@ -266,7 +270,7 @@ bool WindowImGui::Render(ICommandContext *commands,
     if (!std::isfinite(reference_white_scale) || reference_white_scale <= 0)
       return false;
     if (!display_settings_)
-      display_settings_ = device_->CreateBuffer({256});
+      display_settings_ = rhi::QueryInterfacePtr<IDevice>(device_)->CreateBuffer({256});
     const float settings[] = {reference_white_scale, 0, 0, 0};
     if (!display_settings_ || !commands->CmdUploadBuffer(display_settings_.Get(), 0, settings, sizeof(settings)))
       return false;
@@ -290,7 +294,7 @@ bool WindowImGui::Render(ICommandContext *commands,
   auto ensure_capacity = [&](ObjPtr<IBuffer> &buffer, size_t required) {
     if (buffer && buffer->GetDesc().size >= required)
       return true;
-    auto replacement = device_->CreateBuffer({required + required / 2});
+    auto replacement = rhi::QueryInterfacePtr<IDevice>(device_)->CreateBuffer({required + required / 2});
     if (!replacement)
       return false;
     buffer = std::move(replacement);
@@ -335,7 +339,8 @@ bool WindowImGui::Render(ICommandContext *commands,
         if (right <= x || bottom <= y || !draw.ElemCount)
           continue;
         auto texture = reinterpret_cast<IImage *>(static_cast<uintptr_t>(draw.GetTexID()));
-        ObjPtr<IBindingGroup> group = device_->CreateBindingGroup(program_->GetDesc().pipeline_layout.groups[0]);
+        ObjPtr<IBindingGroup> group =
+            rhi::QueryInterfacePtr<IDevice>(device_)->CreateBindingGroup(program_->GetDesc().pipeline_layout.groups[0]);
         success =
             texture && group && group->BindResource(0, texture) && group->BindResource(1, sampler_.Get()) &&
             (color_space == COLOR_SPACE_SRGB_NONLINEAR || group->BindResource(2, display_settings_.Get())) &&

@@ -30,7 +30,7 @@ bool ValidateGeometryBuffers(const BottomLevelAccelerationStructureDesc &desc,
     auto buffer = rhi::QueryInterfacePtr<IBackendBuffer>(view.buffer).Get();
     if (!buffer || buffer->Owner() != device || view.offset % alignment)
       return false;
-    auto size = buffer->GetDesc().size;
+    auto size = view.buffer->GetDesc().size;
     if (view.offset > size || required > size - view.offset)
       return false;
     return !view.size || (view.size <= size - view.offset && required <= view.size);

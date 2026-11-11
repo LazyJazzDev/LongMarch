@@ -6,9 +6,8 @@
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::IBackendProgram)
 
 namespace grassland::rhi::backend {
-class IBackendProgram : public IProgram {
+class IBackendProgram : public IObject {
  public:
-  const ProgramDesc &GetDesc() const override = 0;
   virtual IBackendDevice *Owner() const = 0;
 };
 }  // namespace grassland::rhi::backend

@@ -20,7 +20,7 @@
 #endif
 
 namespace grassland::rhi::backend::metal {
-IMetalWindow *IMetalWindow::Create(IMetalDevice *device, const WindowDesc &desc) {
+rhi::IWindow *IMetalWindow::Create(IMetalDevice *device, const WindowDesc &desc) {
   return MetalWindowImpl::Create(device, desc);
 }
 
@@ -122,7 +122,7 @@ rhi::IImage *MetalWindowImpl::GetNextImage() {
     std::abort();
   }
 #endif
-  return ObjectPtr<IBackendImage>(next_image_).Detach();
+  return rhi::QueryInterfacePtr<IImage>(next_image_.Get()).Detach();
 }
 
 IBackendQueue *MetalWindowImpl::OwnerQueue() const {
@@ -304,8 +304,9 @@ void MetalWindowImpl::DestroyWindow() {
 }
 
 bool MetalWindowImpl::InitializeWindow(IBackendDevice *device, const WindowDesc &desc) {
-  queue_ =
-      rhi::QueryInterfacePtr<IBackendQueue>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get()).Get();
+  queue_ = rhi::QueryInterfacePtr<IBackendQueue>(
+               ObjectPtr<IQueue>::Adopt(rhi::QueryInterfacePtr<IDevice>(device)->GetQueue(QUEUE_TYPE_MAIN)).Get())
+               .Get();
   requested_mode_ = desc.present_mode;
   requested_color_space_ = desc.color_space;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());

@@ -13,7 +13,6 @@ class ID3D12SwapChainImage : public ID3D12Image {
                                       uint64_t generation,
                                       ID3D12Resource *image,
                                       ObjectPtr<D3D12DescriptorPool::Lease> attachment);
-  virtual bool IsValid() const = 0;
   virtual HRESULT Present() = 0;
 };
 

@@ -3,16 +3,16 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalComputeProgramImpl final : public Object<IMetalComputeProgram> {
+class MetalComputeProgramImpl final
+    : public Object<rhi::IComputeProgram, IMetalComputeProgram, IBackendComputeProgram> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IComputeProgram,
                             IMetalComputeProgram,
                             IBackendComputeProgram,
                             IComputeProgram,
-                            IMetalProgramBase,
-                            IObject)
+                            IMetalProgramBase)
 
-  static IMetalComputeProgram *Create(IMetalDevice *device, const ComputeProgramDesc &desc);
+  static rhi::IComputeProgram *Create(IMetalDevice *device, const ComputeProgramDesc &desc);
 
   MTL::ComputePipelineState *NativePipeline() const;
 

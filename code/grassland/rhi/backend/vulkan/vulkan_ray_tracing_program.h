@@ -10,20 +10,9 @@
 LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanRayTracingProgram)
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanRayTracingProgram : public IBackendRayTracingProgram, public IVulkanProgramBase {
+class IVulkanRayTracingProgram : public IVulkanProgramBase {
  public:
-  virtual void AddRef() noexcept override = 0;
-  virtual void Release() noexcept override = 0;
-  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
-
-  template <typename T>
-  T *QueryInterface() noexcept {
-    void *result = nullptr;
-    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
-  }
-
-  static IVulkanRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
-  virtual IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) = 0;
+  static rhi::IRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
   virtual const IBackendShaderBindingTable *DefaultShaderBindingTable() const = 0;
   virtual VkPipeline NativePipeline() const = 0;
 };

@@ -13,10 +13,10 @@ ShaderBindingTableImpl::ShaderBindingTableImpl(IRayTracingProgram *program,
       regions_(regions) {
 }
 
-IBackendShaderBindingTable *IBackendShaderBindingTable::Create(IRayTracingProgram *program,
-                                                               const ShaderBindingTableDesc &desc,
-                                                               ObjectPtr<IBuffer> buffer,
-                                                               const std::array<Region, 4> &regions) {
+rhi::IShaderBindingTable *IBackendShaderBindingTable::Create(IRayTracingProgram *program,
+                                                             const ShaderBindingTableDesc &desc,
+                                                             ObjectPtr<IBuffer> buffer,
+                                                             const std::array<Region, 4> &regions) {
   return new ShaderBindingTableImpl(program, desc, buffer, regions);
 }
 }  // namespace grassland::rhi::backend

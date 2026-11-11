@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalSwapChainImageImpl final : public Object<IMetalSwapChainImage> {
+class MetalSwapChainImageImpl final : public Object<rhi::IImage, IMetalSwapChainImage> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, IMetalSwapChainImage, IMetalImage, IBackendImage, rhi::IImage)
   MetalSwapChainImageImpl(ImageDesc desc, IMetalWindow *window, uint64_t generation, CA::MetalDrawable *drawable);

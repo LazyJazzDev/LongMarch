@@ -404,8 +404,7 @@ bool CompileSlang(const IShader *shader_object,
   }
   if (layout->getParameterCount() != 0 && (!binding_layout || binding_layout->groups.empty())) {
     ReportError(
-        -1,
-        "IBackendShader resource bindings require a binding layout, which is outside the current graphics program API.");
+        -1, "Shader resource bindings require a binding layout, which is outside the current graphics program API.");
     return false;
   }
   Slang::ComPtr<ISlangBlob> blob;
@@ -463,8 +462,7 @@ bool CompileSlang(const IShader *shader_object,
     }
     const uint32_t stage_bit = 1u << shader_object->GetStage();
     if (!match || count != match->desc.count || !(match->desc.visibility & stage_bit)) {
-      ReportError(
-          -1, std::string("IBackendShader resource does not match the C++ binding layout: ") + parameter->getName());
+      ReportError(-1, std::string("Shader resource does not match the C++ binding layout: ") + parameter->getName());
       return false;
     }
     if (resource == BINDING_STRUCTURED_BUFFER || resource == BINDING_RW_STRUCTURED_BUFFER) {

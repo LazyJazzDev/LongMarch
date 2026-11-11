@@ -3,16 +3,16 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanRayTracingProgramImpl final : public Object<IVulkanRayTracingProgram> {
+class VulkanRayTracingProgramImpl final
+    : public Object<rhi::IRayTracingProgram, IVulkanRayTracingProgram, IBackendRayTracingProgram> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IRayTracingProgram,
                             IVulkanRayTracingProgram,
                             IBackendRayTracingProgram,
                             IRayTracingProgram,
-                            IVulkanProgramBase,
-                            IObject)
+                            IVulkanProgramBase)
 
-  static IVulkanRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
+  static rhi::IRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
 
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
 
@@ -33,7 +33,7 @@ class VulkanRayTracingProgramImpl final : public Object<IVulkanRayTracingProgram
 
   VkPipeline pipeline_{};
 
-  IBackendShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
+  IShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
 
   ObjectPtr<IBackendShaderBindingTable> table_;
 

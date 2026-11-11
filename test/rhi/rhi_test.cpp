@@ -43,7 +43,7 @@ struct Calls {
   bool device_destroyed_before_core{};
 };
 
-class TestDevice final : public backend::Object<backend::IBackendDevice> {
+class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendDevice> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::IBackendDevice, rhi::IDevice)
 
@@ -60,7 +60,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
     ADD_FAILURE();
   }
 
-  TestDevice(PhysicalDevice info, backend::IBackendCore *core, Calls &calls) : calls_(calls) {
+  TestDevice(PhysicalDevice info, rhi::ICore *core, Calls &calls) : calls_(calls) {
     InitializeDevice(std::move(info), core, BACKEND_API_DEFAULT);
   }
 
@@ -92,7 +92,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
   }
 
  private:
-  void InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api) {
+  void InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api) {
     api_ = api;
     core_ = core;
     info_ = std::move(info);
@@ -123,7 +123,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
     if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
         desc.stage > SHADER_STAGE_CALLABLE)
       return nullptr;
-    return IBackendShader::Create(desc, api_);
+    return backend::CreateShader(desc, api_);
   }
 
   ISampler *CreateSampler(const SamplerDesc &) override {
@@ -166,7 +166,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
   rhi::IQueue *GetQueue(QueueType type) override {
     if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
       return nullptr;
-    return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
+    return rhi::QueryInterfacePtr<rhi::IQueue>(queues_[type].Get()).Detach();
   }
 
   const PhysicalDevice &GetPhysicalDevice() const noexcept override {
@@ -174,7 +174,7 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
   }
 
  private:
-  IBackendCore *OwnerCore() const {
+  ICore *OwnerCore() const {
     return core_;
   }
 
@@ -215,9 +215,10 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
         if (!queue)
           continue;
         uint64_t completed = 0;
-        const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+        const bool timeline_valid =
+            rhi::QueryInterfacePtr<rhi::ITimeline>(queue->GetTimeline())->GetCompletedValue(completed);
         if (timeline_valid && completed != UINT64_MAX)
-          next.push_back({queue->GetTimeline(), completed + 1});
+          next.push_back({rhi::QueryInterfacePtr<rhi::ITimeline>(queue->GetTimeline()).Get(), completed + 1});
         if (!queue->CollectCompleted(completed, timeline_valid))
           empty = false;
       }
@@ -238,14 +239,14 @@ class TestDevice final : public backend::Object<backend::IBackendDevice> {
   std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
-  IBackendCore *core_{};
+  ICore *core_{};
   PhysicalDevice info_{};
   std::thread collector_{};
 };
 
-class TestCore final : public backend::Object<backend::IBackendCore> {
+class TestCore final : public backend::Object<rhi::ICore> {
  public:
-  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, backend::IBackendCore, rhi::ICore)
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, rhi::ICore)
 
   TestCore(std::vector<PhysicalDevice> devices, Calls &calls, bool fail = false)
       : devices_(std::move(devices)),
@@ -280,7 +281,7 @@ class TestCore final : public backend::Object<backend::IBackendCore> {
 
  public:
   rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
-    return backend::IBackendCore::CommonCreateDeviceByAutoSelection(requirement);
+    return backend::CreateDeviceByAutoSelection(this, requirement);
   }
 };
 

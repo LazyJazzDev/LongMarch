@@ -83,7 +83,7 @@ D3D12WindowImpl::~D3D12WindowImpl() {
   DestroyWindow();
 }
 
-ID3D12Window *D3D12WindowImpl::Create(ID3D12Device *device, const WindowDesc &desc) {
+rhi::IWindow *D3D12WindowImpl::Create(ID3D12Device *device, const WindowDesc &desc) {
   auto object = std::unique_ptr<D3D12WindowImpl>(new D3D12WindowImpl(device));
   if (!object->InitializeWindow(device, desc))
     return nullptr;
@@ -219,7 +219,7 @@ bool D3D12WindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
   return true;
 }
 
-ID3D12Window *ID3D12Window::Create(ID3D12Device *device, const WindowDesc &desc) {
+rhi::IWindow *ID3D12Window::Create(ID3D12Device *device, const WindowDesc &desc) {
   return D3D12WindowImpl::Create(device, desc);
 }
 
@@ -321,7 +321,7 @@ rhi::IImage *D3D12WindowImpl::GetNextImage() {
     std::abort();
   }
 #endif
-  return ObjectPtr<IBackendImage>(next_image_).Detach();
+  return rhi::QueryInterfacePtr<IImage>(next_image_.Get()).Detach();
 }
 
 IBackendQueue *D3D12WindowImpl::OwnerQueue() const {
@@ -503,8 +503,9 @@ void D3D12WindowImpl::DestroyWindow() {
 }
 
 bool D3D12WindowImpl::InitializeWindow(IBackendDevice *device, const WindowDesc &desc) {
-  queue_ =
-      rhi::QueryInterfacePtr<IBackendQueue>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get()).Get();
+  queue_ = rhi::QueryInterfacePtr<IBackendQueue>(
+               ObjectPtr<IQueue>::Adopt(rhi::QueryInterfacePtr<IDevice>(device)->GetQueue(QUEUE_TYPE_MAIN)).Get())
+               .Get();
   requested_mode_ = desc.present_mode;
   requested_color_space_ = desc.color_space;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());

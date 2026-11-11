@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
-class ShaderBindingTableImpl final : public Object<IBackendShaderBindingTable> {
+class ShaderBindingTableImpl final : public Object<rhi::IShaderBindingTable, IBackendShaderBindingTable> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IShaderBindingTable, IBackendShaderBindingTable, IShaderBindingTable)
   ShaderBindingTableImpl(IRayTracingProgram *program,

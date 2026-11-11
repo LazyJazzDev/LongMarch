@@ -148,8 +148,8 @@ ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const s
       create.renderPass = pass;
       create.attachmentCount = uint32_t(fresh->views.size());
       create.pAttachments = fresh->views.data();
-      create.width = images[0]->GetDesc().width;
-      create.height = images[0]->GetDesc().height;
+      create.width = rhi::QueryInterfacePtr<IImage>(images[0])->GetDesc().width;
+      create.height = rhi::QueryInterfacePtr<IImage>(images[0])->GetDesc().height;
       create.layers = 1;
       if (!Check(vkCreateFramebuffer(device_, &create, nullptr, &fresh->framebuffer), "Create framebuffer")) {
         DestroyEntry(*fresh);

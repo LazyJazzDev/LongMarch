@@ -11,9 +11,7 @@ using D3D12TemporalBufferPool = TemporalBufferPool<ID3D12Device, ID3D12Allocated
 class ID3D12TemporalBufferLease : public ID3D12Buffer {
  public:
   static ID3D12TemporalBufferLease *Create(D3D12TemporalBufferPool *pool, ID3D12AllocatedBuffer *buffer, size_t level);
-  virtual BufferDesc GetDesc() const = 0;
-  virtual ID3D12Resource *NativeBuffer() const = 0;
-  virtual D3D12_RESOURCE_STATES DefaultState() const = 0;
+
   virtual bool Read(void *data, uint64_t size, uint64_t offset = 0) = 0;
   virtual bool Write(const void *data, uint64_t size, uint64_t offset = 0) = 0;
 

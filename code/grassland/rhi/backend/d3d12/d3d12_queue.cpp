@@ -10,7 +10,7 @@
 namespace grassland::rhi::backend::d3d12 {
 
 rhi::ICommandContext *D3D12QueueImpl::CreateCommandContext() {
-  return ID3D12CommandContext::Create(this);
+  return CreateD3D12CommandContext(this);
 }
 
 ID3D12Queue *D3D12QueueImpl::Create(ID3D12Device *device, QueueType type) {
@@ -35,7 +35,8 @@ ID3D12Timeline *D3D12QueueImpl::GetTimeline() const {
 
 bool D3D12QueueImpl::WaitIdle() {
   const auto value = NextSerial();
-  return Check(queue_->Signal(timeline_->NativeFence(), value), "Signal idle timeline") && timeline_->WaitHost(value);
+  return Check(queue_->Signal(timeline_->NativeFence(), value), "Signal idle timeline") &&
+         rhi::QueryInterfacePtr<ITimeline>(timeline_.Get())->WaitHost(value);
 }
 
 D3D12QueueImpl::D3D12QueueImpl(ID3D12Device *device, QueueType type) {
@@ -67,7 +68,7 @@ ObjectPtr<IBackendSubmissionToken> D3D12QueueImpl::Submit(const ObjectPtr<IBacke
       existing->value = std::max(existing->value, wait.value);
   }
   std::unique_lock<std::mutex> queue_lock(*mutex_);
-  const Event signal{GetTimeline(), NextSerial()};
+  const Event signal{rhi::QueryInterfacePtr<ITimeline>(GetTimeline()).Get(), NextSerial()};
   auto completion = ObjectPtr<IBackendSubmissionToken>::Adopt(IBackendSubmissionToken::Create(signal));
   // Register before native submission, while the collector cannot take the list.
   auto entry = pending_.insert(pending_.end(), {commands, completion});
@@ -107,7 +108,8 @@ bool D3D12QueueImpl::CollectCompleted(uint64_t completed, bool timeline_valid) {
   // Polling may submit a recovery signal; releasing resources may acquire other
   // backend locks. Neither operation runs under the submission mutex.
   for (auto it = work.begin(); it != work.end();) {
-    const auto status = it->commands->PollCompletion(it->completion->GetEvent(), completed, timeline_valid);
+    const auto status = it->commands->PollCompletion(
+        rhi::QueryInterfacePtr<ISubmissionToken>(it->completion.Get())->GetEvent(), completed, timeline_valid);
     if (status == SUBMISSION_STATUS_PENDING) {
       ++it;
       continue;

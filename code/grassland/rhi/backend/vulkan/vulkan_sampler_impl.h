@@ -3,11 +3,11 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanSamplerImpl final : public Object<IVulkanSampler> {
+class VulkanSamplerImpl final : public Object<rhi::ISampler, IVulkanSampler> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ISampler, IVulkanSampler, IBackendSampler, ISampler)
 
-  static IVulkanSampler *Create(IVulkanDevice *device, const SamplerDesc &desc);
+  static rhi::ISampler *Create(IVulkanDevice *device, const SamplerDesc &desc);
 
   ~VulkanSamplerImpl() override;
 

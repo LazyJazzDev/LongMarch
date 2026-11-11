@@ -6,16 +6,11 @@
 namespace grassland::rhi::backend::metal {
 class IMetalAccelerationStructure;
 class IMetalAllocatedBuffer;
-class IMetalAllocatedImage;
-class IMetalBindingGroup;
 class IMetalBindingVersion;
-class IMetalBottomLevelAccelerationStructure;
 class IMetalBuffer;
-class IMetalCommandContext;
 class IMetalComputeProgram;
 class IMetalCore;
 class IMetalDevice;
-class IMetalDownloadToken;
 class IMetalImage;
 class IMetalProgram;
 class IMetalProgramBase;

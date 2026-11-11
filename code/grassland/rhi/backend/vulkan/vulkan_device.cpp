@@ -107,7 +107,7 @@ void VulkanDeviceImpl::RecycleCommandResources(VkCommandPool pool, VkCommandBuff
   vkDestroyCommandPool(device_, pool, nullptr);
 }
 
-VulkanDeviceImpl::VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, IBackendCore *core)
+VulkanDeviceImpl::VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, ICore *core)
     : upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
       download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
       scratch_pool_(this) {
@@ -136,10 +136,10 @@ VulkanDeviceImpl::~VulkanDeviceImpl() {
   DestroyDevice();
 }
 
-IVulkanDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                    IBackendCore *core,
-                                                    VkPhysicalDevice physical_device,
-                                                    uint32_t api_version) {
+rhi::IDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                                   ICore *core,
+                                                   VkPhysicalDevice physical_device,
+                                                   uint32_t api_version) {
   auto device = std::unique_ptr<VulkanDeviceImpl>(new VulkanDeviceImpl(std::move(info), core));
   DeviceFeatures enabled(physical_device, api_version);
   if (!enabled)
@@ -241,7 +241,7 @@ ISampler *VulkanDeviceImpl::CreateSampler(const SamplerDesc &desc) {
 }
 
 IBindingGroup *VulkanDeviceImpl::CreateBindingGroup(const BindingLayoutDesc &layout) {
-  return IVulkanBindingGroup::Create(this, layout);
+  return CreateVulkanBindingGroup(this, layout);
 }
 
 VulkanDescriptorPool &VulkanDeviceImpl::DescriptorPool() {
@@ -281,11 +281,12 @@ VulkanTemporalBufferPool &VulkanDeviceImpl::UploadPool() {
 }
 
 rhi::IImage *VulkanDeviceImpl::CreateImage(const ImageDesc &desc) {
-  return IVulkanAllocatedImage::Create(this, desc);
+  return CreateVulkanAllocatedImage(this, desc);
 }
 
 rhi::IBuffer *VulkanDeviceImpl::CreateBuffer(const BufferDesc &desc) {
-  return IVulkanAllocatedBuffer::Create(this, desc);
+  auto buffer = ObjectPtr<IVulkanAllocatedBuffer>::Adopt(IVulkanAllocatedBuffer::Create(this, desc));
+  return rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach();
 }
 
 rhi::IComputeProgram *VulkanDeviceImpl::CreateComputeProgram(const ComputeProgramDesc &desc) {
@@ -306,7 +307,7 @@ VulkanScratchPool &VulkanDeviceImpl::ScratchPool() {
 
 IBottomLevelAccelerationStructure *VulkanDeviceImpl::CreateBottomLevelAccelerationStructure(
     const BottomLevelAccelerationStructureDesc &desc) {
-  return IVulkanBottomLevelAccelerationStructure::Create(this, desc);
+  return CreateVulkanBottomLevelAccelerationStructure(this, desc);
 }
 
 ITopLevelAccelerationStructure *VulkanDeviceImpl::CreateTopLevelAccelerationStructure(
@@ -324,14 +325,14 @@ VulkanTemporalBufferPool &VulkanDeviceImpl::DownloadPool() {
   return download_pool_;
 }
 
-IVulkanDevice *IVulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                 IBackendCore *core,
-                                                 VkPhysicalDevice physical_device,
-                                                 uint32_t api_version) {
+rhi::IDevice *IVulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                                ICore *core,
+                                                VkPhysicalDevice physical_device,
+                                                uint32_t api_version) {
   return VulkanDeviceImpl::CreateVulkanDevice(info, core, physical_device, api_version);
 }
 
-void VulkanDeviceImpl::InitializeDevice(PhysicalDevice info, IBackendCore *core, BackendAPI api) {
+void VulkanDeviceImpl::InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api) {
   api_ = api;
   core_ = core;
   info_ = std::move(info);
@@ -341,7 +342,7 @@ rhi::IShader *VulkanDeviceImpl::CreateShader(const ShaderDesc &desc) {
   if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
       desc.stage > SHADER_STAGE_CALLABLE)
     return nullptr;
-  return IBackendShader::Create(desc, api_);
+  return backend::CreateShader(desc, api_);
 }
 
 void VulkanDeviceImpl::DestroyDevice() {
@@ -367,14 +368,14 @@ bool VulkanDeviceImpl::SupportGeometryShader() const {
 rhi::IQueue *VulkanDeviceImpl::GetQueue(QueueType type) {
   if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
     return nullptr;
-  return ObjectPtr<IBackendQueue>::Retain(queues_[type].Get()).Detach();
+  return rhi::QueryInterfacePtr<IQueue>(queues_[type].Get()).Detach();
 }
 
 const PhysicalDevice &VulkanDeviceImpl::GetPhysicalDevice() const noexcept {
   return info_;
 }
 
-IBackendCore *VulkanDeviceImpl::OwnerCore() const {
+ICore *VulkanDeviceImpl::OwnerCore() const {
   return core_;
 }
 
@@ -413,9 +414,9 @@ void VulkanDeviceImpl::Collect() {
       if (!queue)
         continue;
       uint64_t completed = 0;
-      const bool timeline_valid = queue->GetTimeline()->GetCompletedValue(completed);
+      const bool timeline_valid = rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline())->GetCompletedValue(completed);
       if (timeline_valid && completed != UINT64_MAX)
-        next.push_back({queue->GetTimeline(), completed + 1});
+        next.push_back({rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline()).Get(), completed + 1});
       if (!queue->CollectCompleted(completed, timeline_valid))
         empty = false;
     }

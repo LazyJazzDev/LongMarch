@@ -15,7 +15,7 @@ bool MetalCoreImpl::DebugEnabled() const {
   return enable_debug_;
 }
 
-IMetalCore *MetalCoreImpl::CreateMetalCore(const CoreDesc &desc) {
+rhi::ICore *MetalCoreImpl::CreateMetalCore(const CoreDesc &desc) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto core = std::unique_ptr<MetalCoreImpl>(new MetalCoreImpl(desc));
   uint64_t host_memory = 0;
@@ -84,7 +84,7 @@ rhi::IDevice *MetalCoreImpl::CreateDevice(int32_t device_idx) {
   return IMetalDevice::Create(adapter.info, this, adapter.native);
 }
 
-IMetalCore *IMetalCore::CreateMetalCore(const CoreDesc &desc) {
+rhi::ICore *IMetalCore::CreateMetalCore(const CoreDesc &desc) {
   return MetalCoreImpl::CreateMetalCore(desc);
 }
 }  // namespace grassland::rhi::backend::metal

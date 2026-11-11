@@ -3,11 +3,11 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12SamplerImpl final : public Object<ID3D12Sampler> {
+class D3D12SamplerImpl final : public Object<rhi::ISampler, ID3D12Sampler> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(ISampler, ID3D12Sampler, IBackendSampler, ISampler)
 
-  static ID3D12Sampler *Create(ID3D12Device *device, const SamplerDesc &desc);
+  static rhi::ISampler *Create(ID3D12Device *device, const SamplerDesc &desc);
 
   const D3D12_SAMPLER_DESC &NativeDesc() const {
     return native_desc_;

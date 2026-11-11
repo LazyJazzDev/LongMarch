@@ -26,7 +26,7 @@ IShaderBindingTable *D3D12RayTracingProgramImpl::CreateShaderBindingTable(const 
   return BuildShaderBindingTable(desc);
 }
 
-ID3D12RayTracingProgram *D3D12RayTracingProgramImpl::Create(ID3D12Device *owner_device,
+rhi::IRayTracingProgram *D3D12RayTracingProgramImpl::Create(ID3D12Device *owner_device,
                                                             const RayTracingProgramDesc &desc) {
   auto object = std::unique_ptr<D3D12RayTracingProgramImpl>(new D3D12RayTracingProgramImpl(owner_device, desc));
   if (!object->ValidateLayout() || object->desc_.max_recursion_depth > 31 || object->desc_.max_attribute_size > 32)
@@ -114,15 +114,16 @@ ID3D12RayTracingProgram *D3D12RayTracingProgramImpl::Create(ID3D12Device *owner_
                   D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
     }
   }
+  ObjPtr<IShaderBindingTable> table = object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc());
   object->table_ = ObjectPtr<IBackendShaderBindingTable>::Adopt(
-      object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc()));
+      rhi::QueryInterfacePtr<IBackendShaderBindingTable>(table.Get()).Detach());
   if (!object->table_)
     return nullptr;
   object->pipeline_ = std::move(pipeline);
   return object.release();
 }
 
-IBackendShaderBindingTable *D3D12RayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
+IShaderBindingTable *D3D12RayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
   constexpr uint64_t stride = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
   constexpr uint64_t alignment = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
   std::vector<uint8_t> data;
@@ -149,10 +150,11 @@ IBackendShaderBindingTable *D3D12RayTracingProgramImpl::BuildShaderBindingTable(
   for (auto &region : regions)
     if (region.size)
       region.address += address;
-  return IBackendShaderBindingTable::Create(this, desc, std::move(buffer), regions);
+  return IBackendShaderBindingTable::Create(
+      this, desc, ObjectPtr<IBuffer>::Adopt(rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach()), regions);
 }
 
-ID3D12RayTracingProgram *ID3D12RayTracingProgram::Create(ID3D12Device *device, const RayTracingProgramDesc &desc) {
+rhi::IRayTracingProgram *ID3D12RayTracingProgram::Create(ID3D12Device *device, const RayTracingProgramDesc &desc) {
   return D3D12RayTracingProgramImpl::Create(device, desc);
 }
 

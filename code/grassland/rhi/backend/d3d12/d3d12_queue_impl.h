@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12QueueImpl final : public Object<ID3D12Queue> {
+class D3D12QueueImpl final : public Object<rhi::IQueue, ID3D12Queue> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, ID3D12Queue, IBackendQueue, rhi::IQueue)
   rhi::ICommandContext *CreateCommandContext() override;

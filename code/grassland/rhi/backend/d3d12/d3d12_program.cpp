@@ -16,7 +16,7 @@ ID3D12PipelineState *D3D12ProgramImpl::NativePipeline() const {
   return pipeline_.Get();
 }
 
-ID3D12Program *D3D12ProgramImpl::Create(ID3D12Device *owner_device, const ProgramDesc &desc) {
+rhi::IProgram *D3D12ProgramImpl::Create(ID3D12Device *owner_device, const ProgramDesc &desc) {
   auto object = std::unique_ptr<D3D12ProgramImpl>(new D3D12ProgramImpl(owner_device, desc));
   if (!object->ValidateLayout()) {
     ReportError(-1, "Invalid graphics program layout.");
@@ -103,7 +103,7 @@ ID3D12Program *D3D12ProgramImpl::Create(ID3D12Device *owner_device, const Progra
   return object.release();
 }
 
-ID3D12Program *ID3D12Program::Create(ID3D12Device *device, const ProgramDesc &desc) {
+rhi::IProgram *ID3D12Program::Create(ID3D12Device *device, const ProgramDesc &desc) {
   return D3D12ProgramImpl::Create(device, desc);
 }
 

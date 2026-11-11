@@ -3,16 +3,16 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12ComputeProgramImpl final : public Object<ID3D12ComputeProgram> {
+class D3D12ComputeProgramImpl final
+    : public Object<rhi::IComputeProgram, ID3D12ComputeProgram, IBackendComputeProgram> {
  public:
   LONGMARCH_RHI_FINAL_QUERY(IComputeProgram,
                             ID3D12ComputeProgram,
                             IBackendComputeProgram,
                             IComputeProgram,
-                            ID3D12ProgramBase,
-                            IObject)
+                            ID3D12ProgramBase)
 
-  static ID3D12ComputeProgram *Create(ID3D12Device *device, const ComputeProgramDesc &desc);
+  static rhi::IComputeProgram *Create(ID3D12Device *device, const ComputeProgramDesc &desc);
 
   ID3D12PipelineState *NativePipeline() const;
 

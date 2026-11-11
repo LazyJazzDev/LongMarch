@@ -43,7 +43,7 @@ VkImage VulkanAllocatedImageImpl::NativeImage() const {
   return image_;
 }
 
-IVulkanAllocatedImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc &desc) {
+IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc &desc) {
   if (!desc.width || !desc.height)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
@@ -83,7 +83,7 @@ IVulkanAllocatedImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, c
   // Establish the fixed default layout once, before exposing the resource.
   // Temporary initialization commands are outside the rendering loop.
   const auto native = device->NativeDevice();
-  auto queue_owner = ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN));
+  auto queue_owner = ObjectPtr<IQueue>::Adopt(rhi::QueryInterfacePtr<IDevice>(device)->GetQueue(QUEUE_TYPE_MAIN));
   auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(queue_owner.Get()).Get();
   std::lock_guard<std::mutex> lock(queue->QueueMutex());
   VkCommandPool pool{};
@@ -143,7 +143,7 @@ IVulkanAllocatedImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, c
   return image.release();
 }
 
-IVulkanAllocatedImage *IVulkanAllocatedImage::Create(IVulkanDevice *device, const ImageDesc &desc) {
+IImage *CreateVulkanAllocatedImage(IVulkanDevice *device, const ImageDesc &desc) {
   return VulkanAllocatedImageImpl::Create(device, desc);
 }
 
@@ -176,5 +176,3 @@ const void *VulkanAllocatedImageImpl::DeviceIdentity() const {
   return device_;
 }
 }  // namespace grassland::rhi::backend::vulkan
-
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanAllocatedImage, "cc7d23e5-e7de-45ae-a4d6-2f954645a1ab")
