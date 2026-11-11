@@ -146,6 +146,9 @@ Metal performance or Linux performance.
 
 ## Validation
 
+The following checks apply to the interface/state separation at `015e960a`.
+The performance measurements above apply only to the older implementation.
+
 - Windows Release: 218 passed, two Debug-only queue-diagnostic tests skipped
   (`--gtest_filter=-*RayTracing*`, `LONGMARCH_RHI_WINDOW_TESTS=1`).
 - Windows Debug: 44 interface, timeline, offscreen, window, and ImGui tests
@@ -156,17 +159,14 @@ Metal performance or Linux performance.
   of the previously identified DXR compressed-BLAS validation issue; both
   backends' ray-tracing pipeline demos were explicitly exercised instead.
 - Meshy-PC-3090: GCC Release build passed; isolated regression runs yielded
-  102 passed, nine skipped. The final ancestor-query change passed an additional
-  eight-test selection. Vulkan raytracing demo passed. One broad single-process
-  run encountered the previously observed repeated-Vulkan-load/static-TLS
-  problem; the failed case passed in a fresh process, followed by the full
-  isolated selection with no failures.
-- Clang syntax checks passed for 84 RHI/test translation units. Four interface
+  103 passed, nine skipped, and no failures. Each test runs in a fresh process
+  to avoid the previously observed repeated-Vulkan-load/static-TLS problem.
+- Clang syntax checks passed for 88 RHI/test translation units. Four interface
   tests executed successfully with both GCC and Clang with RTTI disabled.
-  Strict C++17 header probes passed with both compilers.
 - Audit: 111 library UUID registrations are unique UUIDv4 values and match the
   random generator's output. RHI contains no remaining `dynamic_cast`.
-  Stored owner pointers were moved, not duplicated; native timeline ownership
-  replaces the former unique pointer with an intrusive reference.
+  Intermediate interfaces have no state; final implementations introduce their
+  single reference counter through `Object<Interface>`. Shared state is composed
+  into those final implementations rather than inherited.
 - Metal source was migrated, but no macOS build or runtime validation was
   available. Windows/Linux checks do not substitute for that validation.
