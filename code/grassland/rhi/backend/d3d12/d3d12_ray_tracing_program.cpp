@@ -150,3 +150,5 @@ ShaderBindingTable *D3D12RayTracingProgram::BuildShaderBindingTable(const Shader
 }
 
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12RayTracingProgram, "5d1da804-a5b3-4469-a380-9d7a44cee916")

@@ -61,3 +61,5 @@ D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const Imag
   return new D3D12AllocatedImage(device, desc, std::move(image), std::move(allocation), std::move(attachment));
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12AllocatedImage, "3d5647bf-0a89-4f7f-bce8-dd9e99c879a1")

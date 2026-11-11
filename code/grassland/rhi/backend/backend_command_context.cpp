@@ -322,3 +322,5 @@ bool CommandContext::CmdCompactAccelerationStructure(IAccelerationStructure *, I
   return false;
 }
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::CommandContext, "4a13943e-6f88-4739-91c4-0eb6b6a04a0c")

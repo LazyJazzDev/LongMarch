@@ -35,3 +35,5 @@ MetalSampler *MetalSampler::Create(MetalDevice *device, const SamplerDesc &desc)
   return new MetalSampler(device, desc, std::move(sampler));
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalSampler, "c609fe39-6f33-4a10-a4b1-db4fa86332b7")

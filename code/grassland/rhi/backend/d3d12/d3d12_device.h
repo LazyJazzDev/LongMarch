@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::d3d12 {
+class D3D12Device;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12Device)
 #include <d3d12sdklayers.h>
 
 #include <tuple>

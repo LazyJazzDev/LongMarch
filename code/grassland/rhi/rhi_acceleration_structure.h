@@ -2,6 +2,7 @@
 #include <array>
 
 #include "grassland/rhi/rhi_binding_group.h"
+#include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi {
 // Describes fixed geometry shape, not input buffer ownership. Counts/format/stride

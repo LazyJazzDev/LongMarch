@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class Shader;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Shader)
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_shader.h"
 

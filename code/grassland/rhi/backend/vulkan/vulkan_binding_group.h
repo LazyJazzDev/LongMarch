@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanBindingGroup;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanBindingGroup)
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_descriptor_pool.h"
 
@@ -44,7 +50,7 @@ class VulkanBindingGroup final : public BindingGroup {
 };
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanBindingGroup::Version, "fe3339ef-20d4-4c9c-b124-60c9431ce9b8")
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanBindingGroup::Version)
 
 inline bool grassland::rhi::backend::vulkan::VulkanBindingGroup::Version::QueryInterface(InterfaceID id,
                                                                                          void **output) noexcept {

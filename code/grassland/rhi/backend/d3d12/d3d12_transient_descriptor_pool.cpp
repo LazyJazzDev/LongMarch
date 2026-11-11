@@ -149,3 +149,6 @@ void D3D12TransientDescriptorPool::Clear() {
   }
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12TransientDescriptorPool::Lease,
+                   "edcbe9c2-3d76-4843-9aee-2beaa73f8a15")

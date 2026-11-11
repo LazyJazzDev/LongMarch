@@ -1,4 +1,22 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::metal {
+class MetalAccelerationStructure;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalAccelerationStructure)
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::metal {
+class MetalTopLevelAccelerationStructure;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalTopLevelAccelerationStructure)
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::metal {
+class MetalBottomLevelAccelerationStructure;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalBottomLevelAccelerationStructure)
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_acceleration_structure.h"

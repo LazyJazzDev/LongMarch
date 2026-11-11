@@ -122,3 +122,5 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
   return object.release();
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalProgram, "26dfc710-560c-4dff-bfbd-2adc53cd3739")

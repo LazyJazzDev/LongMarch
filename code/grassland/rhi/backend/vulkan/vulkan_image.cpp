@@ -79,3 +79,5 @@ const void *VulkanImage::DeviceIdentity() const {
 }
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanImage, "bab85247-2604-44fe-b152-1ea15663177a")

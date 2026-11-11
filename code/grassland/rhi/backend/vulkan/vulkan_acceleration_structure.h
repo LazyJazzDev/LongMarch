@@ -1,4 +1,22 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanAccelerationStructure;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanAccelerationStructure)
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanTopLevelAccelerationStructure;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanTopLevelAccelerationStructure)
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanBottomLevelAccelerationStructure;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanBottomLevelAccelerationStructure)
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"

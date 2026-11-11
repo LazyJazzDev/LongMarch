@@ -73,3 +73,5 @@ int32_t SelectPhysicalDevice(const std::vector<PhysicalDevice> &devices, DeviceF
 }
 
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::Core, "e4b44f28-4fd0-428a-927d-19a615be66fc")

@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::d3d12 {
+class D3D12Core;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12Core)
 #include <d3d12sdklayers.h>
 
 #include "grassland/rhi/backend/backend_core.h"

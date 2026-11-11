@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class Queue;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Queue)
 #include <list>
 
 #include "grassland/rhi/backend/backend_command_context.h"

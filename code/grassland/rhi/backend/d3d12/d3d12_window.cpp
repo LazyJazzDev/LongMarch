@@ -200,3 +200,5 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
 }
 
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Window, "1babd07b-773d-4d2b-9392-ec5113e23fdf")

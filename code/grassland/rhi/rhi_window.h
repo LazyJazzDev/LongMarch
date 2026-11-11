@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
 #ifndef GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_NONE
 #endif

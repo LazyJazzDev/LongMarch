@@ -37,3 +37,5 @@ HRESULT D3D12SwapChainImage::Present() {
 }
 
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12SwapChainImage, "f03d8d79-9e19-41ca-b585-8f6f5bd64143")

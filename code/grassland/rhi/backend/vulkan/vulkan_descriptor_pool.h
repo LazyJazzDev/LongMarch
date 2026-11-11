@@ -53,7 +53,7 @@ class VulkanDescriptorPool {
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanDescriptorPool::Lease, "4eacb408-4ddb-4df5-9846-c7fd2101efb2")
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanDescriptorPool::Lease)
 
 inline bool grassland::rhi::backend::vulkan::VulkanDescriptorPool::Lease::QueryInterface(InterfaceID id,
                                                                                          void **output) noexcept {

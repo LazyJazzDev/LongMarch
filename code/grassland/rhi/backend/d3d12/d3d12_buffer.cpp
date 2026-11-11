@@ -11,3 +11,5 @@ Device *D3D12Buffer::Owner() const {
 }
 
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Buffer, "29cbc4ee-c77c-48a4-8c31-de9ee75c704d")

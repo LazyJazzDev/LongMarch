@@ -1013,3 +1013,5 @@ IDownloadToken *D3D12CommandContext::CmdDownloadImage(IImage *image, const Image
       new D3D12DownloadToken(std::move(lease), DownloadLayout{0, pitch, packed, height})));
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12CommandContext, "5962a78a-e01d-4cc1-9f13-4544d7232c63")

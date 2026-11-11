@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class BindingGroup;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::BindingGroup)
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_binding_group.h"
 
@@ -75,7 +81,7 @@ bool ValidateBindingLayout(const BindingLayoutDesc &layout);
 bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b);
 }  // namespace grassland::rhi::backend
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::BindingGroup::Version, "8b356457-129b-40a7-ab14-51c6b2565805")
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::BindingGroup::Version)
 
 inline bool grassland::rhi::backend::BindingGroup::Version::QueryInterface(InterfaceID id, void **output) noexcept {
   if (!output)

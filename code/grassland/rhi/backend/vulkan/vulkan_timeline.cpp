@@ -40,3 +40,5 @@ VkSemaphore VulkanTimeline::NativeSemaphore() const {
 }
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanTimeline, "30a1e28a-4bf1-4d83-a693-bc60f95ec95b")

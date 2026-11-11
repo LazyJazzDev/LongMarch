@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::d3d12 {
+class D3D12RayTracingProgram;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12RayTracingProgram)
 #include "grassland/rhi/backend/backend_ray_tracing_program.h"
 #include "grassland/rhi/backend/backend_shader_binding_table.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 
+#include "grassland/rhi/rhi_interface_id.h"
 #include "grassland/rhi/rhi_object.h"
 
 namespace grassland::rhi {

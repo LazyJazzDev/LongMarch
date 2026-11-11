@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class SubmissionToken;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::SubmissionToken)
 #include <condition_variable>
 #include <mutex>
 

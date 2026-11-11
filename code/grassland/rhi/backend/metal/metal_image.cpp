@@ -21,3 +21,5 @@ MTL::Texture *MetalImage::NativeImage() const {
 }
 
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalImage, "3c717669-dee3-407f-92be-d6485832e1c3")

@@ -108,3 +108,5 @@ rhi::IDevice *D3D12Core::CreateDevice(int32_t device_idx) {
 }
 
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Core, "0ff7c9ac-b8cc-4d2c-b5ec-9995a69b861d")

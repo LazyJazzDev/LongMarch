@@ -46,3 +46,5 @@ MetalComputeProgram *MetalComputeProgram::Create(MetalDevice *owner_device, cons
   return object.release();
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalComputeProgram, "848b485d-2208-4d1d-86ae-cadee6182bfe")

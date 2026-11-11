@@ -99,3 +99,5 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
   return object.release();
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Program, "2919454c-7ff9-4ce3-b919-40901e038398")

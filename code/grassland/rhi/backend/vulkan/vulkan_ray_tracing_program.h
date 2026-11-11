@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanRayTracingProgram;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanRayTracingProgram)
 #include <array>
 
 #include "grassland/rhi/backend/backend_ray_tracing_program.h"

@@ -59,3 +59,5 @@ VulkanComputeProgram *VulkanComputeProgram::Create(VulkanDevice *owner_device, c
   return object.release();
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanComputeProgram, "3ce12e7b-3db2-461e-b7d0-9ec0f172ebd1")

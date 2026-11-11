@@ -230,3 +230,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
 }
 
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12BindingGroup, "b827b0e0-c57d-4316-b632-77a41d222ae7")
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12BindingGroup::Version, "1e82b239-9a3f-4e32-aeab-b2fdaba168ff")

@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "grassland/rhi/rhi_interface_ids.h"
+#include "grassland/rhi/rhi_interface_id.h"
 #include "grassland/rhi/rhi_util.h"
 
 namespace grassland::rhi {

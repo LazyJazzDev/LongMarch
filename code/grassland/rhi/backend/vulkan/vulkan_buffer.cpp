@@ -11,3 +11,5 @@ Device *VulkanBuffer::Owner() const {
 }
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanBuffer, "edd00360-77f8-46d3-9659-0c06d6616086")

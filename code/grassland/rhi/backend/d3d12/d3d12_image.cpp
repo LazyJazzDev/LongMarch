@@ -50,3 +50,5 @@ D3D12_RESOURCE_STATES D3D12Image::DefaultState() const {
 }
 
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Image, "85eb3c59-b643-4c32-b41f-66ed7e262a3e")

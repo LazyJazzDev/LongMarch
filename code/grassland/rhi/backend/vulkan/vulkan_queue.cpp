@@ -43,3 +43,5 @@ VulkanQueue::VulkanQueue(VulkanDevice *device, QueueType type, VkQueue queue, st
 }
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanQueue, "09666973-0b3a-4165-bb7f-0faf38e0f01a")

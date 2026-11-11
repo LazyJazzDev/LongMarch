@@ -740,3 +740,5 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
       std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalCommandContext, "cd04e62d-678c-4e07-aef6-f5fb982bba78")

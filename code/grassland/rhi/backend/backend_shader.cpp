@@ -28,3 +28,5 @@ const std::string &Shader::GetPreprocessedCode() const {
 }
 
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::Shader, "74166d66-39c8-4b6f-b9bc-1721e275a3c2")

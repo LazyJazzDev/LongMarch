@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi_binding_group.h"
+#include "grassland/rhi/rhi_interface_id.h"
 #include "grassland/rhi/rhi_shader.h"
 
 namespace grassland::rhi {

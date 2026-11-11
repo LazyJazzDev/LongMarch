@@ -38,3 +38,5 @@ D3D12Queue::D3D12Queue(D3D12Device *device, QueueType type) : Queue(device, type
 }
 
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Queue, "46194ddb-7a1a-4d51-b878-0e51d212d642")

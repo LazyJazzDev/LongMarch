@@ -317,3 +317,5 @@ VulkanTemporalBufferPool &VulkanDevice::DownloadPool() {
   return download_pool_;
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanDevice, "96a1c412-20e1-40bc-b542-d515f9a41965")

@@ -181,3 +181,5 @@ rhi::IDevice *VulkanCore::CreateDevice(int32_t device_idx) {
 }
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanCore, "38b5aac6-db8d-4fe0-86ac-ed06f0b3c970")

@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanImage;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanImage)
 #include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 

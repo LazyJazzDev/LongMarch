@@ -951,3 +951,5 @@ IDownloadToken *VulkanCommandContext::CmdDownloadImage(IImage *image, const Imag
       std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanCommandContext, "91254acd-ec4a-490b-a6f9-ca359d27d0e5")

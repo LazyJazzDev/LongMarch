@@ -1,4 +1,10 @@
 #pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class Sampler;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Sampler)
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_sampler.h"
 

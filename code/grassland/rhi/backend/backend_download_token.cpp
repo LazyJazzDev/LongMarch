@@ -28,3 +28,5 @@ void DownloadToken::BindSubmission(SubmissionToken *submission) {
   submission_ = ObjectPtr<SubmissionToken>::Retain(submission);
 }
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::DownloadToken, "ed7d2ceb-b722-4881-ad53-9d19894b4bb2")

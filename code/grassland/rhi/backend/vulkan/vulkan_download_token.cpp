@@ -34,3 +34,5 @@ bool VulkanDownloadToken::CopyData(void *destination) const {
   return true;
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanDownloadToken, "1f0619cd-eb9a-4ecc-8260-c1737da81a3b")

@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::d3d12 {
+class D3D12BindingGroup;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12BindingGroup)
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 
@@ -42,7 +48,7 @@ class D3D12BindingGroup final : public BindingGroup {
 };
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12BindingGroup::Version, "1e82b239-9a3f-4e32-aeab-b2fdaba168ff")
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12BindingGroup::Version)
 
 inline bool grassland::rhi::backend::d3d12::D3D12BindingGroup::Version::QueryInterface(InterfaceID id,
                                                                                        void **output) noexcept {

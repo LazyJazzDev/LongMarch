@@ -51,8 +51,7 @@ class VulkanRenderTargetPool {
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanRenderTargetPool::Lease,
-                   "0954731d-c668-4aca-af2c-c3099abc20f4")
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanRenderTargetPool::Lease)
 
 inline bool grassland::rhi::backend::vulkan::VulkanRenderTargetPool::Lease::QueryInterface(InterfaceID id,
                                                                                            void **output) noexcept {

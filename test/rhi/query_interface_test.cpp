@@ -40,7 +40,7 @@ constexpr auto parsed = ParseInterfaceID("523d719e-fb75-41e8-addc-fc6abcf4575f")
 static_assert(parsed.has_value());
 static_assert(parsed->high == 0x523d719efb7541e8ULL);
 static_assert(parsed->low == 0xaddcfc6abcf4575fULL);
-static_assert(*parsed == uuid<ILeft>());
+
 static_assert(!ParseInterfaceID("523d719e-fb75-41e8-addc-fc6abcf4575x"));
 
 TEST(RhiQueryInterface, UUIDParsingIsStrictAndCaseIndependent) {
@@ -48,6 +48,7 @@ TEST(RhiQueryInterface, UUIDParsingIsStrictAndCaseIndependent) {
   for (const char *invalid : {"", "523d719efb7541e8addcfc6abcf4575f", "523d719e_fb75-41e8-addc-fc6abcf4575f",
                               "{523d719e-fb75-41e8-addc-fc6abcf4575f}", "523d719e-fb75-41e8-addc-fc6abcf4575f "})
     EXPECT_FALSE(ParseInterfaceID(invalid));
+  EXPECT_EQ(*parsed, uuid<ILeft>());
   EXPECT_NE(uuid<ILeft>(), uuid<IRight>());
 }
 

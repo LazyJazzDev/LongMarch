@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class ComputeProgram;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::ComputeProgram)
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_compute_program.h"
 

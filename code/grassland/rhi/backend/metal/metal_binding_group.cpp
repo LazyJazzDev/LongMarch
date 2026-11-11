@@ -218,3 +218,7 @@ MetalBindingGroup *MetalBindingGroup::Create(MetalDevice *device, const BindingL
   return version ? new MetalBindingGroup(device, std::move(version)) : nullptr;
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalBindingGroup, "cc9ee713-7a82-44a9-9c5d-6b138c2b32bd")
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalBindingGroup::Version, "fcef2422-11d0-4f7f-acb2-f3fcd629a898")

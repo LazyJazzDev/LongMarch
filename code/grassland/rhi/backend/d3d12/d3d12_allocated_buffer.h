@@ -1,4 +1,10 @@
 #pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::d3d12 {
+class D3D12AllocatedBuffer;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12AllocatedBuffer)
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 
 namespace D3D12MA {

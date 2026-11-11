@@ -64,3 +64,5 @@ IShader *IDevice::CreateShaderFromSource(const std::string &source,
   return CreateShader(desc);
 }
 }  // namespace grassland::rhi
+
+LONGMARCH_RHI_UUID(grassland::rhi::IDevice, "7a97161c-7adc-4201-a4f0-53f40b94b527")

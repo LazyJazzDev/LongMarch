@@ -186,3 +186,5 @@ ShaderBindingTable *VulkanRayTracingProgram::BuildShaderBindingTable(const Shade
 }
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanRayTracingProgram, "dbbe212c-3234-418b-b6b0-6676da637f09")

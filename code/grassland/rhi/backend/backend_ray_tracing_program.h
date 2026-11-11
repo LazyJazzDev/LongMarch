@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class RayTracingProgram;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::RayTracingProgram)
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
 

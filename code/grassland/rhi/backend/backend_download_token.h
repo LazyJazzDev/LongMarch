@@ -1,4 +1,10 @@
 #pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class DownloadToken;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::DownloadToken)
 
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/rhi_download_token.h"

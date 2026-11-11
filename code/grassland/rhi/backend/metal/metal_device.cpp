@@ -104,3 +104,5 @@ MetalTemporalBufferPool &MetalDevice::DownloadPool() {
   return temporal_buffers_;
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalDevice, "0edf854d-4ccc-4b02-8c0c-030ded3b67dc")

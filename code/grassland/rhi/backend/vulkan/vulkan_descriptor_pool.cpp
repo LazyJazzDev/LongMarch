@@ -121,3 +121,5 @@ std::pair<size_t, size_t> VulkanDescriptorPool::GetPageCounts() const {
 }
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanDescriptorPool::Lease, "4eacb408-4ddb-4df5-9846-c7fd2101efb2")

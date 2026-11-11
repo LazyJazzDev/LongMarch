@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class Device;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Device)
 #include <array>
 #include <atomic>
 #include <mutex>

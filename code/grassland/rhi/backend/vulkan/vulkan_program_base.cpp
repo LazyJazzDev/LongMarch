@@ -31,3 +31,5 @@ bool VulkanProgramBase::CreateLayout(const PipelineLayoutDesc &desc) {
   return Check(vkCreatePipelineLayout(layout_device_, &create, nullptr, &layout_), "Create pipeline layout");
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanProgramBase, "267525b2-441a-4f53-a2e2-826fd05cd6d2")

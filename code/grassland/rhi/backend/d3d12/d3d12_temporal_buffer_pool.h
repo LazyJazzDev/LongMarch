@@ -1,4 +1,10 @@
 #pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::d3d12 {
+class D3D12TemporalBufferLease;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12TemporalBufferLease)
 #include "grassland/rhi/backend/backend_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 

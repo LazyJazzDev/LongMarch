@@ -7,3 +7,5 @@ bool Sampler::Validate(const SamplerDesc &desc) {
          desc.address_v >= SAMPLER_ADDRESS_REPEAT && desc.address_v <= SAMPLER_ADDRESS_MIRRORED_REPEAT;
 }
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::Sampler, "34cc865a-50d9-49f8-b8db-591bc452621f")

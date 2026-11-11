@@ -47,13 +47,17 @@ constexpr std::optional<InterfaceID> ParseInterfaceID(std::string_view text) noe
 }
 
 template <typename T>
-constexpr InterfaceID uuid() = delete;
+InterfaceID uuid() = delete;
 }  // namespace grassland::rhi
 
-// Use at global namespace scope, before the first query for Type. No runtime registration.
+// Declare in the interface header; define once in its implementation file.
+#define LONGMARCH_RHI_DECLARE_UUID(Type) \
+  template <>                            \
+  grassland::rhi::InterfaceID grassland::rhi::uuid<Type>();
+
 #define LONGMARCH_RHI_UUID(Type, Text)                                                               \
   template <>                                                                                        \
-  inline constexpr grassland::rhi::InterfaceID grassland::rhi::uuid<Type>() {                        \
+  grassland::rhi::InterfaceID grassland::rhi::uuid<Type>() {                                         \
     static_assert(grassland::rhi::ParseInterfaceID(Text).has_value(), "Invalid RHI interface UUID"); \
     return *grassland::rhi::ParseInterfaceID(Text);                                                  \
   }

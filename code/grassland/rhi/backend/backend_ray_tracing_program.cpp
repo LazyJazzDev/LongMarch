@@ -81,3 +81,5 @@ ShaderBindingTableDesc RayTracingProgram::DefaultShaderBindingTableDesc() const 
 }
 
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::RayTracingProgram, "e0b9733f-8a37-4702-800c-3022865d522c")

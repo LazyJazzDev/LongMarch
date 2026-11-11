@@ -104,3 +104,5 @@ QueueType Queue::GetType() const {
 }
 
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::Queue, "5b1b277a-1b68-4947-bf02-14449939898d")

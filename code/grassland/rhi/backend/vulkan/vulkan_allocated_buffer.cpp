@@ -69,3 +69,5 @@ bool VulkanAllocatedBuffer::Read(void *data, uint64_t size, uint64_t offset) {
   return true;
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanAllocatedBuffer, "0e429c4d-302f-421e-90d8-b29a6593b7d3")

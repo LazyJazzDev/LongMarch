@@ -141,3 +141,5 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
   return image.release();
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanAllocatedImage, "cc7d23e5-e7de-45ae-a4d6-2f954645a1ab")

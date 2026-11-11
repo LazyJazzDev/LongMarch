@@ -27,3 +27,5 @@ bool ComputeProgram::ValidateLayout() const {
   return true;
 }
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::ComputeProgram, "f64ab67b-e062-4368-8605-dc1700c88e59")

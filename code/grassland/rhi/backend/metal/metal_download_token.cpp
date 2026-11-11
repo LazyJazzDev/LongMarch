@@ -40,3 +40,5 @@ bool MetalDownloadToken::CopyData(void *destination) const {
   return true;
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalDownloadToken, "cb7cec7d-cb18-4503-8444-82a8cde172f9")

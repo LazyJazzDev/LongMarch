@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanAllocatedImage;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanAllocatedImage)
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
 typedef struct VmaAllocation_T *VmaAllocation;
 

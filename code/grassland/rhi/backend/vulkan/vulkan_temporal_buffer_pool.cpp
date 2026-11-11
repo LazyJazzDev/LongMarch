@@ -32,3 +32,5 @@ bool VulkanTemporalBufferLease::Read(void *data, uint64_t size, uint64_t offset)
   return buffer_->Read(data, size, offset);
 }
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanTemporalBufferLease, "b8b91e0e-bc72-4ea2-b918-d6135648577f")

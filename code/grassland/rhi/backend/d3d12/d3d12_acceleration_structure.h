@@ -1,4 +1,22 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::d3d12 {
+class D3D12AccelerationStructure;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12AccelerationStructure)
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::d3d12 {
+class D3D12TopLevelAccelerationStructure;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12TopLevelAccelerationStructure)
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::d3d12 {
+class D3D12BottomLevelAccelerationStructure;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12BottomLevelAccelerationStructure)
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"

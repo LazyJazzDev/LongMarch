@@ -77,3 +77,5 @@ bool D3D12AllocatedBuffer::Read(void *data, uint64_t size, uint64_t offset) {
   return true;
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12AllocatedBuffer, "f17438f1-4828-4dc2-943d-11e8afe77444")

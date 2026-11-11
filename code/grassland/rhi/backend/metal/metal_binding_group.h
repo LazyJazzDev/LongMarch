@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::metal {
+class MetalBindingGroup;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalBindingGroup)
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
@@ -46,7 +52,7 @@ class MetalBindingGroup final : public BindingGroup {
 };
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalBindingGroup::Version, "fcef2422-11d0-4f7f-acb2-f3fcd629a898")
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalBindingGroup::Version)
 
 inline bool grassland::rhi::backend::metal::MetalBindingGroup::Version::QueryInterface(InterfaceID id,
                                                                                        void **output) noexcept {

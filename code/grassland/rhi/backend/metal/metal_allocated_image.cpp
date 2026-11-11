@@ -33,3 +33,5 @@ bool MetalAllocatedImage::IsValid() const {
   return bool(texture_);
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalAllocatedImage, "4ab5d857-2e2e-4232-bd99-aca3979a9c87")

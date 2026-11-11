@@ -337,3 +337,5 @@ bool Window::SetTitle(const std::string &title) {
 }
 
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::Window, "093b830a-4e7b-4d76-8df4-9a2693735c9d")

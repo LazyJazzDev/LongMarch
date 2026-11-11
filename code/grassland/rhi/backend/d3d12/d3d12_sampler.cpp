@@ -27,3 +27,5 @@ D3D12Sampler *D3D12Sampler::Create(D3D12Device *device, const SamplerDesc &desc)
   return sampler.Detach();
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Sampler, "d1e384fa-d35c-42e0-8d5f-110c64fe99d0")

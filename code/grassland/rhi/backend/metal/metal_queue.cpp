@@ -56,3 +56,5 @@ MetalQueue::MetalQueue(MetalDevice *device, QueueType type) : Queue(device, type
 }
 
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalQueue, "b34deab1-e42d-43f3-b6c4-f47dc7638e30")

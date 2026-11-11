@@ -1,4 +1,10 @@
 #pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::metal {
+class MetalTemporalBufferLease;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalTemporalBufferLease)
 #include "grassland/rhi/backend/backend_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/metal/metal_allocated_buffer.h"
 

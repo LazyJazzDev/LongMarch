@@ -262,3 +262,11 @@ D3D12TopLevelAccelerationStructure *D3D12TopLevelAccelerationStructure::Create(
   return object.release();
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12BottomLevelAccelerationStructure,
+                   "5531d910-c7c4-412a-b787-1d220ae37cdb")
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12TopLevelAccelerationStructure,
+                   "4755c2d8-b4b6-477e-809f-939fc3683688")
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12AccelerationStructure, "c8f939f7-1266-44ee-ad3e-f0efb8e7007c")

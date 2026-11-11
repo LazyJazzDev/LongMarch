@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::metal {
+class MetalQueue;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalQueue)
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_timeline.h"

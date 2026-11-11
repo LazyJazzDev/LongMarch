@@ -34,3 +34,5 @@ bool D3D12DownloadToken::CopyData(void *destination) const {
   return true;
 }
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12DownloadToken, "c5315cf9-1ed2-46ac-b619-f12be68cb0ae")

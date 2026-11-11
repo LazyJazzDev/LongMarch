@@ -36,3 +36,5 @@ ID3D12Fence *D3D12Timeline::NativeFence() const {
 }
 
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Timeline, "32d5dccb-60c3-4ca2-af93-4b67d85e7b16")

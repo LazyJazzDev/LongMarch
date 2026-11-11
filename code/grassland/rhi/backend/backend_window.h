@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend {
+class Window;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Window)
 #include <mutex>
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"

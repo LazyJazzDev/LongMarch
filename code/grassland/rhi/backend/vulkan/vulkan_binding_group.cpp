@@ -291,3 +291,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
 }
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanBindingGroup, "d572985f-e699-4c7c-b9da-2c57af2e528c")
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanBindingGroup::Version, "fe3339ef-20d4-4c9c-b124-60c9431ce9b8")

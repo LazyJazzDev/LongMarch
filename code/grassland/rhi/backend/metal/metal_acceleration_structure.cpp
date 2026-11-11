@@ -191,3 +191,11 @@ void MetalTopLevelAccelerationStructure::CommitDependencies(
   bottom_levels_ = std::move(refs);
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalBottomLevelAccelerationStructure,
+                   "5efa0e0c-89c2-4fdf-8295-1b1e502f6363")
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalTopLevelAccelerationStructure,
+                   "240cc2a8-c334-4c86-b106-32c7fcc0f439")
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalAccelerationStructure, "15b08793-ad90-4431-b925-abab83480476")

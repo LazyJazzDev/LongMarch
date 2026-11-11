@@ -32,3 +32,5 @@ bool MetalTemporalBufferLease::Read(void *data, uint64_t size, uint64_t offset) 
   return buffer_->Read(data, size, offset);
 }
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalTemporalBufferLease, "d8febe53-823a-4731-847d-f2f1766778c8")

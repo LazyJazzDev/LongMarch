@@ -11,3 +11,5 @@ Device *MetalBuffer::Owner() const {
 }
 
 }  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalBuffer, "203e6dfb-bb02-4155-900a-b13f43af47bc")

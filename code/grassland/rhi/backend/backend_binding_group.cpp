@@ -268,3 +268,7 @@ bool BindingGroup::BindResource(uint32_t binding,
 }
 
 }  // namespace grassland::rhi::backend
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::BindingGroup::Version, "8b356457-129b-40a7-ab14-51c6b2565805")
+
+LONGMARCH_RHI_UUID(grassland::rhi::backend::BindingGroup, "84d77c02-7724-4c23-ab73-333b6878b5aa")

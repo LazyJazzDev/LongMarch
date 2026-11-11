@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::metal {
+class MetalWindow;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalWindow)
 #include <QuartzCore/QuartzCore.hpp>
 
 #include "grassland/rhi/backend/backend_window.h"

@@ -1,4 +1,10 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_interface_id.h"
+
+namespace grassland::rhi::backend::metal {
+class MetalAllocatedBuffer;
+}
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalAllocatedBuffer)
 #include "grassland/rhi/backend/metal/metal_buffer.h"
 
 namespace grassland::rhi::backend::metal {
