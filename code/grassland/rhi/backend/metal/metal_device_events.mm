@@ -1,36 +1,37 @@
 #import <Metal/Metal.h>
+#include "grassland/rhi/backend/metal/metal_device_impl.h"
 
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
 
 namespace grassland::rhi::backend::metal {
 
-void MetalDevice::InterruptCollector() {
+void MetalDeviceImpl::InterruptCollector() {
   std::lock_guard<std::mutex> lock(wait_state_->mutex);
   wait_state_->notified = true;
   wait_state_->changed.notify_all();
 }
 
-void MetalDevice::NotifyTimelineFailure() {
+void MetalDeviceImpl::NotifyTimelineFailure() {
   std::lock_guard<std::mutex> lock(wait_state_->mutex);
   wait_state_->changed.notify_all();
 }
 
-void MetalDevice::ObserveCompletion(MTL::CommandBuffer *commands, Event signal) {
+void MetalDeviceImpl::ObserveCompletion(MTL::CommandBuffer *commands, Event signal) {
   auto state = wait_state_;
-  rhi::QueryInterfacePtr<MetalTimeline>(signal.timeline).Get()->ObserveCompletion(commands, signal.value, [state] {
+  rhi::QueryInterfacePtr<IMetalTimeline>(signal.timeline).Get()->ObserveCompletion(commands, signal.value, [state] {
     std::lock_guard<std::mutex> lock(state->mutex);
     state->notified = true;
     state->changed.notify_all();
   });
 }
 
-bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
+bool MetalDeviceImpl::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto state = wait_state_;
   for (const auto &event : events) {
     auto native =
-        (__bridge id<MTLSharedEvent>)(void *)rhi::QueryInterfacePtr<MetalTimeline>(event.timeline).Get()->HostEvent();
+        (__bridge id<MTLSharedEvent>)(void *)rhi::QueryInterfacePtr<IMetalTimeline>(event.timeline).Get()->HostEvent();
     std::weak_ptr<WaitState> weak = state;
     [native notifyListener:(__bridge MTLSharedEventListener *)(void *)state->listener.get()
                    atValue:event.value
@@ -60,7 +61,7 @@ bool MetalDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
   }
 }
 
-void MetalDevice::WaitForProgress(const std::vector<Event> &) {
+void MetalDeviceImpl::WaitForProgress(const std::vector<Event> &) {
   auto state = wait_state_;
   std::unique_lock<std::mutex> lock(state->mutex);
   state->changed.wait(lock, [&] { return state->notified; });

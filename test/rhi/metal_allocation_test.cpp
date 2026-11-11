@@ -82,7 +82,7 @@ TEST(RhiMetalAllocation, FactoriesPropagateCpuAllocationFailures) {
   {
     // Native sampler creation precedes the wrapper allocation; RAII must release
     // that state when wrapper allocation fails.
-    FailAllocation fail(sizeof(MetalSampler));
+    FailAllocation fail(sizeof(IMetalSampler));
     try {
       ObjPtr<ISampler> sampler = device->CreateSampler();
     } catch (const std::bad_alloc &) {
@@ -104,7 +104,7 @@ TEST(RhiMetalAllocation, FailedLeaseConstructionReturnsBorrowedUploadBuffer) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto &pool = static_cast<MetalDevice *>(device.Get())->UploadPool();
+  auto &pool = static_cast<IMetalDevice *>(device.Get())->UploadPool();
   auto warm = pool.Acquire(256);
   ASSERT_TRUE(warm);
   auto native = warm->NativeBuffer();
@@ -132,7 +132,7 @@ TEST(RhiMetalAllocation, RecyclingAllocationFailureReleasesStorageWithoutThrowin
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto &pool = static_cast<MetalDevice *>(device.Get())->UploadPool();
+  auto &pool = static_cast<IMetalDevice *>(device.Get())->UploadPool();
   std::vector<backend::ObjectPtr<MetalTemporalBufferPool::Lease>> leases;
   // Enough decreasing occupancy samples to grow libc++'s deque storage.
   for (size_t i = 0; i < 1024; ++i) {

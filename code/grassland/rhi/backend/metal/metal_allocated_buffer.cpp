@@ -9,7 +9,7 @@ class MetalAllocatedBufferImpl final : public Object<IMetalAllocatedBuffer> {
  public:
   LONGMARCH_RHI_QUERY_INTERFACES(Object<IMetalAllocatedBuffer>, IBuffer, IBackendBuffer, IMetalBuffer)
 
-  static IMetalAllocatedBuffer *Create(MetalDevice *device,
+  static IMetalAllocatedBuffer *Create(IMetalDevice *device,
                                        const BufferDesc &desc,
                                        bool upload = false,
                                        bool download = false);
@@ -18,11 +18,11 @@ class MetalAllocatedBufferImpl final : public Object<IMetalAllocatedBuffer> {
   bool Write(const void *data, uint64_t size);
 
  private:
-  MetalAllocatedBufferImpl(MetalDevice *device, const BufferDesc &desc);
+  MetalAllocatedBufferImpl(IMetalDevice *device, const BufferDesc &desc);
   NS::SharedPtr<MTL::IBackendBuffer> buffer_;
 
  private:
-  MetalDevice *device_;
+  IMetalDevice *device_;
   BufferDesc desc_;
 
  public:
@@ -33,7 +33,7 @@ class MetalAllocatedBufferImpl final : public Object<IMetalAllocatedBuffer> {
   Device *Owner() const override;
 };
 
-IMetalAllocatedBuffer *IMetalAllocatedBuffer::Create(MetalDevice *device,
+IMetalAllocatedBuffer *IMetalAllocatedBuffer::Create(IMetalDevice *device,
                                                      const BufferDesc &desc,
                                                      bool upload,
                                                      bool download) {
@@ -44,12 +44,12 @@ Device *MetalAllocatedBufferImpl::Owner() const {
   return device_;
 }
 
-MetalAllocatedBufferImpl::MetalAllocatedBufferImpl(MetalDevice *device, const BufferDesc &desc)
+MetalAllocatedBufferImpl::MetalAllocatedBufferImpl(IMetalDevice *device, const BufferDesc &desc)
     : device_(device),
       desc_(desc) {
 }
 
-IMetalAllocatedBuffer *MetalAllocatedBufferImpl::Create(MetalDevice *device,
+IMetalAllocatedBuffer *MetalAllocatedBufferImpl::Create(IMetalDevice *device,
                                                         const BufferDesc &desc,
                                                         bool upload,
                                                         bool download) {

@@ -27,7 +27,7 @@ D3D12_BLEND_OP NativeBlendOp(BlendOp op) {
   return operations[op];
 }
 
-bool SupportsImageStorage(ID3D12Device *device, ImageFormat format) {
+bool SupportsImageStorage(::ID3D12Device *device, ImageFormat format) {
   const auto native = NativeImageFormat(format);
   if (native == DXGI_FORMAT_UNKNOWN || IsDepthFormat(format))
     return false;

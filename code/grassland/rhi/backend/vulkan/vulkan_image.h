@@ -11,28 +11,10 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanImage)
 namespace grassland::rhi::backend::vulkan {
 
 // Common resource access; derived classes define ownership and validity.
+struct VulkanImageState;
+
 class VulkanImage : public Image {
  public:
-  LONGMARCH_RHI_QUERY(VulkanImage, Image)
-
-  class Views {
-   public:
-    Views() = default;
-    Views(Views &&other) noexcept;
-    Views &operator=(Views &&other) noexcept;
-    bool Initialize(VkDevice device, VkImage image, ImageFormat format, bool sampled);
-    ~Views();
-    Views(const Views &) = delete;
-    Views &operator=(const Views &) = delete;
-    void Reset();
-    VkImageView Attachment() const;
-    VkImageView Binding() const;
-
-   private:
-    VkDevice device_{};
-    VkImageView attachment_{}, binding_{};
-  };
-
   virtual VkImageView AttachmentView() const = 0;
   virtual VkImageView BindingView() const = 0;
   const void *DeviceIdentity() const override;
@@ -40,11 +22,9 @@ class VulkanImage : public Image {
   VkImageLayout DefaultLayout() const;
 
  protected:
-  VulkanImage(ImageDesc desc, const void *device, VkImageLayout default_layout, Queue *queue = nullptr);
-
- private:
-  const void *device_;
-  VkImageLayout default_layout_;
+  void InitializeVulkanImage(ImageDesc desc, const void *device, VkImageLayout default_layout, Queue *queue = nullptr);
+  virtual VulkanImageState &StateVulkanImage() = 0;
+  virtual const VulkanImageState &StateVulkanImage() const = 0;
 };
 
 }  // namespace grassland::rhi::backend::vulkan

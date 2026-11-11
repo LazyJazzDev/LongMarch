@@ -14,7 +14,7 @@ class D3D12AllocatedBufferImpl final : public Object<ID3D12AllocatedBuffer> {
   LONGMARCH_RHI_QUERY_INTERFACES(Object<ID3D12AllocatedBuffer>, IBuffer, IBackendBuffer, ID3D12Buffer)
 
   ~D3D12AllocatedBufferImpl() override;
-  static ID3D12AllocatedBuffer *Create(D3D12Device *device,
+  static ID3D12AllocatedBuffer *Create(ID3D12Device *device,
                                        const BufferDesc &desc,
                                        bool upload = false,
                                        bool download = false);
@@ -24,7 +24,7 @@ class D3D12AllocatedBufferImpl final : public Object<ID3D12AllocatedBuffer> {
   bool Write(const void *data, uint64_t size, uint64_t offset = 0);
 
  private:
-  D3D12AllocatedBufferImpl(D3D12Device *device, const BufferDesc &desc);
+  D3D12AllocatedBufferImpl(ID3D12Device *device, const BufferDesc &desc);
 
   ComPtr<ID3D12Resource> buffer_;
   ComPtr<D3D12MA::Allocation> allocation_;
@@ -32,7 +32,7 @@ class D3D12AllocatedBufferImpl final : public Object<ID3D12AllocatedBuffer> {
   bool download_{};
 
  private:
-  D3D12Device *device_;
+  ID3D12Device *device_;
   BufferDesc desc_;
 
  public:
@@ -43,7 +43,7 @@ class D3D12AllocatedBufferImpl final : public Object<ID3D12AllocatedBuffer> {
   Device *Owner() const override;
 };
 
-ID3D12AllocatedBuffer *ID3D12AllocatedBuffer::Create(D3D12Device *device,
+ID3D12AllocatedBuffer *ID3D12AllocatedBuffer::Create(ID3D12Device *device,
                                                      const BufferDesc &desc,
                                                      bool upload,
                                                      bool download) {
@@ -54,7 +54,7 @@ Device *D3D12AllocatedBufferImpl::Owner() const {
   return device_;
 }
 
-D3D12AllocatedBufferImpl::D3D12AllocatedBufferImpl(D3D12Device *device, const BufferDesc &desc)
+D3D12AllocatedBufferImpl::D3D12AllocatedBufferImpl(ID3D12Device *device, const BufferDesc &desc)
     : device_(device),
       desc_(desc) {
 }
@@ -75,7 +75,7 @@ D3D12_RESOURCE_STATES D3D12AllocatedBufferImpl::DefaultState() const {
                    : D3D12_RESOURCE_STATE_COMMON;
 }
 
-ID3D12AllocatedBuffer *D3D12AllocatedBufferImpl::Create(D3D12Device *device,
+ID3D12AllocatedBuffer *D3D12AllocatedBufferImpl::Create(ID3D12Device *device,
                                                         const BufferDesc &desc,
                                                         bool upload,
                                                         bool download) {

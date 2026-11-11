@@ -2,120 +2,77 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanCommandContext;
+class IVulkanCommandContext;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanCommandContext)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanCommandContext)
 #include <vector>
 
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanQueue;
+class IVulkanQueue;
 class VulkanImage;
 class IVulkanBuffer;
-class VulkanProgram;
-class VulkanRayTracingProgram;
+class IVulkanProgram;
+class IVulkanRayTracingProgram;
 class VulkanProgramBase;
-class VulkanWindow;
-class VulkanTopLevelAccelerationStructure;
+class IVulkanWindow;
+class IVulkanTopLevelAccelerationStructure;
 
-class VulkanCommandContext final : public CommandContext {
+class IVulkanCommandContext : public CommandContext {
  public:
-  LONGMARCH_RHI_QUERY(VulkanCommandContext, CommandContext)
-
-  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
-  bool CmdDispatchRays(uint32_t width,
-                       uint32_t height,
-                       uint32_t depth = 1,
-                       IShaderBindingTable *sbt = nullptr) override;
-  bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
-  bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override;
-  bool CmdBuildBottomLevelAccelerationStructure(
+  static IVulkanCommandContext *Create(IVulkanQueue *queue);
+  virtual bool CmdBindRayTracingProgram(IRayTracingProgram *program) = 0;
+  virtual bool CmdDispatchRays(uint32_t width,
+                               uint32_t height,
+                               uint32_t depth = 1,
+                               IShaderBindingTable *sbt = nullptr) = 0;
+  virtual bool CmdQueryCompactedSize(IAccelerationStructure *structure) = 0;
+  virtual bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) = 0;
+  virtual bool CmdBuildBottomLevelAccelerationStructure(
       IBottomLevelAccelerationStructure *destination,
       const std::vector<AccelerationStructureGeometryBuffers> &geometries,
-      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
-  bool CmdBuildTopLevelAccelerationStructure(
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) = 0;
+  virtual bool CmdBuildTopLevelAccelerationStructure(
       ITopLevelAccelerationStructure *destination,
       const std::vector<RayTracingInstance> &instances,
-      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
-  ~VulkanCommandContext() override;
-  static VulkanCommandContext *Create(VulkanQueue *queue);
-  IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
-  IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
-  bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
-  bool CmdCopyBuffer(IBuffer *source,
-                     uint64_t source_offset,
-                     IBuffer *destination,
-                     uint64_t destination_offset,
-                     uint64_t size) override;
-  bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
-  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
-  bool CmdBindComputeProgram(IComputeProgram *program) override;
-  bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
-  bool CmdBindProgram(IProgram *program) override;
-  bool CmdBeginRendering(const RenderingInfo &info) override;
-  bool CmdEndRendering() override;
-  bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) override;
-  bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) override;
-  bool CmdSetViewport(const Viewport &viewport) override;
-  bool CmdSetScissor(const Scissor &scissor) override;
-  bool CmdDraw(uint32_t vertex_count,
-               uint32_t instance_count = 1,
-               uint32_t first_vertex = 0,
-               uint32_t first_instance = 0) override;
-  bool CmdDrawIndexed(uint32_t index_count,
-                      uint32_t instance_count = 1,
-                      uint32_t first_index = 0,
-                      int32_t vertex_offset = 0,
-                      uint32_t first_instance = 0) override;
-  bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
-  bool CmdPresent(rhi::IWindow *window) override;
-  void UpdatePresentedImages() override;
-  SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
-  SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
-
- private:
-  VulkanCommandContext(VulkanQueue *queue);
-
-  bool ValidateGroups();
-  bool BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *version);
-  std::vector<VulkanBindingGroup::Version *> groups_;
-  VulkanProgram *program_{};
-  VulkanProgramBase *native_program_{};
-  std::unordered_map<VulkanTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
-      as_dependencies_;
-  bool compute_active_{};
-  VulkanRayTracingProgram *ray_program_{};
-  const PipelineLayoutDesc *binding_layout_{};
-  VulkanImage *render_target_{};
-  std::vector<IVulkanBuffer *> vertex_buffers_;
-  bool viewport_set_{}, scissor_set_{}, index_bound_{};
-
-  bool EndRecording() override;
-  bool TransitionBuffer(IVulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access);
-
-  struct BufferState {
-    VkPipelineStageFlags stages;
-    VkAccessFlags access;
-  };
-
-  std::unordered_map<IVulkanBuffer *, BufferState> buffer_states_;
-  bool TransitionImage(VulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
-
-  struct ImageState {
-    VkImageLayout layout;
-    VkPipelineStageFlags stages;
-    VkAccessFlags access;
-  };
-
-  std::unordered_map<VulkanImage *, ImageState> image_states_;
-  std::vector<VulkanWindow *> presents_;
-  VulkanDevice *device_;
-  VkCommandPool pool_{};
-  VkCommandBuffer command_{};
-  bool submission_failed_{};
-  bool reusable_{};
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) = 0;
+  virtual IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) = 0;
+  virtual IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) = 0;
+  virtual bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) = 0;
+  virtual bool CmdCopyBuffer(IBuffer *source,
+                             uint64_t source_offset,
+                             IBuffer *destination,
+                             uint64_t destination_offset,
+                             uint64_t size) = 0;
+  virtual bool CmdBindGroup(uint32_t index, IBindingGroup *group) = 0;
+  virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) = 0;
+  virtual bool CmdBindComputeProgram(IComputeProgram *program) = 0;
+  virtual bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) = 0;
+  virtual bool CmdBindProgram(IProgram *program) = 0;
+  virtual bool CmdBeginRendering(const RenderingInfo &info) = 0;
+  virtual bool CmdEndRendering() = 0;
+  virtual bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) = 0;
+  virtual bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) = 0;
+  virtual bool CmdSetViewport(const Viewport &viewport) = 0;
+  virtual bool CmdSetScissor(const Scissor &scissor) = 0;
+  virtual bool CmdDraw(uint32_t vertex_count,
+                       uint32_t instance_count = 1,
+                       uint32_t first_vertex = 0,
+                       uint32_t first_instance = 0) = 0;
+  virtual bool CmdDrawIndexed(uint32_t index_count,
+                              uint32_t instance_count = 1,
+                              uint32_t first_index = 0,
+                              int32_t vertex_offset = 0,
+                              uint32_t first_instance = 0) = 0;
+  virtual bool CmdClearImage(rhi::IImage *image, const ClearValue &value) = 0;
+  virtual bool CmdPresent(rhi::IWindow *window) = 0;
+  virtual void UpdatePresentedImages() = 0;
+  virtual SubmitResult SubmitNative(const SubmitInfo &info, Event signal) = 0;
+  virtual SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::vulkan

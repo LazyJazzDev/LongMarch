@@ -1,34 +1,38 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/backend/vulkan/vulkan_compute_program_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanComputeProgram::VulkanComputeProgram(VulkanDevice *device, const ComputeProgramDesc &desc)
-    : ComputeProgram(device, desc),
-      VulkanProgramBase(device->NativeDevice()) {
+VulkanComputeProgramImpl::VulkanComputeProgramImpl(IVulkanDevice *device, const ComputeProgramDesc &desc) {
+  InitializeComputeProgram(device, desc);
+  InitializeVulkanProgramBase(device->NativeDevice());
 }
 
-VulkanComputeProgram::~VulkanComputeProgram() {
+VulkanComputeProgramImpl::~VulkanComputeProgramImpl() {
   auto device = LayoutDevice();
   if (pipeline_)
     vkDestroyPipeline(device, pipeline_, nullptr);
+
+  DestroyVulkanProgramBase();
 }
 
-VkPipeline VulkanComputeProgram::NativePipeline() const {
+VkPipeline VulkanComputeProgramImpl::NativePipeline() const {
   return pipeline_;
 }
 
-VulkanComputeProgram *VulkanComputeProgram::Create(VulkanDevice *owner_device, const ComputeProgramDesc &desc) {
-  auto object = std::unique_ptr<VulkanComputeProgram>(new VulkanComputeProgram(owner_device, desc));
+IVulkanComputeProgram *VulkanComputeProgramImpl::Create(IVulkanDevice *owner_device, const ComputeProgramDesc &desc) {
+  auto object = std::unique_ptr<VulkanComputeProgramImpl>(new VulkanComputeProgramImpl(owner_device, desc));
   auto device = owner_device->NativeDevice();
-  if (!object->ValidateLayout() ||
-      !ValidatePipelineBindings(owner_device->NativePhysicalDevice(), object->desc_.pipeline_layout))
+  if (!object->ValidateLayout() || !ValidatePipelineBindings(owner_device->NativePhysicalDevice(),
+                                                             object->StateComputeProgram().desc_.pipeline_layout))
     return nullptr;
   std::vector<uint8_t> code;
   std::array<uint32_t, 3> threads{};
-  if (!CompileSlang(object->desc_.compute_shader, ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_VULKAN),
-                    BACKEND_API_VULKAN, code, &object->desc_.pipeline_layout, &threads))
+  if (!CompileSlang(object->StateComputeProgram().desc_.compute_shader,
+                    ShaderMacroHeader(object->StateComputeProgram().desc_.pipeline_layout, BACKEND_API_VULKAN),
+                    BACKEND_API_VULKAN, code, &object->StateComputeProgram().desc_.pipeline_layout, &threads))
     return nullptr;
   VkPhysicalDeviceProperties properties{};
   vkGetPhysicalDeviceProperties(owner_device->NativePhysicalDevice(), &properties);
@@ -37,7 +41,7 @@ VulkanComputeProgram *VulkanComputeProgram::Create(VulkanDevice *owner_device, c
       return nullptr;
   if (uint64_t(threads[0]) * threads[1] * threads[2] > properties.limits.maxComputeWorkGroupInvocations)
     return nullptr;
-  if (!object->CreateLayout(object->desc_.pipeline_layout))
+  if (!object->CreateLayout(object->StateComputeProgram().desc_.pipeline_layout))
     return nullptr;
 
   VkShaderModuleCreateInfo module_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
@@ -50,7 +54,7 @@ VulkanComputeProgram *VulkanComputeProgram::Create(VulkanDevice *owner_device, c
   create.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   create.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   create.stage.module = module;
-  create.stage.pName = object->desc_.compute_shader->GetEntry().c_str();
+  create.stage.pName = object->StateComputeProgram().desc_.compute_shader->GetEntry().c_str();
   create.layout = object->NativeLayout();
   auto result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &create, nullptr, &object->pipeline_);
   vkDestroyShaderModule(device, module, nullptr);
@@ -60,4 +64,10 @@ VulkanComputeProgram *VulkanComputeProgram::Create(VulkanDevice *owner_device, c
 }
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanComputeProgram, "3ce12e7b-3db2-461e-b7d0-9ec0f172ebd1")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanComputeProgram, "3ce12e7b-3db2-461e-b7d0-9ec0f172ebd1")
+
+namespace grassland::rhi::backend::vulkan {
+IVulkanComputeProgram *IVulkanComputeProgram::Create(IVulkanDevice *device, const ComputeProgramDesc &desc) {
+  return VulkanComputeProgramImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::vulkan

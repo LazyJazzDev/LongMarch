@@ -2,29 +2,34 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalProgram;
+class IMetalProgram;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalProgram)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalProgram)
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_program.h"
 #include "grassland/rhi/backend/metal/metal_program_base.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDevice;
+class IMetalDevice;
 
-class MetalProgram final : public Program, public MetalProgramBase {
+class IMetalProgram : public Program, public MetalProgramBase {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(MetalProgram, Program, MetalProgramBase)
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
 
-  static MetalProgram *Create(MetalDevice *device, const ProgramDesc &desc);
-  MTL::RenderPipelineState *NativePipeline() const;
-  MTL::DepthStencilState *NativeDepthStencil() const;
-  static constexpr uint32_t VertexBufferBase = 8;
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
 
- private:
-  MetalProgram(MetalDevice *device, const ProgramDesc &desc);
-  NS::SharedPtr<MTL::RenderPipelineState> pipeline_;
-  NS::SharedPtr<MTL::DepthStencilState> depth_stencil_;
+ public:
+  static IMetalProgram *Create(IMetalDevice *device, const ProgramDesc &desc);
+  virtual MTL::RenderPipelineState *NativePipeline() const = 0;
+  virtual MTL::DepthStencilState *NativeDepthStencil() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::metal

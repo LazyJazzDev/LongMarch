@@ -11,7 +11,7 @@ namespace grassland::rhi {
 inline bool SupportsD24S8(IDevice *device, BackendAPI api) {
 #ifdef LONGMARCH_VULKAN_ENABLED
   if (api == BACKEND_API_VULKAN) {
-    auto native = static_cast<backend::vulkan::VulkanDevice *>(device);
+    auto native = static_cast<backend::vulkan::IVulkanDevice *>(device);
     VkFormatProperties properties{};
     vkGetPhysicalDeviceFormatProperties(native->NativePhysicalDevice(), VK_FORMAT_D24_UNORM_S8_UINT, &properties);
     constexpr auto required = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |

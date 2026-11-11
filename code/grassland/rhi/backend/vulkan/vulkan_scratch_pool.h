@@ -10,13 +10,13 @@ namespace grassland::rhi::backend::vulkan {
 // Contexts retain the returned storage directly, including buffers replaced by resizing.
 class VulkanScratchPool {
  public:
-  explicit VulkanScratchPool(VulkanDevice *device);
+  explicit VulkanScratchPool(IVulkanDevice *device);
   // Share the current buffer; resize on demand using the last second's peak request.
   ObjectPtr<IVulkanAllocatedBuffer> Acquire(uint64_t size);
   void Clear();
 
  private:
-  VulkanDevice *device_;
+  IVulkanDevice *device_;
   std::mutex mutex_;
   ObjectPtr<IVulkanAllocatedBuffer> buffer_;
   std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> peaks_;

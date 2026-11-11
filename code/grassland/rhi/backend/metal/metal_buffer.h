@@ -10,7 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalBuffer)
 #include "grassland/rhi/backend/backend_buffer.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDevice;
+class IMetalDevice;
 
 class IMetalBuffer : public IBackendBuffer {
  public:

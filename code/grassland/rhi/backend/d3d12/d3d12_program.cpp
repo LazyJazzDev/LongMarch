@@ -3,29 +3,34 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_program_impl.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12Program::D3D12Program(D3D12Device *device, const ProgramDesc &desc) : Program(device, desc) {
+D3D12ProgramImpl::D3D12ProgramImpl(ID3D12Device *device, const ProgramDesc &desc) {
+  InitializeProgram(device, desc);
 }
 
-ID3D12PipelineState *D3D12Program::NativePipeline() const {
+ID3D12PipelineState *D3D12ProgramImpl::NativePipeline() const {
   return pipeline_.Get();
 }
 
-D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc &desc) {
-  auto object = std::unique_ptr<D3D12Program>(new D3D12Program(owner_device, desc));
+ID3D12Program *D3D12ProgramImpl::Create(ID3D12Device *owner_device, const ProgramDesc &desc) {
+  auto object = std::unique_ptr<D3D12ProgramImpl>(new D3D12ProgramImpl(owner_device, desc));
   if (!object->ValidateLayout()) {
     ReportError(-1, "Invalid graphics program layout.");
     return nullptr;
   }
   auto native = owner_device->NativeDevice();
   std::vector<uint8_t> vertex, fragment;
-  auto prefix = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_D3D12, object->desc_.vertex_attributes);
-  if (!CompileSlang(object->desc_.vertex_shader, prefix, BACKEND_API_D3D12, vertex, &object->desc_.pipeline_layout))
+  auto prefix = ShaderMacroHeader(object->StateProgram().desc_.pipeline_layout, BACKEND_API_D3D12,
+                                  object->StateProgram().desc_.vertex_attributes);
+  if (!CompileSlang(object->StateProgram().desc_.vertex_shader, prefix, BACKEND_API_D3D12, vertex,
+                    &object->StateProgram().desc_.pipeline_layout))
     return nullptr;
-  if (!CompileSlang(object->desc_.fragment_shader, prefix, BACKEND_API_D3D12, fragment, &object->desc_.pipeline_layout))
+  if (!CompileSlang(object->StateProgram().desc_.fragment_shader, prefix, BACKEND_API_D3D12, fragment,
+                    &object->StateProgram().desc_.pipeline_layout))
     return nullptr;
-  if (!object->CreateLayout(native, object->desc_.pipeline_layout,
+  if (!object->CreateLayout(native, object->StateProgram().desc_.pipeline_layout,
                             D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT))
     return nullptr;
   std::vector<D3D12_INPUT_ELEMENT_DESC> inputs;
@@ -33,8 +38,8 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
       DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT,
       DXGI_FORMAT_R32_SINT,  DXGI_FORMAT_R32G32_SINT,  DXGI_FORMAT_R32G32B32_SINT,  DXGI_FORMAT_R32G32B32A32_SINT,
       DXGI_FORMAT_R32_UINT,  DXGI_FORMAT_R32G32_UINT,  DXGI_FORMAT_R32G32B32_UINT,  DXGI_FORMAT_R32G32B32A32_UINT};
-  for (const auto &a : object->desc_.vertex_attributes) {
-    auto instance = object->desc_.vertex_bindings[a.binding].per_instance;
+  for (const auto &a : object->StateProgram().desc_.vertex_attributes) {
+    auto instance = object->StateProgram().desc_.vertex_bindings[a.binding].per_instance;
     inputs.push_back(
         {"TEXCOORD", a.location, formats[a.type], a.binding, a.offset,
          instance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
@@ -53,7 +58,7 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
   state.RasterizerState.FrontCounterClockwise = desc.rasterizer.front_face == FRONT_FACE_COUNTER_CLOCKWISE;
   state.RasterizerState.DepthClipEnable = TRUE;
   state.BlendState.IndependentBlendEnable = TRUE;
-  const auto &ds = object->desc_.depth_stencil;
+  const auto &ds = object->StateProgram().desc_.depth_stencil;
   state.DepthStencilState.DepthEnable = ds.depth_test;
   state.DepthStencilState.DepthWriteMask = ds.depth_write ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
   state.DepthStencilState.DepthFunc = static_cast<D3D12_COMPARISON_FUNC>(ds.depth_compare + 1);
@@ -76,10 +81,11 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
       : (desc.topology == PRIMITIVE_TOPOLOGY_LINE_LIST || desc.topology == PRIMITIVE_TOPOLOGY_LINE_STRIP)
           ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE
           : D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  state.NumRenderTargets = static_cast<UINT>(object->desc_.color_formats.size());
-  for (size_t i = 0; i < object->desc_.color_formats.size(); ++i) {
-    state.RTVFormats[i] = NativeImageFormat(object->desc_.color_formats[i]);
-    const auto value = object->desc_.blend_states.empty() ? BlendState{} : object->desc_.blend_states[i];
+  state.NumRenderTargets = static_cast<UINT>(object->StateProgram().desc_.color_formats.size());
+  for (size_t i = 0; i < object->StateProgram().desc_.color_formats.size(); ++i) {
+    state.RTVFormats[i] = NativeImageFormat(object->StateProgram().desc_.color_formats[i]);
+    const auto value =
+        object->StateProgram().desc_.blend_states.empty() ? BlendState{} : object->StateProgram().desc_.blend_states[i];
     auto &blend = state.BlendState.RenderTarget[i];
     blend.BlendEnable = value.blend_enable;
     blend.SrcBlend = NativeBlendFactor(value.src_color);
@@ -100,4 +106,10 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
 }
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Program, "2919454c-7ff9-4ce3-b919-40901e038398")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Program, "2919454c-7ff9-4ce3-b919-40901e038398")
+
+namespace grassland::rhi::backend::d3d12 {
+ID3D12Program *ID3D12Program::Create(ID3D12Device *device, const ProgramDesc &desc) {
+  return D3D12ProgramImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::d3d12

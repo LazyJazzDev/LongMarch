@@ -282,7 +282,7 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
 #if defined(LONGMARCH_D3D12_ENABLED)
   backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
   if (GetParam() == BACKEND_API_D3D12) {
-    ASSERT_TRUE(SUCCEEDED(static_cast<backend::d3d12::D3D12Device *>(device.Get())
+    ASSERT_TRUE(SUCCEEDED(static_cast<backend::d3d12::ID3D12Device *>(device.Get())
                               ->NativeDevice()
                               ->QueryInterface(IID_PPV_ARGS(&messages))));
   }

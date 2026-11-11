@@ -37,7 +37,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE D3D12TransientDescriptorPool::Lease::GPU(uint32_t in
   return result;
 }
 
-D3D12TransientDescriptorPool::D3D12TransientDescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type)
+D3D12TransientDescriptorPool::D3D12TransientDescriptorPool(::ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type)
     : device_(device),
       type_(type),
       limit_(type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER ? 2048 : 1000000),

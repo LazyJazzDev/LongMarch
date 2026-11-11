@@ -2,23 +2,19 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalAllocatedImage;
+class IMetalAllocatedImage;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalAllocatedImage)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalAllocatedImage)
 #include "grassland/rhi/backend/metal/metal_image.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDevice;
+class IMetalDevice;
 
-class MetalAllocatedImage final : public MetalImage {
+class IMetalAllocatedImage : public MetalImage {
  public:
-  LONGMARCH_RHI_QUERY(MetalAllocatedImage, MetalImage)
-
-  static MetalAllocatedImage *Create(MetalDevice *device, const ImageDesc &desc);
-  bool IsValid() const override;
-
- private:
-  MetalAllocatedImage(MetalDevice *device, ImageDesc desc, NS::SharedPtr<MTL::Texture> texture);
-  NS::SharedPtr<MTL::Texture> texture_;
+  static IMetalAllocatedImage *Create(IMetalDevice *device, const ImageDesc &desc);
+  virtual bool IsValid() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::metal

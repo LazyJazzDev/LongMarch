@@ -33,9 +33,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
   if (api == BACKEND_API_METAL) {
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto owner = static_cast<MetalDevice *>(device);
+    auto owner = static_cast<IMetalDevice *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<MetalQueue *>(queue_owner.Get());
+    auto native_queue = static_cast<IMetalQueue *>(queue_owner.Get());
     auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(sizeof(output), MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
     std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
@@ -54,9 +54,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
-    auto owner = static_cast<D3D12Device *>(device);
+    auto owner = static_cast<ID3D12Device *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<D3D12Queue *>(queue_owner.Get());
+    auto native_queue = static_cast<ID3D12Queue *>(queue_owner.Get());
     auto source = static_cast<ID3D12Buffer *>(buffer)->NativeBuffer();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
@@ -106,9 +106,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (api == BACKEND_API_VULKAN) {
     using namespace backend::vulkan;
-    auto owner = static_cast<VulkanDevice *>(device);
+    auto owner = static_cast<IVulkanDevice *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<VulkanQueue *>(queue_owner.Get());
+    auto native_queue = static_cast<IVulkanQueue *>(queue_owner.Get());
     auto native = owner->NativeDevice();
     auto source = static_cast<IVulkanBuffer *>(buffer)->NativeBuffer();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -188,8 +188,8 @@ class RhiRayTracing : public testing::TestWithParam<BackendAPI> {
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
       backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
-      ASSERT_TRUE(SUCCEEDED(
-          static_cast<backend::d3d12::D3D12Device *>(device)->NativeDevice()->QueryInterface(IID_PPV_ARGS(&messages))));
+      ASSERT_TRUE(SUCCEEDED(static_cast<backend::d3d12::ID3D12Device *>(device)->NativeDevice()->QueryInterface(
+          IID_PPV_ARGS(&messages))));
       for (UINT64 i = 0; i < messages->GetNumStoredMessages(); ++i) {
         SIZE_T size{};
         ASSERT_TRUE(SUCCEEDED(messages->GetMessage(i, nullptr, &size)));
@@ -286,18 +286,18 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
     abandoned.Release();
 #if defined(LONGMARCH_METAL_ENABLED)
     if (api == BACKEND_API_METAL)
-      EXPECT_EQ(static_cast<backend::metal::MetalTopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
+      EXPECT_EQ(static_cast<backend::metal::IMetalTopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
                 compact.Get());
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (api == BACKEND_API_D3D12)
-      EXPECT_EQ(static_cast<backend::d3d12::D3D12TopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
+      EXPECT_EQ(static_cast<backend::d3d12::ID3D12TopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
                 compact.Get());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     if (api == BACKEND_API_VULKAN)
       EXPECT_EQ(
-          static_cast<backend::vulkan::VulkanTopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
+          static_cast<backend::vulkan::IVulkanTopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
           compact.Get());
 #endif
   }
@@ -785,15 +785,15 @@ TEST_P(RhiRayTracing, ScratchPoolSharesStorageAndShrinksAfterDemandExpires) {
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
-    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->ScratchPool());
+    check(static_cast<backend::d3d12::ID3D12Device *>(device.Get())->ScratchPool());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN)
-    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->ScratchPool());
+    check(static_cast<backend::vulkan::IVulkanDevice *>(device.Get())->ScratchPool());
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL)
-    check(static_cast<backend::metal::MetalDevice *>(device.Get())->ScratchPool());
+    check(static_cast<backend::metal::IMetalDevice *>(device.Get())->ScratchPool());
 #endif
   CheckNativeErrors(device.Get());
 }
@@ -838,15 +838,16 @@ TEST_P(RhiRayTracing, SharedScratchSurvivesResizingAndOutOfOrderContextSubmissio
       // Replace the cache while unsubmitted commands still reference the old buffer.
 #if defined(LONGMARCH_METAL_ENABLED)
       if (api == BACKEND_API_METAL)
-        ASSERT_TRUE(static_cast<backend::metal::MetalDevice *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
+        ASSERT_TRUE(static_cast<backend::metal::IMetalDevice *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
       if (api == BACKEND_API_D3D12)
-        ASSERT_TRUE(static_cast<backend::d3d12::D3D12Device *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
+        ASSERT_TRUE(static_cast<backend::d3d12::ID3D12Device *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
       if (api == BACKEND_API_VULKAN)
-        ASSERT_TRUE(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
+        ASSERT_TRUE(
+            static_cast<backend::vulkan::IVulkanDevice *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
 #endif
     }
   }

@@ -2,69 +2,76 @@
 
 #include <cstring>
 
+#include "grassland/rhi/backend/metal/metal_acceleration_structure_impl.h"
+#include "grassland/rhi/backend/metal/metal_acceleration_structure_state.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-MetalAccelerationStructure::MetalAccelerationStructure(MetalDevice *device) : device_(device) {
+void MetalAccelerationStructure::InitializeMetalAccelerationStructure(IMetalDevice *device) {
+  StateMetalAccelerationStructure().device_ = device;
 }
 
-MetalDevice *MetalAccelerationStructure::Owner() const {
-  return device_;
+IMetalDevice *MetalAccelerationStructure::Owner() const {
+  return StateMetalAccelerationStructure().device_;
 }
 
 MTL::AccelerationStructure *MetalAccelerationStructure::NativeStructure() const {
-  return structure_.get();
+  return StateMetalAccelerationStructure().structure_.get();
 }
 
 MTL::IBackendBuffer *MetalAccelerationStructure::CompactionQuery() const {
-  return query_.get();
+  return StateMetalAccelerationStructure().query_.get();
 }
 
 uint64_t MetalAccelerationStructure::ScratchSize(AccelerationStructureBuildMode mode) const {
-  return mode == ACCELERATION_STRUCTURE_UPDATE ? update_scratch_ : build_scratch_;
+  return mode == ACCELERATION_STRUCTURE_UPDATE ? StateMetalAccelerationStructure().update_scratch_
+                                               : StateMetalAccelerationStructure().build_scratch_;
 }
 
 uint64_t MetalAccelerationStructure::ReadCompactedSize() const {
   uint64_t size = 0;
-  if (query_)
-    std::memcpy(&size, query_->contents(), sizeof(size));
+  if (StateMetalAccelerationStructure().query_)
+    std::memcpy(&size, StateMetalAccelerationStructure().query_->contents(), sizeof(size));
   return size;
 }
 
 bool MetalAccelerationStructure::AllowsUpdate() const {
-  return allow_update_;
+  return StateMetalAccelerationStructure().allow_update_;
 }
 
 bool MetalAccelerationStructure::AllowsCompaction() const {
-  return allow_compaction_;
+  return StateMetalAccelerationStructure().allow_compaction_;
 }
 
 bool MetalAccelerationStructure::IsCompactStorage() const {
-  return compact_;
+  return StateMetalAccelerationStructure().compact_;
 }
 
 bool MetalAccelerationStructure::Allocate(MTL::AccelerationStructureDescriptor *desc,
                                           bool update,
                                           bool compaction,
                                           uint64_t compacted_size) {
-  const auto sizes = device_->NativeDevice()->accelerationStructureSizes(desc);
+  const auto sizes = StateMetalAccelerationStructure().device_->NativeDevice()->accelerationStructureSizes(desc);
   const auto size = compacted_size ? compacted_size : sizes.accelerationStructureSize;
   if (!size)
     return false;
-  structure_ = NS::TransferPtr(device_->NativeDevice()->newAccelerationStructure(size));
-  if (!structure_)
+  StateMetalAccelerationStructure().structure_ =
+      NS::TransferPtr(StateMetalAccelerationStructure().device_->NativeDevice()->newAccelerationStructure(size));
+  if (!StateMetalAccelerationStructure().structure_)
     return false;
   if (compaction) {
-    query_ = NS::TransferPtr(device_->NativeDevice()->newBuffer(sizeof(uint64_t), MTL::ResourceStorageModeShared));
-    if (!query_)
+    StateMetalAccelerationStructure().query_ =
+        NS::TransferPtr(StateMetalAccelerationStructure().device_->NativeDevice()->newBuffer(
+            sizeof(uint64_t), MTL::ResourceStorageModeShared));
+    if (!StateMetalAccelerationStructure().query_)
       return false;
-    std::memset(query_->contents(), 0, sizeof(uint64_t));
+    std::memset(StateMetalAccelerationStructure().query_->contents(), 0, sizeof(uint64_t));
   }
-  build_scratch_ = sizes.buildScratchBufferSize;
-  update_scratch_ = sizes.refitScratchBufferSize;
-  allow_update_ = update;
-  allow_compaction_ = compaction;
-  compact_ = compacted_size != 0;
+  StateMetalAccelerationStructure().build_scratch_ = sizes.buildScratchBufferSize;
+  StateMetalAccelerationStructure().update_scratch_ = sizes.refitScratchBufferSize;
+  StateMetalAccelerationStructure().allow_update_ = update;
+  StateMetalAccelerationStructure().allow_compaction_ = compaction;
+  StateMetalAccelerationStructure().compact_ = compacted_size != 0;
   return true;
 }
 
@@ -118,84 +125,106 @@ MTL::InstanceAccelerationStructureDescriptor *NativeInstances(const TopLevelAcce
   return native;
 }
 
-MetalBottomLevelAccelerationStructure::MetalBottomLevelAccelerationStructure(
-    MetalDevice *device,
+MetalBottomLevelAccelerationStructureImpl::MetalBottomLevelAccelerationStructureImpl(
+    IMetalDevice *device,
     const BottomLevelAccelerationStructureDesc &desc)
-    : MetalAccelerationStructure(device),
-      desc_(desc) {
+    : desc_(desc) {
+  InitializeMetalAccelerationStructure(device);
 }
 
-MetalBottomLevelAccelerationStructure *MetalBottomLevelAccelerationStructure::Create(
-    MetalDevice *device,
+IMetalBottomLevelAccelerationStructure *MetalBottomLevelAccelerationStructureImpl::Create(
+    IMetalDevice *device,
     const BottomLevelAccelerationStructureDesc &desc) {
   if (!device->SupportRayQuery() || !ValidateBottomLevelDesc(desc))
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto result =
-      std::unique_ptr<MetalBottomLevelAccelerationStructure>(new MetalBottomLevelAccelerationStructure(device, desc));
+  auto result = std::unique_ptr<MetalBottomLevelAccelerationStructureImpl>(
+      new MetalBottomLevelAccelerationStructureImpl(device, desc));
   if (!result->Allocate(NativeGeometries(desc), desc.allow_update, desc.allow_compaction, desc.compacted_size))
     return nullptr;
   return result.release();
 }
 
-AccelerationStructureType MetalBottomLevelAccelerationStructure::GetType() const {
+AccelerationStructureType MetalBottomLevelAccelerationStructureImpl::GetType() const {
   return ACCELERATION_STRUCTURE_BOTTOM_LEVEL;
 }
 
-uint64_t MetalBottomLevelAccelerationStructure::GetCompactedSize() const {
+uint64_t MetalBottomLevelAccelerationStructureImpl::GetCompactedSize() const {
   return ReadCompactedSize();
 }
 
-const BottomLevelAccelerationStructureDesc &MetalBottomLevelAccelerationStructure::GetDesc() const {
+const BottomLevelAccelerationStructureDesc &MetalBottomLevelAccelerationStructureImpl::GetDesc() const {
   return desc_;
 }
 
-MetalTopLevelAccelerationStructure::MetalTopLevelAccelerationStructure(MetalDevice *device,
-                                                                       const TopLevelAccelerationStructureDesc &desc)
-    : MetalAccelerationStructure(device),
-      desc_(desc) {
+MetalTopLevelAccelerationStructureImpl::MetalTopLevelAccelerationStructureImpl(
+    IMetalDevice *device,
+    const TopLevelAccelerationStructureDesc &desc)
+    : desc_(desc) {
+  InitializeMetalAccelerationStructure(device);
 }
 
-MetalTopLevelAccelerationStructure *MetalTopLevelAccelerationStructure::Create(
-    MetalDevice *device,
+IMetalTopLevelAccelerationStructure *MetalTopLevelAccelerationStructureImpl::Create(
+    IMetalDevice *device,
     const TopLevelAccelerationStructureDesc &desc) {
   if (!device->SupportRayQuery() || !desc.instance_count)
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto result =
-      std::unique_ptr<MetalTopLevelAccelerationStructure>(new MetalTopLevelAccelerationStructure(device, desc));
+      std::unique_ptr<MetalTopLevelAccelerationStructureImpl>(new MetalTopLevelAccelerationStructureImpl(device, desc));
   if (!result->Allocate(NativeInstances(desc), desc.allow_update, desc.allow_compaction, desc.compacted_size))
     return nullptr;
   return result.release();
 }
 
-AccelerationStructureType MetalTopLevelAccelerationStructure::GetType() const {
+AccelerationStructureType MetalTopLevelAccelerationStructureImpl::GetType() const {
   return ACCELERATION_STRUCTURE_TOP_LEVEL;
 }
 
-uint64_t MetalTopLevelAccelerationStructure::GetCompactedSize() const {
+uint64_t MetalTopLevelAccelerationStructureImpl::GetCompactedSize() const {
   return ReadCompactedSize();
 }
 
-const TopLevelAccelerationStructureDesc &MetalTopLevelAccelerationStructure::GetDesc() const {
+const TopLevelAccelerationStructureDesc &MetalTopLevelAccelerationStructureImpl::GetDesc() const {
   return desc_;
 }
 
-const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &MetalTopLevelAccelerationStructure::BottomLevels()
+const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &MetalTopLevelAccelerationStructureImpl::BottomLevels()
     const {
   return bottom_levels_;
 }
 
-void MetalTopLevelAccelerationStructure::CommitDependencies(
+void MetalTopLevelAccelerationStructureImpl::CommitDependencies(
     std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> refs) {
   bottom_levels_ = std::move(refs);
 }
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalBottomLevelAccelerationStructure,
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalBottomLevelAccelerationStructure,
                    "5efa0e0c-89c2-4fdf-8295-1b1e502f6363")
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalTopLevelAccelerationStructure,
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalTopLevelAccelerationStructure,
                    "240cc2a8-c334-4c86-b106-32c7fcc0f439")
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalAccelerationStructure, "15b08793-ad90-4431-b925-abab83480476")
+
+namespace grassland::rhi::backend::metal {
+MetalAccelerationStructureState::MetalAccelerationStructureState() = default;
+MetalAccelerationStructureState::~MetalAccelerationStructureState() = default;
+}  // namespace grassland::rhi::backend::metal
+
+namespace grassland::rhi::backend::metal {
+IMetalBottomLevelAccelerationStructure *IMetalBottomLevelAccelerationStructure::Create(
+    IMetalDevice *device,
+    const BottomLevelAccelerationStructureDesc &desc) {
+  return MetalBottomLevelAccelerationStructureImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::metal
+
+namespace grassland::rhi::backend::metal {
+IMetalTopLevelAccelerationStructure *IMetalTopLevelAccelerationStructure::Create(
+    IMetalDevice *device,
+    const TopLevelAccelerationStructureDesc &desc) {
+  return MetalTopLevelAccelerationStructureImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::metal

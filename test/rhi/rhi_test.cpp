@@ -1,10 +1,13 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <type_traits>
 #include <utility>
 
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_device_state.h"
 #include "grassland/rhi/rhix/rhix.h"
+
+using grassland::rhi::backend::MatchInterfaces;
 
 namespace grassland::rhix {
 using namespace rhi;
@@ -34,7 +37,10 @@ struct Calls {
   bool device_destroyed_before_core{};
 };
 
-class TestDevice final : public backend::Device {
+class TestDevice final : public backend::Object<backend::Device> {
+ public:
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::Device, rhi::IDevice)
+
  public:
   bool WaitNativeEvents(const std::vector<Event> &, bool) const override {
     ADD_FAILURE();
@@ -49,21 +55,35 @@ class TestDevice final : public backend::Device {
     ADD_FAILURE();
   }
 
-  TestDevice(PhysicalDevice info, backend::Core *core, Calls &calls)
-      : backend::Device(std::move(info), core),
-        calls_(calls) {
+  TestDevice(PhysicalDevice info, backend::Core *core, Calls &calls) : calls_(calls) {
+    InitializeDevice(std::move(info), core);
   }
 
   ~TestDevice() override {
     ++calls_.device_destructions;
     calls_.device_destroyed_before_core = calls_.core_destructions == 0;
+    DestroyDevice();
   }
 
  private:
   Calls &calls_;
+
+ private:
+  backend::DeviceState state_;
+
+  backend::DeviceState &StateDevice() override {
+    return state_;
+  }
+
+  const backend::DeviceState &StateDevice() const override {
+    return state_;
+  }
 };
 
-class TestCore final : public backend::Core {
+class TestCore final : public backend::Object<backend::Core> {
+ public:
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, backend::Core, rhi::ICore)
+
  public:
   TestCore(std::vector<PhysicalDevice> devices, Calls &calls, bool fail = false)
       : devices_(std::move(devices)),
@@ -184,7 +204,7 @@ TEST(RhiOwnership, CallerReleasesAllChildCopiesBeforeParent) {
   EXPECT_FALSE(copy);
   auto device = moved.CreateDevice(0);
   core = {};
-  EXPECT_TRUE((*static_cast<backend::Core *>((moved).Get())).IsUniquelyOwned());
+  EXPECT_TRUE((*static_cast<TestCore *>((moved).Get())).IsUniquelyOwned());
   EXPECT_EQ(calls.core_destructions, 0);
   Device shared = device;
   ObjectContainer &container = device;

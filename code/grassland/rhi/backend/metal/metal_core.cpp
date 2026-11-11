@@ -3,20 +3,22 @@
 #include <TargetConditionals.h>
 #include <sys/sysctl.h>
 
+#include "grassland/rhi/backend/metal/metal_core_impl.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_device_impl.h"
 
 namespace grassland::rhi::backend::metal {
 
-MetalCore::MetalCore(const CoreDesc &desc) : enable_debug_(desc.enable_debug) {
+MetalCoreImpl::MetalCoreImpl(const CoreDesc &desc) : enable_debug_(desc.enable_debug) {
 }
 
-bool MetalCore::DebugEnabled() const {
+bool MetalCoreImpl::DebugEnabled() const {
   return enable_debug_;
 }
 
-MetalCore *MetalCore::CreateMetalCore(const CoreDesc &desc) {
+IMetalCore *MetalCoreImpl::CreateMetalCore(const CoreDesc &desc) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto core = std::unique_ptr<MetalCore>(new MetalCore(desc));
+  auto core = std::unique_ptr<MetalCoreImpl>(new MetalCoreImpl(desc));
   uint64_t host_memory = 0;
   size_t size = sizeof(host_memory);
   if (sysctlbyname("hw.memsize", &host_memory, &size, nullptr, 0) != 0)
@@ -63,14 +65,14 @@ MetalCore *MetalCore::CreateMetalCore(const CoreDesc &desc) {
   return core.release();
 }
 
-std::vector<PhysicalDevice> MetalCore::GetPhysicalDevices() const {
+std::vector<PhysicalDevice> MetalCoreImpl::GetPhysicalDevices() const {
   std::vector<PhysicalDevice> devices;
   for (const auto &adapter : adapters_)
     devices.push_back(adapter.info);
   return devices;
 }
 
-rhi::IDevice *MetalCore::CreateDevice(int32_t device_idx) {
+rhi::IDevice *MetalCoreImpl::CreateDevice(int32_t device_idx) {
 #if !defined(NDEBUG)
   if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
     ReportError(-1, "Physical device ID is out of range.");
@@ -80,9 +82,15 @@ rhi::IDevice *MetalCore::CreateDevice(int32_t device_idx) {
   const auto &adapter = adapters_[device_idx];
   // Metal's enumerated MTLDevice is already usable; no feature enable mask or
   // separate logical-device creation exists. Each wrapper owns a native retain.
-  return MetalDevice::Create(adapter.info, this, adapter.native);
+  return IMetalDevice::Create(adapter.info, this, adapter.native);
 }
 
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalCore, "30ef4d7e-ae80-4882-b15d-023c44be58cf")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalCore, "30ef4d7e-ae80-4882-b15d-023c44be58cf")
+
+namespace grassland::rhi::backend::metal {
+IMetalCore *IMetalCore::CreateMetalCore(const CoreDesc &desc) {
+  return MetalCoreImpl::CreateMetalCore(desc);
+}
+}  // namespace grassland::rhi::backend::metal

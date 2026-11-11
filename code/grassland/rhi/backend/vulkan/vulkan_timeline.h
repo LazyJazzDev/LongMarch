@@ -2,29 +2,23 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanTimeline;
+class IVulkanTimeline;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanTimeline)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTimeline)
 #include "grassland/rhi/backend/backend_timeline.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDevice;
+class IVulkanDevice;
 
-class VulkanTimeline final : public Timeline {
+class IVulkanTimeline : public Timeline {
  public:
-  LONGMARCH_RHI_QUERY(VulkanTimeline, Timeline)
-
-  static ObjectPtr<VulkanTimeline> Create(VulkanDevice *device);
-  ~VulkanTimeline() override;
-  bool GetCompletedValue(uint64_t &value) const override;
-  bool WaitHost(uint64_t value) const override;
-  VkSemaphore NativeSemaphore() const;
-
- private:
-  explicit VulkanTimeline(VulkanDevice *device);
-  VkDevice device_{};
-  VkSemaphore semaphore_{};
+  static ObjectPtr<IVulkanTimeline> Create(IVulkanDevice *device);
+  virtual bool GetCompletedValue(uint64_t &value) const = 0;
+  virtual bool WaitHost(uint64_t value) const = 0;
+  virtual VkSemaphore NativeSemaphore() const = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::vulkan

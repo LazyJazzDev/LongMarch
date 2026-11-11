@@ -2,27 +2,23 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Timeline;
+class ID3D12Timeline;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12Timeline)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Timeline)
 #include "grassland/rhi/backend/backend_timeline.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Device;
+class ID3D12Device;
 
-class D3D12Timeline final : public Timeline {
+class ID3D12Timeline : public Timeline {
  public:
-  LONGMARCH_RHI_QUERY(D3D12Timeline, Timeline)
-
-  static ObjectPtr<D3D12Timeline> Create(D3D12Device *device);
-  bool GetCompletedValue(uint64_t &value) const override;
-  bool WaitHost(uint64_t value) const override;
-  ID3D12Fence *NativeFence() const;
-
- private:
-  explicit D3D12Timeline(D3D12Device *device);
-  ComPtr<ID3D12Fence> fence_;
+  static ObjectPtr<ID3D12Timeline> Create(ID3D12Device *device);
+  virtual bool GetCompletedValue(uint64_t &value) const = 0;
+  virtual bool WaitHost(uint64_t value) const = 0;
+  virtual ID3D12Fence *NativeFence() const = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::d3d12

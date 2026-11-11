@@ -2,9 +2,9 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Core;
+class ID3D12Core;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12Core)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Core)
 #include <d3d12sdklayers.h>
 
 #include "grassland/rhi/backend/backend_core.h"
@@ -12,26 +12,13 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12Core)
 
 namespace grassland::rhi::backend::d3d12 {
 
-class D3D12Core final : public Core {
+class ID3D12Core : public Core {
  public:
-  LONGMARCH_RHI_QUERY(D3D12Core, Core)
-
-  static D3D12Core *CreateD3D12Core(const CoreDesc &desc);
-  ~D3D12Core() override;
-  std::vector<PhysicalDevice> GetPhysicalDevices() const override;
-  rhi::IDevice *CreateDevice(int32_t device_idx) override;
-
- private:
-  D3D12Core();
-
-  struct Adapter {
-    ComPtr<IDXGIAdapter1> native;
-    PhysicalDevice info;
-  };
-
-  ComPtr<ID3D12Debug4> debug_controller_;
-  ComPtr<IDXGIFactory4> factory_;
-  std::vector<Adapter> adapters_;
+  static ID3D12Core *CreateD3D12Core(const CoreDesc &desc);
+  virtual std::vector<PhysicalDevice> GetPhysicalDevices() const = 0;
+  virtual rhi::IDevice *CreateDevice(int32_t device_idx) = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::d3d12

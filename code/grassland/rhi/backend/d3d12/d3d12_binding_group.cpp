@@ -9,7 +9,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12BindingGroup::Version::Version(D3D12Device *device, const BindingLayoutDesc &layout)
+D3D12BindingGroup::Version::Version(ID3D12Device *device, const BindingLayoutDesc &layout)
     : BindingGroup::Version(layout),
       device_(device) {
   uint32_t resource = 0, sampler = 0;
@@ -22,7 +22,7 @@ D3D12BindingGroup::Version::Version(D3D12Device *device, const BindingLayoutDesc
   }
 }
 
-D3D12BindingGroup::Version *D3D12BindingGroup::Version::Create(D3D12Device *device, const BindingLayoutDesc &layout) {
+D3D12BindingGroup::Version *D3D12BindingGroup::Version::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
   uint64_t resources = 0, samplers = 0;
   for (auto b : layout.bindings) {
     if ((b.type == BINDING_STRUCTURED_BUFFER || b.type == BINDING_RW_STRUCTURED_BUFFER) &&
@@ -158,7 +158,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                   const std::vector<IImage *> &images) {
   const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
-    if (!rhi::QueryInterfacePtr<D3D12AllocatedImage>(image).Get())
+    if (!rhi::QueryInterfacePtr<ID3D12AllocatedImage>(image).Get())
       return false;
   auto native = device_->NativeDevice();
   if (binding.type == BINDING_TEXTURE2D) {
@@ -182,7 +182,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
   auto native = device_->NativeDevice();
   for (size_t i = 0; i < samplers.size(); ++i)
     native->CopyDescriptorsSimple(1, samplers_->CPU(offsets_[binding_index] + first_element + uint32_t(i)),
-                                  rhi::QueryInterfacePtr<D3D12Sampler>(samplers[i]).Get()->Descriptor(),
+                                  rhi::QueryInterfacePtr<ID3D12Sampler>(samplers[i]).Get()->Descriptor(),
                                   D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
   for (size_t i = 0; i < samplers.size(); ++i)
     initialized_[binding_index][first_element + i] = true;
@@ -193,11 +193,11 @@ D3D12DescriptorPool::Lease *D3D12BindingGroup::Version::ResourceDescriptors() co
   return resources_.Get();
 }
 
-D3D12BindingGroup::D3D12BindingGroup(D3D12Device *device, ObjectPtr<Version> version)
+D3D12BindingGroup::D3D12BindingGroup(ID3D12Device *device, ObjectPtr<Version> version)
     : BindingGroup(device, std::move(version)) {
 }
 
-D3D12BindingGroup *D3D12BindingGroup::Create(D3D12Device *device, const BindingLayoutDesc &layout) {
+D3D12BindingGroup *D3D12BindingGroup::Create(ID3D12Device *device, const BindingLayoutDesc &layout) {
   if (!ValidateBindingLayout(layout))
     return nullptr;
   auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
@@ -210,7 +210,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                   uint32_t first_element,
                                                   const std::vector<ITopLevelAccelerationStructure *> &values) {
   for (auto value : values) {
-    auto native = rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(value).Get();
+    auto native = rhi::QueryInterfacePtr<ID3D12TopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
       return false;
   }
@@ -220,7 +220,7 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
     desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
     desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     desc.RaytracingAccelerationStructure.Location =
-        rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(values[i]).Get()->Address();
+        rhi::QueryInterfacePtr<ID3D12TopLevelAccelerationStructure>(values[i]).Get()->Address();
     device->CreateShaderResourceView(nullptr, &desc,
                                      resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
   }

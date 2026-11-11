@@ -1,6 +1,8 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
+#include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
 
 #include <algorithm>
+
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
 
 namespace grassland::rhi::backend::vulkan {
 VulkanRenderTargetPool::Lease::Lease(VulkanRenderTargetPool *pool,
@@ -17,7 +19,7 @@ VulkanRenderTargetPool::Lease::~Lease() {
   pool_->ReleaseEntry(entry_);
 }
 
-const std::vector<VkImageView> &VulkanRenderTargetPool::Lease::Views() const {
+const std::vector<VkImageView> &VulkanRenderTargetPool::Lease::VulkanImageViews() const {
   return entry_->views;
 }
 

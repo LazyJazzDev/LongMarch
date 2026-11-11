@@ -1,12 +1,12 @@
-﻿// Include Vulkan before GLFW declares its surface functions.
+﻿#include "grassland/rhi/backend/vulkan/vulkan_window_impl.h"
+// Include Vulkan before GLFW declares its surface functions.
 #define GLFW_INCLUDE_VULKAN
-#include "grassland/rhi/backend/vulkan/vulkan_window.h"
-
 #include <cstdlib>
 #include <optional>
 
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_window.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -35,11 +35,11 @@ std::optional<WindowPresentationOption> PresentationFormat(VkSurfaceFormatKHR na
 }
 }  // namespace
 
-VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
+VulkanWindowImpl::VulkanWindowImpl(IVulkanDevice *device) : device_(device) {
 }
 
-VulkanWindow::~VulkanWindow() {
-  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(OwnerQueue()).Get();
+VulkanWindowImpl::~VulkanWindowImpl() {
+  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
   glfw::UnregisterWindow(GLFWWindow());
   std::lock_guard<std::mutex> lock(queue->QueueMutex());
   vkQueueWaitIdle(queue->NativeQueue());
@@ -47,10 +47,12 @@ VulkanWindow::~VulkanWindow() {
   DestroySwapchain();
   if (surface_)
     vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);
+
+  DestroyWindow();
 }
 
-VulkanWindow *VulkanWindow::Create(VulkanDevice *device, const WindowDesc &desc) {
-  auto object = std::unique_ptr<VulkanWindow>(new VulkanWindow(device));
+IVulkanWindow *VulkanWindowImpl::Create(IVulkanDevice *device, const WindowDesc &desc) {
+  auto object = std::unique_ptr<VulkanWindowImpl>(new VulkanWindowImpl(device));
   if (!object->device_->SupportsSwapchain()) {
     ReportError(-1, "VK_KHR_swapchain is unavailable.");
     return nullptr;
@@ -73,15 +75,15 @@ VulkanWindow *VulkanWindow::Create(VulkanDevice *device, const WindowDesc &desc)
   return object.release();
 }
 
-ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
-  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(OwnerQueue()).Get();
+ObjectPtr<Image> VulkanWindowImpl::AcquireNativeFrame() {
+  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return {};
-  if (invalid_)
+  if (StateWindow().invalid_)
     return {};
   auto &sync = acquire_sync_[current_sync_];
   const auto native = device_->NativeDevice();
@@ -192,7 +194,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       initialized_images_[current_image_] = true;
     }
   } else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-    invalid_ = true;
+    StateWindow().invalid_ = true;
     return {};
   }
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -200,15 +202,15 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     return {};
   }
   return ObjectPtr<Image>::Adopt(
-      new VulkanSwapChainImage(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
+      IVulkanSwapChainImage::Create(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
 }
 
-VkSemaphore VulkanWindow::RenderSemaphore() const {
+VkSemaphore VulkanWindowImpl::RenderSemaphore() const {
   return rendered_[current_image_];
 }
 
-VkResult VulkanWindow::PresentFrame() {
-  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(OwnerQueue()).Get();
+VkResult VulkanWindowImpl::PresentFrame() {
+  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
   const auto rendered = RenderSemaphore();
   VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
   present.waitSemaphoreCount = 1;
@@ -221,11 +223,11 @@ VkResult VulkanWindow::PresentFrame() {
   // its acquire fence and consuming submission have completed.
   current_sync_ = (current_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
-    invalid_ = true;
+    StateWindow().invalid_ = true;
   return result;
 }
 
-std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOptions() const {
+std::vector<WindowPresentationOption> VulkanWindowImpl::GetSupportedPresentationOptions() const {
   const auto physical = device_->NativePhysicalDevice();
   VkSurfaceCapabilitiesKHR caps{};
   if (!Check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface_, &caps), "Surface capabilities"))
@@ -266,11 +268,11 @@ std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOpti
   return options;
 }
 
-PresentMode VulkanWindow::GetPresentMode() const {
+PresentMode VulkanWindowImpl::GetPresentMode() const {
   return mode_;
 }
 
-void VulkanWindow::DestroySwapchain() {
+void VulkanWindowImpl::DestroySwapchain() {
   for (auto image : images_)
     device_->RenderTargets().Retire(image);
   image_views_.clear();
@@ -297,8 +299,8 @@ void VulkanWindow::DestroySwapchain() {
   swapchain_ = VK_NULL_HANDLE;
 }
 
-bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
-  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(OwnerQueue()).Get();
+bool VulkanWindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
+  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(OwnerQueue()).Get();
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
   int width, height;
@@ -411,4 +413,10 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
 }
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanWindow, "2bd587e1-b088-4f5c-8138-3fd885407013")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanWindow, "2bd587e1-b088-4f5c-8138-3fd885407013")
+
+namespace grassland::rhi::backend::vulkan {
+IVulkanWindow *IVulkanWindow::Create(IVulkanDevice *device, const WindowDesc &desc) {
+  return VulkanWindowImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::vulkan

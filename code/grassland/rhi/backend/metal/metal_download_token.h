@@ -2,26 +2,18 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDownloadToken;
+class IMetalDownloadToken;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalDownloadToken)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalDownloadToken)
 #include "grassland/rhi/backend/backend_download_token.h"
 #include "grassland/rhi/backend/metal/metal_temporal_buffer_pool.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDownloadToken final : public DownloadToken {
+class IMetalDownloadToken : public DownloadToken {
  public:
-  LONGMARCH_RHI_QUERY(MetalDownloadToken, DownloadToken)
-
-  MetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size);
-  MetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, const DownloadLayout &layout);
-  ~MetalDownloadToken() override;
-
- protected:
-  bool CopyData(void *destination) const override;
-
- private:
-  ObjectPtr<IMetalTemporalBufferLease> lease_;
-  DownloadLayout layout_;
+  static IMetalDownloadToken *Create(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size);
+  static IMetalDownloadToken *Create(ObjectPtr<IMetalTemporalBufferLease> lease, const DownloadLayout &layout);
 };
+
+;
 }  // namespace grassland::rhi::backend::metal

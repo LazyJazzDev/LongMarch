@@ -10,7 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalBindingGroup)
 #include "grassland/rhi/backend/backend_binding_group.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDevice;
+class IMetalDevice;
 // Argument IDs are dense and independent of shader liveness and stage visibility.
 uint32_t MetalArgumentCount(const BindingLayoutDesc &layout);
 bool ValidateMetalBindingLayout(MTL::Device *device, const BindingLayoutDesc &layout);
@@ -24,15 +24,15 @@ class MetalBindingGroup final : public BindingGroup {
     using BindingGroup::Version::QueryInterface;
     bool QueryInterface(InterfaceID id, void **output) noexcept override;
 
-    static Version *Create(MetalDevice *device, const BindingLayoutDesc &layout);
+    static Version *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
     ObjectPtr<BindingGroup::Version> Clone() const override;
     bool IsInitialized(size_t binding, uint32_t element) const override;
     void Bind(MTL::ComputeCommandEncoder *encoder, uint32_t group) const;
     void Bind(MTL::RenderCommandEncoder *encoder, uint32_t group) const;
 
    private:
-    MetalDevice *device_;
-    Version(MetalDevice *device, const BindingLayoutDesc &layout);
+    IMetalDevice *device_;
+    Version(IMetalDevice *device, const BindingLayoutDesc &layout);
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<BufferView> &values) override;
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<IImage *> &values) override;
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<ISampler *> &values) override;
@@ -45,10 +45,10 @@ class MetalBindingGroup final : public BindingGroup {
     NS::SharedPtr<MTL::IBackendBuffer> arguments_, sizes_;
   };
 
-  static MetalBindingGroup *Create(MetalDevice *device, const BindingLayoutDesc &layout);
+  static MetalBindingGroup *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
 
  private:
-  MetalBindingGroup(MetalDevice *device, ObjectPtr<Version> version);
+  MetalBindingGroup(IMetalDevice *device, ObjectPtr<Version> version);
 };
 }  // namespace grassland::rhi::backend::metal
 

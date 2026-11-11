@@ -10,10 +10,8 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Core)
 
 namespace grassland::rhi::backend {
 
-class Core : public Object<rhi::ICore> {
+class Core : public rhi::ICore {
  public:
-  LONGMARCH_RHI_QUERY(Core, Object<rhi::ICore>)
-
   rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override;
 };
 

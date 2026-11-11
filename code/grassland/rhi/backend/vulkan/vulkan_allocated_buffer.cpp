@@ -10,7 +10,7 @@ class VulkanAllocatedBufferImpl final : public Object<IVulkanAllocatedBuffer> {
   LONGMARCH_RHI_QUERY_INTERFACES(Object<IVulkanAllocatedBuffer>, IBuffer, IBackendBuffer, IVulkanBuffer)
 
   ~VulkanAllocatedBufferImpl() override;
-  static IVulkanAllocatedBuffer *Create(VulkanDevice *device,
+  static IVulkanAllocatedBuffer *Create(IVulkanDevice *device,
                                         const BufferDesc &desc,
                                         bool upload = false,
                                         bool download = false);
@@ -19,14 +19,14 @@ class VulkanAllocatedBufferImpl final : public Object<IVulkanAllocatedBuffer> {
   bool Write(const void *data, uint64_t size);
 
  private:
-  VulkanAllocatedBufferImpl(VulkanDevice *device, const BufferDesc &desc);
+  VulkanAllocatedBufferImpl(IVulkanDevice *device, const BufferDesc &desc);
 
   VkBuffer buffer_{};
   VmaAllocation allocation_{};
   void *mapped_{};
 
  private:
-  VulkanDevice *device_;
+  IVulkanDevice *device_;
   BufferDesc desc_;
 
  public:
@@ -37,7 +37,7 @@ class VulkanAllocatedBufferImpl final : public Object<IVulkanAllocatedBuffer> {
   Device *Owner() const override;
 };
 
-IVulkanAllocatedBuffer *IVulkanAllocatedBuffer::Create(VulkanDevice *device,
+IVulkanAllocatedBuffer *IVulkanAllocatedBuffer::Create(IVulkanDevice *device,
                                                        const BufferDesc &desc,
                                                        bool upload,
                                                        bool download) {
@@ -48,7 +48,7 @@ Device *VulkanAllocatedBufferImpl::Owner() const {
   return device_;
 }
 
-VulkanAllocatedBufferImpl::VulkanAllocatedBufferImpl(VulkanDevice *device, const BufferDesc &desc)
+VulkanAllocatedBufferImpl::VulkanAllocatedBufferImpl(IVulkanDevice *device, const BufferDesc &desc)
     : device_(device),
       desc_(desc) {
 }
@@ -62,7 +62,7 @@ VkBuffer VulkanAllocatedBufferImpl::NativeBuffer() const {
   return buffer_;
 }
 
-IVulkanAllocatedBuffer *VulkanAllocatedBufferImpl::Create(VulkanDevice *device,
+IVulkanAllocatedBuffer *VulkanAllocatedBufferImpl::Create(IVulkanDevice *device,
                                                           const BufferDesc &desc,
                                                           bool upload,
                                                           bool download) {

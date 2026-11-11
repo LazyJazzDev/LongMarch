@@ -2,15 +2,24 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
+#include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_allocated_image_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_compute_program_impl.h"
+#include "grassland/rhi/backend/d3d12/d3d12_device_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_program_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
+#include "grassland/rhi/backend/d3d12/d3d12_sampler_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
+#include "grassland/rhi/backend/d3d12/d3d12_window_impl.h"
 #include "grassland/util/log.h"
 
 // Match the Windows SDK declarations used by the backend.
@@ -19,11 +28,11 @@
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
-bool D3D12Device::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
+bool D3D12DeviceImpl::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
   std::vector<ID3D12Fence *> fences;
   std::vector<uint64_t> values;
   for (const auto &event : events) {
-    fences.push_back(rhi::QueryInterfacePtr<D3D12Timeline>(event.timeline).Get()->NativeFence());
+    fences.push_back(rhi::QueryInterfacePtr<ID3D12Timeline>(event.timeline).Get()->NativeFence());
     values.push_back(event.value);
   }
   ComPtr<ID3D12Device1> device;
@@ -37,21 +46,21 @@ bool D3D12Device::WaitNativeEvents(const std::vector<Event> &events, bool wait_a
   return SUCCEEDED(device_->GetDeviceRemovedReason());
 }
 
-void D3D12Device::InterruptCollector() {
+void D3D12DeviceImpl::InterruptCollector() {
   SetEvent(collector_shutdown_);
 }
 
-void D3D12Device::WaitForProgress(const std::vector<Event> &next) {
+void D3D12DeviceImpl::WaitForProgress(const std::vector<Event> &next) {
   std::array<HANDLE, 3> handles{collector_shutdown_};
   DWORD count = 1;
   for (const auto &event : next) {
-    for (size_t index = 0; index < queues_.size(); ++index) {
-      if (!queues_[index] || queues_[index]->GetTimeline() != event.timeline)
+    for (size_t index = 0; index < StateDevice().queues_.size(); ++index) {
+      if (!StateDevice().queues_[index] || StateDevice().queues_[index]->GetTimeline() != event.timeline)
         continue;
       auto &handle = progress_events_[index];
       if (progress_values_[index] != event.value) {
         ResetEvent(handle);
-        if (!Check(rhi::QueryInterfacePtr<D3D12Timeline>(event.timeline)
+        if (!Check(rhi::QueryInterfacePtr<ID3D12Timeline>(event.timeline)
                        .Get()
                        ->NativeFence()
                        ->SetEventOnCompletion(event.value, handle),
@@ -67,8 +76,8 @@ void D3D12Device::WaitForProgress(const std::vector<Event> &next) {
   WaitForMultipleObjects(count, handles.data(), FALSE, INFINITE);
 }
 
-bool D3D12Device::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
-                                          ComPtr<ID3D12GraphicsCommandList> &list) {
+bool D3D12DeviceImpl::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
+                                              ComPtr<ID3D12GraphicsCommandList> &list) {
   {
     std::lock_guard<std::mutex> lock(command_pool_mutex_);
     if (!command_pool_.empty()) {
@@ -89,8 +98,8 @@ bool D3D12Device::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &alloca
       "CreateCommandList");
 }
 
-void D3D12Device::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator,
-                                          ComPtr<ID3D12GraphicsCommandList> list) {
+void D3D12DeviceImpl::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator,
+                                              ComPtr<ID3D12GraphicsCommandList> list) {
   try {
     std::lock_guard<std::mutex> lock(command_pool_mutex_);
     command_pool_.emplace_back(std::move(allocator), std::move(list));
@@ -100,8 +109,8 @@ void D3D12Device::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocat
   }
 }
 
-D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device) {
-  auto object = std::unique_ptr<D3D12Device>(new D3D12Device(std::move(info), core, std::move(device)));
+ID3D12Device *D3D12DeviceImpl::Create(PhysicalDevice info, Core *core, ComPtr<::ID3D12Device> device) {
+  auto object = std::unique_ptr<D3D12DeviceImpl>(new D3D12DeviceImpl(std::move(info), core, std::move(device)));
   if (SUCCEEDED(object->device_.As(&object->debug_messages_))) {
     auto callback = [](D3D12_MESSAGE_CATEGORY, D3D12_MESSAGE_SEVERITY severity, D3D12_MESSAGE_ID id, LPCSTR description,
                        void *) {
@@ -137,8 +146,8 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
       SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
     object->tearing_ = tearing;
   for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
-    object->queues_[type] = ObjectPtr<Queue>::Adopt(D3D12Queue::Create(object.get(), type));
-    if (!object->queues_[type])
+    object->StateDevice().queues_[type] = ObjectPtr<Queue>::Adopt(ID3D12Queue::Create(object.get(), type));
+    if (!object->StateDevice().queues_[type])
       return nullptr;
   }
   object->collector_shutdown_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
@@ -157,49 +166,48 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
   return object.release();
 }
 
-D3D12TransientDescriptorPool &D3D12Device::ResourceDescriptors() {
+D3D12TransientDescriptorPool &D3D12DeviceImpl::ResourceDescriptors() {
   return resource_descriptors_;
 }
 
-D3D12TransientDescriptorPool &D3D12Device::SamplerDescriptors() {
+D3D12TransientDescriptorPool &D3D12DeviceImpl::SamplerDescriptors() {
   return sampler_descriptors_;
 }
 
-D3D12DescriptorPool &D3D12Device::DSVPool() {
+D3D12DescriptorPool &D3D12DeviceImpl::DSVPool() {
   return dsv_pool_;
 }
 
-D3D12DescriptorPool &D3D12Device::RTVPool() {
+D3D12DescriptorPool &D3D12DeviceImpl::RTVPool() {
   return rtv_pool_;
 }
 
-D3D12MA::Allocator *D3D12Device::Allocator() const {
+D3D12MA::Allocator *D3D12DeviceImpl::Allocator() const {
   return allocator_.Get();
 }
 
-ID3D12Device *D3D12Device::NativeDevice() const {
+::ID3D12Device *D3D12DeviceImpl::NativeDevice() const {
   return device_.Get();
 }
 
-D3D12DescriptorPool &D3D12Device::ResourceDescriptorStorage() {
+D3D12DescriptorPool &D3D12DeviceImpl::ResourceDescriptorStorage() {
   return resource_descriptor_storage_;
 }
 
-D3D12DescriptorPool &D3D12Device::SamplerDescriptorStorage() {
+D3D12DescriptorPool &D3D12DeviceImpl::SamplerDescriptorStorage() {
   return sampler_descriptor_storage_;
 }
 
-IDXGIFactory4 *D3D12Device::Factory() const {
+IDXGIFactory4 *D3D12DeviceImpl::Factory() const {
   return factory_.Get();
 }
 
-bool D3D12Device::SupportsTearing() const {
+bool D3D12DeviceImpl::SupportsTearing() const {
   return tearing_;
 }
 
-D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
-    : Device(std::move(info), core, BACKEND_API_D3D12),
-      upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
+D3D12DeviceImpl::D3D12DeviceImpl(PhysicalDevice info, Core *core, ComPtr<::ID3D12Device> device)
+    : upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
       download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
       scratch_pool_(this),
       device_(std::move(device)),
@@ -209,15 +217,16 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
       sampler_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER),
       resource_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096),
       sampler_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 256) {
+  InitializeDevice(std::move(info), core, BACKEND_API_D3D12);
 }
 
-D3D12Device::~D3D12Device() {
+D3D12DeviceImpl::~D3D12DeviceImpl() {
   ShutdownQueues();
   upload_pool_.Clear();
   download_pool_.Clear();
   scratch_pool_.Clear();
   command_pool_.clear();
-  for (auto &queue : queues_)
+  for (auto &queue : StateDevice().queues_)
     queue.Reset();
   for (auto event : progress_events_)
     if (event)
@@ -226,68 +235,76 @@ D3D12Device::~D3D12Device() {
     CloseHandle(collector_shutdown_);
   if (debug_callback_cookie_)
     debug_messages_->UnregisterMessageCallback(debug_callback_cookie_);
+
+  DestroyDevice();
 }
 
-rhi::IComputeProgram *D3D12Device::CreateComputeProgram(const ComputeProgramDesc &desc) {
-  return D3D12ComputeProgram::Create(this, desc);
+rhi::IComputeProgram *D3D12DeviceImpl::CreateComputeProgram(const ComputeProgramDesc &desc) {
+  return ID3D12ComputeProgram::Create(this, desc);
 }
 
-rhi::IProgram *D3D12Device::CreateProgram(const ProgramDesc &desc) {
-  return D3D12Program::Create(this, desc);
+rhi::IProgram *D3D12DeviceImpl::CreateProgram(const ProgramDesc &desc) {
+  return ID3D12Program::Create(this, desc);
 }
 
-D3D12TemporalBufferPool &D3D12Device::UploadPool() {
+D3D12TemporalBufferPool &D3D12DeviceImpl::UploadPool() {
   return upload_pool_;
 }
 
-rhi::IImage *D3D12Device::CreateImage(const ImageDesc &desc) {
-  return D3D12AllocatedImage::Create(this, desc);
+rhi::IImage *D3D12DeviceImpl::CreateImage(const ImageDesc &desc) {
+  return ID3D12AllocatedImage::Create(this, desc);
 }
 
-rhi::IBuffer *D3D12Device::CreateBuffer(const BufferDesc &desc) {
+rhi::IBuffer *D3D12DeviceImpl::CreateBuffer(const BufferDesc &desc) {
   return ID3D12AllocatedBuffer::Create(this, desc);
 }
 
-rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {
-  return D3D12Window::Create(this, desc);
+rhi::IWindow *D3D12DeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
+  return ID3D12Window::Create(this, desc);
 }
 
-ISampler *D3D12Device::CreateSampler(const SamplerDesc &desc) {
-  return D3D12Sampler::Create(this, desc);
+ISampler *D3D12DeviceImpl::CreateSampler(const SamplerDesc &desc) {
+  return ID3D12Sampler::Create(this, desc);
 }
 
-IBindingGroup *D3D12Device::CreateBindingGroup(const BindingLayoutDesc &layout) {
+IBindingGroup *D3D12DeviceImpl::CreateBindingGroup(const BindingLayoutDesc &layout) {
   return D3D12BindingGroup::Create(this, layout);
 }
 
 }  // namespace grassland::rhi::backend::d3d12
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12ScratchPool &D3D12Device::ScratchPool() {
+D3D12ScratchPool &D3D12DeviceImpl::ScratchPool() {
   return scratch_pool_;
 }
 }  // namespace grassland::rhi::backend::d3d12
 
 namespace grassland::rhi::backend::d3d12 {
-IBottomLevelAccelerationStructure *D3D12Device::CreateBottomLevelAccelerationStructure(
+IBottomLevelAccelerationStructure *D3D12DeviceImpl::CreateBottomLevelAccelerationStructure(
     const BottomLevelAccelerationStructureDesc &desc) {
-  return D3D12BottomLevelAccelerationStructure::Create(this, desc);
+  return ID3D12BottomLevelAccelerationStructure::Create(this, desc);
 }
 
-ITopLevelAccelerationStructure *D3D12Device::CreateTopLevelAccelerationStructure(
+ITopLevelAccelerationStructure *D3D12DeviceImpl::CreateTopLevelAccelerationStructure(
     const TopLevelAccelerationStructureDesc &desc) {
-  return D3D12TopLevelAccelerationStructure::Create(this, desc);
+  return ID3D12TopLevelAccelerationStructure::Create(this, desc);
 }
 
-IRayTracingProgram *D3D12Device::CreateRayTracingProgram(const RayTracingProgramDesc &desc) {
+IRayTracingProgram *D3D12DeviceImpl::CreateRayTracingProgram(const RayTracingProgramDesc &desc) {
   if (!SupportRayTracingPipeline())
     return nullptr;
-  return D3D12RayTracingProgram::Create(this, desc);
+  return ID3D12RayTracingProgram::Create(this, desc);
 }
 
-D3D12TemporalBufferPool &D3D12Device::DownloadPool() {
+D3D12TemporalBufferPool &D3D12DeviceImpl::DownloadPool() {
   return download_pool_;
 }
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Device, "d258bd31-2295-4f22-9c98-bd0133662c47")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Device, "d258bd31-2295-4f22-9c98-bd0133662c47")
+
+namespace grassland::rhi::backend::d3d12 {
+ID3D12Device *ID3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<::ID3D12Device> device) {
+  return D3D12DeviceImpl::Create(info, core, device);
+}
+}  // namespace grassland::rhi::backend::d3d12

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "grassland/rhi/backend/backend_queue_state.h"
+
 namespace grassland::rhi::backend {
 
 ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &commands, const SubmitInfo &info) {
@@ -11,7 +13,7 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
   native_info.waits.reserve(info.waits.size());
   for (const auto &wait : info.waits) {
     auto timeline = rhi::QueryInterfacePtr<Timeline>(wait.timeline).Get();
-    if (!timeline || timeline->Owner() != device_) {
+    if (!timeline || timeline->Owner() != StateQueue().device_) {
       ReportError(-1, "Submission waits require a timeline from this device.");
       return {};
     }
@@ -23,17 +25,17 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
     else
       existing->value = std::max(existing->value, wait.value);
   }
-  std::unique_lock<std::mutex> queue_lock(*mutex_);
+  std::unique_lock<std::mutex> queue_lock(*StateQueue().mutex_);
   const Event signal{GetTimeline(), NextSerial()};
   auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(signal));
   // Register before native submission, while the collector cannot take the list.
-  auto entry = pending_.insert(pending_.end(), {commands, completion});
+  auto entry = StateQueue().pending_.insert(StateQueue().pending_.end(), {commands, completion});
   CommandContext::SubmitResult result;
   try {
     commands->BindDownloads(completion.Get());
     result = commands->SubmitNative(native_info, signal);
     if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
-      pending_.erase(entry);
+      StateQueue().pending_.erase(entry);
       completion->Complete(SUBMISSION_STATUS_FAILED);
       commands->ReleaseDownloads();
       return {};
@@ -41,7 +43,7 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
     commands->MarkSubmitted();
   } catch (...) {
     if (!commands->WasSubmitted()) {
-      pending_.erase(entry);
+      StateQueue().pending_.erase(entry);
       completion->Complete(SUBMISSION_STATUS_FAILED);
       commands->ReleaseDownloads();
     }
@@ -56,10 +58,10 @@ ObjectPtr<SubmissionToken> Queue::Submit(const ObjectPtr<CommandContext> &comman
 }
 
 bool Queue::CollectCompleted(uint64_t completed, bool timeline_valid) {
-  std::list<Submission> work;
+  std::list<QueueState::Submission> work;
   {
-    std::lock_guard<std::mutex> lock(*mutex_);
-    work.splice(work.end(), pending_);
+    std::lock_guard<std::mutex> lock(*StateQueue().mutex_);
+    work.splice(work.end(), StateQueue().pending_);
   }
   // Polling may submit a recovery signal; releasing resources may acquire other
   // backend locks. Neither operation runs under the submission mutex.
@@ -74,35 +76,38 @@ bool Queue::CollectCompleted(uint64_t completed, bool timeline_valid) {
     it->completion->Complete(status);
     it = work.erase(it);
   }
-  std::lock_guard<std::mutex> lock(*mutex_);
-  pending_.splice(pending_.begin(), work);
-  return pending_.empty();
+  std::lock_guard<std::mutex> lock(*StateQueue().mutex_);
+  StateQueue().pending_.splice(StateQueue().pending_.begin(), work);
+  return StateQueue().pending_.empty();
 }
 
-Queue::Queue(Device *device, QueueType type, std::shared_ptr<std::mutex> mutex)
-    : device_(device),
-      type_(type),
-      mutex_(std::move(mutex)) {
+void Queue::InitializeQueue(Device *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
+  StateQueue().device_ = device;
+  StateQueue().type_ = type;
+  StateQueue().mutex_ = std::move(mutex);
 }
-
-Queue::~Queue() = default;
 
 std::mutex &Queue::QueueMutex() {
-  return *mutex_;
+  return *StateQueue().mutex_;
 }
 
 uint64_t Queue::NextSerial() {
-  return ++serial_;
+  return ++StateQueue().serial_;
 }
 
 Device *Queue::Owner() const {
-  return device_;
+  return StateQueue().device_;
 }
 
 QueueType Queue::GetType() const {
-  return type_;
+  return StateQueue().type_;
 }
 
 }  // namespace grassland::rhi::backend
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::Queue, "5b1b277a-1b68-4947-bf02-14449939898d")
+
+namespace grassland::rhi::backend {
+QueueState::QueueState() = default;
+QueueState::~QueueState() = default;
+}  // namespace grassland::rhi::backend

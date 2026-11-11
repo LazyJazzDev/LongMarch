@@ -31,7 +31,11 @@ void *MatchInterfaces(InterfaceID id, Source *source) noexcept {
 template <typename Interface, typename... Bases>
 class Object : public Interface {
  public:
-  using Interface::QueryInterface;
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
 
   bool QueryInterface(InterfaceID id, void **output) noexcept override {
     if (!output)

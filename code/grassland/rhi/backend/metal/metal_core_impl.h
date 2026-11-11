@@ -1,0 +1,28 @@
+#pragma once
+#include "grassland/rhi/backend/metal/metal_core.h"
+
+namespace grassland::rhi::backend::metal {
+class MetalCoreImpl final : public Object<IMetalCore> {
+ public:
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICore, IMetalCore, Core, rhi::ICore)
+  static IMetalCore *CreateMetalCore(const CoreDesc &desc);
+  std::vector<PhysicalDevice> GetPhysicalDevices() const override;
+  rhi::IDevice *CreateDevice(int32_t device_idx) override;
+  bool DebugEnabled() const;
+
+ private:
+  explicit MetalCoreImpl(const CoreDesc &desc);
+  const bool enable_debug_;
+
+  struct Adapter {
+    NS::SharedPtr<MTL::Device> native;
+    PhysicalDevice info;
+  };
+
+  std::vector<Adapter> adapters_;
+
+ public:
+  ~MetalCoreImpl() override {
+  }
+};
+}  // namespace grassland::rhi::backend::metal

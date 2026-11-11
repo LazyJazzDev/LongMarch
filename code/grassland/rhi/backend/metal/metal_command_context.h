@@ -2,9 +2,9 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalCommandContext;
+class IMetalCommandContext;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalCommandContext)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalCommandContext)
 #include <unordered_map>
 
 #include "grassland/rhi/backend/backend_command_context.h"
@@ -13,95 +13,63 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalCommandContext)
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalQueue;
-class MetalProgram;
-class MetalComputeProgram;
+class IMetalQueue;
+class IMetalProgram;
+class IMetalComputeProgram;
 class MetalProgramBase;
 class IMetalBuffer;
 class MetalImage;
-class MetalWindow;
-class MetalSwapChainImage;
+class IMetalWindow;
+class IMetalSwapChainImage;
 
-class MetalCommandContext final : public CommandContext {
+class IMetalCommandContext : public CommandContext {
  public:
-  LONGMARCH_RHI_QUERY(MetalCommandContext, CommandContext)
-
-  static MetalCommandContext *Create(MetalQueue *queue);
-  ~MetalCommandContext() override;
-  bool CmdBuildBottomLevelAccelerationStructure(
+  static IMetalCommandContext *Create(IMetalQueue *queue);
+  virtual bool CmdBuildBottomLevelAccelerationStructure(
       IBottomLevelAccelerationStructure *destination,
       const std::vector<AccelerationStructureGeometryBuffers> &geometries,
-      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
-  bool CmdBuildTopLevelAccelerationStructure(
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) = 0;
+  virtual bool CmdBuildTopLevelAccelerationStructure(
       ITopLevelAccelerationStructure *destination,
       const std::vector<RayTracingInstance> &instances,
-      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
-  bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
-  bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override;
-  IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
-  IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
-  bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
-  bool CmdCopyBuffer(IBuffer *source,
-                     uint64_t source_offset,
-                     IBuffer *destination,
-                     uint64_t destination_offset,
-                     uint64_t size) override;
-  bool CmdBindComputeProgram(IComputeProgram *program) override;
-  bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
-  bool CmdBindProgram(IProgram *program) override;
-  bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
-  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
-  bool CmdBeginRendering(const RenderingInfo &info) override;
-  bool CmdEndRendering() override;
-  bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) override;
-  bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) override;
-  bool CmdSetViewport(const Viewport &viewport) override;
-  bool CmdSetScissor(const Scissor &scissor) override;
-  bool CmdDraw(uint32_t vertex_count,
-               uint32_t instance_count = 1,
-               uint32_t first_vertex = 0,
-               uint32_t first_instance = 0) override;
-  bool CmdDrawIndexed(uint32_t index_count,
-                      uint32_t instance_count = 1,
-                      uint32_t first_index = 0,
-                      int32_t vertex_offset = 0,
-                      uint32_t first_instance = 0) override;
-  bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
-  bool CmdPresent(rhi::IWindow *window) override;
-  void UpdatePresentedImages() override;
-  SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
-  SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
-
- private:
-  MetalCommandContext(MetalQueue *queue);
-
-  bool EndRecording() override;
-  std::vector<MTL::Resource *> AccelerationResources();
-  std::unordered_map<MetalTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
-      as_dependencies_;
-  void ApplyBindings();
-  void ApplyScissor();
-  bool ValidateDraw(bool indexed);
-  MetalProgram *program_{};
-  MetalComputeProgram *compute_program_{};
-  MetalProgramBase *native_program_{};
-  MetalImage *render_target_{};
-  std::vector<ImageFormat> color_formats_;
-  std::vector<IImage *> color_targets_;
-  ImageFormat depth_format_{IMAGE_FORMAT_UNKNOWN};
-  std::vector<MetalBindingGroup::Version *> groups_;
-  NS::SharedPtr<MTL::RenderCommandEncoder> encoder_;
-  std::vector<std::pair<IMetalBuffer *, uint64_t>> vertex_buffers_;
-  IMetalBuffer *index_{};
-  uint64_t index_offset_{};
-  IndexFormat index_format_{INDEX_FORMAT_UINT32};
-  Viewport viewport_{};
-  Scissor scissor_{};
-  bool viewport_set_{}, scissor_set_{};
-
-  MetalDevice *device_;
-  NS::SharedPtr<MTL::CommandBuffer> commands_;
-  std::vector<std::pair<MetalWindow *, MetalSwapChainImage *>> presents_;
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) = 0;
+  virtual bool CmdQueryCompactedSize(IAccelerationStructure *structure) = 0;
+  virtual bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) = 0;
+  virtual IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) = 0;
+  virtual IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) = 0;
+  virtual bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) = 0;
+  virtual bool CmdCopyBuffer(IBuffer *source,
+                             uint64_t source_offset,
+                             IBuffer *destination,
+                             uint64_t destination_offset,
+                             uint64_t size) = 0;
+  virtual bool CmdBindComputeProgram(IComputeProgram *program) = 0;
+  virtual bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) = 0;
+  virtual bool CmdBindProgram(IProgram *program) = 0;
+  virtual bool CmdBindGroup(uint32_t index, IBindingGroup *group) = 0;
+  virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) = 0;
+  virtual bool CmdBeginRendering(const RenderingInfo &info) = 0;
+  virtual bool CmdEndRendering() = 0;
+  virtual bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) = 0;
+  virtual bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) = 0;
+  virtual bool CmdSetViewport(const Viewport &viewport) = 0;
+  virtual bool CmdSetScissor(const Scissor &scissor) = 0;
+  virtual bool CmdDraw(uint32_t vertex_count,
+                       uint32_t instance_count = 1,
+                       uint32_t first_vertex = 0,
+                       uint32_t first_instance = 0) = 0;
+  virtual bool CmdDrawIndexed(uint32_t index_count,
+                              uint32_t instance_count = 1,
+                              uint32_t first_index = 0,
+                              int32_t vertex_offset = 0,
+                              uint32_t first_instance = 0) = 0;
+  virtual bool CmdClearImage(rhi::IImage *image, const ClearValue &value) = 0;
+  virtual bool CmdPresent(rhi::IWindow *window) = 0;
+  virtual void UpdatePresentedImages() = 0;
+  virtual SubmitResult SubmitNative(const SubmitInfo &info, Event signal) = 0;
+  virtual SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::metal

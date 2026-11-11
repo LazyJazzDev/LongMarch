@@ -19,17 +19,21 @@ namespace grassland::rhi::backend {
 
 class Queue;
 
-class Device : public Object<rhi::IDevice> {
- public:
-  LONGMARCH_RHI_QUERY(Device, Object<rhi::IDevice>)
+struct DeviceState;
 
+class Device : public rhi::IDevice {
+ public:
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &desc) override;
   ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
       const TopLevelAccelerationStructureDesc &desc) override;
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
-  Device(PhysicalDevice info, Core *core, BackendAPI api = BACKEND_API_DEFAULT);
-  ~Device() override;
+
+ protected:
+  void InitializeDevice(PhysicalDevice info, Core *core, BackendAPI api = BACKEND_API_DEFAULT);
+  void DestroyDevice();
+
+ public:
   const PhysicalDevice &GetPhysicalDevice() const noexcept;
   std::string Name() const override;
   bool SupportRayTracingPipeline() const override;
@@ -54,15 +58,13 @@ class Device : public Object<rhi::IDevice> {
   virtual void InterruptCollector() = 0;
   void ShutdownQueues();
   Core *OwnerCore() const;
-  std::array<ObjectPtr<Queue>, 2> queues_;
-  std::atomic<bool> stopping_{};
 
  private:
   void Collect();
-  BackendAPI api_;
-  Core *core_;
-  PhysicalDevice info_;
-  std::thread collector_;
+
+ protected:
+  virtual DeviceState &StateDevice() = 0;
+  virtual const DeviceState &StateDevice() const = 0;
 };
 
 }  // namespace grassland::rhi::backend

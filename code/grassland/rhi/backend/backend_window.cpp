@@ -8,6 +8,7 @@
 #include "grassland/rhi/backend/backend_image_presenter.h"
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
+#include "grassland/rhi/backend/backend_window_state.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #ifdef _WIN32
@@ -19,28 +20,29 @@
 
 namespace grassland::rhi::backend {
 
-Window::Window() = default;
+void Window::InitializeWindow() {
+}
 
 bool Window::EnableImGui(bool enabled, const char *font_file_path, float font_size) {
-  if (!glfw::IsWindowThread() || processing_imgui_)
+  if (!glfw::IsWindowThread() || StateWindow().processing_imgui_)
     return false;
   if (!enabled) {
-    imgui_.reset();
+    StateWindow().imgui_.reset();
     return true;
   }
-  if (!imgui_)
-    imgui_ = WindowImGui::Create(device_, window_, font_file_path, font_size);
-  return bool(imgui_);
+  if (!StateWindow().imgui_)
+    StateWindow().imgui_ = WindowImGui::Create(StateWindow().device_, StateWindow().window_, font_file_path, font_size);
+  return bool(StateWindow().imgui_);
 }
 
 ImGuiContext *Window::GetImGuiContext() const {
-  return imgui_ ? imgui_->Context() : nullptr;
+  return StateWindow().imgui_ ? StateWindow().imgui_->Context() : nullptr;
 }
 
 bool Window::UpdateImGui(const std::function<void()> &callback) {
-  if (!imgui_)
+  if (!StateWindow().imgui_)
     return true;
-  if (!glfw::IsWindowThread() || processing_imgui_)
+  if (!glfw::IsWindowThread() || StateWindow().processing_imgui_)
     return false;
 
   struct ProcessingScope {
@@ -53,22 +55,23 @@ bool Window::UpdateImGui(const std::function<void()> &callback) {
     ~ProcessingScope() {
       flag = false;
     }
-  } scope(processing_imgui_);
+  } scope(StateWindow().processing_imgui_);
 
-  return imgui_->Update(callback);
+  return StateWindow().imgui_->Update(callback);
 }
 
 const void *Window::DeviceIdentity() const {
-  return device_;
+  return StateWindow().device_;
 }
 
 bool Window::RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) {
   ObjPtr<IImage> frame = GetNextImage();
   if (!frame)
     return false;
-  if (!presenter_)
-    presenter_ = std::make_unique<ImagePresenter>(device_);
-  return presenter_->Record(commands, image, frame.Get(), color_space, GetColorSpace(), GetHDRReferenceWhiteScale());
+  if (!StateWindow().presenter_)
+    StateWindow().presenter_ = std::make_unique<ImagePresenter>(StateWindow().device_);
+  return StateWindow().presenter_->Record(commands, image, frame.Get(), color_space, GetColorSpace(),
+                                          GetHDRReferenceWhiteScale());
 }
 
 bool Window::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
@@ -79,9 +82,9 @@ bool Window::RecordImGui(rhi::ICommandContext *commands,
                          rhi::IImage *image,
                          ColorSpace color_space,
                          float white_scale) {
-  if (!imgui_)
+  if (!StateWindow().imgui_)
     return true;
-  if (!glfw::IsWindowThread() || processing_imgui_)
+  if (!glfw::IsWindowThread() || StateWindow().processing_imgui_)
     return false;
 
   struct ProcessingScope {
@@ -94,9 +97,9 @@ bool Window::RecordImGui(rhi::ICommandContext *commands,
     ~ProcessingScope() {
       flag = false;
     }
-  } scope(processing_imgui_);
+  } scope(StateWindow().processing_imgui_);
 
-  return imgui_->Record(commands, image, color_space, white_scale);
+  return StateWindow().imgui_->Record(commands, image, color_space, white_scale);
 }
 
 rhi::IImage *Window::GetNextImage() {
@@ -106,48 +109,48 @@ rhi::IImage *Window::GetNextImage() {
     std::abort();
   }
 #endif
-  if (invalid_)
+  if (StateWindow().invalid_)
     return nullptr;
   int width, height;
-  glfwGetFramebufferSize(window_, &width, &height);
-  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+  glfwGetFramebufferSize(StateWindow().window_, &width, &height);
+  if (glfwGetWindowAttrib(StateWindow().window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
     return nullptr;
-  std::lock_guard<std::mutex> lock(next_image_mutex_);
+  std::lock_guard<std::mutex> lock(StateWindow().next_image_mutex_);
 #if !defined(NDEBUG)
-  if (!next_image_) {
+  if (!StateWindow().next_image_) {
     ReportError(-1, "No prepared swapchain image for a drawable window.");
     std::abort();
   }
 #endif
-  return ObjectPtr<Image>(next_image_).Detach();
+  return ObjectPtr<Image>(StateWindow().next_image_).Detach();
 }
 
 Queue *Window::OwnerQueue() const {
-  return queue_;
+  return StateWindow().queue_;
 }
 
 bool Window::UpdateNextImage() {
   auto image = AcquireNativeFrame();
-  std::lock_guard<std::mutex> lock(next_image_mutex_);
-  next_image_ = std::move(image);
+  std::lock_guard<std::mutex> lock(StateWindow().next_image_mutex_);
+  StateWindow().next_image_ = std::move(image);
   int width, height;
-  glfwGetFramebufferSize(window_, &width, &height);
-  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+  glfwGetFramebufferSize(StateWindow().window_, &width, &height);
+  if (glfwGetWindowAttrib(StateWindow().window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
     return true;
   // A native OUT_OF_DATE result defers recovery to an explicit rebuild.
-  if (next_image_ || invalid_)
+  if (StateWindow().next_image_ || StateWindow().invalid_)
     return true;
-  invalid_ = true;
+  StateWindow().invalid_ = true;
   return false;
 }
 
 void Window::ReleaseNextImage() {
-  std::lock_guard<std::mutex> lock(next_image_mutex_);
-  next_image_.Reset();
+  std::lock_guard<std::mutex> lock(StateWindow().next_image_mutex_);
+  StateWindow().next_image_.Reset();
 }
 
 bool Window::IsSwapChainInvalid() const {
-  return invalid_;
+  return StateWindow().invalid_;
 }
 
 bool Window::RebuildSwapChain() {
@@ -157,23 +160,23 @@ bool Window::RebuildSwapChain() {
 #endif
   const auto options = GetSupportedPresentationOptions();
   if (std::none_of(options.begin(), options.end(),
-                   [&](const auto &option) { return option.color_space == requested_color_space_; })) {
+                   [&](const auto &option) { return option.color_space == StateWindow().requested_color_space_; })) {
     ReportError(-1, "Requested swapchain color space is unavailable.");
     return false;
   }
-  invalid_ = true;
+  StateWindow().invalid_ = true;
   ReleaseNextImage();
-  if (!RebuildNativeSwapChain(requested_mode_))
+  if (!RebuildNativeSwapChain(StateWindow().requested_mode_))
     return false;
   int width, height;
-  glfwGetFramebufferSize(window_, &width, &height);
-  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+  glfwGetFramebufferSize(StateWindow().window_, &width, &height);
+  if (glfwGetWindowAttrib(StateWindow().window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
     return true;
-  color_space_ = requested_color_space_;
-  invalid_ = false;
+  StateWindow().color_space_ = StateWindow().requested_color_space_;
+  StateWindow().invalid_ = false;
   if (UpdateNextImage())
     return true;
-  invalid_ = true;
+  StateWindow().invalid_ = true;
   return false;
 }
 
@@ -182,7 +185,7 @@ bool Window::SetPresentMode(PresentMode mode) {
   if (!glfw::IsWindowThread())
     return false;
 #endif
-  requested_mode_ = mode;
+  StateWindow().requested_mode_ = mode;
   return RebuildSwapChain();
 }
 
@@ -195,16 +198,16 @@ bool Window::SetColorSpace(ColorSpace color_space) {
   if (std::none_of(options.begin(), options.end(),
                    [&](const auto &option) { return option.color_space == color_space; }))
     return false;
-  const auto previous = requested_color_space_;
-  requested_color_space_ = color_space;
+  const auto previous = StateWindow().requested_color_space_;
+  StateWindow().requested_color_space_ = color_space;
   if (RebuildSwapChain())
     return true;
-  requested_color_space_ = previous;
+  StateWindow().requested_color_space_ = previous;
   return false;
 }
 
 ColorSpace Window::GetColorSpace() const {
-  return color_space_;
+  return StateWindow().color_space_;
 }
 
 float Window::GetHDRReferenceWhiteScale() const {
@@ -223,7 +226,7 @@ float Window::GetHDRHeadroom() const {
   float white;
   if (!GetHDRReferenceWhiteNits(white))
     return 10.0f;
-  const auto monitor = MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST);
+  const auto monitor = MonitorFromWindow(glfwGetWin32Window(StateWindow().window_), MONITOR_DEFAULTTONEAREST);
   Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
   if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
     return 10.0f;
@@ -255,7 +258,8 @@ bool Window::GetHDRReferenceWhiteNits(float &nits) const {
 #ifdef _WIN32
   MONITORINFOEXW monitor{};
   monitor.cbSize = sizeof(monitor);
-  if (!GetMonitorInfoW(MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST), &monitor))
+  if (!GetMonitorInfoW(MonitorFromWindow(glfwGetWin32Window(StateWindow().window_), MONITOR_DEFAULTTONEAREST),
+                       &monitor))
     return false;
   UINT32 path_count{}, mode_count{};
   if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count) != ERROR_SUCCESS)
@@ -291,29 +295,30 @@ bool Window::GetHDRReferenceWhiteNits(float &nits) const {
 }
 
 ColorSpace Window::RequestedColorSpace() const {
-  return requested_color_space_;
+  return StateWindow().requested_color_space_;
 }
 
-Window::~Window() {
-  imgui_.reset();
-  glfw::UnregisterWindow(window_);
-  glfw::DestroyWindow(window_);
+void Window::DestroyWindow() {
+  StateWindow().imgui_.reset();
+  glfw::UnregisterWindow(StateWindow().window_);
+  glfw::DestroyWindow(StateWindow().window_);
 }
 
 bool Window::InitializeWindow(Device *device, const WindowDesc &desc) {
-  device_ = device;
-  queue_ = rhi::QueryInterfacePtr<Queue>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get()).Get();
-  requested_mode_ = desc.present_mode;
-  requested_color_space_ = desc.color_space;
-  window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
-  if (!window_)
+  StateWindow().device_ = device;
+  StateWindow().queue_ =
+      rhi::QueryInterfacePtr<Queue>(ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN)).Get()).Get();
+  StateWindow().requested_mode_ = desc.present_mode;
+  StateWindow().requested_color_space_ = desc.color_space;
+  StateWindow().window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
+  if (!StateWindow().window_)
     return false;
   glfw::RegisterWindow(this);
   return true;
 }
 
 GLFWwindow *Window::GLFWWindow() const {
-  return window_;
+  return StateWindow().window_;
 }
 
 bool Window::ShouldClose() const {
@@ -321,7 +326,7 @@ bool Window::ShouldClose() const {
   if (!glfw::IsWindowThread())
     return true;
 #endif
-  return glfwWindowShouldClose(window_);
+  return glfwWindowShouldClose(StateWindow().window_);
 }
 
 bool Window::IsKeyDown(int key) const {
@@ -329,13 +334,60 @@ bool Window::IsKeyDown(int key) const {
   if (!glfw::IsWindowThread())
     return false;
 #endif
-  return glfwGetKey(window_, key) == GLFW_PRESS;
+  return glfwGetKey(StateWindow().window_, key) == GLFW_PRESS;
 }
 
 bool Window::SetTitle(const std::string &title) {
-  return glfw::SetWindowTitle(window_, title.c_str());
+  return glfw::SetWindowTitle(StateWindow().window_, title.c_str());
 }
 
 }  // namespace grassland::rhi::backend
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::Window, "093b830a-4e7b-4d76-8df4-9a2693735c9d")
+
+namespace grassland::rhi::backend {
+WindowState::WindowState() = default;
+WindowState::~WindowState() = default;
+}  // namespace grassland::rhi::backend
+
+namespace grassland::rhi::backend {
+EventManager<void(int, int)> &Window::ResizeEvent() {
+  return StateWindow().resize_event_;
+}
+
+EventManager<void(int, int)> &Window::FramebufferResizeEvent() {
+  return StateWindow().framebufferresize_event_;
+}
+
+EventManager<void(bool)> &Window::CursorEnterEvent() {
+  return StateWindow().cursorenter_event_;
+}
+
+EventManager<void(bool)> &Window::FocusEvent() {
+  return StateWindow().focus_event_;
+}
+
+EventManager<void(double, double)> &Window::MouseMoveEvent() {
+  return StateWindow().mousemove_event_;
+}
+
+EventManager<void(int, int, int, double, double)> &Window::MouseButtonEvent() {
+  return StateWindow().mousebutton_event_;
+}
+
+EventManager<void(double, double)> &Window::ScrollEvent() {
+  return StateWindow().scroll_event_;
+}
+
+EventManager<void(int, int, int, int)> &Window::KeyEvent() {
+  return StateWindow().key_event_;
+}
+
+EventManager<void(uint32_t)> &Window::CharEvent() {
+  return StateWindow().char_event_;
+}
+
+EventManager<void(int, const char **)> &Window::DropEvent() {
+  return StateWindow().drop_event_;
+}
+}  // namespace grassland::rhi::backend

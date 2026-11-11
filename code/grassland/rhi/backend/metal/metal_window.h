@@ -2,9 +2,9 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalWindow;
+class IMetalWindow;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalWindow)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalWindow)
 #include <QuartzCore/QuartzCore.hpp>
 
 #include "grassland/rhi/backend/backend_window.h"
@@ -12,27 +12,16 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalWindow)
 
 namespace grassland::rhi::backend::metal {
 
-class MetalWindow final : public Window {
+class IMetalWindow : public Window {
  public:
-  LONGMARCH_RHI_QUERY(MetalWindow, Window)
-
-  ~MetalWindow() override;
-  static MetalWindow *Create(MetalDevice *device, const WindowDesc &desc);
-  ObjectPtr<Image> AcquireNativeFrame() override;
-  bool RebuildNativeSwapChain(PresentMode mode) override;
-  PresentMode GetPresentMode() const override;
-  std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
-  bool IsFrameValid(uint64_t generation) const;
-
- private:
-  MetalWindow(MetalDevice *device);
-
-  MetalDevice *device_;
-  NS::SharedPtr<CA::MetalLayer> layer_;
-  ImageDesc desc_;
-  uint64_t generation_{1};
-  bool valid_{};
-  PresentMode mode_{PRESENT_MODE_VSYNC};
+  static IMetalWindow *Create(IMetalDevice *device, const WindowDesc &desc);
+  virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
+  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
+  virtual PresentMode GetPresentMode() const = 0;
+  virtual std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const = 0;
+  virtual bool IsFrameValid(uint64_t generation) const = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::metal

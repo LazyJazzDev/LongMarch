@@ -1,20 +1,21 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
 
 #include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/d3d12/d3d12_program_base_state.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12ProgramBase::D3D12ProgramBase() = default;
-D3D12ProgramBase::~D3D12ProgramBase() = default;
+void D3D12ProgramBase::InitializeD3D12ProgramBase() {
+}
 
 ID3D12RootSignature *D3D12ProgramBase::NativeRootSignature() const {
-  return root_signature_.Get();
+  return StateD3D12ProgramBase().root_signature_.Get();
 }
 
 uint32_t D3D12ProgramBase::RootParameter(uint32_t group, bool sampler) const {
-  return root_parameters_[group][sampler];
+  return StateD3D12ProgramBase().root_parameters_[group][sampler];
 }
 
-bool D3D12ProgramBase::CreateLayout(ID3D12Device *device,
+bool D3D12ProgramBase::CreateLayout(::ID3D12Device *device,
                                     const PipelineLayoutDesc &layout,
                                     D3D12_ROOT_SIGNATURE_FLAGS flags) {
   D3D12_ROOT_SIGNATURE_DESC root{};
@@ -36,10 +37,10 @@ bool D3D12ProgramBase::CreateLayout(ID3D12Device *device,
     ranges[m.group * 2 + (m.desc.type == BINDING_SAMPLER)].push_back(range);
   }
   std::vector<D3D12_ROOT_PARAMETER> parameters;
-  root_parameters_.assign(layout.groups.size(), {UINT32_MAX, UINT32_MAX});
+  StateD3D12ProgramBase().root_parameters_.assign(layout.groups.size(), {UINT32_MAX, UINT32_MAX});
   for (size_t i = 0; i < ranges.size(); ++i)
     if (!ranges[i].empty()) {
-      root_parameters_[i / 2][i % 2] = uint32_t(parameters.size());
+      StateD3D12ProgramBase().root_parameters_[i / 2][i % 2] = uint32_t(parameters.size());
       D3D12_ROOT_PARAMETER p{};
       p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
       p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -53,7 +54,7 @@ bool D3D12ProgramBase::CreateLayout(ID3D12Device *device,
              "Serialize root signature"))
     return false;
   if (!Check(device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
-                                         IID_PPV_ARGS(&root_signature_)),
+                                         IID_PPV_ARGS(&StateD3D12ProgramBase().root_signature_)),
              "Create root signature"))
     return false;
   return true;
@@ -62,3 +63,8 @@ bool D3D12ProgramBase::CreateLayout(ID3D12Device *device,
 }  // namespace grassland::rhi::backend::d3d12
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12ProgramBase, "1a8ecd83-21dd-483c-bd0b-6efba7356e93")
+
+namespace grassland::rhi::backend::d3d12 {
+D3D12ProgramBaseState::D3D12ProgramBaseState() = default;
+D3D12ProgramBaseState::~D3D12ProgramBaseState() = default;
+}  // namespace grassland::rhi::backend::d3d12

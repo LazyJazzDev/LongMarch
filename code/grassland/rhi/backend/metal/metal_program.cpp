@@ -4,36 +4,37 @@
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
+#include "grassland/rhi/backend/metal/metal_program_impl.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-MetalProgram::MetalProgram(MetalDevice *device, const ProgramDesc &desc)
-    : Program(device, desc),
-      MetalProgramBase(device->NativeDevice(), desc_.pipeline_layout) {
+MetalProgramImpl::MetalProgramImpl(IMetalDevice *device, const ProgramDesc &desc) {
+  InitializeProgram(device, desc);
+  InitializeMetalProgramBase(device->NativeDevice(), StateProgram().desc_.pipeline_layout);
 }
 
-MTL::RenderPipelineState *MetalProgram::NativePipeline() const {
+MTL::RenderPipelineState *MetalProgramImpl::NativePipeline() const {
   return pipeline_.get();
 }
 
-MTL::DepthStencilState *MetalProgram::NativeDepthStencil() const {
+MTL::DepthStencilState *MetalProgramImpl::NativeDepthStencil() const {
   return depth_stencil_.get();
 }
 
-MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc &desc) {
-  auto object = std::unique_ptr<MetalProgram>(new MetalProgram(owner_device, desc));
+IMetalProgram *MetalProgramImpl::Create(IMetalDevice *owner_device, const ProgramDesc &desc) {
+  auto object = std::unique_ptr<MetalProgramImpl>(new MetalProgramImpl(owner_device, desc));
 
-  if (!object->ValidateLayout() || object->desc_.vertex_bindings.size() > 31 - VertexBufferBase) {
+  if (!object->ValidateLayout() || object->StateProgram().desc_.vertex_bindings.size() > 31 - VertexBufferBase) {
     ReportError(-1, "Invalid Metal graphics program layout.");
     return nullptr;
   }
-  for (const auto &binding : object->desc_.vertex_bindings) {
+  for (const auto &binding : object->StateProgram().desc_.vertex_bindings) {
     if (!binding.stride || binding.stride > 2048 || binding.stride % 4) {
       ReportError(-1, "Metal vertex stride must be a multiple of four in [4, 2048].");
       return nullptr;
     }
   }
-  for (const auto &attribute : object->desc_.vertex_attributes) {
+  for (const auto &attribute : object->StateProgram().desc_.vertex_attributes) {
     if (attribute.location >= 31 || attribute.offset % 4) {
       ReportError(-1, "Invalid Metal vertex attribute location or alignment.");
       return nullptr;
@@ -42,9 +43,9 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto device = owner_device->NativeDevice();
   NS::SharedPtr<MTL::Function> functions[2];
-  const IShader *shaders[] = {object->desc_.vertex_shader, object->desc_.fragment_shader};
+  const IShader *shaders[] = {object->StateProgram().desc_.vertex_shader, object->StateProgram().desc_.fragment_shader};
   for (int i = 0; i < 2; ++i) {
-    functions[i] = object->CompileFunction(shaders[i], object->desc_.vertex_attributes);
+    functions[i] = object->CompileFunction(shaders[i], object->StateProgram().desc_.vertex_attributes);
     if (!functions[i])
       return nullptr;
   }
@@ -56,10 +57,11 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
           ? MTL::PrimitiveTopologyClassLine
           : MTL::PrimitiveTopologyClassTriangle);
   descriptor->setFragmentFunction(functions[1].get());
-  for (size_t i = 0; i < object->desc_.color_formats.size(); ++i) {
+  for (size_t i = 0; i < object->StateProgram().desc_.color_formats.size(); ++i) {
     auto attachment = descriptor->colorAttachments()->object(i);
-    attachment->setPixelFormat(NativeImageFormat(object->desc_.color_formats[i]));
-    const auto value = object->desc_.blend_states.empty() ? BlendState{} : object->desc_.blend_states[i];
+    attachment->setPixelFormat(NativeImageFormat(object->StateProgram().desc_.color_formats[i]));
+    const auto value =
+        object->StateProgram().desc_.blend_states.empty() ? BlendState{} : object->StateProgram().desc_.blend_states[i];
     attachment->setBlendingEnabled(value.blend_enable);
     attachment->setSourceRGBBlendFactor(NativeBlendFactor(value.src_color));
     attachment->setDestinationRGBBlendFactor(NativeBlendFactor(value.dst_color));
@@ -68,7 +70,7 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
     attachment->setDestinationAlphaBlendFactor(NativeBlendFactor(value.dst_alpha, true));
     attachment->setAlphaBlendOperation(NativeBlendOp(value.alpha_op));
   }
-  const auto &ds = object->desc_.depth_stencil;
+  const auto &ds = object->StateProgram().desc_.depth_stencil;
   descriptor->setDepthAttachmentPixelFormat(NativeImageFormat(ds.format));
   if (HasStencil(ds.format))
     descriptor->setStencilAttachmentPixelFormat(NativeImageFormat(ds.format));
@@ -95,18 +97,19 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
   if (!object->depth_stencil_)
     return nullptr;
   auto vertex = MTL::VertexDescriptor::vertexDescriptor();
-  for (size_t i = 0; i < object->desc_.vertex_bindings.size(); ++i) {
+  for (size_t i = 0; i < object->StateProgram().desc_.vertex_bindings.size(); ++i) {
     auto layout = vertex->layouts()->object(i + VertexBufferBase);
-    layout->setStride(object->desc_.vertex_bindings[i].stride);
-    layout->setStepFunction(object->desc_.vertex_bindings[i].per_instance ? MTL::VertexStepFunctionPerInstance
-                                                                          : MTL::VertexStepFunctionPerVertex);
+    layout->setStride(object->StateProgram().desc_.vertex_bindings[i].stride);
+    layout->setStepFunction(object->StateProgram().desc_.vertex_bindings[i].per_instance
+                                ? MTL::VertexStepFunctionPerInstance
+                                : MTL::VertexStepFunctionPerVertex);
     layout->setStepRate(1);
   }
   const MTL::VertexFormat formats[] = {MTL::VertexFormatFloat,  MTL::VertexFormatFloat2, MTL::VertexFormatFloat3,
                                        MTL::VertexFormatFloat4, MTL::VertexFormatInt,    MTL::VertexFormatInt2,
                                        MTL::VertexFormatInt3,   MTL::VertexFormatInt4,   MTL::VertexFormatUInt,
                                        MTL::VertexFormatUInt2,  MTL::VertexFormatUInt3,  MTL::VertexFormatUInt4};
-  for (const auto &a : object->desc_.vertex_attributes) {
+  for (const auto &a : object->StateProgram().desc_.vertex_attributes) {
     auto attribute = vertex->attributes()->object(a.location);
     attribute->setFormat(formats[a.type]);
     attribute->setBufferIndex(a.binding + VertexBufferBase);
@@ -123,4 +126,10 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
 }
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalProgram, "26dfc710-560c-4dff-bfbd-2adc53cd3739")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalProgram, "26dfc710-560c-4dff-bfbd-2adc53cd3739")
+
+namespace grassland::rhi::backend::metal {
+IMetalProgram *IMetalProgram::Create(IMetalDevice *device, const ProgramDesc &desc) {
+  return MetalProgramImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::metal

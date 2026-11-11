@@ -1,30 +1,31 @@
 ﻿#include "grassland/rhi/backend/metal/metal_compute_program.h"
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/backend/metal/metal_compute_program_impl.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 
 namespace grassland::rhi::backend::metal {
-MetalComputeProgram::MetalComputeProgram(MetalDevice *device, const ComputeProgramDesc &desc)
-    : ComputeProgram(device, desc),
-      MetalProgramBase(device->NativeDevice(), desc_.pipeline_layout) {
+MetalComputeProgramImpl::MetalComputeProgramImpl(IMetalDevice *device, const ComputeProgramDesc &desc) {
+  InitializeComputeProgram(device, desc);
+  InitializeMetalProgramBase(device->NativeDevice(), StateComputeProgram().desc_.pipeline_layout);
 }
 
-MTL::ComputePipelineState *MetalComputeProgram::NativePipeline() const {
+MTL::ComputePipelineState *MetalComputeProgramImpl::NativePipeline() const {
   return pipeline_.get();
 }
 
-MTL::Size MetalComputeProgram::ThreadGroupSize() const {
+MTL::Size MetalComputeProgramImpl::ThreadGroupSize() const {
   return threads_;
 }
 
-MetalComputeProgram *MetalComputeProgram::Create(MetalDevice *owner_device, const ComputeProgramDesc &desc) {
-  auto object = std::unique_ptr<MetalComputeProgram>(new MetalComputeProgram(owner_device, desc));
+IMetalComputeProgram *MetalComputeProgramImpl::Create(IMetalDevice *owner_device, const ComputeProgramDesc &desc) {
+  auto object = std::unique_ptr<MetalComputeProgramImpl>(new MetalComputeProgramImpl(owner_device, desc));
   if (!object->ValidateLayout())
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   std::array<uint32_t, 3> threads{};
-  auto function = object->CompileFunction(object->desc_.compute_shader, {}, &threads);
+  auto function = object->CompileFunction(object->StateComputeProgram().desc_.compute_shader, {}, &threads);
   if (!function)
     return nullptr;
   auto device = owner_device->NativeDevice();
@@ -47,4 +48,10 @@ MetalComputeProgram *MetalComputeProgram::Create(MetalDevice *owner_device, cons
 }
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalComputeProgram, "848b485d-2208-4d1d-86ae-cadee6182bfe")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalComputeProgram, "848b485d-2208-4d1d-86ae-cadee6182bfe")
+
+namespace grassland::rhi::backend::metal {
+IMetalComputeProgram *IMetalComputeProgram::Create(IMetalDevice *device, const ComputeProgramDesc &desc) {
+  return MetalComputeProgramImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::metal

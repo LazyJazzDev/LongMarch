@@ -2,6 +2,7 @@
 
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_window_impl.h"
 #define GLFW_INCLUDE_NONE
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -53,18 +54,20 @@ bool HDRDisplayEnabled(IDXGIFactory4 *factory, GLFWwindow *window) {
 }
 }  // namespace
 
-D3D12Window::D3D12Window(D3D12Device *device) : device_(device) {
+D3D12WindowImpl::D3D12WindowImpl(ID3D12Device *device) : device_(device) {
 }
 
-D3D12Window::~D3D12Window() {
+D3D12WindowImpl::~D3D12WindowImpl() {
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(rhi::QueryInterfacePtr<D3D12Queue>(OwnerQueue()).Get()->QueueMutex());
-  rhi::QueryInterfacePtr<D3D12Queue>(OwnerQueue()).Get()->WaitIdle();
+  std::lock_guard<std::mutex> lock(rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->QueueMutex());
+  rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->WaitIdle();
   ReleaseNextImage();
+
+  DestroyWindow();
 }
 
-D3D12Window *D3D12Window::Create(D3D12Device *device, const WindowDesc &desc) {
-  auto object = std::unique_ptr<D3D12Window>(new D3D12Window(device));
+ID3D12Window *D3D12WindowImpl::Create(ID3D12Device *device, const WindowDesc &desc) {
+  auto object = std::unique_ptr<D3D12WindowImpl>(new D3D12WindowImpl(device));
   if (!object->InitializeWindow(device, desc))
     return nullptr;
   if (!object->RebuildSwapChain())
@@ -72,11 +75,11 @@ D3D12Window *D3D12Window::Create(D3D12Device *device, const WindowDesc &desc) {
   return object.release();
 }
 
-bool D3D12Window::IsFrameValid(uint64_t generation) const {
+bool D3D12WindowImpl::IsFrameValid(uint64_t generation) const {
   return generation_ == generation && valid_;
 }
 
-HRESULT D3D12Window::PresentFrame(uint64_t generation) {
+HRESULT D3D12WindowImpl::PresentFrame(uint64_t generation) {
 #if !defined(NDEBUG)
   if (!IsFrameValid(generation))
     return E_INVALIDARG;
@@ -86,7 +89,7 @@ HRESULT D3D12Window::PresentFrame(uint64_t generation) {
                              mode_ == PRESENT_MODE_CONTINUOUS ? DXGI_PRESENT_ALLOW_TEARING : 0);
 }
 
-ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
+ObjectPtr<Image> D3D12WindowImpl::AcquireNativeFrame() {
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
@@ -95,7 +98,7 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
     return {};
   // Native presentation can dispatch resize messages before the next PollEvents.
   if (desc_.width != width || desc_.height != height) {
-    invalid_ = true;
+    StateWindow().invalid_ = true;
     return {};
   }
 #if !defined(NDEBUG)
@@ -110,16 +113,16 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
 #endif
   const UINT index = swapchain_->GetCurrentBackBufferIndex();
   auto frame = ObjectPtr<Image>::Adopt(
-      new D3D12SwapChainImage(desc_, this, generation_, images_[index].Get(), attachments_[index]));
+      ID3D12SwapChainImage::Create(desc_, this, generation_, images_[index].Get(), attachments_[index]));
   acquired_ = true;
   return frame;
 }
 
-PresentMode D3D12Window::GetPresentMode() const {
+PresentMode D3D12WindowImpl::GetPresentMode() const {
   return mode_;
 }
 
-std::vector<WindowPresentationOption> D3D12Window::GetSupportedPresentationOptions() const {
+std::vector<WindowPresentationOption> D3D12WindowImpl::GetSupportedPresentationOptions() const {
   std::vector<WindowPresentationOption> options;
   const bool hdr = HDRDisplayEnabled(device_->Factory(), GLFWWindow());
   for (auto color_space : {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084}) {
@@ -133,7 +136,7 @@ std::vector<WindowPresentationOption> D3D12Window::GetSupportedPresentationOptio
   return options;
 }
 
-bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
+bool D3D12WindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
   mode_ = requested_mode == PRESENT_MODE_CONTINUOUS && device_->SupportsTearing() ? requested_mode : PRESENT_MODE_VSYNC;
   const auto image_format = PresentationFormat(RequestedColorSpace());
   const auto native_format = NativeImageFormat(image_format);
@@ -144,10 +147,10 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return true;
-  std::lock_guard<std::mutex> lock(rhi::QueryInterfacePtr<D3D12Queue>(OwnerQueue()).Get()->QueueMutex());
+  std::lock_guard<std::mutex> lock(rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->QueueMutex());
   const UINT flags = device_->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
   if (swapchain_) {
-    if (!rhi::QueryInterfacePtr<D3D12Queue>(OwnerQueue()).Get()->WaitIdle())
+    if (!rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->WaitIdle())
       return false;
     ++generation_;
     valid_ = false;
@@ -171,8 +174,8 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
     ComPtr<IDXGISwapChain1> chain;
     const HWND hwnd = glfwGetWin32Window(GLFWWindow());
     if (!Check(device_->Factory()->CreateSwapChainForHwnd(
-                   rhi::QueryInterfacePtr<D3D12Queue>(OwnerQueue()).Get()->NativeQueue(), hwnd, &desc, nullptr, nullptr,
-                   &chain),
+                   rhi::QueryInterfacePtr<ID3D12Queue>(OwnerQueue()).Get()->NativeQueue(), hwnd, &desc, nullptr,
+                   nullptr, &chain),
                "CreateSwapChainForHwnd") ||
         !Check(chain.As(&swapchain_), "Query IDXGISwapChain3"))
       return false;
@@ -201,4 +204,10 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
 
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Window, "1babd07b-773d-4d2b-9392-ec5113e23fdf")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Window, "1babd07b-773d-4d2b-9392-ec5113e23fdf")
+
+namespace grassland::rhi::backend::d3d12 {
+ID3D12Window *ID3D12Window::Create(ID3D12Device *device, const WindowDesc &desc) {
+  return D3D12WindowImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::d3d12

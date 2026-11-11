@@ -19,11 +19,13 @@ class WindowImGui;
 class ImagePresenter;
 class Device;
 
-class Window : public Object<rhi::IWindow> {
- public:
-  LONGMARCH_RHI_QUERY(Window, Object<rhi::IWindow>)
+struct WindowState;
 
-  Window();
+class Window : public rhi::IWindow {
+ protected:
+  void InitializeWindow();
+
+ public:
   Queue *OwnerQueue() const;
   bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
   bool UpdateImGui(const std::function<void()> &callback) override;
@@ -32,48 +34,21 @@ class Window : public Object<rhi::IWindow> {
   bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image, ColorSpace color_space, float white_scale);
   bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space);
   const void *DeviceIdentity() const;
+  EventManager<void(int, int)> &ResizeEvent() override;
+  EventManager<void(int, int)> &FramebufferResizeEvent() override;
+  EventManager<void(bool)> &CursorEnterEvent() override;
+  EventManager<void(bool)> &FocusEvent() override;
+  EventManager<void(double, double)> &MouseMoveEvent() override;
+  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override;
+  EventManager<void(double, double)> &ScrollEvent() override;
+  EventManager<void(int, int, int, int)> &KeyEvent() override;
+  EventManager<void(uint32_t)> &CharEvent() override;
+  EventManager<void(int, const char **)> &DropEvent() override;
 
-  EventManager<void(int, int)> &ResizeEvent() override {
-    return resize_event_;
-  }
+ protected:
+  void DestroyWindow();
 
-  EventManager<void(int, int)> &FramebufferResizeEvent() override {
-    return framebufferresize_event_;
-  }
-
-  EventManager<void(bool)> &CursorEnterEvent() override {
-    return cursorenter_event_;
-  }
-
-  EventManager<void(bool)> &FocusEvent() override {
-    return focus_event_;
-  }
-
-  EventManager<void(double, double)> &MouseMoveEvent() override {
-    return mousemove_event_;
-  }
-
-  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override {
-    return mousebutton_event_;
-  }
-
-  EventManager<void(double, double)> &ScrollEvent() override {
-    return scroll_event_;
-  }
-
-  EventManager<void(int, int, int, int)> &KeyEvent() override {
-    return key_event_;
-  }
-
-  EventManager<void(uint32_t)> &CharEvent() override {
-    return char_event_;
-  }
-
-  EventManager<void(int, const char **)> &DropEvent() override {
-    return drop_event_;
-  }
-
-  ~Window() override;
+ public:
   rhi::IImage *GetNextImage() override;
   bool IsSwapChainInvalid() const override;
   bool RebuildSwapChain() override;
@@ -94,31 +69,9 @@ class Window : public Object<rhi::IWindow> {
 
  protected:
   bool InitializeWindow(Device *device, const WindowDesc &desc);
-  bool invalid_{true};
   ColorSpace RequestedColorSpace() const;
-
- private:
-  Device *device_{};
-  Queue *queue_{};
-  std::unique_ptr<WindowImGui> imgui_;
-  std::unique_ptr<ImagePresenter> presenter_;
-  bool processing_imgui_{};
-  EventManager<void(int, int)> resize_event_;
-  EventManager<void(int, int)> framebufferresize_event_;
-  EventManager<void(bool)> cursorenter_event_;
-  EventManager<void(bool)> focus_event_;
-  EventManager<void(double, double)> mousemove_event_;
-  EventManager<void(int, int, int, double, double)> mousebutton_event_;
-  EventManager<void(double, double)> scroll_event_;
-  EventManager<void(int, int, int, int)> key_event_;
-  EventManager<void(uint32_t)> char_event_;
-  EventManager<void(int, const char **)> drop_event_;
-  PresentMode requested_mode_{PRESENT_MODE_VSYNC};
-  ColorSpace requested_color_space_{COLOR_SPACE_SRGB_NONLINEAR};
-  ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
-  GLFWwindow *window_{};
-  std::mutex next_image_mutex_;
-  ObjectPtr<Image> next_image_;
+  virtual WindowState &StateWindow() = 0;
+  virtual const WindowState &StateWindow() const = 0;
 };
 
 }  // namespace grassland::rhi::backend

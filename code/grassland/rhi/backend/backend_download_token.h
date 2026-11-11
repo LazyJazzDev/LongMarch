@@ -18,12 +18,14 @@ struct DownloadLayout {
   uint64_t stencil_offset{}, stencil_pitch{};
 };
 
-class DownloadToken : public Object<IDownloadToken> {
- public:
-  LONGMARCH_RHI_QUERY(DownloadToken, Object<IDownloadToken>)
+struct DownloadTokenState;
 
-  explicit DownloadToken(uint64_t size);
-  ~DownloadToken() override;
+class DownloadToken : public IDownloadToken {
+ protected:
+  void InitializeDownloadToken(uint64_t size);
+  void DestroyDownloadToken();
+
+ public:
   SubmissionStatus GetStatus() const override;
   bool WaitHost() const override;
   uint64_t GetSize() const override;
@@ -32,9 +34,7 @@ class DownloadToken : public Object<IDownloadToken> {
 
  protected:
   virtual bool CopyData(void *destination) const = 0;
-
- private:
-  const uint64_t size_;
-  ObjectPtr<SubmissionToken> submission_;
+  virtual DownloadTokenState &StateDownloadToken() = 0;
+  virtual const DownloadTokenState &StateDownloadToken() const = 0;
 };
 }  // namespace grassland::rhi::backend

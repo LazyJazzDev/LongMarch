@@ -1,22 +1,28 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_image.h"
 
 #include <utility>
 
+#include "grassland/rhi/backend/vulkan/vulkan_image_state.h"
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
+
 namespace grassland::rhi::backend::vulkan {
 
-VulkanImage::VulkanImage(ImageDesc desc, const void *device, VkImageLayout default_layout, Queue *queue)
-    : Image(desc, queue),
-      device_(device),
-      default_layout_(default_layout) {
+void VulkanImage::InitializeVulkanImage(ImageDesc desc,
+                                        const void *device,
+                                        VkImageLayout default_layout,
+                                        Queue *queue) {
+  InitializeImage(desc, queue);
+  StateVulkanImage().device_ = device;
+  StateVulkanImage().default_layout_ = default_layout;
 }
 
-VulkanImage::Views::Views(Views &&other) noexcept
+VulkanImageViews::VulkanImageViews(VulkanImageViews &&other) noexcept
     : device_(other.device_),
       attachment_(std::exchange(other.attachment_, VK_NULL_HANDLE)),
       binding_(std::exchange(other.binding_, VK_NULL_HANDLE)) {
 }
 
-VulkanImage::Views &VulkanImage::Views::operator=(Views &&other) noexcept {
+VulkanImageViews &VulkanImageViews::operator=(VulkanImageViews &&other) noexcept {
   if (this != &other) {
     Reset();
     device_ = other.device_;
@@ -26,11 +32,11 @@ VulkanImage::Views &VulkanImage::Views::operator=(Views &&other) noexcept {
   return *this;
 }
 
-VulkanImage::Views::~Views() {
+VulkanImageViews::~VulkanImageViews() {
   Reset();
 }
 
-void VulkanImage::Views::Reset() {
+void VulkanImageViews::Reset() {
   if (binding_ && binding_ != attachment_)
     vkDestroyImageView(device_, binding_, nullptr);
   if (attachment_)
@@ -38,15 +44,15 @@ void VulkanImage::Views::Reset() {
   attachment_ = binding_ = VK_NULL_HANDLE;
 }
 
-VkImageView VulkanImage::Views::Attachment() const {
+VkImageView VulkanImageViews::Attachment() const {
   return attachment_;
 }
 
-VkImageView VulkanImage::Views::Binding() const {
+VkImageView VulkanImageViews::Binding() const {
   return binding_;
 }
 
-bool VulkanImage::Views::Initialize(VkDevice device, VkImage image, ImageFormat format, bool sampled) {
+bool VulkanImageViews::Initialize(VkDevice device, VkImage image, ImageFormat format, bool sampled) {
   Reset();
   device_ = device;
   VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
@@ -71,13 +77,18 @@ bool VulkanImage::Views::Initialize(VkDevice device, VkImage image, ImageFormat 
 }
 
 VkImageLayout VulkanImage::DefaultLayout() const {
-  return default_layout_;
+  return StateVulkanImage().default_layout_;
 }
 
 const void *VulkanImage::DeviceIdentity() const {
-  return device_;
+  return StateVulkanImage().device_;
 }
 
 }  // namespace grassland::rhi::backend::vulkan
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanImage, "bab85247-2604-44fe-b152-1ea15663177a")
+
+namespace grassland::rhi::backend::vulkan {
+VulkanImageState::VulkanImageState() = default;
+VulkanImageState::~VulkanImageState() = default;
+}  // namespace grassland::rhi::backend::vulkan

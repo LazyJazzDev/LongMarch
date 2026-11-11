@@ -11,21 +11,18 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Timeline)
 namespace grassland::rhi::backend {
 class Device;
 
-class Timeline : public Object<ITimeline> {
+struct TimelineState;
+
+class Timeline : public ITimeline {
+ protected:
+  void InitializeTimeline(Device *device);
+
  public:
-  LONGMARCH_RHI_QUERY(Timeline, Object<ITimeline>)
+  Device *Owner() const;
 
-  explicit Timeline(Device *device) : device_(device) {
-  }
-
-  ~Timeline() override = default;
-
-  Device *Owner() const {
-    return device_;
-  }
-
- private:
-  Device *device_;
+ protected:
+  virtual TimelineState &StateTimeline() = 0;
+  virtual const TimelineState &StateTimeline() const = 0;
 };
 
 }  // namespace grassland::rhi::backend

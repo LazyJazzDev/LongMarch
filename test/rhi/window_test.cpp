@@ -640,7 +640,7 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
 #if defined(LONGMARCH_D3D12_ENABLED)
   backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
   if (GetParam() == BACKEND_API_D3D12 && std::getenv("LONGMARCH_RHI_VALIDATION")) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    auto native = static_cast<backend::d3d12::ID3D12Device *>(device.Get());
     ASSERT_TRUE(SUCCEEDED(native->NativeDevice()->QueryInterface(IID_PPV_ARGS(&messages))));
     messages->ClearStoredMessages();
   }

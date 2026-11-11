@@ -9,7 +9,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanBindingGroup)
 #include "grassland/rhi/backend/vulkan/vulkan_descriptor_pool.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDevice;
+class IVulkanDevice;
 
 bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc &layout);
 VkDescriptorSetLayout CreateBindingLayout(VkDevice device, const BindingLayoutDesc &layout);
@@ -23,18 +23,18 @@ class VulkanBindingGroup final : public BindingGroup {
     using BindingGroup::Version::QueryInterface;
     bool QueryInterface(InterfaceID id, void **output) noexcept override;
 
-    static Version *Create(VulkanDevice *device, const BindingLayoutDesc &layout);
+    static Version *Create(IVulkanDevice *device, const BindingLayoutDesc &layout);
     ObjectPtr<BindingGroup::Version> Clone() const override;
     bool IsInitialized(size_t binding_index, uint32_t element) const override;
     ~Version() override;
     VkDescriptorSet Set() const;
 
    private:
-    VulkanDevice *device_;
+    IVulkanDevice *device_;
     bool WriteDescriptors(size_t binding_index,
                           uint32_t first_element,
                           const std::vector<ITopLevelAccelerationStructure *> &values) override;
-    Version(VulkanDevice *device, const BindingLayoutDesc &layout);
+    Version(IVulkanDevice *device, const BindingLayoutDesc &layout);
     bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
     bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
     bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) override;
@@ -43,10 +43,10 @@ class VulkanBindingGroup final : public BindingGroup {
     std::vector<std::vector<bool>> initialized_;
   };
 
-  static VulkanBindingGroup *Create(VulkanDevice *device, const BindingLayoutDesc &layout);
+  static VulkanBindingGroup *Create(IVulkanDevice *device, const BindingLayoutDesc &layout);
 
  private:
-  VulkanBindingGroup(VulkanDevice *device, ObjectPtr<Version> version);
+  VulkanBindingGroup(IVulkanDevice *device, ObjectPtr<Version> version);
 };
 }  // namespace grassland::rhi::backend::vulkan
 

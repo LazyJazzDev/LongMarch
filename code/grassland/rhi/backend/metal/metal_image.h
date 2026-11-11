@@ -12,20 +12,18 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalImage)
 namespace grassland::rhi::backend::metal {
 
 // Native texture is borrowed. Concrete image classes own its backing storage.
+struct MetalImageState;
+
 class MetalImage : public Image {
  public:
-  LONGMARCH_RHI_QUERY(MetalImage, Image)
-
   bool SupportsStorage() const override;
   const void *DeviceIdentity() const override;
   MTL::Texture *NativeImage() const;
 
  protected:
-  MetalImage(ImageDesc desc, const void *device, MTL::Texture *image, Queue *queue = nullptr);
-
- private:
-  const void *device_;
-  MTL::Texture *image_;
+  void InitializeMetalImage(ImageDesc desc, const void *device, MTL::Texture *image, Queue *queue = nullptr);
+  virtual MetalImageState &StateMetalImage() = 0;
+  virtual const MetalImageState &StateMetalImage() const = 0;
 };
 
 }  // namespace grassland::rhi::backend::metal

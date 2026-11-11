@@ -1,5 +1,7 @@
 #include "grassland/rhi/backend/backend_sampler.h"
 
+#include "grassland/rhi/backend/backend_sampler_state.h"
+
 namespace grassland::rhi::backend {
 bool Sampler::Validate(const SamplerDesc &desc) {
   return desc.filter >= SAMPLER_FILTER_NEAREST && desc.filter <= SAMPLER_FILTER_LINEAR &&
@@ -9,3 +11,25 @@ bool Sampler::Validate(const SamplerDesc &desc) {
 }  // namespace grassland::rhi::backend
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::Sampler, "34cc865a-50d9-49f8-b8db-591bc452621f")
+
+namespace grassland::rhi::backend {
+void Sampler::InitializeSampler(const SamplerDesc &desc, const void *device) {
+  StateSampler().desc_ = desc;
+  StateSampler().device_ = device;
+}
+}  // namespace grassland::rhi::backend
+
+namespace grassland::rhi::backend {
+SamplerState::SamplerState() = default;
+SamplerState::~SamplerState() = default;
+}  // namespace grassland::rhi::backend
+
+namespace grassland::rhi::backend {
+const SamplerDesc &Sampler::GetDesc() const {
+  return StateSampler().desc_;
+}
+
+const void *Sampler::DeviceIdentity() const {
+  return StateSampler().device_;
+}
+}  // namespace grassland::rhi::backend

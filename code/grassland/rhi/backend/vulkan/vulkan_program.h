@@ -2,25 +2,31 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanProgram;
+class IVulkanProgram;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanProgram)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanProgram)
 #include "grassland/rhi/backend/backend_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program_base.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDevice;
+class IVulkanDevice;
 
-class VulkanProgram final : public Program, public VulkanProgramBase {
+class IVulkanProgram : public Program, public VulkanProgramBase {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(VulkanProgram, Program, VulkanProgramBase)
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
 
-  static VulkanProgram *Create(VulkanDevice *device, const ProgramDesc &desc);
-  ~VulkanProgram() override;
-  VkPipeline NativePipeline() const;
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
 
- private:
-  VulkanProgram(VulkanDevice *device, const ProgramDesc &desc);
-  VkPipeline pipeline_{};
+ public:
+  static IVulkanProgram *Create(IVulkanDevice *device, const ProgramDesc &desc);
+  virtual VkPipeline NativePipeline() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::vulkan

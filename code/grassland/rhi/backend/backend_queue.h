@@ -14,12 +14,16 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Queue)
 
 namespace grassland::rhi::backend {
 
-class Queue : public Object<rhi::IQueue> {
- public:
-  LONGMARCH_RHI_QUERY(Queue, Object<rhi::IQueue>)
+struct QueueState;
 
-  Queue(Device *device, QueueType type, std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
-  ~Queue() override;
+class Queue : public rhi::IQueue {
+ protected:
+  void InitializeQueue(Device *device,
+                       QueueType type,
+                       std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
+  void DestroyQueue();
+
+ public:
   Device *Owner() const;
   virtual Timeline *GetTimeline() const = 0;
   QueueType GetType() const override;
@@ -30,18 +34,9 @@ class Queue : public Object<rhi::IQueue> {
   // Called only by the device collector; returns whether this queue is drained.
   bool CollectCompleted(uint64_t completed, bool timeline_valid);
 
- private:
-  struct Submission {
-    ObjectPtr<CommandContext> commands;
-    ObjectPtr<SubmissionToken> completion;
-  };
-
-  std::list<Submission> pending_;
-  Device *device_;
-  QueueType type_;
-  // Logical queues that share a native queue also share its host synchronization.
-  std::shared_ptr<std::mutex> mutex_;
-  uint64_t serial_{};
+ protected:
+  virtual QueueState &StateQueue() = 0;
+  virtual const QueueState &StateQueue() const = 0;
 };
 
 }  // namespace grassland::rhi::backend

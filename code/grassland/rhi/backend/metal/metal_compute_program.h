@@ -2,26 +2,32 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalComputeProgram;
+class IMetalComputeProgram;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalComputeProgram)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalComputeProgram)
 #include "grassland/rhi/backend/backend_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_program_base.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDevice;
+class IMetalDevice;
 
-class MetalComputeProgram final : public ComputeProgram, public MetalProgramBase {
+class IMetalComputeProgram : public ComputeProgram, public MetalProgramBase {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(MetalComputeProgram, ComputeProgram, MetalProgramBase)
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
 
-  static MetalComputeProgram *Create(MetalDevice *device, const ComputeProgramDesc &desc);
-  MTL::ComputePipelineState *NativePipeline() const;
-  MTL::Size ThreadGroupSize() const;
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
 
- private:
-  MetalComputeProgram(MetalDevice *device, const ComputeProgramDesc &desc);
-  NS::SharedPtr<MTL::ComputePipelineState> pipeline_;
-  MTL::Size threads_{};
+ public:
+  static IMetalComputeProgram *Create(IMetalDevice *device, const ComputeProgramDesc &desc);
+  virtual MTL::ComputePipelineState *NativePipeline() const = 0;
+  virtual MTL::Size ThreadGroupSize() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::metal

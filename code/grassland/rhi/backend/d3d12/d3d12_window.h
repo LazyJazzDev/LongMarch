@@ -2,9 +2,9 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Window;
+class ID3D12Window;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12Window)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Window)
 #include <array>
 
 #include "grassland/rhi/backend/backend_window.h"
@@ -12,31 +12,17 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12Window)
 
 namespace grassland::rhi::backend::d3d12 {
 
-class D3D12Window final : public Window {
+class ID3D12Window : public Window {
  public:
-  LONGMARCH_RHI_QUERY(D3D12Window, Window)
-
-  ~D3D12Window() override;
-  static D3D12Window *Create(D3D12Device *device, const WindowDesc &desc);
-  ObjectPtr<Image> AcquireNativeFrame() override;
-  bool RebuildNativeSwapChain(PresentMode mode) override;
-  PresentMode GetPresentMode() const override;
-  std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
-  bool IsFrameValid(uint64_t generation) const;
-  HRESULT PresentFrame(uint64_t generation);
-
- private:
-  D3D12Window(D3D12Device *device);
-
-  D3D12Device *device_;
-  ComPtr<IDXGISwapChain3> swapchain_;
-  std::array<ComPtr<ID3D12Resource>, 3> images_;
-  std::array<ObjectPtr<D3D12DescriptorPool::Lease>, 3> attachments_;
-  ImageDesc desc_;
-  std::atomic<uint64_t> generation_{1};
-  bool acquired_{};
-  bool valid_{};
-  PresentMode mode_{PRESENT_MODE_VSYNC};
+  static ID3D12Window *Create(ID3D12Device *device, const WindowDesc &desc);
+  virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
+  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
+  virtual PresentMode GetPresentMode() const = 0;
+  virtual std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const = 0;
+  virtual bool IsFrameValid(uint64_t generation) const = 0;
+  virtual HRESULT PresentFrame(uint64_t generation) = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::d3d12

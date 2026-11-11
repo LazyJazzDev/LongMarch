@@ -2,9 +2,9 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalCore;
+class IMetalCore;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalCore)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalCore)
 
 #include <Metal/Metal.hpp>
 
@@ -12,26 +12,14 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalCore)
 
 namespace grassland::rhi::backend::metal {
 
-class MetalCore final : public Core {
+class IMetalCore : public Core {
  public:
-  LONGMARCH_RHI_QUERY(MetalCore, Core)
-
-  static MetalCore *CreateMetalCore(const CoreDesc &desc);
-  std::vector<PhysicalDevice> GetPhysicalDevices() const override;
-  rhi::IDevice *CreateDevice(int32_t device_idx) override;
-
-  bool DebugEnabled() const;
-
- private:
-  explicit MetalCore(const CoreDesc &desc);
-  const bool enable_debug_;
-
-  struct Adapter {
-    NS::SharedPtr<MTL::Device> native;
-    PhysicalDevice info;
-  };
-
-  std::vector<Adapter> adapters_;
+  static IMetalCore *CreateMetalCore(const CoreDesc &desc);
+  virtual std::vector<PhysicalDevice> GetPhysicalDevices() const = 0;
+  virtual rhi::IDevice *CreateDevice(int32_t device_idx) = 0;
+  virtual bool DebugEnabled() const = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::metal

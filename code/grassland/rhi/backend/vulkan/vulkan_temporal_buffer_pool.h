@@ -10,7 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTemporalBuffe
 
 namespace grassland::rhi::backend::vulkan {
 class IVulkanTemporalBufferLease;
-using VulkanTemporalBufferPool = TemporalBufferPool<VulkanDevice, IVulkanAllocatedBuffer, IVulkanTemporalBufferLease>;
+using VulkanTemporalBufferPool = TemporalBufferPool<IVulkanDevice, IVulkanAllocatedBuffer, IVulkanTemporalBufferLease>;
 
 class IVulkanTemporalBufferLease : public IVulkanBuffer {
  public:

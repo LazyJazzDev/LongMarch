@@ -1,31 +1,34 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/backend/d3d12/d3d12_compute_program_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12ComputeProgram::D3D12ComputeProgram(D3D12Device *device, const ComputeProgramDesc &desc)
-    : ComputeProgram(device, desc) {
+D3D12ComputeProgramImpl::D3D12ComputeProgramImpl(ID3D12Device *device, const ComputeProgramDesc &desc) {
+  InitializeComputeProgram(device, desc);
 }
 
-ID3D12PipelineState *D3D12ComputeProgram::NativePipeline() const {
+ID3D12PipelineState *D3D12ComputeProgramImpl::NativePipeline() const {
   return pipeline_.Get();
 }
 
-D3D12ComputeProgram *D3D12ComputeProgram::Create(D3D12Device *owner_device, const ComputeProgramDesc &desc) {
-  auto object = std::unique_ptr<D3D12ComputeProgram>(new D3D12ComputeProgram(owner_device, desc));
+ID3D12ComputeProgram *D3D12ComputeProgramImpl::Create(ID3D12Device *owner_device, const ComputeProgramDesc &desc) {
+  auto object = std::unique_ptr<D3D12ComputeProgramImpl>(new D3D12ComputeProgramImpl(owner_device, desc));
   if (!object->ValidateLayout())
     return nullptr;
   std::vector<uint8_t> code;
   std::array<uint32_t, 3> threads{};
-  if (!CompileSlang(object->desc_.compute_shader, ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_D3D12),
-                    BACKEND_API_D3D12, code, &object->desc_.pipeline_layout, &threads))
+  if (!CompileSlang(object->StateComputeProgram().desc_.compute_shader,
+                    ShaderMacroHeader(object->StateComputeProgram().desc_.pipeline_layout, BACKEND_API_D3D12),
+                    BACKEND_API_D3D12, code, &object->StateComputeProgram().desc_.pipeline_layout, &threads))
     return nullptr;
   if (!threads[0] || !threads[1] || !threads[2] || threads[0] > 1024 || threads[1] > 1024 || threads[2] > 64 ||
       uint64_t(threads[0]) * threads[1] * threads[2] > 1024)
     return nullptr;
   auto device = owner_device->NativeDevice();
-  if (!object->CreateLayout(device, object->desc_.pipeline_layout, D3D12_ROOT_SIGNATURE_FLAG_NONE))
+  if (!object->CreateLayout(device, object->StateComputeProgram().desc_.pipeline_layout,
+                            D3D12_ROOT_SIGNATURE_FLAG_NONE))
     return nullptr;
   D3D12_COMPUTE_PIPELINE_STATE_DESC state{};
   state.pRootSignature = object->NativeRootSignature();
@@ -38,4 +41,10 @@ D3D12ComputeProgram *D3D12ComputeProgram::Create(D3D12Device *owner_device, cons
 }
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12ComputeProgram, "f0ee363d-3b36-4a53-8e17-b8a0ea11bf0a")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12ComputeProgram, "f0ee363d-3b36-4a53-8e17-b8a0ea11bf0a")
+
+namespace grassland::rhi::backend::d3d12 {
+ID3D12ComputeProgram *ID3D12ComputeProgram::Create(ID3D12Device *device, const ComputeProgramDesc &desc) {
+  return D3D12ComputeProgramImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::d3d12

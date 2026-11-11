@@ -1,27 +1,29 @@
 ﻿#include "grassland/rhi/backend/backend_compute_program.h"
 
 #include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_compute_program_state.h"
 
 namespace grassland::rhi::backend {
-ComputeProgram::ComputeProgram(Device *device, const ComputeProgramDesc &desc)
-    : device_(device),
-      desc_(desc),
-      shader_(ObjectPtr<IShader>::Retain(desc.compute_shader)) {
+void ComputeProgram::InitializeComputeProgram(Device *device, const ComputeProgramDesc &desc) {
+  StateComputeProgram().device_ = device;
+  StateComputeProgram().desc_ = desc;
+  StateComputeProgram().shader_ = ObjectPtr<IShader>::Retain(desc.compute_shader);
 }
 
 const ComputeProgramDesc &ComputeProgram::GetDesc() const {
-  return desc_;
+  return StateComputeProgram().desc_;
 }
 
 Device *ComputeProgram::Owner() const {
-  return device_;
+  return StateComputeProgram().device_;
 }
 
 bool ComputeProgram::ValidateLayout() const {
-  if (!desc_.compute_shader || desc_.compute_shader->GetStage() != SHADER_STAGE_COMPUTE ||
-      desc_.pipeline_layout.groups.size() > 8)
+  if (!StateComputeProgram().desc_.compute_shader ||
+      StateComputeProgram().desc_.compute_shader->GetStage() != SHADER_STAGE_COMPUTE ||
+      StateComputeProgram().desc_.pipeline_layout.groups.size() > 8)
     return false;
-  for (const auto &group : desc_.pipeline_layout.groups)
+  for (const auto &group : StateComputeProgram().desc_.pipeline_layout.groups)
     if (!ValidateBindingLayout(group))
       return false;
   return true;
@@ -29,3 +31,8 @@ bool ComputeProgram::ValidateLayout() const {
 }  // namespace grassland::rhi::backend
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::ComputeProgram, "f64ab67b-e062-4368-8605-dc1700c88e59")
+
+namespace grassland::rhi::backend {
+ComputeProgramState::ComputeProgramState() = default;
+ComputeProgramState::~ComputeProgramState() = default;
+}  // namespace grassland::rhi::backend

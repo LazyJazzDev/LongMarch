@@ -2,33 +2,24 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanAllocatedImage;
+class IVulkanAllocatedImage;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanAllocatedImage)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanAllocatedImage)
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
 typedef struct VmaAllocation_T *VmaAllocation;
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDevice;
+class IVulkanDevice;
 
-class VulkanAllocatedImage final : public VulkanImage {
+class IVulkanAllocatedImage : public VulkanImage {
  public:
-  LONGMARCH_RHI_QUERY(VulkanAllocatedImage, VulkanImage)
-
-  static VulkanAllocatedImage *Create(VulkanDevice *device, const ImageDesc &desc);
-  ~VulkanAllocatedImage() override;
-  bool IsValid() const override;
-  bool SupportsStorage() const override;
-  VkImage NativeImage() const override;
-  VkImageView AttachmentView() const override;
-  VkImageView BindingView() const override;
-
- private:
-  VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc);
-  VulkanDevice *device_;
-  VkImage image_{};
-  Views views_;
-  bool storage_{};
-  VmaAllocation allocation_{};
+  static IVulkanAllocatedImage *Create(IVulkanDevice *device, const ImageDesc &desc);
+  virtual bool IsValid() const = 0;
+  virtual bool SupportsStorage() const = 0;
+  virtual VkImage NativeImage() const = 0;
+  virtual VkImageView AttachmentView() const = 0;
+  virtual VkImageView BindingView() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::vulkan

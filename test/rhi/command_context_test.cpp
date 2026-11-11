@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <chrono>
@@ -6,10 +6,18 @@
 #include <future>
 #include <type_traits>
 
+#include "grassland/rhi/backend/backend_command_context_state.h"
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_device_state.h"
+#include "grassland/rhi/backend/backend_image_state.h"
 #include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_queue_state.h"
+#include "grassland/rhi/backend/backend_timeline_state.h"
 #include "grassland/rhi/backend/backend_window.h"
+#include "grassland/rhi/backend/backend_window_state.h"
 #include "grassland/rhi/rhix/rhix.h"
+
+using grassland::rhi::backend::MatchInterfaces;
 
 namespace grassland::rhix {
 using namespace rhi;
@@ -34,7 +42,10 @@ struct Gate {
   int windows_destroyed{};
 };
 
-class TestWindow final : public backend::Window {
+class TestWindow final : public backend::Object<backend::Window> {
+ public:
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IWindow, backend::Window, rhi::IWindow)
+
  public:
   explicit TestWindow(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
   }
@@ -43,6 +54,7 @@ class TestWindow final : public backend::Window {
     EXPECT_EQ(gate_->devices_destroyed, 0);
     std::lock_guard<std::mutex> lock(gate_->mutex);
     ++gate_->windows_destroyed;
+    DestroyWindow();
   }
 
   ObjectPtr<backend::Image> AcquireNativeFrame() override {
@@ -67,14 +79,28 @@ class TestWindow final : public backend::Window {
 
  private:
   std::shared_ptr<Gate> gate_;
+
+ private:
+  backend::WindowState state_;
+
+  backend::WindowState &StateWindow() override {
+    return state_;
+  }
+
+  const backend::WindowState &StateWindow() const override {
+    return state_;
+  }
 };
 
-class TestImage final : public backend::Image {
+class TestImage final : public backend::Object<backend::Image> {
+ public:
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IImage, backend::Image, rhi::IImage)
+
  public:
   explicit TestImage(std::shared_ptr<Gate> gate, backend::Window *window = nullptr)
-      : backend::Image({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM}),
-        gate_(std::move(gate)),
+      : gate_(std::move(gate)),
         window_(window) {
+    InitializeImage({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM});
   }
 
   ~TestImage() override {
@@ -98,6 +124,17 @@ class TestImage final : public backend::Image {
  private:
   std::shared_ptr<Gate> gate_;
   backend::Window *window_;
+
+ private:
+  backend::ImageState state_;
+
+  backend::ImageState &StateImage() override {
+    return state_;
+  }
+
+  const backend::ImageState &StateImage() const override {
+    return state_;
+  }
 };
 
 class TestResource final : public backend::Object<rhi::IObject> {
@@ -114,9 +151,13 @@ class TestResource final : public backend::Object<rhi::IObject> {
   std::shared_ptr<Gate> gate_;
 };
 
-class TestTimeline final : public backend::Timeline {
+class TestTimeline final : public backend::Object<backend::Timeline> {
  public:
-  TestTimeline(backend::Device *device, std::shared_ptr<Gate> gate) : Timeline(device), gate_(std::move(gate)) {
+  LONGMARCH_RHI_FINAL_QUERY(ITimeline, backend::Timeline, ITimeline)
+
+ public:
+  TestTimeline(backend::Device *device, std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
+    InitializeTimeline(device);
   }
 
   bool GetCompletedValue(uint64_t &value) const override {
@@ -141,14 +182,28 @@ class TestTimeline final : public backend::Timeline {
  private:
   uint64_t value_{};
   std::shared_ptr<Gate> gate_;
+
+ private:
+  backend::TimelineState state_;
+
+  backend::TimelineState &StateTimeline() override {
+    return state_;
+  }
+
+  const backend::TimelineState &StateTimeline() const override {
+    return state_;
+  }
 };
 
-class TestCommandContext final : public backend::CommandContext {
+class TestCommandContext final : public backend::Object<backend::CommandContext> {
+ public:
+  LONGMARCH_RHI_FINAL_QUERY(rhi::ICommandContext, backend::CommandContext, rhi::ICommandContext)
+
  public:
   TestCommandContext(rhi::IQueue *queue, std::shared_ptr<Gate> gate, bool fail_after_submit = false)
-      : backend::CommandContext(static_cast<backend::Queue *>(queue)),
-        gate_(std::move(gate)),
+      : gate_(std::move(gate)),
         fail_after_submit_(fail_after_submit) {
+    InitializeCommandContext(static_cast<backend::Queue *>(queue));
   }
 
   std::vector<ClearValue> recorded_values;
@@ -162,7 +217,7 @@ class TestCommandContext final : public backend::CommandContext {
   bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override {
 #if !defined(NDEBUG)
     if (!image) {
-      recording_failed_ = true;
+      StateCommandContext().recording_failed_ = true;
       return false;
     }
 #endif
@@ -174,10 +229,10 @@ class TestCommandContext final : public backend::CommandContext {
 
   bool CmdPresent(rhi::IWindow *window) override {
 #if !defined(NDEBUG)
-    if (sealed_ || !window)
+    if (StateCommandContext().sealed_ || !window)
       return false;
 #endif
-    if (recording_failed_)
+    if (StateCommandContext().recording_failed_)
       return false;
     ++recorded_presents;
     return true;
@@ -221,9 +276,23 @@ class TestCommandContext final : public backend::CommandContext {
  private:
   std::shared_ptr<Gate> gate_;
   bool fail_after_submit_;
+
+ private:
+  backend::CommandContextState state_;
+
+  backend::CommandContextState &StateCommandContext() override {
+    return state_;
+  }
+
+  const backend::CommandContextState &StateCommandContext() const override {
+    return state_;
+  }
 };
 
-class TestQueue final : public backend::Queue {
+class TestQueue final : public backend::Object<backend::Queue> {
+ public:
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IQueue, backend::Queue, rhi::IQueue)
+
  public:
   TestTimeline *GetTimeline() const override {
     return timeline_.get();
@@ -234,21 +303,37 @@ class TestQueue final : public backend::Queue {
   }
 
   TestQueue(backend::Device *device, QueueType type, std::shared_ptr<Gate> gate)
-      : backend::Queue(device, type),
-        gate_(std::move(gate)),
+      : gate_(std::move(gate)),
         timeline_(std::make_unique<TestTimeline>(device, gate_)) {
+    InitializeQueue(device, type);
   }
 
  private:
   std::shared_ptr<Gate> gate_;
   std::unique_ptr<TestTimeline> timeline_;
+
+ private:
+  backend::QueueState state_;
+
+  backend::QueueState &StateQueue() override {
+    return state_;
+  }
+
+  const backend::QueueState &StateQueue() const override {
+    return state_;
+  }
 };
 
-class TestDevice final : public backend::Device {
+class TestDevice final : public backend::Object<backend::Device> {
  public:
-  explicit TestDevice(std::shared_ptr<Gate> gate) : backend::Device({}, {}), gate_(std::move(gate)) {
+  LONGMARCH_RHI_FINAL_QUERY(rhi::IDevice, backend::Device, rhi::IDevice)
+
+ public:
+  explicit TestDevice(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
+    InitializeDevice({}, {});
+
     for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
-      queues_[type] = ObjectPtr<backend::Queue>::Adopt(new TestQueue(this, type, gate_));
+      StateDevice().queues_[type] = ObjectPtr<backend::Queue>::Adopt(new TestQueue(this, type, gate_));
     StartCollector();
   }
 
@@ -262,6 +347,7 @@ class TestDevice final : public backend::Device {
     gate_->changed.notify_all();
     ShutdownQueues();
     ++gate_->devices_destroyed;
+    DestroyDevice();
   }
 
  private:
@@ -302,6 +388,17 @@ class TestDevice final : public backend::Device {
   }
 
   std::shared_ptr<Gate> gate_;
+
+ private:
+  backend::DeviceState state_;
+
+  backend::DeviceState &StateDevice() override {
+    return state_;
+  }
+
+  const backend::DeviceState &StateDevice() const override {
+    return state_;
+  }
 };
 
 TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {

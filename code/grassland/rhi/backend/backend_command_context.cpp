@@ -2,6 +2,7 @@
 
 #include <system_error>
 
+#include "grassland/rhi/backend/backend_command_context_state.h"
 #include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_window.h"
@@ -13,22 +14,23 @@ bool CommandContext::CmdDrawImGui(IWindow *window, IImage *target) {
   auto image = rhi::QueryInterfacePtr<Image>(target).Get();
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
       (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
-      sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
-    recording_failed_ = true;
+      StateCommandContext().sealed_ || !StateCommandContext().rendering_.color_attachments.empty() ||
+      StateCommandContext().rendering_.depth_stencil.image) {
+    StateCommandContext().recording_failed_ = true;
     ReportError(-1,
                 "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
     return false;
   }
   const auto format = target->GetDesc().format;
   if (!IsColorFormat(format) || IsSignedIntegerFormat(format) || IsUnsignedIntegerFormat(format)) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     ReportError(-1, "CmdDrawImGui requires a non-integer color target.");
     return false;
   }
   if (!RetainResource(target))
     return false;
   if (!native->RecordImGui(this, target, COLOR_SPACE_BT709_LINEAR, 1.0f)) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
   return true;
@@ -39,8 +41,9 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
   auto image = rhi::QueryInterfacePtr<Image>(frame_img).Get();
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
       (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
-      sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
-    recording_failed_ = true;
+      StateCommandContext().sealed_ || !StateCommandContext().rendering_.color_attachments.empty() ||
+      StateCommandContext().rendering_.depth_stencil.image) {
+    StateCommandContext().recording_failed_ = true;
     ReportError(-1,
                 "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");
     return false;
@@ -48,7 +51,7 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
   if (!RetainResource(frame_img))
     return false;
   if (!native->RecordPresentImage(this, frame_img, frame_color_space)) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
   return CmdPresent(window);
@@ -57,51 +60,51 @@ bool CommandContext::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSp
 bool CommandContext::CmdBuildBottomLevelAccelerationStructure(IBottomLevelAccelerationStructure *,
                                                               const std::vector<AccelerationStructureGeometryBuffers> &,
                                                               AccelerationStructureBuildMode) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 
 bool CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *,
                                                            const std::vector<RayTracingInstance> &,
                                                            AccelerationStructureBuildMode) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 
 bool CommandContext::CmdBindRayTracingProgram(IRayTracingProgram *) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 
 bool CommandContext::CmdDispatchRays(uint32_t, uint32_t, uint32_t, IShaderBindingTable *) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 
 bool CommandContext::CmdBindComputeProgram(IComputeProgram *) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 
 bool CommandContext::CmdDispatch(uint32_t, uint32_t, uint32_t) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 
 bool CommandContext::CmdBindGroup(uint32_t, IBindingGroup *) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 
 bool CommandContext::CmdUploadImage(IImage *, const void *, uint64_t) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 
 bool CommandContext::PrepareRendering(const RenderingInfo &info) {
   auto next = info;
   if (next.color_attachments.size() > 8 || (next.color_attachments.empty() && !next.depth_stencil.image)) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
   std::vector<IImage *> images;
@@ -121,7 +124,7 @@ bool CommandContext::PrepareRendering(const RenderingInfo &info) {
   };
   for (auto color : next.color_attachments)
     if (!validate(color.color_attachment, false, color.load_op, color.store_op)) {
-      recording_failed_ = true;
+      StateCommandContext().recording_failed_ = true;
       return false;
     }
   const auto &ds = next.depth_stencil;
@@ -130,32 +133,33 @@ bool CommandContext::PrepareRendering(const RenderingInfo &info) {
        ds.stencil_load_op > ATTACHMENT_LOAD_OP_DISCARD || ds.stencil_store_op < ATTACHMENT_STORE_OP_STORE ||
        ds.stencil_store_op > ATTACHMENT_STORE_OP_DISCARD ||
        !(ds.clear_value.depth >= 0 && ds.clear_value.depth <= 1))) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
-  rendering_ = std::move(next);
+  StateCommandContext().rendering_ = std::move(next);
   return true;
 }
 
 bool CommandContext::RenderingMatches(const IProgram *program) const {
   const auto &desc = program->GetDesc();
-  if (desc.color_formats.size() != rendering_.color_attachments.size())
+  if (desc.color_formats.size() != StateCommandContext().rendering_.color_attachments.size())
     return false;
   for (size_t i = 0; i < desc.color_formats.size(); ++i)
-    if (desc.color_formats[i] != rendering_.color_attachments[i].color_attachment->GetDesc().format)
+    if (desc.color_formats[i] !=
+        StateCommandContext().rendering_.color_attachments[i].color_attachment->GetDesc().format)
       return false;
-  return desc.depth_stencil.format ==
-         (rendering_.depth_stencil.image ? rendering_.depth_stencil.image->GetDesc().format : IMAGE_FORMAT_UNKNOWN);
+  return desc.depth_stencil.format == (StateCommandContext().rendering_.depth_stencil.image
+                                           ? StateCommandContext().rendering_.depth_stencil.image->GetDesc().format
+                                           : IMAGE_FORMAT_UNKNOWN);
 }
 
-CommandContext::CommandContext(Queue *queue) : queue_(queue) {
+void CommandContext::InitializeCommandContext(Queue *queue) {
+  StateCommandContext().queue_ = queue;
 }
-
-CommandContext::~CommandContext() = default;
 
 rhi::ISubmissionToken *CommandContext::Submit(const rhi::SubmitInfo &info) {
   try {
-    return queue_->Submit(ObjectPtr<CommandContext>::Retain(this), info).Detach();
+    return StateCommandContext().queue_->Submit(ObjectPtr<CommandContext>::Retain(this), info).Detach();
   } catch (const std::system_error &error) {
     ReportError(error.code().value(), error.what());
   }
@@ -163,78 +167,78 @@ rhi::ISubmissionToken *CommandContext::Submit(const rhi::SubmitInfo &info) {
 }
 
 void CommandContext::BindDownloads(SubmissionToken *submission) {
-  for (const auto &token : downloads_)
+  for (const auto &token : StateCommandContext().downloads_)
     token->BindSubmission(submission);
 }
 
 void CommandContext::ReleaseDownloads() {
-  downloads_.clear();
+  StateCommandContext().downloads_.clear();
 }
 
 IDownloadToken *CommandContext::RegisterDownload(ObjectPtr<DownloadToken> token) {
-  downloads_.push_back(token);
+  StateCommandContext().downloads_.push_back(token);
   return token.Detach();
 }
 
 IDownloadToken *CommandContext::CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return nullptr;
 }
 
 IDownloadToken *CommandContext::CmdDownloadImage(IImage *, const ImageDownloadRegion &) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return nullptr;
 }
 
 bool CommandContext::RetainResource(rhi::IObject *resource) {
 #if !defined(NDEBUG)
-  if (sealed_)
+  if (StateCommandContext().sealed_)
     return false;
 #endif
-  if (recording_failed_)
+  if (StateCommandContext().recording_failed_)
     return false;
-  if (resources_.find(resource) != resources_.end())
+  if (StateCommandContext().resources_.find(resource) != StateCommandContext().resources_.end())
     return true;
-  resources_.emplace(resource, ObjectPtr<rhi::IObject>::Retain(resource));
+  StateCommandContext().resources_.emplace(resource, ObjectPtr<rhi::IObject>::Retain(resource));
 
   return true;
 }
 
 bool CommandContext::Seal() {
-  if (recording_failed_)
+  if (StateCommandContext().recording_failed_)
     return false;
 #if !defined(NDEBUG)
-  if (sealed_) {
+  if (StateCommandContext().sealed_) {
     ReportError(-1, "Cannot submit a command context twice.");
     return false;
   }
 #endif
-  sealed_ = true;
+  StateCommandContext().sealed_ = true;
   if (!EndRecording()) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
   return true;
 }
 
 Queue *CommandContext::OwnerQueue() const {
-  return queue_;
+  return StateCommandContext().queue_;
 }
 
 const void *CommandContext::DeviceIdentity() const {
-  return queue_->Owner();
+  return StateCommandContext().queue_->Owner();
 }
 
 void CommandContext::MarkSubmitted() {
-  submitted_ = true;
+  StateCommandContext().submitted_ = true;
 }
 
 bool CommandContext::WasSubmitted() const {
-  return submitted_;
+  return StateCommandContext().submitted_;
 }
 
 bool CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
@@ -244,49 +248,49 @@ bool CommandContext::CmdCopyBuffer(IBuffer *source,
                                    IBuffer *destination,
                                    uint64_t destination_offset,
                                    uint64_t size) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
 
 bool CommandContext::CmdBindProgram(IProgram *program) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
 
 bool CommandContext::CmdBeginRendering(const RenderingInfo &info) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
 
 bool CommandContext::CmdEndRendering() {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing is not implemented for this backend.");
   return false;
 }
 
 bool CommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
 
 bool CommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
 
 bool CommandContext::CmdSetViewport(const Viewport &viewport) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
 
 bool CommandContext::CmdSetScissor(const Scissor &scissor) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
@@ -295,7 +299,7 @@ bool CommandContext::CmdDraw(uint32_t vertex_count,
                              uint32_t instance_count,
                              uint32_t first_vertex,
                              uint32_t first_instance) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
@@ -305,7 +309,7 @@ bool CommandContext::CmdDrawIndexed(uint32_t index_count,
                                     uint32_t first_index,
                                     int32_t vertex_offset,
                                     uint32_t first_instance) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
   return false;
 }
@@ -313,14 +317,19 @@ bool CommandContext::CmdDrawIndexed(uint32_t index_count,
 
 namespace grassland::rhi::backend {
 bool CommandContext::CmdQueryCompactedSize(IAccelerationStructure *) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 
 bool CommandContext::CmdCompactAccelerationStructure(IAccelerationStructure *, IAccelerationStructure *) {
-  recording_failed_ = true;
+  StateCommandContext().recording_failed_ = true;
   return false;
 }
 }  // namespace grassland::rhi::backend
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::CommandContext, "4a13943e-6f88-4739-91c4-0eb6b6a04a0c")
+
+namespace grassland::rhi::backend {
+CommandContextState::CommandContextState() = default;
+CommandContextState::~CommandContextState() = default;
+}  // namespace grassland::rhi::backend

@@ -1,17 +1,20 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_core.h"
 
+#include "grassland/rhi/backend/vulkan/vulkan_core_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_device_impl.h"
 #include "grassland/util/log.h"
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanCore::VulkanCore() = default;
+VulkanCoreImpl::VulkanCoreImpl() {
+}
 
-VkInstance VulkanCore::Instance() const {
+VkInstance VulkanCoreImpl::Instance() const {
   return instance_;
 }
 
-VulkanCore *VulkanCore::CreateVulkanCore(const CoreDesc &desc) {
+IVulkanCore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
   uint32_t loader_version = VK_API_VERSION_1_0;
   const auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
       vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
@@ -92,7 +95,7 @@ VulkanCore *VulkanCore::CreateVulkanCore(const CoreDesc &desc) {
   create.pApplicationInfo = &application;
   create.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   create.ppEnabledExtensionNames = extensions.data();
-  auto core = std::unique_ptr<VulkanCore>(new VulkanCore());
+  auto core = std::unique_ptr<VulkanCoreImpl>(new VulkanCoreImpl());
   if (!Check(vkCreateInstance(&create, nullptr, &core->instance_), "vkCreateInstance"))
     return {};
   if (desc.enable_debug) {
@@ -152,7 +155,7 @@ VulkanCore *VulkanCore::CreateVulkanCore(const CoreDesc &desc) {
   return core.release();
 }
 
-VulkanCore::~VulkanCore() {
+VulkanCoreImpl::~VulkanCoreImpl() {
   if (debug_messenger_) {
     auto destroy_debug = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
         vkGetInstanceProcAddr(instance_, "vkDestroyDebugUtilsMessengerEXT"));
@@ -162,14 +165,14 @@ VulkanCore::~VulkanCore() {
     vkDestroyInstance(instance_, nullptr);
 }
 
-std::vector<PhysicalDevice> VulkanCore::GetPhysicalDevices() const {
+std::vector<PhysicalDevice> VulkanCoreImpl::GetPhysicalDevices() const {
   std::vector<PhysicalDevice> devices;
   for (const auto &adapter : adapters_)
     devices.push_back(adapter.info);
   return devices;
 }
 
-rhi::IDevice *VulkanCore::CreateDevice(int32_t device_idx) {
+rhi::IDevice *VulkanCoreImpl::CreateDevice(int32_t device_idx) {
 #if !defined(NDEBUG)
   if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
     ReportError(-1, "Physical device ID is out of range.");
@@ -177,9 +180,15 @@ rhi::IDevice *VulkanCore::CreateDevice(int32_t device_idx) {
   }
 #endif
   const auto &adapter = adapters_[device_idx];
-  return VulkanDevice::CreateVulkanDevice(adapter.info, this, adapter.native, adapter.api_version);
+  return IVulkanDevice::CreateVulkanDevice(adapter.info, this, adapter.native, adapter.api_version);
 }
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanCore, "38b5aac6-db8d-4fe0-86ac-ed06f0b3c970")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanCore, "38b5aac6-db8d-4fe0-86ac-ed06f0b3c970")
+
+namespace grassland::rhi::backend::vulkan {
+IVulkanCore *IVulkanCore::CreateVulkanCore(const CoreDesc &desc) {
+  return VulkanCoreImpl::CreateVulkanCore(desc);
+}
+}  // namespace grassland::rhi::backend::vulkan

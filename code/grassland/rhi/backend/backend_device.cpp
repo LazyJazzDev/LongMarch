@@ -4,6 +4,7 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_device_state.h"
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_shader.h"
 
@@ -24,7 +25,10 @@ IRayTracingProgram *Device::CreateRayTracingProgram(const RayTracingProgramDesc 
   return nullptr;
 }
 
-Device::Device(PhysicalDevice info, Core *core, BackendAPI api) : api_(api), core_(core), info_(std::move(info)) {
+void Device::InitializeDevice(PhysicalDevice info, Core *core, BackendAPI api) {
+  StateDevice().api_ = api;
+  StateDevice().core_ = core;
+  StateDevice().info_ = std::move(info);
 }
 
 rhi::IImage *Device::CreateImage(const ImageDesc &) {
@@ -51,7 +55,7 @@ rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
   if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
       desc.stage > SHADER_STAGE_CALLABLE)
     return nullptr;
-  return Shader::Create(desc, api_);
+  return Shader::Create(desc, StateDevice().api_);
 }
 
 ISampler *Device::CreateSampler(const SamplerDesc &) {
@@ -64,24 +68,24 @@ IBindingGroup *Device::CreateBindingGroup(const BindingLayoutDesc &) {
   return nullptr;
 }
 
-Device::~Device() {
+void Device::DestroyDevice() {
   ShutdownQueues();
 }
 
 std::string Device::Name() const {
-  return info_.name;
+  return StateDevice().info_.name;
 }
 
 bool Device::SupportRayTracingPipeline() const {
-  return info_.ray_tracing_pipeline_feature;
+  return StateDevice().info_.ray_tracing_pipeline_feature;
 }
 
 bool Device::SupportRayQuery() const {
-  return info_.ray_query_feature;
+  return StateDevice().info_.ray_query_feature;
 }
 
 bool Device::SupportGeometryShader() const {
-  return info_.geometry_shader_feature;
+  return StateDevice().info_.geometry_shader_feature;
 }
 
 rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &) {
@@ -92,19 +96,19 @@ rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &) {
 rhi::IQueue *Device::GetQueue(QueueType type) {
   if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
     return nullptr;
-  return ObjectPtr<Queue>::Retain(queues_[type].Get()).Detach();
+  return ObjectPtr<Queue>::Retain(StateDevice().queues_[type].Get()).Detach();
 }
 
 const PhysicalDevice &Device::GetPhysicalDevice() const noexcept {
-  return info_;
+  return StateDevice().info_;
 }
 
 Core *Device::OwnerCore() const {
-  return core_;
+  return StateDevice().core_;
 }
 
 void Device::StartCollector() {
-  collector_ = std::thread([this] { Collect(); });
+  StateDevice().collector_ = std::thread([this] { Collect(); });
 }
 
 bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
@@ -130,11 +134,11 @@ bool Device::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
 
 void Device::Collect() {
   std::vector<Event> next;
-  next.reserve(queues_.size());
+  next.reserve(StateDevice().queues_.size());
   for (;;) {
     next.clear();
     bool empty = true;
-    for (const auto &queue : queues_) {
+    for (const auto &queue : StateDevice().queues_) {
       if (!queue)
         continue;
       uint64_t completed = 0;
@@ -144,20 +148,25 @@ void Device::Collect() {
       if (!queue->CollectCompleted(completed, timeline_valid))
         empty = false;
     }
-    if (stopping_ && empty)
+    if (StateDevice().stopping_ && empty)
       return;
     WaitForProgress(next);
   }
 }
 
 void Device::ShutdownQueues() {
-  if (!collector_.joinable())
+  if (!StateDevice().collector_.joinable())
     return;
-  stopping_ = true;
+  StateDevice().stopping_ = true;
   InterruptCollector();
-  collector_.join();
+  StateDevice().collector_.join();
 }
 
 }  // namespace grassland::rhi::backend
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::Device, "6d6cc71b-9a19-4b0d-ac68-84d86e402f5d")
+
+namespace grassland::rhi::backend {
+DeviceState::DeviceState() = default;
+DeviceState::~DeviceState() = default;
+}  // namespace grassland::rhi::backend

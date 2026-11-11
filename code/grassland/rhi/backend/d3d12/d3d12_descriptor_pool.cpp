@@ -31,7 +31,9 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3D12DescriptorPool::Lease::CPU(uint32_t index) cons
   return result;
 }
 
-D3D12DescriptorPool::D3D12DescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t page_capacity)
+D3D12DescriptorPool::D3D12DescriptorPool(::ID3D12Device *device,
+                                         D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                         uint32_t page_capacity)
     : device_(device),
       type_(type),
       page_capacity_(page_capacity),

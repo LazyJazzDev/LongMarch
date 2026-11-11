@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanScratchPool::VulkanScratchPool(VulkanDevice *device) : device_(device) {
+VulkanScratchPool::VulkanScratchPool(IVulkanDevice *device) : device_(device) {
 }
 
 ObjectPtr<IVulkanAllocatedBuffer> VulkanScratchPool::Acquire(uint64_t size) {

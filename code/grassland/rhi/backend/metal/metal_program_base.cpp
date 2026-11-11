@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
+#include "grassland/rhi/backend/metal/metal_program_base_state.h"
 
 namespace grassland::rhi::backend::metal {
 // Both backends consume the same DX-layout SPIR-V. Argument IDs come from the
@@ -79,27 +80,27 @@ static bool CompileMetal(const IShader *shader,
   }
 }
 
-MetalProgramBase::MetalProgramBase(MTL::Device *device, const PipelineLayoutDesc &layout)
-    : native_device_(device),
-      layout_(layout) {
+void MetalProgramBase::InitializeMetalProgramBase(MTL::Device *device, const PipelineLayoutDesc &layout) {
+  StateMetalProgramBase().native_device_ = device;
+  StateMetalProgramBase().layout_ = &(layout);
 }
 
 const PipelineLayoutDesc &MetalProgramBase::BindingLayout() const {
-  return layout_;
+  return StateMetalProgramBase().layout_;
 }
 
 NS::SharedPtr<MTL::Function> MetalProgramBase::CompileFunction(const IShader *shader,
                                                                const std::vector<InputAttributeDesc> &attributes,
                                                                std::array<uint32_t, 3> *threads) const {
-  for (const auto &group : layout_.groups)
-    if (!ValidateMetalBindingLayout(native_device_, group))
+  for (const auto &group : (*StateMetalProgramBase().layout_).groups)
+    if (!ValidateMetalBindingLayout(StateMetalProgramBase().native_device_, group))
       return {};
   std::string code, entry;
-  if (!CompileMetal(shader, layout_, attributes, code, entry, threads))
+  if (!CompileMetal(shader, StateMetalProgramBase().layout_, attributes, code, entry, threads))
     return {};
   NS::Error *error = nullptr;
-  auto library = NS::TransferPtr(
-      native_device_->newLibrary(NS::String::string(code.c_str(), NS::UTF8StringEncoding), nullptr, &error));
+  auto library = NS::TransferPtr(StateMetalProgramBase().native_device_->newLibrary(
+      NS::String::string(code.c_str(), NS::UTF8StringEncoding), nullptr, &error));
   if (!library) {
     ReportMetalError(error, "Metal library compilation failed");
     return {};
@@ -112,3 +113,8 @@ NS::SharedPtr<MTL::Function> MetalProgramBase::CompileFunction(const IShader *sh
 }  // namespace grassland::rhi::backend::metal
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalProgramBase, "48d78e4c-57e0-4ad1-9dc1-254d12006fc6")
+
+namespace grassland::rhi::backend::metal {
+MetalProgramBaseState::MetalProgramBaseState() = default;
+MetalProgramBaseState::~MetalProgramBaseState() = default;
+}  // namespace grassland::rhi::backend::metal

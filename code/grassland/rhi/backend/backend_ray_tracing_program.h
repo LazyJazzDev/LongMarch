@@ -11,11 +11,13 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::RayTracingProgram)
 namespace grassland::rhi::backend {
 class Device;
 
-class RayTracingProgram : public Object<IRayTracingProgram> {
- public:
-  LONGMARCH_RHI_QUERY(RayTracingProgram, Object<IRayTracingProgram>)
+struct RayTracingProgramState;
 
-  RayTracingProgram(Device *device, const RayTracingProgramDesc &desc);
+class RayTracingProgram : public IRayTracingProgram {
+ protected:
+  void InitializeRayTracingProgram(Device *device, const RayTracingProgramDesc &desc);
+
+ public:
   const RayTracingProgramDesc &GetDesc() const override;
   Device *Owner() const;
 
@@ -23,10 +25,7 @@ class RayTracingProgram : public Object<IRayTracingProgram> {
   bool ValidateLayout() const;
   bool ValidateShaderBindingTable(const ShaderBindingTableDesc &desc) const;
   ShaderBindingTableDesc DefaultShaderBindingTableDesc() const;
-  Device *device_;
-  RayTracingProgramDesc desc_;
-
- private:
-  std::vector<ObjectPtr<IShader>> shaders_;
+  virtual RayTracingProgramState &StateRayTracingProgram() = 0;
+  virtual const RayTracingProgramState &StateRayTracingProgram() const = 0;
 };
 }  // namespace grassland::rhi::backend

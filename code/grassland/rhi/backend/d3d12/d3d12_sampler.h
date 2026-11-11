@@ -2,32 +2,21 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Sampler;
+class ID3D12Sampler;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12Sampler)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12Sampler)
 #include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Device;
+class ID3D12Device;
 
-class D3D12Sampler final : public Sampler {
+class ID3D12Sampler : public Sampler {
  public:
-  LONGMARCH_RHI_QUERY(D3D12Sampler, Sampler)
-
-  static D3D12Sampler *Create(D3D12Device *device, const SamplerDesc &desc);
-
-  const D3D12_SAMPLER_DESC &NativeDesc() const {
-    return native_desc_;
-  }
-
-  D3D12_CPU_DESCRIPTOR_HANDLE Descriptor() const {
-    return descriptor_->CPU();
-  }
-
- private:
-  D3D12Sampler(D3D12Device *device, const SamplerDesc &desc);
-  D3D12_SAMPLER_DESC native_desc_{};
-  ObjectPtr<D3D12DescriptorPool::Lease> descriptor_;
+  static ID3D12Sampler *Create(ID3D12Device *device, const SamplerDesc &desc);
+  virtual const D3D12_SAMPLER_DESC &NativeDesc() const = 0;
+  virtual D3D12_CPU_DESCRIPTOR_HANDLE Descriptor() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::d3d12

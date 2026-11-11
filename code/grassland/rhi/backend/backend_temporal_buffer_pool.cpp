@@ -119,14 +119,14 @@ void TemporalBufferPool<DeviceType, BufferType, LeaseType>::Clear() {
   }
 }
 #if defined(LONGMARCH_D3D12_ENABLED)
-template class TemporalBufferPool<d3d12::D3D12Device, d3d12::ID3D12AllocatedBuffer, d3d12::ID3D12TemporalBufferLease>;
+template class TemporalBufferPool<d3d12::ID3D12Device, d3d12::ID3D12AllocatedBuffer, d3d12::ID3D12TemporalBufferLease>;
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
-template class TemporalBufferPool<vulkan::VulkanDevice,
+template class TemporalBufferPool<vulkan::IVulkanDevice,
                                   vulkan::IVulkanAllocatedBuffer,
                                   vulkan::IVulkanTemporalBufferLease>;
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
-template class TemporalBufferPool<metal::MetalDevice, metal::IMetalAllocatedBuffer, metal::IMetalTemporalBufferLease>;
+template class TemporalBufferPool<metal::IMetalDevice, metal::IMetalAllocatedBuffer, metal::IMetalTemporalBufferLease>;
 #endif
 }  // namespace grassland::rhi::backend

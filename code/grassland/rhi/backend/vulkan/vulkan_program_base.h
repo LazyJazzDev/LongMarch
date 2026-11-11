@@ -10,24 +10,18 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanProgramBase)
 
 namespace grassland::rhi::backend::vulkan {
 // Layout ownership only; the owning Device must outlive the Program.
+struct VulkanProgramBaseState;
+
 class VulkanProgramBase : public IObject {
  public:
   VkPipelineLayout NativeLayout() const;
 
  protected:
-  VkDevice LayoutDevice() const {
-    return layout_device_;
-  }
-
-  explicit VulkanProgramBase(VkDevice device);
-  ~VulkanProgramBase();
-  VulkanProgramBase(const VulkanProgramBase &) = delete;
-  VulkanProgramBase &operator=(const VulkanProgramBase &) = delete;
+  VkDevice LayoutDevice() const;
+  void InitializeVulkanProgramBase(VkDevice device);
+  void DestroyVulkanProgramBase();
   bool CreateLayout(const PipelineLayoutDesc &desc);
-
- private:
-  VkDevice layout_device_;
-  std::vector<VkDescriptorSetLayout> set_layouts_;
-  VkPipelineLayout layout_{};
+  virtual VulkanProgramBaseState &StateVulkanProgramBase() = 0;
+  virtual const VulkanProgramBaseState &StateVulkanProgramBase() const = 0;
 };
 }  // namespace grassland::rhi::backend::vulkan

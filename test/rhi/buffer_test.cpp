@@ -28,9 +28,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
   if (api == BACKEND_API_METAL) {
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto owner = static_cast<MetalDevice *>(device);
+    auto owner = static_cast<IMetalDevice *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<MetalQueue *>(queue_owner.Get());
+    auto native_queue = static_cast<IMetalQueue *>(queue_owner.Get());
     auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(sizeof(output), MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
     std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
@@ -49,9 +49,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
-    auto owner = static_cast<D3D12Device *>(device);
+    auto owner = static_cast<ID3D12Device *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<D3D12Queue *>(queue_owner.Get());
+    auto native_queue = static_cast<ID3D12Queue *>(queue_owner.Get());
     auto source = static_cast<ID3D12Buffer *>(buffer)->NativeBuffer();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
@@ -101,9 +101,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (api == BACKEND_API_VULKAN) {
     using namespace backend::vulkan;
-    auto owner = static_cast<VulkanDevice *>(device);
+    auto owner = static_cast<IVulkanDevice *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<VulkanQueue *>(queue_owner.Get());
+    auto native_queue = static_cast<IVulkanQueue *>(queue_owner.Get());
     auto native = owner->NativeDevice();
     auto source = static_cast<IVulkanBuffer *>(buffer)->NativeBuffer();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -250,15 +250,15 @@ TEST_P(RhiBuffer, AbandonedUploadsReturnStorageAndLeasesDoNotOverlap) {
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
-    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->UploadPool());
+    check(static_cast<backend::d3d12::ID3D12Device *>(device.Get())->UploadPool());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN)
-    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
+    check(static_cast<backend::vulkan::IVulkanDevice *>(device.Get())->UploadPool());
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL)
-    check(static_cast<backend::metal::MetalDevice *>(device.Get())->UploadPool());
+    check(static_cast<backend::metal::IMetalDevice *>(device.Get())->UploadPool());
 #endif
 }
 
@@ -317,15 +317,15 @@ TEST_P(RhiBuffer, UploadClassesReuseIndependentlyAndReleaseExpiredPeakCapacity) 
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
-    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->UploadPool());
+    check(static_cast<backend::d3d12::ID3D12Device *>(device.Get())->UploadPool());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN)
-    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
+    check(static_cast<backend::vulkan::IVulkanDevice *>(device.Get())->UploadPool());
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL)
-    check(static_cast<backend::metal::MetalDevice *>(device.Get())->UploadPool());
+    check(static_cast<backend::metal::IMetalDevice *>(device.Get())->UploadPool());
 #endif
 }
 
@@ -379,15 +379,15 @@ TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) 
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
-    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->UploadPool());
+    check(static_cast<backend::d3d12::ID3D12Device *>(device.Get())->UploadPool());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN)
-    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
+    check(static_cast<backend::vulkan::IVulkanDevice *>(device.Get())->UploadPool());
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL)
-    check(static_cast<backend::metal::MetalDevice *>(device.Get())->UploadPool());
+    check(static_cast<backend::metal::IMetalDevice *>(device.Get())->UploadPool());
 #endif
 }
 

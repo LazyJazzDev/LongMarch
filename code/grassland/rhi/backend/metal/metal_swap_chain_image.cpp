@@ -1,20 +1,21 @@
 ﻿#include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 
+#include "grassland/rhi/backend/metal/metal_swap_chain_image_impl.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
 
 namespace grassland::rhi::backend::metal {
 
-MetalSwapChainImage::MetalSwapChainImage(ImageDesc desc,
-                                         MetalWindow *window,
-                                         uint64_t generation,
-                                         CA::MetalDrawable *drawable)
-    : MetalImage(desc, window->DeviceIdentity(), drawable->texture(), window->OwnerQueue()),
-      window_(window),
+MetalSwapChainImageImpl::MetalSwapChainImageImpl(ImageDesc desc,
+                                                 IMetalWindow *window,
+                                                 uint64_t generation,
+                                                 CA::MetalDrawable *drawable)
+    : window_(window),
       generation_(generation),
       drawable_(NS::RetainPtr(drawable)) {
+  InitializeMetalImage(desc, window->DeviceIdentity(), drawable->texture(), window->OwnerQueue());
 }
 
-bool MetalSwapChainImage::IsValid() const {
+bool MetalSwapChainImageImpl::IsValid() const {
 #if !defined(NDEBUG)
   if (present_requested_)
     return false;
@@ -22,11 +23,11 @@ bool MetalSwapChainImage::IsValid() const {
   return window_->IsFrameValid(generation_);
 }
 
-CA::MetalDrawable *MetalSwapChainImage::NativeDrawable() const {
+CA::MetalDrawable *MetalSwapChainImageImpl::NativeDrawable() const {
   return drawable_.get();
 }
 
-void MetalSwapChainImage::DidPresent() {
+void MetalSwapChainImageImpl::DidPresent() {
 #if !defined(NDEBUG)
   present_requested_ = true;
 #endif
@@ -37,4 +38,13 @@ void MetalSwapChainImage::DidPresent() {
 
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalSwapChainImage, "e121e257-92bc-4748-bbe0-2eff7a5af162")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalSwapChainImage, "e121e257-92bc-4748-bbe0-2eff7a5af162")
+
+namespace grassland::rhi::backend::metal {
+IMetalSwapChainImage *IMetalSwapChainImage::Create(ImageDesc desc,
+                                                   IMetalWindow *window,
+                                                   uint64_t generation,
+                                                   CA::MetalDrawable *drawable) {
+  return new MetalSwapChainImageImpl(desc, window, generation, drawable);
+}
+}  // namespace grassland::rhi::backend::metal

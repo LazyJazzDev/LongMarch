@@ -4,47 +4,50 @@
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program_impl.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanDevice *device, const RayTracingProgramDesc &desc)
-    : RayTracingProgram(device, desc),
-      VulkanProgramBase(device->NativeDevice()) {
+VulkanRayTracingProgramImpl::VulkanRayTracingProgramImpl(IVulkanDevice *device, const RayTracingProgramDesc &desc) {
+  InitializeRayTracingProgram(device, desc);
+  InitializeVulkanProgramBase(device->NativeDevice());
 }
 
-VulkanRayTracingProgram::~VulkanRayTracingProgram() {
+VulkanRayTracingProgramImpl::~VulkanRayTracingProgramImpl() {
   if (pipeline_)
     vkDestroyPipeline(LayoutDevice(), pipeline_, nullptr);
+
+  DestroyVulkanProgramBase();
 }
 
-VkPipeline VulkanRayTracingProgram::NativePipeline() const {
+VkPipeline VulkanRayTracingProgramImpl::NativePipeline() const {
   return pipeline_;
 }
 
-const ShaderBindingTable *VulkanRayTracingProgram::DefaultShaderBindingTable() const {
+const ShaderBindingTable *VulkanRayTracingProgramImpl::DefaultShaderBindingTable() const {
   return table_.Get();
 }
 
-IShaderBindingTable *VulkanRayTracingProgram::CreateShaderBindingTable(const ShaderBindingTableDesc &desc) {
+IShaderBindingTable *VulkanRayTracingProgramImpl::CreateShaderBindingTable(const ShaderBindingTableDesc &desc) {
   if (!ValidateShaderBindingTable(desc))
     return nullptr;
   return BuildShaderBindingTable(desc);
 }
 
-VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_device,
-                                                         const RayTracingProgramDesc &desc) {
-  auto object = std::unique_ptr<VulkanRayTracingProgram>(new VulkanRayTracingProgram(owner_device, desc));
+IVulkanRayTracingProgram *VulkanRayTracingProgramImpl::Create(IVulkanDevice *owner_device,
+                                                              const RayTracingProgramDesc &desc) {
+  auto object = std::unique_ptr<VulkanRayTracingProgramImpl>(new VulkanRayTracingProgramImpl(owner_device, desc));
   auto device = owner_device->NativeDevice();
-  if (!object->ValidateLayout() ||
-      !ValidatePipelineBindings(owner_device->NativePhysicalDevice(), object->desc_.pipeline_layout))
+  if (!object->ValidateLayout() || !ValidatePipelineBindings(owner_device->NativePhysicalDevice(),
+                                                             object->StateRayTracingProgram().desc_.pipeline_layout))
     return nullptr;
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR properties{
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
   VkPhysicalDeviceProperties2 physical{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &properties};
   vkGetPhysicalDeviceProperties2(owner_device->NativePhysicalDevice(), &physical);
-  if (object->desc_.max_recursion_depth > properties.maxRayRecursionDepth ||
-      object->desc_.max_attribute_size > properties.maxRayHitAttributeSize)
+  if (object->StateRayTracingProgram().desc_.max_recursion_depth > properties.maxRayRecursionDepth ||
+      object->StateRayTracingProgram().desc_.max_attribute_size > properties.maxRayHitAttributeSize)
     return nullptr;
-  if (!object->CreateLayout(object->desc_.pipeline_layout))
+  if (!object->CreateLayout(object->StateRayTracingProgram().desc_.pipeline_layout))
     return nullptr;
   std::vector<IShader *> shaders;
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups;
@@ -60,10 +63,10 @@ VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_dev
     shaders.push_back(shader);
     groups.push_back(value);
   };
-  general(object->desc_.ray_generation);
-  for (auto shader : object->desc_.miss_shaders)
+  general(object->StateRayTracingProgram().desc_.ray_generation);
+  for (auto shader : object->StateRayTracingProgram().desc_.miss_shaders)
     general(shader);
-  for (auto hit : object->desc_.hit_groups) {
+  for (auto hit : object->StateRayTracingProgram().desc_.hit_groups) {
     auto value = group();
     value.type = hit.intersection ? VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR
                                   : VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
@@ -81,12 +84,13 @@ VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_dev
     }
     groups.push_back(value);
   }
-  for (auto shader : object->desc_.callable_shaders)
+  for (auto shader : object->StateRayTracingProgram().desc_.callable_shaders)
     general(shader);
   std::vector<std::vector<uint8_t>> code(shaders.size());
-  auto header = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_VULKAN);
+  auto header = ShaderMacroHeader(object->StateRayTracingProgram().desc_.pipeline_layout, BACKEND_API_VULKAN);
   for (size_t i = 0; i < shaders.size(); ++i)
-    if (!CompileSlang(shaders[i], header, BACKEND_API_VULKAN, code[i], &object->desc_.pipeline_layout))
+    if (!CompileSlang(shaders[i], header, BACKEND_API_VULKAN, code[i],
+                      &object->StateRayTracingProgram().desc_.pipeline_layout))
       return nullptr;
   std::vector<VkPipelineShaderStageCreateInfo> stages(shaders.size());
   constexpr VkShaderStageFlagBits native_stages[] = {
@@ -114,7 +118,7 @@ VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_dev
     create.pStages = stages.data();
     create.groupCount = uint32_t(groups.size());
     create.pGroups = groups.data();
-    create.maxPipelineRayRecursionDepth = object->desc_.max_recursion_depth;
+    create.maxPipelineRayRecursionDepth = object->StateRayTracingProgram().desc_.max_recursion_depth;
     create.layout = object->NativeLayout();
     auto command = owner_device->Procedures().CreateRayTracingPipelinesKHR;
     success = Check(command(device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &create, nullptr, &pipeline),
@@ -138,8 +142,9 @@ VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_dev
   if (!Check(get_handles(device, pipeline, 0, uint32_t(groups.size()), handles.size(), handles.data()),
              "Get ray tracing shader handles"))
     return nullptr;
-  const size_t counts[] = {1, object->desc_.miss_shaders.size(), object->desc_.hit_groups.size(),
-                           object->desc_.callable_shaders.size()};
+  const size_t counts[] = {1, object->StateRayTracingProgram().desc_.miss_shaders.size(),
+                           object->StateRayTracingProgram().desc_.hit_groups.size(),
+                           object->StateRayTracingProgram().desc_.callable_shaders.size()};
   size_t offset = 0;
   for (size_t t = 0; t < 4; ++t) {
     auto size = counts[t] * object->handle_size_;
@@ -153,14 +158,14 @@ VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_dev
   return object.release();
 }
 
-ShaderBindingTable *VulkanRayTracingProgram::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
+ShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
   const std::vector<uint32_t> raygen{0};
   const std::vector<uint32_t> *indices[] = {&raygen, &desc.miss_shader_indices, &desc.hit_group_indices,
                                             &desc.callable_shader_indices};
   uint64_t capacity = alignment_;
   for (auto table : indices)
     capacity += table->size() * stride_ + alignment_;
-  auto owner = rhi::QueryInterfacePtr<VulkanDevice>(device_).Get();
+  auto owner = rhi::QueryInterfacePtr<IVulkanDevice>(StateRayTracingProgram().device_).Get();
   auto buffer = ObjectPtr<IVulkanAllocatedBuffer>::Adopt(IVulkanAllocatedBuffer::Create(owner, {capacity}, true));
   if (!buffer)
     return nullptr;
@@ -187,4 +192,10 @@ ShaderBindingTable *VulkanRayTracingProgram::BuildShaderBindingTable(const Shade
 
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanRayTracingProgram, "dbbe212c-3234-418b-b6b0-6676da637f09")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanRayTracingProgram, "dbbe212c-3234-418b-b6b0-6676da637f09")
+
+namespace grassland::rhi::backend::vulkan {
+IVulkanRayTracingProgram *IVulkanRayTracingProgram::Create(IVulkanDevice *device, const RayTracingProgramDesc &desc) {
+  return VulkanRayTracingProgramImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::vulkan

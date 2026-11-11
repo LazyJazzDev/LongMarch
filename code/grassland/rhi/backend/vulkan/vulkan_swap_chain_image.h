@@ -2,32 +2,26 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanSwapChainImage;
+class IVulkanSwapChainImage;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanSwapChainImage)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanSwapChainImage)
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
 
-class VulkanWindow;
+class IVulkanWindow;
 
-class VulkanSwapChainImage final : public VulkanImage {
+class IVulkanSwapChainImage : public VulkanImage {
  public:
-  LONGMARCH_RHI_QUERY(VulkanSwapChainImage, VulkanImage)
-
-  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image, VkImageView attachment);
-  ~VulkanSwapChainImage() override;
-  bool IsValid() const override;
-  VkImage NativeImage() const override;
-  VkImageView AttachmentView() const override;
-  VkImageView BindingView() const override;
-  VulkanWindow *Owner() const;
-
- private:
-  VulkanWindow *window_;
-  VkImage image_{};
-  VkImageView attachment_{};
+  static IVulkanSwapChainImage *Create(ImageDesc desc, IVulkanWindow *window, VkImage image, VkImageView attachment);
+  virtual bool IsValid() const = 0;
+  virtual VkImage NativeImage() const = 0;
+  virtual VkImageView AttachmentView() const = 0;
+  virtual VkImageView BindingView() const = 0;
+  virtual IVulkanWindow *Owner() const = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::vulkan

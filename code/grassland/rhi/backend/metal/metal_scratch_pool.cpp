@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-MetalScratchPool::MetalScratchPool(MetalDevice *device) : device_(device) {
+MetalScratchPool::MetalScratchPool(IMetalDevice *device) : device_(device) {
 }
 
 ObjectPtr<IMetalAllocatedBuffer> MetalScratchPool::Acquire(uint64_t size) {

@@ -45,9 +45,9 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
   if (api == BACKEND_API_METAL) {
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto owner = static_cast<MetalDevice *>(device);
+    auto owner = static_cast<IMetalDevice *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<MetalQueue *>(queue_owner.Get());
+    auto native_queue = static_cast<IMetalQueue *>(queue_owner.Get());
     auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
     std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
@@ -67,9 +67,9 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
-    auto owner = static_cast<D3D12Device *>(device);
+    auto owner = static_cast<ID3D12Device *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<D3D12Queue *>(queue_owner.Get());
+    auto native_queue = static_cast<ID3D12Queue *>(queue_owner.Get());
     auto source = static_cast<D3D12Image *>(image)->NativeImage();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
@@ -127,9 +127,9 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (api == BACKEND_API_VULKAN) {
     using namespace backend::vulkan;
-    auto owner = static_cast<VulkanDevice *>(device);
+    auto owner = static_cast<IVulkanDevice *>(device);
     ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<VulkanQueue *>(queue_owner.Get());
+    auto native_queue = static_cast<IVulkanQueue *>(queue_owner.Get());
     auto native = owner->NativeDevice();
     auto source = static_cast<VulkanImage *>(image)->NativeImage();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -225,7 +225,7 @@ class RhiImage : public testing::TestWithParam<BackendAPI> {
   void Track(IDevice *device) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12)
-      ASSERT_TRUE(SUCCEEDED(static_cast<backend::d3d12::D3D12Device *>(device)->NativeDevice()->QueryInterface(
+      ASSERT_TRUE(SUCCEEDED(static_cast<backend::d3d12::ID3D12Device *>(device)->NativeDevice()->QueryInterface(
           IID_PPV_ARGS(&messages_))));
 #endif
   }
@@ -351,14 +351,14 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
     bool supported = false;
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
-      auto owner = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+      auto owner = static_cast<backend::d3d12::ID3D12Device *>(device.Get());
       supported = backend::d3d12::SupportsImageStorage(owner->NativeDevice(), format);
       EXPECT_FALSE(backend::d3d12::SupportsImageStorage(owner->NativeDevice(), IMAGE_FORMAT_UNKNOWN));
     }
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     if (GetParam() == BACKEND_API_VULKAN) {
-      auto owner = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+      auto owner = static_cast<backend::vulkan::IVulkanDevice *>(device.Get());
       supported = backend::vulkan::SupportsImageStorage(owner->NativePhysicalDevice(), format);
       EXPECT_FALSE(backend::vulkan::SupportsImageStorage(owner->NativePhysicalDevice(), IMAGE_FORMAT_UNKNOWN));
     }
@@ -385,7 +385,7 @@ TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto owner = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+  auto owner = static_cast<backend::d3d12::ID3D12Device *>(device.Get());
   ObjPtr<IImage> color = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> depth = device->CreateImage({8, 8, IMAGE_FORMAT_D32_SFLOAT});
   ASSERT_TRUE(color && depth);
@@ -1053,7 +1053,7 @@ TEST_P(RhiImage, FragmentRayQueriesRetainIndirectBlasResources) {
     GTEST_SKIP() << "Ray query unavailable";
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL &&
-      !static_cast<backend::metal::MetalDevice *>(device.Get())->NativeDevice()->supportsRaytracingFromRender())
+      !static_cast<backend::metal::IMetalDevice *>(device.Get())->NativeDevice()->supportsRaytracingFromRender())
     GTEST_SKIP() << "Render-stage ray query unavailable";
 #endif
   Track(device.Get());
@@ -1403,7 +1403,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   }
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    auto native = static_cast<backend::d3d12::ID3D12Device *>(device.Get());
     // Grow independently from 32: resources reach 4096, samplers reach 256.
     // Earlier recorded draws pin every smaller page until command retirement.
     EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 8u);
@@ -1427,9 +1427,9 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   std::shared_ptr<void> gate;
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    auto native = static_cast<backend::d3d12::ID3D12Device *>(device.Get());
     ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<backend::d3d12::D3D12Queue *>(queue_owner.Get());
+    auto native_queue = static_cast<backend::d3d12::ID3D12Queue *>(queue_owner.Get());
     backend::d3d12::ComPtr<ID3D12Fence> fence;
     ASSERT_TRUE(SUCCEEDED(native->NativeDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))));
     gate = std::shared_ptr<void>(native, [native_queue, fence](void *) {
@@ -1443,9 +1443,9 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN) {
-    auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+    auto native = static_cast<backend::vulkan::IVulkanDevice *>(device.Get());
     ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<backend::vulkan::VulkanQueue *>(queue_owner.Get());
+    auto native_queue = static_cast<backend::vulkan::IVulkanQueue *>(queue_owner.Get());
     VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
     type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
     VkSemaphoreCreateInfo create{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
@@ -1477,9 +1477,9 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL) {
-    auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+    auto native = static_cast<backend::metal::IMetalDevice *>(device.Get());
     ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<backend::metal::MetalQueue *>(queue_owner.Get());
+    auto native_queue = static_cast<backend::metal::IMetalQueue *>(queue_owner.Get());
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto event = NS::TransferPtr(native->NativeDevice()->newSharedEvent());
     ASSERT_TRUE(event);
@@ -1503,7 +1503,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   commands.Release();
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    auto native = static_cast<backend::d3d12::ID3D12Device *>(device.Get());
     EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 8u);
     EXPECT_EQ(native->SamplerDescriptors().GetPageCounts().second, 4u);
   }
@@ -1512,7 +1512,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(done->WaitHost());
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    auto native = static_cast<backend::d3d12::ID3D12Device *>(device.Get());
     EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 0u);
     EXPECT_EQ(native->SamplerDescriptors().GetPageCounts().second, 0u);
   }

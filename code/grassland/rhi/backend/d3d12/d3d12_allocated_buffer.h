@@ -15,7 +15,7 @@ class Allocator;
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12AllocatedBuffer : public ID3D12Buffer {
  public:
-  static ID3D12AllocatedBuffer *Create(D3D12Device *device,
+  static ID3D12AllocatedBuffer *Create(ID3D12Device *device,
                                        const BufferDesc &desc,
                                        bool upload = false,
                                        bool download = false);

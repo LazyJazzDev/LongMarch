@@ -1,12 +1,16 @@
 ﻿#include "grassland/rhi/backend/backend_ray_tracing_program.h"
 
 #include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_ray_tracing_program_state.h"
 
 namespace grassland::rhi::backend {
-RayTracingProgram::RayTracingProgram(Device *device, const RayTracingProgramDesc &desc) : device_(device), desc_(desc) {
+void RayTracingProgram::InitializeRayTracingProgram(Device *device, const RayTracingProgramDesc &desc) {
+  StateRayTracingProgram().device_ = device;
+  StateRayTracingProgram().desc_ = desc;
+
   auto retain = [&](IShader *shader) {
     if (shader)
-      shaders_.push_back(ObjectPtr<IShader>::Retain(shader));
+      StateRayTracingProgram().shaders_.push_back(ObjectPtr<IShader>::Retain(shader));
   };
   retain(desc.ray_generation);
   for (auto shader : desc.miss_shaders)
@@ -21,22 +25,23 @@ RayTracingProgram::RayTracingProgram(Device *device, const RayTracingProgramDesc
 }
 
 const RayTracingProgramDesc &RayTracingProgram::GetDesc() const {
-  return desc_;
+  return StateRayTracingProgram().desc_;
 }
 
 Device *RayTracingProgram::Owner() const {
-  return device_;
+  return StateRayTracingProgram().device_;
 }
 
 bool RayTracingProgram::ValidateLayout() const {
   auto stage = [](IShader *shader, ShaderStage expected) { return shader && shader->GetStage() == expected; };
-  if (!stage(desc_.ray_generation, SHADER_STAGE_RAY_GENERATION) || !desc_.max_recursion_depth ||
-      desc_.pipeline_layout.groups.size() > 8)
+  if (!stage(StateRayTracingProgram().desc_.ray_generation, SHADER_STAGE_RAY_GENERATION) ||
+      !StateRayTracingProgram().desc_.max_recursion_depth ||
+      StateRayTracingProgram().desc_.pipeline_layout.groups.size() > 8)
     return false;
-  for (auto shader : desc_.miss_shaders)
+  for (auto shader : StateRayTracingProgram().desc_.miss_shaders)
     if (!stage(shader, SHADER_STAGE_MISS))
       return false;
-  for (const auto &group : desc_.hit_groups) {
+  for (const auto &group : StateRayTracingProgram().desc_.hit_groups) {
     if (!group.closest_hit && !group.any_hit && !group.intersection)
       return false;
     if (group.closest_hit && !stage(group.closest_hit, SHADER_STAGE_CLOSEST_HIT))
@@ -46,10 +51,10 @@ bool RayTracingProgram::ValidateLayout() const {
     if (group.intersection && !stage(group.intersection, SHADER_STAGE_INTERSECTION))
       return false;
   }
-  for (auto shader : desc_.callable_shaders)
+  for (auto shader : StateRayTracingProgram().desc_.callable_shaders)
     if (!stage(shader, SHADER_STAGE_CALLABLE))
       return false;
-  for (const auto &group : desc_.pipeline_layout.groups)
+  for (const auto &group : StateRayTracingProgram().desc_.pipeline_layout.groups)
     if (!ValidateBindingLayout(group))
       return false;
   return true;
@@ -57,13 +62,13 @@ bool RayTracingProgram::ValidateLayout() const {
 
 bool RayTracingProgram::ValidateShaderBindingTable(const ShaderBindingTableDesc &desc) const {
   for (auto index : desc.miss_shader_indices)
-    if (index >= desc_.miss_shaders.size())
+    if (index >= StateRayTracingProgram().desc_.miss_shaders.size())
       return false;
   for (auto index : desc.hit_group_indices)
-    if (index >= desc_.hit_groups.size())
+    if (index >= StateRayTracingProgram().desc_.hit_groups.size())
       return false;
   for (auto index : desc.callable_shader_indices)
-    if (index >= desc_.callable_shaders.size())
+    if (index >= StateRayTracingProgram().desc_.callable_shaders.size())
       return false;
   return true;
 }
@@ -74,12 +79,17 @@ ShaderBindingTableDesc RayTracingProgram::DefaultShaderBindingTableDesc() const 
     for (size_t i = 0; i < count; ++i)
       indices.push_back(uint32_t(i));
   };
-  fill(result.miss_shader_indices, desc_.miss_shaders.size());
-  fill(result.hit_group_indices, desc_.hit_groups.size());
-  fill(result.callable_shader_indices, desc_.callable_shaders.size());
+  fill(result.miss_shader_indices, StateRayTracingProgram().desc_.miss_shaders.size());
+  fill(result.hit_group_indices, StateRayTracingProgram().desc_.hit_groups.size());
+  fill(result.callable_shader_indices, StateRayTracingProgram().desc_.callable_shaders.size());
   return result;
 }
 
 }  // namespace grassland::rhi::backend
 
 LONGMARCH_RHI_UUID(grassland::rhi::backend::RayTracingProgram, "e0b9733f-8a37-4702-800c-3022865d522c")
+
+namespace grassland::rhi::backend {
+RayTracingProgramState::RayTracingProgramState() = default;
+RayTracingProgramState::~RayTracingProgramState() = default;
+}  // namespace grassland::rhi::backend

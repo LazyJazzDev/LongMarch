@@ -12,7 +12,7 @@ typedef struct VmaAllocator_T *VmaAllocator;
 namespace grassland::rhi::backend::vulkan {
 class IVulkanAllocatedBuffer : public IVulkanBuffer {
  public:
-  static IVulkanAllocatedBuffer *Create(VulkanDevice *device,
+  static IVulkanAllocatedBuffer *Create(IVulkanDevice *device,
                                         const BufferDesc &desc,
                                         bool upload = false,
                                         bool download = false);

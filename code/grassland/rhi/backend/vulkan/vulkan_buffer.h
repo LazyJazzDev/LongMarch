@@ -9,7 +9,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanBuffer)
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDevice;
+class IVulkanDevice;
 
 // Resource access only. Derived classes define allocation ownership (standalone or future pool leases).
 class IVulkanBuffer : public IBackendBuffer {

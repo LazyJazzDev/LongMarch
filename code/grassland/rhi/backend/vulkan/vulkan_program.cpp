@@ -2,25 +2,28 @@
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_program_impl.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanProgram::VulkanProgram(VulkanDevice *device, const ProgramDesc &desc)
-    : Program(device, desc),
-      VulkanProgramBase(device->NativeDevice()) {
+VulkanProgramImpl::VulkanProgramImpl(IVulkanDevice *device, const ProgramDesc &desc) {
+  InitializeProgram(device, desc);
+  InitializeVulkanProgramBase(device->NativeDevice());
 }
 
-VulkanProgram::~VulkanProgram() {
+VulkanProgramImpl::~VulkanProgramImpl() {
   auto device = LayoutDevice();
   if (pipeline_)
     vkDestroyPipeline(device, pipeline_, nullptr);
+
+  DestroyVulkanProgramBase();
 }
 
-VkPipeline VulkanProgram::NativePipeline() const {
+VkPipeline VulkanProgramImpl::NativePipeline() const {
   return pipeline_;
 }
 
-VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDesc &desc) {
-  auto object = std::unique_ptr<VulkanProgram>(new VulkanProgram(owner_device, desc));
+IVulkanProgram *VulkanProgramImpl::Create(IVulkanDevice *owner_device, const ProgramDesc &desc) {
+  auto object = std::unique_ptr<VulkanProgramImpl>(new VulkanProgramImpl(owner_device, desc));
   auto device = owner_device->NativeDevice();
 
   struct ShaderModules {
@@ -36,15 +39,18 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
 
   auto &modules = shader_modules.handles;
   if (!object->ValidateLayout() ||
-      !ValidatePipelineBindings(owner_device->NativePhysicalDevice(), object->desc_.pipeline_layout)) {
+      !ValidatePipelineBindings(owner_device->NativePhysicalDevice(), object->StateProgram().desc_.pipeline_layout)) {
     ReportError(-1, "Invalid graphics program layout.");
     return nullptr;
   }
   std::vector<uint8_t> code[2];
-  auto prefix = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_VULKAN, object->desc_.vertex_attributes);
-  if (!CompileSlang(object->desc_.vertex_shader, prefix, BACKEND_API_VULKAN, code[0], &object->desc_.pipeline_layout))
+  auto prefix = ShaderMacroHeader(object->StateProgram().desc_.pipeline_layout, BACKEND_API_VULKAN,
+                                  object->StateProgram().desc_.vertex_attributes);
+  if (!CompileSlang(object->StateProgram().desc_.vertex_shader, prefix, BACKEND_API_VULKAN, code[0],
+                    &object->StateProgram().desc_.pipeline_layout))
     return nullptr;
-  if (!CompileSlang(object->desc_.fragment_shader, prefix, BACKEND_API_VULKAN, code[1], &object->desc_.pipeline_layout))
+  if (!CompileSlang(object->StateProgram().desc_.fragment_shader, prefix, BACKEND_API_VULKAN, code[1],
+                    &object->StateProgram().desc_.pipeline_layout))
     return nullptr;
   for (int i = 0; i < 2; ++i) {
     VkShaderModuleCreateInfo create{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
@@ -54,7 +60,7 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
       return nullptr;
     }
   }
-  if (!object->CreateLayout(object->desc_.pipeline_layout))
+  if (!object->CreateLayout(object->StateProgram().desc_.pipeline_layout))
     return nullptr;
   VkPipelineShaderStageCreateInfo stages[2]{};
   for (int i = 0; i < 2; ++i) {
@@ -62,12 +68,12 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
     stages[i].module = modules[i];
   }
   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  stages[0].pName = object->desc_.vertex_shader->GetEntry().c_str();
+  stages[0].pName = object->StateProgram().desc_.vertex_shader->GetEntry().c_str();
   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  stages[1].pName = object->desc_.fragment_shader->GetEntry().c_str();
+  stages[1].pName = object->StateProgram().desc_.fragment_shader->GetEntry().c_str();
   std::vector<VkVertexInputBindingDescription> bindings;
-  for (uint32_t i = 0; i < object->desc_.vertex_bindings.size(); ++i) {
-    const auto &b = object->desc_.vertex_bindings[i];
+  for (uint32_t i = 0; i < object->StateProgram().desc_.vertex_bindings.size(); ++i) {
+    const auto &b = object->StateProgram().desc_.vertex_bindings[i];
     bindings.push_back({i, b.stride, b.per_instance ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX});
   }
   const VkFormat formats[] = {VK_FORMAT_R32_SFLOAT,          VK_FORMAT_R32G32_SFLOAT,     VK_FORMAT_R32G32B32_SFLOAT,
@@ -75,7 +81,7 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
                               VK_FORMAT_R32G32B32_SINT,      VK_FORMAT_R32G32B32A32_SINT, VK_FORMAT_R32_UINT,
                               VK_FORMAT_R32G32_UINT,         VK_FORMAT_R32G32B32_UINT,    VK_FORMAT_R32G32B32A32_UINT};
   std::vector<VkVertexInputAttributeDescription> attributes;
-  for (const auto &a : object->desc_.vertex_attributes)
+  for (const auto &a : object->StateProgram().desc_.vertex_attributes)
     attributes.push_back({a.location, a.binding, formats[a.type], a.offset});
   VkPipelineVertexInputStateCreateInfo input{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
   input.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
@@ -97,8 +103,9 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
   VkPipelineMultisampleStateCreateInfo sample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
   sample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
   std::vector<VkPipelineColorBlendAttachmentState> blend_attachments;
-  for (size_t i = 0; i < object->desc_.color_formats.size(); ++i) {
-    const auto value = object->desc_.blend_states.empty() ? BlendState{} : object->desc_.blend_states[i];
+  for (size_t i = 0; i < object->StateProgram().desc_.color_formats.size(); ++i) {
+    const auto value =
+        object->StateProgram().desc_.blend_states.empty() ? BlendState{} : object->StateProgram().desc_.blend_states[i];
     VkPipelineColorBlendAttachmentState attachment{};
     attachment.blendEnable = value.blend_enable;
     attachment.srcColorBlendFactor = NativeBlendFactor(value.src_color);
@@ -130,7 +137,7 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
   VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
   blend.attachmentCount = uint32_t(blend_attachments.size());
   blend.pAttachments = blend_attachments.data();
-  const auto &ds = object->desc_.depth_stencil;
+  const auto &ds = object->StateProgram().desc_.depth_stencil;
   VkPipelineDepthStencilStateCreateInfo depth{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
   depth.depthTestEnable = ds.depth_test;
   depth.depthWriteEnable = ds.depth_write;
@@ -166,7 +173,7 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
   create.pDynamicState = &dynamic;
   create.layout = object->NativeLayout();
   std::vector<VkFormat> color_formats;
-  for (auto format : object->desc_.color_formats)
+  for (auto format : object->StateProgram().desc_.color_formats)
     color_formats.push_back(NativeImageFormat(format));
   VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
   if (owner_device->Procedures().CmdBeginRendering) {
@@ -176,7 +183,7 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
     rendering.stencilAttachmentFormat = HasStencil(ds.format) ? NativeImageFormat(ds.format) : VK_FORMAT_UNDEFINED;
     create.pNext = &rendering;
   } else {
-    create.renderPass = owner_device->RenderTargets().RenderPass(object->desc_.color_formats, ds.format);
+    create.renderPass = owner_device->RenderTargets().RenderPass(object->StateProgram().desc_.color_formats, ds.format);
     if (!create.renderPass) {
       return nullptr;
     }
@@ -188,4 +195,10 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
 }
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanProgram, "d24a9c9f-6f6f-4489-a840-064c2a4309c1")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanProgram, "d24a9c9f-6f6f-4489-a840-064c2a4309c1")
+
+namespace grassland::rhi::backend::vulkan {
+IVulkanProgram *IVulkanProgram::Create(IVulkanDevice *device, const ProgramDesc &desc) {
+  return VulkanProgramImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::vulkan

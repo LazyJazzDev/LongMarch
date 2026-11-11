@@ -32,12 +32,12 @@ bool ValidateMetalBindingLayout(MTL::Device *device, const BindingLayoutDesc &la
   return samplers <= device->maxArgumentBufferSamplerCount();
 }
 
-MetalBindingGroup::Version::Version(MetalDevice *device, const BindingLayoutDesc &layout)
+MetalBindingGroup::Version::Version(IMetalDevice *device, const BindingLayoutDesc &layout)
     : BindingGroup::Version(layout),
       device_(device) {
 }
 
-MetalBindingGroup::Version *MetalBindingGroup::Version::Create(MetalDevice *device, const BindingLayoutDesc &layout) {
+MetalBindingGroup::Version *MetalBindingGroup::Version::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
   if (!ValidateMetalBindingLayout(device->NativeDevice(), layout))
     return nullptr;
 
@@ -127,7 +127,7 @@ bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, cons
 
 bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, const std::vector<ISampler *> &values) {
   for (size_t i = 0; i < values.size(); ++i) {
-    encoder_->setSamplerState(rhi::QueryInterfacePtr<MetalSampler>(values[i]).Get()->NativeSampler(),
+    encoder_->setSamplerState(rhi::QueryInterfacePtr<IMetalSampler>(values[i]).Get()->NativeSampler(),
                               offsets_[b] + first + i);
     initialized_[b][first + i] = true;
   }
@@ -138,13 +138,13 @@ bool MetalBindingGroup::Version::WriteDescriptors(size_t b,
                                                   uint32_t first,
                                                   const std::vector<ITopLevelAccelerationStructure *> &values) {
   for (auto value : values) {
-    auto native = rhi::QueryInterfacePtr<MetalTopLevelAccelerationStructure>(value).Get();
+    auto native = rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
       return false;
   }
   for (size_t i = 0; i < values.size(); ++i) {
     encoder_->setAccelerationStructure(
-        rhi::QueryInterfacePtr<MetalTopLevelAccelerationStructure>(values[i]).Get()->NativeStructure(),
+        rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(values[i]).Get()->NativeStructure(),
         offsets_[b] + first + i);
     initialized_[b][first + i] = true;
   }
@@ -173,8 +173,9 @@ void MetalBindingGroup::Version::Bind(MTL::RenderCommandEncoder *encoder, uint32
     for (auto &resource : references_[b]) {
       MTL::Resource *native =
           desc.type == BINDING_ACCELERATION_STRUCTURE
-              ? static_cast<MTL::Resource *>(
-                    rhi::QueryInterfacePtr<MetalTopLevelAccelerationStructure>(resource.Get()).Get()->NativeStructure())
+              ? static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(resource.Get())
+                                                 .Get()
+                                                 ->NativeStructure())
           : desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
               ? static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<IMetalBuffer>(resource.Get()).Get()->NativeBuffer())
               : static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<MetalImage>(resource.Get()).Get()->NativeImage());
@@ -199,8 +200,9 @@ void MetalBindingGroup::Version::Bind(MTL::ComputeCommandEncoder *encoder, uint3
     for (auto &resource : references_[b]) {
       MTL::Resource *native =
           desc.type == BINDING_ACCELERATION_STRUCTURE
-              ? static_cast<MTL::Resource *>(
-                    rhi::QueryInterfacePtr<MetalTopLevelAccelerationStructure>(resource.Get()).Get()->NativeStructure())
+              ? static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(resource.Get())
+                                                 .Get()
+                                                 ->NativeStructure())
           : desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
               ? static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<IMetalBuffer>(resource.Get()).Get()->NativeBuffer())
               : static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<MetalImage>(resource.Get()).Get()->NativeImage());
@@ -209,11 +211,11 @@ void MetalBindingGroup::Version::Bind(MTL::ComputeCommandEncoder *encoder, uint3
   }
 }
 
-MetalBindingGroup::MetalBindingGroup(MetalDevice *device, ObjectPtr<Version> version)
+MetalBindingGroup::MetalBindingGroup(IMetalDevice *device, ObjectPtr<Version> version)
     : BindingGroup(device, ObjectPtr<BindingGroup::Version>::Retain(version.Get())) {
 }
 
-MetalBindingGroup *MetalBindingGroup::Create(MetalDevice *device, const BindingLayoutDesc &layout) {
+MetalBindingGroup *MetalBindingGroup::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
   auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
   return version ? new MetalBindingGroup(device, std::move(version)) : nullptr;
 }

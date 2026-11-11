@@ -2,20 +2,24 @@
 
 #include <vector>
 
+#include "grassland/rhi/backend/vulkan/vulkan_download_token_impl.h"
+
 namespace grassland::rhi::backend::vulkan {
-VulkanDownloadToken::VulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size)
-    : VulkanDownloadToken(std::move(lease), DownloadLayout{0, size, size, 1}) {
+VulkanDownloadTokenImpl::VulkanDownloadTokenImpl(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size)
+    : VulkanDownloadTokenImpl(std::move(lease), DownloadLayout{0, size, size, 1}) {
 }
 
-VulkanDownloadToken::VulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, const DownloadLayout &layout)
-    : DownloadToken(layout.row_bytes * layout.rows),
-      lease_(std::move(lease)),
+VulkanDownloadTokenImpl::VulkanDownloadTokenImpl(ObjectPtr<IVulkanTemporalBufferLease> lease,
+                                                 const DownloadLayout &layout)
+    : lease_(std::move(lease)),
       layout_(layout) {
+  InitializeDownloadToken(layout.row_bytes * layout.rows);
 }
 
-VulkanDownloadToken::~VulkanDownloadToken() = default;
+VulkanDownloadTokenImpl::~VulkanDownloadTokenImpl() {
+}
 
-bool VulkanDownloadToken::CopyData(void *destination) const {
+bool VulkanDownloadTokenImpl::CopyData(void *destination) const {
   auto output = static_cast<uint8_t *>(destination);
   if (!layout_.stencil_pitch && layout_.row_pitch == layout_.row_bytes)
     return lease_->Read(output, GetSize(), layout_.offset);
@@ -35,4 +39,15 @@ bool VulkanDownloadToken::CopyData(void *destination) const {
 }
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanDownloadToken, "1f0619cd-eb9a-4ecc-8260-c1737da81a3b")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanDownloadToken, "1f0619cd-eb9a-4ecc-8260-c1737da81a3b")
+
+namespace grassland::rhi::backend::vulkan {
+IVulkanDownloadToken *IVulkanDownloadToken::Create(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size) {
+  return new VulkanDownloadTokenImpl(lease, size);
+}
+
+IVulkanDownloadToken *IVulkanDownloadToken::Create(ObjectPtr<IVulkanTemporalBufferLease> lease,
+                                                   const DownloadLayout &layout) {
+  return new VulkanDownloadTokenImpl(lease, layout);
+}
+}  // namespace grassland::rhi::backend::vulkan

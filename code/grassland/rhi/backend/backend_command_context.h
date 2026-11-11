@@ -17,10 +17,10 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::CommandContext)
 namespace grassland::rhi::backend {
 class Queue;
 
-class CommandContext : public Object<rhi::ICommandContext> {
- public:
-  LONGMARCH_RHI_QUERY(CommandContext, Object<rhi::ICommandContext>)
+struct CommandContextState;
 
+class CommandContext : public rhi::ICommandContext {
+ public:
   bool CmdDrawImGui(IWindow *window, IImage *target) override;
   bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override;
   bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
@@ -45,9 +45,16 @@ class CommandContext : public Object<rhi::ICommandContext> {
     SUBMIT_RESULT_FAILED_IN_FLIGHT,
   } SubmitResult;
 
-  explicit CommandContext(Queue *queue);
+ protected:
+  void InitializeCommandContext(Queue *queue);
+
+ public:
   rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
-  ~CommandContext() override;
+
+ protected:
+  void DestroyCommandContext();
+
+ public:
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
   bool CmdCopyBuffer(IBuffer *source,
                      uint64_t source_offset,
@@ -100,15 +107,8 @@ class CommandContext : public Object<rhi::ICommandContext> {
   virtual bool EndRecording() = 0;
   bool PrepareRendering(const RenderingInfo &info);
   bool RenderingMatches(const IProgram *program) const;
-  RenderingInfo rendering_;
-  bool recording_failed_{};
-  bool sealed_{};
-
- private:
-  Queue *queue_;
-  std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_;
-  bool submitted_{};
-  std::vector<ObjectPtr<DownloadToken>> downloads_;
+  virtual CommandContextState &StateCommandContext() = 0;
+  virtual const CommandContextState &StateCommandContext() const = 0;
 };
 
 }  // namespace grassland::rhi::backend

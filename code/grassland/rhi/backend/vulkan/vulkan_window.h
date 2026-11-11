@@ -2,53 +2,25 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanWindow;
+class IVulkanWindow;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanWindow)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanWindow)
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
 
-class VulkanWindow final : public Window {
+class IVulkanWindow : public Window {
  public:
-  LONGMARCH_RHI_QUERY(VulkanWindow, Window)
-
-  ~VulkanWindow() override;
-  static VulkanWindow *Create(VulkanDevice *device, const WindowDesc &desc);
-  ObjectPtr<Image> AcquireNativeFrame() override;
-  bool RebuildNativeSwapChain(PresentMode mode) override;
-  PresentMode GetPresentMode() const override;
-  std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
-  VkSemaphore RenderSemaphore() const;
-  VkResult PresentFrame();
-
- private:
-  VulkanWindow(VulkanDevice *device);
-
-  void DestroySwapchain();
-  VulkanDevice *device_;
-  VkSurfaceKHR surface_{};
-  VkSwapchainKHR swapchain_{};
-
-  // Swapchain-local rotation, independent of which image Acquire returns.
-  struct AcquireSync {
-    VkSemaphore semaphore{};
-    VkFence fence{};
-    bool acquired{};
-    // Timeline value of the submission consuming this acquire semaphore.
-    uint64_t submission_value{};
-  };
-
-  std::vector<AcquireSync> acquire_sync_;
-  uint32_t current_sync_{};
-  uint32_t current_image_{};
-  std::vector<VkImage> images_;
-  std::vector<VulkanImage::Views> image_views_;
-  std::vector<VkSemaphore> rendered_;
-  std::vector<bool> initialized_images_;
-  ImageDesc desc_;
-  PresentMode mode_{PRESENT_MODE_VSYNC};
+  static IVulkanWindow *Create(IVulkanDevice *device, const WindowDesc &desc);
+  virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
+  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
+  virtual PresentMode GetPresentMode() const = 0;
+  virtual std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const = 0;
+  virtual VkSemaphore RenderSemaphore() const = 0;
+  virtual VkResult PresentFrame() = 0;
 };
+
+;
 
 }  // namespace grassland::rhi::backend::vulkan

@@ -1,15 +1,17 @@
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
 
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_sampler_impl.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12Sampler::D3D12Sampler(D3D12Device *device, const SamplerDesc &desc) : Sampler(desc, device) {
+D3D12SamplerImpl::D3D12SamplerImpl(ID3D12Device *device, const SamplerDesc &desc) {
+  InitializeSampler(desc, device);
 }
 
-D3D12Sampler *D3D12Sampler::Create(D3D12Device *device, const SamplerDesc &desc) {
+ID3D12Sampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc &desc) {
   if (!Validate(desc))
     return nullptr;
-  auto sampler = ObjectPtr<D3D12Sampler>::Adopt(new D3D12Sampler(device, desc));
+  auto sampler = ObjectPtr<D3D12SamplerImpl>::Adopt(new D3D12SamplerImpl(device, desc));
   sampler->descriptor_ = device->SamplerDescriptorStorage().Acquire(1);
   if (!sampler->descriptor_)
     return nullptr;
@@ -28,4 +30,10 @@ D3D12Sampler *D3D12Sampler::Create(D3D12Device *device, const SamplerDesc &desc)
 }
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12Sampler, "d1e384fa-d35c-42e0-8d5f-110c64fe99d0")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12Sampler, "d1e384fa-d35c-42e0-8d5f-110c64fe99d0")
+
+namespace grassland::rhi::backend::d3d12 {
+ID3D12Sampler *ID3D12Sampler::Create(ID3D12Device *device, const SamplerDesc &desc) {
+  return D3D12SamplerImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::d3d12

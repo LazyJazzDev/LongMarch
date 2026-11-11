@@ -2,25 +2,21 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalSampler;
+class IMetalSampler;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalSampler)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalSampler)
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_sampler.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDevice;
+class IMetalDevice;
 
-class MetalSampler final : public Sampler {
+class IMetalSampler : public Sampler {
  public:
-  LONGMARCH_RHI_QUERY(MetalSampler, Sampler)
-
-  static MetalSampler *Create(MetalDevice *device, const SamplerDesc &desc);
-  MTL::SamplerState *NativeSampler() const;
-
- private:
-  MetalSampler(MetalDevice *device, const SamplerDesc &desc, NS::SharedPtr<MTL::SamplerState> sampler);
-  NS::SharedPtr<MTL::SamplerState> sampler_;
+  static IMetalSampler *Create(IMetalDevice *device, const SamplerDesc &desc);
+  virtual MTL::SamplerState *NativeSampler() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::metal

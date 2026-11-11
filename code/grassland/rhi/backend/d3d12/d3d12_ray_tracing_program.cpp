@@ -4,40 +4,45 @@
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program_impl.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Device *device, const RayTracingProgramDesc &desc)
-    : RayTracingProgram(device, desc) {
+D3D12RayTracingProgramImpl::D3D12RayTracingProgramImpl(ID3D12Device *device, const RayTracingProgramDesc &desc) {
+  InitializeRayTracingProgram(device, desc);
 }
 
-ID3D12StateObject *D3D12RayTracingProgram::NativePipeline() const {
+ID3D12StateObject *D3D12RayTracingProgramImpl::NativePipeline() const {
   return pipeline_.Get();
 }
 
-const ShaderBindingTable *D3D12RayTracingProgram::DefaultShaderBindingTable() const {
+const ShaderBindingTable *D3D12RayTracingProgramImpl::DefaultShaderBindingTable() const {
   return table_.Get();
 }
 
-IShaderBindingTable *D3D12RayTracingProgram::CreateShaderBindingTable(const ShaderBindingTableDesc &desc) {
+IShaderBindingTable *D3D12RayTracingProgramImpl::CreateShaderBindingTable(const ShaderBindingTableDesc &desc) {
   if (!ValidateShaderBindingTable(desc))
     return nullptr;
   return BuildShaderBindingTable(desc);
 }
 
-D3D12RayTracingProgram *D3D12RayTracingProgram::Create(D3D12Device *owner_device, const RayTracingProgramDesc &desc) {
-  auto object = std::unique_ptr<D3D12RayTracingProgram>(new D3D12RayTracingProgram(owner_device, desc));
-  if (!object->ValidateLayout() || object->desc_.max_recursion_depth > 31 || object->desc_.max_attribute_size > 32)
+ID3D12RayTracingProgram *D3D12RayTracingProgramImpl::Create(ID3D12Device *owner_device,
+                                                            const RayTracingProgramDesc &desc) {
+  auto object = std::unique_ptr<D3D12RayTracingProgramImpl>(new D3D12RayTracingProgramImpl(owner_device, desc));
+  if (!object->ValidateLayout() || object->StateRayTracingProgram().desc_.max_recursion_depth > 31 ||
+      object->StateRayTracingProgram().desc_.max_attribute_size > 32)
     return nullptr;
   auto native = owner_device->NativeDevice();
   ComPtr<ID3D12Device5> device;
   if (FAILED(native->QueryInterface(IID_PPV_ARGS(&device))))
     return nullptr;
-  if (!object->CreateLayout(native, object->desc_.pipeline_layout, D3D12_ROOT_SIGNATURE_FLAG_NONE))
+  if (!object->CreateLayout(native, object->StateRayTracingProgram().desc_.pipeline_layout,
+                            D3D12_ROOT_SIGNATURE_FLAG_NONE))
     return nullptr;
-  std::vector<IShader *> shaders{object->desc_.ray_generation};
-  shaders.insert(shaders.end(), object->desc_.miss_shaders.begin(), object->desc_.miss_shaders.end());
+  std::vector<IShader *> shaders{object->StateRayTracingProgram().desc_.ray_generation};
+  shaders.insert(shaders.end(), object->StateRayTracingProgram().desc_.miss_shaders.begin(),
+                 object->StateRayTracingProgram().desc_.miss_shaders.end());
   std::vector<std::array<uint32_t, 3>> indices;
-  for (auto group : object->desc_.hit_groups) {
+  for (auto group : object->StateRayTracingProgram().desc_.hit_groups) {
     std::array<uint32_t, 3> item{UINT32_MAX, UINT32_MAX, UINT32_MAX};
     IShader *members[] = {group.closest_hit, group.any_hit, group.intersection};
     for (int i = 0; i < 3; ++i)
@@ -48,16 +53,18 @@ D3D12RayTracingProgram *D3D12RayTracingProgram::Create(D3D12Device *owner_device
     indices.push_back(item);
   }
   auto callable_start = shaders.size();
-  shaders.insert(shaders.end(), object->desc_.callable_shaders.begin(), object->desc_.callable_shaders.end());
+  shaders.insert(shaders.end(), object->StateRayTracingProgram().desc_.callable_shaders.begin(),
+                 object->StateRayTracingProgram().desc_.callable_shaders.end());
   std::vector<std::vector<uint8_t>> code(shaders.size());
   std::vector<std::wstring> names(shaders.size()), entries(shaders.size()), hit_names(indices.size());
   std::vector<D3D12_EXPORT_DESC> exports(shaders.size());
   std::vector<D3D12_DXIL_LIBRARY_DESC> libraries(shaders.size());
   std::vector<D3D12_HIT_GROUP_DESC> hits(indices.size());
   std::vector<D3D12_STATE_SUBOBJECT> subobjects;
-  auto header = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_D3D12);
+  auto header = ShaderMacroHeader(object->StateRayTracingProgram().desc_.pipeline_layout, BACKEND_API_D3D12);
   for (size_t i = 0; i < shaders.size(); ++i) {
-    if (!CompileSlang(shaders[i], header, BACKEND_API_D3D12, code[i], &object->desc_.pipeline_layout))
+    if (!CompileSlang(shaders[i], header, BACKEND_API_D3D12, code[i],
+                      &object->StateRayTracingProgram().desc_.pipeline_layout))
       return nullptr;
     names[i] = L"rhi_shader_" + std::to_wstring(i);
     const auto &entry = shaders[i]->GetEntry();
@@ -82,8 +89,9 @@ D3D12RayTracingProgram *D3D12RayTracingProgram::Create(D3D12Device *owner_device
       hit.IntersectionShaderImport = names[indices[i][2]].c_str();
     subobjects.push_back({D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP, &hit});
   }
-  D3D12_RAYTRACING_SHADER_CONFIG shader_config{object->desc_.max_payload_size, object->desc_.max_attribute_size};
-  D3D12_RAYTRACING_PIPELINE_CONFIG pipeline_config{object->desc_.max_recursion_depth};
+  D3D12_RAYTRACING_SHADER_CONFIG shader_config{object->StateRayTracingProgram().desc_.max_payload_size,
+                                               object->StateRayTracingProgram().desc_.max_attribute_size};
+  D3D12_RAYTRACING_PIPELINE_CONFIG pipeline_config{object->StateRayTracingProgram().desc_.max_recursion_depth};
   auto root = object->NativeRootSignature();
   subobjects.push_back({D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG, &shader_config});
   subobjects.push_back({D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG, &pipeline_config});
@@ -97,7 +105,7 @@ D3D12RayTracingProgram *D3D12RayTracingProgram::Create(D3D12Device *owner_device
   if (FAILED(pipeline.As(&properties)))
     return nullptr;
   std::vector<std::vector<std::wstring>> tables{{names[0]}, {}, hit_names, {}};
-  for (size_t i = 0; i < object->desc_.miss_shaders.size(); ++i)
+  for (size_t i = 0; i < object->StateRayTracingProgram().desc_.miss_shaders.size(); ++i)
     tables[1].push_back(names[1 + i]);
   for (size_t i = callable_start; i < names.size(); ++i)
     tables[3].push_back(names[i]);
@@ -119,7 +127,7 @@ D3D12RayTracingProgram *D3D12RayTracingProgram::Create(D3D12Device *owner_device
   return object.release();
 }
 
-ShaderBindingTable *D3D12RayTracingProgram::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
+ShaderBindingTable *D3D12RayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
   constexpr uint64_t stride = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
   constexpr uint64_t alignment = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
   std::vector<uint8_t> data;
@@ -137,7 +145,7 @@ ShaderBindingTable *D3D12RayTracingProgram::BuildShaderBindingTable(const Shader
     for (size_t i = 0; i < indices[t]->size(); ++i)
       std::memcpy(data.data() + offset + i * stride, identifiers_[t].data() + (*indices[t])[i] * stride, stride);
   }
-  auto owner = rhi::QueryInterfacePtr<D3D12Device>(device_).Get();
+  auto owner = rhi::QueryInterfacePtr<ID3D12Device>(StateRayTracingProgram().device_).Get();
   auto buffer =
       ObjectPtr<ID3D12AllocatedBuffer>::Adopt(ID3D12AllocatedBuffer::Create(owner, {uint64_t(data.size())}, true));
   if (!buffer || !buffer->Write(data.data(), data.size()))
@@ -151,4 +159,10 @@ ShaderBindingTable *D3D12RayTracingProgram::BuildShaderBindingTable(const Shader
 
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12RayTracingProgram, "5d1da804-a5b3-4469-a380-9d7a44cee916")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12RayTracingProgram, "5d1da804-a5b3-4469-a380-9d7a44cee916")
+
+namespace grassland::rhi::backend::d3d12 {
+ID3D12RayTracingProgram *ID3D12RayTracingProgram::Create(ID3D12Device *device, const RayTracingProgramDesc &desc) {
+  return D3D12RayTracingProgramImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::d3d12

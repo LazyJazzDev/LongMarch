@@ -2,9 +2,9 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanRayTracingProgram;
+class IVulkanRayTracingProgram;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanRayTracingProgram)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanRayTracingProgram)
 #include <array>
 
 #include "grassland/rhi/backend/backend_ray_tracing_program.h"
@@ -13,24 +13,26 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanRayTracingProg
 #include "grassland/rhi/backend/vulkan/vulkan_program_base.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDevice;
+class IVulkanDevice;
 
-class VulkanRayTracingProgram final : public RayTracingProgram, public VulkanProgramBase {
+class IVulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBase {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(VulkanRayTracingProgram, RayTracingProgram, VulkanProgramBase)
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
 
-  static VulkanRayTracingProgram *Create(VulkanDevice *device, const RayTracingProgramDesc &desc);
-  IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
-  const ShaderBindingTable *DefaultShaderBindingTable() const;
-  ~VulkanRayTracingProgram() override;
-  VkPipeline NativePipeline() const;
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
 
- private:
-  VulkanRayTracingProgram(VulkanDevice *device, const RayTracingProgramDesc &desc);
-  VkPipeline pipeline_{};
-  ShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
-  ObjectPtr<ShaderBindingTable> table_;
-  std::array<std::vector<uint8_t>, 4> identifiers_;
-  uint64_t handle_size_{}, stride_{}, alignment_{};
+ public:
+  static IVulkanRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
+  virtual IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) = 0;
+  virtual const ShaderBindingTable *DefaultShaderBindingTable() const = 0;
+  virtual VkPipeline NativePipeline() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::vulkan

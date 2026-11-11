@@ -4,20 +4,23 @@
 #include <cstring>
 #include <vector>
 
+#include "grassland/rhi/backend/metal/metal_download_token_impl.h"
+
 namespace grassland::rhi::backend::metal {
-MetalDownloadToken::MetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size)
-    : MetalDownloadToken(std::move(lease), DownloadLayout{0, size, size, 1}) {
+MetalDownloadTokenImpl::MetalDownloadTokenImpl(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size)
+    : MetalDownloadTokenImpl(std::move(lease), DownloadLayout{0, size, size, 1}) {
 }
 
-MetalDownloadToken::MetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, const DownloadLayout &layout)
-    : DownloadToken(layout.row_bytes * layout.rows),
-      lease_(std::move(lease)),
+MetalDownloadTokenImpl::MetalDownloadTokenImpl(ObjectPtr<IMetalTemporalBufferLease> lease, const DownloadLayout &layout)
+    : lease_(std::move(lease)),
       layout_(layout) {
+  InitializeDownloadToken(layout.row_bytes * layout.rows);
 }
 
-MetalDownloadToken::~MetalDownloadToken() = default;
+MetalDownloadTokenImpl::~MetalDownloadTokenImpl() {
+}
 
-bool MetalDownloadToken::CopyData(void *destination) const {
+bool MetalDownloadTokenImpl::CopyData(void *destination) const {
   auto output = static_cast<uint8_t *>(destination);
   if (!layout_.stencil_pitch && layout_.row_pitch == layout_.row_bytes)
     return lease_->Read(output, GetSize(), layout_.offset);
@@ -41,4 +44,15 @@ bool MetalDownloadToken::CopyData(void *destination) const {
 }
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalDownloadToken, "cb7cec7d-cb18-4503-8444-82a8cde172f9")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalDownloadToken, "cb7cec7d-cb18-4503-8444-82a8cde172f9")
+
+namespace grassland::rhi::backend::metal {
+IMetalDownloadToken *IMetalDownloadToken::Create(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size) {
+  return new MetalDownloadTokenImpl(lease, size);
+}
+
+IMetalDownloadToken *IMetalDownloadToken::Create(ObjectPtr<IMetalTemporalBufferLease> lease,
+                                                 const DownloadLayout &layout) {
+  return new MetalDownloadTokenImpl(lease, layout);
+}
+}  // namespace grassland::rhi::backend::metal

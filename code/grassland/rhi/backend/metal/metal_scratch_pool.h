@@ -10,13 +10,13 @@ namespace grassland::rhi::backend::metal {
 // Contexts retain the returned storage directly, including buffers replaced by resizing.
 class MetalScratchPool {
  public:
-  explicit MetalScratchPool(MetalDevice *device);
+  explicit MetalScratchPool(IMetalDevice *device);
   // Share the current buffer; resize on demand using the last second's peak request.
   ObjectPtr<IMetalAllocatedBuffer> Acquire(uint64_t size);
   void Clear();
 
  private:
-  MetalDevice *device_;
+  IMetalDevice *device_;
   std::mutex mutex_;
   ObjectPtr<IMetalAllocatedBuffer> buffer_;
   std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> peaks_;

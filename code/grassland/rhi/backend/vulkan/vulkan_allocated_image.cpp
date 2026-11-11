@@ -4,16 +4,16 @@
 
 #include <cstdlib>
 
+#include "grassland/rhi/backend/vulkan/vulkan_allocated_image_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanAllocatedImage::VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc)
-    : VulkanImage(desc, device, VK_IMAGE_LAYOUT_GENERAL),
-      device_(device) {
+VulkanAllocatedImageImpl::VulkanAllocatedImageImpl(IVulkanDevice *device, ImageDesc desc) : device_(device) {
+  InitializeVulkanImage(desc, device, VK_IMAGE_LAYOUT_GENERAL);
 }
 
-VulkanAllocatedImage::~VulkanAllocatedImage() {
+VulkanAllocatedImageImpl::~VulkanAllocatedImageImpl() {
   if (image_) {
     device_->RenderTargets().Retire(image_);
     views_.Reset();
@@ -21,27 +21,27 @@ VulkanAllocatedImage::~VulkanAllocatedImage() {
   }
 }
 
-VkImageView VulkanAllocatedImage::AttachmentView() const {
+VkImageView VulkanAllocatedImageImpl::AttachmentView() const {
   return views_.Attachment();
 }
 
-VkImageView VulkanAllocatedImage::BindingView() const {
+VkImageView VulkanAllocatedImageImpl::BindingView() const {
   return views_.Binding();
 }
 
-bool VulkanAllocatedImage::IsValid() const {
+bool VulkanAllocatedImageImpl::IsValid() const {
   return true;
 }
 
-bool VulkanAllocatedImage::SupportsStorage() const {
+bool VulkanAllocatedImageImpl::SupportsStorage() const {
   return storage_;
 }
 
-VkImage VulkanAllocatedImage::NativeImage() const {
+VkImage VulkanAllocatedImageImpl::NativeImage() const {
   return image_;
 }
 
-VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const ImageDesc &desc) {
+IVulkanAllocatedImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc &desc) {
   if (!desc.width || !desc.height)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
@@ -57,7 +57,7 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     if ((properties.optimalTilingFeatures & required) != required)
       return nullptr;
   }
-  auto image = std::unique_ptr<VulkanAllocatedImage>(new VulkanAllocatedImage(device, desc));
+  auto image = std::unique_ptr<VulkanAllocatedImageImpl>(new VulkanAllocatedImageImpl(device, desc));
   VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
   info.imageType = VK_IMAGE_TYPE_2D;
   info.format = format;
@@ -82,7 +82,7 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
   // Temporary initialization commands are outside the rendering loop.
   const auto native = device->NativeDevice();
   auto queue_owner = ObjectPtr<IQueue>::Adopt(device->GetQueue(QUEUE_TYPE_MAIN));
-  auto queue = rhi::QueryInterfacePtr<VulkanQueue>(queue_owner.Get()).Get();
+  auto queue = rhi::QueryInterfacePtr<IVulkanQueue>(queue_owner.Get()).Get();
   std::lock_guard<std::mutex> lock(queue->QueueMutex());
   VkCommandPool pool{};
   const auto status = [&]() -> VkResult {
@@ -142,4 +142,10 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
 }
 }  // namespace grassland::rhi::backend::vulkan
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::VulkanAllocatedImage, "cc7d23e5-e7de-45ae-a4d6-2f954645a1ab")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::vulkan::IVulkanAllocatedImage, "cc7d23e5-e7de-45ae-a4d6-2f954645a1ab")
+
+namespace grassland::rhi::backend::vulkan {
+IVulkanAllocatedImage *IVulkanAllocatedImage::Create(IVulkanDevice *device, const ImageDesc &desc) {
+  return VulkanAllocatedImageImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::vulkan

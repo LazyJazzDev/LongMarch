@@ -10,13 +10,13 @@ namespace grassland::rhi::backend::d3d12 {
 // Contexts retain the returned storage directly, including buffers replaced by resizing.
 class D3D12ScratchPool {
  public:
-  explicit D3D12ScratchPool(D3D12Device *device);
+  explicit D3D12ScratchPool(ID3D12Device *device);
   // Share the current buffer; resize on demand using the last second's peak request.
   ObjectPtr<ID3D12AllocatedBuffer> Acquire(uint64_t size);
   void Clear();
 
  private:
-  D3D12Device *device_;
+  ID3D12Device *device_;
   std::mutex mutex_;
   ObjectPtr<ID3D12AllocatedBuffer> buffer_;
   std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> peaks_;

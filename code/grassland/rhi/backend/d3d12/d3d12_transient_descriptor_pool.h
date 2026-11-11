@@ -31,7 +31,7 @@ class D3D12TransientDescriptorPool {
     uint32_t count_;
   };
 
-  D3D12TransientDescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type);
+  D3D12TransientDescriptorPool(::ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type);
   // Round to a power-of-two class, with a final class at the native heap limit.
   ObjectPtr<Lease> Acquire(uint32_t minimum_count);
   // Allocated / occupied pages, in one class or across all classes (count == 0).
@@ -40,7 +40,7 @@ class D3D12TransientDescriptorPool {
 
  private:
   void ReleasePage(ID3D12DescriptorHeap *heap, size_t level);
-  ID3D12Device *device_;
+  ::ID3D12Device *device_;
   D3D12_DESCRIPTOR_HEAP_TYPE type_;
   uint32_t limit_, stride_;
   mutable std::mutex mutex_;

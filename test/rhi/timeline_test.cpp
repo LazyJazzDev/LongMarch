@@ -34,8 +34,8 @@ void CheckIndependentRetirement(BackendAPI api) {
   ASSERT_TRUE(main);
   ASSERT_TRUE(assist);
 #ifdef LONGMARCH_VULKAN_ENABLED
-  if (api == BACKEND_API_VULKAN && static_cast<backend::vulkan::VulkanQueue *>(main.Get())->NativeQueue() ==
-                                       static_cast<backend::vulkan::VulkanQueue *>(assist.Get())->NativeQueue())
+  if (api == BACKEND_API_VULKAN && static_cast<backend::vulkan::IVulkanQueue *>(main.Get())->NativeQueue() ==
+                                       static_cast<backend::vulkan::IVulkanQueue *>(assist.Get())->NativeQueue())
     GTEST_SKIP() << "Independent GPU progress requires distinct native queues.";
 #endif
   backend::ObjectPtr<backend::Timeline> gate;
@@ -57,7 +57,7 @@ void CheckIndependentRetirement(BackendAPI api) {
   } release;
 #ifdef LONGMARCH_D3D12_ENABLED
   if (api == BACKEND_API_D3D12) {
-    auto timeline = backend::d3d12::D3D12Timeline::Create(static_cast<backend::d3d12::D3D12Device *>(device.Get()));
+    auto timeline = backend::d3d12::ID3D12Timeline::Create(static_cast<backend::d3d12::ID3D12Device *>(device.Get()));
     ASSERT_TRUE(timeline);
     auto fence = timeline->NativeFence();
     release.open = [fence] { EXPECT_EQ(fence->Signal(1), S_OK); };
@@ -66,8 +66,8 @@ void CheckIndependentRetirement(BackendAPI api) {
 #endif
 #ifdef LONGMARCH_VULKAN_ENABLED
   if (api == BACKEND_API_VULKAN) {
-    auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
-    auto timeline = backend::vulkan::VulkanTimeline::Create(native);
+    auto native = static_cast<backend::vulkan::IVulkanDevice *>(device.Get());
+    auto timeline = backend::vulkan::IVulkanTimeline::Create(native);
     ASSERT_TRUE(timeline);
     const auto semaphore = timeline->NativeSemaphore();
     release.open = [native, semaphore] {
@@ -81,9 +81,9 @@ void CheckIndependentRetirement(BackendAPI api) {
 #endif
 #ifdef LONGMARCH_METAL_ENABLED
   if (api == BACKEND_API_METAL) {
-    auto timeline = backend::metal::MetalTimeline::Create(static_cast<backend::metal::MetalDevice *>(device.Get()));
+    auto timeline = backend::metal::IMetalTimeline::Create(static_cast<backend::metal::IMetalDevice *>(device.Get()));
     ASSERT_TRUE(timeline);
-    auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+    auto native = static_cast<backend::metal::IMetalDevice *>(device.Get());
     auto event = NS::TransferPtr(native->NativeDevice()->newSharedEvent());
     ASSERT_TRUE(event);
     // A CPU-controlled gate must use a SharedEvent. Bridge it to the GPU-only

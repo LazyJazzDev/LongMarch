@@ -8,26 +8,28 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalAccelerationStru
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalTopLevelAccelerationStructure;
+class IMetalTopLevelAccelerationStructure;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalTopLevelAccelerationStructure)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTopLevelAccelerationStructure)
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalBottomLevelAccelerationStructure;
+class IMetalBottomLevelAccelerationStructure;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::MetalBottomLevelAccelerationStructure)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalBottomLevelAccelerationStructure)
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDevice;
+class IMetalDevice;
+
+struct MetalAccelerationStructureState;
 
 class MetalAccelerationStructure : public IObject {
  public:
-  MetalDevice *Owner() const;
+  IMetalDevice *Owner() const;
   MTL::AccelerationStructure *NativeStructure() const;
   MTL::IBackendBuffer *CompactionQuery() const;
   uint64_t ScratchSize(AccelerationStructureBuildMode mode) const;
@@ -37,58 +39,61 @@ class MetalAccelerationStructure : public IObject {
   bool IsCompactStorage() const;
 
  protected:
-  explicit MetalAccelerationStructure(MetalDevice *device);
+  void InitializeMetalAccelerationStructure(IMetalDevice *device);
   bool Allocate(MTL::AccelerationStructureDescriptor *descriptor,
                 bool update,
                 bool compaction,
                 uint64_t compacted_size);
-
- private:
-  MetalDevice *device_;
-  NS::SharedPtr<MTL::AccelerationStructure> structure_;
-  NS::SharedPtr<MTL::IBackendBuffer> query_;
-  uint64_t build_scratch_{}, update_scratch_{};
-  bool allow_update_{}, allow_compaction_{}, compact_{};
+  virtual MetalAccelerationStructureState &StateMetalAccelerationStructure() = 0;
+  virtual const MetalAccelerationStructureState &StateMetalAccelerationStructure() const = 0;
 };
 
-class MetalBottomLevelAccelerationStructure final
-    : public AccelerationStructureObject<IBottomLevelAccelerationStructure>,
-      public MetalAccelerationStructure {
+class IMetalBottomLevelAccelerationStructure : public IBottomLevelAccelerationStructure,
+                                               public MetalAccelerationStructure {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(MetalBottomLevelAccelerationStructure,
-                               AccelerationStructureObject<IBottomLevelAccelerationStructure>,
-                               MetalAccelerationStructure)
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
 
-  static MetalBottomLevelAccelerationStructure *Create(MetalDevice *device,
-                                                       const BottomLevelAccelerationStructureDesc &desc);
-  AccelerationStructureType GetType() const override;
-  uint64_t GetCompactedSize() const override;
-  const BottomLevelAccelerationStructureDesc &GetDesc() const override;
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
 
- private:
-  MetalBottomLevelAccelerationStructure(MetalDevice *device, const BottomLevelAccelerationStructureDesc &desc);
-  BottomLevelAccelerationStructureDesc desc_;
-};
-
-class MetalTopLevelAccelerationStructure final : public AccelerationStructureObject<ITopLevelAccelerationStructure>,
-                                                 public MetalAccelerationStructure {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(MetalTopLevelAccelerationStructure,
-                               AccelerationStructureObject<ITopLevelAccelerationStructure>,
-                               MetalAccelerationStructure)
-
-  static MetalTopLevelAccelerationStructure *Create(MetalDevice *device, const TopLevelAccelerationStructureDesc &desc);
-  AccelerationStructureType GetType() const override;
-  uint64_t GetCompactedSize() const override;
-  const TopLevelAccelerationStructureDesc &GetDesc() const override;
-  const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &BottomLevels() const;
-  void CommitDependencies(std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references);
-
- private:
-  MetalTopLevelAccelerationStructure(MetalDevice *device, const TopLevelAccelerationStructureDesc &desc);
-  TopLevelAccelerationStructureDesc desc_;
-  std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> bottom_levels_;
+  static IMetalBottomLevelAccelerationStructure *Create(IMetalDevice *device,
+                                                        const BottomLevelAccelerationStructureDesc &desc);
+  virtual AccelerationStructureType GetType() const = 0;
+  virtual uint64_t GetCompactedSize() const = 0;
+  virtual const BottomLevelAccelerationStructureDesc &GetDesc() const = 0;
 };
+
+;
+
+class IMetalTopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public MetalAccelerationStructure {
+ public:
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
+
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
+
+ public:
+  static IMetalTopLevelAccelerationStructure *Create(IMetalDevice *device,
+                                                     const TopLevelAccelerationStructureDesc &desc);
+  virtual AccelerationStructureType GetType() const = 0;
+  virtual uint64_t GetCompactedSize() const = 0;
+  virtual const TopLevelAccelerationStructureDesc &GetDesc() const = 0;
+  virtual const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &BottomLevels() const = 0;
+  virtual void CommitDependencies(std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references) = 0;
+};
+
+;
 
 MTL::PrimitiveAccelerationStructureDescriptor *NativeGeometries(
     const BottomLevelAccelerationStructureDesc &desc,

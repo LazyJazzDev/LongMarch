@@ -1,8 +1,9 @@
-﻿#pragma once
+#pragma once
 #include <map>
 #include <mutex>
 
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
 #include "grassland/rhi/rhi_command_context.h"
 
 namespace grassland::rhi::backend::vulkan {
@@ -22,7 +23,7 @@ class VulkanRenderTargetPool {
 
     Lease(VulkanRenderTargetPool *pool, Entry *entry, const std::vector<VulkanImage *> &images);
     ~Lease() override;
-    const std::vector<VkImageView> &Views() const;
+    const std::vector<VkImageView> &VulkanImageViews() const;
     VkFramebuffer Framebuffer() const;
 
    private:

@@ -8,25 +8,27 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanAccelerationSt
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanTopLevelAccelerationStructure;
+class IVulkanTopLevelAccelerationStructure;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanTopLevelAccelerationStructure)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanTopLevelAccelerationStructure)
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanBottomLevelAccelerationStructure;
+class IVulkanBottomLevelAccelerationStructure;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::VulkanBottomLevelAccelerationStructure)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::vulkan::IVulkanBottomLevelAccelerationStructure)
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDevice;
+class IVulkanDevice;
+
+struct VulkanAccelerationStructureState;
 
 class VulkanAccelerationStructure : public IObject {
  public:
-  VulkanDevice *Owner() const;
+  IVulkanDevice *Owner() const;
   VkAccelerationStructureKHR NativeStructure() const;
   VkQueryPool CompactionQuery() const;
   VkBuildAccelerationStructureFlagsKHR BuildFlags() const;
@@ -38,66 +40,64 @@ class VulkanAccelerationStructure : public IObject {
   bool IsCompactStorage() const;
 
  protected:
-  explicit VulkanAccelerationStructure(VulkanDevice *device);
-  ~VulkanAccelerationStructure();
+  void InitializeVulkanAccelerationStructure(IVulkanDevice *device);
+  void DestroyVulkanAccelerationStructure();
   bool Allocate(const VkAccelerationStructureBuildGeometryInfoKHR &info,
                 const std::vector<uint32_t> &counts,
                 uint64_t compacted_size);
-
- private:
-  VulkanDevice *device_;
-  VkBuffer buffer_{};
-  VmaAllocation allocation_{};
-  VkAccelerationStructureKHR structure_{};
-  VkQueryPool query_{};
-  VkBuildAccelerationStructureFlagsKHR flags_{};
-  uint64_t address_{};
-  uint64_t build_scratch_{}, update_scratch_{};
-  bool allow_update_{}, allow_compaction_{}, compact_{};
+  virtual VulkanAccelerationStructureState &StateVulkanAccelerationStructure() = 0;
+  virtual const VulkanAccelerationStructureState &StateVulkanAccelerationStructure() const = 0;
 };
 
-class VulkanBottomLevelAccelerationStructure final
-    : public AccelerationStructureObject<IBottomLevelAccelerationStructure>,
-      public VulkanAccelerationStructure {
+class IVulkanBottomLevelAccelerationStructure : public IBottomLevelAccelerationStructure,
+                                                public VulkanAccelerationStructure {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(VulkanBottomLevelAccelerationStructure,
-                               AccelerationStructureObject<IBottomLevelAccelerationStructure>,
-                               VulkanAccelerationStructure)
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
 
-  static VulkanBottomLevelAccelerationStructure *Create(VulkanDevice *device,
-                                                        const BottomLevelAccelerationStructureDesc &desc);
-  AccelerationStructureType GetType() const override;
-  uint64_t GetCompactedSize() const override;
-  const BottomLevelAccelerationStructureDesc &GetDesc() const override;
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
 
- private:
-  VulkanBottomLevelAccelerationStructure(VulkanDevice *device, const BottomLevelAccelerationStructureDesc &desc);
-  BottomLevelAccelerationStructureDesc desc_;
-};
-
-class VulkanTopLevelAccelerationStructure final : public AccelerationStructureObject<ITopLevelAccelerationStructure>,
-                                                  public VulkanAccelerationStructure {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(VulkanTopLevelAccelerationStructure,
-                               AccelerationStructureObject<ITopLevelAccelerationStructure>,
-                               VulkanAccelerationStructure)
-
-  static VulkanTopLevelAccelerationStructure *Create(VulkanDevice *device,
-                                                     const TopLevelAccelerationStructureDesc &desc);
-  AccelerationStructureType GetType() const override;
-  uint64_t GetCompactedSize() const override;
-  const TopLevelAccelerationStructureDesc &GetDesc() const override;
-  const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &BottomLevels() const;
-  void CommitDependencies(std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references);
-
- private:
-  VulkanTopLevelAccelerationStructure(VulkanDevice *device, const TopLevelAccelerationStructureDesc &desc);
-  TopLevelAccelerationStructureDesc desc_;
-  std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> bottom_levels_;
+  static IVulkanBottomLevelAccelerationStructure *Create(IVulkanDevice *device,
+                                                         const BottomLevelAccelerationStructureDesc &desc);
+  virtual AccelerationStructureType GetType() const = 0;
+  virtual uint64_t GetCompactedSize() const = 0;
+  virtual const BottomLevelAccelerationStructureDesc &GetDesc() const = 0;
 };
+
+;
+
+class IVulkanTopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public VulkanAccelerationStructure {
+ public:
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
+
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
+
+ public:
+  static IVulkanTopLevelAccelerationStructure *Create(IVulkanDevice *device,
+                                                      const TopLevelAccelerationStructureDesc &desc);
+  virtual AccelerationStructureType GetType() const = 0;
+  virtual uint64_t GetCompactedSize() const = 0;
+  virtual const TopLevelAccelerationStructureDesc &GetDesc() const = 0;
+  virtual const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &BottomLevels() const = 0;
+  virtual void CommitDependencies(std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references) = 0;
+};
+
+;
 
 std::vector<VkAccelerationStructureGeometryKHR> NativeGeometries(
-    VulkanDevice *device,
+    IVulkanDevice *device,
     const BottomLevelAccelerationStructureDesc &desc,
     const std::vector<AccelerationStructureGeometryBuffers> &buffers = {});
 }  // namespace grassland::rhi::backend::vulkan

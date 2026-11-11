@@ -12,22 +12,20 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Program)
 namespace grassland::rhi::backend {
 class Device;
 
-class Program : public Object<IProgram> {
- public:
-  LONGMARCH_RHI_QUERY(Program, Object<IProgram>)
+struct ProgramState;
 
-  Program(Device *device, const ProgramDesc &desc);
-  ~Program() override;
+class Program : public IProgram {
+ protected:
+  void InitializeProgram(Device *device, const ProgramDesc &desc);
+  void DestroyProgram();
+
+ public:
   const ProgramDesc &GetDesc() const override;
   Device *Owner() const;
 
  protected:
   bool ValidateLayout() const;
-  Device *device_;
-  ProgramDesc desc_;
-
- private:
-  ObjectPtr<IShader> vertex_shader_;
-  ObjectPtr<IShader> fragment_shader_;
+  virtual ProgramState &StateProgram() = 0;
+  virtual const ProgramState &StateProgram() const = 0;
 };
 }  // namespace grassland::rhi::backend

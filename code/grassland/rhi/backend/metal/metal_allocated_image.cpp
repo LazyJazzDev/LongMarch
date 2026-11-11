@@ -1,15 +1,18 @@
 ﻿#include "grassland/rhi/backend/metal/metal_allocated_image.h"
 
+#include "grassland/rhi/backend/metal/metal_allocated_image_impl.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-MetalAllocatedImage::MetalAllocatedImage(MetalDevice *device, ImageDesc desc, NS::SharedPtr<MTL::Texture> texture)
-    : MetalImage(desc, device, texture.get()),
-      texture_(std::move(texture)) {
+MetalAllocatedImageImpl::MetalAllocatedImageImpl(IMetalDevice *device,
+                                                 ImageDesc desc,
+                                                 NS::SharedPtr<MTL::Texture> texture)
+    : texture_(std::move(texture)) {
+  InitializeMetalImage(desc, device, texture_.get());
 }
 
-MetalAllocatedImage *MetalAllocatedImage::Create(MetalDevice *device, const ImageDesc &desc) {
+IMetalAllocatedImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &desc) {
   const auto format = NativeImageFormat(desc.format);
   if (!desc.width || !desc.height || desc.width > 16384 || desc.height > 16384 || format == MTL::PixelFormatInvalid)
     return nullptr;
@@ -26,12 +29,18 @@ MetalAllocatedImage *MetalAllocatedImage::Create(MetalDevice *device, const Imag
     ReportError(-1, "Metal image allocation failed.");
     return nullptr;
   }
-  return new MetalAllocatedImage(device, desc, std::move(texture));
+  return new MetalAllocatedImageImpl(device, desc, std::move(texture));
 }
 
-bool MetalAllocatedImage::IsValid() const {
+bool MetalAllocatedImageImpl::IsValid() const {
   return bool(texture_);
 }
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalAllocatedImage, "4ab5d857-2e2e-4232-bd99-aca3979a9c87")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalAllocatedImage, "4ab5d857-2e2e-4232-bd99-aca3979a9c87")
+
+namespace grassland::rhi::backend::metal {
+IMetalAllocatedImage *IMetalAllocatedImage::Create(IMetalDevice *device, const ImageDesc &desc) {
+  return MetalAllocatedImageImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::metal

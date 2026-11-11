@@ -1,18 +1,21 @@
 ﻿#include "grassland/rhi/backend/metal/metal_sampler.h"
 
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_sampler_impl.h"
 
 namespace grassland::rhi::backend::metal {
-MetalSampler::MetalSampler(MetalDevice *device, const SamplerDesc &desc, NS::SharedPtr<MTL::SamplerState> sampler)
-    : Sampler(desc, device),
-      sampler_(std::move(sampler)) {
+MetalSamplerImpl::MetalSamplerImpl(IMetalDevice *device,
+                                   const SamplerDesc &desc,
+                                   NS::SharedPtr<MTL::SamplerState> sampler)
+    : sampler_(std::move(sampler)) {
+  InitializeSampler(desc, device);
 }
 
-MTL::SamplerState *MetalSampler::NativeSampler() const {
+MTL::SamplerState *MetalSamplerImpl::NativeSampler() const {
   return sampler_.get();
 }
 
-MetalSampler *MetalSampler::Create(MetalDevice *device, const SamplerDesc &desc) {
+IMetalSampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc &desc) {
   if (!Validate(desc))
     return nullptr;
 
@@ -32,8 +35,14 @@ MetalSampler *MetalSampler::Create(MetalDevice *device, const SamplerDesc &desc)
     ReportError(-1, "Metal sampler creation failed.");
     return nullptr;
   }
-  return new MetalSampler(device, desc, std::move(sampler));
+  return new MetalSamplerImpl(device, desc, std::move(sampler));
 }
 }  // namespace grassland::rhi::backend::metal
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::MetalSampler, "c609fe39-6f33-4a10-a4b1-db4fa86332b7")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::metal::IMetalSampler, "c609fe39-6f33-4a10-a4b1-db4fa86332b7")
+
+namespace grassland::rhi::backend::metal {
+IMetalSampler *IMetalSampler::Create(IMetalDevice *device, const SamplerDesc &desc) {
+  return MetalSamplerImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::metal

@@ -3,23 +3,24 @@
 
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_command_context_impl.h"
 
 namespace grassland::rhi::backend::d3d12 {
-bool D3D12CommandContext::CmdBuildBottomLevelAccelerationStructure(
+bool D3D12CommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     IBottomLevelAccelerationStructure *destination,
     const std::vector<AccelerationStructureGeometryBuffers> &geometries,
     AccelerationStructureBuildMode mode) {
-  auto target = rhi::QueryInterfacePtr<D3D12BottomLevelAccelerationStructure>(destination).Get();
+  auto target = rhi::QueryInterfacePtr<ID3D12BottomLevelAccelerationStructure>(destination).Get();
   if (!ray_list_ || !target || target->Owner() != device_ || rendering_active_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage())) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
 #if !defined(NDEBUG)
   if (!ValidateGeometryBuffers(target->GetDesc(), geometries, device_)) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
 #endif
@@ -66,16 +67,16 @@ bool D3D12CommandContext::CmdBuildBottomLevelAccelerationStructure(
   return true;
 }
 
-bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *destination,
-                                                                const std::vector<RayTracingInstance> &instances,
-                                                                AccelerationStructureBuildMode mode) {
-  auto target = rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(destination).Get();
+bool D3D12CommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *destination,
+                                                                    const std::vector<RayTracingInstance> &instances,
+                                                                    AccelerationStructureBuildMode mode) {
+  auto target = rhi::QueryInterfacePtr<ID3D12TopLevelAccelerationStructure>(destination).Get();
   if (!ray_list_ || !target || target->Owner() != device_ || rendering_active_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
       !ValidateInstances(target->GetDesc(), instances)) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
   if (mode == ACCELERATION_STRUCTURE_UPDATE) {
@@ -83,16 +84,16 @@ bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
     const size_t previous_count =
         pending == as_dependencies_.end() ? target->BottomLevels().size() : pending->second.size();
     if (instances.size() != previous_count) {
-      recording_failed_ = true;
+      StateCommandContext().recording_failed_ = true;
       return false;
     }
   }
   std::vector<D3D12_RAYTRACING_INSTANCE_DESC> native(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
-    auto blas = rhi::QueryInterfacePtr<D3D12BottomLevelAccelerationStructure>(instance.blas).Get();
+    auto blas = rhi::QueryInterfacePtr<ID3D12BottomLevelAccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
-      recording_failed_ = true;
+      StateCommandContext().recording_failed_ = true;
       return false;
     }
     if (!RetainResource(blas))
@@ -157,10 +158,10 @@ bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
   return true;
 }
 
-bool D3D12CommandContext::CmdQueryCompactedSize(IAccelerationStructure *structure) {
+bool D3D12CommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *structure) {
   auto target = rhi::QueryInterfacePtr<D3D12AccelerationStructure>(structure).Get();
   if (!ray_list_ || !target || target->Owner() != device_ || !target->AllowsCompaction() || rendering_active_) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
   if (!RetainResource(structure))
@@ -178,27 +179,27 @@ bool D3D12CommandContext::CmdQueryCompactedSize(IAccelerationStructure *structur
                             D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 }
 
-bool D3D12CommandContext::CmdCompactAccelerationStructure(IAccelerationStructure *source,
-                                                          IAccelerationStructure *destination) {
+bool D3D12CommandContextImpl::CmdCompactAccelerationStructure(IAccelerationStructure *source,
+                                                              IAccelerationStructure *destination) {
   auto from = rhi::QueryInterfacePtr<D3D12AccelerationStructure>(source).Get();
   auto to = rhi::QueryInterfacePtr<D3D12AccelerationStructure>(destination).Get();
   if (!ray_list_ || !from || !to || from == to || from->Owner() != device_ || to->Owner() != device_ ||
       !from->AllowsCompaction() || !to->IsCompactStorage() || source->GetType() != destination->GetType() ||
       rendering_active_) {
-    recording_failed_ = true;
+    StateCommandContext().recording_failed_ = true;
     return false;
   }
   if (!RetainResource(source))
     return false;
   if (!RetainResource(destination))
     return false;
-  if (auto top = rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(source).Get()) {
+  if (auto top = rhi::QueryInterfacePtr<ID3D12TopLevelAccelerationStructure>(source).Get()) {
     auto pending = as_dependencies_.find(top);
     auto dependencies = pending == as_dependencies_.end() ? top->BottomLevels() : pending->second;
     for (const auto &blas : dependencies)
       if (!RetainResource(blas.Get()))
         return false;
-    auto target = rhi::QueryInterfacePtr<D3D12TopLevelAccelerationStructure>(destination).Get();
+    auto target = rhi::QueryInterfacePtr<ID3D12TopLevelAccelerationStructure>(destination).Get();
     for (const auto &blas : target->BottomLevels())
       if (!RetainResource(blas.Get()))
         return false;

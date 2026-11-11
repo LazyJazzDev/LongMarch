@@ -10,7 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalAllocatedBuffer
 namespace grassland::rhi::backend::metal {
 class IMetalAllocatedBuffer : public IMetalBuffer {
  public:
-  static IMetalAllocatedBuffer *Create(MetalDevice *device,
+  static IMetalAllocatedBuffer *Create(IMetalDevice *device,
                                        const BufferDesc &desc,
                                        bool upload = false,
                                        bool download = false);

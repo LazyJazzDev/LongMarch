@@ -10,7 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12TemporalBufferL
 
 namespace grassland::rhi::backend::d3d12 {
 class ID3D12TemporalBufferLease;
-using D3D12TemporalBufferPool = TemporalBufferPool<D3D12Device, ID3D12AllocatedBuffer, ID3D12TemporalBufferLease>;
+using D3D12TemporalBufferPool = TemporalBufferPool<ID3D12Device, ID3D12AllocatedBuffer, ID3D12TemporalBufferLease>;
 
 class ID3D12TemporalBufferLease : public ID3D12Buffer {
  public:

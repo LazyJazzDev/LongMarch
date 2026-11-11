@@ -1,28 +1,30 @@
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 
+#include "grassland/rhi/backend/d3d12/d3d12_allocated_image_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #define D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 #include <D3D12MemAlloc.h>
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12AllocatedImage::D3D12AllocatedImage(D3D12Device *device,
-                                         ImageDesc desc,
-                                         ComPtr<ID3D12Resource> image,
-                                         ComPtr<D3D12MA::Allocation> allocation,
-                                         ObjectPtr<D3D12DescriptorPool::Lease> attachment)
-    : D3D12Image(desc, device, image.Get(), std::move(attachment)),
-      allocation_(std::move(allocation)),
+D3D12AllocatedImageImpl::D3D12AllocatedImageImpl(ID3D12Device *device,
+                                                 ImageDesc desc,
+                                                 ComPtr<ID3D12Resource> image,
+                                                 ComPtr<D3D12MA::Allocation> allocation,
+                                                 ObjectPtr<D3D12DescriptorPool::Lease> attachment)
+    : allocation_(std::move(allocation)),
       image_(std::move(image)) {
+  InitializeD3D12Image(desc, device, image_.Get(), std::move(attachment));
 }
 
-D3D12AllocatedImage::~D3D12AllocatedImage() = default;
+D3D12AllocatedImageImpl::~D3D12AllocatedImageImpl() {
+}
 
-bool D3D12AllocatedImage::IsValid() const {
+bool D3D12AllocatedImageImpl::IsValid() const {
   return true;
 }
 
-D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const ImageDesc &desc) {
+ID3D12AllocatedImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &desc) {
   if (!desc.width || !desc.height)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
@@ -58,8 +60,14 @@ D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const Imag
   auto attachment = CreateAttachmentView(device, image.Get());
   if (!attachment)
     return nullptr;
-  return new D3D12AllocatedImage(device, desc, std::move(image), std::move(allocation), std::move(attachment));
+  return new D3D12AllocatedImageImpl(device, desc, std::move(image), std::move(allocation), std::move(attachment));
 }
 }  // namespace grassland::rhi::backend::d3d12
 
-LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::D3D12AllocatedImage, "3d5647bf-0a89-4f7f-bce8-dd9e99c879a1")
+LONGMARCH_RHI_UUID(grassland::rhi::backend::d3d12::ID3D12AllocatedImage, "3d5647bf-0a89-4f7f-bce8-dd9e99c879a1")
+
+namespace grassland::rhi::backend::d3d12 {
+ID3D12AllocatedImage *ID3D12AllocatedImage::Create(ID3D12Device *device, const ImageDesc &desc) {
+  return D3D12AllocatedImageImpl::Create(device, desc);
+}
+}  // namespace grassland::rhi::backend::d3d12

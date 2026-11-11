@@ -52,11 +52,11 @@ VkDescriptorSetLayout CreateBindingLayout(VkDevice device, const BindingLayoutDe
   return result;
 }
 
-VulkanBindingGroup::VulkanBindingGroup(VulkanDevice *device, ObjectPtr<Version> version)
+VulkanBindingGroup::VulkanBindingGroup(IVulkanDevice *device, ObjectPtr<Version> version)
     : BindingGroup(device, std::move(version)) {
 }
 
-VulkanBindingGroup *VulkanBindingGroup::Create(VulkanDevice *device, const BindingLayoutDesc &layout) {
+VulkanBindingGroup *VulkanBindingGroup::Create(IVulkanDevice *device, const BindingLayoutDesc &layout) {
   if (!ValidateBindingLayout(layout))
     return nullptr;
   if (!ValidatePipelineBindings(device->NativePhysicalDevice(), {{layout}}))
@@ -67,7 +67,7 @@ VulkanBindingGroup *VulkanBindingGroup::Create(VulkanDevice *device, const Bindi
   return new VulkanBindingGroup(device, std::move(version));
 }
 
-VulkanBindingGroup::Version::Version(VulkanDevice *device, const BindingLayoutDesc &layout)
+VulkanBindingGroup::Version::Version(IVulkanDevice *device, const BindingLayoutDesc &layout)
     : BindingGroup::Version(layout),
       device_(device) {
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
@@ -87,7 +87,7 @@ VkDescriptorSet VulkanBindingGroup::Version::Set() const {
   return lease_->Set();
 }
 
-VulkanBindingGroup::Version *VulkanBindingGroup::Version::Create(VulkanDevice *device,
+VulkanBindingGroup::Version *VulkanBindingGroup::Version::Create(IVulkanDevice *device,
                                                                  const BindingLayoutDesc &layout) {
   auto version = std::unique_ptr<Version>(new Version(device, layout));
   version->native_layout_ = CreateBindingLayout(device->NativeDevice(), layout);
@@ -169,7 +169,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                    const std::vector<IImage *> &images) {
   const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
-    if (!rhi::QueryInterfacePtr<VulkanAllocatedImage>(image).Get())
+    if (!rhi::QueryInterfacePtr<IVulkanAllocatedImage>(image).Get())
       return false;
   auto native = device_->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(images.size());
@@ -199,7 +199,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   auto native = device_->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(samplers.size());
   for (size_t i = 0; i < samplers.size(); ++i)
-    infos[i].sampler = rhi::QueryInterfacePtr<VulkanSampler>(samplers[i]).Get()->NativeSampler();
+    infos[i].sampler = rhi::QueryInterfacePtr<IVulkanSampler>(samplers[i]).Get()->NativeSampler();
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
   write.dstBinding = binding.binding;
@@ -268,13 +268,13 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                    uint32_t first_element,
                                                    const std::vector<ITopLevelAccelerationStructure *> &values) {
   for (auto value : values) {
-    auto native = rhi::QueryInterfacePtr<VulkanTopLevelAccelerationStructure>(value).Get();
+    auto native = rhi::QueryInterfacePtr<IVulkanTopLevelAccelerationStructure>(value).Get();
     if (!native || native->Owner() != device_)
       return false;
   }
   std::vector<VkAccelerationStructureKHR> handles;
   for (auto value : values)
-    handles.push_back(rhi::QueryInterfacePtr<VulkanTopLevelAccelerationStructure>(value).Get()->NativeStructure());
+    handles.push_back(rhi::QueryInterfacePtr<IVulkanTopLevelAccelerationStructure>(value).Get()->NativeStructure());
   VkWriteDescriptorSetAccelerationStructureKHR as{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
   as.accelerationStructureCount = uint32_t(handles.size());
   as.pAccelerationStructures = handles.data();

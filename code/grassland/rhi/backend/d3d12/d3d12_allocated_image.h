@@ -2,9 +2,9 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12AllocatedImage;
+class ID3D12AllocatedImage;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12AllocatedImage)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12AllocatedImage)
 #include "grassland/rhi/backend/d3d12/d3d12_image.h"
 
 namespace D3D12MA {
@@ -12,23 +12,13 @@ class Allocation;
 }
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Device;
+class ID3D12Device;
 
-class D3D12AllocatedImage final : public D3D12Image {
+class ID3D12AllocatedImage : public D3D12Image {
  public:
-  LONGMARCH_RHI_QUERY(D3D12AllocatedImage, D3D12Image)
-
-  static D3D12AllocatedImage *Create(D3D12Device *device, const ImageDesc &desc);
-  ~D3D12AllocatedImage() override;
-  bool IsValid() const override;
-
- private:
-  D3D12AllocatedImage(D3D12Device *device,
-                      ImageDesc desc,
-                      ComPtr<ID3D12Resource> image,
-                      ComPtr<D3D12MA::Allocation> allocation,
-                      ObjectPtr<D3D12DescriptorPool::Lease> attachment);
-  ComPtr<D3D12MA::Allocation> allocation_;
-  ComPtr<ID3D12Resource> image_;
+  static ID3D12AllocatedImage *Create(ID3D12Device *device, const ImageDesc &desc);
+  virtual bool IsValid() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::d3d12

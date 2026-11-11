@@ -11,19 +11,21 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Image)
 namespace grassland::rhi::backend {
 class Queue;
 
-class Image : public Object<rhi::IImage> {
- public:
-  LONGMARCH_RHI_QUERY(Image, Object<rhi::IImage>)
+struct ImageState;
 
-  explicit Image(ImageDesc desc, Queue *queue = nullptr);
+class Image : public rhi::IImage {
+ protected:
+  void InitializeImage(ImageDesc desc, Queue *queue = nullptr);
+
+ public:
   bool SupportsQueue(const Queue *queue) const;
   const ImageDesc &GetDesc() const override;
   virtual bool SupportsStorage() const;
   virtual const void *DeviceIdentity() const = 0;
 
- private:
-  ImageDesc desc_;
-  Queue *queue_;
+ protected:
+  virtual ImageState &StateImage() = 0;
+  virtual const ImageState &StateImage() const = 0;
 };
 
 }  // namespace grassland::rhi::backend

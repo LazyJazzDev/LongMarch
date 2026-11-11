@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12ScratchPool::D3D12ScratchPool(D3D12Device *device) : device_(device) {
+D3D12ScratchPool::D3D12ScratchPool(ID3D12Device *device) : device_(device) {
 }
 
 ObjectPtr<ID3D12AllocatedBuffer> D3D12ScratchPool::Acquire(uint64_t size) {

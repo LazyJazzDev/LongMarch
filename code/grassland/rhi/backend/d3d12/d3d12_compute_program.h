@@ -2,24 +2,31 @@
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12ComputeProgram;
+class ID3D12ComputeProgram;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12ComputeProgram)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12ComputeProgram)
 #include "grassland/rhi/backend/backend_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Device;
+class ID3D12Device;
 
-class D3D12ComputeProgram final : public ComputeProgram, public D3D12ProgramBase {
+class ID3D12ComputeProgram : public ComputeProgram, public D3D12ProgramBase {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(D3D12ComputeProgram, ComputeProgram, D3D12ProgramBase)
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
 
-  static D3D12ComputeProgram *Create(D3D12Device *device, const ComputeProgramDesc &desc);
-  ID3D12PipelineState *NativePipeline() const;
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
 
- private:
-  D3D12ComputeProgram(D3D12Device *device, const ComputeProgramDesc &desc);
-  ComPtr<ID3D12PipelineState> pipeline_;
+ public:
+  static ID3D12ComputeProgram *Create(ID3D12Device *device, const ComputeProgramDesc &desc);
+  virtual ID3D12PipelineState *NativePipeline() const = 0;
 };
+
+;
 }  // namespace grassland::rhi::backend::d3d12

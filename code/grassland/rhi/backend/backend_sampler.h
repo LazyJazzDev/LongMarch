@@ -9,25 +9,19 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::Sampler)
 #include "grassland/rhi/rhi_sampler.h"
 
 namespace grassland::rhi::backend {
-class Sampler : public Object<ISampler> {
+struct SamplerState;
+
+class Sampler : public ISampler {
+ protected:
+  void InitializeSampler(const SamplerDesc &desc, const void *device);
+
  public:
-  LONGMARCH_RHI_QUERY(Sampler, Object<ISampler>)
-
-  Sampler(const SamplerDesc &desc, const void *device) : desc_(desc), device_(device) {
-  }
-
-  const SamplerDesc &GetDesc() const override {
-    return desc_;
-  }
-
-  const void *DeviceIdentity() const {
-    return device_;
-  }
-
+  const SamplerDesc &GetDesc() const override;
+  const void *DeviceIdentity() const;
   static bool Validate(const SamplerDesc &desc);
 
- private:
-  SamplerDesc desc_;
-  const void *device_;
+ protected:
+  virtual SamplerState &StateSampler() = 0;
+  virtual const SamplerState &StateSampler() const = 0;
 };
 }  // namespace grassland::rhi::backend

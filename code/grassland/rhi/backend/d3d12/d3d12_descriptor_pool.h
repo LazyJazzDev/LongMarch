@@ -36,13 +36,13 @@ class D3D12DescriptorPool {
     uint32_t offset_, count_;
   };
 
-  D3D12DescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t page_capacity = 256);
+  D3D12DescriptorPool(::ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t page_capacity = 256);
   ObjectPtr<Lease> Acquire(uint32_t count);
   std::pair<size_t, size_t> GetPageCounts() const;
 
  private:
   void ReleaseRange(Page *page, uint32_t offset, uint32_t count);
-  ID3D12Device *device_;
+  ::ID3D12Device *device_;
   D3D12_DESCRIPTOR_HEAP_TYPE type_;
   uint32_t page_capacity_, stride_;
   mutable std::mutex mutex_;

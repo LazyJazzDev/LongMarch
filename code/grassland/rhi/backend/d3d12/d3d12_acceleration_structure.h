@@ -8,25 +8,27 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12AccelerationStru
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12TopLevelAccelerationStructure;
+class ID3D12TopLevelAccelerationStructure;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12TopLevelAccelerationStructure)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12TopLevelAccelerationStructure)
 #include "grassland/rhi/rhi_interface_id.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12BottomLevelAccelerationStructure;
+class ID3D12BottomLevelAccelerationStructure;
 }
-LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::D3D12BottomLevelAccelerationStructure)
+LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::d3d12::ID3D12BottomLevelAccelerationStructure)
 #include "grassland/rhi/backend/backend_acceleration_structure.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Device;
+class ID3D12Device;
+
+struct D3D12AccelerationStructureState;
 
 class D3D12AccelerationStructure : public IObject {
  public:
-  D3D12Device *Owner() const;
+  ID3D12Device *Owner() const;
   ID3D12Resource *NativeResource() const;
   ID3D12Resource *CompactionReadback() const;
   ID3D12Resource *CompactionOutput() const;
@@ -39,60 +41,62 @@ class D3D12AccelerationStructure : public IObject {
   bool IsCompactStorage() const;
 
  protected:
-  explicit D3D12AccelerationStructure(D3D12Device *device);
-  ~D3D12AccelerationStructure();
+  void InitializeD3D12AccelerationStructure(ID3D12Device *device);
+  void DestroyD3D12AccelerationStructure();
   bool Allocate(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &inputs, uint64_t compacted_size);
-
- private:
-  D3D12Device *device_;
-  ComPtr<ID3D12Resource> resource_, query_buffer_, query_output_;
-  ComPtr<D3D12MA::Allocation> allocation_, query_allocation_, query_output_allocation_;
-  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs_{};
-  uint64_t build_scratch_{}, update_scratch_{};
-  bool allow_update_{}, allow_compaction_{}, compact_{};
+  virtual D3D12AccelerationStructureState &StateD3D12AccelerationStructure() = 0;
+  virtual const D3D12AccelerationStructureState &StateD3D12AccelerationStructure() const = 0;
 };
 
-class D3D12BottomLevelAccelerationStructure final
-    : public AccelerationStructureObject<IBottomLevelAccelerationStructure>,
-      public D3D12AccelerationStructure {
+class ID3D12BottomLevelAccelerationStructure : public IBottomLevelAccelerationStructure,
+                                               public D3D12AccelerationStructure {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(D3D12BottomLevelAccelerationStructure,
-                               AccelerationStructureObject<IBottomLevelAccelerationStructure>,
-                               D3D12AccelerationStructure)
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
 
-  static D3D12BottomLevelAccelerationStructure *Create(D3D12Device *device,
-                                                       const BottomLevelAccelerationStructureDesc &desc);
-  AccelerationStructureType GetType() const override;
-  uint64_t GetCompactedSize() const override;
-  const BottomLevelAccelerationStructureDesc &GetDesc() const override;
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
 
- private:
-  D3D12BottomLevelAccelerationStructure(D3D12Device *device, const BottomLevelAccelerationStructureDesc &desc);
-  BottomLevelAccelerationStructureDesc desc_;
-};
-
-class D3D12TopLevelAccelerationStructure final : public AccelerationStructureObject<ITopLevelAccelerationStructure>,
-                                                 public D3D12AccelerationStructure {
  public:
-  LONGMARCH_RHI_QUERY_MULTIPLE(D3D12TopLevelAccelerationStructure,
-                               AccelerationStructureObject<ITopLevelAccelerationStructure>,
-                               D3D12AccelerationStructure)
-
-  static D3D12TopLevelAccelerationStructure *Create(D3D12Device *device, const TopLevelAccelerationStructureDesc &desc);
-  AccelerationStructureType GetType() const override;
-  uint64_t GetCompactedSize() const override;
-  const TopLevelAccelerationStructureDesc &GetDesc() const override;
-  const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &BottomLevels() const;
-  void CommitDependencies(std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references);
-
- private:
-  D3D12TopLevelAccelerationStructure(D3D12Device *device, const TopLevelAccelerationStructureDesc &desc);
-  TopLevelAccelerationStructureDesc desc_;
-  std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> bottom_levels_;
+  static ID3D12BottomLevelAccelerationStructure *Create(ID3D12Device *device,
+                                                        const BottomLevelAccelerationStructureDesc &desc);
+  virtual AccelerationStructureType GetType() const = 0;
+  virtual uint64_t GetCompactedSize() const = 0;
+  virtual const BottomLevelAccelerationStructureDesc &GetDesc() const = 0;
 };
+
+;
+
+class ID3D12TopLevelAccelerationStructure : public ITopLevelAccelerationStructure, public D3D12AccelerationStructure {
+ public:
+  virtual void AddRef() noexcept override = 0;
+  virtual void Release() noexcept override = 0;
+  virtual bool QueryInterface(InterfaceID id, void **output) noexcept override = 0;
+
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
+
+ public:
+  static ID3D12TopLevelAccelerationStructure *Create(ID3D12Device *device,
+                                                     const TopLevelAccelerationStructureDesc &desc);
+  virtual AccelerationStructureType GetType() const = 0;
+  virtual uint64_t GetCompactedSize() const = 0;
+  virtual const TopLevelAccelerationStructureDesc &GetDesc() const = 0;
+  virtual const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &BottomLevels() const = 0;
+  virtual void CommitDependencies(std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references) = 0;
+};
+
+;
 
 std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> NativeGeometries(
-    D3D12Device *device,
+    ID3D12Device *device,
     const BottomLevelAccelerationStructureDesc &desc,
     const std::vector<AccelerationStructureGeometryBuffers> &buffers = {});
 }  // namespace grassland::rhi::backend::d3d12

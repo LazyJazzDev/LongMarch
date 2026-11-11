@@ -10,7 +10,7 @@ LONGMARCH_RHI_DECLARE_UUID(grassland::rhi::backend::metal::IMetalTemporalBufferL
 
 namespace grassland::rhi::backend::metal {
 class IMetalTemporalBufferLease;
-using MetalTemporalBufferPool = TemporalBufferPool<MetalDevice, IMetalAllocatedBuffer, IMetalTemporalBufferLease>;
+using MetalTemporalBufferPool = TemporalBufferPool<IMetalDevice, IMetalAllocatedBuffer, IMetalTemporalBufferLease>;
 
 class IMetalTemporalBufferLease : public IMetalBuffer {
  public:
