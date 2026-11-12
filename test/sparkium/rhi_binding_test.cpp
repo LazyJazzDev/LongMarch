@@ -4,6 +4,7 @@
 #include "grassland/util/virtual_file_system.h"
 #include "sparkium/core/render_layout.h"
 #include "sparkium/core/resource_updates.h"
+#include "sparkium/pipelines/raytracing/core/core.h"
 
 namespace {
 using namespace grassland;
@@ -30,6 +31,18 @@ class SparkiumBindingTest : public testing::TestWithParam<BackendAPI> {
   ObjPtr<IDevice> device_;
   VirtualFileSystem shaders_;
 };
+
+TEST_P(SparkiumBindingTest, InvalidGeometryLightShaderReturnsFailureWithoutThrowing) {
+  auto core = sparkium::Core::Create(device_.Get());
+  ASSERT_TRUE(core);
+  auto *tracing = sparkium::raytracing::DedicatedCast(core.get());
+  ASSERT_TRUE(tracing);
+  EXPECT_NO_THROW({
+    EXPECT_EQ(tracing->GetGeometryLightPowerProgram("#error invalid geometry for failure regression", ""), nullptr);
+  });
+  EXPECT_FALSE(core->IsValid());
+  EXPECT_EQ(tracing->GetGeometryLightPowerProgram("#error invalid geometry for failure regression", ""), nullptr);
+}
 
 TEST_P(SparkiumBindingTest, UploadSnapshotsSurviveCanceledRecordingAndAcceptOnlyRecordedPrefix) {
   sparkium::ResourceUpdates updates;

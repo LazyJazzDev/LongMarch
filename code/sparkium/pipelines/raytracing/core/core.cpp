@@ -26,6 +26,8 @@ rhi::IComputeProgram *Core::GetComputeProgram(const std::string &name) {
 }
 
 rhi::IComputeProgram *Core::GetGeometryLightPowerProgram(const CodeLines &geometry, const CodeLines &material) {
+  if (!IsValid())
+    return nullptr;
   // The VFS, backend, entry point, profile and binding layout are fixed for this Core.
   auto key = std::make_pair(std::string(geometry), std::string(material));
   auto found = geometry_light_programs_.find(key);
@@ -38,8 +40,10 @@ rhi::IComputeProgram *Core::GetGeometryLightPowerProgram(const CodeLines &geomet
   resources.shader =
       GetDevice()->CreateShader("light/geometry_material/gather_primitive_power.slang", "GatherPrimitivePowerKernel",
                                 rhi::SHADER_STAGE_COMPUTE, &vfs, {"."}, {});
-  if (!resources.shader)
-    throw std::runtime_error("failed to compile geometry light power shader");
+  if (!resources.shader) {
+    ReportFailure("failed to compile geometry light power shader");
+    return nullptr;
+  }
   {
     rhi::ComputeProgramDesc desc;
     desc.compute_shader = resources.shader.Get();
@@ -47,6 +51,10 @@ rhi::IComputeProgram *Core::GetGeometryLightPowerProgram(const CodeLines &geomet
                                      {1, rhi::BINDING_BYTE_ADDRESS_BUFFER, 1},
                                      {2, rhi::BINDING_RW_BYTE_ADDRESS_BUFFER, 1}}}};
     resources.program = GetDevice()->CreateComputeProgram(desc);
+  }
+  if (!resources.program) {
+    ReportFailure("failed to create geometry light power program");
+    return nullptr;
   }
   auto *program = resources.program.Get();
   geometry_light_programs_.emplace(std::move(key), std::move(resources));

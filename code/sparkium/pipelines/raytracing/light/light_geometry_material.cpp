@@ -21,6 +21,10 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
 
   gather_primitive_power_program_ =
       core_->GetGeometryLightPowerProgram(geometry_->SamplerImpl(), material_->EvaluatorImpl());
+  if (!direct_lighting_sampler_data_ || !gather_primitive_power_program_) {
+    core_->ReportFailure("failed to create geometry light resources");
+    return;
+  }
   uint32_t primitive_count = geometry_->PrimitiveCount();
   uint32_t group_size = 64;
 
@@ -39,12 +43,20 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
   core_->QueueUpload(direct_lighting_sampler_data_.Get(), &primitive_count, sizeof(uint32_t), sizeof(glm::mat4x3));
   blelloch_scan_up_program_ = core_->GetComputeProgram("blelloch_scan_up");
   blelloch_scan_down_program_ = core_->GetComputeProgram("blelloch_scan_down");
+  if (!metadata_buffer_ || !blelloch_scan_up_program_ || !blelloch_scan_down_program_) {
+    core_->ReportFailure("failed to create geometry light scan resources");
+    return;
+  }
   gather_group_ =
       core_->GetDevice()->CreateBindingGroup(gather_primitive_power_program_->GetDesc().pipeline_layout.groups[0]);
   scan_group_ = core_->GetDevice()->CreateBindingGroup(blelloch_scan_up_program_->GetDesc().pipeline_layout.groups[0]);
+  if (!gather_group_ || !scan_group_)
+    core_->ReportFailure("failed to create geometry light bindings");
 }
 
 int LightGeometryMaterial::SamplerShader(Scene *scene) {
+  if (!core_->IsValid())
+    return -1;
   if (dynamic_cast<GeometryMesh *>(geometry_)) {
     if (dynamic_cast<MaterialLight *>(material_)) {
       return 0x1000001;
@@ -67,8 +79,10 @@ int LightGeometryMaterial::SamplerShader(Scene *scene) {
     direct_lighting_sampler_ =
         core_->GetDevice()->CreateShader("light/geometry_material/direct_lighting_sampler.slang",
                                          "SampleDirectLightingCallable", rhi::SHADER_STAGE_CALLABLE, &vfs, {"."}, {});
-    if (!direct_lighting_sampler_)
-      throw std::runtime_error("failed to compile geometry light callable");
+    if (!direct_lighting_sampler_) {
+      core_->ReportFailure("failed to compile geometry light callable");
+      return -1;
+    }
   }
   return scene->RegisterCallableShader(direct_lighting_sampler_.Get());
 }
@@ -79,33 +93,50 @@ rhi::IBuffer *LightGeometryMaterial::SamplerData() {
 }
 
 bool LightGeometryMaterial::RecordPreprocess(rhi::ICommandContext *cmd_context) {
+  if (!core_->IsValid() || !cmd_context || !gather_group_ || !scan_group_)
+    return false;
   uint32_t group_size = 64;
-  cmd_context->CmdBindComputeProgram(gather_primitive_power_program_);
-  gather_group_->BindResource(0, geometry_->Buffer());
-  gather_group_->BindResource(1, material_->Buffer());
-  gather_group_->BindResource(2, direct_lighting_sampler_data_.Get());
-  cmd_context->CmdBindGroup(0, gather_group_.Get());
-  cmd_context->CmdDispatch((geometry_->PrimitiveCount() + 63) / 64, 1, 1);
-  cmd_context->CmdBindComputeProgram(blelloch_scan_up_program_);
-  scan_group_->BindResource(0, direct_lighting_sampler_data_.Get());
+  if (!cmd_context->CmdBindComputeProgram(gather_primitive_power_program_))
+    return false;
+  if (!gather_group_->BindResource(0, geometry_->Buffer()))
+    return false;
+  if (!gather_group_->BindResource(1, material_->Buffer()))
+    return false;
+  if (!gather_group_->BindResource(2, direct_lighting_sampler_data_.Get()))
+    return false;
+  if (!cmd_context->CmdBindGroup(0, gather_group_.Get()))
+    return false;
+  if (!cmd_context->CmdDispatch((geometry_->PrimitiveCount() + 63) / 64, 1, 1))
+    return false;
+  if (!cmd_context->CmdBindComputeProgram(blelloch_scan_up_program_))
+    return false;
+  if (!scan_group_->BindResource(0, direct_lighting_sampler_data_.Get()))
+    return false;
 
   for (size_t i = 1; i < metadatas_.size(); i++) {
-    scan_group_->BindResource(
-        1, rhi::BufferView{metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i, sizeof(BlellochScanMetadata)});
-    cmd_context->CmdBindGroup(0, scan_group_.Get());
-    cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1);
+    if (!scan_group_->BindResource(
+            1, rhi::BufferView{metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i, sizeof(BlellochScanMetadata)}))
+      return false;
+    if (!cmd_context->CmdBindGroup(0, scan_group_.Get()))
+      return false;
+    if (!cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1))
+      return false;
   }
 
-  cmd_context->CmdBindComputeProgram(blelloch_scan_down_program_);
+  if (!cmd_context->CmdBindComputeProgram(blelloch_scan_down_program_))
+    return false;
 
   for (size_t i = metadatas_.size() - 1; i < metadatas_.size(); i--) {
     if (metadatas_[i].element_count < group_size) {
       continue;
     }
-    scan_group_->BindResource(
-        1, rhi::BufferView{metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i, sizeof(BlellochScanMetadata)});
-    cmd_context->CmdBindGroup(0, scan_group_.Get());
-    cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1);
+    if (!scan_group_->BindResource(
+            1, rhi::BufferView{metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i, sizeof(BlellochScanMetadata)}))
+      return false;
+    if (!cmd_context->CmdBindGroup(0, scan_group_.Get()))
+      return false;
+    if (!cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1))
+      return false;
   }
   return true;
 }
