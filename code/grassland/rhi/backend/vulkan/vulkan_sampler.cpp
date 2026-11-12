@@ -1,7 +1,6 @@
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
-#include "grassland/rhi/backend/vulkan/vulkan_sampler_impl.h"
 
 namespace grassland::rhi::backend::vulkan {
 VulkanSamplerImpl::VulkanSamplerImpl(IVulkanDevice *device, const SamplerDesc &desc) : device_(device->NativeDevice()) {

@@ -4,8 +4,6 @@
 #include <cstring>
 #include <vector>
 
-#include "grassland/rhi/backend/metal/metal_download_token_impl.h"
-
 namespace grassland::rhi::backend::metal {
 MetalDownloadTokenImpl::MetalDownloadTokenImpl(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size)
     : MetalDownloadTokenImpl(std::move(lease), DownloadLayout{0, size, size, 1}) {

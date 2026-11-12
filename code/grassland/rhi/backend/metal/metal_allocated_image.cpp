@@ -1,6 +1,5 @@
 ﻿#include "grassland/rhi/backend/metal/metal_allocated_image.h"
 
-#include "grassland/rhi/backend/metal/metal_allocated_image_impl.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 

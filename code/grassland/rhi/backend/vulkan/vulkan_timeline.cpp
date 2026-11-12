@@ -1,7 +1,6 @@
 #include "grassland/rhi/backend/vulkan/vulkan_timeline.h"
 
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
-#include "grassland/rhi/backend/vulkan/vulkan_timeline_impl.h"
 
 namespace grassland::rhi::backend::vulkan {
 

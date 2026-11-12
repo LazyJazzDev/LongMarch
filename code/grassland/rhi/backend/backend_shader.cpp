@@ -1,7 +1,6 @@
 ﻿#include "grassland/rhi/backend/backend_shader.h"
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
-#include "grassland/rhi/backend/backend_shader_impl.h"
 
 namespace grassland::rhi::backend {
 ShaderImpl::ShaderImpl(const ShaderDesc &desc) : stage_(desc.stage), entry_(desc.entry_point) {

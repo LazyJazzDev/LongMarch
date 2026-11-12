@@ -140,7 +140,9 @@ query adds exactly one reference; failed queries clear the output. Implementatio
 classes are never inherited.
 
 Objects communicate through hidden interfaces rather than implementation
-layouts. Final definitions remain in their `.cpp` or internal `*_impl.h` files.
+layouts. Interface and final implementation declarations share the corresponding
+backend header; the former 47 `*_impl.h` files are merged into those headers.
+Classes defined entirely inside a `.cpp` remain local to that implementation.
 
 No additional type tag, query table, cached interface pointer, or second
 reference count is stored per object. UUID comparisons and pointer adjustments

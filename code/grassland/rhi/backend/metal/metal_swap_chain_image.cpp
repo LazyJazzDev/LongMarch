@@ -1,6 +1,5 @@
 ﻿#include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 
-#include "grassland/rhi/backend/metal/metal_swap_chain_image_impl.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
 
 namespace grassland::rhi::backend::metal {

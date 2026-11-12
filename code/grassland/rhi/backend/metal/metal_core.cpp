@@ -3,7 +3,7 @@
 #include <TargetConditionals.h>
 #include <sys/sysctl.h>
 
-#include "grassland/rhi/backend/metal/metal_core_impl.h"
+#include "grassland/rhi/backend/metal/metal_core.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {

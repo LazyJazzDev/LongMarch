@@ -13,7 +13,7 @@
 #include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
-#include "grassland/rhi/backend/vulkan/vulkan_binding_group_impl.h"
+#include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"

@@ -2,7 +2,7 @@
 
 #include <vk_mem_alloc.h>
 
-#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure_impl.h"
+#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {

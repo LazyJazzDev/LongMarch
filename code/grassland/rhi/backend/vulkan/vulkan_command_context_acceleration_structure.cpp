@@ -3,7 +3,6 @@
 
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
-#include "grassland/rhi/backend/vulkan/vulkan_command_context_impl.h"
 
 namespace grassland::rhi::backend::vulkan {
 namespace {

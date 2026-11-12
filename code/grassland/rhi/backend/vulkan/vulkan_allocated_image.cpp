@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <utility>
 
-#include "grassland/rhi/backend/vulkan/vulkan_allocated_image_impl.h"
+#include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"

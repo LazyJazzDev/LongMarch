@@ -3,7 +3,6 @@
 #include <unordered_set>
 
 #include "grassland/rhi/backend/metal/metal_command_context.h"
-#include "grassland/rhi/backend/metal/metal_command_context_impl.h"
 
 namespace grassland::rhi::backend::metal {
 bool MetalCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(

@@ -1,7 +1,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
 
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
-#include "grassland/rhi/backend/d3d12/d3d12_sampler_impl.h"
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12SamplerImpl::D3D12SamplerImpl(ID3D12Device *device, const SamplerDesc &desc) {

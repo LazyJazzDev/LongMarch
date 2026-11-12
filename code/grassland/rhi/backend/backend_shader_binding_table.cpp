@@ -1,7 +1,5 @@
 #include "grassland/rhi/backend/backend_shader_binding_table.h"
 
-#include "grassland/rhi/backend/backend_shader_binding_table_impl.h"
-
 namespace grassland::rhi::backend {
 ShaderBindingTableImpl::ShaderBindingTableImpl(IRayTracingProgram *program,
                                                const ShaderBindingTableDesc &desc,

@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
-#include "grassland/rhi/backend/vulkan/vulkan_compute_program_impl.h"
+#include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {

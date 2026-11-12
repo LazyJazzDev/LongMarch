@@ -1,7 +1,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
-#include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
 namespace grassland::rhi::backend::d3d12 {

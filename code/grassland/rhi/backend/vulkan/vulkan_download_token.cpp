@@ -2,8 +2,6 @@
 
 #include <vector>
 
-#include "grassland/rhi/backend/vulkan/vulkan_download_token_impl.h"
-
 namespace grassland::rhi::backend::vulkan {
 VulkanDownloadTokenImpl::VulkanDownloadTokenImpl(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size)
     : VulkanDownloadTokenImpl(std::move(lease), DownloadLayout{0, size, size, 1}) {

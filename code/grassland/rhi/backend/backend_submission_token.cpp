@@ -1,7 +1,5 @@
 ﻿#include "grassland/rhi/backend/backend_submission_token.h"
 
-#include "grassland/rhi/backend/backend_submission_token_impl.h"
-
 namespace grassland::rhi::backend {
 
 SubmissionTokenImpl::SubmissionTokenImpl(Event event) : event_(event) {

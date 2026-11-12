@@ -3,7 +3,7 @@
 #include <utility>
 
 #include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
-#include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image_impl.h"
+#include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
 namespace grassland::rhi::backend::vulkan {

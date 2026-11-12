@@ -13,7 +13,6 @@
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
-#include "grassland/rhi/backend/metal/metal_window_impl.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_queue.h"
 #define GLFW_INCLUDE_NONE

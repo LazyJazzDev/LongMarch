@@ -7,7 +7,7 @@
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
-#include "grassland/rhi/backend/vulkan/vulkan_queue_impl.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend::vulkan {

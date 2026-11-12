@@ -2,8 +2,6 @@
 
 #include <vector>
 
-#include "grassland/rhi/backend/d3d12/d3d12_download_token_impl.h"
-
 namespace grassland::rhi::backend::d3d12 {
 D3D12DownloadTokenImpl::D3D12DownloadTokenImpl(ObjectPtr<ID3D12TemporalBufferLease> lease, uint64_t size)
     : D3D12DownloadTokenImpl(std::move(lease), DownloadLayout{0, size, size, 1}) {

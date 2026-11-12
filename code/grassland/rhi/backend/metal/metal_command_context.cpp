@@ -10,7 +10,7 @@
 #include "grassland/rhi/backend/backend_download_token.h"
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
-#include "grassland/rhi/backend/metal/metal_command_context_impl.h"
+#include "grassland/rhi/backend/metal/metal_command_context.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_download_token.h"

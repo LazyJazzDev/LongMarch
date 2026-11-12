@@ -2,7 +2,6 @@
 
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
-#include "grassland/rhi/backend/d3d12/d3d12_window_impl.h"
 #define GLFW_INCLUDE_NONE
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>

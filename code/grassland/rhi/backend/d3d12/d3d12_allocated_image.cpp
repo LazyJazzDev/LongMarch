@@ -1,6 +1,5 @@
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 
-#include "grassland/rhi/backend/d3d12/d3d12_allocated_image_impl.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #define D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 #include <D3D12MemAlloc.h>

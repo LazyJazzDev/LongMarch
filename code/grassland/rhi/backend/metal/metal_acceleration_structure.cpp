@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-#include "grassland/rhi/backend/metal/metal_acceleration_structure_impl.h"
+#include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {

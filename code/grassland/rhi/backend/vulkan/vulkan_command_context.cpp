@@ -15,7 +15,6 @@
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
-#include "grassland/rhi/backend/vulkan/vulkan_command_context_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_download_token.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image_views.h"

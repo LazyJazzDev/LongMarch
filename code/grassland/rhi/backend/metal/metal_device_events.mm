@@ -1,7 +1,6 @@
 #import <Metal/Metal.h>
-#include "grassland/rhi/backend/metal/metal_device_impl.h"
-
 #include "grassland/rhi/backend/metal/metal_device.h"
+
 #include "grassland/rhi/backend/metal/metal_queue.h"
 
 namespace grassland::rhi::backend::metal {

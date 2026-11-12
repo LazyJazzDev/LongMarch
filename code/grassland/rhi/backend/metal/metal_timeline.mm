@@ -1,11 +1,10 @@
+#include "grassland/rhi/backend/metal/metal_timeline.h"
 #import <Metal/Metal.h>
-#include "grassland/rhi/backend/metal/metal_timeline_impl.h"
 
 #include <condition_variable>
 #include <mutex>
 
 #include "grassland/rhi/backend/metal/metal_device.h"
-#include "grassland/rhi/backend/metal/metal_timeline.h"
 
 namespace grassland::rhi::backend::metal {
 struct MetalTimelineImpl::CompletionState final {

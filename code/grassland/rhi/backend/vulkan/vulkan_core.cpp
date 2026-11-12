@@ -1,6 +1,5 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_core.h"
 
-#include "grassland/rhi/backend/vulkan/vulkan_core_impl.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/util/log.h"
 

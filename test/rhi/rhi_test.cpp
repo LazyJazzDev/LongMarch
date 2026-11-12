@@ -12,7 +12,6 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_shader.h"
-#include "grassland/rhi/backend/backend_shader_impl.h"
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_queue.h"

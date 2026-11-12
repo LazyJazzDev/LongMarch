@@ -39,7 +39,6 @@
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_download_token.h"
 #include "grassland/rhi/backend/backend_shader.h"
-#include "grassland/rhi/backend/backend_shader_impl.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_command_context.h"
 #include "grassland/rhi/rhi_image.h"
