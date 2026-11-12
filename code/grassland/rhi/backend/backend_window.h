@@ -65,6 +65,18 @@ class Window : public Object<rhi::IWindow> {
     return drop_event_;
   }
 
+  bool SupportsMagnifyGestures() const override {
+#if defined(__APPLE__)
+    return magnify_monitor_ != nullptr;
+#else
+    return false;
+#endif
+  }
+
+  EventManager<void(const MagnifyGesture &)> &MagnifyEvent() override {
+    return magnify_event_;
+  }
+
   ~Window() override;
   rhi::IImage *GetNextImage() override;
   bool IsSwapChainInvalid() const override;
@@ -95,6 +107,10 @@ class Window : public Object<rhi::IWindow> {
   std::unique_ptr<WindowImGui> imgui_;
   std::unique_ptr<ImagePresenter> presenter_;
   bool processing_imgui_{};
+  EventManager<void(const MagnifyGesture &)> magnify_event_;
+#if defined(__APPLE__)
+  void *magnify_monitor_{};
+#endif
   EventManager<void(int, int)> resize_event_;
   EventManager<void(int, int)> framebufferresize_event_;
   EventManager<void(bool)> cursorenter_event_;

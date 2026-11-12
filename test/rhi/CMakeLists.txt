@@ -19,6 +19,6 @@ if (LONGMARCH_METAL_ENABLED)
 endif ()
 
 if (APPLE)
-    target_sources(test_rhi PRIVATE cocoa_hdr_test.mm)
+    target_sources(test_rhi PRIVATE cocoa_hdr_test.mm cocoa_gesture_test.mm)
     target_link_libraries(test_rhi PRIVATE "-framework Cocoa")
 endif ()

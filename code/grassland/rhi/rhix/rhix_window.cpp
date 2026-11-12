@@ -58,6 +58,14 @@ EventManager<void(int, const char **)> &Window::DropEvent() const {
   return Get()->DropEvent();
 }
 
+bool Window::SupportsMagnifyGestures() const {
+  return Get() && Get()->SupportsMagnifyGestures();
+}
+
+EventManager<void(const rhi::MagnifyGesture &)> &Window::MagnifyEvent() const {
+  return Get()->MagnifyEvent();
+}
+
 bool Window::PollEvents() {
   return rhi::PollEvents();
 }

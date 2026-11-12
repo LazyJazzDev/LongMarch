@@ -27,6 +27,8 @@ class Window : public ObjectContainer {
   EventManager<void(int, int, int, int)> &KeyEvent() const;
   EventManager<void(uint32_t)> &CharEvent() const;
   EventManager<void(int, const char **)> &DropEvent() const;
+  bool SupportsMagnifyGestures() const;
+  EventManager<void(const rhi::MagnifyGesture &)> &MagnifyEvent() const;
   Image GetNextImage() const;
   bool IsSwapChainInvalid() const;
   bool RebuildSwapChain() const;

@@ -295,6 +295,9 @@ ColorSpace Window::RequestedColorSpace() const {
 }
 
 Window::~Window() {
+#if defined(__APPLE__)
+  glfw::RemoveMagnifyEvents(magnify_monitor_);
+#endif
   imgui_.reset();
   glfw::UnregisterWindow(window_);
   glfw::DestroyWindow(window_);
@@ -309,6 +312,9 @@ bool Window::InitializeWindow(Device *device, const WindowDesc &desc) {
   if (!window_)
     return false;
   glfw::RegisterWindow(this);
+#if defined(__APPLE__)
+  magnify_monitor_ = glfw::InstallMagnifyEvents(window_);
+#endif
   return true;
 }
 

@@ -8,18 +8,18 @@
 
 namespace {
 
-graphics::BackendAPI ParseBackend(const std::string &name) {
+rhi::BackendAPI ParseBackend(const std::string &name) {
   if (name == "auto") {
-    return graphics::BACKEND_API_DEFAULT;
+    return rhi::BACKEND_API_DEFAULT;
   }
   if (name == "vulkan") {
-    return graphics::BACKEND_API_VULKAN;
+    return rhi::BACKEND_API_VULKAN;
   }
   if (name == "d3d12") {
-    return graphics::BACKEND_API_D3D12;
+    return rhi::BACKEND_API_D3D12;
   }
   if (name == "metal") {
-    return graphics::BACKEND_API_METAL;
+    return rhi::BACKEND_API_METAL;
   }
   throw std::invalid_argument("Unknown backend: " + name);
 }
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     int cell_grid_width = grid_size::kDefault;
     int cell_grid_height = grid_size::kDefault;
     int frames = 0;
-    auto api = graphics::BACKEND_API_DEFAULT;
+    auto api = rhi::BACKEND_API_DEFAULT;
     std::string screenshot;
     float random_density = 0.0f;
     bool random_requested = false;
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
       app.SetRandomInitialCells(random_density, 0);
     }
     app.SetScreenshotPath(screenshot);
-    app.Run(frames);
+    return app.Run(frames) ? 0 : 1;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';
     return 1;

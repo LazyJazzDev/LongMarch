@@ -6,10 +6,8 @@ Model::Model(const std::vector<Vertex> &vertices, const std::vector<uint32_t> &i
 }
 
 DeviceModel::DeviceModel(Application *app, uint32_t num_vertices, uint32_t num_indices) : app_(app) {
-  app_->Core()->CreateBuffer(std::max<size_t>(num_vertices, 1) * sizeof(Vertex), graphics::BUFFER_TYPE_DYNAMIC,
-                             &vertex_buffer_);
-  app_->Core()->CreateBuffer(std::max<size_t>(num_indices, 1) * sizeof(uint32_t), graphics::BUFFER_TYPE_DYNAMIC,
-                             &index_buffer_);
+  vertex_buffer_ = app_->CreateBuffer(std::max<size_t>(num_vertices, 1) * sizeof(Vertex));
+  index_buffer_ = app_->CreateBuffer(std::max<size_t>(num_indices, 1) * sizeof(uint32_t));
 }
 
 DeviceModel::DeviceModel(Application *app, const Model &model)
@@ -18,27 +16,16 @@ DeviceModel::DeviceModel(Application *app, const Model &model)
   UploadIndices(model.Indices());
 }
 
-DeviceModel::~DeviceModel() {
-  // Replacing a UI mesh can happen while an earlier frame still uses its buffers.
-  // Keep both buffers alive until all submitted draws have finished.
-  app_->Core()->WaitGPU();
-}
+// Submitted RHI commands retain their exact allocations until GPU completion.
+DeviceModel::~DeviceModel() = default;
 
 void DeviceModel::UploadVertices(const std::vector<Vertex> &vertices) {
-  const size_t size = vertices.size() * sizeof(Vertex);
-  if (size > vertex_buffer_->Size()) {
-    vertex_buffer_->Resize(size);
-  }
-  vertex_buffer_->UploadData(vertices.data(), size);
+  app_->UploadBuffer(vertex_buffer_, vertices.data(), vertices.size() * sizeof(Vertex));
 }
 
 void DeviceModel::UploadIndices(const std::vector<uint32_t> &indices) {
-  const size_t size = indices.size() * sizeof(uint32_t);
-  if (size > index_buffer_->Size()) {
-    index_buffer_->Resize(size);
-  }
-  index_buffer_->UploadData(indices.data(), size);
-  index_count_ = static_cast<uint32_t>(indices.size());
+  if (app_->UploadBuffer(index_buffer_, indices.data(), indices.size() * sizeof(uint32_t)))
+    index_count_ = static_cast<uint32_t>(indices.size());
 }
 
 std::vector<Vertex> ComposeVertices(const std::vector<glm::vec2> &positions, const glm::vec4 &color) {
