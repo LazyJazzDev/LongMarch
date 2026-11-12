@@ -3,6 +3,7 @@
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/virtual_file_system.h"
 #include "sparkium/core/render_layout.h"
+#include "sparkium/core/resource_updates.h"
 
 namespace {
 using namespace grassland;
@@ -16,9 +17,6 @@ class SparkiumBindingTest : public testing::TestWithParam<BackendAPI> {
     device_ = core_->CreateDeviceByAutoSelection();
     ASSERT_TRUE(device_);
     shaders_ = VirtualFileSystem::LoadDirectory(LONGMARCH_SPARKIUM_SHADERS);
-    std::vector<uint8_t> bindings;
-    ASSERT_EQ(shaders_.ReadFile("rhi_bindings.slang", bindings), 0);
-    ASSERT_EQ(shaders_.WriteFile("bindings.slang", bindings), 0);
   }
 
   ObjPtr<IShader> Shader(const std::string &file,
@@ -32,6 +30,50 @@ class SparkiumBindingTest : public testing::TestWithParam<BackendAPI> {
   ObjPtr<IDevice> device_;
   VirtualFileSystem shaders_;
 };
+
+TEST_P(SparkiumBindingTest, UploadSnapshotsSurviveCanceledRecordingAndAcceptOnlyRecordedPrefix) {
+  sparkium::ResourceUpdates updates;
+  ObjPtr<IBuffer> buffer = device_->CreateBuffer({sizeof(uint32_t)});
+  ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_ASSIST);
+  ASSERT_TRUE(buffer);
+  ASSERT_TRUE(queue);
+  uint32_t source = 17;
+  ASSERT_TRUE(updates.Upload(buffer.Get(), &source, sizeof(source)));
+  source = 29;
+  {
+    ObjPtr<ICommandContext> canceled = queue->CreateCommandContext();
+    auto cursor = updates.Begin();
+    ASSERT_TRUE(updates.Record(canceled.Get(), cursor));
+  }
+  auto cursor = updates.Begin();
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ASSERT_TRUE(updates.Record(commands.Get(), cursor));
+  ASSERT_TRUE(updates.Upload(buffer.Get(), &source, sizeof(source)));
+  ObjPtr<IDownloadToken> first = commands->CmdDownloadBuffer(buffer.Get(), 0, sizeof(source));
+  ASSERT_TRUE(first);
+  ObjPtr<ISubmissionToken> submitted = commands->Submit();
+  ASSERT_TRUE(submitted);
+  ASSERT_TRUE(updates.Accept(cursor));
+  EXPECT_FALSE(updates.Accept(cursor));
+  EXPECT_FALSE(updates.Empty());
+  ASSERT_TRUE(submitted->WaitHost());
+  uint32_t actual{};
+  ASSERT_TRUE(first->CopyTo(&actual, sizeof(actual)));
+  EXPECT_EQ(actual, 17u);
+
+  cursor = updates.Begin();
+  commands = queue->CreateCommandContext();
+  ASSERT_TRUE(updates.Record(commands.Get(), cursor));
+  ObjPtr<IDownloadToken> second = commands->CmdDownloadBuffer(buffer.Get(), 0, sizeof(source));
+  ASSERT_TRUE(second);
+  submitted = commands->Submit();
+  ASSERT_TRUE(submitted);
+  ASSERT_TRUE(updates.Accept(cursor));
+  EXPECT_TRUE(updates.Empty());
+  ASSERT_TRUE(submitted->WaitHost());
+  ASSERT_TRUE(second->CopyTo(&actual, sizeof(actual)));
+  EXPECT_EQ(actual, 29u);
+}
 
 TEST_P(SparkiumBindingTest, SharedPathTracerCompilesWithFourGroups) {
   shaders_.WriteFile("software_camera.slang", "#include \"camera/pinhole.slang\"\n");

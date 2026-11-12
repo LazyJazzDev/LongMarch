@@ -1,4 +1,4 @@
-﻿#include "sparkium/scene_io/json_scene.h"
+#include "sparkium/scene_io/json_scene.h"
 
 #include <algorithm>
 #include <array>
@@ -17,9 +17,30 @@
 #include "sparkium/camera/cameras.h"
 #include "sparkium/core/core.h"
 
+#define STB_IMAGE_STATIC
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 namespace sparkium {
 namespace {
 using Value = rapidjson::Value;
+
+rhi::ObjPtr<rhi::IImage> LoadTexture(Core *core, const std::string &path) {
+  int width{}, height{}, channels{};
+  void *pixels = stbi_load(path.c_str(), &width, &height, &channels, 4);
+  auto format = rhi::IMAGE_FORMAT_R8G8B8A8_UNORM;
+  if (!pixels) {
+    pixels = stbi_loadf(path.c_str(), &width, &height, &channels, 4);
+    format = rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT;
+  }
+  if (!pixels)
+    return {};
+  rhi::ObjPtr<rhi::IImage> image =
+      core->GetDevice()->CreateImage({static_cast<uint32_t>(width), static_cast<uint32_t>(height), format});
+  const bool uploaded = image && core->QueueUpload(image.Get(), pixels);
+  stbi_image_free(pixels);
+  return uploaded ? image : rhi::ObjPtr<rhi::IImage>{};
+}
 
 const Value &RequireObject(const Value &value) {
   if (!value.IsObject())
@@ -812,7 +833,7 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
         principled->emission_color = Vec3Member(spec, "emission_color", principled->emission_color);
         if (spec.HasMember("textures")) {
           const auto &textures = RequireObject(spec["textures"]);
-          const std::pair<const char *, graphics::Image **> slots[] = {
+          const std::pair<const char *, rhi::IImage **> slots[] = {
               {"normal", &principled->textures.normal},
               {"base_color", &principled->textures.base_color},
               {"metallic", &principled->textures.metallic},
@@ -824,11 +845,11 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
           for (auto [slot, destination] : slots) {
             if (!textures.HasMember(slot))
               continue;
-            auto image = std::unique_ptr<graphics::Image>{};
             auto asset = Resolve(path, ReadString(textures[slot]));
-            if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
+            auto image = LoadTexture(core, asset.string());
+            if (!image)
               throw std::runtime_error("cannot load texture: " + asset.string());
-            *destination = image.get();
+            *destination = image.Get();
             result->images_.push_back(std::move(image));
           }
           principled->textures.normal_reverse_y = BoolMember(textures, "normal_reverse_y", false);
@@ -838,17 +859,17 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
         const auto &graph = RequireObject(Member(spec, "graph"));
         const auto &nodes = RequireObject(Member(graph, "nodes"));
         std::map<std::string, int> texture_slots;
-        std::vector<graphics::Image *> textures;
+        std::vector<rhi::IImage *> textures;
         for (auto node = nodes.MemberBegin(); node != nodes.MemberEnd(); ++node) {
           if (!RequireObject(node->value).HasMember("type") ||
               std::string(ReadString(node->value["type"])) != "image_texture")
             continue;
           auto asset = Resolve(path, ReadString(Member(node->value, "path")));
-          auto image = std::unique_ptr<graphics::Image>{};
-          if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
+          auto image = LoadTexture(core, asset.string());
+          if (!image)
             throw std::runtime_error("cannot load shader graph texture: " + asset.string());
           texture_slots[ReadString(node->name)] = static_cast<int>(textures.size());
-          textures.push_back(image.get());
+          textures.push_back(image.Get());
           result->images_.push_back(std::move(image));
         }
         auto code = ShaderGraphCompiler(graph, texture_slots).Compile();
@@ -936,6 +957,11 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
         throw std::runtime_error("unknown entity type: " + type);
       }
       result->scene_->AddEntity(entity_ptr);
+    }
+    if (!core->IsValid() || !result->film_->IsValid()) {
+      if (error)
+        *error = "failed to initialize scene GPU resources";
+      return nullptr;
     }
     return result;
   } catch (const std::exception &exception) {

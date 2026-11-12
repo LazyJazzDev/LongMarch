@@ -1,4 +1,4 @@
-﻿#include "sparkium/core/core.h"
+#include "sparkium/core/core.h"
 
 #include "sparkium/core/camera.h"
 #include "sparkium/core/entity.h"
@@ -9,56 +9,95 @@
 #include "sparkium/pipelines/pipelines.h"
 
 namespace sparkium {
-Core::Core(graphics::Core *core) : core_(core) {
-  LoadPublicShaders();
-  LoadPublicBuffers();
-  LoadPublicImages();
+Core::Core(rhi::IDevice *device) : device_(device) {
 }
 
-graphics::Core *Core::GraphicsCore() const {
-  return core_;
+std::unique_ptr<Core> Core::Create(rhi::IDevice *device) {
+  if (!device)
+    return {};
+  std::unique_ptr<Core> core(new Core(device));
+  if (!core->LoadPublicShaders() || !core->LoadPublicBuffers() || !core->LoadPublicImages())
+    return {};
+  return core;
+}
+
+bool Core::IsValid() const {
+  return valid_;
+}
+
+bool Core::ReportFailure(const char *message) {
+  LogError("Sparkium: {}", message);
+  valid_ = false;
+  return false;
+}
+
+bool Core::QueueUpload(rhi::IBuffer *buffer, const void *data, uint64_t size, uint64_t offset) {
+  return (valid_ && updates_.Upload(buffer, data, size, offset)) || ReportFailure("Cannot queue buffer upload");
+}
+
+bool Core::QueueUpload(rhi::IImage *image, const void *data, uint64_t row_pitch) {
+  return (valid_ && updates_.Upload(image, data, row_pitch)) || ReportFailure("Cannot queue image upload");
+}
+
+bool Core::QueueBuild(rhi::IBottomLevelAccelerationStructure *structure,
+                      const std::vector<rhi::AccelerationStructureGeometryBuffers> &geometries) {
+  return (valid_ && updates_.Build(structure, geometries)) || ReportFailure("Cannot queue geometry build");
+}
+
+ResourceUpdates::Cursor Core::BeginUpdates() const {
+  return updates_.Begin();
+}
+
+bool Core::RecordUpdates(rhi::ICommandContext *commands, ResourceUpdates::Cursor &cursor) {
+  return valid_ && updates_.Record(commands, cursor);
+}
+
+bool Core::AcceptUpdates(const ResourceUpdates::Cursor &cursor) {
+  return updates_.Accept(cursor);
+}
+
+rhi::IDevice *Core::GetDevice() const {
+  return device_;
 }
 
 RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const {
   if (render_pipeline == RENDER_PIPELINE_AUTO) {
-    const bool prefer_ray_query =
-        core_->API() == graphics::BACKEND_API_D3D12 || core_->API() == graphics::BACKEND_API_VULKAN;
-    if (prefer_ray_query && core_->DeviceRayQuerySupport()) {
+    if (device_->SupportRayQuery()) {
       render_pipeline = RENDER_PIPELINE_RAY_QUERY;
-    } else if (core_->DeviceRayTracingSupport()) {
+    } else if (device_->SupportRayTracingPipeline()) {
       render_pipeline = RENDER_PIPELINE_RAY_TRACING;
-    } else if (core_->DeviceRayQuerySupport()) {
-      render_pipeline = RENDER_PIPELINE_RAY_QUERY;
     } else {
       render_pipeline = RENDER_PIPELINE_RT_FALLBACK;
     }
   }
   // Older Blender scenes request pipeline RT. Keep them on native traversal
   // when the device supports inline queries instead of a full RT pipeline.
-  if (render_pipeline == RENDER_PIPELINE_RAY_TRACING && !core_->DeviceRayTracingSupport())
-    return core_->DeviceRayQuerySupport() ? RENDER_PIPELINE_RAY_QUERY : RENDER_PIPELINE_RT_FALLBACK;
+  if (render_pipeline == RENDER_PIPELINE_RAY_TRACING && !device_->SupportRayTracingPipeline())
+    return device_->SupportRayQuery() ? RENDER_PIPELINE_RAY_QUERY : RENDER_PIPELINE_RT_FALLBACK;
   return render_pipeline;
 }
 
-void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline) {
-  render_pipeline = ResolveRenderPipeline(render_pipeline);
-  switch (render_pipeline) {
+bool Core::RecordRender(Renderer &renderer,
+                        rhi::ICommandContext *commands,
+                        ResourceUpdates::Cursor &updates,
+                        Scene *scene,
+                        Camera *camera,
+                        Film *film,
+                        RenderPipeline render_pipeline) {
+  if (!valid_ || !commands || !scene || !camera || !film)
+    return false;
+  switch (ResolveRenderPipeline(render_pipeline)) {
     case RENDER_PIPELINE_RASTERIZATION:
-      raster::Render(this, scene, camera, film);
-      break;
+      return raster::RecordRender(this, commands, updates, scene, camera, film);
     case RENDER_PIPELINE_RAY_TRACING:
-      raytracing::Render(this, scene, camera, film);
-      break;
+      return raytracing::RecordRender(this, renderer, commands, updates, scene, camera, film);
     case RENDER_PIPELINE_RAY_QUERY:
-      if (!core_->DeviceRayQuerySupport())
-        throw std::runtime_error("ray_query is unavailable on the selected graphics backend");
-      raytracing::Render(this, scene, camera, film, true, true);
-      break;
+      return device_->SupportRayQuery() &&
+             raytracing::RecordRender(this, renderer, commands, updates, scene, camera, film, true, true);
     case RENDER_PIPELINE_RT_FALLBACK:
-      raytracing::Render(this, scene, camera, film, true);
-      break;
+      return raytracing::RecordRender(this, renderer, commands, updates, scene, camera, film, true);
     default:
-      LogError("Unknown render pipeline");
+      return false;
   }
 }
 
@@ -66,79 +105,101 @@ const VirtualFileSystem &Core::GetShadersVFS() const {
   return shaders_vfs_;
 }
 
-graphics::Shader *Core::GetShader(const std::string &name) {
-  return shaders_[name].get();
+rhi::IShader *Core::GetShader(const std::string &name) {
+  auto found = shaders_.find(name);
+  return found == shaders_.end() ? nullptr : found->second.Get();
 }
 
-graphics::ComputeProgram *Core::GetComputeProgram(const std::string &name) {
-  return compute_programs_[name].get();
+rhi::IComputeProgram *Core::GetComputeProgram(const std::string &name) {
+  auto found = compute_programs_.find(name);
+  return found == compute_programs_.end() ? nullptr : found->second.Get();
 }
 
-graphics::Buffer *Core::GetBuffer(const std::string &name) {
-  return buffers_[name].get();
+rhi::IBuffer *Core::GetBuffer(const std::string &name) {
+  auto found = buffers_.find(name);
+  return found == buffers_.end() ? nullptr : found->second.Get();
 }
 
-graphics::Image *Core::GetImage(const std::string &name) {
-  return images_[name].get();
+rhi::IImage *Core::GetImage(const std::string &name) {
+  auto found = images_.find(name);
+  return found == images_.end() ? nullptr : found->second.Get();
 }
 
-void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::Shader> &&shader) {
+bool Core::SetPublicResource(const std::string &name, rhi::ObjPtr<rhi::IShader> &&shader) {
+  if (!shader)
+    return ReportFailure("Cannot create public resource");
   shaders_[name] = std::move(shader);
+  return true;
 }
 
-void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::ComputeProgram> &&program) {
+bool Core::SetPublicResource(const std::string &name, rhi::ObjPtr<rhi::IComputeProgram> &&program) {
+  if (!program)
+    return ReportFailure("Cannot create public resource");
   compute_programs_[name] = std::move(program);
+  return true;
 }
 
-void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::Buffer> &&buffer) {
+bool Core::SetPublicResource(const std::string &name, rhi::ObjPtr<rhi::IBuffer> &&buffer) {
+  if (!buffer)
+    return ReportFailure("Cannot create public resource");
   buffers_[name] = std::move(buffer);
+  return true;
 }
 
-void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::Image> &&image) {
+bool Core::SetPublicResource(const std::string &name, rhi::ObjPtr<rhi::IImage> &&image) {
+  if (!image)
+    return ReportFailure("Cannot create public resource");
   images_[name] = std::move(image);
+  return true;
 }
 
-void Core::LoadPublicShaders() {
+bool Core::LoadPublicShaders() {
   shaders_vfs_ = VirtualFileSystem::LoadDirectory(LONGMARCH_SPARKIUM_SHADERS);
-  std::unique_ptr<graphics::Shader> shader;
-  std::unique_ptr<graphics::ComputeProgram> compute_program;
+  rhi::ObjPtr<rhi::IShader> shader;
+  rhi::ObjPtr<rhi::IComputeProgram> compute_program;
 
   for (bool hdr : {false, true}) {
     const std::string name = hdr ? "tone_mapping_hdr" : "tone_mapping";
-    std::vector<std::string> args;
+    std::vector<std::pair<std::string, std::string>> defines;
     if (hdr)
-      args.push_back("-DSPARKIUM_HDR_OUTPUT=1");
-    core_->CreateShader(shaders_vfs_, "tone_mapping.slang", "Main", "cs_6_0", args, &shader);
-    SetPublicResource(name, std::move(shader));
-    core_->CreateComputeProgram(GetShader(name), &compute_program);
-    compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-    compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
-    compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-    compute_program->Finalize();
-    SetPublicResource(name, std::move(compute_program));
+      defines.emplace_back("SPARKIUM_HDR_OUTPUT", "1");
+    shader =
+        device_->CreateShader("tone_mapping.slang", "Main", rhi::SHADER_STAGE_COMPUTE, &shaders_vfs_, {"."}, defines);
+    if (!SetPublicResource(name, std::move(shader)))
+      return false;
+    {
+      rhi::ComputeProgramDesc desc;
+      desc.compute_shader = GetShader(name);
+      desc.pipeline_layout.groups = {
+          {{{0, rhi::BINDING_TEXTURE2D, 1}, {1, rhi::BINDING_RW_TEXTURE2D, 1}, {2, rhi::BINDING_UNIFORM_BUFFER, 1}}}};
+      compute_program = device_->CreateComputeProgram(desc);
+    }
+    if (!SetPublicResource(name, std::move(compute_program)))
+      return false;
   }
+  return true;
 }
 
-void Core::LoadPublicBuffers() {
+bool Core::LoadPublicBuffers() {
   auto path = FindAssetFile("data/new-joe-kuo-7.21201");
   auto data = SobolTableGen(65536, 1024, path);
-  std::unique_ptr<graphics::Buffer> buffer;
-  core_->CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &buffer);
-  buffer->UploadData(data.data(), data.size() * sizeof(float));
-  SetPublicResource("sobol", std::move(buffer));
+  rhi::ObjPtr<rhi::IBuffer> buffer;
+  buffer = device_->CreateBuffer({data.size() * sizeof(float)});
+  QueueUpload(buffer.Get(), data.data(), data.size() * sizeof(float));
+  return SetPublicResource("sobol", std::move(buffer)) && valid_;
 }
 
-void Core::LoadPublicImages() {
+bool Core::LoadPublicImages() {
   uint32_t pixel = 0xFFFFFFFF;
   float hdr_pixel[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-  std::unique_ptr<graphics::Image> image;
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  image->UploadData(&pixel);
+  rhi::ObjPtr<rhi::IImage> image;
+  image = device_->CreateImage({1, 1, rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  QueueUpload(image.Get(), &pixel);
   SetPublicResource("white", std::move(image));
 
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
-  image->UploadData(hdr_pixel);
+  image = device_->CreateImage({1, 1, rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  QueueUpload(image.Get(), hdr_pixel);
   SetPublicResource("white_hdr", std::move(image));
 
   pixel = 0;
@@ -147,18 +208,18 @@ void Core::LoadPublicImages() {
   hdr_pixel[2] = 0.0f;
   hdr_pixel[3] = 1.0f;
 
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  image->UploadData(&pixel);
+  image = device_->CreateImage({1, 1, rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  QueueUpload(image.Get(), &pixel);
   SetPublicResource("black", std::move(image));
 
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
-  image->UploadData(hdr_pixel);
+  image = device_->CreateImage({1, 1, rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  QueueUpload(image.Get(), hdr_pixel);
   SetPublicResource("black_hdr", std::move(image));
 
   pixel = 0xFFFF8080;  // Normal map default value (0.5, 0.5, 1.0)
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  image->UploadData(&pixel);
-  SetPublicResource("normal_default", std::move(image));
+  image = device_->CreateImage({1, 1, rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  QueueUpload(image.Get(), &pixel);
+  return SetPublicResource("normal_default", std::move(image)) && valid_;
 }
 
 }  // namespace sparkium

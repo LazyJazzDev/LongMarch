@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "sparkium/core/camera.h"
 #include "sparkium/core/core.h"
 #include "sparkium/core/film.h"
@@ -16,11 +16,10 @@ class Material;
 class Light;
 class Entity;
 class Camera;
-class Film;
 
 struct GeometryRegistration {
   int32_t data_index;
-  graphics::AccelerationStructure *blas;
+  rhi::IBottomLevelAccelerationStructure *blas;
 };
 
 struct InstanceRegistration {
@@ -52,8 +51,8 @@ struct BlellochScanMetadata {
 };
 
 struct InstanceHitGroups {
-  graphics::HitGroup render_group;
-  graphics::HitGroup shadow_group;
+  rhi::RayTracingHitGroup render_group;
+  rhi::RayTracingHitGroup shadow_group;
 };
 
 }  // namespace sparkium::raytracing

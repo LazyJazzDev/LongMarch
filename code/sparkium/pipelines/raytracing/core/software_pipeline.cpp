@@ -1,4 +1,4 @@
-﻿#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
+#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 
 #include <algorithm>
 #include <array>
@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "sparkium/core/render_layout.h"
 #include "sparkium/pipelines/raytracing/core/camera.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"
@@ -47,7 +48,7 @@ static_assert(sizeof(GPUInstance) == 112, "Slang software instance layout change
 }  // namespace
 
 SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query) : core_(core), ray_query_(ray_query) {
-  if (ray_query_ && !core_->GraphicsCore()->DeviceRayQuerySupport())
+  if (ray_query_ && !core_->GetDevice()->SupportRayQuery())
     throw std::runtime_error("native ray queries are unavailable on the selected backend");
   static_assert(sizeof(BuildParameters) == 256, "uniform buffer alignment");
 }
@@ -63,32 +64,42 @@ void SoftwarePipeline::AddInstance(Geometry *geometry,
   instances_.push_back({geometry, material, transform, geometry_index});
 }
 
-void SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
-  auto graphics = core_->GraphicsCore();
+bool SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
+  auto device = core_->GetDevice();
   builders_.clear();
   if (builder_shaders_.empty()) {
+    auto shaders_vfs = core_->GetShadersVFS();
     for (const char *entry : {"InitLeaves", "ReduceNodes", "MortonKeys", "BitonicSort", "SortLeaves"}) {
-      std::unique_ptr<graphics::Shader> shader;
-      if (graphics->CreateShader(core_->GetShadersVFS(), "software/build.slang", entry, "cs_6_0", {"-I."}, &shader))
-        throw std::runtime_error(std::string("failed to compile software BVH kernel: ") + entry);
+      rhi::ObjPtr<rhi::IShader> shader;
+      shader = device->CreateShader("software/build.slang", entry, rhi::SHADER_STAGE_COMPUTE, &shaders_vfs, {"."}, {});
+      if (!shader)
+        return core_->ReportFailure("failed to compile software BVH kernel");
       builder_shaders_.push_back(std::move(shader));
     }
   }
   for (auto &shader : builder_shaders_) {
-    std::unique_ptr<graphics::ComputeProgram> program;
-    graphics->CreateComputeProgram(shader.get(), &program);
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffer_count);
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-    program->Finalize();
+    rhi::ObjPtr<rhi::IComputeProgram> program;
+    {
+      rhi::ComputeProgramDesc desc;
+      desc.compute_shader = shader.Get();
+      desc.pipeline_layout.groups = {{{{0, rhi::BINDING_RW_BYTE_ADDRESS_BUFFER, 1},
+                                       {1, rhi::BINDING_BYTE_ADDRESS_BUFFER, static_cast<uint32_t>(buffer_count)},
+                                       {2, rhi::BINDING_UNIFORM_BUFFER, 1},
+                                       {3, rhi::BINDING_RW_BYTE_ADDRESS_BUFFER, 1},
+                                       {4, rhi::BINDING_BYTE_ADDRESS_BUFFER, 1}}}};
+      program = device->CreateComputeProgram(desc);
+    }
+    if (!program)
+      return core_->ReportFailure("failed to create software BVH pipeline");
     builders_.push_back(std::move(program));
   }
+  build_group_ = core_->GetDevice()->CreateBindingGroup(builders_.front()->GetDesc().pipeline_layout.groups[0]);
   builder_buffer_count_ = buffer_count;
+  return build_group_ &&
+         std::all_of(builders_.begin(), builders_.end(), [](const auto &program) { return bool(program); });
 }
 
-void SoftwarePipeline::CompileRenderer(const std::vector<MaterialCode> &materials,
+bool SoftwarePipeline::CompileRenderer(const std::vector<MaterialCode> &materials,
                                        uint32_t buffers,
                                        uint32_t sdr_count,
                                        uint32_t hdr_count,
@@ -181,34 +192,31 @@ float Transmission(HitRecord hit, float3 direction) {
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("software_materials.slang", source.str());
   vfs.WriteFile("software_camera.slang", "#include \"" + camera_file + "\"\n");
-  render_program_.reset();
-  std::vector<std::string> args{"-I.", "-DSOFTWARE_DATA_BUFFER_COUNT=" + std::to_string(buffers)};
-  args.push_back("-DSPARKIUM_CAMERA_ENTRY=" + camera_entry);
+  render_program_.Release();
+  std::vector<std::pair<std::string, std::string>> defines{{"SOFTWARE_DATA_BUFFER_COUNT", std::to_string(buffers)}};
+  defines.emplace_back("SPARKIUM_CAMERA_ENTRY", camera_entry);
   if (ray_query_)
-    args.push_back("-DSPARKIUM_RAY_QUERY");
+    defines.emplace_back("SPARKIUM_RAY_QUERY", "1");
   if (has_graph)
-    args.push_back("-DSPARKIUM_SHADER_GRAPHS");
-  if (core_->GraphicsCore()->CreateShader(vfs, "software/render.slang", "Main", ray_query_ ? "cs_6_5" : "cs_6_0", args,
-                                          &render_shader_))
-    throw std::runtime_error("failed to compile compute ray tracing shader");
-  core_->GraphicsCore()->CreateComputeProgram(render_shader_.get(), &render_program_);
-  for (auto binding : std::vector<std::pair<graphics::ResourceType, uint32_t>>{
-           {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
-           {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
-           {ray_query_ ? graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE : graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1},
-           {graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1},
-           {graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers + 6},
-           {graphics::RESOURCE_TYPE_IMAGE, sdr_count},
-           {graphics::RESOURCE_TYPE_IMAGE, hdr_count},
-           {graphics::RESOURCE_TYPE_SAMPLER, 2}})
-    render_program_->AddResourceBinding(binding.first, binding.second);
-  render_program_->Finalize();
+    defines.emplace_back("SPARKIUM_SHADER_GRAPHS", "1");
+  render_shader_ = core_->GetDevice()->CreateShader("software/render.slang", "Main", rhi::SHADER_STAGE_COMPUTE, &vfs,
+                                                    {"."}, defines);
+  if (!render_shader_)
+    return core_->ReportFailure("failed to compile compute ray tracing shader");
+  rhi::ComputeProgramDesc desc;
+  desc.compute_shader = render_shader_.Get();
+  desc.pipeline_layout = RayTracingLayout(!ray_query_, buffers, sdr_count, hdr_count);
+  render_program_ = core_->GetDevice()->CreateComputeProgram(desc);
+  if (!render_program_)
+    return core_->ReportFailure("failed to create compute path tracing pipeline");
+  render_group_ = core_->GetDevice()->CreateBindingGroup(desc.pipeline_layout.groups[SPARKIUM_GROUP_SCENE]);
   camera_file_ = camera_file;
   camera_entry_ = camera_entry;
   material_sources_ = materials;
   buffer_count_ = buffers;
   sdr_count_ = sdr_count;
   hdr_count_ = hdr_count;
+  return render_program_ && render_group_;
 }
 
 void SoftwarePipeline::AppendBuild(std::vector<BuildPass> &passes, BuildParameters parameters) {
@@ -236,20 +244,21 @@ void SoftwarePipeline::AppendBuild(std::vector<BuildPass> &passes, BuildParamete
   }
 }
 
-void SoftwarePipeline::Update(graphics::CommandContext *commands,
-                              const std::vector<graphics::Buffer *> &buffers,
-                              uint32_t sdr_count,
-                              uint32_t hdr_count,
-                              Camera *camera) {
-  auto graphics = core_->GraphicsCore();
+bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
+                                     ResourceUpdates::Cursor &updates,
+                                     const std::vector<rhi::IBuffer *> &buffers,
+                                     uint32_t sdr_count,
+                                     uint32_t hdr_count,
+                                     Camera *camera) {
+  auto device = core_->GetDevice();
   const std::string camera_file = camera->ShaderFile();
   const std::string camera_entry = camera->EntryPoint();
   std::vector<GeometryLayout> geometries;
   std::vector<GPUInstance> gpu_instances;
-  std::vector<graphics::RayTracingInstance> native_instances;
+  std::vector<rhi::RayTracingInstance> native_instances;
   std::vector<MaterialCode> materials;
   if (16ull + instances_.size() * sizeof(GPUInstance) > std::numeric_limits<uint32_t>::max())
-    throw std::runtime_error("software instance byte address overflow");
+    return core_->ReportFailure("software instance byte address overflow");
   const uint32_t tlas_leaves = ray_query_ ? 1 : LeafCount(instances_.size());
   uint64_t node_count = uint64_t(tlas_leaves) * 2 - 1;
   uint32_t max_leaves = tlas_leaves;
@@ -259,7 +268,7 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
     if (geometry == geometries.end()) {
       const uint32_t count = instance.geometry->PrimitiveCount(), leaves = ray_query_ ? 1 : LeafCount(count);
       if (node_count + uint64_t(leaves) * 2 - 1 > std::numeric_limits<uint32_t>::max() / 32u)
-        throw std::runtime_error("software BVH node address overflow");
+        return core_->ReportFailure("software BVH node address overflow");
       geometries.push_back(
           {instance.geometry, static_cast<uint32_t>(node_count), leaves, count, instance.geometry_index});
       geometry = geometries.end() - 1;
@@ -274,15 +283,20 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
       materials.push_back(std::move(source));
     glm::mat4 object_to_world(instance.transform);
     if (std::abs(glm::determinant(object_to_world)) < 1.0e-20f)
-      throw std::runtime_error("software ray tracing requires invertible instance transforms");
+      return core_->ReportFailure("software ray tracing requires invertible instance transforms");
     gpu_instances.push_back({instance.transform, glm::mat4x3(glm::inverse(object_to_world)), geometry->root,
                              instance.geometry_index, material_index, geometry->count});
     if (ray_query_) {
       auto blas = instance.geometry->BLAS();
       if (!blas)
-        throw std::runtime_error("failed to build native triangle BLAS");
-      native_instances.push_back(
-          blas->MakeInstance(instance.transform, static_cast<uint32_t>(native_instances.size())));
+        return core_->ReportFailure("failed to build native triangle BLAS");
+      rhi::RayTracingInstance native;
+      native.blas = blas;
+      native.custom_index = static_cast<uint32_t>(native_instances.size());
+      for (uint32_t row = 0; row < 3; ++row)
+        for (uint32_t column = 0; column < 4; ++column)
+          native.transform[row * 4 + column] = instance.transform[column][row];
+      native_instances.push_back(native);
     }
   }
 
@@ -290,36 +304,40 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   for (size_t i = 0; !rebuild && i < geometries.size(); ++i)
     rebuild = geometries[i].geometry != geometries_[i].geometry || geometries[i].count != geometries_[i].count;
   if (rebuild && !ray_query_) {
-    graphics->CreateBuffer(node_count * 32, graphics::BUFFER_TYPE_STATIC, &nodes_);
-    graphics->CreateBuffer(uint64_t(max_leaves) * 8, graphics::BUFFER_TYPE_STATIC, &keys_);
+    nodes_ = device->CreateBuffer({node_count * 32});
+    keys_ = device->CreateBuffer({uint64_t(max_leaves) * 8});
   }
 
   size_t instance_bytes = 16 + gpu_instances.size() * sizeof(GPUInstance);
-  if (!instances_buffer_ || instances_buffer_->Size() < instance_bytes)
-    graphics->CreateBuffer(instance_bytes, graphics::BUFFER_TYPE_STATIC, &instances_buffer_);
+  if (!instances_buffer_ || instances_buffer_->GetDesc().size < instance_bytes)
+    instances_buffer_ = device->CreateBuffer({instance_bytes});
   std::array<uint32_t, 4> header{static_cast<uint32_t>(gpu_instances.size()), 0, 0, 0};
-  instances_buffer_->UploadData(header.data(), sizeof(header));
+  core_->QueueUpload(instances_buffer_.Get(), header.data(), sizeof(header));
   if (!gpu_instances.empty())
-    instances_buffer_->UploadData(gpu_instances.data(), gpu_instances.size() * sizeof(GPUInstance), 16);
+    core_->QueueUpload(instances_buffer_.Get(), gpu_instances.data(), gpu_instances.size() * sizeof(GPUInstance), 16);
   if (ray_query_) {
-    if (!native_tlas_) {
-      if (graphics->CreateTopLevelAccelerationStructure(native_instances, &native_tlas_))
-        throw std::runtime_error("failed to create native TLAS");
-    } else if (native_tlas_->UpdateInstances(native_instances)) {
-      throw std::runtime_error("failed to update native TLAS");
-    }
+    if (!core_->RecordUpdates(commands, updates))
+      return false;
+    if (!native_tlas_ || native_tlas_->GetDesc().instance_count < native_instances.size())
+      native_tlas_ = device->CreateTopLevelAccelerationStructure(
+          {static_cast<uint32_t>(std::max<size_t>(1, native_instances.size()))});
+    if (!native_tlas_ || !commands->CmdBuildTopLevelAccelerationStructure(native_tlas_.Get(), native_instances))
+      return core_->ReportFailure("failed to build native ray query TLAS");
     if (!render_program_ || camera_file_ != camera_file || camera_entry_ != camera_entry ||
         materials != material_sources_ || buffer_count_ != buffers.size() || sdr_count_ != sdr_count ||
         hdr_count_ != hdr_count)
-      CompileRenderer(materials, buffers.size(), sdr_count, hdr_count, camera_file, camera_entry);
-    return;
+      if (!CompileRenderer(materials, buffers.size(), sdr_count, hdr_count, camera_file, camera_entry))
+        return false;
+    return true;
   }
   if (builders_.empty() || builder_buffer_count_ != buffers.size())
-    CompileBuilders(buffers.size());
+    if (!CompileBuilders(buffers.size()))
+      return false;
   if (!render_program_ || camera_file_ != camera_file || camera_entry_ != camera_entry ||
       materials != material_sources_ || buffer_count_ != buffers.size() || sdr_count_ != sdr_count ||
       hdr_count_ != hdr_count)
-    CompileRenderer(materials, buffers.size(), sdr_count, hdr_count, camera_file, camera_entry);
+    if (!CompileRenderer(materials, buffers.size(), sdr_count, hdr_count, camera_file, camera_entry))
+      return false;
   std::vector<BuildPass> passes;
   if (rebuild)
     for (const auto &geometry : geometries) {
@@ -339,20 +357,24 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   for (const auto &pass : passes)
     parameters.push_back(pass.parameters);
   size_t parameter_bytes = parameters.size() * sizeof(BuildParameters);
-  if (!parameters_buffer_ || parameters_buffer_->Size() < parameter_bytes)
-    graphics->CreateBuffer(parameter_bytes, graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
-  parameters_buffer_->UploadData(parameters.data(), parameter_bytes);
+  if (!parameters_buffer_ || parameters_buffer_->GetDesc().size < parameter_bytes)
+    parameters_buffer_ = device->CreateBuffer({parameter_bytes});
+  core_->QueueUpload(parameters_buffer_.Get(), parameters.data(), parameter_bytes);
+  if (!core_->RecordUpdates(commands, updates))
+    return false;
   for (size_t i = 0; i < passes.size(); ++i) {
-    commands->CmdBindComputeProgram(builders_[passes[i].kernel].get());
-    commands->CmdBindResources(0, {nodes_.get()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(1, buffers, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(2, {parameters_buffer_->Range(i * sizeof(BuildParameters), sizeof(BuildParameters))},
-                               graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(3, {keys_.get()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(4, {instances_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+    commands->CmdBindComputeProgram(builders_[passes[i].kernel].Get());
+    build_group_->BindResource(0, nodes_.Get());
+    build_group_->BindResource(1, buffers);
+    build_group_->BindResource(
+        2, rhi::BufferView{parameters_buffer_.Get(), i * sizeof(BuildParameters), sizeof(BuildParameters)});
+    build_group_->BindResource(3, keys_.Get());
+    build_group_->BindResource(4, instances_buffer_.Get());
+    commands->CmdBindGroup(0, build_group_.Get());
     commands->CmdDispatch((passes[i].count + 63) / 64, 1, 1);
   }
   geometries_ = std::move(geometries);
   tlas_leaves_ = tlas_leaves;
+  return true;
 }
 }  // namespace sparkium::raytracing

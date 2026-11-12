@@ -1,4 +1,4 @@
-﻿#include "sparkium/geometry/geometry_mesh.h"
+#include "sparkium/geometry/geometry_mesh.h"
 
 #include <cmath>
 #include <cstddef>
@@ -27,6 +27,12 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
     mesh_ptr = &mesh_copy;
   }
 
+  positions_.reserve(mesh_ptr->NumVertices());
+  for (uint32_t i = 0; i < mesh_ptr->NumVertices(); ++i) {
+    const auto &position = mesh_ptr->Positions()[i];
+    positions_.emplace_back(position[0], position[1], position[2]);
+  }
+  indices_.assign(mesh_ptr->Indices(), mesh_ptr->Indices() + mesh_ptr->NumIndices());
   header_.num_indices = mesh_ptr->NumIndices();
   header_.num_vertices = mesh_ptr->NumVertices();
 
@@ -65,8 +71,8 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
 
   std::memcpy(data.data(), &header_, sizeof(header_));
 
-  core_->GraphicsCore()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
-  geometry_buffer_->UploadData(data.data(), data.size());
+  geometry_buffer_ = core_->GetDevice()->CreateBuffer({data.size()});
+  core_->QueueUpload(geometry_buffer_.Get(), data.data(), data.size());
   primitive_count_ = header_.num_indices / 3;
 }
 
@@ -76,7 +82,8 @@ void GeometryMesh::SetShadowTerminatorGeometryOffset(float cutoff) {
   if (cutoff == header_.shadow_terminator_geometry_offset)
     return;
   header_.shadow_terminator_geometry_offset = cutoff;
-  geometry_buffer_->UploadData(&cutoff, sizeof(cutoff), offsetof(Header, shadow_terminator_geometry_offset));
+  core_->QueueUpload(geometry_buffer_.Get(), &cutoff, sizeof(cutoff),
+                     offsetof(Header, shadow_terminator_geometry_offset));
 }
 
 float GeometryMesh::GetShadowTerminatorGeometryOffset() const {
@@ -87,12 +94,28 @@ int GeometryMesh::PrimitiveCount() {
   return primitive_count_;
 }
 
-graphics::Buffer *GeometryMesh::GetBuffer() const {
-  return geometry_buffer_.get();
+rhi::IBuffer *GeometryMesh::GetBuffer() const {
+  return geometry_buffer_.Get();
 }
 
 const GeometryMesh::Header &GeometryMesh::GetHeader() const {
   return header_;
+}
+
+glm::vec4 GeometryMesh::CentricArea(const glm::mat4x3 &affine) const {
+  glm::vec3 centric{0.0f};
+  float total_area = 0.0f;
+  for (size_t i = 0; i < indices_.size(); i += 3) {
+    glm::vec3 v0 = affine * glm::vec4{positions_[indices_[i]], 1.0};
+    glm::vec3 v1 = affine * glm::vec4{positions_[indices_[i + 1]], 1.0};
+    glm::vec3 v2 = affine * glm::vec4{positions_[indices_[i + 2]], 1.0};
+    float area = glm::length(glm::cross(v1 - v0, v2 - v0)) * 0.5f;
+    centric += area * (v0 + v1 + v2) * 0.3333333f;
+    total_area += area;
+  }
+  if (total_area > 0.0f)
+    centric /= total_area;
+  return glm::vec4(centric, total_area);
 }
 
 }  // namespace sparkium

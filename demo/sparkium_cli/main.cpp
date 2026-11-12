@@ -1,6 +1,5 @@
-﻿#include <long_march.h>
-
-#include "../sparkium_backend.h"
+﻿#include "../sparkium_backend.h"
+#include "sparkium/sparkium.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <filesystem>
@@ -8,7 +7,7 @@
 
 #include "stb_image_write.h"
 
-using namespace long_march;
+using namespace grassland;
 
 namespace {
 void Usage(const char *program) {
@@ -50,7 +49,7 @@ int main(int argc, char **argv) {
     std::filesystem::path output = "output.png";
     std::filesystem::path hdr_output;
     int frames = 1;
-    auto backend = graphics::BACKEND_API_DEFAULT;
+    auto backend = rhi::BACKEND_API_DEFAULT;
     bool override_pipeline = false;
     bool require_hardware_rt = false;
     bool debug = false;
@@ -85,44 +84,76 @@ int main(int argc, char **argv) {
                                    std::filesystem::absolute(output).lexically_normal())
       throw std::runtime_error("SDR and HDR outputs must use different paths");
 
-    std::unique_ptr<graphics::Core> graphics_core;
-    if (graphics::CreateCore(backend, graphics::Core::Settings{2, debug}, &graphics_core) != 0)
-      throw std::runtime_error("failed to create graphics core");
-    if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
-      throw std::runtime_error("failed to initialize graphics device");
-    std::cout << "Backend: " << graphics::BackendAPIString(graphics_core->API())
-              << ", device: " << graphics_core->DeviceName() << '\n';
-    if (require_hardware_rt && !graphics_core->DeviceRayTracingSupport())
-      throw std::runtime_error("hardware ray tracing is unavailable on the selected device");
-    sparkium::Core core(graphics_core.get());
+    rhi::ObjPtr<rhi::ICore> rhi_core = rhi::CreateCore(backend, {debug});
+    if (!rhi_core) {
+      std::cerr << "failed to create RHI core\n";
+      return 1;
+    }
+    rhi::ObjPtr<rhi::IDevice> device = rhi_core->CreateDeviceByAutoSelection();
+    if (!device) {
+      std::cerr << "failed to initialize RHI device\n";
+      return 1;
+    }
+    std::cout << "Backend: " << rhi::BackendAPIName(backend) << ", device: " << device->Name() << '\n';
+    if (require_hardware_rt && !device->SupportRayTracingPipeline() && !device->SupportRayQuery()) {
+      std::cerr << "hardware ray tracing is unavailable on the selected device\n";
+      return 1;
+    }
+    auto core = sparkium::Core::Create(device.Get());
+    if (!core)
+      return 1;
     std::string error;
-    auto loaded = sparkium::JsonScene::Load(&core, scene_path, &error);
+    auto loaded = sparkium::JsonScene::Load(core.get(), scene_path, &error);
     if (!loaded)
       throw std::runtime_error(error);
     if (!override_pipeline)
       pipeline = loaded->GetRenderPipeline();
-    if (core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
+    if (core->ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
       std::cout << "Tracing: native ray query (compute, native AS)\n";
 
     auto *film = loaded->GetFilm();
-    std::unique_ptr<graphics::Image> image;
-    graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-    for (int frame = 0; frame < frames; ++frame)
-      core.Render(loaded->GetScene(), loaded->GetCamera(), film, pipeline);
-    film->Develop(image.get());
+    sparkium::Renderer renderer(core.get());
+    // Bound queued work independently of the requested total sample count.
+    std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> pending;
+    for (int frame = 0; frame < frames; ++frame) {
+      auto &slot = pending[frame % pending.size()];
+      if (slot && !slot->WaitHost())
+        return 1;
+      slot = renderer.Submit(loaded->GetScene(), loaded->GetCamera(), film, pipeline);
+      if (!slot)
+        return 1;
+    }
+    auto download = [&](bool hdr) -> rhi::ObjPtr<rhi::IDownloadToken> {
+      rhi::ObjPtr<rhi::IImage> image =
+          device->CreateImage({static_cast<uint32_t>(film->GetWidth()), static_cast<uint32_t>(film->GetHeight()),
+                               hdr ? rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT : rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+      rhi::ObjPtr<rhi::IQueue> queue = device->GetQueue(rhi::QUEUE_TYPE_ASSIST);
+      rhi::ObjPtr<rhi::ICommandContext> commands = queue ? queue->CreateCommandContext() : nullptr;
+      // Initialize the fresh attachment before its first storage-image write.
+      if (!image || !commands || !commands->CmdClearImage(image.Get(), {}) ||
+          !film->RecordDevelop(commands.Get(), image.Get(), hdr))
+        return {};
+      rhi::ObjPtr<rhi::IDownloadToken> result = commands->CmdDownloadImage(image.Get());
+      if (!result)
+        return {};
+      rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+      if (!submitted || !submitted->WaitHost())
+        return {};
+      return result;
+    };
+    auto pixels_readback = download(false);
     std::vector<uint8_t> pixels(static_cast<size_t>(film->GetWidth()) * film->GetHeight() * 4);
-    image->DownloadData(pixels.data());
+    if (!pixels_readback || !pixels_readback->CopyTo(pixels.data(), pixels.size()))
+      return 1;
     std::filesystem::create_directories(output.has_parent_path() ? output.parent_path() : ".");
     if (!stbi_write_png(output.string().c_str(), film->GetWidth(), film->GetHeight(), 4, pixels.data(),
                         film->GetWidth() * 4))
       throw std::runtime_error("failed to write image: " + output.string());
     if (!hdr_output.empty()) {
-      std::unique_ptr<graphics::Image> hdr_image;
-      graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                                 &hdr_image);
-      film->Develop(hdr_image.get(), true);
+      auto hdr_readback = download(true);
       std::vector<float> hdr_pixels(static_cast<size_t>(film->GetWidth()) * film->GetHeight() * 4);
-      hdr_image->DownloadData(hdr_pixels.data());
+      if (!hdr_readback || !hdr_readback->CopyTo(hdr_pixels.data(), hdr_pixels.size() * sizeof(float)))
+        return 1;
       std::filesystem::create_directories(hdr_output.has_parent_path() ? hdr_output.parent_path() : ".");
       if (!stbi_write_hdr(hdr_output.string().c_str(), film->GetWidth(), film->GetHeight(), 4, hdr_pixels.data()))
         throw std::runtime_error("failed to write HDR image: " + hdr_output.string());

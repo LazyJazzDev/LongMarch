@@ -1,5 +1,5 @@
 
-RWByteAddressBuffer buffer : register(u0, space0);
+RHI_RW_BYTE_ADDRESS_BUFFER(0, 0, buffer);
 
 struct Metadata {
   uint offset;
@@ -7,7 +7,7 @@ struct Metadata {
   uint element_count;
 };
 
-ConstantBuffer<Metadata> metadata : register(b0, space1);
+RHI_UNIFORM(0, 1, Metadata, metadata);
 
 #define GROUP_SIZE 64
 groupshared float group_element[GROUP_SIZE];

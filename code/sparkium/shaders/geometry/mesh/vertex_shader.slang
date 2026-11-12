@@ -1,44 +1,14 @@
 struct VSInput {
-  [[vk::location(0)]] float3 position : TEXCOORD0;
+  RHI_INPUT(0, float3, position);
 #if defined(HAS_NORMAL)
-  [[vk::location(1)]] float3 normal : TEXCOORD1;
-
+  RHI_INPUT(1, float3, normal);
+#endif
 #if defined(HAS_TEXCOORD)
-  [[vk::location(2)]] float2 tex_coord : TEXCOORD2;
-
+  RHI_INPUT(2, float2, tex_coord);
+#endif
 #if defined(HAS_TANGENT)
-  [[vk::location(3)]] float3 tangent : TEXCOORD3;
-  [[vk::location(4)]] float signal : TEXCOORD4;
-#endif
-
-#else
-
-#if defined(HAS_TANGENT)
-  [[vk::location(2)]] float3 tangent : TEXCOORD2;
-  [[vk::location(3)]] float signal : TEXCOORD3;
-#endif
-
-#endif
-
-#else
-
-#if defined(HAS_TEXCOORD)
-  [[vk::location(1)]] float2 tex_coord : TEXCOORD1;
-
-#if defined(HAS_TANGENT)
-  [[vk::location(2)]] float3 tangent : TEXCOORD2;
-  [[vk::location(3)]] float signal : TEXCOORD3;
-#endif
-
-#else
-
-#if defined(HAS_TANGENT)
-  [[vk::location(1)]] float3 tangent : TEXCOORD1;
-  [[vk::location(2)]] float signal : TEXCOORD2;
-#endif
-
-#endif
-
+  RHI_INPUT(3, float3, tangent);
+  RHI_INPUT(4, float, signal);
 #endif
 };
 
@@ -66,8 +36,8 @@ struct GeometryData {
   float4x4 normal_matrix;
 };
 
-ConstantBuffer<CameraData> camera_data : register(b0, space0);
-ConstantBuffer<GeometryData> geometry_data : register(b0, space1);
+RHI_UNIFORM(0, 0, CameraData, camera_data);
+RHI_UNIFORM(0, 1, GeometryData, geometry_data);
 
 VSOutput VSMain(VSInput input) {
   VSOutput output;

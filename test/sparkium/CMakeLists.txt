@@ -7,7 +7,7 @@ LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_fallback_test)
 add_test(NAME sparkium_fallback COMMAND sparkium_fallback_test)
 
 add_executable(sparkium_rhi_test rhi_binding_test.cpp)
-target_link_libraries(sparkium_rhi_test PRIVATE LongMarch GTest::gtest_main)
+target_link_libraries(sparkium_rhi_test PRIVATE Sparkium grassland_rhi GTest::gtest_main)
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_rhi_test)
 add_test(NAME sparkium_rhi COMMAND sparkium_rhi_test)
 

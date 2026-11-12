@@ -1,39 +1,32 @@
 #pragma once
 #include "common.slang"
 #include "buffer_helper.slang"
+#include "render_binding_slots.h"
 
-RWTexture2D<float4> accumulated_color : register(u0, space0);
-RWTexture2D<float> accumulated_samples : register(u0, space1);
-ConstantBuffer<RenderSettings> render_settings : register(b0, space3);
+RHI_RW_TEXTURE2D(SPARKIUM_GROUP_FILM, SPARKIUM_FILM_COLOR, float4, accumulated_color);
+RHI_RW_TEXTURE2D(SPARKIUM_GROUP_FILM, SPARKIUM_FILM_SAMPLES, float, accumulated_samples);
+RHI_UNIFORM(SPARKIUM_GROUP_RENDERER, SPARKIUM_RENDERER_SETTINGS, RenderSettings, render_settings);
+RHI_BYTE_ADDRESS_BUFFER(SPARKIUM_GROUP_RENDERER, SPARKIUM_RENDERER_SOBOL, sobol_table);
 #define SOBOL_TABLE
+RHI_BYTE_ADDRESS_BUFFER(SPARKIUM_GROUP_CAMERA, SPARKIUM_CAMERA_DATA, camera_data);
+
 #ifdef SPARKIUM_SOFTWARE_RT
 #ifdef SPARKIUM_RAY_QUERY
-RaytracingAccelerationStructure query_scene : register(t0, space2);
+RHI_ACCELERATION_STRUCTURE(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_TRAVERSAL, query_scene);
 #else
-ByteAddressBuffer software_nodes : register(t0, space2);
+RHI_BYTE_ADDRESS_BUFFER(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_TRAVERSAL, software_nodes);
 #endif
-ByteAddressBuffer data_buffers[] : register(t0, space4);
-#define sobol_table data_buffers[SOFTWARE_DATA_BUFFER_COUNT]
-#define camera_data data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 1]
-#define instance_metadatas data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 2]
-#define light_selector_data data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 3]
-#define light_metadatas data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 4]
-#define software_instances data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 5]
-Texture2D<float4> sdr_textures[] : register(t0, space5);
-Texture2D<float4> hdr_textures[] : register(t0, space6);
-SamplerState samplers[] : register(s0, space7);
 #else
-RaytracingAccelerationStructure as : register(t0, space2);
-ByteAddressBuffer sobol_table : register(t0, space4);
-ByteAddressBuffer camera_data : register(t0, space5);
-ByteAddressBuffer data_buffers[] : register(t0, space6);
-ByteAddressBuffer instance_metadatas : register(t0, space7);
-ByteAddressBuffer light_selector_data : register(t0, space8);
-ByteAddressBuffer light_metadatas : register(t0, space9);
-Texture2D<float4> sdr_textures[] : register(t0, space10);
-Texture2D<float4> hdr_textures[] : register(t0, space11);
-SamplerState samplers[] : register(s0, space12);
+RHI_ACCELERATION_STRUCTURE(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_TRAVERSAL, as);
 #endif
+RHI_BYTE_ADDRESS_BUFFER_ARRAY(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_BUFFERS, data_buffers);
+RHI_BYTE_ADDRESS_BUFFER(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_INSTANCES, instance_metadatas);
+RHI_BYTE_ADDRESS_BUFFER(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_LIGHT_SELECTOR, light_selector_data);
+RHI_BYTE_ADDRESS_BUFFER(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_LIGHT_METADATA, light_metadatas);
+RHI_BYTE_ADDRESS_BUFFER(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_SOFTWARE_INSTANCES, software_instances);
+RHI_TEXTURE2D_ARRAY(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_SDR_TEXTURES, float4, sdr_textures);
+RHI_TEXTURE2D_ARRAY(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_HDR_TEXTURES, float4, hdr_textures);
+RHI_SAMPLER_ARRAY(SPARKIUM_GROUP_SCENE, SPARKIUM_SCENE_SAMPLERS, samplers);
 
 float4 SampleTexture(int texture_index, float2 uv) {
   if ((texture_index & 0x1000000) != 0) {

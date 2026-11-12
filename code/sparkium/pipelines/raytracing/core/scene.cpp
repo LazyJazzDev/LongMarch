@@ -1,11 +1,12 @@
-﻿#include "sparkium/pipelines/raytracing/core/scene.h"
+#include "sparkium/pipelines/raytracing/core/scene.h"
 
 #include <numeric>
 
+#include "sparkium/core/render_layout.h"
+#include "sparkium/core/renderer.h"
 #include "sparkium/pipelines/raytracing/core/camera.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/entity.h"
-#include "sparkium/pipelines/raytracing/core/film.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"
 #include "sparkium/pipelines/raytracing/core/light.h"
 #include "sparkium/pipelines/raytracing/core/material.h"
@@ -18,22 +19,31 @@ namespace sparkium::raytracing {
 
 Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_ = DedicatedCast(scene_.GetCore());
-  core_->GraphicsCore()->CreateBuffer(sizeof(Settings::RayTracing) + sizeof(sparkium::Film::Info),
-                                      graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.slang", "GatherLightPowerKernel",
-                                      "cs_6_3", &gather_light_power_shader_);
-  core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_LINEAR}, &linear_sampler_);
-  core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);
+  auto shaders_vfs = core_->GetShadersVFS();
+  gather_light_power_shader_ = core_->GetDevice()->CreateShader("gather_light_power.slang", "GatherLightPowerKernel",
+                                                                rhi::SHADER_STAGE_COMPUTE, &shaders_vfs, {"."}, {});
+  linear_sampler_ = core_->GetDevice()->CreateSampler({rhi::SAMPLER_FILTER_LINEAR});
+  nearest_sampler_ = core_->GetDevice()->CreateSampler({rhi::SAMPLER_FILTER_NEAREST});
+  scan_group_ = core_->GetDevice()->CreateBindingGroup(
+      core_->GetComputeProgram("blelloch_scan_up")->GetDesc().pipeline_layout.groups[0]);
 }
 
-void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
+bool Scene::RecordRender(sparkium::Renderer &renderer,
+                         rhi::ICommandContext *commands,
+                         ResourceUpdates::Cursor &updates,
+                         Camera *camera,
+                         sparkium::Film *film,
+                         bool software,
+                         bool ray_query) {
   software = software || ray_query;
   if (!software && !raygen_shader_) {
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.slang", "Main", "lib_6_5", &raygen_shader_);
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.slang", "MissMain", "lib_6_5",
-                                        &default_miss_shader_);
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.slang", "ShadowMiss", "lib_6_5",
-                                        &shadow_miss_shader_);
+    auto shaders_vfs = core_->GetShadersVFS();
+    raygen_shader_ = core_->GetDevice()->CreateShader("raygen.slang", "Main", rhi::SHADER_STAGE_RAY_GENERATION,
+                                                      &shaders_vfs, {"."}, {});
+    default_miss_shader_ =
+        core_->GetDevice()->CreateShader("raygen.slang", "MissMain", rhi::SHADER_STAGE_MISS, &shaders_vfs, {"."}, {});
+    shadow_miss_shader_ =
+        core_->GetDevice()->CreateShader("raygen.slang", "ShadowMiss", rhi::SHADER_STAGE_MISS, &shaders_vfs, {"."}, {});
   }
 
   if (ray_query != ray_query_) {
@@ -51,63 +61,45 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   }
   if (software && !software_pipeline_)
     software_pipeline_ = std::make_unique<SoftwarePipeline>(core_, ray_query_);
-  UpdatePipeline(camera);
+  if (!film->PrepareAccumulation() || !RecordPrepare(commands, updates, camera))
+    return false;
+  auto *renderer_group = renderer.RecordParameters(commands, &scene_, film);
+  auto *scene_group = software ? software_pipeline_->Bindings() : render_group_.Get();
+  auto *camera_group = camera->Bindings();
+  if (!scene_group || !camera_group || !renderer_group)
+    return false;
+  if (software) {
+    if (ray_query_) {
+      if (!scene_group->BindResource(SPARKIUM_SCENE_TRAVERSAL, software_pipeline_->AccelerationStructure()))
+        return false;
+    } else if (!scene_group->BindResource(SPARKIUM_SCENE_TRAVERSAL, software_pipeline_->Nodes()))
+      return false;
+  } else if (!scene_group->BindResource(SPARKIUM_SCENE_TRAVERSAL, tlas_.Get()))
+    return false;
+  if (!scene_group->BindResource(SPARKIUM_SCENE_BUFFERS, buffers_) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_INSTANCES, instance_metadata_buffer_.Get()) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_LIGHT_SELECTOR, light_selector_buffer_.Get()) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_LIGHT_METADATA, light_metadatas_buffer_.Get()) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_SOFTWARE_INSTANCES,
+                                 software ? software_pipeline_->Instances() : instance_metadata_buffer_.Get()) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_SDR_TEXTURES, sdr_images_) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_HDR_TEXTURES, hdr_images_) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_SAMPLERS, std::vector{linear_sampler_.Get(), nearest_sampler_.Get()}) ||
+      !core_->RecordUpdates(commands, updates) || !film->RecordReset(commands))
+    return false;
+  if (!(software ? commands->CmdBindComputeProgram(software_pipeline_->Program())
+                 : commands->CmdBindRayTracingProgram(rt_program_.Get())))
+    return false;
+  if (!commands->CmdBindGroup(SPARKIUM_GROUP_FILM, film->AccumulationGroup()) ||
+      !commands->CmdBindGroup(SPARKIUM_GROUP_SCENE, scene_group) ||
+      !commands->CmdBindGroup(SPARKIUM_GROUP_CAMERA, camera_group) ||
+      !commands->CmdBindGroup(SPARKIUM_GROUP_RENDERER, renderer_group))
+    return false;
+  if (!(software ? commands->CmdDispatch((film->GetWidth() + 7) / 8, (film->GetHeight() + 7) / 8, 1)
+                 : commands->CmdDispatchRays(film->GetWidth(), film->GetHeight(), 1)))
+    return false;
   rendered_ = true;
-  scene_settings_buffer_->UploadData(&settings.raytracing, sizeof(Settings::RayTracing));
-  scene_settings_buffer_->UploadData(&film->film_.info, sizeof(sparkium::Film::Info), sizeof(Settings::RayTracing));
-  film->film_.info.accumulated_samples += settings.raytracing.samples_per_dispatch;
-  std::unique_ptr<graphics::CommandContext> cmd_context;
-  core_->GraphicsCore()->CreateCommandContext(&cmd_context);
-  const auto bind_point = software ? graphics::BIND_POINT_COMPUTE : graphics::BIND_POINT_RAYTRACING;
-  if (software)
-    cmd_context->CmdBindComputeProgram(software_pipeline_->Program());
-  else
-    cmd_context->CmdBindRayTracingProgram(rt_program_.get());
-  cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, bind_point);
-  cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, bind_point);
-  if (software) {
-    if (ray_query_)
-      cmd_context->CmdBindResources(2, software_pipeline_->AccelerationStructure(), bind_point);
-    else
-      cmd_context->CmdBindResources(2, {software_pipeline_->Nodes()}, bind_point);
-  } else
-    cmd_context->CmdBindResources(2, tlas_.get(), bind_point);
-  cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, bind_point);
-  if (software) {
-    auto resources = buffers_;
-    resources.insert(resources.end(),
-                     {core_->GetBuffer("sobol"), camera->Buffer(), instance_metadata_buffer_.get(),
-                      light_selector_buffer_.get(), light_metadatas_buffer_.get(), software_pipeline_->Instances()});
-    cmd_context->CmdBindResources(4, resources, bind_point);
-    cmd_context->CmdBindResources(5, sdr_images_, bind_point);
-    cmd_context->CmdBindResources(6, hdr_images_, bind_point);
-    cmd_context->CmdBindResources(7, std::vector{linear_sampler_.get(), nearest_sampler_.get()}, bind_point);
-  } else {
-    cmd_context->CmdBindResources(4, {core_->GetBuffer("sobol")}, bind_point);
-    cmd_context->CmdBindResources(5, {camera->Buffer()}, bind_point);
-    cmd_context->CmdBindResources(6, buffers_, bind_point);
-    cmd_context->CmdBindResources(7, {instance_metadata_buffer_.get()}, bind_point);
-    cmd_context->CmdBindResources(8, {light_selector_buffer_.get()}, bind_point);
-    cmd_context->CmdBindResources(9, {light_metadatas_buffer_.get()}, bind_point);
-    cmd_context->CmdBindResources(10, sdr_images_, bind_point);
-    cmd_context->CmdBindResources(11, hdr_images_, bind_point);
-    cmd_context->CmdBindResources(12, std::vector{linear_sampler_.get(), nearest_sampler_.get()}, bind_point);
-  }
-  if (software)
-    cmd_context->CmdDispatch((film->GetWidth() + 7) / 8, (film->GetHeight() + 7) / 8, 1);
-  else
-    cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
-                                 1);
-
-  cmd_context->CmdBindComputeProgram(core_->GetComputeProgram("film2img"));
-  cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(2, {film->film_.GetRawImage()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdDispatch((film->film_.GetRawImage()->Extent().width + 7) / 8,
-                           (film->film_.GetRawImage()->Extent().height + 7) / 8, 1);
-
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
-  core_->GraphicsCore()->WaitGPU();
+  return film->RecordResolve(commands);
 }
 
 int32_t Scene::RegisterLight(Light *light, int custom_index) {
@@ -116,12 +108,13 @@ int32_t Scene::RegisterLight(Light *light, int custom_index) {
   light_reg.sampler_data_index = RegisterBuffer(light->SamplerData());
   light_reg.sampler_shader_index = light->SamplerShader(this);
   light_reg.custom_index = custom_index;
-  light_reg.power_offset = light->SamplerPreprocess(preprocess_cmd_context_.get());
+  light_reg.power_offset = light->SamplerPowerOffset();
   light_metadatas_.push_back(light_reg);
+  lights_.push_back(light);
   return light_reg_index;
 }
 
-int32_t Scene::RegisterInstance(graphics::AccelerationStructure *blas,
+int32_t Scene::RegisterInstance(rhi::IBottomLevelAccelerationStructure *blas,
                                 const glm::mat4x3 &transformation,
                                 int32_t hit_group_index,
                                 int32_t geometry_data_index,
@@ -129,7 +122,14 @@ int32_t Scene::RegisterInstance(graphics::AccelerationStructure *blas,
                                 int32_t custom_index) {
   int32_t instance_reg = instances_.size();
   InstanceMetadata entity_metadata{};
-  instances_.push_back(blas->MakeInstance(transformation, geometry_data_index, 255, hit_group_index * 2));
+  rhi::RayTracingInstance instance;
+  instance.blas = blas;
+  instance.custom_index = geometry_data_index;
+  instance.hit_group_offset = hit_group_index * 2;
+  for (uint32_t row = 0; row < 3; ++row)
+    for (uint32_t column = 0; column < 4; ++column)
+      instance.transform[row * 4 + column] = transformation[column][row];
+  instances_.push_back(instance);
   entity_metadata.geometry_data_index = geometry_data_index;
   entity_metadata.material_data_index = material_data_index;
   entity_metadata.custom_index = custom_index;
@@ -156,7 +156,7 @@ int &Scene::InstanceCustomIndex(int32_t instance_index) {
   return instance_metadatas_[instance_index].custom_index;
 }
 
-int32_t Scene::RegisterCallableShader(graphics::Shader *callable_shader) {
+int32_t Scene::RegisterCallableShader(rhi::IShader *callable_shader) {
   if (!callable_shader)
     return -1;
   if (!callable_shader_map_.count(callable_shader)) {
@@ -167,7 +167,7 @@ int32_t Scene::RegisterCallableShader(graphics::Shader *callable_shader) {
   return callable_shader_map_[callable_shader];
 }
 
-int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
+int32_t Scene::RegisterBuffer(rhi::IBuffer *buffer) {
   if (!buffer)
     return -1;
   if (!buffer_map_.count(buffer)) {
@@ -177,15 +177,15 @@ int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
   return buffer_map_[buffer];
 }
 
-int32_t Scene::RegisterImage(graphics::Image *image) {
-  if (image->Format() == graphics::IMAGE_FORMAT_R8G8B8A8_UNORM) {
+int32_t Scene::RegisterImage(rhi::IImage *image) {
+  if (image->GetDesc().format == rhi::IMAGE_FORMAT_R8G8B8A8_UNORM) {
     if (!sdr_image_map_.count(image)) {
       sdr_image_map_[image] = static_cast<int32_t>(sdr_images_.size());
       sdr_images_.emplace_back(image);
     }
     return sdr_image_map_[image];
   }
-  if (image->Format() == graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT) {
+  if (image->GetDesc().format == rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT) {
     if (!hdr_image_map_.count(image)) {
       hdr_image_map_[image] = static_cast<int32_t>(hdr_images_.size());
       hdr_images_.emplace_back(image);
@@ -204,7 +204,7 @@ int32_t Scene::RegisterHitGroup(const InstanceHitGroups &hit_group) {
   return hit_group_map_[hit_group];
 }
 
-void Scene::UpdatePipeline(Camera *camera) {
+bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Cursor &updates, Camera *camera) {
   if (!software_tracing_ && (callable_shaders_.empty() || callable_shaders_[0] != camera->Shader()))
     pipeline_dirty_ = true;
   for (auto &[entity, status] : entities_) {
@@ -241,8 +241,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   instance_metadatas_.clear();
   light_metadatas_.clear();
 
-  preprocess_cmd_context_.reset();
-  core_->GraphicsCore()->CreateCommandContext(&preprocess_cmd_context_);
+  lights_.clear();
 
   bool &pipeline_dirty = pipeline_dirty_;
 
@@ -265,44 +264,49 @@ void Scene::UpdatePipeline(Camera *camera) {
     if (!software_tracing_)
       RegisterCallableShader(camera->Shader());
   }
-
   for (auto *entity : ordered_entities) {
     if (entities_.at(entity).active) {
       entity->Update(this);
     }
   }
-
+  if (!core_->RecordUpdates(commands, updates))
+    return false;
+  for (auto *light : lights_)
+    if (!light->RecordPreprocess(commands))
+      return false;
   if (!software_tracing_) {
-    if (!tlas_) {
-      core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
-    } else {
-      tlas_->UpdateInstances(instances_);
-    }
+    if (!tlas_ || tlas_->GetDesc().instance_count < instances_.size())
+      tlas_ = core_->GetDevice()->CreateTopLevelAccelerationStructure(
+          {static_cast<uint32_t>(std::max<size_t>(1, instances_.size()))});
+    if (!tlas_ || !commands->CmdBuildTopLevelAccelerationStructure(tlas_.Get(), instances_))
+      return core_->ReportFailure("failed to build ray tracing TLAS");
   }
 
   if (!instance_metadata_buffer_ ||
-      sizeof(InstanceMetadata) * instance_metadatas_.size() > instance_metadata_buffer_->Size()) {
-    instance_metadata_buffer_.reset();
-    core_->GraphicsCore()->CreateBuffer(sizeof(InstanceMetadata) * std::max<size_t>(1, instance_metadatas_.size()),
-                                        graphics::BUFFER_TYPE_STATIC, &instance_metadata_buffer_);
+      sizeof(InstanceMetadata) * instance_metadatas_.size() > instance_metadata_buffer_->GetDesc().size) {
+    instance_metadata_buffer_.Release();
+    instance_metadata_buffer_ =
+        core_->GetDevice()->CreateBuffer({sizeof(InstanceMetadata) * std::max<size_t>(1, instance_metadatas_.size())});
   }
   if (!instance_metadatas_.empty())
-    instance_metadata_buffer_->UploadData(instance_metadatas_.data(),
-                                          sizeof(InstanceMetadata) * instance_metadatas_.size());
+    core_->QueueUpload(instance_metadata_buffer_.Get(), instance_metadatas_.data(),
+                       sizeof(InstanceMetadata) * instance_metadatas_.size());
 
   if (!light_selector_buffer_ ||
-      sizeof(uint32_t) + sizeof(float) * light_metadatas_.size() > light_selector_buffer_->Size()) {
-    core_->GraphicsCore()->CreateBuffer(sizeof(uint32_t) + sizeof(float) * light_metadatas_.size(),
-                                        graphics::BUFFER_TYPE_STATIC, &light_selector_buffer_);
+      sizeof(uint32_t) + sizeof(float) * light_metadatas_.size() > light_selector_buffer_->GetDesc().size) {
+    light_selector_buffer_ =
+        core_->GetDevice()->CreateBuffer({sizeof(uint32_t) + sizeof(float) * light_metadatas_.size()});
   }
-  if (!light_metadatas_buffer_ || sizeof(LightMetadata) * light_metadatas_.size() > light_metadatas_buffer_->Size()) {
-    core_->GraphicsCore()->CreateBuffer(sizeof(LightMetadata) * std::max<size_t>(1, light_metadatas_.size()),
-                                        graphics::BUFFER_TYPE_STATIC, &light_metadatas_buffer_);
+  if (!light_metadatas_buffer_ ||
+      sizeof(LightMetadata) * light_metadatas_.size() > light_metadatas_buffer_->GetDesc().size) {
+    light_metadatas_buffer_ =
+        core_->GetDevice()->CreateBuffer({sizeof(LightMetadata) * std::max<size_t>(1, light_metadatas_.size())});
   }
   if (!light_metadatas_.empty())
-    light_metadatas_buffer_->UploadData(light_metadatas_.data(), sizeof(LightMetadata) * light_metadatas_.size());
+    core_->QueueUpload(light_metadatas_buffer_.Get(), light_metadatas_.data(),
+                       sizeof(LightMetadata) * light_metadatas_.size());
   uint32_t light_count = static_cast<uint32_t>(light_metadatas_.size());
-  light_selector_buffer_->UploadData(&light_count, sizeof(uint32_t), 0);
+  core_->QueueUpload(light_selector_buffer_.Get(), &light_count, sizeof(uint32_t), 0);
 
   if (buffers_.empty())
     RegisterBuffer(camera->Buffer());
@@ -310,47 +314,37 @@ void Scene::UpdatePipeline(Camera *camera) {
   if (pipeline_dirty_ || buffers_.size() > buffer_capacity_ || sdr_images_.size() > sdr_image_capacity_ ||
       hdr_images_.size() > hdr_image_capacity_ || (!software_tracing_ && !rt_program_)) {
     if (!software_tracing_) {
-      rt_program_.reset();
-      core_->GraphicsCore()->CreateRayTracingProgram(&rt_program_);
-      miss_shader_indices_ = {0, 1};
-      callable_shader_indices_.resize(callable_shaders_.size());
-      std::iota(callable_shader_indices_.begin(), callable_shader_indices_.end(), 0);
-      hit_group_indices_.resize(hit_groups_.size() * 2);
-      std::iota(hit_group_indices_.begin(), hit_group_indices_.end(), 0);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, sdr_images_.size());
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, hdr_images_.size());
-      rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_SAMPLER, 2);
-
-      rt_program_->AddRayGenShader(raygen_shader_.get());
-      rt_program_->AddMissShader(default_miss_shader_.get());
-      rt_program_->AddMissShader(shadow_miss_shader_.get());
-      for (const auto &hit_group : hit_groups_) {
-        rt_program_->AddHitGroup(hit_group.render_group);
-        rt_program_->AddHitGroup(hit_group.shadow_group);
+      rhi::RayTracingProgramDesc desc;
+      desc.ray_generation = raygen_shader_.Get();
+      desc.miss_shaders = {default_miss_shader_.Get(), shadow_miss_shader_.Get()};
+      // RenderContext in common.slang is 39 scalar words; triangle attributes are float2.
+      desc.max_payload_size = 39 * sizeof(uint32_t);
+      desc.max_recursion_depth = 2;
+      for (const auto &group : hit_groups_) {
+        desc.hit_groups.push_back(group.render_group);
+        desc.hit_groups.push_back(group.shadow_group);
       }
-      for (const auto &callable_shader : callable_shaders_) {
-        rt_program_->AddCallableShader(callable_shader);
-      }
-      rt_program_->Finalize(miss_shader_indices_, hit_group_indices_, callable_shader_indices_);
+      desc.callable_shaders = callable_shaders_;
+      desc.pipeline_layout = RayTracingLayout(false, buffers_.size(), sdr_images_.size(), hdr_images_.size());
+      rt_program_ = core_->GetDevice()->CreateRayTracingProgram(desc);
+      if (!rt_program_)
+        return core_->ReportFailure("failed to create ray tracing pipeline");
+      render_group_ = core_->GetDevice()->CreateBindingGroup(desc.pipeline_layout.groups[SPARKIUM_GROUP_SCENE]);
     }
 
     if (buffers_.size() > buffer_capacity_ || !gather_light_power_program_) {
-      gather_light_power_program_.reset();
-      core_->GraphicsCore()->CreateComputeProgram(gather_light_power_shader_.get(), &gather_light_power_program_);
-      gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-      gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-      gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
-      gather_light_power_program_->Finalize();
+      gather_light_power_program_.Release();
+      {
+        rhi::ComputeProgramDesc desc;
+        desc.compute_shader = gather_light_power_shader_.Get();
+        desc.pipeline_layout.groups = {
+            {{{0, rhi::BINDING_BYTE_ADDRESS_BUFFER, 1},
+              {1, rhi::BINDING_RW_BYTE_ADDRESS_BUFFER, 1},
+              {2, rhi::BINDING_BYTE_ADDRESS_BUFFER, static_cast<uint32_t>(buffers_.size())}}}};
+        gather_light_power_program_ = core_->GetDevice()->CreateComputeProgram(desc);
+      }
+      light_group_ =
+          core_->GetDevice()->CreateBindingGroup(gather_light_power_program_->GetDesc().pipeline_layout.groups[0]);
     }
 
     buffer_capacity_ = buffers_.size();
@@ -372,14 +366,19 @@ void Scene::UpdatePipeline(Camera *camera) {
   }
 
   if (software_tracing_)
-    software_pipeline_->Update(preprocess_cmd_context_.get(), buffers_, sdr_images_.size(), hdr_images_.size(), camera);
+    if (!software_pipeline_->RecordPrepare(commands, updates, buffers_, sdr_images_.size(), hdr_images_.size(), camera))
+      return false;
+  if (!core_->RecordUpdates(commands, updates))
+    return false;
 
-  preprocess_cmd_context_->CmdBindComputeProgram(gather_light_power_program_.get());
-  preprocess_cmd_context_->CmdBindResources(0, {light_metadatas_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
-  preprocess_cmd_context_->CmdBindResources(1, {light_selector_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
-  preprocess_cmd_context_->CmdBindResources(2, buffers_, graphics::BIND_POINT_COMPUTE);
-  if (!light_metadatas_.empty())
-    preprocess_cmd_context_->CmdDispatch((light_metadatas_.size() + 63) / 64, 1, 1);
+  commands->CmdBindComputeProgram(gather_light_power_program_.Get());
+  light_group_->BindResource(0, light_metadatas_buffer_.Get());
+  light_group_->BindResource(1, light_selector_buffer_.Get());
+  light_group_->BindResource(2, buffers_);
+  if (!light_metadatas_.empty()) {
+    commands->CmdBindGroup(0, light_group_.Get());
+    commands->CmdDispatch((light_metadatas_.size() + 63) / 64, 1, 1);
+  }
 
   blelloch_metadatas_.clear();
   BlellochScanMetadata metadata{4, 4, static_cast<uint32_t>(light_metadatas_.size())};
@@ -393,30 +392,34 @@ void Scene::UpdatePipeline(Camera *camera) {
     auto blelloch_scan_up_program = core_->GetComputeProgram("blelloch_scan_up");
     auto blelloch_scan_down_program = core_->GetComputeProgram("blelloch_scan_down");
     if (!blelloch_metadata_buffer_ ||
-        sizeof(BlellochScanMetadata) * blelloch_metadatas_.size() > blelloch_metadata_buffer_->Size()) {
-      core_->GraphicsCore()->CreateBuffer(sizeof(BlellochScanMetadata) * blelloch_metadatas_.size(),
-                                          graphics::BUFFER_TYPE_STATIC, &blelloch_metadata_buffer_);
+        sizeof(BlellochScanMetadata) * blelloch_metadatas_.size() > blelloch_metadata_buffer_->GetDesc().size) {
+      blelloch_metadata_buffer_ =
+          core_->GetDevice()->CreateBuffer({sizeof(BlellochScanMetadata) * blelloch_metadatas_.size()});
     }
-    blelloch_metadata_buffer_->UploadData(blelloch_metadatas_.data(),
-                                          sizeof(BlellochScanMetadata) * blelloch_metadatas_.size());
-    preprocess_cmd_context_->CmdBindComputeProgram(blelloch_scan_up_program);
-    preprocess_cmd_context_->CmdBindResources(0, {light_selector_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+    core_->QueueUpload(blelloch_metadata_buffer_.Get(), blelloch_metadatas_.data(),
+                       sizeof(BlellochScanMetadata) * blelloch_metadatas_.size());
+    if (!core_->RecordUpdates(commands, updates))
+      return false;
+    commands->CmdBindComputeProgram(blelloch_scan_up_program);
+    scan_group_->BindResource(0, light_selector_buffer_.Get());
     for (size_t i = 1; i < blelloch_metadatas_.size(); i++) {
-      preprocess_cmd_context_->CmdBindResources(1, {blelloch_metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},
-                                                graphics::BIND_POINT_COMPUTE);
-      preprocess_cmd_context_->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1);
+      scan_group_->BindResource(1, rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
+                                                   sizeof(BlellochScanMetadata)});
+      commands->CmdBindGroup(0, scan_group_.Get());
+      commands->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1);
     }
-    preprocess_cmd_context_->CmdBindComputeProgram(blelloch_scan_down_program);
+    commands->CmdBindComputeProgram(blelloch_scan_down_program);
     for (size_t i = blelloch_metadatas_.size() - 1; i < blelloch_metadatas_.size(); i--) {
       if (blelloch_metadatas_[i].element_count <= group_size) {
         continue;
       }
-      preprocess_cmd_context_->CmdBindResources(1, {blelloch_metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},
-                                                graphics::BIND_POINT_COMPUTE);
-      preprocess_cmd_context_->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1);
+      scan_group_->BindResource(1, rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
+                                                   sizeof(BlellochScanMetadata)});
+      commands->CmdBindGroup(0, scan_group_.Get());
+      commands->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1);
     }
   }
-  core_->GraphicsCore()->SubmitCommandContext(preprocess_cmd_context_.get());
+  return core_->IsValid();
 }
 
 Scene *DedicatedCast(sparkium::Scene *scene) {
