@@ -6,7 +6,6 @@
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
-#include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 
 namespace grassland::rhi::backend::vulkan {
 VulkanRayTracingProgramImpl::VulkanRayTracingProgramImpl(IVulkanDevice *device, const RayTracingProgramDesc &desc) {

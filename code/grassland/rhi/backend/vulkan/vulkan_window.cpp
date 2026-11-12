@@ -60,15 +60,17 @@ VulkanWindowImpl::VulkanWindowImpl(IVulkanDevice *device) : device_(device) {
 }
 
 VulkanWindowImpl::~VulkanWindowImpl() {
-  auto queue = queue_;
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(queue->QueueMutex());
-  vkQueueWaitIdle(queue->NativeQueue());
+  // No callbacks or resource destructors may run while holding the submission lock.
+  // queue_ can be null when window initialization failed before assigning it.
+  if (queue_) {
+    std::lock_guard<std::mutex> lock(queue_->QueueMutex());
+    Check(vkQueueWaitIdle(queue_->NativeQueue()), "Wait for window queue shutdown");
+  }
   ReleaseNextImage();
   DestroySwapchain();
   if (surface_)
     vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);
-
   DestroyWindow();
 }
 
@@ -712,7 +714,9 @@ ColorSpace VulkanWindowImpl::RequestedColorSpace() const {
 }
 
 void VulkanWindowImpl::DestroyWindow() {
+  // ImGui restores native window hooks; the window must still exist here.
   imgui_.reset();
+  presenter_.reset();
   glfw::UnregisterWindow(window_);
   glfw::DestroyWindow(window_);
 }

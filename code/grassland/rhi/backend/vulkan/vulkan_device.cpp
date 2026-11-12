@@ -19,7 +19,6 @@
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
-#include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
@@ -400,11 +399,13 @@ bool VulkanDeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_al
   std::vector<Event> unique;
   unique.reserve(events.size());
   for (const auto &event : events) {
+#if !defined(NDEBUG)
     auto timeline = rhi::QueryInterfacePtr<IVulkanTimeline>(event.timeline).Get();
     if (!timeline || timeline->Owner() != this) {
       ReportError(-1, "Host waits require timelines from this device.");
       return false;
     }
+#endif
     auto found = std::find_if(unique.begin(), unique.end(),
                               [&](const Event &other) { return other.timeline == event.timeline; });
     if (found == unique.end())

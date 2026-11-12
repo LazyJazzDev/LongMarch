@@ -93,10 +93,12 @@ bool D3D12CommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAcc
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
     auto blas = rhi::QueryInterfacePtr<ID3D12AccelerationStructure>(instance.blas).Get();
+#if !defined(NDEBUG)
     if (!blas || blas->Owner() != device_) {
       recording_failed_ = true;
       return false;
     }
+#endif
     if (!RetainResource(blas))
       return false;
     std::memcpy(native[i].Transform, instance.transform.data(), sizeof(native[i].Transform));

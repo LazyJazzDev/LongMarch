@@ -5,7 +5,6 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
-#include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12RayTracingProgramImpl::D3D12RayTracingProgramImpl(ID3D12Device *device, const RayTracingProgramDesc &desc) {

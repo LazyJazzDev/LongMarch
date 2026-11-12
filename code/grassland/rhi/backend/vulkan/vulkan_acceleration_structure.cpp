@@ -2,7 +2,6 @@
 
 #include <vk_mem_alloc.h>
 
-#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
@@ -406,6 +405,7 @@ VulkanBottomLevelAccelerationStructureImpl::~VulkanBottomLevelAccelerationStruct
 }
 
 VulkanTopLevelAccelerationStructureImpl::~VulkanTopLevelAccelerationStructureImpl() {
+  // Retain referenced BLAS until the TLAS native storage has been destroyed.
   DestroyVulkanAccelerationStructure();
 }
 }  // namespace grassland::rhi::backend::vulkan

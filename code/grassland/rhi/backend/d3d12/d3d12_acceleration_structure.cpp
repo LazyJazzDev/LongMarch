@@ -2,7 +2,6 @@
 
 #include <cstring>
 
-#include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #define D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 #include <D3D12MemAlloc.h>
@@ -399,6 +398,7 @@ D3D12BottomLevelAccelerationStructureImpl::~D3D12BottomLevelAccelerationStructur
 }
 
 D3D12TopLevelAccelerationStructureImpl::~D3D12TopLevelAccelerationStructureImpl() {
+  // Retain referenced BLAS until the TLAS native storage has been destroyed.
   DestroyD3D12AccelerationStructure();
 }
 }  // namespace grassland::rhi::backend::d3d12

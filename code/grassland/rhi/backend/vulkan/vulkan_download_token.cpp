@@ -37,11 +37,11 @@ bool VulkanDownloadTokenImpl::CopyData(void *destination) const {
 }
 
 IVulkanDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size) {
-  return new VulkanDownloadTokenImpl(lease, size);
+  return new VulkanDownloadTokenImpl(std::move(lease), size);
 }
 
 IVulkanDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease,
                                                 const DownloadLayout &layout) {
-  return new VulkanDownloadTokenImpl(lease, layout);
+  return new VulkanDownloadTokenImpl(std::move(lease), layout);
 }
 }  // namespace grassland::rhi::backend::vulkan

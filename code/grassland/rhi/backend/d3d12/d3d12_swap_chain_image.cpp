@@ -39,7 +39,7 @@ ID3D12SwapChainImage *ID3D12SwapChainImage::Create(ImageDesc desc,
                                                    uint64_t generation,
                                                    ID3D12Resource *image,
                                                    ObjectPtr<D3D12DescriptorPool::Lease> attachment) {
-  return new D3D12SwapChainImageImpl(desc, window, generation, image, attachment);
+  return new D3D12SwapChainImageImpl(desc, window, generation, image, std::move(attachment));
 }
 
 void D3D12SwapChainImageImpl::InitializeImage(ImageDesc desc, ID3D12Queue *queue) {

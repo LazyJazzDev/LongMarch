@@ -364,3 +364,66 @@ the stress measurements explicitly identify the current RHI revision above.
   unchanged. Members and implementation methods belong to final classes.
 - Metal source was migrated, but no macOS build or runtime validation was
   available. Windows/Linux checks do not substitute for that validation.
+
+
+## Semantic-audit corrections
+
+The audit against pre-refactor main `e233d265` identified changes beyond interface
+organization. This follow-up addresses them in Vulkan and D3D12:
+
+- Reject swapchain images in texture descriptor updates before any native writes.
+  Vulkan requires a non-null binding view; D3D12 rejects its swapchain-image facet.
+  A desktop regression covers both mixed image arrays and single-slot updates.
+- Key command resource retention by the canonical `QueryInterface<IObject>()`
+  identity, adopting the query's reference for new entries. Frontend and native
+  facets of one object therefore share one retention entry.
+- Keep native interface conversion available in Release, but restore the original
+  Debug-only command-state, thread and event-owner diagnostics. Buffer ownership
+  remains a Debug assertion, as requested separately.
+- Remove self-only native virtual hooks from command contexts, windows, acceleration
+  structures and binding versions, plus the unused D3D12 sampler descriptor getter.
+  Existing sparse-binding tests now check references and completeness, without
+  requiring the implementation-only `IsInitialized` hook.
+- Remove duplicated includes and identical debug/release query branches. Forward
+  consumed factory references with `std::move` instead of temporary retain/release.
+
+### Lifetime decisions
+
+Window teardown is explicitly phased: unregister callbacks; wait for the owning
+queue under its submission mutex; release that mutex; release the current image
+and native presentation resources; then destroy ImGui/presenter and the native
+window. ImGui shutdown must run while the HWND/GLFW window still exists because
+it restores platform hooks. Resource destruction and platform callbacks must not
+run while the queue mutex is held. Partial initialization tolerates a null queue.
+D3D12 explicitly releases attachments, back buffers and the swapchain before the
+HWND, rather than depending on member declaration order.
+
+Vulkan keeps the separate acquisition-fence waits in `DestroySwapchain`; queue
+idle alone is not used as a replacement for presentation-engine acquisition
+completion. The native destruction requirement is described by
+[vkDestroySwapchainKHR](https://docs.vulkan.org/refpages/latest/refpages/source/vkDestroySwapchainKHR.html).
+DXGI's swapchain is associated with its HWND; see
+[CreateSwapChainForHwnd](https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgifactory2-createswapchainforhwnd).
+No D3D11 `ClearState`/`Flush` workaround is introduced into D3D12.
+
+TLAS teardown intentionally retains the new dependency order: destroy TLAS native
+storage while its BLAS references still exist, then release those references.
+This is preferable to mechanically restoring the old base/derived destruction
+order. Download tokens have no reverse dependency between their submission result
+and staging lease; their independent release order needs no added synchronization.
+Children must still be released before their parent Device; no resource destructor
+adds a global device wait.
+
+Scratch capacity caching, pool-bucket capacity computation and explicit framebuffer
+extent are retained: their allocation/reset/caller invariants were checked. These
+are documented implementation refinements, not behavior-preserving renames.
+The shared SubmissionToken/SBT capability interfaces remain because they have real
+consumers; removing them would be a separate choice to couple consumers directly
+to their shared final implementations.
+
+Validation for this follow-up: MSVC Release/Debug build; Release 236 passed and two
+Debug-only cases skipped; Debug 245 passed. Both runs enabled desktop window tests
+and excluded only D3D12's two previously identified compacted-BLAS update cases.
+The final cleanup also passed the Debug full run. On Meshy-PC-3090, GCC and Clang
+each passed syntax checks for 91 translation units with RTTI disabled, using an
+isolated source snapshot. This follow-up does not claim new Linux GPU runtime coverage.

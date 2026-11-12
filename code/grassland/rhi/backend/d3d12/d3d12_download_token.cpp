@@ -36,11 +36,11 @@ bool D3D12DownloadTokenImpl::CopyData(void *destination) const {
 }
 
 ID3D12DownloadToken *CreateD3D12DownloadToken(ObjectPtr<ID3D12TemporalBufferLease> lease, uint64_t size) {
-  return new D3D12DownloadTokenImpl(lease, size);
+  return new D3D12DownloadTokenImpl(std::move(lease), size);
 }
 
 ID3D12DownloadToken *CreateD3D12DownloadToken(ObjectPtr<ID3D12TemporalBufferLease> lease,
                                               const DownloadLayout &layout) {
-  return new D3D12DownloadTokenImpl(lease, layout);
+  return new D3D12DownloadTokenImpl(std::move(lease), layout);
 }
 }  // namespace grassland::rhi::backend::d3d12

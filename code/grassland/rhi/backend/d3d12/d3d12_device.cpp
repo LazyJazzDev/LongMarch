@@ -6,7 +6,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
-#include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
@@ -365,11 +364,13 @@ bool D3D12DeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_all
   std::vector<Event> unique;
   unique.reserve(events.size());
   for (const auto &event : events) {
+#if !defined(NDEBUG)
     auto timeline = rhi::QueryInterfacePtr<ID3D12Timeline>(event.timeline).Get();
     if (!timeline || timeline->Owner() != this) {
       ReportError(-1, "Host waits require timelines from this device.");
       return false;
     }
+#endif
     auto found = std::find_if(unique.begin(), unique.end(),
                               [&](const Event &other) { return other.timeline == event.timeline; });
     if (found == unique.end())

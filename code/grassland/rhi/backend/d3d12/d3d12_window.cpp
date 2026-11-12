@@ -81,10 +81,19 @@ D3D12WindowImpl::D3D12WindowImpl(ID3D12Device *device) : device_(device) {
 
 D3D12WindowImpl::~D3D12WindowImpl() {
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(queue_->QueueMutex());
-  queue_->WaitIdle();
+  // No callbacks or resource destructors may run while holding the submission lock.
+  // queue_ can be null when window initialization failed before assigning it.
+  if (queue_) {
+    std::lock_guard<std::mutex> lock(queue_->QueueMutex());
+    queue_->WaitIdle();
+  }
   ReleaseNextImage();
-
+  // Release all DXGI presentation resources before destroying their HWND.
+  for (auto &attachment : attachments_)
+    attachment.Reset();
+  for (auto &image : images_)
+    image.Reset();
+  swapchain_.Reset();
   DestroyWindow();
 }
 
@@ -501,7 +510,9 @@ ColorSpace D3D12WindowImpl::RequestedColorSpace() const {
 }
 
 void D3D12WindowImpl::DestroyWindow() {
+  // ImGui restores native window hooks; the window must still exist here.
   imgui_.reset();
+  presenter_.reset();
   glfw::UnregisterWindow(window_);
   glfw::DestroyWindow(window_);
 }
