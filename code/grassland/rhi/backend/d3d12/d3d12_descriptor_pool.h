@@ -9,7 +9,9 @@
 namespace grassland::rhi::backend::d3d12 {
 // The Device owns the pool; leases borrow their exact page and range.
 // Pages remain allocated until pool destruction.
-class D3D12DescriptorPool {
+class D3D12DescriptorPool final {
+  class LeaseImpl;
+
   struct Page {
     ComPtr<ID3D12DescriptorHeap> heap;
     uint32_t capacity{};
@@ -19,30 +21,29 @@ class D3D12DescriptorPool {
   };
 
  public:
-  class Lease final : public Object<IObject> {
+  class ILease : public IObject {
    public:
-    Lease(D3D12DescriptorPool *pool, Page *page, uint32_t offset, uint32_t count);
-    ~Lease() override;
-    ID3D12DescriptorHeap *Heap() const;
-    uint32_t Count() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE CPU(uint32_t index = 0) const;
-
-   private:
-    D3D12DescriptorPool *pool_;
-    Page *page_;
-    uint32_t offset_, count_;
+    virtual ID3D12DescriptorHeap *Heap() const = 0;
+    virtual uint32_t Count() const = 0;
+    virtual D3D12_CPU_DESCRIPTOR_HANDLE CPU(uint32_t index = 0) const = 0;
   };
 
-  D3D12DescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t page_capacity = 256);
+  using Lease = ILease;
+
+  D3D12DescriptorPool(::ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t page_capacity = 256);
   ObjectPtr<Lease> Acquire(uint32_t count);
   std::pair<size_t, size_t> GetPageCounts() const;
 
  private:
   void ReleaseRange(Page *page, uint32_t offset, uint32_t count);
-  ID3D12Device *device_;
+  ::ID3D12Device *device_;
   D3D12_DESCRIPTOR_HEAP_TYPE type_;
   uint32_t page_capacity_, stride_;
   mutable std::mutex mutex_;
   std::vector<std::unique_ptr<Page>> pages_;
 };
 }  // namespace grassland::rhi::backend::d3d12
+
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::D3D12DescriptorPool::ILease,
+                        grassland::rhi::IObject,
+                        "376aa279-89ab-4240-81b5-da312dda344c")

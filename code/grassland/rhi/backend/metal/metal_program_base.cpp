@@ -79,27 +79,20 @@ static bool CompileMetal(const IShader *shader,
   }
 }
 
-MetalProgramBase::MetalProgramBase(MTL::Device *device, const PipelineLayoutDesc &layout)
-    : native_device_(device),
-      layout_(layout) {
-}
-
-const PipelineLayoutDesc &MetalProgramBase::BindingLayout() const {
-  return layout_;
-}
-
-NS::SharedPtr<MTL::Function> MetalProgramBase::CompileFunction(const IShader *shader,
-                                                               const std::vector<InputAttributeDesc> &attributes,
-                                                               std::array<uint32_t, 3> *threads) const {
-  for (const auto &group : layout_.groups)
-    if (!ValidateMetalBindingLayout(native_device_, group))
+NS::SharedPtr<MTL::Function> CompileMetalFunction(MTL::Device *device,
+                                                  const PipelineLayoutDesc &layout,
+                                                  const IShader *shader,
+                                                  const std::vector<InputAttributeDesc> &attributes,
+                                                  std::array<uint32_t, 3> *threads) {
+  for (const auto &group : layout.groups)
+    if (!ValidateMetalBindingLayout(device, group))
       return {};
   std::string code, entry;
-  if (!CompileMetal(shader, layout_, attributes, code, entry, threads))
+  if (!CompileMetal(shader, layout, attributes, code, entry, threads))
     return {};
   NS::Error *error = nullptr;
-  auto library = NS::TransferPtr(
-      native_device_->newLibrary(NS::String::string(code.c_str(), NS::UTF8StringEncoding), nullptr, &error));
+  auto library =
+      NS::TransferPtr(device->newLibrary(NS::String::string(code.c_str(), NS::UTF8StringEncoding), nullptr, &error));
   if (!library) {
     ReportMetalError(error, "Metal library compilation failed");
     return {};

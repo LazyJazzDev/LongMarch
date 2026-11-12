@@ -1,4 +1,5 @@
 ﻿#pragma once
+
 #ifndef GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_NONE
 #endif
@@ -8,6 +9,8 @@
 
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/util/event_manager.h"
+
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IWindow, grassland::rhi::IObject, "49b2b063-75db-4ba6-96ae-48d94b3a2022")
 
 namespace grassland::rhi {
 enum class MagnifyPhase { kBegin, kUpdate, kEnd, kCancel };

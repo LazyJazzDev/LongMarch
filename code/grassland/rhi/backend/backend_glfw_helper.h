@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_util.h"
+
 struct GLFWwindow;
 #ifdef __OBJC__
 @class NSEvent;
@@ -9,10 +11,9 @@ struct MagnifyGesture;
 
 namespace grassland::rhi::backend {
 
-class Window;
-
 namespace glfw {
-void RegisterWindow(Window *window);
+// Both borrowed interfaces must belong to the same window.
+void RegisterWindow(IWindow *window, IBackendWindow *backend);
 void UnregisterWindow(GLFWwindow *window);
 // Look up and retain the registered window while invoking its callbacks.
 void DispatchMagnifyEvent(GLFWwindow *window, const MagnifyGesture &gesture);

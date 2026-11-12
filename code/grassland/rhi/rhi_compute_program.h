@@ -2,6 +2,10 @@
 #include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_shader.h"
 
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IComputeProgram,
+                        grassland::rhi::IObject,
+                        "c1726e27-b6b5-4af9-b022-b27a814389cf")
+
 namespace grassland::rhi {
 struct ComputeProgramDesc {
   IShader *compute_shader{};

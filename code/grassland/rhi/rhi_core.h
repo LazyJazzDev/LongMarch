@@ -1,6 +1,8 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi_object.h"
 
+LONGMARCH_RHI_INTERFACE(grassland::rhi::ICore, grassland::rhi::IObject, "299e58a8-f58c-4cea-9df2-7ba69bc52d75")
+
 namespace grassland::rhi {
 class IDevice;
 

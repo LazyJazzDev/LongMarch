@@ -18,11 +18,11 @@ void glfw::DestroyCocoaWindow(GLFWwindow *window) {
   }
 }
 
-float Window::GetHDRHeadroom() const {
+float CocoaHDRHeadroom(GLFWwindow *window) {
   if (!glfw::IsWindowThread())
     return 10.0f;
   @autoreleasepool {
-    auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
+    auto screen = [glfwGetCocoaWindow(window) screen];
     if (screen) {
       const float headroom = screen.maximumExtendedDynamicRangeColorComponentValue;
       if (std::isfinite(headroom) && headroom >= 1.0f)

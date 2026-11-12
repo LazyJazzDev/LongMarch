@@ -19,6 +19,20 @@ class PublicCore final : public rhi::ICore {
   explicit PublicCore(Counts &counts) : counts_(counts) {
   }
 
+  bool QueryInterface(InterfaceID id, void **output) noexcept override {
+    if (!output)
+      return false;
+    *output = nullptr;
+    if (id == uuid<ICore>())
+      *output = static_cast<ICore *>(this);
+    else if (id == uuid<IObject>())
+      *output = static_cast<IObject *>(this);
+    else
+      return false;
+    AddRef();
+    return true;
+  }
+
   void AddRef() noexcept override {
     ++counts_.references;
     ++counts_.retains;

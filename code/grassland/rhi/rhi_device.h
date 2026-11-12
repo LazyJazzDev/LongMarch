@@ -6,6 +6,8 @@
 #include "grassland/rhi/rhi_timeline.h"
 #include "grassland/util/file_system.h"
 
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IDevice, grassland::rhi::IObject, "7a97161c-7adc-4201-a4f0-53f40b94b527")
+
 namespace grassland::rhi {
 class IImage;
 class IBuffer;

@@ -4,40 +4,58 @@
 #include <cassert>
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12TransientDescriptorPool::Lease::Lease(D3D12TransientDescriptorPool *pool, ID3D12DescriptorHeap *heap, size_t level)
+class D3D12TransientDescriptorPool::LeaseImpl final : public Object<D3D12TransientDescriptorPool::ILease> {
+ public:
+  LeaseImpl(D3D12TransientDescriptorPool *pool, ID3D12DescriptorHeap *heap, size_t level);
+  ~LeaseImpl() override;
+  ID3D12DescriptorHeap *Heap() const;
+  uint32_t Count() const;
+  D3D12_CPU_DESCRIPTOR_HANDLE CPU(uint32_t index = 0) const;
+  D3D12_GPU_DESCRIPTOR_HANDLE GPU(uint32_t index = 0) const;
+
+ private:
+  D3D12TransientDescriptorPool *pool_;
+  ID3D12DescriptorHeap *heap_;
+  size_t level_;
+  uint32_t count_;
+};
+
+D3D12TransientDescriptorPool::LeaseImpl::LeaseImpl(D3D12TransientDescriptorPool *pool,
+                                                   ID3D12DescriptorHeap *heap,
+                                                   size_t level)
     : pool_(pool),
       heap_(heap),
       level_(level),
       count_(heap->GetDesc().NumDescriptors) {
 }
 
-D3D12TransientDescriptorPool::Lease::~Lease() {
+D3D12TransientDescriptorPool::LeaseImpl::~LeaseImpl() {
   pool_->ReleasePage(heap_, level_);
 }
 
-ID3D12DescriptorHeap *D3D12TransientDescriptorPool::Lease::Heap() const {
+ID3D12DescriptorHeap *D3D12TransientDescriptorPool::LeaseImpl::Heap() const {
   return heap_;
 }
 
-uint32_t D3D12TransientDescriptorPool::Lease::Count() const {
+uint32_t D3D12TransientDescriptorPool::LeaseImpl::Count() const {
   return count_;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE D3D12TransientDescriptorPool::Lease::CPU(uint32_t index) const {
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12TransientDescriptorPool::LeaseImpl::CPU(uint32_t index) const {
   assert(index < count_);
   auto result = heap_->GetCPUDescriptorHandleForHeapStart();
   result.ptr += SIZE_T(index) * pool_->stride_;
   return result;
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE D3D12TransientDescriptorPool::Lease::GPU(uint32_t index) const {
+D3D12_GPU_DESCRIPTOR_HANDLE D3D12TransientDescriptorPool::LeaseImpl::GPU(uint32_t index) const {
   assert(index < count_);
   auto result = heap_->GetGPUDescriptorHandleForHeapStart();
   result.ptr += UINT64(index) * pool_->stride_;
   return result;
 }
 
-D3D12TransientDescriptorPool::D3D12TransientDescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type)
+D3D12TransientDescriptorPool::D3D12TransientDescriptorPool(::ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type)
     : device_(device),
       type_(type),
       limit_(type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER ? 2048 : 1000000),
@@ -89,7 +107,7 @@ ObjectPtr<D3D12TransientDescriptorPool::Lease> D3D12TransientDescriptorPool::Acq
       bucket.available.pop_back();
       ++bucket.occupied;
     }
-    return ObjectPtr<Lease>::Adopt(new Lease(this, heap, level));
+    return ObjectPtr<Lease>::Adopt(new LeaseImpl(this, heap, level));
   } catch (const std::bad_alloc &) {
     if (heap)
       ReleasePage(heap, level);

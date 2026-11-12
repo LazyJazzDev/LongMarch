@@ -13,9 +13,14 @@ enum TemporalBufferUsage { TEMPORAL_BUFFER_UPLOAD, TEMPORAL_BUFFER_DOWNLOAD };
 // Defined and explicitly instantiated in the .cpp for supported native backends.
 // Pools own storage; intrusive leases borrow it until their final reference dies.
 template <typename DeviceType, typename BufferType, typename LeaseType>
-class TemporalBufferPool {
+class TemporalBufferPool final {
  public:
   using Lease = LeaseType;
+
+  static constexpr uint64_t CapacityForLevel(size_t level) {
+    return uint64_t{65536} << level;
+  }
+
   TemporalBufferPool(DeviceType *device, TemporalBufferUsage usage);
   ~TemporalBufferPool();
   ObjectPtr<Lease> Acquire(uint64_t size);

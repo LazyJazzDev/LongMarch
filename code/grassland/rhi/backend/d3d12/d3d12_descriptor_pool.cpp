@@ -5,33 +5,49 @@
 #include <limits>
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12DescriptorPool::Lease::Lease(D3D12DescriptorPool *pool, Page *page, uint32_t offset, uint32_t count)
+class D3D12DescriptorPool::LeaseImpl final : public Object<D3D12DescriptorPool::ILease> {
+ public:
+  LeaseImpl(D3D12DescriptorPool *pool, Page *page, uint32_t offset, uint32_t count);
+  ~LeaseImpl() override;
+  ID3D12DescriptorHeap *Heap() const;
+  uint32_t Count() const;
+  D3D12_CPU_DESCRIPTOR_HANDLE CPU(uint32_t index = 0) const;
+
+ private:
+  D3D12DescriptorPool *pool_;
+  Page *page_;
+  uint32_t offset_, count_;
+};
+
+D3D12DescriptorPool::LeaseImpl::LeaseImpl(D3D12DescriptorPool *pool, Page *page, uint32_t offset, uint32_t count)
     : pool_(pool),
       page_(page),
       offset_(offset),
       count_(count) {
 }
 
-D3D12DescriptorPool::Lease::~Lease() {
+D3D12DescriptorPool::LeaseImpl::~LeaseImpl() {
   pool_->ReleaseRange(page_, offset_, count_);
 }
 
-ID3D12DescriptorHeap *D3D12DescriptorPool::Lease::Heap() const {
+ID3D12DescriptorHeap *D3D12DescriptorPool::LeaseImpl::Heap() const {
   return page_->heap.Get();
 }
 
-uint32_t D3D12DescriptorPool::Lease::Count() const {
+uint32_t D3D12DescriptorPool::LeaseImpl::Count() const {
   return count_;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE D3D12DescriptorPool::Lease::CPU(uint32_t index) const {
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12DescriptorPool::LeaseImpl::CPU(uint32_t index) const {
   assert(index < count_);
   auto result = page_->heap->GetCPUDescriptorHandleForHeapStart();
   result.ptr += SIZE_T(offset_ + index) * pool_->stride_;
   return result;
 }
 
-D3D12DescriptorPool::D3D12DescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t page_capacity)
+D3D12DescriptorPool::D3D12DescriptorPool(::ID3D12Device *device,
+                                         D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                         uint32_t page_capacity)
     : device_(device),
       type_(type),
       page_capacity_(page_capacity),
@@ -78,7 +94,7 @@ ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t coun
     available = fresh->capacity;
     pages_.push_back(std::move(fresh));
   }
-  auto lease = ObjectPtr<Lease>::Adopt(new Lease(this, page, offset, count));
+  auto lease = ObjectPtr<Lease>::Adopt(new LeaseImpl(this, page, offset, count));
   auto range = page->ranges.extract(offset);
   auto fit = page->available.extract({available, offset});
   if (available > count) {

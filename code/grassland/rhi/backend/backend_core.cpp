@@ -15,28 +15,28 @@
 
 namespace grassland::rhi::backend {
 
-rhi::IDevice *Core::CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement) {
-  const auto id = SelectPhysicalDevice(GetPhysicalDevices(), requirement);
+rhi::IDevice *CreateDeviceByAutoSelection(ICore *core, DeviceFeatureRequirement requirement) {
+  const auto id = SelectPhysicalDevice(core->GetPhysicalDevices(), requirement);
   if (id < 0) {
     ReportError(-1, "No physical device satisfies the requested RHI features.");
     return nullptr;
   }
-  return CreateDevice(id);
+  return core->CreateDevice(id);
 }
 
-Core *CreateCore(BackendAPI api, const CoreDesc &desc) {
+ICore *CreateCore(BackendAPI api, const CoreDesc &desc) {
   switch (api) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     case BACKEND_API_D3D12:
-      return d3d12::D3D12Core::CreateD3D12Core(desc);
+      return d3d12::CreateD3D12Core(desc);
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     case BACKEND_API_VULKAN:
-      return vulkan::VulkanCore::CreateVulkanCore(desc);
+      return vulkan::IVulkanCore::CreateVulkanCore(desc);
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
     case BACKEND_API_METAL:
-      return metal::MetalCore::CreateMetalCore(desc);
+      return metal::IMetalCore::CreateMetalCore(desc);
 #endif
     default:
       ReportError(-1, "Requested RHI backend is unavailable in this build.");

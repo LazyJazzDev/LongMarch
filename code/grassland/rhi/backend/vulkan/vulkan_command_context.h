@@ -1,20 +1,45 @@
 ﻿#pragma once
+#include <array>
+#include <unordered_map>
 #include <vector>
 
-#include "grassland/rhi/backend/backend_command_context.h"
+#include "grassland/rhi/backend/backend_download_token.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_util.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanQueue;
-class VulkanImage;
-class VulkanBuffer;
-class VulkanProgram;
-class VulkanRayTracingProgram;
-class VulkanProgramBase;
-class VulkanWindow;
-class VulkanTopLevelAccelerationStructure;
+class IVulkanCommandContext : public IObject {
+ public:
+  typedef enum {
+    SUBMIT_RESULT_REJECTED,
+    SUBMIT_RESULT_SUBMITTED,
+    SUBMIT_RESULT_FAILED_IN_FLIGHT,
+  } SubmitResult;
 
-class VulkanCommandContext final : public CommandContext {
+ public:
+  virtual void BindDownloads(rhi::ISubmissionToken *submission) = 0;
+  virtual void ReleaseDownloads() = 0;
+  virtual bool Seal() = 0;
+  virtual void MarkSubmitted() = 0;
+  virtual bool WasSubmitted() const = 0;
+  virtual void UpdatePresentedImages() = 0;
+  virtual SubmitResult SubmitNative(const SubmitInfo &info, Event signal) = 0;
+  virtual SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) = 0;
+};
+
+ICommandContext *CreateVulkanCommandContext(IVulkanQueue *queue);
+
+}  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanCommandContext,
+                        grassland::rhi::IObject,
+                        "c66f4335-1f50-47ca-9a8d-754583fbdfea")
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulkanCommandContext> {
  public:
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
@@ -31,8 +56,8 @@ class VulkanCommandContext final : public CommandContext {
       ITopLevelAccelerationStructure *destination,
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
-  ~VulkanCommandContext() override;
-  static VulkanCommandContext *Create(VulkanQueue *queue);
+  ~VulkanCommandContextImpl() override;
+  static ICommandContext *Create(IVulkanQueue *queue);
   IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
   IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
@@ -68,32 +93,39 @@ class VulkanCommandContext final : public CommandContext {
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
-  VulkanCommandContext(VulkanQueue *queue);
+  const void *DeviceIdentity() const;
+  IVulkanQueue *OwnerQueue() const;
 
+  // Inputs and ranges have been validated by the recording entry point.
+  bool CopyBuffer(IVulkanBuffer *source,
+                  uint64_t source_offset,
+                  IVulkanBuffer *destination,
+                  uint64_t destination_offset,
+                  uint64_t size);
+  VulkanCommandContextImpl(IVulkanQueue *queue);
   bool ValidateGroups();
-  bool BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *version);
-  std::vector<VulkanBindingGroup::Version *> groups_;
-  VulkanProgram *program_{};
-  VulkanProgramBase *native_program_{};
-  std::unordered_map<VulkanTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
+  bool BindGroupVersion(uint32_t index, IVulkanBindingVersion *version);
+  std::vector<IVulkanBindingVersion *> groups_;
+  IProgram *program_{};
+  IVulkanProgramBase *native_program_{};
+  std::unordered_map<IVulkanTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
       as_dependencies_;
   bool compute_active_{};
-  VulkanRayTracingProgram *ray_program_{};
+  IVulkanRayTracingProgram *ray_program_{};
   const PipelineLayoutDesc *binding_layout_{};
-  VulkanImage *render_target_{};
-  std::vector<VulkanBuffer *> vertex_buffers_;
+  IVulkanImage *render_target_{};
+  std::vector<IVulkanBuffer *> vertex_buffers_;
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
-
-  bool EndRecording() override;
-  bool TransitionBuffer(VulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access);
+  bool EndRecording();
+  bool TransitionBuffer(IVulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct BufferState {
     VkPipelineStageFlags stages;
     VkAccessFlags access;
   };
 
-  std::unordered_map<VulkanBuffer *, BufferState> buffer_states_;
-  bool TransitionImage(VulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
+  std::unordered_map<IVulkanBuffer *, BufferState> buffer_states_;
+  bool TransitionImage(IVulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct ImageState {
     VkImageLayout layout;
@@ -101,13 +133,58 @@ class VulkanCommandContext final : public CommandContext {
     VkAccessFlags access;
   };
 
-  std::unordered_map<VulkanImage *, ImageState> image_states_;
-  std::vector<VulkanWindow *> presents_;
-  VulkanDevice *device_;
+  std::unordered_map<IVulkanImage *, ImageState> image_states_;
+  std::vector<IVulkanWindow *> presents_;
+  IVulkanDevice *device_;
   VkCommandPool pool_{};
   VkCommandBuffer command_{};
   bool submission_failed_{};
   bool reusable_{};
-};
 
+ public:
+  bool CmdDrawImGui(IWindow *window, IImage *target) override;
+
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override;
+
+ private:
+  bool PrepareRendering(const RenderingInfo &info);
+
+  bool RenderingMatches(const IProgram *program) const;
+
+  void InitializeCommandContext(IVulkanQueue *queue);
+
+ public:
+  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
+
+  void BindDownloads(rhi::ISubmissionToken *submission) override;
+
+  void ReleaseDownloads() override;
+
+ private:
+  // Call before encoding each resource use. Retains each exact object once.
+  IDownloadToken *RegisterDownload(ObjectPtr<IVulkanDownloadToken> token);
+
+  template <typename T, std::enable_if_t<!std::is_convertible_v<T *, rhi::IObject *>, int> = 0>
+  bool RetainResource(T *resource) {
+    return RetainResource(rhi::QueryInterfacePtr<rhi::IObject>(resource).Get());
+  }
+
+  bool RetainResource(rhi::IObject *resource);
+
+ public:
+  bool Seal() override;
+
+  void MarkSubmitted() override;
+
+  bool WasSubmitted() const override;
+
+ private:
+  RenderingInfo rendering_{};
+  bool recording_failed_{};
+  bool sealed_{};
+  IVulkanQueue *queue_{};
+  std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
+  bool submitted_{};
+  std::vector<ObjectPtr<IVulkanDownloadToken>> downloads_{};
+};
 }  // namespace grassland::rhi::backend::vulkan

@@ -3,22 +3,16 @@
 
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12ProgramBase,
+                        grassland::rhi::IObject,
+                        "1a8ecd83-21dd-483c-bd0b-6efba7356e93")
+
 namespace grassland::rhi::backend::d3d12 {
 // Layout ownership only; object identity and reference counting belong to the concrete Program.
-class D3D12ProgramBase {
+class ID3D12ProgramBase : public IObject {
  public:
-  ID3D12RootSignature *NativeRootSignature() const;
-  uint32_t RootParameter(uint32_t group, bool sampler) const;
-
- protected:
-  D3D12ProgramBase();
-  ~D3D12ProgramBase();
-  D3D12ProgramBase(const D3D12ProgramBase &) = delete;
-  D3D12ProgramBase &operator=(const D3D12ProgramBase &) = delete;
-  bool CreateLayout(ID3D12Device *device, const PipelineLayoutDesc &layout, D3D12_ROOT_SIGNATURE_FLAGS flags);
-
- private:
-  std::vector<std::array<uint32_t, 2>> root_parameters_;
-  ComPtr<ID3D12RootSignature> root_signature_;
+  virtual ID3D12Device *Owner() const = 0;
+  virtual ID3D12RootSignature *NativeRootSignature() const = 0;
+  virtual uint32_t RootParameter(uint32_t group, bool sampler) const = 0;
 };
 }  // namespace grassland::rhi::backend::d3d12

@@ -2,22 +2,26 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <glm/gtc/packing.hpp>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 #include "format_support.h"
 #include "grassland/rhi/backend/backend_binding_group.h"
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image_presenter.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
 #include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhi_device.h"
 #include "imgui.h"
+#include "native_binding_test_util.h"
+#include "native_image_test_util.h"
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
@@ -45,16 +49,16 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
   if (api == BACKEND_API_METAL) {
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto owner = static_cast<MetalDevice *>(device);
-    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<MetalQueue *>(queue_owner.Get());
+    auto owner = rhi::QueryInterfacePtr<IMetalDevice>(device).Get();
+    ObjPtr<IQueue> queue_owner = rhi::QueryInterfacePtr<IDevice>(owner)->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<IMetalQueue>(queue_owner.Get()).Get();
     auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
     std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
     auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
-    blit->copyFromTexture(static_cast<MetalImage *>(image)->NativeImage(), 0, 0, MTL::Origin::Make(x, y, 0),
-                          MTL::Size::Make(1, 1, 1), readback.get(), 0, 256, 256);
+    blit->copyFromTexture(rhi::QueryInterfacePtr<IMetalImage>(image).Get()->NativeImage(), 0, 0,
+                          MTL::Origin::Make(x, y, 0), MTL::Size::Make(1, 1, 1), readback.get(), 0, 256, 256);
     blit->endEncoding();
     commands->commit();
     commands->waitUntilCompleted();
@@ -67,10 +71,10 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
-    auto owner = static_cast<D3D12Device *>(device);
-    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<D3D12Queue *>(queue_owner.Get());
-    auto source = static_cast<D3D12Image *>(image)->NativeImage();
+    auto owner = rhi::QueryInterfacePtr<ID3D12Device>(device).Get();
+    ObjPtr<IQueue> queue_owner = rhi::QueryInterfacePtr<IDevice>(owner)->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<ID3D12Queue>(queue_owner.Get()).Get();
+    auto source = rhi::QueryInterfacePtr<ID3D12Image>(image).Get()->NativeImage();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_READBACK;
@@ -127,11 +131,11 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (api == BACKEND_API_VULKAN) {
     using namespace backend::vulkan;
-    auto owner = static_cast<VulkanDevice *>(device);
-    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<VulkanQueue *>(queue_owner.Get());
+    auto owner = rhi::QueryInterfacePtr<IVulkanDevice>(device).Get();
+    ObjPtr<IQueue> queue_owner = rhi::QueryInterfacePtr<IDevice>(owner)->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<IVulkanQueue>(queue_owner.Get()).Get();
     auto native = owner->NativeDevice();
-    auto source = static_cast<VulkanImage *>(image)->NativeImage();
+    auto source = rhi::QueryInterfacePtr<IVulkanImage>(image).Get()->NativeImage();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     desc.size = sizeof(output);
     desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -225,8 +229,9 @@ class RhiImage : public testing::TestWithParam<BackendAPI> {
   void Track(IDevice *device) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12)
-      ASSERT_TRUE(SUCCEEDED(static_cast<backend::d3d12::D3D12Device *>(device)->NativeDevice()->QueryInterface(
-          IID_PPV_ARGS(&messages_))));
+      ASSERT_TRUE(
+          SUCCEEDED(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device).Get()->NativeDevice()->QueryInterface(
+              IID_PPV_ARGS(&messages_))));
 #endif
   }
 
@@ -347,18 +352,17 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
       continue;
     ObjPtr<IImage> image = device->CreateImage({16, 16, format});
     ASSERT_TRUE(image);
-    const auto native = static_cast<backend::Image *>(image.Get());
     bool supported = false;
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
-      auto owner = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+      auto owner = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get();
       supported = backend::d3d12::SupportsImageStorage(owner->NativeDevice(), format);
       EXPECT_FALSE(backend::d3d12::SupportsImageStorage(owner->NativeDevice(), IMAGE_FORMAT_UNKNOWN));
     }
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     if (GetParam() == BACKEND_API_VULKAN) {
-      auto owner = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+      auto owner = rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get();
       supported = backend::vulkan::SupportsImageStorage(owner->NativePhysicalDevice(), format);
       EXPECT_FALSE(backend::vulkan::SupportsImageStorage(owner->NativePhysicalDevice(), IMAGE_FORMAT_UNKNOWN));
     }
@@ -369,7 +373,7 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
       EXPECT_FALSE(backend::metal::SupportsImageStorage(IMAGE_FORMAT_UNKNOWN));
     }
 #endif
-    EXPECT_EQ(native->SupportsStorage(), supported);
+    EXPECT_EQ(NativeImageSupportsStorage(image.Get()), supported);
     if (IsDepthFormat(format))
       EXPECT_FALSE(supported);
     BindingLayoutDesc layout{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}};
@@ -385,11 +389,11 @@ TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto owner = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+  auto owner = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get();
   ObjPtr<IImage> color = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ObjPtr<IImage> depth = device->CreateImage({8, 8, IMAGE_FORMAT_D32_SFLOAT});
   ASSERT_TRUE(color && depth);
-  auto handle = static_cast<backend::d3d12::D3D12Image *>(color.Get())->AttachmentView().ptr;
+  auto handle = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Image>(color.Get()).Get()->AttachmentView().ptr;
   EXPECT_NE(handle, 0u);
   EXPECT_EQ(owner->RTVPool().GetPageCounts().second, 1u);
   EXPECT_EQ(owner->DSVPool().GetPageCounts().second, 1u);
@@ -402,7 +406,7 @@ TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
   rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
   ASSERT_TRUE(commands->CmdBeginRendering(rendering));
   ASSERT_TRUE(commands->CmdEndRendering());
-  EXPECT_EQ(static_cast<backend::d3d12::D3D12Image *>(color.Get())->AttachmentView().ptr, handle);
+  EXPECT_EQ(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Image>(color.Get()).Get()->AttachmentView().ptr, handle);
   color.Release();
   depth.Release();
   EXPECT_EQ(owner->RTVPool().GetPageCounts().second, 1u);
@@ -455,7 +459,7 @@ TEST_P(RhiImage, PresentationConvertsAllColorSpacesAndPreservesHDR) {
   ASSERT_TRUE(device);
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
-  backend::ImagePresenter presenter(static_cast<backend::Device *>(device.Get()));
+  backend::ImagePresenter presenter(device.Get());
   ObjPtr<IImage> input = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> encoded = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   ObjPtr<IImage> converted = device->CreateImage({2, 2, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
@@ -680,7 +684,7 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
   const uint32_t green = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), &green, 4));
-  ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+  ASSERT_TRUE(RecordNativeImGui(window.Get(), commands.Get(), target.Get()));
   ASSERT_TRUE(window->EnableImGui(false));
   texture.Release();
   ObjPtr<ISubmissionToken> done = commands->Submit();
@@ -711,8 +715,7 @@ TEST_P(RhiImage, ImGuiHDRPreservesSolidColorsAndBlendsInOutputSpace) {
   Track(device.Get());
   ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "HDR UI color verification"});
   ASSERT_TRUE(window);
-  auto ui =
-      backend::WindowImGui::Create(static_cast<backend::Device *>(device.Get()), window->GLFWWindow(), nullptr, 13);
+  auto ui = backend::WindowImGui::Create(device.Get(), window->GLFWWindow(), nullptr, 13);
   ASSERT_TRUE(ui);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
@@ -844,14 +847,14 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
       return;
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, ImGui::GetIO().DisplaySize, IM_COL32_WHITE);
   };
-  auto original_context = static_cast<backend::Window *>(window.Get())->GetImGuiContext();
+  auto original_context = rhi::QueryInterfacePtr<backend::IBackendWindow>(window.Get()).Get()->GetImGuiContext();
   for (bool visible : {true, false, false, true, false}) {
     record_ui = visible;
     ASSERT_TRUE(window->UpdateImGui(draw_window));
     ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
-    ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+    ASSERT_TRUE(RecordNativeImGui(window.Get(), commands.Get(), target.Get()));
     ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     ASSERT_TRUE(done->WaitHost());
@@ -859,7 +862,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
     ReadPixel(device.Get(), target.Get(), GetParam(), 20, 20, pixel);
     const uint8_t channel = visible ? 255 : 0;
     EXPECT_EQ(pixel, (std::array<uint8_t, 4>{channel, channel, 255, 255}));
-    EXPECT_EQ(static_cast<backend::Window *>(window.Get())->GetImGuiContext(), original_context);
+    EXPECT_EQ(rhi::QueryInterfacePtr<backend::IBackendWindow>(window.Get()).Get()->GetImGuiContext(), original_context);
   }
 }
 
@@ -889,7 +892,7 @@ TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
     ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
-    ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+    ASSERT_TRUE(RecordNativeImGui(window.Get(), commands.Get(), target.Get()));
     targets.push_back(target);
     recordings.push_back(commands);
   }
@@ -946,7 +949,7 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
     ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), background));
-    ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+    ASSERT_TRUE(RecordNativeImGui(window.Get(), commands.Get(), target.Get()));
     EXPECT_EQ(updates, before);  // Recording must not run UI logic.
     ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done && done->WaitHost());
@@ -1052,8 +1055,10 @@ TEST_P(RhiImage, FragmentRayQueriesRetainIndirectBlasResources) {
   if (!device)
     GTEST_SKIP() << "Ray query unavailable";
 #if defined(LONGMARCH_METAL_ENABLED)
-  if (GetParam() == BACKEND_API_METAL &&
-      !static_cast<backend::metal::MetalDevice *>(device.Get())->NativeDevice()->supportsRaytracingFromRender())
+  if (GetParam() == BACKEND_API_METAL && !rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get())
+                                              .Get()
+                                              ->NativeDevice()
+                                              ->supportsRaytracingFromRender())
     GTEST_SKIP() << "Render-stage ray query unavailable";
 #endif
   Track(device.Get());
@@ -1359,11 +1364,12 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 16, 16}}));
   // Fork only the buffer binding, then destroy the source version. Copied image
   // and sampler descriptors must keep their native handles valid for GPU use.
-  auto original = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(
-      static_cast<backend::BindingGroup *>(material.Get())->CurrentVersion());
-  ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}}, 0));
-  EXPECT_NE(static_cast<backend::BindingGroup *>(material.Get())->CurrentVersion(), original.Get());
-  original.Reset();
+  WithNativeBindingGroup(material.Get(), [&](auto *native) {
+    auto original = RetainBindingVersion(native->CurrentVersion());
+    ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}}, 0));
+    EXPECT_NE(native->CurrentVersion(), original.Get());
+    original.Reset();
+  });
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   const uint32_t red_pixel = 0xff0000ff, green_pixel = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(red.Get(), &red_pixel, 4));
@@ -1403,7 +1409,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   }
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    auto native = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get();
     // Grow independently from 32: resources reach 4096, samplers reach 256.
     // Earlier recorded draws pin every smaller page until command retirement.
     EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 8u);
@@ -1427,9 +1433,9 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   std::shared_ptr<void> gate;
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
-    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<backend::d3d12::D3D12Queue *>(queue_owner.Get());
+    auto native = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get();
+    ObjPtr<IQueue> queue_owner = device->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Queue>(queue_owner.Get()).Get();
     backend::d3d12::ComPtr<ID3D12Fence> fence;
     ASSERT_TRUE(SUCCEEDED(native->NativeDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))));
     gate = std::shared_ptr<void>(native, [native_queue, fence](void *) {
@@ -1443,9 +1449,9 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN) {
-    auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
-    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<backend::vulkan::VulkanQueue *>(queue_owner.Get());
+    auto native = rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get();
+    ObjPtr<IQueue> queue_owner = device->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<backend::vulkan::IVulkanQueue>(queue_owner.Get()).Get();
     VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
     type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
     VkSemaphoreCreateInfo create{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
@@ -1477,9 +1483,9 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL) {
-    auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
-    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<backend::metal::MetalQueue *>(queue_owner.Get());
+    auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get();
+    ObjPtr<IQueue> queue_owner = device->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<backend::metal::IMetalQueue>(queue_owner.Get()).Get();
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto event = NS::TransferPtr(native->NativeDevice()->newSharedEvent());
     ASSERT_TRUE(event);
@@ -1503,7 +1509,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   commands.Release();
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    auto native = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get();
     EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 8u);
     EXPECT_EQ(native->SamplerDescriptors().GetPageCounts().second, 4u);
   }
@@ -1512,7 +1518,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(done->WaitHost());
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    auto native = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get();
     EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 0u);
     EXPECT_EQ(native->SamplerDescriptors().GetPageCounts().second, 0u);
   }

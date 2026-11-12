@@ -3,20 +3,19 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanSampler::VulkanSampler(VulkanDevice *device, const SamplerDesc &desc)
-    : Sampler(desc, device),
-      device_(device->NativeDevice()) {
+VulkanSamplerImpl::VulkanSamplerImpl(IVulkanDevice *device, const SamplerDesc &desc) : device_(device->NativeDevice()) {
+  InitializeSampler(desc, device);
 }
 
-VulkanSampler::~VulkanSampler() {
+VulkanSamplerImpl::~VulkanSamplerImpl() {
   if (sampler_)
     vkDestroySampler(device_, sampler_, nullptr);
 }
 
-VulkanSampler *VulkanSampler::Create(VulkanDevice *device, const SamplerDesc &desc) {
-  if (!Validate(desc))
+rhi::ISampler *VulkanSamplerImpl::Create(IVulkanDevice *device, const SamplerDesc &desc) {
+  if (!ValidateSamplerDesc(desc))
     return nullptr;
-  auto sampler = ObjectPtr<VulkanSampler>::Adopt(new VulkanSampler(device, desc));
+  auto sampler = ObjectPtr<VulkanSamplerImpl>::Adopt(new VulkanSamplerImpl(device, desc));
   const VkSamplerAddressMode modes[] = {VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                                         VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT};
   VkSamplerCreateInfo create{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -28,5 +27,9 @@ VulkanSampler *VulkanSampler::Create(VulkanDevice *device, const SamplerDesc &de
   if (!Check(vkCreateSampler(device->NativeDevice(), &create, nullptr, &sampler->sampler_), "Create sampler"))
     return nullptr;
   return sampler.Detach();
+}
+
+rhi::ISampler *IVulkanSampler::Create(IVulkanDevice *device, const SamplerDesc &desc) {
+  return VulkanSamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::vulkan

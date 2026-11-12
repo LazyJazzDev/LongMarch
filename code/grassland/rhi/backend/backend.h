@@ -1,6 +1,9 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/backend_util.h"
+#include <array>
+#include <atomic>
+#include <mutex>
+#include <thread>
 
-namespace grassland::rhi::backend {}
+#include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/rhi_device.h"

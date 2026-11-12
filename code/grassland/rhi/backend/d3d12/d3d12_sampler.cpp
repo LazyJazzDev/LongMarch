@@ -3,13 +3,14 @@
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12Sampler::D3D12Sampler(D3D12Device *device, const SamplerDesc &desc) : Sampler(desc, device) {
+D3D12SamplerImpl::D3D12SamplerImpl(ID3D12Device *device, const SamplerDesc &desc) {
+  InitializeSampler(desc, device);
 }
 
-D3D12Sampler *D3D12Sampler::Create(D3D12Device *device, const SamplerDesc &desc) {
-  if (!Validate(desc))
+rhi::ISampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc &desc) {
+  if (!ValidateSamplerDesc(desc))
     return nullptr;
-  auto sampler = ObjectPtr<D3D12Sampler>::Adopt(new D3D12Sampler(device, desc));
+  auto sampler = ObjectPtr<D3D12SamplerImpl>::Adopt(new D3D12SamplerImpl(device, desc));
   sampler->descriptor_ = device->SamplerDescriptorStorage().Acquire(1);
   if (!sampler->descriptor_)
     return nullptr;
@@ -25,5 +26,9 @@ D3D12Sampler *D3D12Sampler::Create(D3D12Device *device, const SamplerDesc &desc)
   native.MaxAnisotropy = 1;
   device->NativeDevice()->CreateSampler(&native, sampler->Descriptor());
   return sampler.Detach();
+}
+
+rhi::ISampler *ID3D12Sampler::Create(ID3D12Device *device, const SamplerDesc &desc) {
+  return D3D12SamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::d3d12

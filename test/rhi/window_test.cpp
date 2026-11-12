@@ -30,6 +30,43 @@ namespace {
 
 class RhiWindow : public testing::TestWithParam<BackendAPI> {};
 
+TEST_P(RhiWindow, MagnifyDispatchRetainsWindowAndIsolatesCallbacks) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto window = device.CreateGLFWWindow({160, 120, "Magnify dispatch"});
+  auto other = device.CreateGLFWWindow({160, 120, "Magnify isolation"});
+  ASSERT_TRUE(window);
+  ASSERT_TRUE(other);
+#ifndef __APPLE__
+  EXPECT_FALSE(window.SupportsMagnifyGestures());
+#endif
+  auto native = window.GLFWWindow();
+  int calls = 0, other_calls = 0, scroll_calls = 0;
+  other.MagnifyEvent().RegisterCallback([&](const MagnifyGesture &) { ++other_calls; });
+  window.ScrollEvent().RegisterCallback([&](double, double) { ++scroll_calls; });
+  window.MagnifyEvent().RegisterCallback([&](const MagnifyGesture &) { window.Release(); }, 200);
+  window.MagnifyEvent().RegisterCallback(
+      [&](const MagnifyGesture &event) {
+        ++calls;
+        EXPECT_DOUBLE_EQ(event.scale, 1.25);
+        EXPECT_DOUBLE_EQ(event.x, 40.0);
+        EXPECT_DOUBLE_EQ(event.y, 60.0);
+        EXPECT_EQ(event.phase, MagnifyPhase::kBegin);
+      },
+      100);
+  backend::glfw::DispatchMagnifyEvent(native, {1.25, 40.0, 60.0, MagnifyPhase::kBegin});
+  EXPECT_FALSE(window);
+  EXPECT_EQ(calls, 1);
+  EXPECT_EQ(other_calls, 0);
+  EXPECT_EQ(scroll_calls, 0);
+  backend::glfw::DispatchMagnifyEvent(native, {});
+  EXPECT_EQ(calls, 1);
+}
+
 TEST_P(RhiWindow, ReferenceWhiteQueryDoesNotReplaceTheCurrentFrame) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP();
@@ -200,21 +237,30 @@ TEST_P(RhiWindow, ImGuiFontInitializationOptions) {
   auto previous = ImGui::GetCurrentContext();
   EXPECT_FALSE(window.EnableImGui(true, nullptr, 0));
   EXPECT_FALSE(window.EnableImGui(true, "missing-rhi-font.ttf", 20));
-  EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext(), nullptr);
+  EXPECT_EQ(
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(window.Get()).Get()->GetImGuiContext(),
+      nullptr);
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
   ASSERT_TRUE(window.EnableImGui(true, nullptr, 24));
-  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext());
+  ImGui::SetCurrentContext(grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(window.Get())
+                               .Get()
+                               ->GetImGuiContext());
   EXPECT_FLOAT_EQ(ImGui::GetIO().Fonts->Fonts[0]->FontSize, 24);
   ImGui::SetCurrentContext(previous);
-  auto context = static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext();
+  auto context =
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(window.Get()).Get()->GetImGuiContext();
   ASSERT_TRUE(window.EnableImGui(true, nullptr, 32));
-  EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext(), context);
+  EXPECT_EQ(
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(window.Get()).Get()->GetImGuiContext(),
+      context);
   ASSERT_TRUE(window.EnableImGui(false));
   const auto path = (std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() /
                      "external/imgui/misc/fonts/Roboto-Medium.ttf")
                         .string();
   ASSERT_TRUE(window.EnableImGui(true, path.c_str(), 28));
-  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(window.Get())->GetImGuiContext());
+  ImGui::SetCurrentContext(grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(window.Get())
+                               .Get()
+                               ->GetImGuiContext());
   EXPECT_FLOAT_EQ(ImGui::GetIO().Fonts->Fonts[0]->FontSize, 28);
   EXPECT_NE(ImGui::GetIO().Fonts->Fonts[0]->FindGlyphNoFallback('A'), nullptr);
   EXPECT_NE(ImGui::GetIO().Fonts->TexID, ImTextureID{});
@@ -255,23 +301,34 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   ASSERT_TRUE(first.EnableImGui());
   ASSERT_TRUE(second.EnableImGui());
   EXPECT_EQ(ImGui::GetCurrentContext(), previous);
-  ASSERT_NE(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(), nullptr);
-  ASSERT_NE(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(),
-            static_cast<grassland::rhi::backend::Window *>(second.Get())->GetImGuiContext());
+  ASSERT_NE(
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(first.Get()).Get()->GetImGuiContext(),
+      nullptr);
+  ASSERT_NE(
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(first.Get()).Get()->GetImGuiContext(),
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(second.Get())
+          .Get()
+          ->GetImGuiContext());
 #ifdef _WIN32
   // Native messages can arrive outside PollEvents with no current context, or
   // while a different window's context is selected.
-  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
+  ImGui::SetCurrentContext(
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(first.Get()).Get()->GetImGuiContext());
   auto first_native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
-  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(second.Get())->GetImGuiContext());
+  ImGui::SetCurrentContext(grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(second.Get())
+                               .Get()
+                               ->GetImGuiContext());
   auto second_native = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
   ImGui::SetCurrentContext(nullptr);
   SendMessageW(first_native, WM_NULL, 0, 0);
   SendMessageW(second_native, WM_NULL, 0, 0);
   EXPECT_EQ(ImGui::GetCurrentContext(), nullptr);
-  ImGui::SetCurrentContext(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
+  ImGui::SetCurrentContext(
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(first.Get()).Get()->GetImGuiContext());
   SendMessageW(second_native, WM_NULL, 0, 0);
-  EXPECT_EQ(ImGui::GetCurrentContext(), static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
+  EXPECT_EQ(
+      ImGui::GetCurrentContext(),
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(first.Get()).Get()->GetImGuiContext());
   ImGui::SetCurrentContext(previous);
 #endif
   EXPECT_EQ(glfwGetWindowUserPointer(first.GLFWWindow()), &marker);
@@ -294,7 +351,9 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   auto draw_first = [&] {
     ++first_draws;
     EXPECT_EQ(ImGui::GetCurrentContext(),
-              static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext());
+              grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(first.Get())
+                  .Get()
+                  ->GetImGuiContext());
     EXPECT_FALSE(first.EnableImGui(false));
     EXPECT_FALSE(first.UpdateImGui({}));
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(255, 0, 0, 255));
@@ -303,7 +362,9 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   auto draw_second = [&] {
     ++second_draws;
     EXPECT_EQ(ImGui::GetCurrentContext(),
-              static_cast<grassland::rhi::backend::Window *>(second.Get())->GetImGuiContext());
+              grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(second.Get())
+                  .Get()
+                  ->GetImGuiContext());
     ImGui::GetForegroundDrawList()->AddRectFilled({0, 0}, {100, 100}, IM_COL32(0, 255, 0, 255));
   };
   ASSERT_TRUE(first.UpdateImGui(draw_first));
@@ -343,7 +404,9 @@ TEST_P(RhiWindow, ImGuiContextsCallbacksAndRecordedLifetime) {
   EXPECT_EQ(second_draws, 6);
   // Drop the CPU context/font owner while submitted overlays retain GPU inputs.
   ASSERT_TRUE(first.EnableImGui(false));
-  EXPECT_EQ(static_cast<grassland::rhi::backend::Window *>(first.Get())->GetImGuiContext(), nullptr);
+  EXPECT_EQ(
+      grassland::rhi::QueryInterfacePtr<grassland::rhi::backend::IBackendWindow>(first.Get()).Get()->GetImGuiContext(),
+      nullptr);
   for (auto &done : pending)
     EXPECT_TRUE(done.WaitHost());
   auto commands = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
@@ -433,6 +496,28 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
   ASSERT_TRUE(render());
   EXPECT_EQ(clicked, 1);
   EXPECT_EQ(mouse_events, 2);
+}
+
+TEST_P(RhiWindow, SwapchainImagesCannotBeBoundAsTextures) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 on a desktop.";
+  if (GetParam() != BACKEND_API_VULKAN && GetParam() != BACKEND_API_D3D12)
+    GTEST_SKIP();
+  ObjPtr<ICore> core = rhi::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({128, 128, "Texture binding contract"});
+  ASSERT_TRUE(window);
+  ObjPtr<IImage> frame = window->GetNextImage();
+  ASSERT_TRUE(frame);
+  ObjPtr<IImage> texture = device->CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ASSERT_TRUE(texture);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup({{{0, BINDING_TEXTURE2D, 2}}});
+  ASSERT_TRUE(group);
+  EXPECT_FALSE(group->BindResource(0, std::vector<IImage *>{texture.Get(), frame.Get()}));
+  EXPECT_TRUE(group->BindResource(0, std::vector<IImage *>{texture.Get(), texture.Get()}));
+  EXPECT_FALSE(group->BindResource(0, frame.Get()));
 }
 
 TEST_P(RhiWindow, SwapchainRejectsAssistQueueDuringRecording) {
@@ -640,7 +725,7 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
 #if defined(LONGMARCH_D3D12_ENABLED)
   backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
   if (GetParam() == BACKEND_API_D3D12 && std::getenv("LONGMARCH_RHI_VALIDATION")) {
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    auto native = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get();
     ASSERT_TRUE(SUCCEEDED(native->NativeDevice()->QueryInterface(IID_PPV_ARGS(&messages))));
     messages->ClearStoredMessages();
   }
