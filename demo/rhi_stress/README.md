@@ -40,3 +40,26 @@ raw pixels and metadata. Compare raw outputs from identical frame/warmup counts
 before timing binaries built from different revisions. Image capture is not used
 for performance samples. Use Release without validation, the same build options,
 and identical benchmark sources for both revisions.
+
+For paired measurements, preserve each executable together with its runtime DLLs.
+Build the same `demo/rhi_stress` source on both revisions using the same Release
+configuration. From the repository root, run (replace executable paths):
+
+```powershell
+python scripts/compare_rhi_stress.py prepare --baseline BASELINE.exe --candidate CANDIDATE.exe --output out/stress-comparison --performance-cores
+python scripts/compare_rhi_stress.py measure --baseline BASELINE.exe --candidate CANDIDATE.exe --output out/stress-comparison --performance-cores
+python scripts/summarize_rhi_stress.py out/stress-comparison
+```
+
+Preparation compares exact pixels, checks shader-work scaling, and calibrates a
+common frame count targeting five seconds averaged across the two binaries.
+Measurement uses 120 warmup frames, full-length priming runs, two randomized
+blocks of eight A/B pairs and two interleaved A/A controls per case. Each block
+balances A/B execution order. All valid samples are retained. The summary uses
+paired log-ratio bootstrap intervals and also reports intervals adjusted for
+four wall-time comparisons. The predeclared practical equivalence band is +/-3%.
+
+`--performance-cores` restricts the Windows runner and its children to the fastest
+CPU efficiency class. Omit it in both commands to test normal scheduling instead;
+use a fresh output directory. Scheduling can materially change the magnitude of
+the observed overhead, so report the chosen configuration explicitly.

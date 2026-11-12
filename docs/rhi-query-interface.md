@@ -132,6 +132,61 @@ including query reference operations and failure checks. They do not isolate
 GPU execution time or the cost of UUID comparisons. Results apply to the tested
 scenes, hardware, driver, and build configuration.
 
+### Current implementation stress measurement
+
+Main `e233d265` was compared with RHI `3a1fbc02`, using the identical
+`demo/rhi_stress` source from `195fdf3c` in both builds. Both were built in the
+same Release build directory with MSVC 14.51.36231, Ninja, `/O2 /Ob2 /DNDEBUG`,
+and identical runtime DLLs. Hardware: native Windows, Core Ultra 7 270K Plus,
+RTX 5080, NVIDIA 617.42. Validation was disabled for timing.
+
+The draw workload renders 4096 independently bound textured quads at 1280x720,
+with 16 submissions and 1 MiB of constant uploads per frame. The shader workload
+renders 256 quads at 3840x2160, with four submissions and 2048 dependent fragment
+iterations. Increasing iterations from 256 to 2048 increased wall time by
+7.10-7.36x in both revisions, confirming substantial shader load.
+
+| Backend / workload | Main ms/frame | PR ms/frame | Paired time change (95% CI) |
+| --- | ---: | ---: | ---: |
+| Vulkan / draw | 0.867 | 5.561 | +541.55% [+536.59, +546.29] |
+| D3D12 / draw | 1.882 | 9.488 | +404.23% [+400.63, +407.69] |
+| Vulkan / shader | 8.546 | 8.546 | -0.01% [-0.03, +0.02] |
+| D3D12 / shader | 14.583 | 14.610 | +0.18% [-0.05, +0.43] |
+
+Each case has 16 paired comparisons in two independently randomized eight-pair
+blocks, plus four interleaved A/A controls. Execution order is balanced per block;
+120 warmup frames and three in-flight frame slots are used. Measured frame counts
+are 1600/600 for Vulkan draw/shader and 900/350 for D3D12 draw/shader. Full-length
+priming runs precede measurement. No samples were removed. Frame times are
+arithmetic means; changes use geometric paired ratios with 20,000 bootstrap
+resamples stratified by block. Raw data also contains Bonferroni-adjusted 98.75%
+intervals for the four wall-time cases. These quantify within-session sampling
+variation, not systematic hardware or scheduling effects.
+
+The table restricts both binaries to the eight performance cores. The two blocks
+independently reproduce draw-time ratios of 6.412/6.419 for Vulkan and
+5.032/5.052 for D3D12. A/A draw variations range from -3.66% to +1.05% and
+-4.37% to +1.87%, respectively, far smaller than the regressions. A separate
+normal-scheduling check (two balanced pairs per API, all 24 logical CPUs) also
+reproduces the regression: Vulkan 9.31-9.47x and D3D12 6.84-6.89x. Those extra
+pairs are a sensitivity check, not part of the table or its intervals. The exact
+slowdown is scheduling-dependent; the regression is not an affinity artifact.
+
+Both shader cases fall within the predeclared +/-3% practical equivalence band,
+including adjusted intervals. This does not mean CPU overhead disappeared:
+recording/submission wall time rises from 0.191 to 0.504 ms/frame on Vulkan and
+0.405 to 0.984 ms/frame on D3D12, while GPU work dominates total throughput.
+This timer includes allocations, synchronization and driver stalls; it does not
+isolate UUID lookup, reference counting, or CPU cycles. Attribution to a specific
+function requires profiling. The draw workload deliberately makes many separate
+RHI calls rather than using instancing, so these ratios are not universal costs
+for production scenes. No Linux or Metal performance claim is made.
+
+All four main/PR raw output comparisons are byte-identical (eight measured,
+two warmup frames); Windows Debug runs of both profiles and both APIs pass.
+See [benchmark usage](../demo/rhi_stress/README.md) and
+[complete samples, provenance and statistics](benchmarks/rhi-stress-query-interface.json).
+
 ### Earlier implementation measurement, 2026-11-11
 
 The following data measures `8c166da4`, before the subsequent interface/state
@@ -220,7 +275,8 @@ the backing allocation can change during build/compaction.
 ## Validation
 
 The following checks apply to the implementation with parallel interface chains.
-The performance measurements above apply only to the older implementation.
+The historical lightweight measurements apply only to the older implementation;
+the stress measurements explicitly identify the current RHI revision above.
 
 - Windows Release: 220 passed, two Debug-only queue-diagnostic tests skipped
   (`--gtest_filter=-*RayTracing*`, `LONGMARCH_RHI_WINDOW_TESTS=1`).

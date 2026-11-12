@@ -1,0 +1,4390 @@
+{
+  "plan": {
+    "profiles": {
+      "draw": {
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "batch": 256,
+        "iterations": 1
+      },
+      "shader": {
+        "grid": 16,
+        "width": 3840,
+        "height": 2160,
+        "batch": 64,
+        "iterations": 2048
+      }
+    },
+    "hashes": {
+      "A": "d0ee0d9831badb548054d74a1d897eae19d73f47faf4dbb04560fd0f6efb9427",
+      "B": "25e251f9238509ac4a0cc5b479f223029fbae92d4a782596ec1773a8d8d4d8af"
+    },
+    "affinity": {
+      "logical_processors": [
+        0,
+        1,
+        10,
+        11,
+        12,
+        13,
+        22,
+        23
+      ],
+      "mask": 12598275,
+      "topology": [
+        {
+          "group": 0,
+          "logical": 0,
+          "core": 0,
+          "efficiency": 1,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 1,
+          "core": 1,
+          "efficiency": 1,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 2,
+          "core": 2,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 3,
+          "core": 3,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 4,
+          "core": 4,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 5,
+          "core": 5,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 6,
+          "core": 6,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 7,
+          "core": 7,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 8,
+          "core": 8,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 9,
+          "core": 9,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 10,
+          "core": 10,
+          "efficiency": 1,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 11,
+          "core": 11,
+          "efficiency": 1,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 12,
+          "core": 12,
+          "efficiency": 1,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 13,
+          "core": 13,
+          "efficiency": 1,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 14,
+          "core": 14,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 15,
+          "core": 15,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 16,
+          "core": 16,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 17,
+          "core": 17,
+          "efficiency": 0,
+          "flags": 1
+        },
+        {
+          "group": 0,
+          "logical": 18,
+          "core": 18,
+          "efficiency": 0,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 19,
+          "core": 19,
+          "efficiency": 0,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 20,
+          "core": 20,
+          "efficiency": 0,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 21,
+          "core": 21,
+          "efficiency": 0,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 22,
+          "core": 22,
+          "efficiency": 1,
+          "flags": 0
+        },
+        {
+          "group": 0,
+          "logical": 23,
+          "core": 23,
+          "efficiency": 1,
+          "flags": 0
+        }
+      ]
+    },
+    "cases": {
+      "vulkan/draw": {
+        "frames": 1600,
+        "capture_sha256": "3eb62e6c6ab91a77765e2f15f41762cad47ba05827e765807927a11ed5c332a7",
+        "calibration": [
+          {
+            "backend": "Vulkan",
+            "grid": 64,
+            "width": 1280,
+            "height": 720,
+            "draws_per_frame": 4096,
+            "submissions_per_frame": 16,
+            "iterations": 1,
+            "frames": 200,
+            "warmup": 120,
+            "in_flight": 3,
+            "seconds": 0.1890555,
+            "record_seconds": 0.1889424,
+            "wait_seconds": 2.56e-05,
+            "started_unix": 1794393115.5947075,
+            "process_seconds": 1.1340792179107666
+          },
+          {
+            "backend": "Vulkan",
+            "grid": 64,
+            "width": 1280,
+            "height": 720,
+            "draws_per_frame": 4096,
+            "submissions_per_frame": 16,
+            "iterations": 1,
+            "frames": 200,
+            "warmup": 120,
+            "in_flight": 3,
+            "seconds": 1.0688525,
+            "record_seconds": 1.0687265,
+            "wait_seconds": 2.94e-05,
+            "started_unix": 1794393117.723966,
+            "process_seconds": 2.549516201019287
+          }
+        ]
+      },
+      "vulkan/shader": {
+        "frames": 600,
+        "capture_sha256": "f3ad1293a705c4eb77ae1622f6c316947a5f6c535ef61b201532edbfbb2e697a",
+        "calibration": [
+          {
+            "backend": "Vulkan",
+            "grid": 16,
+            "width": 3840,
+            "height": 2160,
+            "draws_per_frame": 256,
+            "submissions_per_frame": 4,
+            "iterations": 2048,
+            "frames": 200,
+            "warmup": 120,
+            "in_flight": 3,
+            "seconds": 1.7114368,
+            "record_seconds": 0.047972,
+            "wait_seconds": 1.6380476,
+            "started_unix": 1794393121.8230946,
+            "process_seconds": 3.555978536605835
+          },
+          {
+            "backend": "Vulkan",
+            "grid": 16,
+            "width": 3840,
+            "height": 2160,
+            "draws_per_frame": 256,
+            "submissions_per_frame": 4,
+            "iterations": 2048,
+            "frames": 200,
+            "warmup": 120,
+            "in_flight": 3,
+            "seconds": 1.7065024,
+            "record_seconds": 0.1074027,
+            "wait_seconds": 1.5736367,
+            "started_unix": 1794393126.8818347,
+            "process_seconds": 3.548492193222046
+          }
+        ]
+      },
+      "d3d12/draw": {
+        "frames": 900,
+        "capture_sha256": "0251b33b1f5b6e0ec65438fbf916aed8bcd20f25118094b769f79868c494577b",
+        "calibration": [
+          {
+            "backend": "D3D12",
+            "grid": 64,
+            "width": 1280,
+            "height": 720,
+            "draws_per_frame": 4096,
+            "submissions_per_frame": 16,
+            "iterations": 1,
+            "frames": 200,
+            "warmup": 120,
+            "in_flight": 3,
+            "seconds": 0.3788559,
+            "record_seconds": 0.3787368,
+            "wait_seconds": 2.28e-05,
+            "started_unix": 1794393131.749848,
+            "process_seconds": 1.6215569972991943
+          },
+          {
+            "backend": "D3D12",
+            "grid": 64,
+            "width": 1280,
+            "height": 720,
+            "draws_per_frame": 4096,
+            "submissions_per_frame": 16,
+            "iterations": 1,
+            "frames": 200,
+            "warmup": 120,
+            "in_flight": 3,
+            "seconds": 1.8932027,
+            "record_seconds": 1.8930222,
+            "wait_seconds": 3.11e-05,
+            "started_unix": 1794393134.6007419,
+            "process_seconds": 4.033815145492554
+          }
+        ]
+      },
+      "d3d12/shader": {
+        "frames": 350,
+        "capture_sha256": "f3ad1293a705c4eb77ae1622f6c316947a5f6c535ef61b201532edbfbb2e697a",
+        "calibration": [
+          {
+            "backend": "D3D12",
+            "grid": 16,
+            "width": 3840,
+            "height": 2160,
+            "draws_per_frame": 256,
+            "submissions_per_frame": 4,
+            "iterations": 2048,
+            "frames": 200,
+            "warmup": 120,
+            "in_flight": 3,
+            "seconds": 2.921972,
+            "record_seconds": 0.0784171,
+            "wait_seconds": 2.8008415,
+            "started_unix": 1794393140.5394907,
+            "process_seconds": 5.682368516921997
+          },
+          {
+            "backend": "D3D12",
+            "grid": 16,
+            "width": 3840,
+            "height": 2160,
+            "draws_per_frame": 256,
+            "submissions_per_frame": 4,
+            "iterations": 2048,
+            "frames": 200,
+            "warmup": 120,
+            "in_flight": 3,
+            "seconds": 2.8965251,
+            "record_seconds": 0.1925495,
+            "wait_seconds": 2.6615896,
+            "started_unix": 1794393147.961373,
+            "process_seconds": 5.63947606086731
+          }
+        ]
+      }
+    },
+    "seed": 1142026,
+    "target_seconds": 5,
+    "blocks": 2,
+    "comparison_pairs_per_block": 8,
+    "control_pairs_per_block": 2,
+    "warmup": 120,
+    "practical_equivalence_percent": 3,
+    "note": "All valid samples retained; two independently balanced blocks; A/A interleaved with A/B.",
+    "shader_scaling": [
+      {
+        "api": "vulkan",
+        "label": "A",
+        "backend": "Vulkan",
+        "grid": 16,
+        "width": 3840,
+        "height": 2160,
+        "draws_per_frame": 256,
+        "submissions_per_frame": 4,
+        "iterations": 256,
+        "frames": 200,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 0.2408855,
+        "record_seconds": 0.0322179,
+        "wait_seconds": 0.2050673,
+        "started_unix": 1794393153.7866385,
+        "process_seconds": 1.2365341186523438
+      },
+      {
+        "api": "vulkan",
+        "label": "B",
+        "backend": "Vulkan",
+        "grid": 16,
+        "width": 3840,
+        "height": 2160,
+        "draws_per_frame": 256,
+        "submissions_per_frame": 4,
+        "iterations": 256,
+        "frames": 200,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 0.2395614,
+        "record_seconds": 0.0839568,
+        "wait_seconds": 0.1524217,
+        "started_unix": 1794393155.0239098,
+        "process_seconds": 1.2140746116638184
+      },
+      {
+        "api": "d3d12",
+        "label": "A",
+        "backend": "D3D12",
+        "grid": 16,
+        "width": 3840,
+        "height": 2160,
+        "draws_per_frame": 256,
+        "submissions_per_frame": 4,
+        "iterations": 256,
+        "frames": 200,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 0.3972111,
+        "record_seconds": 0.0530171,
+        "wait_seconds": 0.3386324,
+        "started_unix": 1794393156.2379951,
+        "process_seconds": 1.6288819313049316
+      },
+      {
+        "api": "d3d12",
+        "label": "B",
+        "backend": "D3D12",
+        "grid": 16,
+        "width": 3840,
+        "height": 2160,
+        "draws_per_frame": 256,
+        "submissions_per_frame": 4,
+        "iterations": 256,
+        "frames": 200,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 0.3954411,
+        "record_seconds": 0.153072,
+        "wait_seconds": 0.2372766,
+        "started_unix": 1794393157.8668854,
+        "process_seconds": 1.6283795833587646
+      }
+    ],
+    "duration_rule": "Same frame count per pair, calibrated to mean baseline/candidate duration of at least five seconds; calibration excluded from estimates."
+  },
+  "summary": {
+    "vulkan/draw": {
+      "comparison": {
+        "seconds": {
+          "pairs": 16,
+          "ratio": 6.415456411479072,
+          "ci95": [
+            6.36585716096993,
+            6.462948412747838
+          ],
+          "ci98_75": [
+            6.352162453039635,
+            6.473427336619495
+          ],
+          "min_ratio": 6.220542558108568,
+          "max_ratio": 6.545652130514281,
+          "block_ratios": [
+            6.411846232597533,
+            6.419068623065558
+          ],
+          "mean_ms_per_frame": {
+            "A": 0.86695897265625,
+            "B": 5.5611630234375
+          }
+        },
+        "record_seconds": {
+          "pairs": 16,
+          "ratio": 6.41661977552182,
+          "ci95": [
+            6.366255257421167,
+            6.463666345960748
+          ],
+          "ci98_75": [
+            6.352444787505223,
+            6.476638447106535
+          ],
+          "min_ratio": 6.2216239407960785,
+          "max_ratio": 6.546834102762763,
+          "block_ratios": [
+            6.413015604315569,
+            6.420225972304008
+          ],
+          "mean_ms_per_frame": {
+            "A": 0.8667616015625,
+            "B": 5.56090529296875
+          }
+        }
+      },
+      "control": {
+        "seconds": {
+          "pairs": 4,
+          "ratio": 0.9804994980546096,
+          "ci95": [
+            0.9665810106777083,
+            0.9946184076296721
+          ],
+          "ci98_75": [
+            0.9665810106777083,
+            0.9946184076296721
+          ],
+          "min_ratio": 0.9633959625664044,
+          "max_ratio": 1.0105299423354446,
+          "block_ratios": [
+            0.9866815425953952,
+            0.9743561870596079
+          ],
+          "mean_ms_per_frame": {
+            "A": 0.876843,
+            "B": 0.8597521875
+          }
+        },
+        "record_seconds": {
+          "pairs": 4,
+          "ratio": 0.9805096670831327,
+          "ci95": [
+            0.966594264586152,
+            0.9946254001983958
+          ],
+          "ci98_75": [
+            0.966594264586152,
+            0.9946254001983958
+          ],
+          "min_ratio": 0.9634076866878353,
+          "max_ratio": 1.0105329247228398,
+          "block_ratios": [
+            0.9866890023351449,
+            0.97436903114171
+          ],
+          "mean_ms_per_frame": {
+            "A": 0.8766405937499999,
+            "B": 0.85956265625
+          }
+        }
+      }
+    },
+    "vulkan/shader": {
+      "comparison": {
+        "seconds": {
+          "pairs": 16,
+          "ratio": 0.9999319076743067,
+          "ci95": [
+            0.9996518421375381,
+            1.0001999172455767
+          ],
+          "ci98_75": [
+            0.9995757258733101,
+            1.0002663934364968
+          ],
+          "min_ratio": 0.9987386841490168,
+          "max_ratio": 1.0007581430143098,
+          "block_ratios": [
+            1.0000996621960017,
+            0.9997641812913868
+          ],
+          "mean_ms_per_frame": {
+            "A": 8.546245552083333,
+            "B": 8.545663135416667
+          }
+        },
+        "record_seconds": {
+          "pairs": 16,
+          "ratio": 2.6376194371716286,
+          "ci95": [
+            2.578782044618498,
+            2.6969134735782574
+          ],
+          "ci98_75": [
+            2.5614018105535123,
+            2.7126743349993485
+          ],
+          "min_ratio": 2.420170893399684,
+          "max_ratio": 2.8523906101543033,
+          "block_ratios": [
+            2.610622496884501,
+            2.664895557916956
+          ],
+          "mean_ms_per_frame": {
+            "A": 0.19142262499999999,
+            "B": 0.50448590625
+          }
+        }
+      },
+      "control": {
+        "seconds": {
+          "pairs": 4,
+          "ratio": 1.0000190023285163,
+          "ci95": [
+            0.9996518540391243,
+            1.0003862854627201
+          ],
+          "ci98_75": [
+            0.9996518540391243,
+            1.0003862854627201
+          ],
+          "min_ratio": 0.9996130748040303,
+          "max_ratio": 1.0005631497284428,
+          "block_ratios": [
+            0.9999112191699601,
+            1.000126797105313
+          ],
+          "mean_ms_per_frame": {
+            "A": 8.546481,
+            "B": 8.546643875000001
+          }
+        },
+        "record_seconds": {
+          "pairs": 4,
+          "ratio": 0.9988440667933992,
+          "ci95": [
+            0.947656746627031,
+            1.0527962506671595
+          ],
+          "ci98_75": [
+            0.947656746627031,
+            1.0527962506671595
+          ],
+          "min_ratio": 0.9387754235993467,
+          "max_ratio": 1.085625281871481,
+          "block_ratios": [
+            0.9882676021647635,
+            1.0095337210113686
+          ],
+          "mean_ms_per_frame": {
+            "A": 0.18868520833333335,
+            "B": 0.18840483333333333
+          }
+        }
+      }
+    },
+    "d3d12/draw": {
+      "comparison": {
+        "seconds": {
+          "pairs": 16,
+          "ratio": 5.042293865456556,
+          "ci95": [
+            5.006252508972193,
+            5.07688598152985
+          ],
+          "ci98_75": [
+            4.99575027343751,
+            5.086366333512565
+          ],
+          "min_ratio": 4.856639368147252,
+          "max_ratio": 5.17501663252975,
+          "block_ratios": [
+            5.0323273339545915,
+            5.052280135688453
+          ],
+          "mean_ms_per_frame": {
+            "A": 1.8818661319444445,
+            "B": 9.4880589375
+          }
+        },
+        "record_seconds": {
+          "pairs": 16,
+          "ratio": 5.0427897364739085,
+          "ci95": [
+            5.006799917638692,
+            5.077409031601497
+          ],
+          "ci98_75": [
+            4.997262572223636,
+            5.086165307572086
+          ],
+          "min_ratio": 4.857169257750178,
+          "max_ratio": 5.175517960885558,
+          "block_ratios": [
+            5.032823784799297,
+            5.05277542263497
+          ],
+          "mean_ms_per_frame": {
+            "A": 1.8816087430555555,
+            "B": 9.487694569444445
+          }
+        }
+      },
+      "control": {
+        "seconds": {
+          "pairs": 4,
+          "ratio": 1.0005405839084531,
+          "ci95": [
+            0.9832241889489389,
+            1.0181619525837935
+          ],
+          "ci98_75": [
+            0.9832241889489389,
+            1.0181619525837935
+          ],
+          "min_ratio": 0.9562934506436382,
+          "max_ratio": 1.0186586114242016,
+          "block_ratios": [
+            0.9869835654896726,
+            1.0142838189521437
+          ],
+          "mean_ms_per_frame": {
+            "A": 1.8977563888888889,
+            "B": 1.8985121944444443
+          }
+        },
+        "record_seconds": {
+          "pairs": 4,
+          "ratio": 1.0005382699985592,
+          "ci95": [
+            0.9832247284283379,
+            1.0181566846186916
+          ],
+          "ci98_75": [
+            0.9832247284283379,
+            1.0181566846186916
+          ],
+          "min_ratio": 0.9562938029797755,
+          "max_ratio": 1.0186521394570265,
+          "block_ratios": [
+            0.9869806119447557,
+            1.0142821628068042
+          ],
+          "mean_ms_per_frame": {
+            "A": 1.897511,
+            "B": 1.8982622777777778
+          }
+        }
+      }
+    },
+    "d3d12/shader": {
+      "comparison": {
+        "seconds": {
+          "pairs": 16,
+          "ratio": 1.0018400273611172,
+          "ci95": [
+            0.9995110745683415,
+            1.0042765865379906
+          ],
+          "ci98_75": [
+            0.9989447995418451,
+            1.0049945197005616
+          ],
+          "min_ratio": 0.9955885269640914,
+          "max_ratio": 1.010503144305907,
+          "block_ratios": [
+            1.0009270007514373,
+            1.0027538868163386
+          ],
+          "mean_ms_per_frame": {
+            "A": 14.582880142857142,
+            "B": 14.60969375
+          }
+        },
+        "record_seconds": {
+          "pairs": 16,
+          "ratio": 2.4270905364316078,
+          "ci95": [
+            2.38120772156574,
+            2.466426082137098
+          ],
+          "ci98_75": [
+            2.3672910144531247,
+            2.4762063941795276
+          ],
+          "min_ratio": 2.1705189004530165,
+          "max_ratio": 2.5651044045180345,
+          "block_ratios": [
+            2.4364157052236304,
+            2.4178010589105017
+          ],
+          "mean_ms_per_frame": {
+            "A": 0.40535042857142856,
+            "B": 0.9842192678571429
+          }
+        }
+      },
+      "control": {
+        "seconds": {
+          "pairs": 4,
+          "ratio": 0.9991292149950698,
+          "ci95": [
+            0.9968873478520812,
+            1.0013761237992826
+          ],
+          "ci98_75": [
+            0.9968873478520812,
+            1.0013761237992826
+          ],
+          "min_ratio": 0.9942468526976966,
+          "max_ratio": 1.00168657778208,
+          "block_ratios": [
+            1.0006101382882455,
+            0.9976504834983952
+          ],
+          "mean_ms_per_frame": {
+            "A": 14.629969857142857,
+            "B": 14.617269
+          }
+        },
+        "record_seconds": {
+          "pairs": 4,
+          "ratio": 0.9838815535435426,
+          "ci95": [
+            0.9665698832918985,
+            1.0015032830387882
+          ],
+          "ci98_75": [
+            0.9665698832918985,
+            1.0015032830387882
+          ],
+          "min_ratio": 0.9526040007179422,
+          "max_ratio": 1.023733640990278,
+          "block_ratios": [
+            1.0020065166436833,
+            0.9660844468813836
+          ],
+          "mean_ms_per_frame": {
+            "A": 0.40072985714285714,
+            "B": 0.39419314285714285
+          }
+        }
+      }
+    }
+  },
+  "samples": [
+    {
+      "frames": 350,
+      "seconds": 5.1203271,
+      "record_seconds": 0.1390489,
+      "wait_seconds": 4.9380943,
+      "started_unix": 1794393324.4323792,
+      "process_seconds": 7.8836376667022705,
+      "block": 0,
+      "mode": "control",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "45, 2850, 2850, 193.43, 0",
+      "gpu_after": "56, 2805, 2805, 220.80, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1227099,
+      "record_seconds": 0.1417795,
+      "wait_seconds": 4.9369663,
+      "started_unix": 1794393332.4101791,
+      "process_seconds": 7.881452560424805,
+      "block": 0,
+      "mode": "control",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "44, 2880, 2880, 181.12, 0",
+      "gpu_after": "56, 2805, 2805, 220.09, 100"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.333214,
+      "record_seconds": 1.3329281,
+      "wait_seconds": 0.0001758,
+      "started_unix": 1794393340.3734577,
+      "process_seconds": 2.2844133377075195,
+      "block": 0,
+      "mode": "control",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "56, 2805, 2805, 220.09, 100",
+      "gpu_after": "43, 2910, 2910, 74.71, 55"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3838692,
+      "record_seconds": 1.3835556,
+      "wait_seconds": 0.0001842,
+      "started_unix": 1794393342.7394042,
+      "process_seconds": 2.3209738731384277,
+      "block": 0,
+      "mode": "control",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "43, 2910, 2910, 74.71, 55",
+      "gpu_after": "42, 2910, 2910, 74.45, 52"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1291568,
+      "record_seconds": 0.1180186,
+      "wait_seconds": 4.9855837,
+      "started_unix": 1794393345.145335,
+      "process_seconds": 6.973376035690308,
+      "block": 0,
+      "mode": "control",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "42, 2910, 2910, 74.45, 52",
+      "gpu_after": "64, 2827, 2827, 318.61, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1271722,
+      "record_seconds": 0.1128992,
+      "wait_seconds": 4.9889162,
+      "started_unix": 1794393352.2090929,
+      "process_seconds": 6.980669260025024,
+      "block": 0,
+      "mode": "control",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "64, 2827, 2827, 318.61, 100",
+      "gpu_after": "64, 2827, 2827, 318.92, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.7010537,
+      "record_seconds": 1.7008451,
+      "wait_seconds": 9.51e-05,
+      "started_unix": 1794393359.2787404,
+      "process_seconds": 2.933356523513794,
+      "block": 0,
+      "mode": "control",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "64, 2827, 2827, 318.92, 100",
+      "gpu_after": "43, 2895, 2895, 67.02, 42"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.732793,
+      "record_seconds": 1.7325695,
+      "wait_seconds": 0.0001024,
+      "started_unix": 1794393362.3063653,
+      "process_seconds": 2.9669408798217773,
+      "block": 0,
+      "mode": "control",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "43, 2895, 2895, 67.02, 42",
+      "gpu_after": "42, 2910, 2910, 65.56, 43"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3828258,
+      "record_seconds": 1.3825067,
+      "wait_seconds": 0.0002068,
+      "started_unix": 1794393365.3582966,
+      "process_seconds": 2.3315327167510986,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "42, 2910, 2910, 65.56, 43",
+      "gpu_after": "42, 2910, 2910, 74.01, 56"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.8044112,
+      "record_seconds": 8.8039815,
+      "wait_seconds": 0.0002492,
+      "started_unix": 1794393367.777902,
+      "process_seconds": 10.287508249282837,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "42, 2910, 2910, 74.01, 56",
+      "gpu_after": "40, 2910, 2910, 57.71, 9"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0875636,
+      "record_seconds": 0.1404181,
+      "wait_seconds": 4.9032556,
+      "started_unix": 1794393378.148731,
+      "process_seconds": 7.859551191329956,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "40, 2910, 2910, 57.71, 9",
+      "gpu_after": "47, 2842, 2842, 214.56, 56"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1256424,
+      "record_seconds": 0.3465467,
+      "wait_seconds": 4.7355911,
+      "started_unix": 1794393386.1021416,
+      "process_seconds": 7.897483587265015,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "47, 2842, 2842, 214.56, 56",
+      "gpu_after": "48, 2812, 2812, 210.86, 38"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1284564,
+      "record_seconds": 0.3032616,
+      "wait_seconds": 4.8000492,
+      "started_unix": 1794393394.090914,
+      "process_seconds": 6.991881608963013,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "48, 2812, 2812, 210.86, 38",
+      "gpu_after": "64, 2827, 2827, 318.83, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1271025,
+      "record_seconds": 0.1168992,
+      "wait_seconds": 4.9847868,
+      "started_unix": 1794393401.1749659,
+      "process_seconds": 6.968881845474243,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "64, 2827, 2827, 318.83, 100",
+      "gpu_after": "65, 2827, 2827, 319.79, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5275223,
+      "record_seconds": 8.5271099,
+      "wait_seconds": 0.0001546,
+      "started_unix": 1794393408.2370472,
+      "process_seconds": 10.698209524154663,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "65, 2827, 2827, 319.79, 100",
+      "gpu_after": "40, 2325, 2325, 55.40, 1"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6478251,
+      "record_seconds": 1.6475858,
+      "wait_seconds": 9.42e-05,
+      "started_unix": 1794393419.030115,
+      "process_seconds": 2.7415082454681396,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2325, 2325, 55.40, 1",
+      "gpu_after": "41, 2910, 2910, 65.81, 45"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.369502,
+      "record_seconds": 1.369204,
+      "wait_seconds": 0.0001799,
+      "started_unix": 1794393421.8642442,
+      "process_seconds": 2.313631296157837,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 65.81, 45",
+      "gpu_after": "41, 2910, 2910, 74.11, 49"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.8997509,
+      "record_seconds": 8.8993554,
+      "wait_seconds": 0.0002575,
+      "started_unix": 1794393424.2724073,
+      "process_seconds": 10.42464303970337,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 74.11, 49",
+      "gpu_after": "39, 2902, 2902, 57.59, 8"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1294587,
+      "record_seconds": 0.1228017,
+      "wait_seconds": 4.9812549,
+      "started_unix": 1794393434.7858877,
+      "process_seconds": 6.973882675170898,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "39, 2902, 2902, 57.59, 8",
+      "gpu_after": "62, 2827, 2827, 316.38, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1266613,
+      "record_seconds": 0.2972011,
+      "wait_seconds": 4.8043263,
+      "started_unix": 1794393441.8491805,
+      "process_seconds": 6.977375268936157,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "62, 2827, 2827, 316.38, 100",
+      "gpu_after": "63, 2827, 2827, 318.39, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.704793,
+      "record_seconds": 1.7045618,
+      "wait_seconds": 9.9e-05,
+      "started_unix": 1794393448.922143,
+      "process_seconds": 2.9527337551116943,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "46, 2872, 2872, 260.92, 0",
+      "gpu_after": "41, 2910, 2910, 64.52, 0"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5729334,
+      "record_seconds": 8.5724779,
+      "wait_seconds": 0.0001592,
+      "started_unix": 1794393451.970967,
+      "process_seconds": 10.723833084106445,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 64.52, 0",
+      "gpu_after": "40, 2910, 2910, 58.11, 8"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0972422,
+      "record_seconds": 0.3389897,
+      "wait_seconds": 4.7154575,
+      "started_unix": 1794393462.7881732,
+      "process_seconds": 7.845488548278809,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 58.11, 8",
+      "gpu_after": "55, 2835, 2835, 221.24, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0976364,
+      "record_seconds": 0.1438556,
+      "wait_seconds": 4.9100121,
+      "started_unix": 1794393470.7265835,
+      "process_seconds": 7.870776176452637,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "55, 2835, 2835, 221.24, 100",
+      "gpu_after": "55, 2805, 2805, 218.71, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1280368,
+      "record_seconds": 0.311156,
+      "wait_seconds": 4.7916185,
+      "started_unix": 1794393478.6814382,
+      "process_seconds": 6.990832567214966,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "55, 2805, 2805, 218.71, 100",
+      "gpu_after": "64, 2827, 2827, 318.45, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1251997,
+      "record_seconds": 0.1133522,
+      "wait_seconds": 4.9865901,
+      "started_unix": 1794393485.7632914,
+      "process_seconds": 6.9786810874938965,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "64, 2827, 2827, 318.45, 100",
+      "gpu_after": "65, 2827, 2827, 320.01, 100"
+    },
+    {
+      "frames": 1600,
+      "seconds": 9.0231986,
+      "record_seconds": 9.0227998,
+      "wait_seconds": 0.0002558,
+      "started_unix": 1794393492.8246365,
+      "process_seconds": 10.52802038192749,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "65, 2827, 2827, 320.01, 100",
+      "gpu_after": "40, 1672, 1672, 52.12, 0"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.4404316,
+      "record_seconds": 1.4400823,
+      "wait_seconds": 0.000219,
+      "started_unix": 1794393503.4493785,
+      "process_seconds": 2.3848018646240234,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 1672, 1672, 52.12, 0",
+      "gpu_after": "42, 2910, 2910, 74.06, 49"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5717522,
+      "record_seconds": 8.5714104,
+      "wait_seconds": 0.0001531,
+      "started_unix": 1794393505.9320004,
+      "process_seconds": 10.718409538269043,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "41, 2910, 2910, 70.50, 0",
+      "gpu_after": "40, 2910, 2910, 56.81, 8"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.7217733,
+      "record_seconds": 1.7215186,
+      "wait_seconds": 0.0001002,
+      "started_unix": 1794393516.7431414,
+      "process_seconds": 2.9493093490600586,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 56.81, 8",
+      "gpu_after": "40, 2910, 2910, 66.16, 44"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0962281,
+      "record_seconds": 0.3615917,
+      "wait_seconds": 4.6914279,
+      "started_unix": 1794393519.784703,
+      "process_seconds": 7.84255313873291,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 66.16, 44",
+      "gpu_after": "54, 2835, 2835, 220.40, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1176972,
+      "record_seconds": 0.1491663,
+      "wait_seconds": 4.9248755,
+      "started_unix": 1794393527.714549,
+      "process_seconds": 7.880173683166504,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "54, 2835, 2835, 220.40, 100",
+      "gpu_after": "55, 2805, 2805, 218.60, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1151713,
+      "record_seconds": 0.1451006,
+      "wait_seconds": 4.9260185,
+      "started_unix": 1794393535.6804457,
+      "process_seconds": 7.872316360473633,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "55, 2805, 2805, 218.60, 100",
+      "gpu_after": "56, 2805, 2805, 220.44, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1162895,
+      "record_seconds": 0.3507172,
+      "wait_seconds": 4.7225973,
+      "started_unix": 1794393543.6405005,
+      "process_seconds": 7.885636806488037,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "56, 2805, 2805, 220.44, 100",
+      "gpu_after": "56, 2805, 2805, 218.68, 78"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6927107,
+      "record_seconds": 1.6924911,
+      "wait_seconds": 0.0001021,
+      "started_unix": 1794393551.623384,
+      "process_seconds": 2.929701328277588,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "56, 2805, 2805, 218.68, 78",
+      "gpu_after": "42, 2910, 2910, 65.77, 42"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5692317,
+      "record_seconds": 8.5689001,
+      "wait_seconds": 0.0001487,
+      "started_unix": 1794393554.6464512,
+      "process_seconds": 10.70479941368103,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "42, 2910, 2910, 65.77, 42",
+      "gpu_after": "38, 1777, 1777, 52.12, 0"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3940991,
+      "record_seconds": 1.3937792,
+      "wait_seconds": 0.0001968,
+      "started_unix": 1794393565.437998,
+      "process_seconds": 2.347702980041504,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "38, 1777, 1777, 52.12, 0",
+      "gpu_after": "40, 2910, 2910, 73.44, 51"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.9376398,
+      "record_seconds": 8.9372318,
+      "wait_seconds": 0.0002659,
+      "started_unix": 1794393567.87515,
+      "process_seconds": 10.422142028808594,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "40, 2910, 2910, 73.44, 51",
+      "gpu_after": "38, 2902, 2902, 57.66, 9"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.126738,
+      "record_seconds": 0.1195326,
+      "wait_seconds": 4.9820329,
+      "started_unix": 1794393578.386691,
+      "process_seconds": 6.974131107330322,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "38, 2902, 2902, 57.66, 9",
+      "gpu_after": "45, 2865, 2865, 268.18, 1"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1300067,
+      "record_seconds": 0.3063236,
+      "wait_seconds": 4.7984986,
+      "started_unix": 1794393585.4565086,
+      "process_seconds": 7.000548601150513,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "45, 2865, 2865, 268.18, 1",
+      "gpu_after": "49, 2835, 2835, 293.79, 6"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1114749,
+      "record_seconds": 0.1357356,
+      "wait_seconds": 4.9324063,
+      "started_unix": 1794393592.5411856,
+      "process_seconds": 7.885064125061035,
+      "block": 0,
+      "mode": "control",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "49, 2835, 2835, 293.79, 6",
+      "gpu_after": "46, 2835, 2835, 202.35, 0"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1200958,
+      "record_seconds": 0.1389571,
+      "wait_seconds": 4.9375641,
+      "started_unix": 1794393600.5172656,
+      "process_seconds": 7.877897024154663,
+      "block": 0,
+      "mode": "control",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "46, 2835, 2835, 202.35, 0",
+      "gpu_after": "46, 2857, 2857, 196.97, 0"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3824957,
+      "record_seconds": 1.3821802,
+      "wait_seconds": 0.0001938,
+      "started_unix": 1794393608.4881694,
+      "process_seconds": 2.3265879154205322,
+      "block": 0,
+      "mode": "control",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "46, 2857, 2857, 196.97, 0",
+      "gpu_after": "42, 2910, 2910, 73.74, 55"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3970533,
+      "record_seconds": 1.3967386,
+      "wait_seconds": 0.0001907,
+      "started_unix": 1794393610.9058995,
+      "process_seconds": 2.3514881134033203,
+      "block": 0,
+      "mode": "control",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 69.64, 0",
+      "gpu_after": "42, 2910, 2910, 74.72, 56"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6878632,
+      "record_seconds": 1.6876455,
+      "wait_seconds": 0.0001007,
+      "started_unix": 1794393613.3493166,
+      "process_seconds": 2.905961751937866,
+      "block": 0,
+      "mode": "control",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "42, 2910, 2910, 74.72, 56",
+      "gpu_after": "41, 2910, 2910, 65.35, 44"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.7650055,
+      "record_seconds": 1.7647772,
+      "wait_seconds": 0.0001052,
+      "started_unix": 1794393616.3410249,
+      "process_seconds": 2.9970147609710693,
+      "block": 0,
+      "mode": "control",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "41, 2910, 2910, 65.35, 44",
+      "gpu_after": "41, 2910, 2910, 66.32, 42"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.125864,
+      "record_seconds": 0.1092663,
+      "wait_seconds": 4.9910827,
+      "started_unix": 1794393619.4252305,
+      "process_seconds": 6.993261337280273,
+      "block": 0,
+      "mode": "control",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 64.43, 0",
+      "gpu_after": "48, 2842, 2842, 286.67, 0"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1247906,
+      "record_seconds": 0.1070231,
+      "wait_seconds": 4.9923924,
+      "started_unix": 1794393626.5091503,
+      "process_seconds": 6.964876174926758,
+      "block": 0,
+      "mode": "control",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "48, 2842, 2842, 286.67, 0",
+      "gpu_after": "51, 2827, 2827, 302.17, 29"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0757943,
+      "record_seconds": 0.1442158,
+      "wait_seconds": 4.8878958,
+      "started_unix": 1794393633.5625095,
+      "process_seconds": 7.849487543106079,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "51, 2827, 2827, 302.17, 29",
+      "gpu_after": "47, 2857, 2857, 201.59, 0"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1291061,
+      "record_seconds": 0.3656122,
+      "wait_seconds": 4.7196966,
+      "started_unix": 1794393641.5049906,
+      "process_seconds": 7.892695426940918,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "47, 2857, 2857, 201.59, 0",
+      "gpu_after": "47, 2842, 2842, 198.77, 0"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1256736,
+      "record_seconds": 0.1118502,
+      "wait_seconds": 4.9884802,
+      "started_unix": 1794393649.4882598,
+      "process_seconds": 6.976601839065552,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "47, 2842, 2842, 198.77, 0",
+      "gpu_after": "52, 2827, 2827, 301.95, 21"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1257687,
+      "record_seconds": 0.3054698,
+      "wait_seconds": 4.7950772,
+      "started_unix": 1794393656.559935,
+      "process_seconds": 6.975034952163696,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "52, 2827, 2827, 301.95, 21",
+      "gpu_after": "66, 2827, 2827, 321.47, 92"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.860406,
+      "record_seconds": 8.859978,
+      "wait_seconds": 0.0002545,
+      "started_unix": 1794393663.628758,
+      "process_seconds": 10.377789735794067,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "66, 2827, 2827, 321.47, 92",
+      "gpu_after": "41, 2850, 2850, 57.73, 5"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3543398,
+      "record_seconds": 1.3540398,
+      "wait_seconds": 0.0001785,
+      "started_unix": 1794393674.1003182,
+      "process_seconds": 2.301180124282837,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "41, 2850, 2850, 57.73, 5",
+      "gpu_after": "42, 2910, 2910, 72.19, 0"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.7038769,
+      "record_seconds": 1.703623,
+      "wait_seconds": 0.0001021,
+      "started_unix": 1794393676.4914005,
+      "process_seconds": 2.9338881969451904,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "42, 2910, 2910, 72.19, 0",
+      "gpu_after": "41, 2910, 2910, 64.49, 1"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.478426,
+      "record_seconds": 8.4780893,
+      "wait_seconds": 0.0001421,
+      "started_unix": 1794393679.5215766,
+      "process_seconds": 10.626212358474731,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 64.49, 1",
+      "gpu_after": "40, 2910, 2910, 57.50, 9"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0990287,
+      "record_seconds": 0.3374211,
+      "wait_seconds": 4.7185436,
+      "started_unix": 1794393690.2424698,
+      "process_seconds": 7.864314794540405,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 57.50, 9",
+      "gpu_after": "55, 2835, 2835, 220.32, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1216226,
+      "record_seconds": 0.1415838,
+      "wait_seconds": 4.9364567,
+      "started_unix": 1794393698.1903605,
+      "process_seconds": 7.873347282409668,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "55, 2835, 2835, 220.32, 100",
+      "gpu_after": "56, 2805, 2805, 219.72, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6807569,
+      "record_seconds": 1.6805383,
+      "wait_seconds": 9.54e-05,
+      "started_unix": 1794393706.161195,
+      "process_seconds": 2.90395450592041,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "56, 2805, 2805, 219.72, 100",
+      "gpu_after": "41, 2910, 2910, 65.91, 43"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5159712,
+      "record_seconds": 8.515701,
+      "wait_seconds": 0.0001403,
+      "started_unix": 1794393709.1546164,
+      "process_seconds": 10.673331499099731,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 65.91, 43",
+      "gpu_after": "39, 2910, 2910, 58.14, 9"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.8177239,
+      "record_seconds": 8.8173312,
+      "wait_seconds": 0.0002467,
+      "started_unix": 1794393719.92326,
+      "process_seconds": 10.296653270721436,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "38, 1672, 1672, 52.45, 0",
+      "gpu_after": "39, 2902, 2902, 57.90, 10"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3912411,
+      "record_seconds": 1.3909333,
+      "wait_seconds": 0.0001806,
+      "started_unix": 1794393730.3046212,
+      "process_seconds": 2.3320014476776123,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "39, 2902, 2902, 57.90, 10",
+      "gpu_after": "39, 2910, 2910, 73.73, 53"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.128998,
+      "record_seconds": 0.1200331,
+      "wait_seconds": 4.9833185,
+      "started_unix": 1794393732.7259367,
+      "process_seconds": 6.9755859375,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "39, 2910, 2910, 73.73, 53",
+      "gpu_after": "62, 2827, 2827, 315.30, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1270509,
+      "record_seconds": 0.304167,
+      "wait_seconds": 4.7977355,
+      "started_unix": 1794393739.7900505,
+      "process_seconds": 7.004406213760376,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "62, 2827, 2827, 315.30, 100",
+      "gpu_after": "63, 2827, 2827, 316.95, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1189878,
+      "record_seconds": 0.1355795,
+      "wait_seconds": 4.9399362,
+      "started_unix": 1794393746.8796525,
+      "process_seconds": 7.992387771606445,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "63, 2827, 2827, 316.95, 100",
+      "gpu_after": "45, 2850, 2850, 193.74, 0"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1029209,
+      "record_seconds": 0.3388941,
+      "wait_seconds": 4.7199688,
+      "started_unix": 1794393754.9644055,
+      "process_seconds": 7.865870237350464,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "45, 2850, 2850, 193.74, 0",
+      "gpu_after": "56, 2812, 2812, 221.32, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5575328,
+      "record_seconds": 8.5572152,
+      "wait_seconds": 0.0001348,
+      "started_unix": 1794393762.920105,
+      "process_seconds": 10.703977346420288,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "45, 2865, 2865, 191.25, 0",
+      "gpu_after": "40, 2910, 2910, 56.99, 8"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6709444,
+      "record_seconds": 1.6707254,
+      "wait_seconds": 0.0001004,
+      "started_unix": 1794393773.7104638,
+      "process_seconds": 3.016685724258423,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 56.99, 8",
+      "gpu_after": "40, 2910, 2910, 66.45, 44"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.129832,
+      "record_seconds": 0.3028768,
+      "wait_seconds": 4.8017172,
+      "started_unix": 1794393776.8195317,
+      "process_seconds": 6.977770090103149,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 66.45, 44",
+      "gpu_after": "63, 2827, 2827, 317.62, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1259458,
+      "record_seconds": 0.1095318,
+      "wait_seconds": 4.9910577,
+      "started_unix": 1794393783.8868709,
+      "process_seconds": 6.994615793228149,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "63, 2827, 2827, 317.62, 100",
+      "gpu_after": "48, 2850, 2850, 278.93, 0"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3842588,
+      "record_seconds": 1.3839324,
+      "wait_seconds": 0.0001787,
+      "started_unix": 1794393790.9781566,
+      "process_seconds": 2.333956003189087,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "48, 2850, 2850, 278.93, 0",
+      "gpu_after": "43, 2895, 2895, 74.82, 55"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.9267187,
+      "record_seconds": 8.9263107,
+      "wait_seconds": 0.0002696,
+      "started_unix": 1794393793.4024544,
+      "process_seconds": 10.421775102615356,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "42, 2895, 2895, 71.18, 0",
+      "gpu_after": "40, 2902, 2902, 57.79, 8"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.8332822,
+      "record_seconds": 8.8328527,
+      "wait_seconds": 0.0002266,
+      "started_unix": 1794393803.9110765,
+      "process_seconds": 10.322596311569214,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "39, 1590, 1590, 52.11, 0",
+      "gpu_after": "39, 2902, 2902, 58.80, 9"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3739061,
+      "record_seconds": 1.37359,
+      "wait_seconds": 0.0001892,
+      "started_unix": 1794393814.329771,
+      "process_seconds": 2.33221697807312,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "39, 2902, 2902, 58.80, 9",
+      "gpu_after": "40, 2910, 2910, 72.88, 52"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1205741,
+      "record_seconds": 0.3271661,
+      "wait_seconds": 4.7502653,
+      "started_unix": 1794393816.7589905,
+      "process_seconds": 7.880288600921631,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 72.88, 52",
+      "gpu_after": "54, 2805, 2805, 219.17, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1147661,
+      "record_seconds": 0.13559,
+      "wait_seconds": 4.9352922,
+      "started_unix": 1794393824.7255733,
+      "process_seconds": 7.8800811767578125,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "54, 2805, 2805, 219.17, 100",
+      "gpu_after": "55, 2805, 2805, 219.69, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1258779,
+      "record_seconds": 0.304833,
+      "wait_seconds": 4.7958834,
+      "started_unix": 1794393832.6987615,
+      "process_seconds": 7.09661865234375,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "55, 2805, 2805, 219.69, 100",
+      "gpu_after": "63, 2827, 2827, 318.41, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1284864,
+      "record_seconds": 0.1194186,
+      "wait_seconds": 4.9837232,
+      "started_unix": 1794393839.885667,
+      "process_seconds": 6.977596998214722,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "63, 2827, 2827, 318.41, 100",
+      "gpu_after": "48, 2857, 2857, 275.96, 1"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.531722,
+      "record_seconds": 8.53139,
+      "wait_seconds": 0.0001522,
+      "started_unix": 1794393846.9533663,
+      "process_seconds": 10.687079429626465,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "48, 2857, 2857, 275.96, 1",
+      "gpu_after": "41, 2910, 2910, 58.46, 9"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.7567131,
+      "record_seconds": 1.7564531,
+      "wait_seconds": 0.0001074,
+      "started_unix": 1794393857.7305956,
+      "process_seconds": 2.9980175495147705,
+      "block": 0,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "41, 2910, 2910, 58.46, 9",
+      "gpu_after": "41, 2910, 2910, 64.90, 41"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1236386,
+      "record_seconds": 0.1437442,
+      "wait_seconds": 4.9358099,
+      "started_unix": 1794393860.8198216,
+      "process_seconds": 7.884945869445801,
+      "block": 1,
+      "mode": "control",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 64.90, 41",
+      "gpu_after": "55, 2805, 2805, 220.01, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1290992,
+      "record_seconds": 0.1369313,
+      "wait_seconds": 4.9486075,
+      "started_unix": 1794393868.7871635,
+      "process_seconds": 7.892626762390137,
+      "block": 1,
+      "mode": "control",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "55, 2805, 2805, 220.01, 100",
+      "gpu_after": "56, 2805, 2805, 220.14, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.7168214,
+      "record_seconds": 1.7165874,
+      "wait_seconds": 9.81e-05,
+      "started_unix": 1794393876.777015,
+      "process_seconds": 2.9560282230377197,
+      "block": 1,
+      "mode": "control",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "56, 2805, 2805, 220.14, 100",
+      "gpu_after": "42, 2910, 2910, 65.45, 42"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6870193,
+      "record_seconds": 1.6867961,
+      "wait_seconds": 0.0001063,
+      "started_unix": 1794393879.8317575,
+      "process_seconds": 2.9227774143218994,
+      "block": 1,
+      "mode": "control",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "42, 2910, 2910, 65.45, 42",
+      "gpu_after": "41, 2910, 2910, 66.77, 43"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1282429,
+      "record_seconds": 0.1178236,
+      "wait_seconds": 4.9848585,
+      "started_unix": 1794393882.846519,
+      "process_seconds": 6.976471662521362,
+      "block": 1,
+      "mode": "control",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 66.77, 43",
+      "gpu_after": "63, 2827, 2827, 318.10, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1266564,
+      "record_seconds": 0.1106099,
+      "wait_seconds": 4.9905769,
+      "started_unix": 1794393889.9125886,
+      "process_seconds": 6.984327077865601,
+      "block": 1,
+      "mode": "control",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "46, 2872, 2872, 264.16, 0",
+      "gpu_after": "49, 2850, 2850, 285.24, 0"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3849532,
+      "record_seconds": 1.3846376,
+      "wait_seconds": 0.0001985,
+      "started_unix": 1794393896.9943273,
+      "process_seconds": 2.3464865684509277,
+      "block": 1,
+      "mode": "control",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "49, 2850, 2850, 285.24, 0",
+      "gpu_after": "43, 2895, 2895, 74.77, 55"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3558102,
+      "record_seconds": 1.3555163,
+      "wait_seconds": 0.0001863,
+      "started_unix": 1794393899.4320972,
+      "process_seconds": 2.2997806072235107,
+      "block": 1,
+      "mode": "control",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "43, 2895, 2895, 71.93, 1",
+      "gpu_after": "43, 2910, 2910, 75.43, 53"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1250409,
+      "record_seconds": 0.1452592,
+      "wait_seconds": 4.9360485,
+      "started_unix": 1794393901.815248,
+      "process_seconds": 7.886101722717285,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "43, 2910, 2910, 75.43, 53",
+      "gpu_after": "56, 2805, 2805, 220.12, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1045306,
+      "record_seconds": 0.3483069,
+      "wait_seconds": 4.7134497,
+      "started_unix": 1794393909.7988951,
+      "process_seconds": 7.8608715534210205,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "56, 2805, 2805, 220.12, 100",
+      "gpu_after": "57, 2835, 2835, 221.67, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5807848,
+      "record_seconds": 8.5804492,
+      "wait_seconds": 0.0001417,
+      "started_unix": 1794393917.746806,
+      "process_seconds": 10.76376986503601,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "57, 2835, 2835, 221.67, 100",
+      "gpu_after": "41, 2910, 2910, 56.89, 7"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.7063529,
+      "record_seconds": 1.706131,
+      "wait_seconds": 0.0001064,
+      "started_unix": 1794393928.6064816,
+      "process_seconds": 2.9411420822143555,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "41, 2910, 2910, 56.89, 7",
+      "gpu_after": "41, 2910, 2910, 66.57, 43"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1266569,
+      "record_seconds": 0.2945323,
+      "wait_seconds": 4.8068699,
+      "started_unix": 1794393931.6330233,
+      "process_seconds": 6.965832233428955,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "41, 2910, 2910, 66.57, 43",
+      "gpu_after": "64, 2827, 2827, 319.05, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1331314,
+      "record_seconds": 0.1146796,
+      "wait_seconds": 4.9929896,
+      "started_unix": 1794393938.6895819,
+      "process_seconds": 6.976087808609009,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "64, 2827, 2827, 319.05, 100",
+      "gpu_after": "64, 2827, 2827, 319.34, 100"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.9383983,
+      "record_seconds": 8.9379819,
+      "wait_seconds": 0.0002733,
+      "started_unix": 1794393945.7634401,
+      "process_seconds": 10.425435543060303,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "64, 2827, 2827, 319.34, 100",
+      "gpu_after": "41, 2902, 2902, 58.69, 8"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3681173,
+      "record_seconds": 1.3677964,
+      "wait_seconds": 0.0001968,
+      "started_unix": 1794393956.2759953,
+      "process_seconds": 2.314469814300537,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 0,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "41, 2902, 2902, 58.69, 8",
+      "gpu_after": "42, 2910, 2910, 74.39, 52"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1286577,
+      "record_seconds": 0.1220442,
+      "wait_seconds": 4.9810996,
+      "started_unix": 1794393958.675776,
+      "process_seconds": 6.9717183113098145,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "42, 2910, 2910, 74.39, 52",
+      "gpu_after": "64, 2827, 2827, 317.94, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1252711,
+      "record_seconds": 0.3017488,
+      "wait_seconds": 4.7984943,
+      "started_unix": 1794393965.7363,
+      "process_seconds": 6.976366996765137,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "64, 2827, 2827, 317.94, 100",
+      "gpu_after": "65, 2827, 2827, 318.72, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1251055,
+      "record_seconds": 0.1415335,
+      "wait_seconds": 4.9400734,
+      "started_unix": 1794393972.806948,
+      "process_seconds": 7.881316900253296,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "65, 2827, 2827, 318.72, 100",
+      "gpu_after": "57, 2805, 2805, 220.53, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1268275,
+      "record_seconds": 0.3482553,
+      "wait_seconds": 4.7354254,
+      "started_unix": 1794393980.771972,
+      "process_seconds": 7.894275426864624,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "57, 2805, 2805, 220.53, 100",
+      "gpu_after": "57, 2805, 2805, 221.87, 100"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3956791,
+      "record_seconds": 1.3953722,
+      "wait_seconds": 0.0001809,
+      "started_unix": 1794393988.75183,
+      "process_seconds": 2.339249610900879,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "57, 2805, 2805, 221.87, 100",
+      "gpu_after": "43, 2895, 2895, 74.19, 54"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.9534391,
+      "record_seconds": 8.953044,
+      "wait_seconds": 0.0002657,
+      "started_unix": 1794393991.1872015,
+      "process_seconds": 10.4395170211792,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "43, 2895, 2895, 74.19, 54",
+      "gpu_after": "41, 2902, 2902, 59.36, 9"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6984077,
+      "record_seconds": 1.698186,
+      "wait_seconds": 0.0001012,
+      "started_unix": 1794394001.719434,
+      "process_seconds": 2.9209296703338623,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2902, 2902, 59.36, 9",
+      "gpu_after": "41, 2910, 2910, 65.38, 42"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5119342,
+      "record_seconds": 8.5116386,
+      "wait_seconds": 0.0001442,
+      "started_unix": 1794394004.7237523,
+      "process_seconds": 10.652888774871826,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 65.38, 42",
+      "gpu_after": "38, 2122, 2122, 53.35, 0"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1278505,
+      "record_seconds": 0.3027981,
+      "wait_seconds": 4.7998442,
+      "started_unix": 1794394015.4684374,
+      "process_seconds": 6.9815895557403564,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "38, 2122, 2122, 53.35, 0",
+      "gpu_after": "50, 2835, 2835, 297.89, 23"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.127644,
+      "record_seconds": 0.1133086,
+      "wait_seconds": 4.9889655,
+      "started_unix": 1794394022.5406744,
+      "process_seconds": 6.9786536693573,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "50, 2835, 2835, 297.89, 23",
+      "gpu_after": "64, 2827, 2827, 317.42, 95"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6766079,
+      "record_seconds": 1.6763923,
+      "wait_seconds": 9.44e-05,
+      "started_unix": 1794394029.6138768,
+      "process_seconds": 2.9054253101348877,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "64, 2827, 2827, 317.42, 95",
+      "gpu_after": "42, 2895, 2895, 67.21, 44"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5770639,
+      "record_seconds": 8.5767565,
+      "wait_seconds": 0.0001511,
+      "started_unix": 1794394032.605262,
+      "process_seconds": 10.724785327911377,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "42, 2895, 2895, 67.21, 44",
+      "gpu_after": "40, 2910, 2910, 57.30, 9"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0949926,
+      "record_seconds": 0.3422841,
+      "wait_seconds": 4.7097189,
+      "started_unix": 1794394043.4136302,
+      "process_seconds": 7.846160650253296,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 1777, 1777, 52.48, 0",
+      "gpu_after": "55, 2835, 2835, 222.28, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1046645,
+      "record_seconds": 0.1394206,
+      "wait_seconds": 4.9215672,
+      "started_unix": 1794394051.3510218,
+      "process_seconds": 7.859228134155273,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "55, 2835, 2835, 222.28, 100",
+      "gpu_after": "55, 2835, 2835, 221.40, 100"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.8671846,
+      "record_seconds": 8.8667869,
+      "wait_seconds": 0.0002522,
+      "started_unix": 1794394059.3006618,
+      "process_seconds": 10.349005460739136,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "55, 2835, 2835, 221.40, 100",
+      "gpu_after": "40, 2902, 2902, 59.03, 8"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.4098416,
+      "record_seconds": 1.4095251,
+      "wait_seconds": 0.0001892,
+      "started_unix": 1794394069.7375689,
+      "process_seconds": 2.3712241649627686,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 2,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2902, 2902, 59.03, 8",
+      "gpu_after": "40, 2910, 2910, 73.01, 45"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1250837,
+      "record_seconds": 0.1055651,
+      "wait_seconds": 4.9930853,
+      "started_unix": 1794394072.201258,
+      "process_seconds": 6.971031188964844,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "40, 2910, 2910, 73.01, 45",
+      "gpu_after": "63, 2827, 2827, 315.90, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1277122,
+      "record_seconds": 0.3011129,
+      "wait_seconds": 4.8014785,
+      "started_unix": 1794394079.2564042,
+      "process_seconds": 6.980384588241577,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "63, 2827, 2827, 315.90, 100",
+      "gpu_after": "64, 2827, 2827, 317.74, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6741379,
+      "record_seconds": 1.6739214,
+      "wait_seconds": 9.74e-05,
+      "started_unix": 1794394086.330959,
+      "process_seconds": 2.918668270111084,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "64, 2827, 2827, 317.74, 100",
+      "gpu_after": "42, 2910, 2910, 67.53, 44"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5232319,
+      "record_seconds": 8.522923,
+      "wait_seconds": 0.0001549,
+      "started_unix": 1794394089.3401423,
+      "process_seconds": 10.66441035270691,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "42, 2910, 2910, 67.53, 44",
+      "gpu_after": "39, 2902, 2902, 54.04, 8"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.434427,
+      "record_seconds": 1.4341077,
+      "wait_seconds": 0.000204,
+      "started_unix": 1794394100.0986612,
+      "process_seconds": 2.3967366218566895,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "39, 2902, 2902, 54.04, 8",
+      "gpu_after": "40, 2910, 2910, 70.81, 0"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.9229142,
+      "record_seconds": 8.9224788,
+      "wait_seconds": 0.0002633,
+      "started_unix": 1794394102.5792325,
+      "process_seconds": 10.419708967208862,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "40, 2910, 2910, 70.81, 0",
+      "gpu_after": "38, 2910, 2910, 55.41, 0"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1047907,
+      "record_seconds": 0.140958,
+      "wait_seconds": 4.9197772,
+      "started_unix": 1794394113.0843093,
+      "process_seconds": 7.8644843101501465,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "38, 2910, 2910, 55.41, 0",
+      "gpu_after": "44, 2812, 2812, 194.79, 0"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0983615,
+      "record_seconds": 0.3461802,
+      "wait_seconds": 4.7088511,
+      "started_unix": 1794394121.0373235,
+      "process_seconds": 7.855448246002197,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 3,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "44, 2812, 2812, 194.79, 0",
+      "gpu_after": "43, 2835, 2835, 182.23, 0"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.4163365,
+      "record_seconds": 1.416018,
+      "wait_seconds": 0.0001745,
+      "started_unix": 1794394128.974959,
+      "process_seconds": 2.3976328372955322,
+      "block": 1,
+      "mode": "control",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "43, 2835, 2835, 182.23, 0",
+      "gpu_after": "40, 2910, 2910, 69.58, 0"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.4604771,
+      "record_seconds": 1.4601264,
+      "wait_seconds": 0.0002157,
+      "started_unix": 1794394131.4684362,
+      "process_seconds": 2.4293315410614014,
+      "block": 1,
+      "mode": "control",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 69.58, 0",
+      "gpu_after": "40, 2910, 2910, 69.23, 0"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6788445,
+      "record_seconds": 1.6786212,
+      "wait_seconds": 9.98e-05,
+      "started_unix": 1794394133.9896796,
+      "process_seconds": 2.9092090129852295,
+      "block": 1,
+      "mode": "control",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "40, 2910, 2910, 69.23, 0",
+      "gpu_after": "39, 2910, 2910, 63.44, 0"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6971663,
+      "record_seconds": 1.6969418,
+      "wait_seconds": 0.0001035,
+      "started_unix": 1794394136.992003,
+      "process_seconds": 3.030341625213623,
+      "block": 1,
+      "mode": "control",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "39, 2910, 2910, 63.44, 0",
+      "gpu_after": "39, 2910, 2910, 65.04, 5"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1322527,
+      "record_seconds": 0.1193962,
+      "wait_seconds": 4.9874259,
+      "started_unix": 1794394140.114719,
+      "process_seconds": 6.9866650104522705,
+      "block": 1,
+      "mode": "control",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "39, 2910, 2910, 65.04, 5",
+      "gpu_after": "57, 2827, 2827, 312.79, 80"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1293641,
+      "record_seconds": 0.1099792,
+      "wait_seconds": 4.9939108,
+      "started_unix": 1794394147.1970782,
+      "process_seconds": 6.978206157684326,
+      "block": 1,
+      "mode": "control",
+      "pair": 1,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "57, 2827, 2827, 312.79, 80",
+      "gpu_after": "63, 2827, 2827, 317.37, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0946545,
+      "record_seconds": 0.1369331,
+      "wait_seconds": 4.9141748,
+      "started_unix": 1794394154.2725446,
+      "process_seconds": 7.844726085662842,
+      "block": 1,
+      "mode": "control",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "63, 2827, 2827, 317.37, 100",
+      "gpu_after": "56, 2812, 2812, 220.67, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1241344,
+      "record_seconds": 0.1397625,
+      "wait_seconds": 4.9404776,
+      "started_unix": 1794394162.2101934,
+      "process_seconds": 7.888609886169434,
+      "block": 1,
+      "mode": "control",
+      "pair": 1,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "56, 2812, 2812, 220.67, 100",
+      "gpu_after": "53, 2805, 2805, 219.50, 82"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.6125299,
+      "record_seconds": 8.6122368,
+      "wait_seconds": 0.0001474,
+      "started_unix": 1794394170.1891005,
+      "process_seconds": 10.760852575302124,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "53, 2805, 2805, 219.50, 82",
+      "gpu_after": "39, 2722, 2722, 53.15, 1"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.7015671,
+      "record_seconds": 1.7013329,
+      "wait_seconds": 9.72e-05,
+      "started_unix": 1794394181.0369256,
+      "process_seconds": 2.9288971424102783,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "39, 2722, 2722, 53.15, 1",
+      "gpu_after": "40, 2910, 2910, 64.34, 0"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1307257,
+      "record_seconds": 0.3067383,
+      "wait_seconds": 4.7986823,
+      "started_unix": 1794394184.0586245,
+      "process_seconds": 6.986274480819702,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 64.34, 0",
+      "gpu_after": "50, 2827, 2827, 298.76, 26"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1299693,
+      "record_seconds": 0.1120433,
+      "wait_seconds": 4.9925201,
+      "started_unix": 1794394191.1385067,
+      "process_seconds": 6.976556301116943,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "50, 2827, 2827, 298.76, 26",
+      "gpu_after": "64, 2827, 2827, 317.99, 97"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0928797,
+      "record_seconds": 0.1398155,
+      "wait_seconds": 4.9094872,
+      "started_unix": 1794394198.199407,
+      "process_seconds": 7.860104560852051,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "64, 2827, 2827, 317.99, 97",
+      "gpu_after": "49, 2835, 2835, 214.83, 46"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1350242,
+      "record_seconds": 0.3462814,
+      "wait_seconds": 4.745419,
+      "started_unix": 1794394206.156532,
+      "process_seconds": 7.903807878494263,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "49, 2835, 2835, 214.83, 46",
+      "gpu_after": "49, 2805, 2805, 213.52, 45"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.914317,
+      "record_seconds": 8.9138894,
+      "wait_seconds": 0.0002575,
+      "started_unix": 1794394214.1570718,
+      "process_seconds": 10.433816909790039,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "49, 2805, 2805, 213.52, 45",
+      "gpu_after": "40, 2902, 2902, 57.70, 6"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3718355,
+      "record_seconds": 1.371509,
+      "wait_seconds": 0.000216,
+      "started_unix": 1794394224.6847734,
+      "process_seconds": 2.3173880577087402,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 4,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2902, 2902, 57.70, 6",
+      "gpu_after": "41, 2910, 2910, 72.53, 0"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1262619,
+      "record_seconds": 0.1172843,
+      "wait_seconds": 4.9835707,
+      "started_unix": 1794394227.0885465,
+      "process_seconds": 6.974600315093994,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 72.53, 0",
+      "gpu_after": "52, 2827, 2827, 306.30, 47"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1257252,
+      "record_seconds": 0.2970088,
+      "wait_seconds": 4.8036082,
+      "started_unix": 1794394234.155509,
+      "process_seconds": 6.988839626312256,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "52, 2827, 2827, 306.30, 47",
+      "gpu_after": "65, 2827, 2827, 319.22, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6713685,
+      "record_seconds": 1.6711562,
+      "wait_seconds": 9.75e-05,
+      "started_unix": 1794394241.2370365,
+      "process_seconds": 2.9184439182281494,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "65, 2827, 2827, 319.22, 100",
+      "gpu_after": "43, 2895, 2895, 66.99, 42"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.5142836,
+      "record_seconds": 8.5139824,
+      "wait_seconds": 0.0001393,
+      "started_unix": 1794394244.2362416,
+      "process_seconds": 10.639091730117798,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "43, 2895, 2895, 66.99, 42",
+      "gpu_after": "41, 2910, 2910, 57.02, 9"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.4059877,
+      "record_seconds": 1.405679,
+      "wait_seconds": 0.0002014,
+      "started_unix": 1794394254.961408,
+      "process_seconds": 2.3671116828918457,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "39, 2205, 2205, 51.31, 0",
+      "gpu_after": "41, 2910, 2910, 74.15, 54"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.9383282,
+      "record_seconds": 8.9379172,
+      "wait_seconds": 0.0002581,
+      "started_unix": 1794394257.425899,
+      "process_seconds": 10.411873817443848,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "41, 2910, 2910, 74.15, 54",
+      "gpu_after": "39, 2910, 2910, 57.69, 9"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1163981,
+      "record_seconds": 0.3538659,
+      "wait_seconds": 4.7192849,
+      "started_unix": 1794394267.9232285,
+      "process_seconds": 7.873385429382324,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "39, 2910, 2910, 57.69, 9",
+      "gpu_after": "54, 2805, 2805, 219.77, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0842678,
+      "record_seconds": 0.1379538,
+      "wait_seconds": 4.9029472,
+      "started_unix": 1794394275.884556,
+      "process_seconds": 7.832675457000732,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 5,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "54, 2805, 2805, 219.77, 100",
+      "gpu_after": "55, 2835, 2835, 222.18, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.4875483,
+      "record_seconds": 8.4872584,
+      "wait_seconds": 0.000139,
+      "started_unix": 1794394283.8110943,
+      "process_seconds": 10.627580642700195,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "55, 2835, 2835, 222.18, 100",
+      "gpu_after": "38, 2685, 2685, 53.63, 1"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.7022606,
+      "record_seconds": 1.7020347,
+      "wait_seconds": 0.0001022,
+      "started_unix": 1794394294.5229514,
+      "process_seconds": 2.9477429389953613,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "38, 2685, 2685, 53.63, 1",
+      "gpu_after": "39, 2910, 2910, 64.04, 0"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3574821,
+      "record_seconds": 1.3571745,
+      "wait_seconds": 0.0001865,
+      "started_unix": 1794394297.5638454,
+      "process_seconds": 2.326178550720215,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "39, 2910, 2910, 64.04, 0",
+      "gpu_after": "40, 2910, 2910, 73.51, 57"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.8856056,
+      "record_seconds": 8.8851963,
+      "wait_seconds": 0.0002593,
+      "started_unix": 1794394299.9758348,
+      "process_seconds": 10.372467517852783,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "39, 2910, 2910, 69.71, 0",
+      "gpu_after": "38, 2910, 2910, 57.75, 8"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1243194,
+      "record_seconds": 0.1097989,
+      "wait_seconds": 4.9891615,
+      "started_unix": 1794394310.4440598,
+      "process_seconds": 6.977004051208496,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "37, 1950, 1950, 50.67, 0",
+      "gpu_after": "45, 2835, 2835, 271.92, 0"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1264925,
+      "record_seconds": 0.2984753,
+      "wait_seconds": 4.8028415,
+      "started_unix": 1794394317.511401,
+      "process_seconds": 6.972333669662476,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "A",
+        "B"
+      ],
+      "gpu_before": "45, 2835, 2835, 271.92, 0",
+      "gpu_after": "47, 2827, 2827, 285.58, 1"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.124818,
+      "record_seconds": 0.3068799,
+      "wait_seconds": 4.7746534,
+      "started_unix": 1794394324.5710828,
+      "process_seconds": 7.901604890823364,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "47, 2827, 2827, 285.58, 1",
+      "gpu_after": "45, 2805, 2805, 199.95, 1"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0821226,
+      "record_seconds": 0.1413855,
+      "wait_seconds": 4.8974911,
+      "started_unix": 1794394332.5608392,
+      "process_seconds": 7.828938245773315,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 6,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "45, 2805, 2805, 199.95, 1",
+      "gpu_after": "44, 2857, 2857, 187.65, 0"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.1263005,
+      "record_seconds": 0.3526354,
+      "wait_seconds": 4.7309606,
+      "started_unix": 1794394340.4942102,
+      "process_seconds": 7.886572360992432,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "44, 2857, 2857, 187.65, 0",
+      "gpu_after": "56, 2812, 2812, 219.85, 100"
+    },
+    {
+      "frames": 350,
+      "seconds": 5.0960178,
+      "record_seconds": 0.1481266,
+      "wait_seconds": 4.9047723,
+      "started_unix": 1794394348.4797127,
+      "process_seconds": 7.858599901199341,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "d3d12",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "45, 2835, 2835, 187.30, 0",
+      "gpu_after": "56, 2835, 2835, 222.62, 100"
+    },
+    {
+      "frames": 900,
+      "seconds": 8.4955805,
+      "record_seconds": 8.4952631,
+      "wait_seconds": 0.000136,
+      "started_unix": 1794394356.4316952,
+      "process_seconds": 10.65064811706543,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "56, 2835, 2835, 222.62, 100",
+      "gpu_after": "40, 2910, 2910, 56.68, 7"
+    },
+    {
+      "frames": 900,
+      "seconds": 1.6887763,
+      "record_seconds": 1.6885143,
+      "wait_seconds": 9.72e-05,
+      "started_unix": 1794394367.1701975,
+      "process_seconds": 2.918329954147339,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "d3d12",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "40, 2910, 2910, 56.68, 7",
+      "gpu_after": "41, 2910, 2910, 66.67, 37"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1262413,
+      "record_seconds": 0.3053613,
+      "wait_seconds": 4.7957172,
+      "started_unix": 1794394370.179389,
+      "process_seconds": 6.985864877700806,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "41, 2910, 2910, 66.67, 37",
+      "gpu_after": "63, 2827, 2827, 318.68, 100"
+    },
+    {
+      "frames": 600,
+      "seconds": 5.1312872,
+      "record_seconds": 0.1095138,
+      "wait_seconds": 4.9963492,
+      "started_unix": 1794394377.257262,
+      "process_seconds": 6.977251768112183,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "vulkan",
+      "profile": "shader",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "63, 2827, 2827, 318.68, 100",
+      "gpu_after": "64, 2827, 2827, 319.60, 100"
+    },
+    {
+      "frames": 1600,
+      "seconds": 8.8424551,
+      "record_seconds": 8.8420399,
+      "wait_seconds": 0.0002538,
+      "started_unix": 1794394384.3198774,
+      "process_seconds": 10.393819093704224,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "B",
+      "actual_binary": "B",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "64, 2827, 2827, 319.60, 100",
+      "gpu_after": "41, 2902, 2902, 59.15, 9"
+    },
+    {
+      "frames": 1600,
+      "seconds": 1.3601751,
+      "record_seconds": 1.3598654,
+      "wait_seconds": 0.0001988,
+      "started_unix": 1794394394.8132777,
+      "process_seconds": 2.297006845474243,
+      "block": 1,
+      "mode": "comparison",
+      "pair": 7,
+      "api": "vulkan",
+      "profile": "draw",
+      "label": "A",
+      "actual_binary": "A",
+      "order": [
+        "B",
+        "A"
+      ],
+      "gpu_before": "41, 2902, 2902, 59.15, 9",
+      "gpu_after": "41, 2910, 2910, 74.47, 55"
+    }
+  ],
+  "interval_method": "20,000 paired bootstrap resamples in log-ratio space, stratified by the two blocks; no samples removed. ci98_75 is a Bonferroni-adjusted interval for four wall-time cases. Intervals do not cover systematic machine/session effects.",
+  "provenance": {
+    "baseline_commit": "e233d265b4a9af8a6767ab2001b9357b38afbdeb",
+    "candidate_commit": "195fdf3cfb084475714c51182824f6d6b508eb8d",
+    "rhi_candidate_commit": "3a1fbc02c4644242dfe5dc9a5578c0518f399ff5",
+    "benchmark_commit": "195fdf3cfb084475714c51182824f6d6b508eb8d",
+    "build_configuration": "Release /O2 /Ob2 /DNDEBUG",
+    "baseline_exe_sha256": "d0ee0d9831badb548054d74a1d897eae19d73f47faf4dbb04560fd0f6efb9427",
+    "candidate_exe_sha256": "25e251f9238509ac4a0cc5b479f223029fbae92d4a782596ec1773a8d8d4d8af",
+    "identical_runtime_dlls": true,
+    "benchmark_git_blobs": {
+      "main.cpp": "5a171fc368023712f056692b8b7445ee1ee3243e",
+      "CMakeLists.txt": "4051874dca24357faa3e5e6b46753678cda3d5b9"
+    }
+  },
+  "default_scheduling_check": {
+    "process_affinity_mask": 16777215,
+    "system_affinity_mask": 16777215,
+    "samples": [
+      {
+        "backend": "Vulkan",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 1600,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 1.3688272,
+        "record_seconds": 1.3685496,
+        "wait_seconds": 0.0001646,
+        "started_unix": 1794394451.0691786,
+        "process_seconds": 2.329735279083252,
+        "api": "vulkan",
+        "pair": 0,
+        "label": "A"
+      },
+      {
+        "backend": "Vulkan",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 1600,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 12.7422868,
+        "record_seconds": 12.741863,
+        "wait_seconds": 0.0002271,
+        "started_unix": 1794394453.399182,
+        "process_seconds": 14.227936744689941,
+        "api": "vulkan",
+        "pair": 0,
+        "label": "B"
+      },
+      {
+        "backend": "D3D12",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 900,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 1.6701981,
+        "record_seconds": 1.6699893,
+        "wait_seconds": 9.32e-05,
+        "started_unix": 1794394467.6273646,
+        "process_seconds": 2.9001097679138184,
+        "api": "d3d12",
+        "pair": 0,
+        "label": "A"
+      },
+      {
+        "backend": "D3D12",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 900,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 11.431586,
+        "record_seconds": 11.4312834,
+        "wait_seconds": 0.0001448,
+        "started_unix": 1794394470.5283952,
+        "process_seconds": 13.568915843963623,
+        "api": "d3d12",
+        "pair": 0,
+        "label": "B"
+      },
+      {
+        "backend": "Vulkan",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 1600,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 12.8541744,
+        "record_seconds": 12.8538114,
+        "wait_seconds": 0.0002113,
+        "started_unix": 1794394484.0976088,
+        "process_seconds": 14.36057734489441,
+        "api": "vulkan",
+        "pair": 1,
+        "label": "B"
+      },
+      {
+        "backend": "Vulkan",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 1600,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 1.3575828,
+        "record_seconds": 1.3572741,
+        "wait_seconds": 0.0001823,
+        "started_unix": 1794394498.4584546,
+        "process_seconds": 2.3043549060821533,
+        "api": "vulkan",
+        "pair": 1,
+        "label": "A"
+      },
+      {
+        "backend": "D3D12",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 900,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 11.4642595,
+        "record_seconds": 11.4638445,
+        "wait_seconds": 0.0001349,
+        "started_unix": 1794394500.7630897,
+        "process_seconds": 13.589139223098755,
+        "api": "d3d12",
+        "pair": 1,
+        "label": "B"
+      },
+      {
+        "backend": "D3D12",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 900,
+        "warmup": 120,
+        "in_flight": 3,
+        "seconds": 1.66496,
+        "record_seconds": 1.6647375,
+        "wait_seconds": 9.88e-05,
+        "started_unix": 1794394514.3524885,
+        "process_seconds": 2.899613618850708,
+        "api": "d3d12",
+        "pair": 1,
+        "label": "A"
+      }
+    ]
+  },
+  "machine": {
+    "os": "Windows",
+    "cpu": "Intel Core Ultra 7 270K Plus",
+    "gpu": "NVIDIA GeForce RTX 5080",
+    "driver": "617.42",
+    "compiler": "MSVC 14.51.36231"
+  },
+  "validation": {
+    "exact_image_comparisons": 4,
+    "debug_cases_passed": 4,
+    "debug_frames": 3,
+    "debug_warmup": 2
+  }
+}
