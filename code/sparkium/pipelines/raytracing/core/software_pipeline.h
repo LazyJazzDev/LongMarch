@@ -1,5 +1,6 @@
 #pragma once
 #include "sparkium/pipelines/raytracing/core/core_util.h"
+#include "sparkium/pipelines/raytracing/core/native_tlas.h"
 
 namespace sparkium::raytracing {
 
@@ -85,10 +86,18 @@ class SoftwarePipeline {
   Core *core_;
   bool ray_query_;
   std::string camera_file_, camera_entry_;
-  rhi::ObjPtr<rhi::ITopLevelAccelerationStructure> native_tlas_;
+  NativeTLAS native_tlas_;
   std::vector<Instance> instances_;
-  std::vector<GeometryLayout> geometries_;
-  uint32_t tlas_leaves_{};
+
+  struct BuildState {
+    rhi::ObjPtr<rhi::IBuffer> nodes;
+    std::vector<GeometryLayout> geometries;
+    std::vector<rhi::ObjPtr<rhi::IBuffer>> geometry_buffers;
+    std::vector<Instance> instances;
+    uint32_t tlas_leaves{};
+  };
+
+  std::shared_ptr<BuildState> accepted_build_ = std::make_shared<BuildState>();
   std::vector<MaterialCode> material_sources_;
   uint32_t buffer_count_{}, sdr_count_{}, hdr_count_{};
   uint32_t builder_buffer_count_{};

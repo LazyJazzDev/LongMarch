@@ -1,5 +1,6 @@
 #pragma once
 #include "sparkium/pipelines/raytracing/core/core_util.h"
+#include "sparkium/pipelines/raytracing/core/native_tlas.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 
 namespace sparkium::raytracing {
@@ -75,7 +76,7 @@ class Scene : public Object {
   rhi::ObjPtr<rhi::IShader> default_miss_shader_;
   rhi::ObjPtr<rhi::IShader> shadow_miss_shader_;
   rhi::ObjPtr<rhi::IRayTracingProgram> rt_program_;
-  rhi::ObjPtr<rhi::ITopLevelAccelerationStructure> tlas_;
+  NativeTLAS tlas_;
   std::map<Entity *, EntityStatus> entities_;
 
   std::vector<InstanceHitGroups> hit_groups_;

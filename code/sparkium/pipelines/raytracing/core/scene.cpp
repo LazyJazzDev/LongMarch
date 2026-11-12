@@ -275,10 +275,7 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
     if (!light->RecordPreprocess(commands))
       return false;
   if (!software_tracing_) {
-    if (!tlas_ || tlas_->GetDesc().instance_count < instances_.size())
-      tlas_ = core_->GetDevice()->CreateTopLevelAccelerationStructure(
-          {static_cast<uint32_t>(std::max<size_t>(1, instances_.size()))});
-    if (!tlas_ || !commands->CmdBuildTopLevelAccelerationStructure(tlas_.Get(), instances_))
+    if (!tlas_.Record(core_->GetDevice(), commands, updates, instances_))
       return core_->ReportFailure("failed to build ray tracing TLAS");
   }
 

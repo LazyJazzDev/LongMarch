@@ -883,21 +883,43 @@ RHI_RW_BYTE_ADDRESS_BUFFER(4, 0, results);
   glm::mat4 mirrored =
       glm::translate(glm::mat4(1), glm::vec3(3, 0, -1)) * glm::scale(glm::mat4(1), glm::vec3(-0.7f, 1.8f, 0.4f));
   std::vector<glm::mat4x3> transforms{glm::mat4x3(1), glm::mat4x3(mirrored)};
-  for (int phase = 0; phase < 4; ++phase) {
-    // Refit instances, shrink the instance tree, then exercise a completely empty TLAS.
-    if (phase == 1)
-      transforms[0] = glm::mat4x3(glm::translate(glm::mat4(1), glm::vec3(-1, 0.5f, -2)));
+  for (int phase = 0; phase < 8; ++phase) {
+    // Static reuse, transform refit, geometry rebuild, static reuse again, then
+    // shrinking/empty/growing instance counts. Compare every phase to the CPU oracle.
     if (phase == 2)
+      transforms[0] = glm::mat4x3(glm::translate(glm::mat4(1), glm::vec3(-1, 0.5f, -2)));
+    if (phase == 3) {
+      for (auto &position : positions)
+        position.z() -= 0.7f;
+      const auto &header = geometry.GetHeader();
+      ASSERT_TRUE(core->QueueUpload(geometry.GetBuffer(), positions.data(), positions.size() * sizeof(Vector3<float>),
+                                    header.position_offset));
+      if (ray_query)
+        ASSERT_TRUE(core->QueueBuild(rt_geometry.BLAS(), {{{geometry.GetBuffer(), header.position_offset},
+                                                           {geometry.GetBuffer(), header.index_offset}}}));
+    }
+    if (phase == 5)
       transforms.resize(1);
-    if (phase == 3)
+    if (phase == 6)
       transforms.clear();
+    if (phase == 7)
+      transforms = {glm::mat4x3(1), glm::mat4x3(mirrored)};
     pipeline.ClearInstances();
     for (auto transform : transforms)
       pipeline.AddInstance(&rt_geometry, &rt_material, transform, 0);
+    sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 1.0f);
+    {
+      // Discarded BUILD/UPDATE must not publish a usable cached tree. The next
+      // recording must reconstruct the requested state, including the first build.
+      auto canceled_updates = core->BeginUpdates();
+      rhi::ObjPtr<rhi::ICommandContext> canceled = queue->CreateCommandContext();
+      ASSERT_TRUE(canceled);
+      ASSERT_TRUE(pipeline.RecordPrepare(canceled.Get(), canceled_updates, buffers, 1, 1,
+                                         sparkium::raytracing::DedicatedCast(&camera)));
+    }
     rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
     ASSERT_TRUE(commands);
     auto updates = core->BeginUpdates();
-    sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 1.0f);
     ASSERT_TRUE(
         pipeline.RecordPrepare(commands.Get(), updates, buffers, 1, 1, sparkium::raytracing::DedicatedCast(&camera)));
     ASSERT_TRUE(core->RecordUpdates(commands.Get(), updates));

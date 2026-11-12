@@ -37,15 +37,19 @@ TEST_P(SparkiumBindingTest, UploadSnapshotsSurviveCanceledRecordingAndAcceptOnly
   ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(buffer);
   ASSERT_TRUE(queue);
+  int accepted = 0;
   uint32_t source = 17;
   ASSERT_TRUE(updates.Upload(buffer.Get(), &source, sizeof(source)));
   source = 29;
   {
     ObjPtr<ICommandContext> canceled = queue->CreateCommandContext();
     auto cursor = updates.Begin();
+    cursor.OnAccepted([&] { ++accepted; });
     ASSERT_TRUE(updates.Record(canceled.Get(), cursor));
   }
+  EXPECT_EQ(accepted, 0);
   auto cursor = updates.Begin();
+  cursor.OnAccepted([&] { ++accepted; });
   ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
   ASSERT_TRUE(updates.Record(commands.Get(), cursor));
   ASSERT_TRUE(updates.Upload(buffer.Get(), &source, sizeof(source)));
@@ -55,6 +59,7 @@ TEST_P(SparkiumBindingTest, UploadSnapshotsSurviveCanceledRecordingAndAcceptOnly
   ASSERT_TRUE(submitted);
   ASSERT_TRUE(updates.Accept(cursor));
   EXPECT_FALSE(updates.Accept(cursor));
+  EXPECT_EQ(accepted, 1);
   EXPECT_FALSE(updates.Empty());
   ASSERT_TRUE(submitted->WaitHost());
   uint32_t actual{};
@@ -73,6 +78,22 @@ TEST_P(SparkiumBindingTest, UploadSnapshotsSurviveCanceledRecordingAndAcceptOnly
   ASSERT_TRUE(submitted->WaitHost());
   ASSERT_TRUE(second->CopyTo(&actual, sizeof(actual)));
   EXPECT_EQ(actual, 29u);
+
+  // Even an empty accepted transaction advances the generation. Its callbacks
+  // cannot run twice, and a cursor captured before that acceptance is stale.
+  cursor = updates.Begin();
+  auto stale = cursor;
+  cursor.OnAccepted([&] { ++accepted; });
+  commands = queue->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(updates.Record(commands.Get(), cursor));
+  submitted = commands->Submit();
+  ASSERT_TRUE(submitted);
+  ASSERT_TRUE(updates.Accept(cursor));
+  EXPECT_FALSE(updates.Accept(cursor));
+  EXPECT_FALSE(updates.Accept(stale));
+  EXPECT_EQ(accepted, 2);
+  ASSERT_TRUE(submitted->WaitHost());
 }
 
 TEST_P(SparkiumBindingTest, SharedPathTracerCompilesWithFourGroups) {

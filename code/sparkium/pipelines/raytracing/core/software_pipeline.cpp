@@ -300,9 +300,24 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
     }
   }
 
-  bool rebuild = !nodes_ || tlas_leaves != tlas_leaves_ || geometries.size() != geometries_.size();
-  for (size_t i = 0; !rebuild && i < geometries.size(); ++i)
-    rebuild = geometries[i].geometry != geometries_[i].geometry || geometries[i].count != geometries_[i].count;
+  // Flush queued geometry writes before deciding which accepted trees remain valid.
+  if (!core_->RecordUpdates(commands, updates))
+    return false;
+  const auto &accepted = *accepted_build_;
+  bool rebuild = !nodes_ || nodes_.Get() != accepted.nodes.Get() || tlas_leaves != accepted.tlas_leaves ||
+                 geometries.size() != accepted.geometries.size();
+  for (size_t i = 0; !rebuild && i < geometries.size(); ++i) {
+    const auto &geometry = geometries[i];
+    rebuild = geometry.geometry != accepted.geometries[i].geometry || geometry.count != accepted.geometries[i].count ||
+              geometry.buffer_index != accepted.geometries[i].buffer_index ||
+              buffers[geometry.buffer_index] != accepted.geometry_buffers[i].Get() ||
+              updates.Writes(buffers[geometry.buffer_index]);
+  }
+  bool instance_tree_changed = rebuild || instances_.size() != accepted.instances.size();
+  for (size_t i = 0; !instance_tree_changed && i < instances_.size(); ++i)
+    instance_tree_changed = instances_[i].geometry != accepted.instances[i].geometry ||
+                            instances_[i].transform != accepted.instances[i].transform ||
+                            instances_[i].geometry_index != accepted.instances[i].geometry_index;
   if (rebuild && !ray_query_) {
     nodes_ = device->CreateBuffer({node_count * 32});
     keys_ = device->CreateBuffer({uint64_t(max_leaves) * 8});
@@ -318,10 +333,7 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
   if (ray_query_) {
     if (!core_->RecordUpdates(commands, updates))
       return false;
-    if (!native_tlas_ || native_tlas_->GetDesc().instance_count < native_instances.size())
-      native_tlas_ = device->CreateTopLevelAccelerationStructure(
-          {static_cast<uint32_t>(std::max<size_t>(1, native_instances.size()))});
-    if (!native_tlas_ || !commands->CmdBuildTopLevelAccelerationStructure(native_tlas_.Get(), native_instances))
+    if (!native_tlas_.Record(device, commands, updates, native_instances))
       return core_->ReportFailure("failed to build native ray query TLAS");
     if (!render_program_ || camera_file_ != camera_file || camera_entry_ != camera_entry ||
         materials != material_sources_ || buffer_count_ != buffers.size() || sdr_count_ != sdr_count ||
@@ -352,7 +364,10 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
   tlas.leaves = tlas_leaves;
   tlas.count = gpu_instances.size();
   tlas.instance_tree = 1;
-  AppendBuild(passes, tlas);
+  if (instance_tree_changed)
+    AppendBuild(passes, tlas);
+  if (passes.empty())
+    return core_->RecordUpdates(commands, updates);
   std::vector<BuildParameters> parameters;
   for (const auto &pass : passes)
     parameters.push_back(pass.parameters);
@@ -363,18 +378,23 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
   if (!core_->RecordUpdates(commands, updates))
     return false;
   for (size_t i = 0; i < passes.size(); ++i) {
-    commands->CmdBindComputeProgram(builders_[passes[i].kernel].Get());
-    build_group_->BindResource(0, nodes_.Get());
-    build_group_->BindResource(1, buffers);
-    build_group_->BindResource(
-        2, rhi::BufferView{parameters_buffer_.Get(), i * sizeof(BuildParameters), sizeof(BuildParameters)});
-    build_group_->BindResource(3, keys_.Get());
-    build_group_->BindResource(4, instances_buffer_.Get());
-    commands->CmdBindGroup(0, build_group_.Get());
-    commands->CmdDispatch((passes[i].count + 63) / 64, 1, 1);
+    if (!commands->CmdBindComputeProgram(builders_[passes[i].kernel].Get()) ||
+        !build_group_->BindResource(0, nodes_.Get()) || !build_group_->BindResource(1, buffers) ||
+        !build_group_->BindResource(
+            2, rhi::BufferView{parameters_buffer_.Get(), i * sizeof(BuildParameters), sizeof(BuildParameters)}) ||
+        !build_group_->BindResource(3, keys_.Get()) || !build_group_->BindResource(4, instances_buffer_.Get()) ||
+        !commands->CmdBindGroup(0, build_group_.Get()) || !commands->CmdDispatch((passes[i].count + 63) / 64, 1, 1))
+      return core_->ReportFailure("failed to record software BVH construction");
   }
-  geometries_ = std::move(geometries);
-  tlas_leaves_ = tlas_leaves;
+  BuildState recorded;
+  recorded.nodes = nodes_;
+  recorded.geometries = std::move(geometries);
+  recorded.instances = instances_;
+  recorded.tlas_leaves = tlas_leaves;
+  for (const auto &geometry : recorded.geometries)
+    recorded.geometry_buffers.push_back(rhi::ObjPtr<rhi::IBuffer>::Retain(buffers[geometry.buffer_index]));
+  updates.OnAccepted(
+      [state = accepted_build_, recorded = std::move(recorded)]() mutable { *state = std::move(recorded); });
   return true;
 }
 }  // namespace sparkium::raytracing

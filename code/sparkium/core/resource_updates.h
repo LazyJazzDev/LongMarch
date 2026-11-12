@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+#include <unordered_set>
 #include <variant>
 
 #include "grassland/rhi/rhi_buffer.h"
@@ -20,11 +22,7 @@ class ResourceUpdates {
   bool Build(grassland::rhi::IBottomLevelAccelerationStructure *structure,
              const std::vector<grassland::rhi::AccelerationStructureGeometryBuffers> &geometries);
 
-  struct Cursor {
-    uint64_t first{};
-    size_t count{};
-  };
-
+  class Cursor;
   Cursor Begin() const;
   // May be called again with the same cursor/context after scene preparation
   // enqueues more uploads. Failed recording must be discarded; Begin a fresh
@@ -32,6 +30,26 @@ class ResourceUpdates {
   bool Record(grassland::rhi::ICommandContext *commands, Cursor &cursor) const;
   bool Accept(const Cursor &cursor);
   bool Empty() const;
+
+  class Cursor {
+   public:
+    // Cache state becomes reusable only when this recording is accepted. Capture
+    // owned state, not a borrowed scene object: a canceled recording may outlive it.
+    void OnAccepted(std::function<void()> action);
+    bool Builds(grassland::rhi::IBottomLevelAccelerationStructure *structure) const;
+    bool Writes(grassland::rhi::IBuffer *buffer) const;
+
+   private:
+    // Only the owner initializes and advances recording/acceptance bookkeeping.
+    friend Cursor ResourceUpdates::Begin() const;
+    friend bool ResourceUpdates::Record(grassland::rhi::ICommandContext *, Cursor &) const;
+    friend bool ResourceUpdates::Accept(const Cursor &);
+    uint64_t first{}, revision{};
+    size_t count{};
+    std::unordered_set<grassland::rhi::IBottomLevelAccelerationStructure *> builds;
+    std::unordered_set<grassland::rhi::IBuffer *> writes;
+    std::vector<std::function<void()>> accepted;
+  };
 
  private:
   struct BufferUpload {
@@ -54,6 +72,7 @@ class ResourceUpdates {
 
   std::vector<std::variant<BufferUpload, ImageUpload, GeometryBuild>> uploads_;
   uint64_t first_{};
+  uint64_t revision_{};
 };
 
 }  // namespace sparkium

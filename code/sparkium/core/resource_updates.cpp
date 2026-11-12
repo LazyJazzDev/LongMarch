@@ -56,17 +56,21 @@ bool ResourceUpdates::Build(grassland::rhi::IBottomLevelAccelerationStructure *s
 }
 
 ResourceUpdates::Cursor ResourceUpdates::Begin() const {
-  return {first_, 0};
+  Cursor cursor;
+  cursor.first = first_;
+  cursor.revision = revision_;
+  return cursor;
 }
 
 bool ResourceUpdates::Record(grassland::rhi::ICommandContext *commands, Cursor &cursor) const {
-  if (!commands || cursor.first != first_ || cursor.count > uploads_.size())
+  if (!commands || cursor.first != first_ || cursor.revision != revision_ || cursor.count > uploads_.size())
     return false;
   for (size_t i = cursor.count; i < uploads_.size(); ++i) {
     const auto &upload = uploads_[i];
     if (const auto *buffer = std::get_if<BufferUpload>(&upload)) {
       if (!commands->CmdUploadBuffer(buffer->buffer.Get(), buffer->offset, buffer->bytes.data(), buffer->bytes.size()))
         return false;
+      cursor.writes.insert(buffer->buffer.Get());
     } else if (const auto *image = std::get_if<ImageUpload>(&upload)) {
       if (!commands->CmdUploadImage(image->image.Get(), image->bytes.data(), image->row_pitch))
         return false;
@@ -74,6 +78,7 @@ bool ResourceUpdates::Record(grassland::rhi::ICommandContext *commands, Cursor &
       const auto &build = std::get<GeometryBuild>(upload);
       if (!commands->CmdBuildBottomLevelAccelerationStructure(build.structure.Get(), build.geometries))
         return false;
+      cursor.builds.insert(build.structure.Get());
     }
   }
   cursor.count = uploads_.size();
@@ -81,15 +86,30 @@ bool ResourceUpdates::Record(grassland::rhi::ICommandContext *commands, Cursor &
 }
 
 bool ResourceUpdates::Accept(const Cursor &cursor) {
-  if (cursor.first != first_ || cursor.count > uploads_.size())
+  if (cursor.first != first_ || cursor.revision != revision_ || cursor.count > uploads_.size())
     return false;
   uploads_.erase(uploads_.begin(), uploads_.begin() + cursor.count);
   first_ += cursor.count;
+  ++revision_;
+  for (const auto &action : cursor.accepted)
+    action();
   return true;
 }
 
 bool ResourceUpdates::Empty() const {
   return uploads_.empty();
+}
+
+void ResourceUpdates::Cursor::OnAccepted(std::function<void()> action) {
+  accepted.push_back(std::move(action));
+}
+
+bool ResourceUpdates::Cursor::Builds(grassland::rhi::IBottomLevelAccelerationStructure *structure) const {
+  return builds.find(structure) != builds.end();
+}
+
+bool ResourceUpdates::Cursor::Writes(grassland::rhi::IBuffer *buffer) const {
+  return writes.find(buffer) != writes.end();
 }
 
 }  // namespace sparkium
