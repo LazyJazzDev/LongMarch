@@ -24,8 +24,14 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
                                                                 rhi::SHADER_STAGE_COMPUTE, &shaders_vfs, {"."}, {});
   linear_sampler_ = core_->GetDevice()->CreateSampler({rhi::SAMPLER_FILTER_LINEAR});
   nearest_sampler_ = core_->GetDevice()->CreateSampler({rhi::SAMPLER_FILTER_NEAREST});
-  scan_group_ = core_->GetDevice()->CreateBindingGroup(
-      core_->GetComputeProgram("blelloch_scan_up")->GetDesc().pipeline_layout.groups[0]);
+  auto *scan_program = core_->GetComputeProgram("blelloch_scan_up");
+  if (!gather_light_power_shader_ || !linear_sampler_ || !nearest_sampler_ || !scan_program) {
+    core_->ReportFailure("failed to create ray tracing scene resources");
+    return;
+  }
+  scan_group_ = core_->GetDevice()->CreateBindingGroup(scan_program->GetDesc().pipeline_layout.groups[0]);
+  if (!scan_group_)
+    core_->ReportFailure("failed to create light scan bindings");
 }
 
 bool Scene::RecordRender(sparkium::Renderer &renderer,
@@ -35,6 +41,8 @@ bool Scene::RecordRender(sparkium::Renderer &renderer,
                          sparkium::Film *film,
                          bool software,
                          bool ray_query) {
+  if (!core_->IsValid() || !commands || !camera || !film)
+    return false;
   software = software || ray_query;
   if (!software && !raygen_shader_) {
     auto shaders_vfs = core_->GetShadersVFS();
@@ -45,6 +53,9 @@ bool Scene::RecordRender(sparkium::Renderer &renderer,
     shadow_miss_shader_ =
         core_->GetDevice()->CreateShader("raygen.slang", "ShadowMiss", rhi::SHADER_STAGE_MISS, &shaders_vfs, {"."}, {});
   }
+
+  if (!software && (!raygen_shader_ || !default_miss_shader_ || !shadow_miss_shader_))
+    return core_->ReportFailure("failed to create ray tracing shaders");
 
   if (ray_query != ray_query_) {
     ray_query_ = ray_query;
@@ -178,6 +189,10 @@ int32_t Scene::RegisterBuffer(rhi::IBuffer *buffer) {
 }
 
 int32_t Scene::RegisterImage(rhi::IImage *image) {
+  if (!image) {
+    core_->ReportFailure("cannot register a missing scene image");
+    return -1;
+  }
   if (image->GetDesc().format == rhi::IMAGE_FORMAT_R8G8B8A8_UNORM) {
     if (!sdr_image_map_.count(image)) {
       sdr_image_map_[image] = static_cast<int32_t>(sdr_images_.size());
@@ -327,6 +342,8 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
       if (!rt_program_)
         return core_->ReportFailure("failed to create ray tracing pipeline");
       render_group_ = core_->GetDevice()->CreateBindingGroup(desc.pipeline_layout.groups[SPARKIUM_GROUP_SCENE]);
+      if (!render_group_)
+        return core_->ReportFailure("failed to create ray tracing scene bindings");
     }
 
     if (buffers_.size() > buffer_capacity_ || !gather_light_power_program_) {
@@ -340,8 +357,12 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
               {2, rhi::BINDING_BYTE_ADDRESS_BUFFER, static_cast<uint32_t>(buffers_.size())}}}};
         gather_light_power_program_ = core_->GetDevice()->CreateComputeProgram(desc);
       }
+      if (!gather_light_power_program_)
+        return core_->ReportFailure("failed to create light power pipeline");
       light_group_ =
           core_->GetDevice()->CreateBindingGroup(gather_light_power_program_->GetDesc().pipeline_layout.groups[0]);
+      if (!light_group_)
+        return core_->ReportFailure("failed to create light power bindings");
     }
 
     buffer_capacity_ = buffers_.size();
@@ -368,13 +389,13 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
   if (!core_->RecordUpdates(commands, updates))
     return false;
 
-  commands->CmdBindComputeProgram(gather_light_power_program_.Get());
-  light_group_->BindResource(0, light_metadatas_buffer_.Get());
-  light_group_->BindResource(1, light_selector_buffer_.Get());
-  light_group_->BindResource(2, buffers_);
   if (!light_metadatas_.empty()) {
-    commands->CmdBindGroup(0, light_group_.Get());
-    commands->CmdDispatch((light_metadatas_.size() + 63) / 64, 1, 1);
+    if (!commands->CmdBindComputeProgram(gather_light_power_program_.Get()) ||
+        !light_group_->BindResource(0, light_metadatas_buffer_.Get()) ||
+        !light_group_->BindResource(1, light_selector_buffer_.Get()) || !light_group_->BindResource(2, buffers_) ||
+        !commands->CmdBindGroup(0, light_group_.Get()) ||
+        !commands->CmdDispatch((light_metadatas_.size() + 63) / 64, 1, 1))
+      return core_->ReportFailure("failed to record light power gathering");
   }
 
   blelloch_metadatas_.clear();
@@ -397,23 +418,30 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
                        sizeof(BlellochScanMetadata) * blelloch_metadatas_.size());
     if (!core_->RecordUpdates(commands, updates))
       return false;
-    commands->CmdBindComputeProgram(blelloch_scan_up_program);
-    scan_group_->BindResource(0, light_selector_buffer_.Get());
+    if (!blelloch_scan_up_program || !blelloch_scan_down_program ||
+        !commands->CmdBindComputeProgram(blelloch_scan_up_program) ||
+        !scan_group_->BindResource(0, light_selector_buffer_.Get()))
+      return core_->ReportFailure("failed to bind light scan pipeline");
     for (size_t i = 1; i < blelloch_metadatas_.size(); i++) {
-      scan_group_->BindResource(1, rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
-                                                   sizeof(BlellochScanMetadata)});
-      commands->CmdBindGroup(0, scan_group_.Get());
-      commands->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1);
+      if (!scan_group_->BindResource(1,
+                                     rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
+                                                     sizeof(BlellochScanMetadata)}) ||
+          !commands->CmdBindGroup(0, scan_group_.Get()) ||
+          !commands->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1))
+        return core_->ReportFailure("failed to record light scan dispatch");
     }
-    commands->CmdBindComputeProgram(blelloch_scan_down_program);
+    if (!commands->CmdBindComputeProgram(blelloch_scan_down_program))
+      return core_->ReportFailure("failed to bind light scan down pipeline");
     for (size_t i = blelloch_metadatas_.size() - 1; i < blelloch_metadatas_.size(); i--) {
       if (blelloch_metadatas_[i].element_count <= group_size) {
         continue;
       }
-      scan_group_->BindResource(1, rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
-                                                   sizeof(BlellochScanMetadata)});
-      commands->CmdBindGroup(0, scan_group_.Get());
-      commands->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1);
+      if (!scan_group_->BindResource(1,
+                                     rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
+                                                     sizeof(BlellochScanMetadata)}) ||
+          !commands->CmdBindGroup(0, scan_group_.Get()) ||
+          !commands->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1))
+        return core_->ReportFailure("failed to record light scan dispatch");
     }
   }
   return core_->IsValid();
