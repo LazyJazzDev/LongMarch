@@ -18,63 +18,6 @@ When retaining the resulting raw pointer afterward, the original object must
 remain alive, just as with the previous borrowed casts. RHIX containers forward
 queries to the underlying RHI object; their ordinary `Get()` remains borrowed.
 
-## Shared backend interface audit
-
-Common backend interfaces are retained only for actual shared consumers or a
-single API-independent service implementation. Matching method names across
-Vulkan, D3D12, and Metal are insufficient justification for another interface.
-
-Of the original 16 `IBackend*` interfaces, 13 have been removed:
-
-| Removed interface | Current home |
-| --- | --- |
-| Program, ComputeProgram, RayTracingProgram | Native ProgramBase owns the typed device query |
-| Buffer | Native buffer interfaces; same-device use is a caller contract checked only in Debug |
-| Sampler | Native sampler; descriptor validation remains a free shared function |
-| BindingGroup, BindingVersion | Native binding group/version; CurrentVersion returns the native type directly |
-| DownloadToken | Native download token; CopyData is private to the final implementation |
-| Device | Native device; collector wait helpers are private implementation methods |
-| Queue, CommandContext | Native submission protocols; EndRecording is private implementation detail |
-| Timeline | Native timeline with typed device ownership |
-| Image | Native image, including queue eligibility and storage support |
-
-The remaining three interfaces have concrete shared responsibilities:
-
-- `IBackendWindow::GetImGuiContext`: the shared GLFW registry and callbacks need
-  this capability. Frame acquisition, presentation, queue identity, and ImGui
-  recording now belong to native window interfaces.
-- `IBackendSubmissionToken`: the producer facet of the single shared
-  `SubmissionTokenImpl`, paired with frontend `ISubmissionToken`. Queues complete
-  the same API-independent status object; they do not access its implementation.
-- `IBackendShaderBindingTable`: internal regions of the single shared
-  `ShaderBindingTableImpl`, paired with frontend `IShaderBindingTable`. Keeping
-  this service interface avoids duplicating the shared object or exposing its
-  concrete storage to native consumers.
-
-Mock queue/device protocols live only in the test target. Native tests dispatch
-to actual backend interfaces, rather than requiring production common facets
-solely for test inspection. All native interfaces remain stateless, single-chain
-interfaces; only final implementations instantiate Object and own state.
-
-### Cleanup validation
-
-At `6d119ff7`, Windows Release built successfully. With window tests enabled,
-220 tests passed and two were skipped. Another 14 ray-tracing tests passed;
-the two known DXR compacted-BLAS update cases were excluded. The library has
-90 distinct registered interface UUIDs, and pre-commit passed.
-
-On Meshy-PC-3090, GCC and Clang each checked 92 RHI/test translation units from
-an isolated source snapshot with `-fsyntax-only -fno-rtti`; both reported zero
-failures. This is compiler validation, not a Linux runtime test. Metal sources
-were migrated and reviewed, but this cleanup has not been compiled on macOS.
-
-Buffer ownership comparisons use Debug assertions. Release performs no device
-identity query for geometry validation; shared validation checks null buffers,
-ranges, and alignment. Other resource types retain their existing policies.
-The Buffer follow-up passed Release and Debug builds and 65 tests in each
-configuration (4/6 skipped respectively; two known DXR cases excluded).
-GCC and Clang each passed 91 current translation-unit syntax checks on Linux.
-
 ## Identification and implementation
 
 `InterfaceID` contains two `uint64_t` values. `ParseInterfaceID` accepts the
@@ -93,7 +36,7 @@ multiple-definition errors. No separate declaration macro or `.cpp` registration
 is needed. Parsing remains constexpr and invalid UUID literals fail at compile
 time. Unregistered
 types cannot instantiate it. There is no runtime registration map, allocation,
-RTTI, or compiler-specific UUID extension. The 89 current library IDs are unique UUIDv4 values. Surviving interfaces
+RTTI, or compiler-specific UUID extension. Interface IDs are unique UUIDv4 values. Surviving interfaces
 retain their IDs; removed interfaces have no registrations.
 
 Every inheritable RHI object layer is a data-free interface. Virtual contracts
@@ -105,7 +48,7 @@ Stateless algorithms may remain ordinary helpers with explicit inputs.
 
 This applies to acceleration structures, images, programs and native layouts,
 binding groups and versions, samplers, downloads, timelines, devices, queues,
-command contexts, and windows. The former 22 backing-state headers are removed.
+command contexts, and windows.
 Queue submission records and resource transition records still represent actual
 work/data. Metal completion callbacks retain a separate `CompletionState` for
 their asynchronous lifetime; it is private to the final timeline implementation,
@@ -146,7 +89,7 @@ classes are never inherited.
 
 Objects communicate through hidden interfaces rather than implementation
 layouts. Interface and final implementation declarations share the corresponding
-backend header; the former 47 `*_impl.h` files are merged into those headers.
+backend header; `*_impl.h` declarations are merged into those headers.
 Classes defined entirely inside a `.cpp` remain local to that implementation.
 
 No additional type tag, query table, cached interface pointer, or second
@@ -170,315 +113,60 @@ through the owner interface where needed. Vulkan program cleanup reuses its
 existing native layout-device handle. This avoids both reference resurrection
 and duplicate owner caches.
 
-## Performance comparison
+## Shared backend capabilities
 
-`scripts/compare_rhi_offscreen.py` compares two separately preserved Release
-`demo_rhix_hello` executables. It alternates their order within paired runs,
-shuffles case order, records every sample, and reports geometric mean wall-time
-ratios with paired bootstrap intervals. Optional baseline-versus-baseline runs
-measure ordinary run-to-run variation. Zero control pairs can be used when
-reusing separately recorded controls for the identical baseline binary.
+Frontend and native interfaces evolve on independent single-inheritance chains.
+Only three common backend capabilities remain because they have shared consumers:
 
-The demo measures rendering after 60 warmup frames, limits the pipeline to three
-in-flight frames, and drains the GPU before ending its timing region. Process
-startup and shader creation are outside that region. Image readback comparison
-is performed separately and must not be enabled for timed runs.
+- `IBackendWindow::GetImGuiContext` serves the shared GLFW callbacks.
+- `IBackendSubmissionToken` publishes the result of the shared submission token.
+- `IBackendShaderBindingTable` exposes the regions of the shared SBT implementation.
 
-These are end-to-end frame-throughput measurements of the entire migration,
-including query reference operations and failure checks. They do not isolate
-GPU execution time or the cost of UUID comparisons. Results apply to the tested
-scenes, hardware, driver, and build configuration.
+Resource, queue, device and command-context consumers use their native backend
+interfaces. Same-device buffer use is a caller contract asserted only in Debug.
+Internal code stores the frontend/native interface it actually needs and reuses
+known interfaces rather than querying repeatedly. Resource retention uses
+canonical `IObject` identity so two facets of one object share one entry.
 
-### Current implementation stress measurement
+Window teardown unregisters callbacks, waits for the owning queue under its
+submission mutex, releases the mutex, releases presentation resources, and then
+destroys ImGui and the native window. Vulkan retains the separate acquisition
+fence waits; D3D12 releases its swapchain before the HWND. TLAS native storage is
+destroyed while its BLAS references still exist. No resource destructor adds a
+global device wait.
 
-Main `e233d265` was compared with RHI `3a1fbc02`, using the identical
-`demo/rhi_stress` source from `195fdf3c` in both builds. Both were built in the
-same Release build directory with MSVC 14.51.36231, Ninja, `/O2 /Ob2 /DNDEBUG`,
-and identical runtime DLLs. Hardware: native Windows, Core Ultra 7 270K Plus,
-RTX 5080, NVIDIA 617.42. Validation was disabled for timing.
+Magnify event storage and Cocoa monitor ownership belong to final backend window
+classes. Dispatch retains the frontend window throughout callbacks; native
+monitor teardown precedes GLFW destruction. Non-Apple windows report no native
+magnify support.
 
-The draw workload renders 4096 independently bound textured quads at 1280x720,
-with 16 submissions and 1 MiB of constant uploads per frame. The shader workload
-renders 256 quads at 3840x2160, with four submissions and 2048 dependent fragment
-iterations. Increasing iterations from 256 to 2048 increased wall time by
-7.10-7.36x in both revisions, confirming substantial shader load.
+## Regression coverage
 
-| Backend / workload | Main ms/frame | PR ms/frame | Paired time change (95% CI) |
-| --- | ---: | ---: | ---: |
-| Vulkan / draw | 0.867 | 5.561 | +541.55% [+536.59, +546.29] |
-| D3D12 / draw | 1.882 | 9.488 | +404.23% [+400.63, +407.69] |
-| Vulkan / shader | 8.546 | 8.546 | -0.01% [-0.03, +0.02] |
-| D3D12 / shader | 14.583 | 14.610 | +0.18% [-0.05, +0.43] |
+Keep tests of actual production behavior: UUID parsing and recursive queries,
+canonical identity and reference ownership, typed RHIX wrappers, descriptor
+versioning, resource lifetimes, GPU timeline/collector progress, swapchain texture
+rejection, and gesture callback lifetime/isolation. Metal regressions additionally
+cover frontend/native retention and active-render-pass validation.
 
-Each case has 16 paired comparisons in two independently randomized eight-pair
-blocks, plus four interleaved A/A controls. Execution order is balanced per block;
-120 warmup frames and three in-flight frame slots are used. Measured frame counts
-are 1600/600 for Vulkan draw/shader and 900/350 for D3D12 draw/shader. Full-length
-priming runs precede measurement. No samples were removed. Frame times are
-arithmetic means; changes use geometric paired ratios with 20,000 bootstrap
-resamples stratified by block. Raw data also contains Bonferroni-adjusted 98.75%
-intervals for the four wall-time cases. These quantify within-session sampling
-variation, not systematic hardware or scheduling effects.
+The former command-context mock suite copied Queue, Collector and Window
+algorithms into the test executable after their shared production bases were
+removed. Those tests no longer exercised native submission/retirement behavior
+and have been removed, along with their test-only interface hierarchy. Core
+selection tests retain a small frontend-only device stub and still exercise the
+production selection helper. Native tests remain; deterministic fault injection
+for blocked next-frame preparation and post-submit allocation failure is not
+claimed to be covered by them.
 
-The table restricts both binaries to the eight performance cores. The two blocks
-independently reproduce draw-time ratios of 6.412/6.419 for Vulkan and
-5.032/5.052 for D3D12. A/A draw variations range from -3.66% to +1.05% and
--4.37% to +1.87%, respectively, far smaller than the regressions. A separate
-normal-scheduling check (two balanced pairs per API, all 24 logical CPUs) also
-reproduces the regression: Vulkan 9.31-9.47x and D3D12 6.84-6.89x. Those extra
-pairs are a sensitivity check, not part of the table or its intervals. The exact
-slowdown is scheduling-dependent; the regression is not an affinity artifact.
+## Performance and deferred work
 
-Both shader cases fall within the predeclared +/-3% practical equivalence band,
-including adjusted intervals. This does not mean CPU overhead disappeared:
-recording/submission wall time rises from 0.191 to 0.504 ms/frame on Vulkan and
-0.405 to 0.984 ms/frame on D3D12, while GPU work dominates total throughput.
-This timer includes allocations, synchronization and driver stalls; it does not
-isolate UUID lookup, reference counting, or CPU cycles. A subsequent
-[profiling and controlled experiment](rhi-draw-profile.md) identifies runtime
-UUID string parsing as the dominant regression; forcing constant evaluation
-removes 96.2%/92.1% of the excess over main on Vulkan/D3D12. The registration
-macro now enforces compile-time parsing with a local constexpr result and retains
-its validity static_assert. The draw workload deliberately makes many separate
-RHI calls rather than using instancing, so these ratios are not universal costs
-for production scenes. No Linux or Metal performance claim is made.
-
-All four main/PR raw output comparisons are byte-identical (eight measured,
-two warmup frames); Windows Debug runs of both profiles and both APIs pass.
-See [benchmark usage](../demo/rhi_stress/README.md) and
-[complete samples, provenance and statistics](benchmarks/rhi-stress-query-interface.json).
-
-### Earlier implementation measurement, 2026-11-11
-
-The following data measures `8c166da4`, before the subsequent interface/state
-separation. It must not be treated as performance data for the current design.
-
-Baseline: main `e233d265`; candidate: `8c166da4`. Both use MSVC 14.51.36231,
-Ninja Release (`/O2 /Ob2 /DNDEBUG`) and identical runtime DLLs. Machine:
-Core Ultra 7 270K Plus, RTX 5080, driver 617.42, native Windows. Normal OS
-scheduling and driver clock management were retained; no concurrent builds or
-other test workloads were launched during sampling.
-
-Each case rendered 100,000 measured frames at 1280x720 per process, with 12
-paired runs in balanced randomized A/B order. Each executable first completed
-a full-length priming run for every case. Four preceding A/A pairs per case
-used the same preserved baseline executable, verified by SHA256. No samples
-from intermediate candidate builds were included. Every valid final sample is
-retained in [the raw results](benchmarks/rhi-query-interface.json).
-
-| Backend / scene | Main (us/frame) | QueryInterface (us/frame) | Paired time change (95% CI) | A/A pair range |
-| --- | ---: | ---: | ---: | ---: |
-| Vulkan / cube | 28.84 | 31.99 | +10.95% [+5.55, +16.43] | -4.37% to +11.06% |
-| Vulkan / texture | 30.28 | 29.50 | -2.55% [-4.44, -0.30] | -3.66% to +8.31% |
-| Vulkan / ray_query | 97.73 | 97.87 | +0.14% [+0.03, +0.27] | -0.12% to +0.94% |
-| D3D12 / cube | 34.53 | 39.80 | +15.24% [+14.25, +16.26] | -2.60% to -0.37% |
-| D3D12 / texture | 31.67 | 32.47 | +2.55% [+0.96, +4.07] | -2.35% to +7.02% |
-| D3D12 / ray_query | 83.00 | 83.59 | +0.71% [+0.39, +1.11] | -1.32% to +0.05% |
-
-Positive changes mean slower rendering. Frame times are arithmetic means;
-changes are geometric means of paired ratios, so they need not equal the ratio
-of those arithmetic means. Intervals use 10,000 paired bootstrap resamples,
-are per case, and are not adjusted for multiple comparisons. They quantify
-sampling variation within this experiment, not possible systematic clock,
-driver, scheduling, or session drift. A/A ranges are descriptive observations
-from four pairs, not confidence bounds or a proof of an overhead threshold.
-
-The clearest regression is D3D12 cube, with a consistent roughly 15% increase.
-Vulkan cube also regressed on average, but varied more between pairs. Small
-texture and ray-query changes should not be advertised as reliable gains or
-universal overhead estimates, given the observed control variation. In
-particular, the Vulkan texture result does not establish an optimization.
-This migration therefore cannot be described as performance-neutral.
-
-Correctness is checked separately using exact raw image comparisons; capture
-hashes are included with the samples. These measurements do not estimate
-Metal performance or Linux performance.
-
-## Internal interface access audit
-
-The follow-up audit covers RHI helpers, all three backends, and RHIX wrappers.
-Compared with `a0579640`, `QueryInterfacePtr` call sites fell from 364 to 222
-(142 removed). This is a source count, not a measured performance improvement.
-
-- WindowImGui and ImagePresenter retain the borrowed `IDevice` interface they
-  actually use. Download tokens retain `ISubmissionToken` directly.
-- Native queues, contexts, windows, ray-tracing programs, and Vulkan/Metal core
-  owners store the appropriate backend interface. Native queue lookup no longer
-  goes through a public queue and back. Device feature checks use physical-device
-  information already available to the backend.
-- Graphics recording uses the original frontend program/image arguments for
-  descriptions and validation. Vulkan framebuffer creation receives its extent;
-  image barriers obtain the native aspect mask directly. Buffer copies share a
-  private native-interface helper after entry-point validation, avoiding the
-  upload/download lease-to-frontend-to-native roundtrip.
-- Descriptor writes reuse interfaces/handles obtained during validation.
-  Collector iterations reuse their timeline query. Scratch pools track their
-  allocation capacity; temporal leases derive capacity from their bucket level.
-- GLFW registration receives both interfaces from the final window object.
-  Lookup retains the frontend interface for the callback, keeping both borrowed
-  facets alive without querying during input dispatch or introducing a cycle.
-- RHIX `Get()` recovers the exact interface subobject supplied to its typed
-  constructor. The container preserves that subobject rather than canonicalizing
-  it to `IObject`. This uses a defined static downcast along the same frontend
-  inheritance path, never a cast between frontend and backend facets. A test
-  covers a noncanonical buffer interface, copy/move, release, and explicit QI.
-
-Queries remain at capability boundaries: external resources/events need backend
-and ownership validation; heterogeneous binding references need the requested
-native resource capability; factories expose an owned frontend interface from
-native storage; submission completion and frontend observation use independent
-facets; resource retention requests canonical object identity. RHIX acceleration
-structure subtype access still queries because the assignable base wrapper can
-hold a different subtype. These are not replaced with assumed cross-facet casts.
-Caching raw acceleration-structure handles across recordings is also avoided:
-the backing allocation can change during build/compaction.
-
-## Validation
-
-The following checks apply to the implementation with parallel interface chains.
-The historical lightweight measurements apply only to the older implementation;
-the stress measurements explicitly identify the current RHI revision above.
-
-- Windows Release: 220 passed, two Debug-only queue-diagnostic tests skipped
-  (`--gtest_filter=-*RayTracing*`, `LONGMARCH_RHI_WINDOW_TESTS=1`).
-- Windows Debug: 48
-  interface, timeline, offscreen, window, ImGui, and scratch-pool tests passed.
-- Main versus final Release: ten raw color/depth outputs are byte-identical
-  across Vulkan/D3D12 cube, texture, ray_query, and raytracing demos (nine frames
-  per capture run). The full ray-tracing regression suite was not rerun because
-  of the previously identified DXR compressed-BLAS validation issue; both
-  backends' ray-tracing pipeline demos were explicitly exercised instead.
-- Meshy-PC-3090: GCC Release build passed; isolated regression runs yielded
-  105 passed, nine skipped, and no failures. Each test runs in a fresh process
-  to avoid the previously observed repeated-Vulkan-load/static-TLS problem.
-- Clang syntax checks passed for 88 RHI/test translation units. Six interface
-  tests executed successfully with both GCC and Clang with RTTI disabled.
-- Historical audit before the shared-backend cleanup: 93 UUID registrations were unique.
-  The current count and interface retention rationale are documented above.
-  RHI contains no `dynamic_cast` or virtual inheritance. All 22 former state
-  wrappers/accessors are absent. The audit checked 88 non-root named interfaces
-  plus four nested lease interfaces and 63 final `Object<...>` implementations.
-  All interface chains are single-inheritance and frontend/backend chains are
-  separate. Registered parent chains cover the full interface ancestry without duplicate
-  inheritance paths (except the intentional independent `IObject` roots). The IDs are
-  unchanged. Members and implementation methods belong to final classes.
-- At the initial migration stage, Metal had no macOS build/runtime validation.
-  The later macOS follow-up below supplies that coverage.
-
-
-## Semantic-audit corrections
-
-The audit against pre-refactor main `e233d265` identified changes beyond interface
-organization. This follow-up addresses them in Vulkan and D3D12:
-
-- Reject swapchain images in texture descriptor updates before any native writes.
-  Vulkan requires a non-null binding view; D3D12 rejects its swapchain-image facet.
-  A desktop regression covers both mixed image arrays and single-slot updates.
-- Key command resource retention by the canonical `QueryInterface<IObject>()`
-  identity, adopting the query's reference for new entries. Frontend and native
-  facets of one object therefore share one retention entry.
-- Keep native interface conversion available in Release, but restore the original
-  Debug-only command-state, thread and event-owner diagnostics. Buffer ownership
-  remains a Debug assertion, as requested separately.
-- Remove self-only native virtual hooks from command contexts, windows, acceleration
-  structures and binding versions, plus the unused D3D12 sampler descriptor getter.
-  Existing sparse-binding tests now check references and completeness, without
-  requiring the implementation-only `IsInitialized` hook.
-- Remove duplicated includes and identical debug/release query branches. Forward
-  consumed factory references with `std::move` instead of temporary retain/release.
-
-### Lifetime decisions
-
-Window teardown is explicitly phased: unregister callbacks; wait for the owning
-queue under its submission mutex; release that mutex; release the current image
-and native presentation resources; then destroy ImGui/presenter and the native
-window. ImGui shutdown must run while the HWND/GLFW window still exists because
-it restores platform hooks. Resource destruction and platform callbacks must not
-run while the queue mutex is held. Partial initialization tolerates a null queue.
-D3D12 explicitly releases attachments, back buffers and the swapchain before the
-HWND, rather than depending on member declaration order.
-
-Vulkan keeps the separate acquisition-fence waits in `DestroySwapchain`; queue
-idle alone is not used as a replacement for presentation-engine acquisition
-completion. The native destruction requirement is described by
-[vkDestroySwapchainKHR](https://docs.vulkan.org/refpages/latest/refpages/source/vkDestroySwapchainKHR.html).
-DXGI's swapchain is associated with its HWND; see
-[CreateSwapChainForHwnd](https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgifactory2-createswapchainforhwnd).
-No D3D11 `ClearState`/`Flush` workaround is introduced into D3D12.
-
-TLAS teardown intentionally retains the new dependency order: destroy TLAS native
-storage while its BLAS references still exist, then release those references.
-This is preferable to mechanically restoring the old base/derived destruction
-order. Download tokens have no reverse dependency between their submission result
-and staging lease; their independent release order needs no added synchronization.
-Children must still be released before their parent Device; no resource destructor
-adds a global device wait.
-
-Scratch capacity caching, pool-bucket capacity computation and explicit framebuffer
-extent are retained: their allocation/reset/caller invariants were checked. These
-are documented implementation refinements, not behavior-preserving renames.
-The shared SubmissionToken/SBT capability interfaces remain because they have real
-consumers; removing them would be a separate choice to couple consumers directly
-to their shared final implementations.
-
-Validation for this follow-up: MSVC Release/Debug build; Release 236 passed and two
-Debug-only cases skipped; Debug 245 passed. Both runs enabled desktop window tests
-and excluded only D3D12's two previously identified compacted-BLAS update cases.
-The final cleanup also passed the Debug full run. On Meshy-PC-3090, GCC and Clang
-each passed syntax checks for 91 translation units with RTTI disabled, using an
-isolated source snapshot. This follow-up does not claim new Linux GPU runtime coverage.
-
-
-## Metal audit follow-up
-
-Metal now builds after correcting native-interface declarations, vertex-buffer
-binding constants, frontend image identities and complete-type includes. It uses
-the same canonical resource-retention identity and phased window teardown as the
-other backends. Debug diagnostics retain their pre-refactor scope; Buffer ownership
-assertions and Scratch capacity caching remain intentional.
-
-Unused native hooks, initialization wrappers, duplicate state and empty translation
-units were removed. Graphics and compute pipelines share Metal shader compilation.
-Explicit ImGui/presentation commands now inspect the actual active render target,
-rather than an unused rendering-description member.
-
-Validation on macOS 27.0.1 / Apple M5:
-
-- Release and Debug builds of `test_rhi`, `demo_rhix_hello` and
-  `demo_rhi_multiqueue` pass.
-- With desktop tests enabled, the 142-case selection covers Metal parameterizations
-  and shared non-Vulkan-specific suites: Release 137 passed / 5 skipped;
-  Debug 139 passed / 3 skipped. Skips are test applicability, Debug-only diagnostics
-  and unavailable ray-tracing-pipeline capabilities. This is not a full Vulkan run.
-- New regressions verify canonical retention across frontend/native image uses and
-  rejection of explicit window drawing during an active render pass (Debug).
-- Release `demo_rhi_multiqueue metal event`: 0 incorrect frames out of 32 and
-  0 incorrect values out of 2,097,152.
-
-These checks validate functionality; they do not establish a performance comparison.
-
-
-## Window gestures after the demo migration
-
-The PR incorporates main `6fe5197c` (#117), including the unchanged RHI versions
-of 2048 and Game of Life. `IWindow::SupportsMagnifyGestures()` and
-`IWindow::MagnifyEvent()` are forwarded by rhix. Gesture event storage and the
-Cocoa monitor belong to each final native window implementation, not to a
-shared stateful Window base. Non-Apple windows report no native magnify support.
-
-GLFW dispatch retains the frontend window while invoking callbacks and uses the
-registered frontend interface directly. A callback may release the last external
-window reference without invalidating later callbacks in the same dispatch.
-Native monitor teardown occurs before GLFW window destruction. The existing
-Cocoa conversion test covers phase, scale, coordinates, window isolation and
-callback lifetime on macOS; the new backend-parameterized dispatch test covers
-retention, isolation and stale registry keys on Windows as well.
-
-Windows Release validation after integration: 238 passed, 2 Debug-only skips,
-with only the two previously documented D3D12 compacted-BLAS cases excluded.
-Both demos build on Windows. Native macOS gesture tests were not executed in
-this Windows follow-up; earlier Metal validation above predates this integration.
-
+`demo/rhi_stress` and the comparison scripts remain reusable tools for draw-heavy,
+shader-heavy and offscreen comparisons. Historical diagnosis and raw reports are
+preserved through fixed-revision links in [Issue #115](https://github.com/LazyJazzDev/LongMarch/issues/115).
+The runtime UUID parsing regression described there has been fixed by forcing
+constant evaluation; those pre-fix timings do not describe current performance.
+[Issue #116](https://github.com/LazyJazzDev/LongMarch/issues/116) tracks shared
+backend workflow extraction. Historical reports and per-run JSON dumps are not
+part of the maintained source tree.
 
 ## 2048 and Game of Life performance against updated main
 
@@ -513,13 +201,13 @@ Run-to-run variation is material for these sub-millisecond frames:
 
 | Demo | Backend | main run-mean range (ms) | PR run-mean range (ms) |
 | --- | --- | ---: | ---: |
-| 2048 | vulkan | 0.1092?0.1297 | 0.1051?0.1455 |
-| 2048 | d3d12 | 0.2237?0.2830 | 0.2272?0.2991 |
-| gol | vulkan | 0.3677?0.3833 | 0.3696?0.4244 |
-| gol | d3d12 | 0.4176?0.5137 | 0.4364?0.5295 |
+| 2048 | vulkan | 0.1092-0.1297 | 0.1051-0.1455 |
+| 2048 | d3d12 | 0.2237-0.2830 | 0.2272-0.2991 |
+| gol | vulkan | 0.3677-0.3833 | 0.3696-0.4244 |
+| gol | d3d12 | 0.4176-0.5137 | 0.4364-0.5295 |
 
-The measured aggregate frame overhead is about 2?5%; OnRender increases by
-roughly 4?7 microseconds. Paired rounds fluctuate in both directions, so these
+The measured aggregate frame overhead is about 2-5%; OnRender increases by
+roughly 4-7 microseconds. Paired rounds fluctuate in both directions, so these
 numbers do not establish a precise intrinsic QueryInterface overhead or a GPU
 regression. The unchanged shaders and matching outputs support functional
 parity, not a claim of identical GPU execution time.
@@ -530,7 +218,5 @@ producing a timing sample; that incomplete run is not counted. All 64 measured
 runs have exactly 4,000 samples. Temporary instrumentation and fixed-seed edits
 were removed after measurement; no benchmark behavior is added to the demos.
 
-Local reproducibility artifacts are under `out/query-interface/demo-comparison/`:
-`instrument.py`, `run-steady.py`, `metadata.json`, `build-comparison.json`,
-`final/samples.json`, per-run logs/PNGs, and `summary.json`. These temporary
-artifacts are not repository assets. macOS/Metal performance was not measured.
+The local logs remain under `out/query-interface/demo-comparison/`; they are
+not repository assets. macOS/Metal performance was not measured.

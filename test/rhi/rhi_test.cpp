@@ -1,22 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <array>
-#include <atomic>
-#include <list>
-#include <mutex>
-#include <thread>
 #include <type_traits>
 #include <utility>
 
-#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_shader.h"
-#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_queue.h"
 #include "grassland/rhi/rhix/rhix.h"
-#include "mock_backend_interfaces.h"
 
 namespace grassland::rhix {
 using namespace rhi;
@@ -47,35 +39,16 @@ struct Calls {
   bool device_destroyed_before_core{};
 };
 
-class TestDevice final : public backend::Object<rhi::IDevice, backend::ITestDevice> {
+class TestDevice final : public backend::Object<rhi::IDevice> {
  public:
-  bool WaitNativeEvents(const std::vector<Event> &, bool) const override {
-    ADD_FAILURE();
-    return false;
-  }
-
-  void InterruptCollector() override {
-    ADD_FAILURE();
-  }
-
-  void WaitForProgress(const std::vector<Event> &) override {
-    ADD_FAILURE();
-  }
-
-  TestDevice(PhysicalDevice info, rhi::ICore *core, Calls &calls) : calls_(calls) {
-    InitializeDevice(std::move(info), core, BACKEND_API_DEFAULT);
+  TestDevice(PhysicalDevice info, Calls &calls) : calls_(calls), info_(std::move(info)) {
   }
 
   ~TestDevice() override {
     ++calls_.device_destructions;
     calls_.device_destroyed_before_core = calls_.core_destructions == 0;
-    DestroyDevice();
   }
 
- private:
-  Calls &calls_;
-
- public:
   IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
       const BottomLevelAccelerationStructureDesc &) override {
     ReportError(-1, "Acceleration structures are unavailable for this backend.");
@@ -93,14 +66,6 @@ class TestDevice final : public backend::Object<rhi::IDevice, backend::ITestDevi
     return nullptr;
   }
 
- private:
-  void InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api) {
-    api_ = api;
-    core_ = core;
-    info_ = std::move(info);
-  }
-
- public:
   rhi::IImage *CreateImage(const ImageDesc &) override {
     ReportError(-1, "Independent images are not implemented for this backend.");
     return nullptr;
@@ -138,12 +103,6 @@ class TestDevice final : public backend::Object<rhi::IDevice, backend::ITestDevi
     return nullptr;
   }
 
- private:
-  void DestroyDevice() {
-    ShutdownQueues();
-  }
-
- public:
   std::string Name() const override {
     return info_.name;
   }
@@ -165,85 +124,20 @@ class TestDevice final : public backend::Object<rhi::IDevice, backend::ITestDevi
     return nullptr;
   }
 
-  rhi::IQueue *GetQueue(QueueType type) override {
-    if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
-      return nullptr;
-    return rhi::QueryInterfacePtr<rhi::IQueue>(queues_[type].Get()).Detach();
+  rhi::IQueue *GetQueue(QueueType) override {
+    ADD_FAILURE() << "Selection tests do not create queues.";
+    return nullptr;
   }
 
-  const PhysicalDevice &GetPhysicalDevice() const noexcept override {
-    return info_;
-  }
-
- private:
-  ICore *OwnerCore() const {
-    return core_;
-  }
-
-  void StartCollector() {
-    collector_ = std::thread([this] { Collect(); });
-  }
-
- public:
-  bool WaitEvents(const std::vector<Event> &events, bool wait_all) const override {
-    if (events.empty())
-      return wait_all;
-    std::vector<Event> unique;
-    unique.reserve(events.size());
-    for (const auto &event : events) {
-      auto timeline = rhi::QueryInterfacePtr<ITestTimeline>(event.timeline).Get();
-      if (!timeline || timeline->Owner() != this) {
-        ReportError(-1, "Host waits require timelines from this device.");
-        return false;
-      }
-      auto found = std::find_if(unique.begin(), unique.end(),
-                                [&](const Event &other) { return other.timeline == event.timeline; });
-      if (found == unique.end())
-        unique.push_back(event);
-      else
-        found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
-    }
-    return WaitNativeEvents(unique, wait_all);
+  bool WaitEvents(const std::vector<Event> &, bool) const override {
+    ADD_FAILURE() << "Selection tests do not submit GPU work.";
+    return false;
   }
 
  private:
-  void Collect() {
-    std::vector<Event> next;
-    next.reserve(queues_.size());
-    for (;;) {
-      next.clear();
-      bool empty = true;
-      for (const auto &queue : queues_) {
-        if (!queue)
-          continue;
-        uint64_t completed = 0;
-        const bool timeline_valid =
-            rhi::QueryInterfacePtr<rhi::ITimeline>(queue->GetTimeline())->GetCompletedValue(completed);
-        if (timeline_valid && completed != UINT64_MAX)
-          next.push_back({rhi::QueryInterfacePtr<rhi::ITimeline>(queue->GetTimeline()).Get(), completed + 1});
-        if (!queue->CollectCompleted(completed, timeline_valid))
-          empty = false;
-      }
-      if (stopping_ && empty)
-        return;
-      WaitForProgress(next);
-    }
-  }
-
-  void ShutdownQueues() {
-    if (!collector_.joinable())
-      return;
-    stopping_ = true;
-    InterruptCollector();
-    collector_.join();
-  }
-
-  std::array<ObjectPtr<ITestQueue>, 2> queues_{};
-  std::atomic<bool> stopping_{};
+  Calls &calls_;
   BackendAPI api_{};
-  ICore *core_{};
   PhysicalDevice info_{};
-  std::thread collector_{};
 };
 
 class TestCore final : public backend::Object<rhi::ICore> {
@@ -271,7 +165,7 @@ class TestCore final : public backend::Object<rhi::ICore> {
     ++calls_.creates;
     if (fail_)
       return {};
-    return new TestDevice(devices_.at(id), this, calls_);
+    return new TestDevice(devices_.at(id), calls_);
   }
 
  private:
