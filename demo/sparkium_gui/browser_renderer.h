@@ -71,7 +71,7 @@ class BrowserRenderer {
   std::condition_variable condition_;
   Request requested_;
   State state_;
-  std::array<Slot, 3> slots_;
+  std::array<Slot, sparkium::Film::kOutputSlots> slots_;
   std::shared_ptr<Frame> latest_;
   std::atomic<bool> stopping_{};
   std::thread thread_;

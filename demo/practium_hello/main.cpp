@@ -87,7 +87,11 @@ int main(int argc, char **argv) {
     }
     using Worker = sparkium::RenderWorker<PractiumDemoScene>;
     Worker worker([device = device.Get()] { return PractiumDemoScene::Create(device); }, settings, sample_limit, false,
-                  settings.ray_tracing ? 32 : 1);
+                  settings.ray_tracing ? 32 : 1,
+                  [interactive = !headless] {
+                    if (interactive)
+                      glfwPostEmptyEvent();
+                  });
     uint64_t requested_revision = 1;
     std::shared_ptr<const Worker::Frame> frame;
     std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> ui_pending;
@@ -162,7 +166,9 @@ int main(int argc, char **argv) {
         // Input keeps the UI responsive while an unchanged completed image
         // does not need another cross-queue presentation submission.
         if (!ui_redraw_frames && latest == frame) {
-          next_presentation = std::chrono::steady_clock::now() + presentation_interval;
+          // An idle poll must not postpone a newly completed image or input.
+          // Only an actual presentation advances the pacing deadline.
+          glfwWaitEventsTimeout(std::chrono::duration<double>(presentation_interval).count());
           continue;
         }
         frame = std::move(latest);

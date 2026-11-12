@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <thread>
 
@@ -25,7 +26,18 @@ TEST_P(RenderWorkerTest, SnapshotsAndHeldOutputsMatchSynchronousRendering) {
   auto direct = ThinLensScene::Create(device.Get(), 32, 24);
   ASSERT_TRUE(direct);
   ThinLensScene::Settings settings;
-  Worker worker([&] { return ThinLensScene::Create(device.Get(), 32, 24); }, settings, 8);
+  std::atomic<Worker *> callback_worker{};
+  std::atomic<uint32_t> notifications{};
+  Worker worker([&] { return ThinLensScene::Create(device.Get(), 32, 24); }, settings, 8, false, 4,
+                [&] {
+                  if (auto *observer = callback_worker.load()) {
+                    // Frontends may query published state while processing a wakeup.
+                    // Calling this under the worker mutex would deadlock.
+                    (void)observer->GetState();
+                    ++notifications;
+                  }
+                });
+  callback_worker.store(&worker);
   auto wait = [&](uint64_t revision, int samples = 8) -> std::shared_ptr<const Worker::Frame> {
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
     while (std::chrono::steady_clock::now() < deadline) {
@@ -95,6 +107,9 @@ TEST_P(RenderWorkerTest, SnapshotsAndHeldOutputsMatchSynchronousRendering) {
   auto third = wait(worker.Configure(settings, 4), 4);
   ASSERT_TRUE(third);
   const auto third_pixels = read(third->Image(), third->rendered.Get());
+  auto fourth = wait(worker.Configure(settings, 4), 4);
+  ASSERT_TRUE(fourth);
+  const auto fourth_pixels = read(fourth->Image(), fourth->rendered.Get());
   const auto blocked_revision = worker.Configure(settings, 16);
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
   while (std::chrono::steady_clock::now() < deadline && worker.GetState().completed_samples != 12)
@@ -104,14 +119,16 @@ TEST_P(RenderWorkerTest, SnapshotsAndHeldOutputsMatchSynchronousRendering) {
   EXPECT_EQ(worker.GetState().completed_samples, 12);
   // All output slots are held: accumulation progresses, but the final batch
   // waits for a reusable image instead of publishing an incomplete result.
-  EXPECT_EQ(worker.Latest(), third);
+  EXPECT_EQ(worker.Latest(), fourth);
   EXPECT_EQ(read(first->Image(), first->rendered.Get()), original);
   first.reset();
   auto final = wait(blocked_revision, 16);
   ASSERT_TRUE(final);
   EXPECT_EQ(read(final->Image(), final->rendered.Get()), reference(false, 16));
   worker.Stop();
+  EXPECT_GT(notifications.load(), 0u);
   EXPECT_EQ(read(third->Image(), third->rendered.Get()), third_pixels);
+  EXPECT_EQ(read(fourth->Image(), fourth->rendered.Get()), fourth_pixels);
   EXPECT_EQ(read(hdr->Image(), hdr->rendered.Get()), hdr_pixels);
 }
 

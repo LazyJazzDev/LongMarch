@@ -10,10 +10,12 @@ class Film : public Object {
  public:
   Film(Core *core, int width, int height);
 
+  // Two queued renders, the latest completed image and a UI-held image may coexist.
+  static constexpr std::size_t kOutputSlots = 4;
   class Output;
   // Called on the rendering thread. Hold the lease through all rendering and
   // presentation uses, including GPU completion. Null with a valid Film means
-  // all three outputs are leased; resource creation failure invalidates Core.
+  // all output slots are leased; resource creation failure invalidates Core.
   std::shared_ptr<const Output> AcquireOutput(bool linear_hdr = false);
 
   void Reset();
@@ -69,7 +71,7 @@ class Film : public Object {
   rhi::IImage *GetStencilImage() const;
 
  private:
-  std::array<std::shared_ptr<Output>, 3> outputs_;
+  std::array<std::shared_ptr<Output>, kOutputSlots> outputs_;
   Core *core_;
   bool reset_pending_{true};
   rhi::ObjPtr<rhi::IImage> accumulated_color_, accumulated_samples_;

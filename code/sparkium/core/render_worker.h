@@ -48,8 +48,10 @@ class RenderWorker {
                const Settings &settings,
                int sample_limit = 0,
                bool hdr = false,
-               int samples_per_batch = 4)
+               int samples_per_batch = 4,
+               std::function<void()> frame_ready = {})
       : factory_(std::move(factory)),
+        frame_ready_(std::move(frame_ready)),
         requested_{1, settings, sample_limit, hdr, samples_per_batch},
         thread_([this] {
           try {
@@ -162,13 +164,21 @@ class RenderWorker {
         Fail("GPU render submission failed");
         return false;
       }
-      std::lock_guard lock(mutex_);
-      if (batch.revision == requested_.revision) {
-        state_.completed_samples = batch.samples;
-        if (batch.frame && (!latest_ || batch.frame->sequence > latest_->sequence))
-          latest_ = batch.frame;
+      bool published = false;
+      {
+        std::lock_guard lock(mutex_);
+        if (batch.revision == requested_.revision) {
+          state_.completed_samples = batch.samples;
+          if (batch.frame && (!latest_ || batch.frame->sequence > latest_->sequence)) {
+            latest_ = batch.frame;
+            published = true;
+          }
+        }
       }
       condition_.notify_all();
+      // Frontend notification runs on the worker, outside its state lock.
+      if (published && frame_ready_)
+        frame_ready_();
       return true;
     };
     while (!stopping_.load()) {
@@ -286,11 +296,12 @@ class RenderWorker {
   }
 
   Factory factory_;
+  std::function<void()> frame_ready_;
   mutable std::mutex mutex_;
   std::condition_variable condition_;
   Request requested_;
   State state_;
-  std::array<Slot, 3> slots_;
+  std::array<Slot, Film::kOutputSlots> slots_;
   std::shared_ptr<Frame> latest_;
   std::atomic<bool> stopping_{};
   std::thread thread_;

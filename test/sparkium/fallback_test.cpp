@@ -427,7 +427,8 @@ TEST_F(SoftwareBVHTest, FilmOutputLeasesPreserveCompletedImages) {
   auto first = film->AcquireOutput();
   auto second = film->AcquireOutput();
   auto third = film->AcquireOutput();
-  ASSERT_TRUE(first && second && third);
+  auto fourth = film->AcquireOutput();
+  ASSERT_TRUE(first && second && third && fourth);
   EXPECT_FALSE(film->AcquireOutput());
   EXPECT_TRUE(core->IsValid());
   auto submit = [&](const std::shared_ptr<const sparkium::Film::Output> &output, bool hdr) {
