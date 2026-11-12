@@ -163,7 +163,9 @@ The synthetic stress demo and its paired-measurement and summary scripts have
 been removed. Historical diagnosis, benchmark source and raw reports remain
 available through Git history and fixed-revision links in
 [Issue #115](https://github.com/LazyJazzDev/LongMarch/issues/115).
-The independent RHIX offscreen comparison script remains available.
+The one-off RHIX offscreen comparison script is also removed from the source
+tree. Future diagnostic runners and raw reports belong in ignored temporary
+directories such as `out/`.
 The runtime UUID parsing regression described there has been fixed by forcing
 constant evaluation; those pre-fix timings do not describe current performance.
 [Issue #116](https://github.com/LazyJazzDev/LongMarch/issues/116) tracks shared
