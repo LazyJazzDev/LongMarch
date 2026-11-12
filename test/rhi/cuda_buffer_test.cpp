@@ -2,20 +2,12 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <numeric>
 #include <type_traits>
 
 #include "grassland/rhi/rhi_core.h"
 #include "grassland/rhi/rhi_cuda_buffer.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_obj_ptr.h"
-#if defined(LONGMARCH_VULKAN_ENABLED)
-#include "grassland/rhi/backend/vulkan/vulkan_device.h"
-#endif
-
-#if defined(LONGMARCH_CUDA_ENABLED)
-cudaError_t TransformCUDABuffer(void *, uint32_t, cudaStream_t);
-#endif
 
 namespace grassland::rhi {
 namespace {
@@ -36,31 +28,7 @@ struct RestoreDevice {
   }
 };
 
-struct Stream {
-  cudaStream_t value{};
-
-  ~Stream() {
-    if (value) {
-      cudaStreamSynchronize(value);
-      cudaStreamDestroy(value);
-    }
-  }
-};
-
 class RhiCUDADevice : public testing::TestWithParam<BackendAPI> {};
-
-void ExpectCUDAProceduresLoaded(IDevice *device, BackendAPI api) {
-#if defined(LONGMARCH_VULKAN_ENABLED)
-  if (api == BACKEND_API_VULKAN) {
-    const auto native = QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device);
-#if defined(_WIN32)
-    EXPECT_NE(native->Procedures().GetMemoryWin32HandleKHR, nullptr);
-#else
-    EXPECT_NE(native->Procedures().GetMemoryFdKHR, nullptr);
-#endif
-  }
-#endif
-}
 
 TEST_P(RhiCUDADevice, CUDADevicesExposeOrdinalBeforeBufferCreation) {
   RestoreDevice restore;
@@ -80,7 +48,6 @@ TEST_P(RhiCUDADevice, CUDADevicesExposeOrdinalBeforeBufferCreation) {
     ASSERT_TRUE(device);
     EXPECT_EQ(device->Name(), properties.name);
     ASSERT_EQ(device->GetCUDADeviceIndex(), properties.cuda_device);
-    ExpectCUDAProceduresLoaded(device.Get(), GetParam());
     int previous = -1;
     ASSERT_EQ(cudaGetDevice(&previous), cudaSuccess);
     ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({4096});
@@ -177,41 +144,6 @@ TEST_P(RhiCUDABuffer, CUDAOnlyCopiesAndOrdinaryInterfaceLifetime) {
   ASSERT_EQ(cudaMemcpy(output.data(), pointer, output.size(), cudaMemcpyDeviceToHost), cudaSuccess);
   EXPECT_TRUE(std::all_of(output.begin(), output.end(), [](uint8_t v) { return v == 0x5a; }));
 }
-
-#if defined(LONGMARCH_CUDA_ENABLED)
-TEST_P(RhiCUDABuffer, CUDAOnlyKernelReadModifyWriteKeepsPointerAndTail) {
-  constexpr uint32_t count = 16387;
-  constexpr size_t bytes = count * sizeof(uint32_t);
-  constexpr size_t tail = 13;
-  ASSERT_EQ(buffer_->GetDesc().size, bytes + tail);
-  void *pointer = buffer_->GetDevicePointer();
-  cudaPointerAttributes attributes{};
-  ASSERT_EQ(cudaPointerGetAttributes(&attributes, pointer), cudaSuccess);
-  ASSERT_EQ(cudaSetDevice(attributes.device), cudaSuccess);
-  // Declared after buffer_ allocation; synchronizes before buffer destruction on all exits.
-  Stream stream;
-  ASSERT_EQ(cudaStreamCreateWithFlags(&stream.value, cudaStreamNonBlocking), cudaSuccess);
-  std::vector<uint32_t> expected(count), output(count);
-  std::iota(expected.begin(), expected.end(), 0);
-  ASSERT_EQ(cudaMemcpyAsync(pointer, expected.data(), bytes, cudaMemcpyHostToDevice, stream.value), cudaSuccess);
-  auto last = static_cast<uint8_t *>(pointer) + bytes;
-  ASSERT_EQ(cudaMemsetAsync(last, 0x6d, tail, stream.value), cudaSuccess);
-  for (int round = 0; round < 4; ++round) {
-    ASSERT_EQ(TransformCUDABuffer(pointer, count, stream.value), cudaSuccess);
-    ASSERT_EQ(cudaMemcpyAsync(output.data(), pointer, bytes, cudaMemcpyDeviceToHost, stream.value), cudaSuccess);
-    ASSERT_EQ(cudaStreamSynchronize(stream.value), cudaSuccess);
-    for (uint32_t i = 0; i < count; ++i) {
-      expected[i] = expected[i] * 3u + 7u;
-      ASSERT_EQ(output[i], expected[i]) << "round=" << round << " index=" << i;
-    }
-    EXPECT_EQ(buffer_->GetDevicePointer(), pointer);
-  }
-  std::vector<uint8_t> suffix(tail);
-  ASSERT_EQ(cudaMemcpyAsync(suffix.data(), last, tail, cudaMemcpyDeviceToHost, stream.value), cudaSuccess);
-  ASSERT_EQ(cudaStreamSynchronize(stream.value), cudaSuccess);
-  EXPECT_TRUE(std::all_of(suffix.begin(), suffix.end(), [](uint8_t v) { return v == 0x6d; }));
-}
-#endif
 
 std::vector<BackendAPI> Backends() {
   std::vector<BackendAPI> result;

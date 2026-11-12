@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <thread>
 
@@ -172,7 +173,9 @@ TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
   ObjPtr<ICUDATimeline> timeline = device->CreateCUDATimeline();
   ASSERT_TRUE(timeline);
   constexpr uint32_t count = 16387;
-  ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({count * sizeof(uint32_t)});
+  constexpr uint64_t bytes = count * sizeof(uint32_t);
+  const std::array<uint8_t, 13> tail{0x6d, 0x1b, 0xa5, 0x37, 0x80, 0xff, 0, 0x19, 0x42, 0xde, 0x73, 0x91, 0x2c};
+  ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({bytes + tail.size()});
   ASSERT_TRUE(buffer);
   auto pointer = buffer->GetDevicePointer();
   CUDAStream stream;
@@ -183,7 +186,9 @@ TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
       expected[i] = i + round * count;
     ObjPtr<IQueue> queue = device->GetQueue(round % 2 ? QUEUE_TYPE_ASSIST : QUEUE_TYPE_MAIN);
     ObjPtr<ICommandContext> upload = queue->CreateCommandContext();
-    ASSERT_TRUE(upload->CmdUploadBuffer(buffer.Get(), 0, expected.data(), count * sizeof(uint32_t)));
+    SCOPED_TRACE(round);
+    ASSERT_TRUE(upload->CmdUploadBuffer(buffer.Get(), 0, expected.data(), bytes));
+    ASSERT_TRUE(upload->CmdUploadBuffer(buffer.Get(), bytes, tail.data(), tail.size()));
     ObjPtr<ISubmissionToken> uploaded = upload->Submit();
     ASSERT_TRUE(uploaded);
     ASSERT_TRUE(timeline->Wait(stream.stream, {uploaded->GetEvent()}));
@@ -192,7 +197,8 @@ TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
     ASSERT_NE(ready.timeline, nullptr);
     ObjPtr<ICommandContext> readback = queue->CreateCommandContext();
     ObjPtr<IDownloadToken> downloaded = readback->CmdDownloadBuffer(buffer.Get(), 0, count * sizeof(uint32_t));
-    ASSERT_TRUE(downloaded);
+    ObjPtr<IDownloadToken> downloaded_tail = readback->CmdDownloadBuffer(buffer.Get(), bytes, tail.size());
+    ASSERT_TRUE(downloaded && downloaded_tail);
     ObjPtr<ISubmissionToken> done = readback->Submit({{ready}});
     ASSERT_TRUE(done);
     ASSERT_TRUE(downloaded->WaitHost());
@@ -200,6 +206,10 @@ TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
     for (auto &value : expected)
       value = value * 3 + 7;
     EXPECT_EQ(actual, expected);
+    std::array<uint8_t, 13> actual_tail{};
+    ASSERT_TRUE(downloaded_tail->WaitHost());
+    ASSERT_TRUE(downloaded_tail->CopyTo(actual_tail.data(), actual_tail.size()));
+    EXPECT_EQ(actual_tail, tail);
     EXPECT_EQ(buffer->GetDevicePointer(), pointer);
   }
 }
@@ -261,6 +271,48 @@ TEST_P(RhiCUDATimeline, WaitsForAllEventsAndCoalescesDuplicateTimelines) {
   ASSERT_TRUE(waited);
   ASSERT_TRUE(submitted);
   EXPECT_TRUE(submitted->WaitHost());
+
+  // Isolate duplicate values: no unrelated pending event may mask waiting for
+  // the smaller value. Exercise both input orders with the lower value complete.
+  for (bool higher_first : {false, true}) {
+    SCOPED_TRACE(higher_first);
+    const uint64_t lower_value = higher_first ? 5 : 3;
+    auto lower = first->Signal(a.stream, lower_value);
+    ASSERT_NE(lower.timeline, nullptr);
+    ASSERT_EQ(cudaStreamSynchronize(a.stream), cudaSuccess);
+    ASSERT_TRUE(first->WaitHost(lower_value));
+    uint64_t completed = 0;
+    ASSERT_TRUE(first->GetCompletedValue(completed));
+    ASSERT_EQ(completed, lower_value);
+    Gate higher_gate;
+    ASSERT_EQ(cudaLaunchHostFunc(a.stream, Gate::Wait, &higher_gate), cudaSuccess);
+    auto higher = first->Signal(a.stream, lower_value + 1);
+    const bool waited_for_maximum =
+        higher.timeline && joined->Wait(consumer.stream, higher_first ? std::vector<Event>{higher, lower}
+                                                                      : std::vector<Event>{lower, higher});
+    cudaError_t status = cudaSuccess;
+    if (waited_for_maximum) {
+      // Give an incorrectly satisfied wait time to finish rather than accepting
+      // a transient NotReady immediately after enqueueing.
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+      do {
+        status = cudaStreamQuery(consumer.stream);
+        if (status != cudaErrorNotReady)
+          break;
+        std::this_thread::yield();
+      } while (std::chrono::steady_clock::now() < deadline);
+    }
+    EXPECT_TRUE(first->GetCompletedValue(completed));
+    EXPECT_EQ(completed, lower_value);
+    higher_gate.open = true;
+    EXPECT_EQ(cudaStreamSynchronize(a.stream), cudaSuccess);
+    EXPECT_EQ(cudaStreamSynchronize(consumer.stream), cudaSuccess);
+    ASSERT_TRUE(waited_for_maximum);
+    EXPECT_EQ(status, cudaErrorNotReady);
+    ASSERT_TRUE(first->WaitHost(lower_value + 1));
+    ASSERT_TRUE(first->GetCompletedValue(completed));
+    EXPECT_EQ(completed, lower_value + 1);
+  }
 }
 
 TEST_P(RhiCUDATimeline, NonCUDADevicesRejectTimelineCreation) {
