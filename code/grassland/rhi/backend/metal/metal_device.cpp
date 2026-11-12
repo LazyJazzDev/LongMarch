@@ -39,7 +39,7 @@ rhi::IDevice *MetalDeviceImpl::Create(PhysicalDevice info, IMetalCore *core, NS:
   descriptor->setRetainedReferences(true);
   descriptor->setErrorOptions(core->DebugEnabled() ? MTL::CommandBufferErrorOptionEncoderExecutionStatus
                                                    : MTL::CommandBufferErrorOptionNone);
-  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST, QUEUE_TYPE_COMPUTE}) {
     object->queues_[type] = ObjectPtr<IMetalQueue>::Adopt(IMetalQueue::Create(object.get(), type, descriptor.get()));
     if (!object->queues_[type])
       return nullptr;
@@ -160,13 +160,13 @@ bool MetalDeviceImpl::SupportGeometryShader() const {
 }
 
 IMetalQueue *MetalDeviceImpl::GetNativeQueue(QueueType type) const {
-  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST && type != QUEUE_TYPE_COMPUTE)
     return nullptr;
   return queues_[type].Get();
 }
 
 rhi::IQueue *MetalDeviceImpl::GetQueue(QueueType type) {
-  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST && type != QUEUE_TYPE_COMPUTE)
     return nullptr;
   return rhi::QueryInterfacePtr<IQueue>(queues_[type].Get()).Detach();
 }

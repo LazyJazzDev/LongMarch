@@ -41,7 +41,9 @@ class ID3D12Device : public IObject {
   virtual  // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
       // The pool grows on demand, independently of swapchain image count.
       bool
-      AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator, ComPtr<ID3D12GraphicsCommandList> &list) = 0;
+      AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
+                              ComPtr<ID3D12GraphicsCommandList> &list,
+                              D3D12_COMMAND_LIST_TYPE type) = 0;
   virtual void RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator,
                                        ComPtr<ID3D12GraphicsCommandList> list) = 0;
 };
@@ -89,7 +91,9 @@ class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
   // The pool grows on demand, independently of swapchain image count.
-  bool AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator, ComPtr<ID3D12GraphicsCommandList> &list);
+  bool AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
+                               ComPtr<ID3D12GraphicsCommandList> &list,
+                               D3D12_COMMAND_LIST_TYPE type);
   void RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator, ComPtr<ID3D12GraphicsCommandList> list);
 
  private:
@@ -101,7 +105,8 @@ class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
   D3D12TemporalBufferPool download_pool_;
   D3D12ScratchPool scratch_pool_;
   std::mutex command_pool_mutex_;
-  std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>>> command_pool_;
+  std::array<std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>>>, 3>
+      command_pool_;
   ComPtr<::ID3D12Device> device_;
   ComPtr<ID3D12InfoQueue1> debug_messages_;
   DWORD debug_callback_cookie_{};
@@ -113,8 +118,8 @@ class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
   ComPtr<IDXGIFactory4> factory_;
   bool tearing_{};
   HANDLE collector_shutdown_{};
-  std::array<HANDLE, 2> progress_events_{};
-  std::array<uint64_t, 2> progress_values_{};
+  std::array<HANDLE, 3> progress_events_{};
+  std::array<uint64_t, 3> progress_values_{};
 
   void InitializeDevice(PhysicalDevice info, ICore *core, BackendAPI api = BACKEND_API_DEFAULT);
 
@@ -151,7 +156,7 @@ class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
 
   void ShutdownQueues();
 
-  std::array<ObjectPtr<ID3D12Queue>, 2> queues_{};
+  std::array<ObjectPtr<ID3D12Queue>, 3> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
   ICore *core_{};

@@ -53,8 +53,8 @@ void VulkanDeviceImpl::InterruptCollector() {
 }
 
 void VulkanDeviceImpl::WaitForProgress(const std::vector<Event> &next) {
-  std::array<VkSemaphore, 3> semaphores{};
-  std::array<uint64_t, 3> values{};
+  std::array<VkSemaphore, 4> semaphores{};
+  std::array<uint64_t, 4> values{};
   for (size_t index = 0; index < next.size(); ++index) {
     semaphores[index] = rhi::QueryInterfacePtr<IVulkanTimeline>(next[index].timeline).Get()->NativeSemaphore();
     values[index] = next[index].value;
@@ -167,23 +167,21 @@ rhi::IDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevic
     const auto required = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
     if (!families[i].queueCount || (families[i].queueFlags & required) != required)
       continue;
-    if (queue_family == UINT32_MAX)
+    if (queue_family == UINT32_MAX || families[i].queueCount > families[queue_family].queueCount)
       queue_family = i;
-    if (families[i].queueCount >= 2) {
-      queue_family = i;
+    if (families[i].queueCount >= 3)
       break;
-    }
   }
   if (queue_family == UINT32_MAX) {
     ReportError(-1, "No Vulkan graphics and compute queue is available.");
     return {};
   }
-  // Both roles share a family, so ordinary resources need no ownership transfers.
+  // All roles share a family, so ordinary resources need no ownership transfers.
   // Do not create unused queues in unrelated families.
-  const float priorities[] = {1.0f, 1.0f};
+  const float priorities[] = {1.0f, 1.0f, 1.0f};
   VkDeviceQueueCreateInfo queue_create{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
   queue_create.queueFamilyIndex = queue_family;
-  queue_create.queueCount = std::min(2u, families[queue_family].queueCount);
+  queue_create.queueCount = std::min(3u, families[queue_family].queueCount);
   queue_create.pQueuePriorities = priorities;
   VkDeviceCreateInfo create{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
   create.pNext = &enabled.Features();
@@ -216,14 +214,16 @@ rhi::IDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevic
   device->physical_ = physical_device;
   device->queue_family_index_ = queue_family;
   device->swapchain_enabled_ = swapchain;
-  auto main_mutex = std::make_shared<std::mutex>();
-  for (uint32_t index = 0; index < 2; ++index) {
-    const auto native_index = index < queue_create.queueCount ? index : 0u;
+  std::array<std::shared_ptr<std::mutex>, 3> native_mutexes;
+  for (uint32_t index = 0; index < device->queues_.size(); ++index) {
+    const auto native_index = std::min(index, queue_create.queueCount - 1);
     VkQueue queue;
     vkGetDeviceQueue(device->device_, queue_family, native_index, &queue);
-    auto mutex = native_index == 0 ? main_mutex : std::make_shared<std::mutex>();
-    device->queues_[index] = ObjectPtr<IVulkanQueue>::Adopt(
-        IVulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue, std::move(mutex)));
+    auto &mutex = native_mutexes[native_index];
+    if (!mutex)
+      mutex = std::make_shared<std::mutex>();
+    device->queues_[index] =
+        ObjectPtr<IVulkanQueue>::Adopt(IVulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue, mutex));
     if (!device->queues_[index])
       return nullptr;
   }
@@ -382,13 +382,13 @@ bool VulkanDeviceImpl::SupportGeometryShader() const {
 }
 
 IVulkanQueue *VulkanDeviceImpl::GetNativeQueue(QueueType type) const {
-  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST && type != QUEUE_TYPE_COMPUTE)
     return nullptr;
   return queues_[type].Get();
 }
 
 rhi::IQueue *VulkanDeviceImpl::GetQueue(QueueType type) {
-  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST && type != QUEUE_TYPE_COMPUTE)
     return nullptr;
   return rhi::QueryInterfacePtr<IQueue>(queues_[type].Get()).Detach();
 }

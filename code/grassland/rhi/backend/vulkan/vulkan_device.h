@@ -150,7 +150,7 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
 
   void ShutdownQueues();
 
-  std::array<ObjectPtr<IVulkanQueue>, 2> queues_{};
+  std::array<ObjectPtr<IVulkanQueue>, 3> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
   IVulkanCore *core_{};

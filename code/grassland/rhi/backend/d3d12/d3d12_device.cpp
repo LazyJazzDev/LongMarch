@@ -57,7 +57,7 @@ void D3D12DeviceImpl::InterruptCollector() {
 }
 
 void D3D12DeviceImpl::WaitForProgress(const std::vector<Event> &next) {
-  std::array<HANDLE, 3> handles{collector_shutdown_};
+  std::array<HANDLE, 4> handles{collector_shutdown_};
   DWORD count = 1;
   for (const auto &event : next) {
     auto timeline = rhi::QueryInterfacePtr<ID3D12Timeline>(event.timeline);
@@ -80,12 +80,14 @@ void D3D12DeviceImpl::WaitForProgress(const std::vector<Event> &next) {
 }
 
 bool D3D12DeviceImpl::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
-                                              ComPtr<ID3D12GraphicsCommandList> &list) {
+                                              ComPtr<ID3D12GraphicsCommandList> &list,
+                                              D3D12_COMMAND_LIST_TYPE type) {
   {
     std::lock_guard<std::mutex> lock(command_pool_mutex_);
-    if (!command_pool_.empty()) {
-      std::tie(allocator, list) = std::move(command_pool_.back());
-      command_pool_.pop_back();
+    auto &pool = command_pool_[type];
+    if (!pool.empty()) {
+      std::tie(allocator, list) = std::move(pool.back());
+      pool.pop_back();
     }
   }
   if (list) {
@@ -93,19 +95,17 @@ bool D3D12DeviceImpl::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &al
       return false;
     return Check(list->Reset(allocator.Get(), nullptr), "Reset command list");
   }
-  if (!Check(device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator)),
-             "CreateCommandAllocator"))
+  if (!Check(device_->CreateCommandAllocator(type, IID_PPV_ARGS(&allocator)), "CreateCommandAllocator"))
     return false;
-  return Check(
-      device_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr, IID_PPV_ARGS(&list)),
-      "CreateCommandList");
+  return Check(device_->CreateCommandList(0, type, allocator.Get(), nullptr, IID_PPV_ARGS(&list)), "CreateCommandList");
 }
 
 void D3D12DeviceImpl::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator,
                                               ComPtr<ID3D12GraphicsCommandList> list) {
   try {
     std::lock_guard<std::mutex> lock(command_pool_mutex_);
-    command_pool_.emplace_back(std::move(allocator), std::move(list));
+    auto type = list->GetType();
+    command_pool_[type].emplace_back(std::move(allocator), std::move(list));
     return;
   } catch (const std::bad_alloc &) {
     // Recycling is optional: release the idle native objects if the pool cannot grow.
@@ -148,7 +148,7 @@ rhi::IDevice *D3D12DeviceImpl::Create(PhysicalDevice info, ICore *core, ComPtr<:
   if (SUCCEEDED(object->factory_.As(&factory5)) &&
       SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
     object->tearing_ = tearing;
-  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST, QUEUE_TYPE_COMPUTE}) {
     object->queues_[type] = ObjectPtr<ID3D12Queue>::Adopt(ID3D12Queue::Create(object.get(), type));
     if (!object->queues_[type])
       return nullptr;
@@ -228,7 +228,8 @@ D3D12DeviceImpl::~D3D12DeviceImpl() {
   upload_pool_.Clear();
   download_pool_.Clear();
   scratch_pool_.Clear();
-  command_pool_.clear();
+  for (auto &pool : command_pool_)
+    pool.clear();
   for (auto &queue : queues_)
     queue.Reset();
   for (auto event : progress_events_)
@@ -347,13 +348,13 @@ bool D3D12DeviceImpl::SupportGeometryShader() const {
 }
 
 ID3D12Queue *D3D12DeviceImpl::GetNativeQueue(QueueType type) const {
-  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST && type != QUEUE_TYPE_COMPUTE)
     return nullptr;
   return queues_[type].Get();
 }
 
 rhi::IQueue *D3D12DeviceImpl::GetQueue(QueueType type) {
-  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST && type != QUEUE_TYPE_COMPUTE)
     return nullptr;
   return rhi::QueryInterfacePtr<IQueue>(queues_[type].Get()).Detach();
 }

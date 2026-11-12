@@ -239,6 +239,8 @@ std::string to_string(QueueType value) {
       return "QUEUE_TYPE_MAIN";
     case QUEUE_TYPE_ASSIST:
       return "QUEUE_TYPE_ASSIST";
+    case QUEUE_TYPE_COMPUTE:
+      return "QUEUE_TYPE_COMPUTE";
     default:
 #if !defined(NDEBUG)
       ReportError(-1, "Unknown QueueType value.");
@@ -253,6 +255,8 @@ std::string QueueTypeName(QueueType value) {
       return "Main";
     case QUEUE_TYPE_ASSIST:
       return "Assist";
+    case QUEUE_TYPE_COMPUTE:
+      return "Compute";
     default:
 #if !defined(NDEBUG)
       ReportError(-1, "Unknown QueueType value.");

@@ -44,6 +44,7 @@ MTL::ClearColor NativeClearColor(ImageFormat format, const ClearColorValue &valu
 }  // namespace
 
 MetalCommandContextImpl::MetalCommandContextImpl(IMetalQueue *queue) : device_(queue->Owner()), queue_(queue) {
+  compute_queue_ = rhi::QueryInterfacePtr<rhi::IQueue>(queue)->GetType() == QUEUE_TYPE_COMPUTE;
 }
 
 ICommandContext *MetalCommandContextImpl::Create(IMetalQueue *queue) {
@@ -57,6 +58,14 @@ ICommandContext *MetalCommandContextImpl::Create(IMetalQueue *queue) {
     return nullptr;
   }
   return object.release();
+}
+
+bool MetalCommandContextImpl::RequireGraphicsQueue() {
+  if (!compute_queue_)
+    return true;
+  recording_failed_ = true;
+  ReportError(-1, "Graphics commands and depth clears are unavailable on a Compute queue.");
+  return false;
 }
 
 bool MetalCommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
@@ -82,6 +91,8 @@ bool MetalCommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue
     return false;
   }
   const auto format = image->GetDesc().format;
+  if (IsDepthFormat(format) && !RequireGraphicsQueue())
+    return false;
   if (IsDepthFormat(format)) {
     auto depth = pass->depthAttachment();
     depth->setTexture(native->NativeImage());
@@ -114,6 +125,8 @@ bool MetalCommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue
 }
 
 bool MetalCommandContextImpl::CmdPresent(rhi::IWindow *window) {
+  if (!RequireGraphicsQueue())
+    return false;
   const auto target = rhi::QueryInterfacePtr<IMetalWindow>(window).Get();
 #if !defined(NDEBUG)
   if (render_target_) {
@@ -403,6 +416,8 @@ bool MetalCommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 }
 
 bool MetalCommandContextImpl::CmdBindProgram(IProgram *program) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IMetalProgram>(program).Get();
 #if !defined(NDEBUG)
   if (!native || native->Owner() != device_ || sealed_) {
@@ -464,6 +479,8 @@ void MetalCommandContextImpl::ApplyScissor() {
 }
 
 bool MetalCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
+  if (!RequireGraphicsQueue())
+    return false;
   if (sealed_ || encoder_ || info.color_attachments.size() > 8 ||
       (info.color_attachments.empty() && !info.depth_stencil.image)) {
     recording_failed_ = true;
@@ -552,6 +569,8 @@ bool MetalCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
 }
 
 bool MetalCommandContextImpl::CmdEndRendering() {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || !render_target_) {
     recording_failed_ = true;
@@ -568,6 +587,8 @@ bool MetalCommandContextImpl::CmdEndRendering() {
 }
 
 bool MetalCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
 #if !defined(NDEBUG)
   assert(!native || native->Owner() == device_);
@@ -589,6 +610,8 @@ bool MetalCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buf
 }
 
 bool MetalCommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
 #if !defined(NDEBUG)
   assert(!native || native->Owner() == device_);
@@ -611,6 +634,8 @@ bool MetalCommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat fo
 }
 
 bool MetalCommandContextImpl::CmdSetViewport(const Viewport &viewport) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || viewport.width <= 0 || viewport.height <= 0) {
     recording_failed_ = true;
@@ -628,6 +653,8 @@ bool MetalCommandContextImpl::CmdSetViewport(const Viewport &viewport) {
 }
 
 bool MetalCommandContextImpl::CmdSetScissor(const Scissor &scissor) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || !scissor.width || !scissor.height || scissor.x < 0 || scissor.y < 0) {
     recording_failed_ = true;
@@ -685,6 +712,8 @@ bool MetalCommandContextImpl::CmdDraw(uint32_t vertex_count,
                                       uint32_t instance_count,
                                       uint32_t first_vertex,
                                       uint32_t first_instance) {
+  if (!RequireGraphicsQueue())
+    return false;
   if (!ValidateDraw(false))
     return false;
   encoder_->drawPrimitives(NativePrimitiveTopology(program_->GetDesc().topology), first_vertex, vertex_count,
@@ -697,6 +726,8 @@ bool MetalCommandContextImpl::CmdDrawIndexed(uint32_t index_count,
                                              uint32_t first_index,
                                              int32_t vertex_offset,
                                              uint32_t first_instance) {
+  if (!RequireGraphicsQueue())
+    return false;
   if (!ValidateDraw(true))
     return false;
   encoder_->drawIndexedPrimitives(
@@ -792,6 +823,8 @@ ICommandContext *CreateMetalCommandContext(IMetalQueue *queue) {
 }
 
 bool MetalCommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IMetalWindow>(window).Get();
   auto image = rhi::QueryInterfacePtr<IMetalImage>(target).Get();
 #if !defined(NDEBUG)
@@ -820,6 +853,8 @@ bool MetalCommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
 }
 
 bool MetalCommandContextImpl::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IMetalWindow>(window).Get();
   auto image = rhi::QueryInterfacePtr<IMetalImage>(frame_img).Get();
 #if !defined(NDEBUG)

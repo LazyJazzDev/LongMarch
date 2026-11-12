@@ -133,6 +133,8 @@ std::string PresentModeName(PresentMode value);
 typedef enum {
   QUEUE_TYPE_MAIN,
   QUEUE_TYPE_ASSIST,
+  // Compute, ray tracing and transfer commands; no graphics or presentation.
+  QUEUE_TYPE_COMPUTE,
 } QueueType;
 
 std::string to_string(QueueType value);

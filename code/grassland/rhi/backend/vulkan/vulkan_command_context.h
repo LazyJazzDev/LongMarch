@@ -93,6 +93,8 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
+  bool RequireGraphicsQueue();
+  bool compute_queue_{};
   const void *DeviceIdentity() const;
   IVulkanQueue *OwnerQueue() const;
 

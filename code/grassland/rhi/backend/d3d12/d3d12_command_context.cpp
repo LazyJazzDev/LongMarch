@@ -35,6 +35,7 @@
 namespace grassland::rhi::backend::d3d12 {
 
 D3D12CommandContextImpl::D3D12CommandContextImpl(ID3D12Queue *queue) : device_(queue->Owner()) {
+  compute_queue_ = rhi::QueryInterfacePtr<rhi::IQueue>(queue)->GetType() == QUEUE_TYPE_COMPUTE;
   InitializeCommandContext(queue);
 }
 
@@ -51,7 +52,8 @@ D3D12CommandContextImpl::~D3D12CommandContextImpl() {
 
 ICommandContext *D3D12CommandContextImpl::Create(ID3D12Queue *queue) {
   auto object = std::unique_ptr<D3D12CommandContextImpl>(new D3D12CommandContextImpl(queue));
-  object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_);
+  object->reusable_ =
+      object->device_->AcquireCommandResources(object->allocator_, object->list_, queue->NativeQueue()->GetDesc().Type);
   if (!object->reusable_)
     return nullptr;
   if (object->device_->GetPhysicalDevice().ray_tracing_pipeline_feature ||
@@ -91,6 +93,14 @@ bool D3D12CommandContextImpl::TransitionResource(ID3D12Resource *resource,
   return true;
 }
 
+bool D3D12CommandContextImpl::RequireGraphicsQueue() {
+  if (!compute_queue_)
+    return true;
+  recording_failed_ = true;
+  ReportError(-1, "Graphics commands and depth clears are unavailable on a Compute queue.");
+  return false;
+}
+
 bool D3D12CommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
   const auto native = rhi::QueryInterfacePtr<ID3D12Image>(image).Get();
 #if !defined(NDEBUG)
@@ -108,6 +118,8 @@ bool D3D12CommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue
   if (!RetainResource(native))
     return false;
   const auto format = image->GetDesc().format;
+  if (IsDepthFormat(format) && !RequireGraphicsQueue())
+    return false;
   if (IsDepthFormat(format)) {
     if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_DEPTH_WRITE, native->DefaultState()))
       return false;
@@ -123,7 +135,8 @@ bool D3D12CommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue
 
 bool D3D12CommandContextImpl::ClearColor(ID3D12Image *image, ImageFormat format, const ClearColorValue &value) {
   const bool signed_integer = IsSignedIntegerFormat(format);
-  if (!signed_integer && !IsUnsignedIntegerFormat(format)) {
+  const bool floating = !signed_integer && !IsUnsignedIntegerFormat(format);
+  if (floating && !compute_queue_) {
     if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
       return false;
     list_->ClearRenderTargetView(image->AttachmentView(), value.float32.data(), 0, nullptr);
@@ -131,14 +144,14 @@ bool D3D12CommandContextImpl::ClearColor(ID3D12Image *image, ImageFormat format,
   }
   if (!image->SupportsStorage()) {
     recording_failed_ = true;
-    ReportError(-1, "D3D12 integer image clears require UAV support.");
+    ReportError(-1, "D3D12 image clear requires UAV support on this queue.");
     return false;
   }
   const auto pixel_size = ImageFormatSize(format);
   const uint32_t component_size =
       pixel_size > 4 || format == IMAGE_FORMAT_R32_UINT || format == IMAGE_FORMAT_R32_INT ? 4 : 1;
   std::array<UINT, 4> integers{};
-  for (size_t i = 0; i < integers.size(); ++i) {
+  for (size_t i = 0; !floating && i < integers.size(); ++i) {
     integers[i] = signed_integer ? static_cast<UINT>(value.int32[i]) : value.uint32[i];
     // Supply the native-width bit pattern, not a sign-extended uint32, to the
     // unsigned clear operation for 8-bit signed views.
@@ -167,8 +180,12 @@ bool D3D12CommandContextImpl::ClearColor(ID3D12Image *image, ImageFormat format,
   barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
   barrier.UAV.pResource = image->NativeImage();
   list_->ResourceBarrier(1, &barrier);
-  list_->ClearUnorderedAccessViewUint(visible->GPU(), storage->CPU(), image->NativeImage(), integers.data(), 0,
-                                      nullptr);
+  if (floating)
+    list_->ClearUnorderedAccessViewFloat(visible->GPU(), storage->CPU(), image->NativeImage(), value.float32.data(), 0,
+                                         nullptr);
+  else
+    list_->ClearUnorderedAccessViewUint(visible->GPU(), storage->CPU(), image->NativeImage(), integers.data(), 0,
+                                        nullptr);
   // Restore existing heaps; their root tables must be rebound on the next draw/dispatch.
   ID3D12DescriptorHeap *heaps[2]{};
   UINT count = 0;
@@ -178,10 +195,13 @@ bool D3D12CommandContextImpl::ClearColor(ID3D12Image *image, ImageFormat format,
   if (count)
     list_->SetDescriptorHeaps(count, heaps);
   tables_dirty_ = true;
-  return TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState());
+  return compute_queue_ ||
+         TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState());
 }
 
 bool D3D12CommandContextImpl::CmdPresent(rhi::IWindow *window) {
+  if (!RequireGraphicsQueue())
+    return false;
   const auto target = rhi::QueryInterfacePtr<ID3D12Window>(window).Get();
 #if !defined(NDEBUG)
   if (rendering_active_) {
@@ -427,6 +447,8 @@ bool D3D12CommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 }
 
 bool D3D12CommandContextImpl::CmdBindProgram(IProgram *program) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<ID3D12Program>(program).Get();
 #if !defined(NDEBUG)
   if (!native || native->Owner() != device_ || sealed_) {
@@ -454,6 +476,8 @@ bool D3D12CommandContextImpl::CmdBindProgram(IProgram *program) {
 }
 
 bool D3D12CommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
+  if (!RequireGraphicsQueue())
+    return false;
   if (sealed_ || rendering_active_ || !PrepareRendering(info)) {
     recording_failed_ = true;
     return false;
@@ -494,6 +518,8 @@ bool D3D12CommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
 }
 
 bool D3D12CommandContextImpl::CmdEndRendering() {
+  if (!RequireGraphicsQueue())
+    return false;
   if (sealed_ || !rendering_active_ || recording_failed_) {
     recording_failed_ = true;
     return false;
@@ -508,6 +534,8 @@ bool D3D12CommandContextImpl::CmdEndRendering() {
 }
 
 bool D3D12CommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
 #if !defined(NDEBUG)
   assert(!native || native->Owner() == device_);
@@ -538,6 +566,8 @@ bool D3D12CommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buf
 }
 
 bool D3D12CommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
 #if !defined(NDEBUG)
   assert(!native || native->Owner() == device_);
@@ -573,6 +603,8 @@ bool D3D12CommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat fo
 }
 
 bool D3D12CommandContextImpl::CmdSetViewport(const Viewport &viewport) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || viewport.width <= 0 || viewport.height <= 0) {
     recording_failed_ = true;
@@ -589,6 +621,8 @@ bool D3D12CommandContextImpl::CmdSetViewport(const Viewport &viewport) {
 }
 
 bool D3D12CommandContextImpl::CmdSetScissor(const Scissor &scissor) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || !scissor.width || !scissor.height) {
     recording_failed_ = true;
@@ -608,6 +642,8 @@ bool D3D12CommandContextImpl::CmdDraw(uint32_t vertex_count,
                                       uint32_t instance_count,
                                       uint32_t first_vertex,
                                       uint32_t first_instance) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_) {
     recording_failed_ = true;
@@ -633,6 +669,8 @@ bool D3D12CommandContextImpl::CmdDrawIndexed(uint32_t index_count,
                                              uint32_t first_index,
                                              int32_t vertex_offset,
                                              uint32_t first_instance) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_ || !index_bound_) {
     recording_failed_ = true;
@@ -739,11 +777,14 @@ bool D3D12CommandContextImpl::PrepareGroups() {
           auto buffer = rhi::QueryInterfacePtr<ID3D12Buffer>(version->GetReferences()[binding_index][j].Get()).Get();
           assert(!buffer || buffer->Owner() == device_);
           resource = buffer->NativeBuffer();
-          if (!TransitionResource(resource,
-                                  (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER)
-                                      ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
-                                      : D3D12_RESOURCE_STATE_GENERIC_READ,
-                                  buffer->DefaultState()))
+          if (!TransitionResource(
+                  resource,
+                  (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER)
+                      ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+                  : compute_queue_ ? (type == BINDING_UNIFORM_BUFFER ? D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+                                                                     : D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+                                   : D3D12_RESOURCE_STATE_GENERIC_READ,
+                  buffer->DefaultState()))
             return false;
         } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
           auto image = rhi::QueryInterfacePtr<ID3D12Image>(version->GetReferences()[binding_index][j].Get()).Get();
@@ -754,9 +795,11 @@ bool D3D12CommandContextImpl::PrepareGroups() {
               return false;
             }
           if (!TransitionResource(resource,
-                                  type == BINDING_TEXTURE2D ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
-                                                                  D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-                                                            : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                                  type == BINDING_TEXTURE2D
+                                      ? (compute_queue_ ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+                                                        : D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+                                                              D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+                                      : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
                                   image->DefaultState()))
             return false;
         }
@@ -1066,6 +1109,8 @@ ICommandContext *CreateD3D12CommandContext(ID3D12Queue *queue) {
 }
 
 bool D3D12CommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<ID3D12Window>(window).Get();
   auto image = rhi::QueryInterfacePtr<ID3D12Image>(target).Get();
 #if !defined(NDEBUG)
@@ -1094,6 +1139,8 @@ bool D3D12CommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
 }
 
 bool D3D12CommandContextImpl::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<ID3D12Window>(window).Get();
   auto image = rhi::QueryInterfacePtr<ID3D12Image>(frame_img).Get();
 #if !defined(NDEBUG)
