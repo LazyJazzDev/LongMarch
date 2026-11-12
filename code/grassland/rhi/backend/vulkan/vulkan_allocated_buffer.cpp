@@ -31,10 +31,6 @@ class VulkanAllocatedBufferImpl final : public Object<rhi::IBuffer, IVulkanAlloc
     return desc_;
   }
 
-  const void *DeviceIdentity() const override {
-    return Owner();
-  }
-
   IVulkanDevice *Owner() const override;
 };
 

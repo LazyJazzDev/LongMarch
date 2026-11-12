@@ -9,6 +9,8 @@ struct BufferDesc {
 };
 
 // Fixed physical allocation. GPU-only contents are initialized/updated with CmdUploadBuffer.
+// A buffer must only be used with objects from its creating Device.
+// Cross-device use violates the API contract; ownership checks are Debug-only.
 class IBuffer : public IObject {
  public:
   virtual BufferDesc GetDesc() const = 0;

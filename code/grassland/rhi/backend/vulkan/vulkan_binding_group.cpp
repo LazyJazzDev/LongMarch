@@ -3,13 +3,13 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cassert>
 #include <limits>
 #include <mutex>
 #include <set>
 #include <thread>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
-#include "grassland/rhi/backend/backend_buffer.h"
 #include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
@@ -18,6 +18,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_buffer.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_image.h"
 
@@ -442,8 +443,11 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
     return false;
   auto values = buffers;
   for (auto &view : values) {
+#ifndef NDEBUG
     auto buffer = rhi::QueryInterfacePtr<IVulkanBuffer>(view.buffer).Get();
-    if (!buffer || buffer->Owner() != device_ || view.offset >= view.buffer->GetDesc().size)
+    assert(!view.buffer || (buffer && buffer->Owner() == device_));
+#endif
+    if (!view.buffer || view.offset >= view.buffer->GetDesc().size)
       return false;
     if (!view.size)
       view.size = view.buffer->GetDesc().size - view.offset;

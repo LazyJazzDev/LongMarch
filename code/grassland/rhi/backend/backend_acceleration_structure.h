@@ -6,7 +6,6 @@ namespace grassland::rhi::backend {
 
 bool ValidateBottomLevelDesc(const BottomLevelAccelerationStructureDesc &desc);
 bool ValidateGeometryBuffers(const BottomLevelAccelerationStructureDesc &desc,
-                             const std::vector<AccelerationStructureGeometryBuffers> &buffers,
-                             const void *device_identity);
+                             const std::vector<AccelerationStructureGeometryBuffers> &buffers);
 bool ValidateInstances(const TopLevelAccelerationStructureDesc &desc, const std::vector<RayTracingInstance> &instances);
 }  // namespace grassland::rhi::backend

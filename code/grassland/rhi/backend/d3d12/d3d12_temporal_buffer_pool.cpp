@@ -19,10 +19,6 @@ class D3D12TemporalBufferLeaseImpl final : public Object<rhi::IBuffer, ID3D12Tem
   size_t level_;
 
  public:
-  const void *DeviceIdentity() const override {
-    return Owner();
-  }
-
   ID3D12Device *Owner() const override {
     return buffer_->Owner();
   }

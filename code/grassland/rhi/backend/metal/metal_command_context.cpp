@@ -1,6 +1,7 @@
 ﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
 
 #include <array>
+#include <cassert>
 #include <cstring>
 #include <list>
 #include <mutex>
@@ -228,7 +229,8 @@ MetalCommandContextImpl::~MetalCommandContextImpl() {
 
 bool MetalCommandContextImpl::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
   auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || sealed_ || render_target_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_ || render_target_) {
     recording_failed_ = true;
     return false;
   }
@@ -250,8 +252,10 @@ bool MetalCommandContextImpl::CmdCopyBuffer(IBuffer *source,
                                             uint64_t destination_offset,
                                             uint64_t size) {
   auto src = rhi::QueryInterfacePtr<IMetalBuffer>(source).Get();
+  assert(!src || src->Owner() == device_);
   auto dst = rhi::QueryInterfacePtr<IMetalBuffer>(destination).Get();
-  if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_ || render_target_) {
+  assert(!dst || dst->Owner() == device_);
+  if (!src || !dst || sealed_ || render_target_) {
     recording_failed_ = true;
     return false;
   }
@@ -556,7 +560,8 @@ bool MetalCommandContextImpl::CmdEndRendering() {
 
 bool MetalCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
   auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -574,7 +579,8 @@ bool MetalCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buf
 
 bool MetalCommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
   auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -690,7 +696,8 @@ bool MetalCommandContextImpl::CmdDrawIndexed(uint32_t index_count,
 
 IDownloadToken *MetalCommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
   auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
-  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
+  assert(!native || native->Owner() == device_);
+  if (sealed_ || render_target_ || !native) {
     recording_failed_ = true;
     return nullptr;
   }

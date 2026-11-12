@@ -1,4 +1,5 @@
 ﻿#include <algorithm>
+#include <cassert>
 #include <cstring>
 
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
@@ -42,7 +43,7 @@ bool VulkanCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     return false;
   }
 #if !defined(NDEBUG)
-  if (!ValidateGeometryBuffers(destination->GetDesc(), geometries, device_)) {
+  if (!ValidateGeometryBuffers(destination->GetDesc(), geometries)) {
     recording_failed_ = true;
     return false;
   }
@@ -63,6 +64,7 @@ bool VulkanCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
       if (!view.buffer)
         continue;
       auto buffer = rhi::QueryInterfacePtr<IVulkanBuffer>(view.buffer).Get();
+      assert(buffer && buffer->Owner() == device_);
       if (!RetainResource(buffer))
         return false;
       if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_ACCESS_SHADER_READ_BIT))

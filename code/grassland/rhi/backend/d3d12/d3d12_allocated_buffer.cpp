@@ -37,10 +37,6 @@ class D3D12AllocatedBufferImpl final : public Object<rhi::IBuffer, ID3D12Allocat
     return desc_;
   }
 
-  const void *DeviceIdentity() const override {
-    return Owner();
-  }
-
   ID3D12Device *Owner() const override;
 };
 

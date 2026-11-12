@@ -7,9 +7,9 @@
 #include <set>
 #include <thread>
 
-#include "grassland/rhi/backend/backend_buffer.h"
 #include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_buffer.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_image.h"
 

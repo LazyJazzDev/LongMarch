@@ -7,7 +7,6 @@
 #include "grassland/rhi/rhi_obj_ptr.h"
 
 namespace grassland::rhi::backend {
-class IBackendBuffer;
 class IBackendShaderBindingTable;
 class IBackendSubmissionToken;
 class IBackendWindow;

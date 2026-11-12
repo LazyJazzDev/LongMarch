@@ -1,6 +1,6 @@
 ﻿#include "grassland/rhi/backend/backend_acceleration_structure.h"
 
-#include "grassland/rhi/backend/backend_buffer.h"
+#include "grassland/rhi/rhi_buffer.h"
 
 namespace grassland::rhi::backend {
 bool ValidateBottomLevelDesc(const BottomLevelAccelerationStructureDesc &desc) {
@@ -22,13 +22,11 @@ bool ValidateBottomLevelDesc(const BottomLevelAccelerationStructureDesc &desc) {
 }
 
 bool ValidateGeometryBuffers(const BottomLevelAccelerationStructureDesc &desc,
-                             const std::vector<AccelerationStructureGeometryBuffers> &buffers,
-                             const void *device_identity) {
+                             const std::vector<AccelerationStructureGeometryBuffers> &buffers) {
   if (buffers.size() != desc.geometries.size() + desc.aabbs.size())
     return false;
-  auto valid = [device_identity](const BufferView &view, uint64_t required, uint64_t alignment) {
-    auto buffer = rhi::QueryInterfacePtr<IBackendBuffer>(view.buffer).Get();
-    if (!buffer || buffer->DeviceIdentity() != device_identity || view.offset % alignment)
+  auto valid = [](const BufferView &view, uint64_t required, uint64_t alignment) {
+    if (!view.buffer || view.offset % alignment)
       return false;
     auto size = view.buffer->GetDesc().size;
     if (view.offset > size || required > size - view.offset)

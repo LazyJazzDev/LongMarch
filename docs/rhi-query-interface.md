@@ -24,11 +24,12 @@ Common backend interfaces are retained only for actual shared consumers or a
 single API-independent service implementation. Matching method names across
 Vulkan, D3D12, and Metal are insufficient justification for another interface.
 
-Of the original 16 `IBackend*` interfaces, 12 have been removed:
+Of the original 16 `IBackend*` interfaces, 13 have been removed:
 
 | Removed interface | Current home |
 | --- | --- |
 | Program, ComputeProgram, RayTracingProgram | Native ProgramBase owns the typed device query |
+| Buffer | Native buffer interfaces; same-device use is a caller contract checked only in Debug |
 | Sampler | Native sampler; descriptor validation remains a free shared function |
 | BindingGroup, BindingVersion | Native binding group/version; CurrentVersion returns the native type directly |
 | DownloadToken | Native download token; CopyData is private to the final implementation |
@@ -37,10 +38,8 @@ Of the original 16 `IBackend*` interfaces, 12 have been removed:
 | Timeline | Native timeline with typed device ownership |
 | Image | Native image, including queue eligibility and storage support |
 
-The remaining four interfaces have concrete shared responsibilities:
+The remaining three interfaces have concrete shared responsibilities:
 
-- `IBackendBuffer::DeviceIdentity`: `ValidateGeometryBuffers` checks ownership
-  without knowing the API. Native buffer interfaces separately expose typed Owner.
 - `IBackendWindow::GetImGuiContext`: the shared GLFW registry and callbacks need
   this capability. Frame acquisition, presentation, queue identity, and ImGui
   recording now belong to native window interfaces.
@@ -69,6 +68,13 @@ an isolated source snapshot with `-fsyntax-only -fno-rtti`; both reported zero
 failures. This is compiler validation, not a Linux runtime test. Metal sources
 were migrated and reviewed, but this cleanup has not been compiled on macOS.
 
+Buffer ownership comparisons use Debug assertions. Release performs no device
+identity query for geometry validation; shared validation checks null buffers,
+ranges, and alignment. Other resource types retain their existing policies.
+The Buffer follow-up passed Release and Debug builds and 65 tests in each
+configuration (4/6 skipped respectively; two known DXR cases excluded).
+GCC and Clang each passed 91 current translation-unit syntax checks on Linux.
+
 ## Identification and implementation
 
 `InterfaceID` contains two `uint64_t` values. `ParseInterfaceID` accepts the
@@ -87,7 +93,7 @@ multiple-definition errors. No separate declaration macro or `.cpp` registration
 is needed. Parsing remains constexpr and invalid UUID literals fail at compile
 time. Unregistered
 types cannot instantiate it. There is no runtime registration map, allocation,
-RTTI, or compiler-specific UUID extension. The 90 current library IDs are unique UUIDv4 values. Surviving interfaces
+RTTI, or compiler-specific UUID extension. The 89 current library IDs are unique UUIDv4 values. Surviving interfaces
 retain their IDs; removed interfaces have no registrations.
 
 Every inheritable RHI object layer is a data-free interface. Virtual contracts
@@ -110,8 +116,7 @@ separate chains, joined only by a final implementation:
 
 ```cpp
 struct IBuffer : IObject { /* frontend contract */ };
-struct IBackendBuffer : IObject { /* owner capability */ };
-struct ID3D12Buffer : IBackendBuffer { /* native resource */ };
+struct ID3D12Buffer : IObject { /* native resource */ };
 struct ID3D12AllocatedBuffer : ID3D12Buffer { /* host access */ };
 
 class D3D12AllocatedBufferImpl final

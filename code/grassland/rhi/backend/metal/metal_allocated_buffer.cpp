@@ -27,10 +27,6 @@ class MetalAllocatedBufferImpl final : public Object<rhi::IBuffer, IMetalAllocat
     return desc_;
   }
 
-  const void *DeviceIdentity() const override {
-    return Owner();
-  }
-
   IMetalDevice *Owner() const override;
 };
 

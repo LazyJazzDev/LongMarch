@@ -1,4 +1,5 @@
-﻿#include <cmath>
+﻿#include <cassert>
+#include <cmath>
 #include <cstring>
 #include <unordered_set>
 
@@ -14,7 +15,7 @@ bool MetalCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
-      !ValidateGeometryBuffers(destination->GetDesc(), geometries, device_)) {
+      !ValidateGeometryBuffers(destination->GetDesc(), geometries)) {
     recording_failed_ = true;
     return false;
   }
@@ -22,10 +23,18 @@ bool MetalCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
   auto scratch = device_->ScratchPool().Acquire(target->ScratchSize(mode));
   if (!scratch || !RetainResource(destination) || !RetainResource(scratch.Get()))
     return false;
-  for (const auto &g : geometries)
-    for (const auto &v : {g.data, g.indices})
+  for (const auto &g : geometries) {
+    for (const auto &v : {g.data, g.indices}) {
+#ifndef NDEBUG
+      if (v.buffer) {
+        auto buffer = rhi::QueryInterfacePtr<IMetalBuffer>(v.buffer).Get();
+        assert(buffer && buffer->Owner() == device_);
+      }
+#endif
       if (v.buffer && !RetainResource(v.buffer))
         return false;
+    }
+  }
   auto descriptor = NativeGeometries(destination->GetDesc(), geometries);
   auto encoder = commands_->accelerationStructureCommandEncoder();
   if (!encoder) {

@@ -1,4 +1,5 @@
 ﻿#include <algorithm>
+#include <cassert>
 #include <cstring>
 
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
@@ -18,7 +19,7 @@ bool D3D12CommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     return false;
   }
 #if !defined(NDEBUG)
-  if (!ValidateGeometryBuffers(destination->GetDesc(), geometries, device_)) {
+  if (!ValidateGeometryBuffers(destination->GetDesc(), geometries)) {
     recording_failed_ = true;
     return false;
   }
@@ -37,6 +38,7 @@ bool D3D12CommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
       if (!view.buffer)
         continue;
       auto buffer = rhi::QueryInterfacePtr<ID3D12Buffer>(view.buffer).Get();
+      assert(buffer && buffer->Owner() == device_);
       if (!RetainResource(buffer))
         return false;
       if (!TransitionResource(buffer->NativeBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,

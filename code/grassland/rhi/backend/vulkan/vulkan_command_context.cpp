@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cmath>
 #include <cstring>
 #include <list>
@@ -286,7 +287,8 @@ bool VulkanCommandContextImpl::CmdUploadBuffer(IBuffer *buffer, uint64_t offset,
     return false;
   }
   auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -326,8 +328,10 @@ bool VulkanCommandContextImpl::CmdCopyBuffer(IBuffer *source,
     return false;
   }
   auto src = rhi::QueryInterfacePtr<IVulkanBuffer>(source).Get();
+  assert(!src || src->Owner() == device_);
   auto dst = rhi::QueryInterfacePtr<IVulkanBuffer>(destination).Get();
-  if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_) {
+  assert(!dst || dst->Owner() == device_);
+  if (!src || !dst || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -522,7 +526,8 @@ bool VulkanCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
 
 bool VulkanCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
   auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -543,7 +548,8 @@ bool VulkanCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *bu
 
 bool VulkanCommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
   auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -658,7 +664,7 @@ bool VulkanCommandContextImpl::CmdEndRendering() {
   else
     vkCmdEndRenderPass(command_);
   // Make reads in this scope complete before later buffer writes, including buffers
-  // first bound inside the scope. IBackendBuffer bindings do not change image layouts.
+  // first bound inside the scope. Buffer bindings do not change image layouts.
   VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
   barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
                           VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
@@ -780,6 +786,7 @@ bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, IVulkanBindingVe
       }
       if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
         auto buffer = rhi::QueryInterfacePtr<IVulkanBuffer>(native->GetReferences()[binding_index][i].Get()).Get();
+        assert(!buffer || buffer->Owner() == device_);
         if (!TransitionBuffer(buffer, stages, b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
           return false;
       }
@@ -903,7 +910,8 @@ bool VulkanCommandContextImpl::CmdDispatchRays(uint32_t width,
 
 IDownloadToken *VulkanCommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
   auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
-  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
+  assert(!native || native->Owner() == device_);
+  if (sealed_ || render_target_ || !native) {
     recording_failed_ = true;
     return nullptr;
   }

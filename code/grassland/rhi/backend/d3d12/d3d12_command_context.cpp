@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <list>
@@ -305,7 +306,8 @@ bool D3D12CommandContextImpl::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, 
     return false;
   }
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -344,8 +346,10 @@ bool D3D12CommandContextImpl::CmdCopyBuffer(IBuffer *source,
     return false;
   }
   auto src = rhi::QueryInterfacePtr<ID3D12Buffer>(source).Get();
+  assert(!src || src->Owner() == device_);
   auto dst = rhi::QueryInterfacePtr<ID3D12Buffer>(destination).Get();
-  if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_) {
+  assert(!dst || dst->Owner() == device_);
+  if (!src || !dst || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -494,7 +498,8 @@ bool D3D12CommandContextImpl::CmdEndRendering() {
 
 bool D3D12CommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -521,7 +526,8 @@ bool D3D12CommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buf
 
 bool D3D12CommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -716,6 +722,7 @@ bool D3D12CommandContextImpl::PrepareGroups() {
         }
         if (type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
           auto buffer = rhi::QueryInterfacePtr<ID3D12Buffer>(version->GetReferences()[binding_index][j].Get()).Get();
+          assert(!buffer || buffer->Owner() == device_);
           resource = buffer->NativeBuffer();
           if (!TransitionResource(resource,
                                   (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER)
@@ -932,7 +939,8 @@ bool D3D12CommandContextImpl::CmdDispatchRays(uint32_t width,
 
 IDownloadToken *D3D12CommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
   auto native = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get();
-  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
+  assert(!native || native->Owner() == device_);
+  if (sealed_ || rendering_active_ || !native) {
     recording_failed_ = true;
     return nullptr;
   }
