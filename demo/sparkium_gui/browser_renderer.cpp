@@ -5,8 +5,9 @@
 
 using namespace grassland::rhi;
 
-BrowserRenderer::BrowserRenderer(IDevice *device)
+BrowserRenderer::BrowserRenderer(IDevice *device, std::function<void()> frame_ready)
     : device_(device),
+      frame_ready_(std::move(frame_ready)),
       thread_([this] {
         try {
           Run();
@@ -89,15 +90,21 @@ void BrowserRenderer::Run() {
     auto frame = std::move(pending.front());
     pending.pop_front();
     const bool completed = frame->rendered->WaitHost();
-    std::lock_guard lock(mutex_);
-    if (!completed) {
-      state_.error = "GPU render submission failed";
-      return false;
+    bool published = false;
+    {
+      std::lock_guard lock(mutex_);
+      if (!completed) {
+        state_.error = "GPU render submission failed";
+        return false;
+      }
+      if (frame->revision == requested_.revision && (!latest_ || frame->sequence > latest_->sequence)) {
+        latest_ = frame;
+        state_.completed_samples = frame->samples;
+        published = true;
+      }
     }
-    if (frame->revision == requested_.revision && (!latest_ || frame->sequence > latest_->sequence)) {
-      latest_ = frame;
-      state_.completed_samples = frame->samples;
-    }
+    if (published && frame_ready_)
+      frame_ready_();
     return true;
   };
   while (!stopping_.load()) {

@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <fstream>
 #include <thread>
@@ -75,7 +76,16 @@ class BrowserRendererTest : public testing::TestWithParam<BackendAPI> {
 };
 
 TEST_P(BrowserRendererTest, HeldImagesStayImmutableAcrossConfigurationAndReload) {
-  BrowserRenderer renderer(device_.Get());
+  std::atomic<uint32_t> notifications{};
+  std::atomic<BrowserRenderer *> observer{};
+  BrowserRenderer renderer(device_.Get(), [&] {
+    // The frontend may query state when awakened; publication must release its lock first.
+    if (auto *worker = observer.load()) {
+      (void)worker->GetState();
+      ++notifications;
+    }
+  });
+  observer.store(&renderer);
   renderer.Load(path_, false);
   auto first = WaitFrame(renderer, [](const auto &) { return true; });
   ASSERT_TRUE(first);
@@ -121,6 +131,7 @@ TEST_P(BrowserRendererTest, HeldImagesStayImmutableAcrossConfigurationAndReload)
   for (size_t i = 0; i < resized.size(); ++i)
     EXPECT_EQ(resized[i], original[i % 4]);
   EXPECT_EQ(Read(renderer, first), original);
+  EXPECT_GT(notifications.load(), 0u);
 }
 
 TEST_P(BrowserRendererTest, SplittingBatchesPreservesAccumulation) {

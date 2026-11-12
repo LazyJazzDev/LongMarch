@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -41,7 +42,7 @@ class BrowserRenderer {
     bool hdr{};
   };
 
-  explicit BrowserRenderer(grassland::rhi::IDevice *device);
+  explicit BrowserRenderer(grassland::rhi::IDevice *device, std::function<void()> frame_ready = {});
   ~BrowserRenderer();
   uint64_t Load(const std::filesystem::path &path, bool hdr);
   uint64_t Configure(const Settings &settings, bool reset);
@@ -67,6 +68,7 @@ class BrowserRenderer {
   void Fail(uint64_t revision, const std::string &error);
 
   grassland::rhi::IDevice *device_;
+  std::function<void()> frame_ready_;
   mutable std::mutex mutex_;
   std::condition_variable condition_;
   Request requested_;

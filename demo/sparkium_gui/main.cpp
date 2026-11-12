@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
     rhi::ObjPtr<rhi::IQueue> main_queue = device->GetQueue(rhi::QUEUE_TYPE_MAIN);
     if (!main_queue)
       return 1;
-    BrowserRenderer renderer(device.Get());
+    BrowserRenderer renderer(device.Get(), [] { glfwPostEmptyEvent(); });
     BrowserRenderer::Settings settings;
     bool hdr_active = false;
     std::string hdr_error;
