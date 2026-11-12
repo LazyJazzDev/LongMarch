@@ -2,24 +2,39 @@
 
 #include <vk_mem_alloc.h>
 
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <list>
+#include <mutex>
+#include <thread>
+
+#include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_shader.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 #include "grassland/rhi/backend/vulkan/vulkan_cuda_buffer.h"
+#include "grassland/rhi/backend/vulkan/vulkan_cuda_timeline.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend::vulkan {
-bool VulkanDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
+bool VulkanDeviceImpl::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
   std::vector<VkSemaphore> semaphores;
   std::vector<uint64_t> values;
   for (const auto &event : events) {
-    semaphores.push_back(static_cast<VulkanTimeline *>(event.timeline)->NativeSemaphore());
+    semaphores.push_back(rhi::QueryInterfacePtr<IVulkanTimeline>(event.timeline).Get()->NativeSemaphore());
     values.push_back(event.value);
   }
   VkSemaphoreWaitInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
@@ -30,18 +45,18 @@ bool VulkanDevice::WaitNativeEvents(const std::vector<Event> &events, bool wait_
   return Check(vkWaitSemaphores(device_, &info, UINT64_MAX), "Wait for timeline events");
 }
 
-void VulkanDevice::InterruptCollector() {
+void VulkanDeviceImpl::InterruptCollector() {
   VkSemaphoreSignalInfo signal{VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO};
   signal.semaphore = collector_shutdown_;
   signal.value = 1;
   Check(vkSignalSemaphore(device_, &signal), "Stop device collector");
 }
 
-void VulkanDevice::WaitForProgress(const std::vector<Event> &next) {
+void VulkanDeviceImpl::WaitForProgress(const std::vector<Event> &next) {
   std::array<VkSemaphore, 3> semaphores{};
   std::array<uint64_t, 3> values{};
   for (size_t index = 0; index < next.size(); ++index) {
-    semaphores[index] = static_cast<VulkanTimeline *>(next[index].timeline)->NativeSemaphore();
+    semaphores[index] = rhi::QueryInterfacePtr<IVulkanTimeline>(next[index].timeline).Get()->NativeSemaphore();
     values[index] = next[index].value;
   }
   size_t count = next.size();
@@ -59,7 +74,7 @@ void VulkanDevice::WaitForProgress(const std::vector<Event> &next) {
   shutdown_consumed_ = stopping_;
 }
 
-bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command) {
+bool VulkanDeviceImpl::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command) {
   {
     std::lock_guard<std::mutex> lock(resource_pool_mutex_);
     if (!command_pool_.empty()) {
@@ -88,7 +103,7 @@ bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer 
   return Check(vkBeginCommandBuffer(command, &begin), "Begin command buffer");
 }
 
-void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command) {
+void VulkanDeviceImpl::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command) {
   try {
     std::lock_guard<std::mutex> lock(resource_pool_mutex_);
     command_pool_.emplace_back(pool, command);
@@ -98,14 +113,14 @@ void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer c
   vkDestroyCommandPool(device_, pool, nullptr);
 }
 
-VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core)
-    : Device(std::move(info), core, BACKEND_API_VULKAN),
-      upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
+VulkanDeviceImpl::VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, IVulkanCore *core)
+    : upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
       download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
       scratch_pool_(this) {
+  InitializeDevice(std::move(info), core, BACKEND_API_VULKAN);
 }
 
-VulkanDevice::~VulkanDevice() {
+VulkanDeviceImpl::~VulkanDeviceImpl() {
   ShutdownQueues();
   upload_pool_.Clear();
   download_pool_.Clear();
@@ -123,13 +138,15 @@ VulkanDevice::~VulkanDevice() {
     vmaDestroyAllocator(allocator_);
   if (device_)
     vkDestroyDevice(device_, nullptr);
+
+  DestroyDevice();
 }
 
-VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                               Core *core,
-                                               VkPhysicalDevice physical_device,
-                                               uint32_t api_version) {
-  auto device = std::unique_ptr<VulkanDevice>(new VulkanDevice(std::move(info), core));
+rhi::IDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                                   IVulkanCore *core,
+                                                   VkPhysicalDevice physical_device,
+                                                   uint32_t api_version) {
+  auto device = std::unique_ptr<VulkanDeviceImpl>(new VulkanDeviceImpl(std::move(info), core));
   DeviceFeatures enabled(physical_device, api_version);
   if (!enabled)
     return {};
@@ -189,7 +206,7 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     memory.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
   memory.physicalDevice = physical_device;
   memory.device = device->device_;
-  memory.instance = static_cast<VulkanCore *>(core)->Instance();
+  memory.instance = core->Instance();
   memory.vulkanApiVersion = VK_API_VERSION_1_2;
   if (!Check(vmaCreateAllocator(&memory, &device->allocator_), "Create VMA allocator"))
     return {};
@@ -205,8 +222,8 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     VkQueue queue;
     vkGetDeviceQueue(device->device_, queue_family, native_index, &queue);
     auto mutex = native_index == 0 ? main_mutex : std::make_shared<std::mutex>();
-    device->queues_[index] = ObjectPtr<Queue>::Adopt(
-        VulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue, std::move(mutex)));
+    device->queues_[index] = ObjectPtr<IVulkanQueue>::Adopt(
+        IVulkanQueue::Create(device.get(), static_cast<QueueType>(index), queue, std::move(mutex)));
     if (!device->queues_[index])
       return nullptr;
   }
@@ -221,112 +238,224 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   return device.release();
 }
 
-const DeviceProcedures &VulkanDevice::Procedures() const {
+const DeviceProcedures &VulkanDeviceImpl::Procedures() const {
   return procedures_;
 }
 
-ISampler *VulkanDevice::CreateSampler(const SamplerDesc &desc) {
-  return VulkanSampler::Create(this, desc);
+ISampler *VulkanDeviceImpl::CreateSampler(const SamplerDesc &desc) {
+  return IVulkanSampler::Create(this, desc);
 }
 
-IBindingGroup *VulkanDevice::CreateBindingGroup(const BindingLayoutDesc &layout) {
-  return VulkanBindingGroup::Create(this, layout);
+IBindingGroup *VulkanDeviceImpl::CreateBindingGroup(const BindingLayoutDesc &layout) {
+  return CreateVulkanBindingGroup(this, layout);
 }
 
-VulkanDescriptorPool &VulkanDevice::DescriptorPool() {
+VulkanDescriptorPool &VulkanDeviceImpl::DescriptorPool() {
   return *descriptor_pool_;
 }
 
-VulkanRenderTargetPool &VulkanDevice::RenderTargets() {
+VulkanRenderTargetPool &VulkanDeviceImpl::RenderTargets() {
   return *render_targets_;
 }
 
-VmaAllocator VulkanDevice::Allocator() const {
+VmaAllocator VulkanDeviceImpl::Allocator() const {
   return allocator_;
 }
 
-VkDevice VulkanDevice::NativeDevice() const {
+VkDevice VulkanDeviceImpl::NativeDevice() const {
   return device_;
 }
 
-VkPhysicalDevice VulkanDevice::NativePhysicalDevice() const {
+VkPhysicalDevice VulkanDeviceImpl::NativePhysicalDevice() const {
   return physical_;
 }
 
-VkInstance VulkanDevice::Instance() const {
-  return static_cast<VulkanCore *>(OwnerCore())->Instance();
+VkInstance VulkanDeviceImpl::Instance() const {
+  return core_->Instance();
 }
 
-uint32_t VulkanDevice::QueueFamily() const {
+uint32_t VulkanDeviceImpl::QueueFamily() const {
   return queue_family_index_;
 }
 
-bool VulkanDevice::SupportsSwapchain() const {
+bool VulkanDeviceImpl::SupportsSwapchain() const {
   return swapchain_enabled_;
 }
 
-VulkanTemporalBufferPool &VulkanDevice::UploadPool() {
+VulkanTemporalBufferPool &VulkanDeviceImpl::UploadPool() {
   return upload_pool_;
 }
 
-rhi::IImage *VulkanDevice::CreateImage(const ImageDesc &desc) {
-  return VulkanAllocatedImage::Create(this, desc);
+rhi::IImage *VulkanDeviceImpl::CreateImage(const ImageDesc &desc) {
+  return CreateVulkanAllocatedImage(this, desc);
 }
 
-rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
-  return VulkanAllocatedBuffer::Create(this, desc);
+rhi::IBuffer *VulkanDeviceImpl::CreateBuffer(const BufferDesc &desc) {
+  auto buffer = ObjectPtr<IVulkanAllocatedBuffer>::Adopt(IVulkanAllocatedBuffer::Create(this, desc));
+  return rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach();
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-ICUDATimeline *VulkanDevice::CreateCUDATimeline() {
-  if (GetCUDADeviceIndex() < 0)
-    return nullptr;
-  return OwnCUDATimeline(VulkanTimeline::Create(this));
+rhi::IBuffer *VulkanDeviceImpl::CreateCUDABuffer(const BufferDesc &desc) {
+  return VulkanCUDABufferImpl::Create(this, desc);
 }
 
-ICUDABuffer *VulkanDevice::CreateCUDABuffer(const BufferDesc &desc) {
-  return VulkanCUDABuffer::Create(this, desc);
+rhi::ICUDATimeline *VulkanDeviceImpl::CreateCUDATimeline() {
+  return rhi::QueryInterfacePtr<rhi::ICUDATimeline>(CreateVulkanCUDATimeline(this).Get()).Detach();
 }
 #endif
 
-rhi::IComputeProgram *VulkanDevice::CreateComputeProgram(const ComputeProgramDesc &desc) {
-  return VulkanComputeProgram::Create(this, desc);
+rhi::IComputeProgram *VulkanDeviceImpl::CreateComputeProgram(const ComputeProgramDesc &desc) {
+  return IVulkanComputeProgram::Create(this, desc);
 }
 
-rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
-  return VulkanProgram::Create(this, desc);
+rhi::IProgram *VulkanDeviceImpl::CreateProgram(const ProgramDesc &desc) {
+  return IVulkanProgram::Create(this, desc);
 }
 
-rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
-  return VulkanWindow::Create(this, desc);
+rhi::IWindow *VulkanDeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
+  return IVulkanWindow::Create(this, desc);
 }
 
-}  // namespace grassland::rhi::backend::vulkan
-
-namespace grassland::rhi::backend::vulkan {
-VulkanScratchPool &VulkanDevice::ScratchPool() {
+VulkanScratchPool &VulkanDeviceImpl::ScratchPool() {
   return scratch_pool_;
 }
-}  // namespace grassland::rhi::backend::vulkan
 
-namespace grassland::rhi::backend::vulkan {
-IBottomLevelAccelerationStructure *VulkanDevice::CreateBottomLevelAccelerationStructure(
+IBottomLevelAccelerationStructure *VulkanDeviceImpl::CreateBottomLevelAccelerationStructure(
     const BottomLevelAccelerationStructureDesc &desc) {
-  return VulkanBottomLevelAccelerationStructure::Create(this, desc);
+  return CreateVulkanBottomLevelAccelerationStructure(this, desc);
 }
 
-ITopLevelAccelerationStructure *VulkanDevice::CreateTopLevelAccelerationStructure(
+ITopLevelAccelerationStructure *VulkanDeviceImpl::CreateTopLevelAccelerationStructure(
     const TopLevelAccelerationStructureDesc &desc) {
-  return VulkanTopLevelAccelerationStructure::Create(this, desc);
+  return IVulkanTopLevelAccelerationStructure::Create(this, desc);
 }
 
-IRayTracingProgram *VulkanDevice::CreateRayTracingProgram(const RayTracingProgramDesc &desc) {
+IRayTracingProgram *VulkanDeviceImpl::CreateRayTracingProgram(const RayTracingProgramDesc &desc) {
   if (!SupportRayTracingPipeline())
     return nullptr;
-  return VulkanRayTracingProgram::Create(this, desc);
+  return IVulkanRayTracingProgram::Create(this, desc);
 }
 
-VulkanTemporalBufferPool &VulkanDevice::DownloadPool() {
+VulkanTemporalBufferPool &VulkanDeviceImpl::DownloadPool() {
   return download_pool_;
+}
+
+rhi::IDevice *IVulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                                IVulkanCore *core,
+                                                VkPhysicalDevice physical_device,
+                                                uint32_t api_version) {
+  return VulkanDeviceImpl::CreateVulkanDevice(info, core, physical_device, api_version);
+}
+
+void VulkanDeviceImpl::InitializeDevice(PhysicalDevice info, IVulkanCore *core, BackendAPI api) {
+  api_ = api;
+  core_ = core;
+  info_ = std::move(info);
+}
+
+rhi::IShader *VulkanDeviceImpl::CreateShader(const ShaderDesc &desc) {
+  if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+      desc.stage > SHADER_STAGE_CALLABLE)
+    return nullptr;
+  return backend::CreateShader(desc, api_);
+}
+
+void VulkanDeviceImpl::DestroyDevice() {
+  ShutdownQueues();
+}
+
+std::string VulkanDeviceImpl::Name() const {
+  return info_.name;
+}
+
+bool VulkanDeviceImpl::SupportRayTracingPipeline() const {
+  return info_.ray_tracing_pipeline_feature;
+}
+
+bool VulkanDeviceImpl::SupportRayQuery() const {
+  return info_.ray_query_feature;
+}
+
+bool VulkanDeviceImpl::SupportGeometryShader() const {
+  return info_.geometry_shader_feature;
+}
+
+IVulkanQueue *VulkanDeviceImpl::GetNativeQueue(QueueType type) const {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return queues_[type].Get();
+}
+
+rhi::IQueue *VulkanDeviceImpl::GetQueue(QueueType type) {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return rhi::QueryInterfacePtr<IQueue>(queues_[type].Get()).Detach();
+}
+
+const PhysicalDevice &VulkanDeviceImpl::GetPhysicalDevice() const noexcept {
+  return info_;
+}
+
+IVulkanCore *VulkanDeviceImpl::OwnerCore() const {
+  return core_;
+}
+
+void VulkanDeviceImpl::StartCollector() {
+  collector_ = std::thread([this] { Collect(); });
+}
+
+bool VulkanDeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
+  if (events.empty())
+    return wait_all;
+  std::vector<Event> unique;
+  unique.reserve(events.size());
+  for (const auto &event : events) {
+#if !defined(NDEBUG)
+    auto timeline = rhi::QueryInterfacePtr<IVulkanTimeline>(event.timeline).Get();
+    if (!timeline || timeline->Owner() != this) {
+      ReportError(-1, "Host waits require timelines from this device.");
+      return false;
+    }
+#endif
+    auto found = std::find_if(unique.begin(), unique.end(),
+                              [&](const Event &other) { return other.timeline == event.timeline; });
+    if (found == unique.end())
+      unique.push_back(event);
+    else
+      found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
+  }
+  return WaitNativeEvents(unique, wait_all);
+}
+
+void VulkanDeviceImpl::Collect() {
+  std::vector<Event> next;
+  next.reserve(queues_.size());
+  for (;;) {
+    next.clear();
+    bool empty = true;
+    for (const auto &queue : queues_) {
+      if (!queue)
+        continue;
+      uint64_t completed = 0;
+      auto timeline = rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline());
+      const bool timeline_valid = timeline->GetCompletedValue(completed);
+      if (timeline_valid && completed != UINT64_MAX)
+        next.push_back({timeline.Get(), completed + 1});
+      if (!queue->CollectCompleted(completed, timeline_valid))
+        empty = false;
+    }
+    if (stopping_ && empty)
+      return;
+    WaitForProgress(next);
+  }
+}
+
+void VulkanDeviceImpl::ShutdownQueues() {
+  if (!collector_.joinable())
+    return;
+  stopping_ = true;
+  InterruptCollector();
+  collector_.join();
 }
 }  // namespace grassland::rhi::backend::vulkan

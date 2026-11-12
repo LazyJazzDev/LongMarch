@@ -1,7 +1,16 @@
 ﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
 
+#include <array>
+#include <cassert>
 #include <cstring>
+#include <list>
+#include <mutex>
+#include <system_error>
+#include <unordered_map>
 
+#include "grassland/rhi/backend/backend_download_token.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
+#include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_download_token.h"
@@ -10,6 +19,12 @@
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_image.h"
+#include "grassland/rhi/rhi_program.h"
+#include "grassland/rhi/rhi_queue.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend::metal {
 
@@ -28,13 +43,11 @@ MTL::ClearColor NativeClearColor(ImageFormat format, const ClearColorValue &valu
 }
 }  // namespace
 
-MetalCommandContext::MetalCommandContext(MetalQueue *queue)
-    : CommandContext(queue),
-      device_(static_cast<MetalDevice *>(queue->Owner())) {
+MetalCommandContextImpl::MetalCommandContextImpl(IMetalQueue *queue) : device_(queue->Owner()), queue_(queue) {
 }
 
-MetalCommandContext *MetalCommandContext::Create(MetalQueue *queue) {
-  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(queue));
+ICommandContext *MetalCommandContextImpl::Create(IMetalQueue *queue) {
+  auto object = std::unique_ptr<MetalCommandContextImpl>(new MetalCommandContextImpl(queue));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   // Metal command buffers are single-use. The persistent native queue manages
   // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
@@ -46,21 +59,19 @@ MetalCommandContext *MetalCommandContext::Create(MetalQueue *queue) {
   return object.release();
 }
 
-bool MetalCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
+bool MetalCommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
+  const auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
 #if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before clear, present or submission.");
     return false;
   }
-  const auto native = dynamic_cast<MetalImage *>(image);
-  if (!native || !native->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
+  if (!native || !image->IsValid() || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     ReportError(-1, "CmdClearImage requires a valid image from this device.");
     return false;
   }
-#else
-  const auto native = static_cast<MetalImage *>(image);
 #endif
   if (!RetainResource(native))
     return false;
@@ -70,7 +81,7 @@ bool MetalCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
     recording_failed_ = true;
     return false;
   }
-  const auto format = native->GetDesc().format;
+  const auto format = image->GetDesc().format;
   if (IsDepthFormat(format)) {
     auto depth = pass->depthAttachment();
     depth->setTexture(native->NativeImage());
@@ -102,14 +113,14 @@ bool MetalCommandContext::CmdClearImage(rhi::IImage *image, const ClearValue &va
   return true;
 }
 
-bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
+bool MetalCommandContextImpl::CmdPresent(rhi::IWindow *window) {
+  const auto target = rhi::QueryInterfacePtr<IMetalWindow>(window).Get();
 #if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before clear, present or submission.");
     return false;
   }
-  const auto target = dynamic_cast<MetalWindow *>(window);
   if (!target || target->DeviceIdentity() != device_ || target->OwnerQueue() != OwnerQueue() ||
       !glfw::IsWindowThread()) {
     recording_failed_ = true;
@@ -123,14 +134,13 @@ bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
       return false;
     }
   }
-#else
-  const auto target = static_cast<MetalWindow *>(window);
 #endif
-  auto frame = ObjectPtr<MetalSwapChainImage>::Adopt(static_cast<MetalSwapChainImage *>(target->GetNextImage()));
+  ObjPtr<IImage> frame_image = window->GetNextImage();
+  auto frame = rhi::QueryInterfacePtr<IMetalSwapChainImage>(frame_image.Get());
   if (!frame || !RetainResource(frame.Get()))
     return false;
 
-  if (!target->RecordImGui(this, frame.Get())) {
+  if (!target->RecordImGui(this, frame_image.Get())) {
     recording_failed_ = true;
     return false;
   }
@@ -138,7 +148,7 @@ bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
   return true;
 }
 
-bool MetalCommandContext::EndRecording() {
+bool MetalCommandContextImpl::EndRecording() {
 #if !defined(NDEBUG)
   if (render_target_) {
     recording_failed_ = true;
@@ -151,28 +161,29 @@ bool MetalCommandContext::EndRecording() {
   return true;
 }
 
-CommandContext::SubmitResult MetalCommandContext::SubmitNative(const SubmitInfo &info, Event signal) {
+IMetalCommandContext::SubmitResult MetalCommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
     return SUBMIT_RESULT_REJECTED;
   }
   for (const auto &present : presents_) {
-    if (!present.second->IsValid())
+    if (!rhi::QueryInterfacePtr<IImage>(present.second)->IsValid())
       return SUBMIT_RESULT_REJECTED;
   }
 #endif
   {
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     if (!info.waits.empty()) {
-      auto preamble = static_cast<MetalQueue *>(OwnerQueue())->CreateCommandBuffer();
+      auto preamble = queue_->CreateCommandBuffer();
       if (!preamble)
         return SUBMIT_RESULT_REJECTED;
       for (const auto &wait : info.waits)
-        preamble->encodeWait(static_cast<MetalTimeline *>(wait.timeline)->NativeEvent(), wait.value);
+        preamble->encodeWait(rhi::QueryInterfacePtr<IMetalTimeline>(wait.timeline).Get()->NativeEvent(), wait.value);
       preamble->commit();
     }
-    commands_->encodeSignalEvent(static_cast<MetalTimeline *>(signal.timeline)->NativeEvent(), signal.value);
+    commands_->encodeSignalEvent(rhi::QueryInterfacePtr<IMetalTimeline>(signal.timeline).Get()->NativeEvent(),
+                                 signal.value);
     for (const auto &present : presents_)
       commands_->presentDrawable(present.second->NativeDrawable());
     device_->ObserveCompletion(commands_.get(), signal);
@@ -187,7 +198,7 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative(const SubmitInfo 
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-void MetalCommandContext::UpdatePresentedImages() {
+void MetalCommandContextImpl::UpdatePresentedImages() {
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next Metal drawable after submission.");
@@ -195,10 +206,10 @@ void MetalCommandContext::UpdatePresentedImages() {
   }
 }
 
-SubmissionStatus MetalCommandContext::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {
+SubmissionStatus MetalCommandContextImpl::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   if (commands_->status() == MTL::CommandBufferStatusError) {
-    static_cast<MetalTimeline *>(signal.timeline)->MarkFailed();
+    rhi::QueryInterfacePtr<IMetalTimeline>(signal.timeline).Get()->MarkFailed();
     device_->NotifyTimelineFailure();
     ReportMetalError(commands_->error(), "Metal command buffer failed",
                      commands_->errorOptions() & MTL::CommandBufferErrorOptionEncoderExecutionStatus);
@@ -213,22 +224,21 @@ SubmissionStatus MetalCommandContext::PollCompletion(Event signal, uint64_t comp
   return SUBMISSION_STATUS_COMPLETED;
 }
 
-MetalCommandContext::~MetalCommandContext() {
+MetalCommandContextImpl::~MetalCommandContextImpl() {
   if (encoder_)
     encoder_->endEncoding();
 }
 
-bool MetalCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
+bool MetalCommandContextImpl::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
+  auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
 #if !defined(NDEBUG)
-  auto native = dynamic_cast<MetalBuffer *>(buffer);
-  if (!native || native->Owner() != device_ || sealed_ || render_target_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_ || render_target_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
-  if (!data || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+  if (!data || !size || offset > buffer->GetDesc().size || size > buffer->GetDesc().size - offset) {
     recording_failed_ = true;
     return false;
   }
@@ -237,31 +247,38 @@ bool MetalCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, cons
     recording_failed_ = true;
     return false;
   }
-  return CmdCopyBuffer(upload.Get(), 0, native, offset, size);
+  return CopyBuffer(upload.Get(), 0, native, offset, size);
 }
 
-bool MetalCommandContext::CmdCopyBuffer(IBuffer *source,
-                                        uint64_t source_offset,
-                                        IBuffer *destination,
-                                        uint64_t destination_offset,
-                                        uint64_t size) {
+bool MetalCommandContextImpl::CmdCopyBuffer(IBuffer *source,
+                                            uint64_t source_offset,
+                                            IBuffer *destination,
+                                            uint64_t destination_offset,
+                                            uint64_t size) {
+  auto src = rhi::QueryInterfacePtr<IMetalBuffer>(source).Get();
+  auto dst = rhi::QueryInterfacePtr<IMetalBuffer>(destination).Get();
 #if !defined(NDEBUG)
-  auto src = dynamic_cast<MetalBuffer *>(source);
-  auto dst = dynamic_cast<MetalBuffer *>(destination);
-  if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_ || render_target_) {
+  assert(!src || src->Owner() == device_);
+  assert(!dst || dst->Owner() == device_);
+  if (!src || !dst || sealed_ || render_target_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto src = dynamic_cast<MetalBuffer *>(source);
-  auto dst = dynamic_cast<MetalBuffer *>(destination);
 #endif
-  if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
-      destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
+  if (src == dst || !size || source_offset > source->GetDesc().size || size > source->GetDesc().size - source_offset ||
+      destination_offset > destination->GetDesc().size || size > destination->GetDesc().size - destination_offset) {
     recording_failed_ = true;
     return false;
   }
-  if (!RetainResource(source) || !RetainResource(destination))
+  return CopyBuffer(src, source_offset, dst, destination_offset, size);
+}
+
+bool MetalCommandContextImpl::CopyBuffer(IMetalBuffer *src,
+                                         uint64_t source_offset,
+                                         IMetalBuffer *dst,
+                                         uint64_t destination_offset,
+                                         uint64_t size) {
+  if (!RetainResource(src) || !RetainResource(dst))
     return false;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto blit = commands_->blitCommandEncoder();
@@ -274,18 +291,18 @@ bool MetalCommandContext::CmdCopyBuffer(IBuffer *source,
   return true;
 }
 
-bool MetalCommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
-  auto native = dynamic_cast<MetalImage *>(image);
-  const uint64_t pitch = native ? uint64_t(native->GetDesc().width) * ImageFormatSize(native->GetDesc().format) : 0;
-  if (sealed_ || encoder_ || !native || !native->IsValid() ||
+bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
+  auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
+  const uint64_t pitch = native ? uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) : 0;
+  if (sealed_ || encoder_ || !native || !image->IsValid() ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
-      !IsColorFormat(native->GetDesc().format) || !pitch || row_pitch < pitch ||
-      (native->GetDesc().height - 1) > (SIZE_MAX - pitch) / row_pitch) {
+      !IsColorFormat(image->GetDesc().format) || !pitch || row_pitch < pitch ||
+      (image->GetDesc().height - 1) > (SIZE_MAX - pitch) / row_pitch) {
     recording_failed_ = true;
     return false;
   }
 
-  const auto desc = native->GetDesc();
+  const auto desc = image->GetDesc();
   const uint64_t size = pitch * desc.height;
   auto upload = device_->UploadPool().Acquire(size);
   if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
@@ -308,21 +325,21 @@ bool MetalCommandContext::CmdUploadImage(IImage *image, const void *data, uint64
   return true;
 }
 
-bool MetalCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
-  auto native = dynamic_cast<MetalBindingGroup *>(group);
+bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group) {
+  auto native = rhi::QueryInterfacePtr<IMetalBindingGroup>(group).Get();
   if (sealed_ || !native_program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
-      !SameBindingLayout(native->GetLayout(), native_program_->BindingLayout().groups[index]) ||
+      !SameBindingLayout(group->GetLayout(), native_program_->BindingLayout().groups[index]) ||
       !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
   }
-  auto version = static_cast<MetalBindingGroup::Version *>(native->CurrentVersion());
+  auto version = native->CurrentVersion();
 #if !defined(NDEBUG)
   for (size_t binding = 0; binding < version->GetLayout().bindings.size(); ++binding) {
     const auto type = version->GetLayout().bindings[binding].type;
     if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
       for (const auto &image : version->GetReferences()[binding]) {
-        if (!static_cast<MetalImage *>(image.Get())->SupportsQueue(OwnerQueue())) {
+        if (!rhi::QueryInterfacePtr<IMetalImage>(image.Get()).Get()->SupportsQueue(OwnerQueue())) {
           recording_failed_ = true;
           return false;
         }
@@ -338,8 +355,8 @@ bool MetalCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   return true;
 }
 
-bool MetalCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
-  auto native = dynamic_cast<MetalComputeProgram *>(program);
+bool MetalCommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
+  auto native = rhi::QueryInterfacePtr<IMetalComputeProgram>(program).Get();
   if (sealed_ || encoder_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
@@ -353,7 +370,7 @@ bool MetalCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
   return true;
 }
 
-bool MetalCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
+bool MetalCommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
   if (sealed_ || encoder_ || !compute_program_ || recording_failed_) {
     recording_failed_ = true;
     return false;
@@ -385,23 +402,21 @@ bool MetalCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
   return true;
 }
 
-bool MetalCommandContext::CmdBindProgram(IProgram *program) {
+bool MetalCommandContextImpl::CmdBindProgram(IProgram *program) {
+  auto native = rhi::QueryInterfacePtr<IMetalProgram>(program).Get();
 #if !defined(NDEBUG)
-  auto native = dynamic_cast<MetalProgram *>(program);
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<MetalProgram *>(program);
 #endif
   if (!RetainResource(native))
     return false;
 
-  vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), {});
-  groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
+  vertex_buffers_.assign(program->GetDesc().vertex_bindings.size(), {});
+  groups_.assign(program->GetDesc().pipeline_layout.groups.size(), nullptr);
 
-  program_ = native;
+  program_ = program;
   compute_program_ = nullptr;
   native_program_ = native;
   if (encoder_)
@@ -409,9 +424,10 @@ bool MetalCommandContext::CmdBindProgram(IProgram *program) {
   return true;
 }
 
-void MetalCommandContext::ApplyBindings() {
+void MetalCommandContextImpl::ApplyBindings() {
   if (program_) {
-    encoder_->setRenderPipelineState(program_->NativePipeline());
+    auto native = rhi::QueryInterfacePtr<IMetalProgram>(program_);
+    encoder_->setRenderPipelineState(native->NativePipeline());
     const auto &raster = program_->GetDesc().rasterizer;
     const MTL::CullMode cull_modes[] = {MTL::CullModeNone, MTL::CullModeFront, MTL::CullModeBack};
     encoder_->setCullMode(cull_modes[raster.cull_mode]);
@@ -419,7 +435,7 @@ void MetalCommandContext::ApplyBindings() {
                                                                                       : MTL::WindingClockwise);
     encoder_->setTriangleFillMode(raster.fill_mode == FILL_MODE_WIREFRAME ? MTL::TriangleFillModeLines
                                                                           : MTL::TriangleFillModeFill);
-    encoder_->setDepthStencilState(program_->NativeDepthStencil());
+    encoder_->setDepthStencilState(native->NativeDepthStencil());
     encoder_->setStencilReferenceValue(program_->GetDesc().depth_stencil.stencil_reference);
   }
   for (uint32_t i = 0; i < groups_.size(); ++i)
@@ -428,7 +444,7 @@ void MetalCommandContext::ApplyBindings() {
   for (size_t i = 0; i < vertex_buffers_.size(); ++i)
     if (vertex_buffers_[i].first)
       encoder_->setVertexBuffer(vertex_buffers_[i].first->NativeBuffer(), vertex_buffers_[i].second,
-                                i + MetalProgram::VertexBufferBase);
+                                i + IMetalProgram::VertexBufferBase);
   if (viewport_set_)
     encoder_->setViewport(MTL::Viewport{viewport_.x, viewport_.y, viewport_.width, viewport_.height,
                                         viewport_.min_depth, viewport_.max_depth});
@@ -436,7 +452,7 @@ void MetalCommandContext::ApplyBindings() {
     ApplyScissor();
 }
 
-void MetalCommandContext::ApplyScissor() {
+void MetalCommandContextImpl::ApplyScissor() {
   // Metal requires the native scissor to fit the current attachment. Preserve
   // the API state and intersect it again when switching to a different target.
   const auto desc = render_target_->GetDesc();
@@ -447,7 +463,7 @@ void MetalCommandContext::ApplyScissor() {
   encoder_->setScissorRect(MTL::ScissorRect{x, y, right - x, bottom - y});
 }
 
-bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
+bool MetalCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
   if (sealed_ || encoder_ || info.color_attachments.size() > 8 ||
       (info.color_attachments.empty() && !info.depth_stencil.image)) {
     recording_failed_ = true;
@@ -455,15 +471,15 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   }
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto pass = MTL::RenderPassDescriptor::renderPassDescriptor();
-  MetalImage *native = nullptr;
+  IImage *target = nullptr;
   uint32_t width = 0, height = 0;
-  auto validate = [&](IImage *image, AttachmentLoadOp load, AttachmentStoreOp store) -> MetalImage * {
-    auto value = dynamic_cast<MetalImage *>(image);
-    if (!value || !value->IsValid() || (value->DeviceIdentity() != device_ || !value->SupportsQueue(OwnerQueue())) ||
+  auto validate = [&](IImage *image, AttachmentLoadOp load, AttachmentStoreOp store) -> IMetalImage * {
+    auto value = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
+    if (!value || !image->IsValid() || (value->DeviceIdentity() != device_ || !value->SupportsQueue(OwnerQueue())) ||
         load < ATTACHMENT_LOAD_OP_LOAD || load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE ||
         store > ATTACHMENT_STORE_OP_DISCARD)
       return nullptr;
-    auto desc = value->GetDesc();
+    auto desc = image->GetDesc();
     if (width && (width != desc.width || height != desc.height))
       return nullptr;
     width = desc.width;
@@ -480,7 +496,7 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   for (size_t i = 0; i < info.color_attachments.size(); ++i) {
     auto &a = info.color_attachments[i];
     auto image = validate(a.color_attachment, a.load_op, a.store_op);
-    if (!image || IsDepthFormat(image->GetDesc().format)) {
+    if (!image || IsDepthFormat(a.color_attachment->GetDesc().format)) {
       recording_failed_ = true;
       return false;
     }
@@ -489,29 +505,29 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
         recording_failed_ = true;
         return false;
       }
-    native = image;
-    color_formats_.push_back(image->GetDesc().format);
-    color_targets_.push_back(image);
+    target = a.color_attachment;
+    color_formats_.push_back(a.color_attachment->GetDesc().format);
+    color_targets_.push_back(a.color_attachment);
     auto color = pass->colorAttachments()->object(i);
     color->setTexture(image->NativeImage());
     color->setLoadAction(loads[a.load_op]);
     color->setStoreAction(store(a.store_op));
     if (a.load_op == ATTACHMENT_LOAD_OP_CLEAR)
-      color->setClearColor(NativeClearColor(image->GetDesc().format, a.clear_value));
+      color->setClearColor(NativeClearColor(a.color_attachment->GetDesc().format, a.clear_value));
   }
 
   depth_format_ = IMAGE_FORMAT_UNKNOWN;
   const auto &ds = info.depth_stencil;
   if (ds.image) {
     auto image = validate(ds.image, ds.depth_load_op, ds.depth_store_op);
-    if (!image || !IsDepthFormat(image->GetDesc().format) || ds.stencil_load_op < ATTACHMENT_LOAD_OP_LOAD ||
+    if (!image || !IsDepthFormat(ds.image->GetDesc().format) || ds.stencil_load_op < ATTACHMENT_LOAD_OP_LOAD ||
         ds.stencil_load_op > ATTACHMENT_LOAD_OP_DISCARD || ds.stencil_store_op < ATTACHMENT_STORE_OP_STORE ||
         ds.stencil_store_op > ATTACHMENT_STORE_OP_DISCARD) {
       recording_failed_ = true;
       return false;
     }
-    native = image;
-    depth_format_ = image->GetDesc().format;
+    target = ds.image;
+    depth_format_ = ds.image->GetDesc().format;
     auto depth = pass->depthAttachment();
     depth->setTexture(image->NativeImage());
     depth->setLoadAction(loads[ds.depth_load_op]);
@@ -530,12 +546,12 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     recording_failed_ = true;
     return false;
   }
-  render_target_ = native;
+  render_target_ = target;
   ApplyBindings();
   return true;
 }
 
-bool MetalCommandContext::CmdEndRendering() {
+bool MetalCommandContextImpl::CmdEndRendering() {
 #if !defined(NDEBUG)
   if (sealed_ || !render_target_) {
     recording_failed_ = true;
@@ -548,45 +564,42 @@ bool MetalCommandContext::CmdEndRendering() {
   encoder_.reset();
   render_target_ = nullptr;
   color_targets_.clear();
-  rendering_ = {};
   return true;
 }
 
-bool MetalCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
+bool MetalCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
+  auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
 #if !defined(NDEBUG)
-  auto native = dynamic_cast<MetalBuffer *>(buffer);
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
-  if (!RetainResource(buffer))
+  if (!RetainResource(native))
     return false;
-  if (!program_ || binding >= vertex_buffers_.size() || offset >= native->GetDesc().size) {
+  if (!program_ || binding >= vertex_buffers_.size() || offset >= buffer->GetDesc().size) {
     recording_failed_ = true;
     return false;
   }
   vertex_buffers_[binding] = {native, offset};
   if (encoder_)
-    encoder_->setVertexBuffer(native->NativeBuffer(), offset, binding + MetalProgram::VertexBufferBase);
+    encoder_->setVertexBuffer(native->NativeBuffer(), offset, binding + IMetalProgram::VertexBufferBase);
   return true;
 }
 
-bool MetalCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
+bool MetalCommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
+  auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
 #if !defined(NDEBUG)
-  auto native = dynamic_cast<MetalBuffer *>(buffer);
-  if (!native || native->Owner() != device_ || sealed_) {
+  assert(!native || native->Owner() == device_);
+  if (!native || sealed_) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
-  if (!RetainResource(buffer))
+  if (!RetainResource(native))
     return false;
-  if ((format != INDEX_FORMAT_UINT16 && format != INDEX_FORMAT_UINT32) || offset >= native->GetDesc().size ||
+  if ((format != INDEX_FORMAT_UINT16 && format != INDEX_FORMAT_UINT32) || offset >= buffer->GetDesc().size ||
       offset % (format == INDEX_FORMAT_UINT16 ? 2 : 4)) {
     recording_failed_ = true;
     return false;
@@ -597,7 +610,7 @@ bool MetalCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format
   return true;
 }
 
-bool MetalCommandContext::CmdSetViewport(const Viewport &viewport) {
+bool MetalCommandContextImpl::CmdSetViewport(const Viewport &viewport) {
 #if !defined(NDEBUG)
   if (sealed_ || viewport.width <= 0 || viewport.height <= 0) {
     recording_failed_ = true;
@@ -614,7 +627,7 @@ bool MetalCommandContext::CmdSetViewport(const Viewport &viewport) {
   return true;
 }
 
-bool MetalCommandContext::CmdSetScissor(const Scissor &scissor) {
+bool MetalCommandContextImpl::CmdSetScissor(const Scissor &scissor) {
 #if !defined(NDEBUG)
   if (sealed_ || !scissor.width || !scissor.height || scissor.x < 0 || scissor.y < 0) {
     recording_failed_ = true;
@@ -630,7 +643,7 @@ bool MetalCommandContext::CmdSetScissor(const Scissor &scissor) {
   return true;
 }
 
-bool MetalCommandContext::ValidateDraw(bool indexed) {
+bool MetalCommandContextImpl::ValidateDraw(bool indexed) {
 #if !defined(NDEBUG)
   if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_ || (indexed && !index_)) {
     recording_failed_ = true;
@@ -668,10 +681,10 @@ bool MetalCommandContext::ValidateDraw(bool indexed) {
   return !recording_failed_;
 }
 
-bool MetalCommandContext::CmdDraw(uint32_t vertex_count,
-                                  uint32_t instance_count,
-                                  uint32_t first_vertex,
-                                  uint32_t first_instance) {
+bool MetalCommandContextImpl::CmdDraw(uint32_t vertex_count,
+                                      uint32_t instance_count,
+                                      uint32_t first_vertex,
+                                      uint32_t first_instance) {
   if (!ValidateDraw(false))
     return false;
   encoder_->drawPrimitives(NativePrimitiveTopology(program_->GetDesc().topology), first_vertex, vertex_count,
@@ -679,11 +692,11 @@ bool MetalCommandContext::CmdDraw(uint32_t vertex_count,
   return true;
 }
 
-bool MetalCommandContext::CmdDrawIndexed(uint32_t index_count,
-                                         uint32_t instance_count,
-                                         uint32_t first_index,
-                                         int32_t vertex_offset,
-                                         uint32_t first_instance) {
+bool MetalCommandContextImpl::CmdDrawIndexed(uint32_t index_count,
+                                             uint32_t instance_count,
+                                             uint32_t first_index,
+                                             int32_t vertex_offset,
+                                             uint32_t first_instance) {
   if (!ValidateDraw(true))
     return false;
   encoder_->drawIndexedPrimitives(
@@ -694,49 +707,46 @@ bool MetalCommandContext::CmdDrawIndexed(uint32_t index_count,
   return true;
 }
 
-IDownloadToken *MetalCommandContext::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+IDownloadToken *MetalCommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) {
+  auto native = rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get();
 #if !defined(NDEBUG)
-  auto native = dynamic_cast<MetalBuffer *>(buffer);
-  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
+  assert(!native || native->Owner() == device_);
+  if (sealed_ || render_target_ || !native) {
     recording_failed_ = true;
     return nullptr;
   }
-#else
-  auto native = dynamic_cast<MetalBuffer *>(buffer);
 #endif
-  if (recording_failed_ || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+  if (recording_failed_ || !size || offset > buffer->GetDesc().size || size > buffer->GetDesc().size - offset) {
     recording_failed_ = true;
     return nullptr;
   }
   auto lease = device_->DownloadPool().Acquire(size);
-  if (!lease || !CmdCopyBuffer(buffer, offset, lease.Get(), 0, size)) {
+  if (!lease || !CopyBuffer(native, offset, lease.Get(), 0, size)) {
     recording_failed_ = true;
     return nullptr;
   }
-  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new MetalDownloadToken(std::move(lease), size)));
+  return RegisterDownload(ObjectPtr<IMetalDownloadToken>::Adopt(CreateMetalDownloadToken(std::move(lease), size)));
 }
 
-IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+IDownloadToken *MetalCommandContextImpl::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
+  auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
 #if !defined(NDEBUG)
-  auto native = dynamic_cast<MetalImage *>(image);
   if (sealed_ || render_target_ || !native ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue()))) {
     recording_failed_ = true;
     return nullptr;
   }
-  if (native->GetDesc().format == IMAGE_FORMAT_D24_UNORM_S8_UINT) {
+  if (image->GetDesc().format == IMAGE_FORMAT_D24_UNORM_S8_UINT) {
     recording_failed_ = true;
     ReportError(-1, "CmdDownloadImage does not support D24S8 readback; use a depth-only or color image.");
     return nullptr;
   }
-#else
-  auto native = static_cast<MetalImage *>(image);
 #endif
-  if (recording_failed_ || !native->IsValid()) {
+  if (recording_failed_ || !image->IsValid()) {
     recording_failed_ = true;
     return nullptr;
   }
-  const auto desc = native->GetDesc();
+  const auto desc = image->GetDesc();
   if (region.x >= desc.width || region.y >= desc.height) {
     recording_failed_ = true;
     return nullptr;
@@ -773,7 +783,146 @@ IDownloadToken *MetalCommandContext::CmdDownloadImage(IImage *image, const Image
                           MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height);
   }
   blit->endEncoding();
-  return RegisterDownload(ObjectPtr<DownloadToken>::Adopt(new MetalDownloadToken(
+  return RegisterDownload(ObjectPtr<IMetalDownloadToken>::Adopt(CreateMetalDownloadToken(
       std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
+}
+
+ICommandContext *CreateMetalCommandContext(IMetalQueue *queue) {
+  return MetalCommandContextImpl::Create(queue);
+}
+
+bool MetalCommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
+  auto native = rhi::QueryInterfacePtr<IMetalWindow>(window).Get();
+  auto image = rhi::QueryInterfacePtr<IMetalImage>(target).Get();
+#if !defined(NDEBUG)
+  if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
+      (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
+      sealed_ || render_target_) {
+    recording_failed_ = true;
+    ReportError(-1,
+                "CmdDrawImGui requires a window and target from this device outside rendering on the window thread.");
+    return false;
+  }
+#endif
+  const auto format = target->GetDesc().format;
+  if (!IsColorFormat(format) || IsSignedIntegerFormat(format) || IsUnsignedIntegerFormat(format)) {
+    recording_failed_ = true;
+    ReportError(-1, "CmdDrawImGui requires a non-integer color target.");
+    return false;
+  }
+  if (!RetainResource(target))
+    return false;
+  if (!native->RecordImGui(this, target, COLOR_SPACE_BT709_LINEAR, 1.0f)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return true;
+}
+
+bool MetalCommandContextImpl::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) {
+  auto native = rhi::QueryInterfacePtr<IMetalWindow>(window).Get();
+  auto image = rhi::QueryInterfacePtr<IMetalImage>(frame_img).Get();
+#if !defined(NDEBUG)
+  if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
+      (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
+      sealed_ || render_target_) {
+    recording_failed_ = true;
+    ReportError(-1,
+                "CmdPresentImage requires a window and image from this device outside rendering on the window thread.");
+    return false;
+  }
+#endif
+  if (!RetainResource(frame_img))
+    return false;
+  if (!native->RecordPresentImage(this, frame_img, frame_color_space)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return CmdPresent(window);
+}
+
+bool MetalCommandContextImpl::CmdBindRayTracingProgram(IRayTracingProgram *) {
+  recording_failed_ = true;
+  return false;
+}
+
+bool MetalCommandContextImpl::CmdDispatchRays(uint32_t, uint32_t, uint32_t, IShaderBindingTable *) {
+  recording_failed_ = true;
+  return false;
+}
+
+rhi::ISubmissionToken *MetalCommandContextImpl::Submit(const rhi::SubmitInfo &info) {
+  try {
+    auto submission = queue_->Submit(ObjectPtr<IMetalCommandContext>::Retain(this), info);
+    return rhi::QueryInterfacePtr<ISubmissionToken>(submission.Get()).Detach();
+  } catch (const std::system_error &error) {
+    ReportError(error.code().value(), error.what());
+  }
+  return nullptr;
+}
+
+void MetalCommandContextImpl::BindDownloads(rhi::ISubmissionToken *submission) {
+  for (const auto &token : downloads_)
+    token->BindSubmission(submission);
+}
+
+void MetalCommandContextImpl::ReleaseDownloads() {
+  downloads_.clear();
+}
+
+IDownloadToken *MetalCommandContextImpl::RegisterDownload(ObjectPtr<IMetalDownloadToken> token) {
+  downloads_.push_back(token);
+  return rhi::QueryInterfacePtr<IDownloadToken>(token.Get()).Detach();
+}
+
+bool MetalCommandContextImpl::RetainResource(rhi::IObject *resource) {
+#if !defined(NDEBUG)
+  if (sealed_)
+    return false;
+#endif
+  if (recording_failed_)
+    return false;
+  auto identity = rhi::QueryInterfacePtr<rhi::IObject>(resource);
+  if (!identity)
+    return false;
+  resource = identity.Get();
+  if (resources_.find(resource) != resources_.end())
+    return true;
+  resources_.emplace(resource, ObjectPtr<rhi::IObject>::Adopt(identity.Detach()));
+
+  return true;
+}
+
+bool MetalCommandContextImpl::Seal() {
+  if (recording_failed_)
+    return false;
+#if !defined(NDEBUG)
+  if (sealed_) {
+    ReportError(-1, "Cannot submit a command context twice.");
+    return false;
+  }
+#endif
+  sealed_ = true;
+  if (!EndRecording()) {
+    recording_failed_ = true;
+    return false;
+  }
+  return true;
+}
+
+IMetalQueue *MetalCommandContextImpl::OwnerQueue() const {
+  return queue_;
+}
+
+const void *MetalCommandContextImpl::DeviceIdentity() const {
+  return queue_->Owner();
+}
+
+void MetalCommandContextImpl::MarkSubmitted() {
+  submitted_ = true;
+}
+
+bool MetalCommandContextImpl::WasSubmitted() const {
+  return submitted_;
 }
 }  // namespace grassland::rhi::backend::metal

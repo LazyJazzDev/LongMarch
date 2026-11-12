@@ -6,7 +6,6 @@
 #include <fstream>
 #include <limits>
 
-#include "grassland/rhi/backend/backend_device.h"
 #include "imgui_impl_glfw.h"
 
 #ifdef _WIN32
@@ -90,7 +89,7 @@ float4 PSMain(Varying input) : SV_Target0 {
 
 }  // namespace
 
-std::unique_ptr<WindowImGui> WindowImGui::Create(Device *device,
+std::unique_ptr<WindowImGui> WindowImGui::Create(IDevice *device,
                                                  GLFWwindow *window,
                                                  const char *font_file_path,
                                                  float font_size) {
@@ -166,8 +165,8 @@ bool WindowImGui::Initialize(GLFWwindow *window, const char *font_file_path, flo
       device_->CreateSampler({SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_CLAMP_TO_EDGE});
   if (!font_ || !sampler_)
     return false;
-  ObjPtr<ICommandContext> upload = ObjPtr<IQueue>(device_->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<ICommandContext> upload = queue ? queue->CreateCommandContext() : nullptr;
   if (!upload || !queue || !upload->CmdUploadImage(font_.Get(), pixels, uint64_t(width) * 4))
     return false;
   ObjPtr<ISubmissionToken> token = upload->Submit();

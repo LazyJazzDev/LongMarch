@@ -1,22 +1,25 @@
 #pragma once
 #include "grassland/rhi/backend/backend_cuda_buffer.h"
-#if defined(LONGMARCH_CUDA_RUNTIME)
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
-
+#if defined(LONGMARCH_CUDA_RUNTIME)
 namespace grassland::rhi::backend::vulkan {
-class VulkanDevice;
-
-// Implements the most-derived interface directly: one interface chain and reference count.
-class VulkanCUDABuffer final : public Object<ICUDABuffer>, public VulkanBuffer {
+class VulkanCUDABufferImpl final : public Object<rhi::ICUDABuffer, IVulkanBuffer> {
  public:
-  static VulkanCUDABuffer *Create(VulkanDevice *device, const BufferDesc &desc);
+  static rhi::IBuffer *Create(IVulkanDevice *device, const BufferDesc &desc);
+  ~VulkanCUDABufferImpl() override;
   BufferDesc GetDesc() const override;
   void *GetDevicePointer() const override;
+
+  IVulkanDevice *Owner() const override {
+    return owner_;
+  }
+
   VkBuffer NativeBuffer() const override;
-  ~VulkanCUDABuffer() override;
 
  private:
-  VulkanCUDABuffer(VulkanDevice *device, const BufferDesc &desc, int cuda_device);
+  VulkanCUDABufferImpl(IVulkanDevice *device, const BufferDesc &desc, int cuda_device);
+  IVulkanDevice *owner_;
+  BufferDesc desc_;
   VkBuffer buffer_{};
   VkDeviceMemory memory_{};
   CUDAMapping mapping_;

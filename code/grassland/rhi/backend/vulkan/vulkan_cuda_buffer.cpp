@@ -13,36 +13,37 @@ constexpr auto memory_handle = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
 }  // namespace
 
-VulkanCUDABuffer::VulkanCUDABuffer(VulkanDevice *device, const BufferDesc &desc, int cuda_device)
-    : VulkanBuffer(device, desc),
+VulkanCUDABufferImpl::VulkanCUDABufferImpl(IVulkanDevice *device, const BufferDesc &desc, int cuda_device)
+    : owner_(device),
+      desc_(desc),
       mapping_(cuda_device) {
 }
 
-VulkanCUDABuffer::~VulkanCUDABuffer() {
+VulkanCUDABufferImpl::~VulkanCUDABufferImpl() {
   mapping_.Reset();
-  auto device = static_cast<VulkanDevice *>(Owner())->NativeDevice();
+  auto device = static_cast<IVulkanDevice *>(Owner())->NativeDevice();
   if (buffer_)
     vkDestroyBuffer(device, buffer_, nullptr);
   if (memory_)
     vkFreeMemory(device, memory_, nullptr);
 }
 
-BufferDesc VulkanCUDABuffer::GetDesc() const {
+BufferDesc VulkanCUDABufferImpl::GetDesc() const {
   return desc_;
 }
 
-VkBuffer VulkanCUDABuffer::NativeBuffer() const {
+VkBuffer VulkanCUDABufferImpl::NativeBuffer() const {
   return buffer_;
 }
 
-void *VulkanCUDABuffer::GetDevicePointer() const {
+void *VulkanCUDABufferImpl::GetDevicePointer() const {
   return mapping_.Pointer();
 }
 
-VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDesc &desc) {
+rhi::IBuffer *VulkanCUDABufferImpl::Create(IVulkanDevice *device, const BufferDesc &desc) {
   if (!desc.size)
     return nullptr;
-  const int ordinal = device->GetCUDADeviceIndex();
+  const int ordinal = device->GetPhysicalDevice().cuda_device;
   if (ordinal < 0) {
     ReportError(-1, "No CUDA device matches this Vulkan adapter.");
     return nullptr;
@@ -56,7 +57,14 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
 #endif
   VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   buffer.size = desc.size;
-  buffer.usage = BufferUsage(device);
+  buffer.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  if (device->GetPhysicalDevice().ray_query_feature || device->GetPhysicalDevice().ray_tracing_pipeline_feature)
+    buffer.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+  if (device->GetPhysicalDevice().ray_tracing_pipeline_feature)
+    buffer.usage |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
   VkPhysicalDeviceExternalBufferInfo query{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO};
   query.usage = buffer.usage;
   query.handleType = memory_handle;
@@ -66,7 +74,7 @@ VulkanCUDABuffer *VulkanCUDABuffer::Create(VulkanDevice *device, const BufferDes
     ReportError(-1, "CUDA buffer allocation is not exportable.");
     return nullptr;
   }
-  auto object = std::unique_ptr<VulkanCUDABuffer>(new VulkanCUDABuffer(device, desc, ordinal));
+  auto object = std::unique_ptr<VulkanCUDABufferImpl>(new VulkanCUDABufferImpl(device, desc, ordinal));
   VkExternalMemoryBufferCreateInfo external{VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO};
   external.handleTypes = memory_handle;
   buffer.pNext = &external;

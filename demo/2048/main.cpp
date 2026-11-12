@@ -9,18 +9,18 @@
 
 namespace {
 
-graphics::BackendAPI ParseBackend(const std::string &name) {
+rhi::BackendAPI ParseBackend(const std::string &name) {
   if (name == "auto") {
-    return graphics::BACKEND_API_DEFAULT;
+    return rhi::BACKEND_API_DEFAULT;
   }
   if (name == "vulkan") {
-    return graphics::BACKEND_API_VULKAN;
+    return rhi::BACKEND_API_VULKAN;
   }
   if (name == "d3d12") {
-    return graphics::BACKEND_API_D3D12;
+    return rhi::BACKEND_API_D3D12;
   }
   if (name == "metal") {
-    return graphics::BACKEND_API_METAL;
+    return rhi::BACKEND_API_METAL;
   }
   throw std::invalid_argument("Unknown backend: " + name);
 }
@@ -96,7 +96,7 @@ int RunBenchmark(int games, float budget_ms, uint32_t seed) {
 int main(int argc, char *argv[]) {
   try {
     int frames = 0;
-    auto api = graphics::BACKEND_API_DEFAULT;
+    auto api = rhi::BACKEND_API_DEFAULT;
     std::string screenshot;
     int benchmark_games = 0;
     float ai_budget_ms = 150.0f;
@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
     application.SetScreenshotPath(screenshot);
     application.SetInitialAiEnabled(autoplay);
     application.SetAiStopTile(stop_tile);
-    application.Run(frames);
+    return application.Run(frames) ? 0 : 1;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';
     return 1;

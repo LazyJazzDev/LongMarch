@@ -1,26 +1,32 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_program.h"
 
+#include <unordered_set>
+
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanProgram::VulkanProgram(VulkanDevice *device, const ProgramDesc &desc)
-    : Program(device, desc),
-      VulkanProgramBase(device->NativeDevice()) {
+VulkanProgramImpl::VulkanProgramImpl(IVulkanDevice *device, const ProgramDesc &desc) {
+  InitializeProgram(device, desc);
+  InitializeVulkanProgramBase(device->NativeDevice());
 }
 
-VulkanProgram::~VulkanProgram() {
-  auto device = static_cast<VulkanDevice *>(device_)->NativeDevice();
+VulkanProgramImpl::~VulkanProgramImpl() {
+  auto device = LayoutDevice();
   if (pipeline_)
     vkDestroyPipeline(device, pipeline_, nullptr);
+
+  DestroyVulkanProgramBase();
 }
 
-VkPipeline VulkanProgram::NativePipeline() const {
+VkPipeline VulkanProgramImpl::NativePipeline() const {
   return pipeline_;
 }
 
-VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDesc &desc) {
-  auto object = std::unique_ptr<VulkanProgram>(new VulkanProgram(owner_device, desc));
+rhi::IProgram *VulkanProgramImpl::Create(IVulkanDevice *owner_device, const ProgramDesc &desc) {
+  auto object = std::unique_ptr<VulkanProgramImpl>(new VulkanProgramImpl(owner_device, desc));
   auto device = owner_device->NativeDevice();
 
   struct ShaderModules {
@@ -185,5 +191,125 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
   if (!Check(result, "Create graphics pipeline"))
     return nullptr;
   return object.release();
+}
+
+rhi::IProgram *IVulkanProgram::Create(IVulkanDevice *device, const ProgramDesc &desc) {
+  return VulkanProgramImpl::Create(device, desc);
+}
+
+void VulkanProgramImpl::InitializeProgram(IVulkanDevice *device, const ProgramDesc &desc) {
+  device_ = device;
+  desc_ = desc;
+  vertex_shader_ = ObjectPtr<IShader>::Retain(desc.vertex_shader);
+  fragment_shader_ = ObjectPtr<IShader>::Retain(desc.fragment_shader);
+}
+
+const ProgramDesc &VulkanProgramImpl::GetDesc() const {
+  return desc_;
+}
+
+IVulkanDevice *VulkanProgramImpl::Owner() const {
+  return device_;
+}
+
+bool VulkanProgramImpl::ValidateLayout() const {
+  if (desc_.topology < PRIMITIVE_TOPOLOGY_TRIANGLE_LIST || desc_.topology > PRIMITIVE_TOPOLOGY_POINT_LIST ||
+      desc_.rasterizer.cull_mode < CULL_MODE_NONE || desc_.rasterizer.cull_mode > CULL_MODE_BACK ||
+      desc_.rasterizer.front_face < FRONT_FACE_COUNTER_CLOCKWISE ||
+      desc_.rasterizer.front_face > FRONT_FACE_CLOCKWISE || desc_.rasterizer.fill_mode < FILL_MODE_SOLID ||
+      desc_.rasterizer.fill_mode > FILL_MODE_WIREFRAME)
+    return false;
+  if (desc_.pipeline_layout.groups.size() > 8)
+    return false;
+  for (const auto &group : desc_.pipeline_layout.groups)
+    if (!ValidateBindingLayout(group))
+      return false;
+  if (!desc_.vertex_shader || !desc_.fragment_shader)
+    return false;
+  if (desc_.vertex_shader->GetStage() != SHADER_STAGE_VERTEX)
+    return false;
+  if (desc_.fragment_shader->GetStage() != SHADER_STAGE_FRAGMENT)
+    return false;
+  if (desc_.color_formats.size() > 8 || (desc_.color_formats.empty() && !IsDepthFormat(desc_.depth_stencil.format)))
+    return false;
+  for (auto format : desc_.color_formats)
+    if (!IsColorFormat(format))
+      return false;
+  if (!desc_.blend_states.empty() && desc_.blend_states.size() != desc_.color_formats.size())
+    return false;
+  for (size_t i = 0; i < desc_.blend_states.size(); ++i) {
+    if (desc_.blend_states[i].blend_enable &&
+        (IsSignedIntegerFormat(desc_.color_formats[i]) || IsUnsignedIntegerFormat(desc_.color_formats[i])))
+      return false;
+  }
+  for (const auto &blend : desc_.blend_states) {
+    for (auto factor : {blend.src_color, blend.dst_color, blend.src_alpha, blend.dst_alpha})
+      if (factor < BLEND_FACTOR_ZERO || factor > BLEND_FACTOR_ONE_MINUS_DST_ALPHA)
+        return false;
+    for (auto op : {blend.color_op, blend.alpha_op})
+      if (op < BLEND_OP_ADD || op > BLEND_OP_MAX)
+        return false;
+  }
+  const auto &depth = desc_.depth_stencil;
+  if (depth.format != IMAGE_FORMAT_UNKNOWN && !IsDepthFormat(depth.format))
+    return false;
+  if ((depth.depth_test || depth.depth_write || depth.stencil_test) && !IsDepthFormat(depth.format))
+    return false;
+  if (depth.stencil_test && !HasStencil(depth.format))
+    return false;
+  if (depth.depth_compare < COMPARE_NEVER || depth.depth_compare > COMPARE_ALWAYS)
+    return false;
+  for (auto face : {depth.front, depth.back}) {
+    if (face.compare < COMPARE_NEVER || face.compare > COMPARE_ALWAYS)
+      return false;
+    for (auto op : {face.fail_op, face.depth_fail_op, face.pass_op})
+      if (op < STENCIL_KEEP || op > STENCIL_DECREMENT_WRAP)
+        return false;
+  }
+  std::unordered_set<uint32_t> locations;
+  for (const auto &attribute : desc_.vertex_attributes) {
+    if (attribute.binding >= desc_.vertex_bindings.size())
+      return false;
+    auto size = InputTypeSize(attribute.type);
+    auto stride = desc_.vertex_bindings[attribute.binding].stride;
+    if (!size || attribute.offset > stride || size > stride - attribute.offset)
+      return false;
+    if (!locations.insert(attribute.location).second)
+      return false;
+  }
+  return true;
+}
+
+void VulkanProgramImpl::InitializeVulkanProgramBase(VkDevice device) {
+  layout_device_ = device;
+}
+
+void VulkanProgramImpl::DestroyVulkanProgramBase() {
+  if (layout_)
+    vkDestroyPipelineLayout(layout_device_, layout_, nullptr);
+  for (auto layout : set_layouts_)
+    vkDestroyDescriptorSetLayout(layout_device_, layout, nullptr);
+}
+
+VkPipelineLayout VulkanProgramImpl::NativeLayout() const {
+  return layout_;
+}
+
+bool VulkanProgramImpl::CreateLayout(const PipelineLayoutDesc &desc) {
+  set_layouts_.reserve(desc.groups.size());
+  for (const auto &group : desc.groups) {
+    auto layout = CreateBindingLayout(layout_device_, group);
+    if (!layout)
+      return false;
+    set_layouts_.push_back(layout);
+  }
+  VkPipelineLayoutCreateInfo create{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+  create.setLayoutCount = uint32_t(set_layouts_.size());
+  create.pSetLayouts = set_layouts_.data();
+  return Check(vkCreatePipelineLayout(layout_device_, &create, nullptr, &layout_), "Create pipeline layout");
+}
+
+VkDevice VulkanProgramImpl::LayoutDevice() const {
+  return layout_device_;
 }
 }  // namespace grassland::rhi::backend::vulkan

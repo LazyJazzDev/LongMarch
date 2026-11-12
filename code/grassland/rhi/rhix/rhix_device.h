@@ -21,7 +21,6 @@ class Device : public ObjectContainer {
   rhi::IDevice *Get() const noexcept;
   Device() noexcept;
   std::string Name() const;
-  int GetCUDADeviceIndex() const noexcept;
   bool WaitEvents(const std::vector<rhi::Event> &events, bool wait_all = true) const;
   bool SupportRayTracingPipeline() const;
   bool SupportRayQuery() const;

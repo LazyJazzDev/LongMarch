@@ -1,26 +1,30 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanComputeProgram::VulkanComputeProgram(VulkanDevice *device, const ComputeProgramDesc &desc)
-    : ComputeProgram(device, desc),
-      VulkanProgramBase(device->NativeDevice()) {
+VulkanComputeProgramImpl::VulkanComputeProgramImpl(IVulkanDevice *device, const ComputeProgramDesc &desc) {
+  InitializeComputeProgram(device, desc);
+  InitializeVulkanProgramBase(device->NativeDevice());
 }
 
-VulkanComputeProgram::~VulkanComputeProgram() {
-  auto device = static_cast<VulkanDevice *>(device_)->NativeDevice();
+VulkanComputeProgramImpl::~VulkanComputeProgramImpl() {
+  auto device = LayoutDevice();
   if (pipeline_)
     vkDestroyPipeline(device, pipeline_, nullptr);
+
+  DestroyVulkanProgramBase();
 }
 
-VkPipeline VulkanComputeProgram::NativePipeline() const {
+VkPipeline VulkanComputeProgramImpl::NativePipeline() const {
   return pipeline_;
 }
 
-VulkanComputeProgram *VulkanComputeProgram::Create(VulkanDevice *owner_device, const ComputeProgramDesc &desc) {
-  auto object = std::unique_ptr<VulkanComputeProgram>(new VulkanComputeProgram(owner_device, desc));
+rhi::IComputeProgram *VulkanComputeProgramImpl::Create(IVulkanDevice *owner_device, const ComputeProgramDesc &desc) {
+  auto object = std::unique_ptr<VulkanComputeProgramImpl>(new VulkanComputeProgramImpl(owner_device, desc));
   auto device = owner_device->NativeDevice();
   if (!object->ValidateLayout() ||
       !ValidatePipelineBindings(owner_device->NativePhysicalDevice(), object->desc_.pipeline_layout))
@@ -57,5 +61,66 @@ VulkanComputeProgram *VulkanComputeProgram::Create(VulkanDevice *owner_device, c
   if (!Check(result, "Create compute pipeline"))
     return nullptr;
   return object.release();
+}
+
+rhi::IComputeProgram *IVulkanComputeProgram::Create(IVulkanDevice *device, const ComputeProgramDesc &desc) {
+  return VulkanComputeProgramImpl::Create(device, desc);
+}
+
+void VulkanComputeProgramImpl::InitializeComputeProgram(IVulkanDevice *device, const ComputeProgramDesc &desc) {
+  device_ = device;
+  desc_ = desc;
+  shader_ = ObjectPtr<IShader>::Retain(desc.compute_shader);
+}
+
+const ComputeProgramDesc &VulkanComputeProgramImpl::GetDesc() const {
+  return desc_;
+}
+
+IVulkanDevice *VulkanComputeProgramImpl::Owner() const {
+  return device_;
+}
+
+bool VulkanComputeProgramImpl::ValidateLayout() const {
+  if (!desc_.compute_shader || desc_.compute_shader->GetStage() != SHADER_STAGE_COMPUTE ||
+      desc_.pipeline_layout.groups.size() > 8)
+    return false;
+  for (const auto &group : desc_.pipeline_layout.groups)
+    if (!ValidateBindingLayout(group))
+      return false;
+  return true;
+}
+
+void VulkanComputeProgramImpl::InitializeVulkanProgramBase(VkDevice device) {
+  layout_device_ = device;
+}
+
+void VulkanComputeProgramImpl::DestroyVulkanProgramBase() {
+  if (layout_)
+    vkDestroyPipelineLayout(layout_device_, layout_, nullptr);
+  for (auto layout : set_layouts_)
+    vkDestroyDescriptorSetLayout(layout_device_, layout, nullptr);
+}
+
+VkPipelineLayout VulkanComputeProgramImpl::NativeLayout() const {
+  return layout_;
+}
+
+bool VulkanComputeProgramImpl::CreateLayout(const PipelineLayoutDesc &desc) {
+  set_layouts_.reserve(desc.groups.size());
+  for (const auto &group : desc.groups) {
+    auto layout = CreateBindingLayout(layout_device_, group);
+    if (!layout)
+      return false;
+    set_layouts_.push_back(layout);
+  }
+  VkPipelineLayoutCreateInfo create{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+  create.setLayoutCount = uint32_t(set_layouts_.size());
+  create.pSetLayouts = set_layouts_.data();
+  return Check(vkCreatePipelineLayout(layout_device_, &create, nullptr, &layout_), "Create pipeline layout");
+}
+
+VkDevice VulkanComputeProgramImpl::LayoutDevice() const {
+  return layout_device_;
 }
 }  // namespace grassland::rhi::backend::vulkan

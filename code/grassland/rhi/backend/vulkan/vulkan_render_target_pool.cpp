@@ -1,27 +1,42 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
+#include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
 
 #include <algorithm>
 
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
+
 namespace grassland::rhi::backend::vulkan {
-VulkanRenderTargetPool::Lease::Lease(VulkanRenderTargetPool *pool,
-                                     Entry *entry,
-                                     const std::vector<VulkanImage *> &images)
+class VulkanRenderTargetPool::LeaseImpl final : public Object<VulkanRenderTargetPool::ILease> {
+ public:
+  LeaseImpl(VulkanRenderTargetPool *pool, Entry *entry, const std::vector<IVulkanImage *> &images);
+  ~LeaseImpl() override;
+  const std::vector<VkImageView> &VulkanImageViews() const;
+  VkFramebuffer Framebuffer() const;
+
+ private:
+  VulkanRenderTargetPool *pool_;
+  Entry *entry_;
+  std::vector<ObjectPtr<IVulkanImage>> images_;
+};
+
+VulkanRenderTargetPool::LeaseImpl::LeaseImpl(VulkanRenderTargetPool *pool,
+                                             Entry *entry,
+                                             const std::vector<IVulkanImage *> &images)
     : pool_(pool),
       entry_(entry) {
   images_.reserve(images.size());
   for (auto image : images)
-    images_.push_back(ObjectPtr<VulkanImage>::Retain(image));
+    images_.push_back(ObjectPtr<IVulkanImage>::Retain(image));
 }
 
-VulkanRenderTargetPool::Lease::~Lease() {
+VulkanRenderTargetPool::LeaseImpl::~LeaseImpl() {
   pool_->ReleaseEntry(entry_);
 }
 
-const std::vector<VkImageView> &VulkanRenderTargetPool::Lease::Views() const {
+const std::vector<VkImageView> &VulkanRenderTargetPool::LeaseImpl::VulkanImageViews() const {
   return entry_->views;
 }
 
-VkFramebuffer VulkanRenderTargetPool::Lease::Framebuffer() const {
+VkFramebuffer VulkanRenderTargetPool::LeaseImpl::Framebuffer() const {
   return entry_->framebuffer;
 }
 
@@ -108,8 +123,9 @@ VkRenderPass VulkanRenderTargetPool::RenderPass(const std::vector<ImageFormat> &
   return it->second;
 }
 
-ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const std::vector<VulkanImage *> &images,
-                                                                         VkRenderPass pass) {
+ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const std::vector<IVulkanImage *> &images,
+                                                                         VkRenderPass pass,
+                                                                         VkExtent2D extent) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::vector<VkImage> handles;
   for (auto image : images)
@@ -131,8 +147,8 @@ ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const s
       create.renderPass = pass;
       create.attachmentCount = uint32_t(fresh->views.size());
       create.pAttachments = fresh->views.data();
-      create.width = images[0]->GetDesc().width;
-      create.height = images[0]->GetDesc().height;
+      create.width = extent.width;
+      create.height = extent.height;
       create.layers = 1;
       if (!Check(vkCreateFramebuffer(device_, &create, nullptr, &fresh->framebuffer), "Create framebuffer")) {
         DestroyEntry(*fresh);
@@ -142,7 +158,7 @@ ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const s
     entry = fresh.get();
     entries_.push_back(std::move(fresh));
   }
-  auto lease = ObjectPtr<Lease>::Adopt(new Lease(this, entry, images));
+  auto lease = ObjectPtr<Lease>::Adopt(new LeaseImpl(this, entry, images));
   ++entry->leases;
   return lease;
 }

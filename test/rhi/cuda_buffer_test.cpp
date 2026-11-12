@@ -52,7 +52,7 @@ class RhiCUDADevice : public testing::TestWithParam<BackendAPI> {};
 void ExpectCUDAProceduresLoaded(IDevice *device, BackendAPI api) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (api == BACKEND_API_VULKAN) {
-    const auto native = static_cast<backend::vulkan::VulkanDevice *>(device);
+    const auto native = QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device);
 #if defined(_WIN32)
     EXPECT_NE(native->Procedures().GetMemoryWin32HandleKHR, nullptr);
 #else
@@ -83,7 +83,8 @@ TEST_P(RhiCUDADevice, CUDADevicesExposeOrdinalBeforeBufferCreation) {
     ExpectCUDAProceduresLoaded(device.Get(), GetParam());
     int previous = -1;
     ASSERT_EQ(cudaGetDevice(&previous), cudaSuccess);
-    ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({4096});
+    ObjPtr<IBuffer> buffer_base = device->CreateCUDABuffer({4096});
+    auto buffer = QueryInterfacePtr<ICUDABuffer>(buffer_base.Get());
     ASSERT_TRUE(buffer);
     int current = -1;
     ASSERT_EQ(cudaGetDevice(&current), cudaSuccess);
@@ -111,7 +112,9 @@ TEST_P(RhiCUDADevice, NonCUDADevicesRejectCUDABufferCreation) {
     ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(i));
     ASSERT_TRUE(device);
     EXPECT_EQ(device->GetCUDADeviceIndex(), -1);
-    ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({4096});
+    ObjPtr<IBuffer> buffer_base = device->CreateCUDABuffer({4096});
+    auto buffer = QueryInterfacePtr<ICUDABuffer>(buffer_base.Get());
+    EXPECT_FALSE(buffer_base);
     EXPECT_FALSE(buffer);
   }
   if (!matches)
@@ -135,7 +138,8 @@ class RhiCUDABuffer : public testing::TestWithParam<BackendAPI> {
       device_ = core_->CreateDevice(static_cast<int32_t>(i));
       ASSERT_TRUE(device_);
       ASSERT_EQ(device_->GetCUDADeviceIndex(), adapters[i].cuda_device);
-      buffer_ = device_->CreateCUDABuffer({65561});
+      ObjPtr<IBuffer> base = device_->CreateCUDABuffer({65561});
+      buffer_ = QueryInterfacePtr<ICUDABuffer>(base.Get());
       ASSERT_TRUE(buffer_);
       return;
     }
@@ -165,9 +169,12 @@ TEST_P(RhiCUDABuffer, CUDAOnlyCopiesAndOrdinaryInterfaceLifetime) {
   ASSERT_EQ(cudaMemcpy(output.data(), pointer, output.size(), cudaMemcpyDeviceToHost), cudaSuccess);
   EXPECT_EQ(input, output);
   ObjPtr<IBuffer> base = buffer_;
-  EXPECT_EQ(static_cast<ICUDABuffer *>(base.Get()), buffer_.Get());
+  EXPECT_EQ(QueryInterfacePtr<ICUDABuffer>(base.Get()).Get(), buffer_.Get());
   buffer_.Release();
-  auto retained = static_cast<ICUDABuffer *>(base.Get());
+  auto retained = QueryInterfacePtr<ICUDABuffer>(base.Get());
+  ASSERT_TRUE(retained);
+  EXPECT_EQ(QueryInterfacePtr<IObject>(base.Get()).Get(), QueryInterfacePtr<IObject>(retained.Get()).Get());
+  base.Release();
   EXPECT_EQ(retained->GetDevicePointer(), pointer);
   EXPECT_EQ(retained->GetDesc().size, input.size());
   ASSERT_EQ(cudaMemset(pointer, 0x5a, input.size()), cudaSuccess);

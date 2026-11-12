@@ -6,8 +6,9 @@
 #include <string>
 #include <vector>
 
-#include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhi_image.h"
+#include "native_image_test_util.h"
 
 namespace grassland::rhi {
 namespace {
@@ -87,7 +88,7 @@ TEST_P(RhiFormats, IntegerClearsUseNumericValuesForTransferAndRenderPass) {
           c.bytes == 1 ? ClearValue{7u, 23u, 65u, 255u} : ClearValue{UINT32_MAX, 16777217u, 0x80000001u, 0x12345678u};
     for (bool render_pass : {false, true}) {
       ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
-      if (GetParam() == BACKEND_API_D3D12 && !static_cast<backend::Image *>(image.Get())->SupportsStorage()) {
+      if (GetParam() == BACKEND_API_D3D12 && !NativeImageSupportsStorage(image.Get())) {
         if (render_pass)
           EXPECT_FALSE(commands->CmdBeginRendering(
               {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, values.color}}}));

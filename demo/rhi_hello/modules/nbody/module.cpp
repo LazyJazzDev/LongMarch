@@ -137,6 +137,9 @@ int RunNBody(grassland::rhi::IDevice *device) {
   if (!next_positions)
     return 1;
 #if defined(LONGMARCH_CUDA_ENABLED)
+  auto cuda_positions = QueryInterfacePtr<ICUDABuffer>(positions.Get());
+  auto cuda_velocities = QueryInterfacePtr<ICUDABuffer>(velocities.Get());
+  auto cuda_next_positions = QueryInterfacePtr<ICUDABuffer>(next_positions.Get());
   NBodyCUDA cuda(device);
   if (device->GetCUDADeviceIndex() >= 0 && !cuda)
     return 1;
@@ -459,10 +462,9 @@ int RunNBody(grassland::rhi::IDevice *device) {
     SubmitInfo submit_info;
 #if defined(LONGMARCH_CUDA_ENABLED)
     if (running && cuda_active) {
-      const auto ready = cuda.Step(static_cast<ICUDABuffer *>(positions.Get())->GetDevicePointer(),
-                                   static_cast<ICUDABuffer *>(velocities.Get())->GetDevicePointer(),
-                                   static_cast<ICUDABuffer *>(next_positions.Get())->GetDevicePointer(), particle_count,
-                                   delta_t, 100.0f / particle_count, last_graphics);
+      const auto ready = cuda.Step(cuda_positions->GetDevicePointer(), cuda_velocities->GetDevicePointer(),
+                                   cuda_next_positions->GetDevicePointer(), particle_count, delta_t,
+                                   100.0f / particle_count, last_graphics);
       if (!ready.timeline)
         return 1;
       submit_info.waits.push_back(ready);
@@ -513,6 +515,7 @@ int RunNBody(grassland::rhi::IDevice *device) {
 
 #if defined(LONGMARCH_CUDA_ENABLED)
     last_graphics = token->GetEvent();
+    cuda.GraphicsSubmitted(last_graphics);
 #endif
     fps.TickFrame();
   }

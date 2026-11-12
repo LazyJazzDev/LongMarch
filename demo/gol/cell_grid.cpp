@@ -81,9 +81,8 @@ bool CellGrid::Update(float t, bool animate_state) {
 
 int CellGrid::CellAt(glm::dvec2 window_position) const {
   // Pointer events use window coordinates; the layout uses framebuffer pixels.
-  const auto window = application_->GetWindow();
-  const glm::vec2 scale = glm::vec2(glm::max(window->GetFramebufferSize(), glm::ivec2{1})) /
-                          glm::vec2(glm::max(window->GetSize(), glm::ivec2{1}));
+  const glm::vec2 scale = glm::vec2(glm::max(application_->GetFramebufferSize(), glm::ivec2{1})) /
+                          glm::vec2(glm::max(application_->GetWindowSize(), glm::ivec2{1}));
   const glm::vec2 position = glm::vec2(window_position) * scale;
   if (position.x < clip_.x || position.x > clip_.z || position.y < clip_.y || position.y > clip_.w || unit_ <= 0.0f)
     return -1;
@@ -125,7 +124,7 @@ void CellGrid::OnCursorPos(double xpos, double ypos) {
 void CellGrid::OnMouseButton(int mouse_button, int state, int mods) {
   if (mouse_button != GLFW_MOUSE_BUTTON_LEFT)
     return;
-  const int index = CellAt(application_->GetWindow()->GetCursorPosition());
+  const int index = CellAt(application_->GetCursorPosition());
   if (index != active_) {
     SetState(active_, 0);
     active_ = index;

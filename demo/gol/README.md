@@ -2,15 +2,15 @@
 
 Conway's Game of Life, ported from the `gol` GUI of
 [Yao-class-cpp-studio/Assignment-2](https://github.com/Yao-class-cpp-studio/Assignment-2)
-to `grassland::graphics`. The original targeted the legacy grassland Vulkan
+to `grassland::rhi`. The original targeted the legacy grassland Vulkan
 wrapper; this version runs on every LongMarch backend (Vulkan, D3D12, Metal).
 
 ```sh
-cmake --build build --target demo_gol
-build/demo/gol/demo_gol                      # 64 x 64 grid
-build/demo/gol/demo_gol 60 40 --random 0.3   # random 60 x 40 grid
-build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/295P5H1V1.cells
-build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/gosper-glider-gun.cells --play
+cmake --build cmake-build-release --target demo_gol
+cmake-build-release/demo/gol/demo_gol                      # 64 x 64 grid
+cmake-build-release/demo/gol/demo_gol 60 40 --random 0.3   # random 60 x 40 grid
+cmake-build-release/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/295P5H1V1.cells
+cmake-build-release/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/gosper-glider-gun.cells --play
 ```
 
 Click cells to toggle them. The buttons play/pause the simulation, cycle the
@@ -80,9 +80,8 @@ Grid navigation:
 - Ctrl + two-finger scrolling or mouse wheel zooms around the pointer (1x–12x).
 - Ctrl + `+` / `-` zooms in/out.
 - Ctrl + `0` restores the fitted, centered view; Shift + wheel pans horizontally.
-- Native pinch zoom uses `graphics::Window::MagnifyEvent()` (currently supported
-  on macOS). The game contains no platform-specific gesture code. See the
-  [window input API](../../docs/graphics-window-input.md) for event semantics.
+- Native pinch zoom uses the RHI window magnify event on macOS, with either
+  the Metal or Vulkan backend.
 - Windows/Linux retain Ctrl + scrolling; driver-emulated pinch only works if
   GLFW can observe both the scrolling and Ctrl key state.
 - The controls stay fixed; cells outside the grid viewport are clipped and cannot be clicked.
@@ -118,4 +117,17 @@ uses the existing buffer without allocating a second grid.
 The `application/` layer replaces the old Vulkan renderer: models are drawn as
 instances in framebuffer pixel coordinates with depth testing, rendered into a
 supersampled target, and resolved to the window for anti-aliasing (the original
-used MSAA, which `grassland::graphics` does not expose).
+used MSAA).
+
+## RHI rendering
+
+The renderer uses RHI device resources, immutable programs and binding groups,
+command-context uploads, the Main queue, and submission/download tokens. Mesh
+replacement relies on RHI resource retention; two submission slots bound the
+number of frames in flight. The existing supersampling, depth ordering and
+second-frame transitions are preserved. PNG export reads the resolved RGBA8
+image through an RHI download token.
+
+The demos link `grassland_rhi` and utility dependencies directly, without the
+legacy `grassland_graphics` renderer. Window input uses RHI events and GLFW
+queries. The application owns an RHI `IWindow` directly.

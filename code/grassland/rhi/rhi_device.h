@@ -6,13 +6,11 @@
 #include "grassland/rhi/rhi_timeline.h"
 #include "grassland/util/file_system.h"
 
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IDevice, grassland::rhi::IObject, "7a97161c-7adc-4201-a4f0-53f40b94b527")
+
 namespace grassland::rhi {
 class IImage;
 class IBuffer;
-#if defined(LONGMARCH_CUDA_RUNTIME)
-class ICUDABuffer;
-class ICUDATimeline;
-#endif
 struct BufferDesc;
 class IComputeProgram;
 struct ComputeProgramDesc;
@@ -33,8 +31,6 @@ class IDevice : public IObject {
       const TopLevelAccelerationStructureDesc &desc) = 0;
   virtual IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) = 0;
   virtual std::string Name() const = 0;
-  // CUDA Runtime device ordinal; -1 when CUDA is disabled or no device matches.
-  virtual int GetCUDADeviceIndex() const noexcept = 0;
   virtual bool SupportRayTracingPipeline() const = 0;
   virtual bool SupportRayQuery() const = 0;
   virtual bool SupportGeometryShader() const = 0;
@@ -43,9 +39,10 @@ class IDevice : public IObject {
   virtual ISampler *CreateSampler(const SamplerDesc &desc = {}) = 0;
   virtual IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) = 0;
   virtual IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
+  virtual int GetCUDADeviceIndex() const = 0;
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  virtual ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) = 0;
-  // Borrowed timeline owned by this device; returns null for non-CUDA devices.
+  // Owned buffer exposing ICUDABuffer through QueryInterface; null if unsupported.
+  virtual IBuffer *CreateCUDABuffer(const BufferDesc &desc) = 0;
   virtual ICUDATimeline *CreateCUDATimeline() = 0;
 #endif
   virtual IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;

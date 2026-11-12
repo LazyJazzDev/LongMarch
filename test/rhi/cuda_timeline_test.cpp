@@ -49,8 +49,8 @@ TEST_P(RhiCUDATimeline, BothQueuesWaitForCUDAAndCUDAWaitsForQueueEvents) {
   if (device->GetCUDADeviceIndex() < 0)
     GTEST_SKIP();
   ASSERT_EQ(cudaSetDevice(device->GetCUDADeviceIndex()), cudaSuccess);
-  auto timeline = device->CreateCUDATimeline();
-  ASSERT_NE(timeline, nullptr);
+  ObjPtr<ICUDATimeline> timeline = device->CreateCUDATimeline();
+  ASSERT_TRUE(timeline);
   CUDAStream producer, consumer;
   ASSERT_EQ(cudaStreamCreateWithFlags(&producer.stream, cudaStreamNonBlocking), cudaSuccess);
   ASSERT_EQ(cudaStreamCreateWithFlags(&consumer.stream, cudaStreamNonBlocking), cudaSuccess);
@@ -68,7 +68,7 @@ TEST_P(RhiCUDATimeline, BothQueuesWaitForCUDAAndCUDAWaitsForQueueEvents) {
     if (ready.timeline) {
       submitted = commands->Submit({{ready}});
       if (submitted) {
-        waited = timeline->Wait(consumer.stream, submitted->GetEvent());
+        waited = timeline->Wait(consumer.stream, {submitted->GetEvent()});
         query = cudaStreamQuery(consumer.stream);
         EXPECT_EQ(submitted->GetStatus(), SUBMISSION_STATUS_PENDING);
       }
@@ -91,7 +91,7 @@ TEST_P(RhiCUDATimeline, BothQueuesWaitForCUDAAndCUDAWaitsForQueueEvents) {
   ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
   ObjPtr<ISubmissionToken> submitted = commands->Submit({{ready}});
   ASSERT_TRUE(submitted);
-  ASSERT_TRUE(timeline->Wait(nullptr, submitted->GetEvent()));
+  ASSERT_TRUE(timeline->Wait(nullptr, {submitted->GetEvent()}));
   ASSERT_EQ(cudaStreamSynchronize(nullptr), cudaSuccess);
   ASSERT_TRUE(submitted->WaitHost());
 }
@@ -131,9 +131,12 @@ TEST_P(RhiCUDATimeline, NBodyCUDAAgreesWithCPUReference) {
     }
   }
   constexpr uint64_t bytes = count * sizeof(Vector);
-  ObjPtr<ICUDABuffer> p = device->CreateCUDABuffer({bytes});
-  ObjPtr<ICUDABuffer> v = device->CreateCUDABuffer({bytes});
-  ObjPtr<ICUDABuffer> next = device->CreateCUDABuffer({bytes});
+  ObjPtr<IBuffer> p_base = device->CreateCUDABuffer({bytes});
+  auto p = QueryInterfacePtr<ICUDABuffer>(p_base.Get());
+  ObjPtr<IBuffer> v_base = device->CreateCUDABuffer({bytes});
+  auto v = QueryInterfacePtr<ICUDABuffer>(v_base.Get());
+  ObjPtr<IBuffer> next_base = device->CreateCUDABuffer({bytes});
+  auto next = QueryInterfacePtr<ICUDABuffer>(next_base.Get());
   ASSERT_TRUE(p && v && next);
   NBodyCUDA cuda(device.Get());
   ASSERT_TRUE(cuda);
@@ -169,10 +172,11 @@ TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
   if (device->GetCUDADeviceIndex() < 0)
     GTEST_SKIP();
   ASSERT_EQ(cudaSetDevice(device->GetCUDADeviceIndex()), cudaSuccess);
-  auto timeline = device->CreateCUDATimeline();
-  ASSERT_NE(timeline, nullptr);
+  ObjPtr<ICUDATimeline> timeline = device->CreateCUDATimeline();
+  ASSERT_TRUE(timeline);
   constexpr uint32_t count = 16387;
-  ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({count * sizeof(uint32_t)});
+  ObjPtr<IBuffer> buffer_base = device->CreateCUDABuffer({count * sizeof(uint32_t)});
+  auto buffer = QueryInterfacePtr<ICUDABuffer>(buffer_base.Get());
   ASSERT_TRUE(buffer);
   auto pointer = buffer->GetDevicePointer();
   CUDAStream stream;
@@ -186,7 +190,7 @@ TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
     ASSERT_TRUE(upload->CmdUploadBuffer(buffer.Get(), 0, expected.data(), count * sizeof(uint32_t)));
     ObjPtr<ISubmissionToken> uploaded = upload->Submit();
     ASSERT_TRUE(uploaded);
-    ASSERT_TRUE(timeline->Wait(stream.stream, uploaded->GetEvent()));
+    ASSERT_TRUE(timeline->Wait(stream.stream, {uploaded->GetEvent()}));
     ASSERT_EQ(TransformCUDABuffer(pointer, count, stream.stream), cudaSuccess);
     auto ready = timeline->Signal(stream.stream, round + 1);
     ASSERT_NE(ready.timeline, nullptr);
@@ -204,6 +208,64 @@ TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
   }
 }
 #endif
+
+TEST_P(RhiCUDATimeline, WaitsForAllEventsAndCoalescesDuplicateTimelines) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  if (device->GetCUDADeviceIndex() < 0)
+    GTEST_SKIP();
+  ASSERT_EQ(cudaSetDevice(device->GetCUDADeviceIndex()), cudaSuccess);
+  ObjPtr<ICUDATimeline> first = device->CreateCUDATimeline();
+  ObjPtr<ICUDATimeline> second = device->CreateCUDATimeline();
+  ObjPtr<ICUDATimeline> joined = device->CreateCUDATimeline();
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  ASSERT_TRUE(joined);
+  EXPECT_EQ(QueryInterfacePtr<ITimeline>(first.Get()).Get(), first.Get());
+  EXPECT_EQ(QueryInterfacePtr<IObject>(first.Get()).Get(),
+            QueryInterfacePtr<IObject>(QueryInterfacePtr<ITimeline>(first.Get()).Get()).Get());
+  CUDAStream a, b, consumer;
+  ASSERT_EQ(cudaStreamCreateWithFlags(&a.stream, cudaStreamNonBlocking), cudaSuccess);
+  ASSERT_EQ(cudaStreamCreateWithFlags(&b.stream, cudaStreamNonBlocking), cudaSuccess);
+  ASSERT_EQ(cudaStreamCreateWithFlags(&consumer.stream, cudaStreamNonBlocking), cudaSuccess);
+  EXPECT_TRUE(joined->Wait(consumer.stream, {}));
+  EXPECT_FALSE(joined->Wait(consumer.stream, {{nullptr, 1}}));
+  EXPECT_EQ(first->Signal(a.stream, 0).timeline, nullptr);
+  Gate gate;
+  ASSERT_EQ(cudaLaunchHostFunc(b.stream, Gate::Wait, &gate), cudaSuccess);
+  auto event_a = first->Signal(a.stream, 2);
+  auto event_b = second->Signal(b.stream, 1);
+  ObjPtr<IQueue> main_queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> assist_queue = device->GetQueue(QUEUE_TYPE_ASSIST);
+  ObjPtr<ICommandContext> main_commands = main_queue->CreateCommandContext();
+  ObjPtr<ICommandContext> assist_commands = assist_queue->CreateCommandContext();
+  ObjPtr<ISubmissionToken> main_done, assist_done;
+  if (event_a.timeline && main_commands)
+    main_done = main_commands->Submit({{event_a}});
+  if (event_b.timeline && assist_commands)
+    assist_done = assist_commands->Submit({{event_b}});
+  bool waited =
+      main_done && assist_done &&
+      joined->Wait(consumer.stream, {{first.Get(), 1}, event_a, main_done->GetEvent(), assist_done->GetEvent()});
+  auto ready = waited ? joined->Signal(consumer.stream, 1) : Event{};
+  EXPECT_EQ(cudaStreamSynchronize(a.stream), cudaSuccess);
+  EXPECT_EQ(cudaStreamQuery(consumer.stream), cudaErrorNotReady);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ObjPtr<ISubmissionToken> submitted;
+  if (ready.timeline && commands)
+    submitted = commands->Submit({{ready}});
+  if (submitted)
+    EXPECT_EQ(submitted->GetStatus(), SUBMISSION_STATUS_PENDING);
+  gate.open = true;
+  EXPECT_EQ(cudaStreamSynchronize(b.stream), cudaSuccess);
+  EXPECT_EQ(cudaStreamSynchronize(consumer.stream), cudaSuccess);
+  ASSERT_TRUE(waited);
+  ASSERT_TRUE(submitted);
+  EXPECT_TRUE(submitted->WaitHost());
+}
 
 TEST_P(RhiCUDATimeline, NonCUDADevicesRejectTimelineCreation) {
   ObjPtr<ICore> core = CreateCore(GetParam());
@@ -227,7 +289,10 @@ const BackendAPI backends[]{
 #if defined(LONGMARCH_D3D12_ENABLED)
     BACKEND_API_D3D12,
 #endif
-    BACKEND_API_VULKAN};
+#if defined(LONGMARCH_VULKAN_ENABLED)
+    BACKEND_API_VULKAN,
+#endif
+};
 INSTANTIATE_TEST_SUITE_P(Backends, RhiCUDATimeline, testing::ValuesIn(backends));
 }  // namespace
 }  // namespace grassland::rhi

@@ -1,20 +1,21 @@
-﻿#include <cmath>
+﻿#include <cassert>
+#include <cmath>
 #include <cstring>
 #include <unordered_set>
 
 #include "grassland/rhi/backend/metal/metal_command_context.h"
 
 namespace grassland::rhi::backend::metal {
-bool MetalCommandContext::CmdBuildBottomLevelAccelerationStructure(
+bool MetalCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     IBottomLevelAccelerationStructure *destination,
     const std::vector<AccelerationStructureGeometryBuffers> &geometries,
     AccelerationStructureBuildMode mode) {
-  auto target = dynamic_cast<MetalBottomLevelAccelerationStructure *>(destination);
+  auto target = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(destination).Get();
   if (sealed_ || encoder_ || !target || target->Owner() != device_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
-      !ValidateGeometryBuffers(target->GetDesc(), geometries, device_)) {
+      !ValidateGeometryBuffers(destination->GetDesc(), geometries)) {
     recording_failed_ = true;
     return false;
   }
@@ -22,11 +23,19 @@ bool MetalCommandContext::CmdBuildBottomLevelAccelerationStructure(
   auto scratch = device_->ScratchPool().Acquire(target->ScratchSize(mode));
   if (!scratch || !RetainResource(destination) || !RetainResource(scratch.Get()))
     return false;
-  for (const auto &g : geometries)
-    for (const auto &v : {g.data, g.indices})
+  for (const auto &g : geometries) {
+    for (const auto &v : {g.data, g.indices}) {
+#ifndef NDEBUG
+      if (v.buffer) {
+        auto buffer = rhi::QueryInterfacePtr<IMetalBuffer>(v.buffer).Get();
+        assert(buffer && buffer->Owner() == device_);
+      }
+#endif
       if (v.buffer && !RetainResource(v.buffer))
         return false;
-  auto descriptor = NativeGeometries(target->GetDesc(), geometries);
+    }
+  }
+  auto descriptor = NativeGeometries(destination->GetDesc(), geometries);
   auto encoder = commands_->accelerationStructureCommandEncoder();
   if (!encoder) {
     recording_failed_ = true;
@@ -44,15 +53,15 @@ bool MetalCommandContext::CmdBuildBottomLevelAccelerationStructure(
   return true;
 }
 
-bool MetalCommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *destination,
-                                                                const std::vector<RayTracingInstance> &instances,
-                                                                AccelerationStructureBuildMode mode) {
-  auto target = dynamic_cast<MetalTopLevelAccelerationStructure *>(destination);
+bool MetalCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *destination,
+                                                                    const std::vector<RayTracingInstance> &instances,
+                                                                    AccelerationStructureBuildMode mode) {
+  auto target = rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(destination).Get();
   if (sealed_ || encoder_ || !target || target->Owner() != device_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
-      !ValidateInstances(target->GetDesc(), instances)) {
+      !ValidateInstances(destination->GetDesc(), instances)) {
     recording_failed_ = true;
     return false;
   }
@@ -72,7 +81,7 @@ bool MetalCommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
   dependencies.reserve(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
-    auto blas = dynamic_cast<MetalBottomLevelAccelerationStructure *>(instance.blas);
+    auto blas = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
       recording_failed_ = true;
       return false;
@@ -114,7 +123,7 @@ bool MetalCommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
   for (const auto &blas : target->BottomLevels())
     if (!RetainResource(blas.Get()))
       return false;
-  auto descriptor = NativeInstances(target->GetDesc());
+  auto descriptor = NativeInstances(destination->GetDesc());
   descriptor->setInstanceCount(instances.size());
   descriptor->setInstanceDescriptorBuffer(upload->NativeBuffer());
   descriptor->setInstancedAccelerationStructures(NS::Array::array(children.data(), children.size()));
@@ -137,8 +146,8 @@ bool MetalCommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
   return true;
 }
 
-bool MetalCommandContext::CmdQueryCompactedSize(IAccelerationStructure *structure) {
-  auto target = dynamic_cast<MetalAccelerationStructure *>(structure);
+bool MetalCommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *structure) {
+  auto target = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(structure).Get();
   if (sealed_ || encoder_ || !target || target->Owner() != device_ || !target->AllowsCompaction()) {
     recording_failed_ = true;
     return false;
@@ -157,10 +166,10 @@ bool MetalCommandContext::CmdQueryCompactedSize(IAccelerationStructure *structur
   return true;
 }
 
-bool MetalCommandContext::CmdCompactAccelerationStructure(IAccelerationStructure *source,
-                                                          IAccelerationStructure *destination) {
-  auto from = dynamic_cast<MetalAccelerationStructure *>(source);
-  auto to = dynamic_cast<MetalAccelerationStructure *>(destination);
+bool MetalCommandContextImpl::CmdCompactAccelerationStructure(IAccelerationStructure *source,
+                                                              IAccelerationStructure *destination) {
+  auto from = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(source).Get();
+  auto to = rhi::QueryInterfacePtr<IMetalAccelerationStructure>(destination).Get();
   if (sealed_ || encoder_ || !from || !to || from == to || from->Owner() != device_ || to->Owner() != device_ ||
       !from->AllowsCompaction() || !to->IsCompactStorage() || source->GetType() != destination->GetType()) {
     recording_failed_ = true;
@@ -168,13 +177,13 @@ bool MetalCommandContext::CmdCompactAccelerationStructure(IAccelerationStructure
   }
   if (!RetainResource(source) || !RetainResource(destination))
     return false;
-  if (auto top = dynamic_cast<MetalTopLevelAccelerationStructure *>(source)) {
+  if (auto top = rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(source).Get()) {
     auto pending = as_dependencies_.find(top);
     auto dependencies = pending == as_dependencies_.end() ? top->BottomLevels() : pending->second;
     for (const auto &blas : dependencies)
       if (!RetainResource(blas.Get()))
         return false;
-    auto target = static_cast<MetalTopLevelAccelerationStructure *>(destination);
+    auto target = rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(destination).Get();
     for (const auto &blas : target->BottomLevels())
       if (!RetainResource(blas.Get()))
         return false;
@@ -191,7 +200,7 @@ bool MetalCommandContext::CmdCompactAccelerationStructure(IAccelerationStructure
   return true;
 }
 
-std::vector<MTL::Resource *> MetalCommandContext::AccelerationResources() {
+std::vector<MTL::Resource *> MetalCommandContextImpl::AccelerationResources() {
   std::vector<MTL::Resource *> resources;
   std::unordered_set<IBottomLevelAccelerationStructure *> seen;
   for (auto group : groups_) {
@@ -201,13 +210,14 @@ std::vector<MTL::Resource *> MetalCommandContext::AccelerationResources() {
       if (group->GetLayout().bindings[b].type != BINDING_ACCELERATION_STRUCTURE)
         continue;
       for (const auto &ref : group->GetReferences()[b]) {
-        auto top = static_cast<MetalTopLevelAccelerationStructure *>(ref.Get());
+        auto top = rhi::QueryInterfacePtr<IMetalTopLevelAccelerationStructure>(ref.Get()).Get();
         auto pending = as_dependencies_.find(top);
         const auto &dependencies = pending == as_dependencies_.end() ? top->BottomLevels() : pending->second;
         for (const auto &blas : dependencies)
           if (seen.insert(blas.Get()).second) {
             RetainResource(blas.Get());
-            resources.push_back(static_cast<MetalBottomLevelAccelerationStructure *>(blas.Get())->NativeStructure());
+            resources.push_back(
+                rhi::QueryInterfacePtr<IMetalAccelerationStructure>(blas.Get()).Get()->NativeStructure());
           }
       }
     }

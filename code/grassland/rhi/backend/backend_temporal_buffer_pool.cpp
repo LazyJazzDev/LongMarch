@@ -33,7 +33,7 @@ void TemporalBufferPool<DeviceType, BufferType, LeaseType>::Bucket::Record(size_
 
 template <typename DeviceType, typename BufferType, typename LeaseType>
 ObjectPtr<LeaseType> TemporalBufferPool<DeviceType, BufferType, LeaseType>::Acquire(uint64_t size) {
-  uint64_t capacity = 65536;
+  uint64_t capacity = CapacityForLevel(0);
   size_t level = 0;
   while (capacity < size && capacity <= UINT64_MAX / 2) {
     capacity *= 2;
@@ -64,7 +64,7 @@ ObjectPtr<LeaseType> TemporalBufferPool<DeviceType, BufferType, LeaseType>::Acqu
       ++bucket.occupied;
     }
     // Construct outside the lock: failed construction returns the borrowed slot.
-    return ObjectPtr<Lease>::Adopt(new Lease(this, buffer, level));
+    return ObjectPtr<Lease>::Adopt(Lease::Create(this, buffer, level));
   } catch (const std::bad_alloc &) {
     if (buffer)
       ReleaseBuffer(buffer, level);
@@ -95,7 +95,7 @@ void TemporalBufferPool<DeviceType, BufferType, LeaseType>::ReleaseBuffer(Buffer
 
 template <typename DeviceType, typename BufferType, typename LeaseType>
 std::pair<size_t, size_t> TemporalBufferPool<DeviceType, BufferType, LeaseType>::GetBufferCounts(uint64_t size) const {
-  uint64_t capacity = 65536;
+  uint64_t capacity = CapacityForLevel(0);
   size_t level = 0;
   while (capacity < size && capacity <= UINT64_MAX / 2) {
     capacity *= 2;
@@ -119,14 +119,14 @@ void TemporalBufferPool<DeviceType, BufferType, LeaseType>::Clear() {
   }
 }
 #if defined(LONGMARCH_D3D12_ENABLED)
-template class TemporalBufferPool<d3d12::D3D12Device, d3d12::D3D12AllocatedBuffer, d3d12::D3D12TemporalBufferLease>;
+template class TemporalBufferPool<d3d12::ID3D12Device, d3d12::ID3D12AllocatedBuffer, d3d12::ID3D12TemporalBufferLease>;
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
-template class TemporalBufferPool<vulkan::VulkanDevice,
-                                  vulkan::VulkanAllocatedBuffer,
-                                  vulkan::VulkanTemporalBufferLease>;
+template class TemporalBufferPool<vulkan::IVulkanDevice,
+                                  vulkan::IVulkanAllocatedBuffer,
+                                  vulkan::IVulkanTemporalBufferLease>;
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
-template class TemporalBufferPool<metal::MetalDevice, metal::MetalAllocatedBuffer, metal::MetalTemporalBufferLease>;
+template class TemporalBufferPool<metal::IMetalDevice, metal::IMetalAllocatedBuffer, metal::IMetalTemporalBufferLease>;
 #endif
 }  // namespace grassland::rhi::backend

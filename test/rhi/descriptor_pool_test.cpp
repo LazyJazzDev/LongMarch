@@ -10,7 +10,7 @@
 
 namespace grassland::rhi::backend::d3d12 {
 TEST(D3D12DescriptorPool, ReleasedHolesAreReusedAndMergedOnBothSides) {
-  ComPtr<ID3D12Device> device;
+  ComPtr<::ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
   D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 8);
   auto a = pool.Acquire(2);
@@ -43,7 +43,7 @@ TEST(D3D12DescriptorPool, ReleasedHolesAreReusedAndMergedOnBothSides) {
 }
 
 TEST(D3D12DescriptorPool, SmallestPagePrecedesTightestFit) {
-  ComPtr<ID3D12Device> device;
+  ComPtr<::ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
   D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 8);
   auto smaller = pool.Acquire(8);
@@ -62,7 +62,7 @@ TEST(D3D12DescriptorPool, SmallestPagePrecedesTightestFit) {
 }
 
 TEST(D3D12DescriptorPool, TightestFitSplitsAndRegistersRemainder) {
-  ComPtr<ID3D12Device> device;
+  ComPtr<::ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
   D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 16);
   auto a = pool.Acquire(6);
@@ -88,7 +88,7 @@ TEST(D3D12DescriptorPool, TightestFitSplitsAndRegistersRemainder) {
 }
 
 TEST(D3D12DescriptorPool, PagesGrowGeometricallyAndRemainAllocated) {
-  ComPtr<ID3D12Device> device;
+  ComPtr<::ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
   D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 7);
   auto a = pool.Acquire(8);
@@ -123,7 +123,7 @@ TEST(D3D12DescriptorPool, PagesGrowGeometricallyAndRemainAllocated) {
 }
 
 TEST(D3D12DescriptorPool, RandomizedAllocationsMatchOccupancyModel) {
-  ComPtr<ID3D12Device> device;
+  ComPtr<::ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
   D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 8);
 
@@ -204,7 +204,7 @@ TEST(D3D12DescriptorPool, RandomizedAllocationsMatchOccupancyModel) {
 }
 
 TEST(D3D12TransientDescriptorPool, WholePagesReuseOnlyTheirClassAndNeverOverlap) {
-  ComPtr<ID3D12Device> device;
+  ComPtr<::ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
   D3D12TransientDescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
   auto first = pool.Acquire(3);
@@ -237,7 +237,7 @@ TEST(D3D12TransientDescriptorPool, WholePagesReuseOnlyTheirClassAndNeverOverlap)
 }
 
 TEST(D3D12TransientDescriptorPool, RecentConcurrentDemandIsCachedThenTrimmedPerClass) {
-  ComPtr<ID3D12Device> device;
+  ComPtr<::ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
   D3D12TransientDescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
   auto first = pool.Acquire(1);
@@ -266,7 +266,7 @@ TEST(D3D12TransientDescriptorPool, RecentConcurrentDemandIsCachedThenTrimmedPerC
 }
 
 TEST(D3D12TransientDescriptorPool, SamplerLimitAndConcurrentReuse) {
-  ComPtr<ID3D12Device> device;
+  ComPtr<::ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
   D3D12TransientDescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
   auto last = pool.Acquire(1025);
@@ -302,7 +302,7 @@ TEST(VulkanDescriptorPool, GroupsReleaseSetsAndTrimIdlePages) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+  auto native = rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get();
   BindingLayoutDesc layout{{{0, BINDING_UNIFORM_BUFFER}}};
   std::vector<ObjPtr<IBindingGroup>> groups;
   for (int i = 0; i < 130; ++i) {
@@ -325,7 +325,7 @@ TEST(VulkanDescriptorPool, EqualNativeTypeCountsSharePagesAndDifferentPatternsSt
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+  auto native = rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get();
   BindingLayoutDesc array{{{0, BINDING_STRUCTURED_BUFFER, 2, SHADER_VISIBILITY_VERTEX, 16}}};
   BindingLayoutDesc split{{{7, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16},
                            {3, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}};
@@ -362,7 +362,7 @@ TEST(VulkanDescriptorPool, LargeDescriptorArraysUseFullPageCapacity) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+  auto native = rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get();
   BindingLayoutDesc layout{{{0, BINDING_STRUCTURED_BUFFER, 1025, SHADER_VISIBILITY_FRAGMENT, 16}}};
   // No library-imposed 1024 limit; hardware limits remain authoritative.
   ASSERT_TRUE(backend::ValidateBindingLayout(layout));

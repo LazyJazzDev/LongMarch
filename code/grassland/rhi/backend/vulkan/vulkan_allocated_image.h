@@ -1,14 +1,19 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
+#include "grassland/rhi/backend/vulkan/vulkan_util.h"
 typedef struct VmaAllocation_T *VmaAllocation;
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDevice;
+IImage *CreateVulkanAllocatedImage(IVulkanDevice *device, const ImageDesc &desc);
 
-class VulkanAllocatedImage final : public VulkanImage {
+}  // namespace grassland::rhi::backend::vulkan
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanAllocatedImageImpl final : public Object<rhi::IImage, IVulkanImage> {
  public:
-  static VulkanAllocatedImage *Create(VulkanDevice *device, const ImageDesc &desc);
-  ~VulkanAllocatedImage() override;
+  static IImage *Create(IVulkanDevice *device, const ImageDesc &desc);
+  ~VulkanAllocatedImageImpl() override;
   bool IsValid() const override;
   bool SupportsStorage() const override;
   VkImage NativeImage() const override;
@@ -16,11 +21,36 @@ class VulkanAllocatedImage final : public VulkanImage {
   VkImageView BindingView() const override;
 
  private:
-  VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc);
-  VulkanDevice *device_;
+  VulkanAllocatedImageImpl(IVulkanDevice *device, ImageDesc desc);
+  IVulkanDevice *device_;
   VkImage image_{};
-  Views views_;
+  VulkanImageViews views_;
   bool storage_{};
   VmaAllocation allocation_{};
+
+  void InitializeImage(ImageDesc desc, IVulkanQueue *queue = nullptr);
+
+ public:
+  bool SupportsQueue(const IVulkanQueue *queue) const override;
+
+  const ImageDesc &GetDesc() const override;
+
+ private:
+  ImageDesc desc_{};
+  IVulkanQueue *queue_{};
+
+  void InitializeVulkanImage(ImageDesc desc,
+                             const void *device,
+                             VkImageLayout default_layout,
+                             IVulkanQueue *queue = nullptr);
+
+ public:
+  VkImageAspectFlags Aspect() const override;
+  VkImageLayout DefaultLayout() const override;
+
+  const void *DeviceIdentity() const override;
+
+ private:
+  VkImageLayout default_layout_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

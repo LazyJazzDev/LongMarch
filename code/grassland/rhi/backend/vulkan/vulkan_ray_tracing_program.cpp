@@ -2,37 +2,41 @@
 
 #include <cstring>
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanDevice *device, const RayTracingProgramDesc &desc)
-    : RayTracingProgram(device, desc),
-      VulkanProgramBase(device->NativeDevice()) {
+VulkanRayTracingProgramImpl::VulkanRayTracingProgramImpl(IVulkanDevice *device, const RayTracingProgramDesc &desc) {
+  InitializeRayTracingProgram(device, desc);
+  InitializeVulkanProgramBase(device->NativeDevice());
 }
 
-VulkanRayTracingProgram::~VulkanRayTracingProgram() {
+VulkanRayTracingProgramImpl::~VulkanRayTracingProgramImpl() {
   if (pipeline_)
-    vkDestroyPipeline(static_cast<VulkanDevice *>(device_)->NativeDevice(), pipeline_, nullptr);
+    vkDestroyPipeline(LayoutDevice(), pipeline_, nullptr);
+
+  DestroyVulkanProgramBase();
 }
 
-VkPipeline VulkanRayTracingProgram::NativePipeline() const {
+VkPipeline VulkanRayTracingProgramImpl::NativePipeline() const {
   return pipeline_;
 }
 
-const ShaderBindingTable *VulkanRayTracingProgram::DefaultShaderBindingTable() const {
+const IBackendShaderBindingTable *VulkanRayTracingProgramImpl::DefaultShaderBindingTable() const {
   return table_.Get();
 }
 
-IShaderBindingTable *VulkanRayTracingProgram::CreateShaderBindingTable(const ShaderBindingTableDesc &desc) {
+IShaderBindingTable *VulkanRayTracingProgramImpl::CreateShaderBindingTable(const ShaderBindingTableDesc &desc) {
   if (!ValidateShaderBindingTable(desc))
     return nullptr;
   return BuildShaderBindingTable(desc);
 }
 
-VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_device,
-                                                         const RayTracingProgramDesc &desc) {
-  auto object = std::unique_ptr<VulkanRayTracingProgram>(new VulkanRayTracingProgram(owner_device, desc));
+rhi::IRayTracingProgram *VulkanRayTracingProgramImpl::Create(IVulkanDevice *owner_device,
+                                                             const RayTracingProgramDesc &desc) {
+  auto object = std::unique_ptr<VulkanRayTracingProgramImpl>(new VulkanRayTracingProgramImpl(owner_device, desc));
   auto device = owner_device->NativeDevice();
   if (!object->ValidateLayout() ||
       !ValidatePipelineBindings(owner_device->NativePhysicalDevice(), object->desc_.pipeline_layout))
@@ -146,29 +150,30 @@ VulkanRayTracingProgram *VulkanRayTracingProgram::Create(VulkanDevice *owner_dev
     object->identifiers_[t].assign(handles.begin() + offset, handles.begin() + offset + size);
     offset += size;
   }
-  object->table_ =
-      ObjectPtr<ShaderBindingTable>::Adopt(object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc()));
+  ObjPtr<IShaderBindingTable> table = object->BuildShaderBindingTable(object->DefaultShaderBindingTableDesc());
+  object->table_ = ObjectPtr<IBackendShaderBindingTable>::Adopt(
+      rhi::QueryInterfacePtr<IBackendShaderBindingTable>(table.Get()).Detach());
   if (!object->table_)
     return nullptr;
   return object.release();
 }
 
-ShaderBindingTable *VulkanRayTracingProgram::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
+IShaderBindingTable *VulkanRayTracingProgramImpl::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
   const std::vector<uint32_t> raygen{0};
   const std::vector<uint32_t> *indices[] = {&raygen, &desc.miss_shader_indices, &desc.hit_group_indices,
                                             &desc.callable_shader_indices};
   uint64_t capacity = alignment_;
   for (auto table : indices)
     capacity += table->size() * stride_ + alignment_;
-  auto owner = static_cast<VulkanDevice *>(device_);
-  auto buffer = ObjectPtr<VulkanAllocatedBuffer>::Adopt(VulkanAllocatedBuffer::Create(owner, {capacity}, true));
+  auto owner = device_;
+  auto buffer = ObjectPtr<IVulkanAllocatedBuffer>::Adopt(IVulkanAllocatedBuffer::Create(owner, {capacity}, true));
   if (!buffer)
     return nullptr;
   VkBufferDeviceAddressInfo info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
   info.buffer = buffer->NativeBuffer();
   auto address = vkGetBufferDeviceAddress(owner->NativeDevice(), &info);
   std::vector<uint8_t> data(capacity);
-  std::array<ShaderBindingTable::Region, 4> regions{};
+  std::array<IBackendShaderBindingTable::Region, 4> regions{};
   uint64_t offset = 0;
   for (size_t t = 0; t < 4; ++t) {
     if (indices[t]->empty())
@@ -182,7 +187,125 @@ ShaderBindingTable *VulkanRayTracingProgram::BuildShaderBindingTable(const Shade
   }
   if (!buffer->Write(data.data(), data.size()))
     return nullptr;
-  return new ShaderBindingTable(this, desc, std::move(buffer), regions);
+  return IBackendShaderBindingTable::Create(
+      this, desc, ObjectPtr<IBuffer>::Adopt(rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach()), regions);
 }
 
+rhi::IRayTracingProgram *IVulkanRayTracingProgram::Create(IVulkanDevice *device, const RayTracingProgramDesc &desc) {
+  return VulkanRayTracingProgramImpl::Create(device, desc);
+}
+
+void VulkanRayTracingProgramImpl::InitializeRayTracingProgram(IVulkanDevice *device,
+                                                              const RayTracingProgramDesc &desc) {
+  device_ = device;
+  desc_ = desc;
+
+  auto retain = [&](IShader *shader) {
+    if (shader)
+      shaders_.push_back(ObjectPtr<IShader>::Retain(shader));
+  };
+  retain(desc.ray_generation);
+  for (auto shader : desc.miss_shaders)
+    retain(shader);
+  for (const auto &group : desc.hit_groups) {
+    retain(group.closest_hit);
+    retain(group.any_hit);
+    retain(group.intersection);
+  }
+  for (auto shader : desc.callable_shaders)
+    retain(shader);
+}
+
+const RayTracingProgramDesc &VulkanRayTracingProgramImpl::GetDesc() const {
+  return desc_;
+}
+
+IVulkanDevice *VulkanRayTracingProgramImpl::Owner() const {
+  return device_;
+}
+
+bool VulkanRayTracingProgramImpl::ValidateLayout() const {
+  auto stage = [](IShader *shader, ShaderStage expected) { return shader && shader->GetStage() == expected; };
+  if (!stage(desc_.ray_generation, SHADER_STAGE_RAY_GENERATION) || !desc_.max_recursion_depth ||
+      desc_.pipeline_layout.groups.size() > 8)
+    return false;
+  for (auto shader : desc_.miss_shaders)
+    if (!stage(shader, SHADER_STAGE_MISS))
+      return false;
+  for (const auto &group : desc_.hit_groups) {
+    if (!group.closest_hit && !group.any_hit && !group.intersection)
+      return false;
+    if (group.closest_hit && !stage(group.closest_hit, SHADER_STAGE_CLOSEST_HIT))
+      return false;
+    if (group.any_hit && !stage(group.any_hit, SHADER_STAGE_ANY_HIT))
+      return false;
+    if (group.intersection && !stage(group.intersection, SHADER_STAGE_INTERSECTION))
+      return false;
+  }
+  for (auto shader : desc_.callable_shaders)
+    if (!stage(shader, SHADER_STAGE_CALLABLE))
+      return false;
+  for (const auto &group : desc_.pipeline_layout.groups)
+    if (!ValidateBindingLayout(group))
+      return false;
+  return true;
+}
+
+bool VulkanRayTracingProgramImpl::ValidateShaderBindingTable(const ShaderBindingTableDesc &desc) const {
+  for (auto index : desc.miss_shader_indices)
+    if (index >= desc_.miss_shaders.size())
+      return false;
+  for (auto index : desc.hit_group_indices)
+    if (index >= desc_.hit_groups.size())
+      return false;
+  for (auto index : desc.callable_shader_indices)
+    if (index >= desc_.callable_shaders.size())
+      return false;
+  return true;
+}
+
+ShaderBindingTableDesc VulkanRayTracingProgramImpl::DefaultShaderBindingTableDesc() const {
+  ShaderBindingTableDesc result;
+  auto fill = [](auto &indices, size_t count) {
+    for (size_t i = 0; i < count; ++i)
+      indices.push_back(uint32_t(i));
+  };
+  fill(result.miss_shader_indices, desc_.miss_shaders.size());
+  fill(result.hit_group_indices, desc_.hit_groups.size());
+  fill(result.callable_shader_indices, desc_.callable_shaders.size());
+  return result;
+}
+
+void VulkanRayTracingProgramImpl::InitializeVulkanProgramBase(VkDevice device) {
+  layout_device_ = device;
+}
+
+void VulkanRayTracingProgramImpl::DestroyVulkanProgramBase() {
+  if (layout_)
+    vkDestroyPipelineLayout(layout_device_, layout_, nullptr);
+  for (auto layout : set_layouts_)
+    vkDestroyDescriptorSetLayout(layout_device_, layout, nullptr);
+}
+
+VkPipelineLayout VulkanRayTracingProgramImpl::NativeLayout() const {
+  return layout_;
+}
+
+bool VulkanRayTracingProgramImpl::CreateLayout(const PipelineLayoutDesc &desc) {
+  set_layouts_.reserve(desc.groups.size());
+  for (const auto &group : desc.groups) {
+    auto layout = CreateBindingLayout(layout_device_, group);
+    if (!layout)
+      return false;
+    set_layouts_.push_back(layout);
+  }
+  VkPipelineLayoutCreateInfo create{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+  create.setLayoutCount = uint32_t(set_layouts_.size());
+  create.pSetLayouts = set_layouts_.data();
+  return Check(vkCreatePipelineLayout(layout_device_, &create, nullptr, &layout_), "Create pipeline layout");
+}
+
+VkDevice VulkanRayTracingProgramImpl::LayoutDevice() const {
+  return layout_device_;
+}
 }  // namespace grassland::rhi::backend::vulkan

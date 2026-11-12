@@ -22,10 +22,6 @@ std::string Device::Name() const {
   return Get()->Name();
 }
 
-int Device::GetCUDADeviceIndex() const noexcept {
-  return Get() ? Get()->GetCUDADeviceIndex() : -1;
-}
-
 bool Device::SupportRayTracingPipeline() const {
 #if !defined(NDEBUG)
   if (!*this)

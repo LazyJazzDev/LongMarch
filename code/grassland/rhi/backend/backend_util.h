@@ -4,14 +4,12 @@
 #include <type_traits>
 #include <utility>
 
-#include "grassland/rhi/rhi_object.h"
+#include "grassland/rhi/rhi_obj_ptr.h"
 #if defined(LONGMARCH_CUDA_RUNTIME)
 #include <cuda_runtime_api.h>
 #endif
 
 namespace grassland::rhi::backend {
-void ReportError(int32_t error_code, const std::string &error_message);
-
 #if defined(LONGMARCH_CUDA_RUNTIME)
 bool CheckCUDA(cudaError_t error, const char *operation);
 
@@ -35,10 +33,61 @@ int FindCUDADeviceByLUID(const void *luid);
 #endif
 #endif
 
-// One intrusive counter per native implementation, with no public state layout.
+class IBackendShaderBindingTable;
+class IBackendSubmissionToken;
+class IBackendWindow;
+class IBackendCUDATimeline;
+}  // namespace grassland::rhi::backend
+
+namespace grassland::rhi::backend {
+void ReportError(int32_t error_code, const std::string &error_message);
+
+// Search each registered chain ancestor-first. IObject identity is handled by Object.
 template <typename Interface>
-class Object : public Interface {
+void *MatchInterface(InterfaceID id, Interface *source) noexcept {
+  if constexpr (std::is_same_v<Interface, IObject>) {
+    return nullptr;
+  } else {
+    using Base = typename InterfaceTraits<Interface>::Base;
+    static_assert(!std::is_same_v<Interface, Base> && std::is_convertible_v<Interface *, Base *> &&
+                      std::is_base_of_v<IObject, Base>,
+                  "Registered parent must be an unambiguous IObject-derived base.");
+    if (auto result = MatchInterface<Base>(id, static_cast<Base *>(source)))
+      return result;
+    return id == uuid<Interface>() ? source : nullptr;
+  }
+}
+
+// One intrusive counter per native implementation, with no public state layout.
+template <typename Primary, typename... Interfaces>
+class Object : public Primary, public Interfaces... {
+  static_assert(std::is_convertible_v<Primary *, IObject *> && (std::is_convertible_v<Interfaces *, IObject *> && ...),
+                "Each interface must have one unambiguous IObject inheritance path.");
+
  public:
+  template <typename T>
+  T *QueryInterface() noexcept {
+    void *result = nullptr;
+    return QueryInterface(uuid<T>(), &result) ? static_cast<T *>(result) : nullptr;
+  }
+
+  bool QueryInterface(InterfaceID id, void **output) noexcept final {
+    if (!output)
+      return false;
+    if (id == uuid<IObject>()) {
+      *output = static_cast<IObject *>(static_cast<Primary *>(this));
+    } else {
+      void *result = MatchInterface<Primary>(id, static_cast<Primary *>(this));
+      if (!result)
+        static_cast<void>(((result = MatchInterface<Interfaces>(id, static_cast<Interfaces *>(this))) || ...));
+      *output = result;
+    }
+    if (!*output)
+      return false;
+    AddRef();
+    return true;
+  }
+
   void AddRef() noexcept final {
     references_.fetch_add(1, std::memory_order_relaxed);
   }
@@ -61,7 +110,7 @@ class Object : public Interface {
 // Backend-only typed strong reference. T may be forward-declared at the storage site;
 // define the owning class's constructor/destructor where T is complete.
 template <typename T>
-class ObjectPtr {
+class ObjectPtr final {
  public:
   ObjectPtr() noexcept = default;
 
@@ -138,8 +187,5 @@ class ObjectPtr {
  private:
   T *ptr_{nullptr};
 };
-
-class Core;
-class Device;
 
 }  // namespace grassland::rhi::backend

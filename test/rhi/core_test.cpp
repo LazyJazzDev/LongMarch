@@ -26,7 +26,7 @@ TEST(RhiCoreSettings, D3D12OverridesDefaultAcrossSequentialCores) {
     ASSERT_TRUE(core);
     ObjPtr<IDevice> device = core.Get()->CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
-    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get())->NativeDevice();
+    auto native = rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get()->NativeDevice();
     backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
     EXPECT_EQ(SUCCEEDED(native->QueryInterface(IID_PPV_ARGS(&messages))), enabled);
     ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
@@ -45,9 +45,11 @@ TEST(RhiCoreSettings, D3D12ValidationMessagesReachConsole) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   backend::d3d12::ComPtr<ID3D12InfoQueue1> messages;
-  ASSERT_EQ(
-      static_cast<backend::d3d12::D3D12Device *>(device.Get())->NativeDevice()->QueryInterface(IID_PPV_ARGS(&messages)),
-      S_OK);
+  ASSERT_EQ(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get())
+                .Get()
+                ->NativeDevice()
+                ->QueryInterface(IID_PPV_ARGS(&messages)),
+            S_OK);
   testing::internal::CaptureStdout();
   auto warning = messages->AddApplicationMessage(D3D12_MESSAGE_SEVERITY_WARNING, "RHI console warning probe");
   auto error = messages->AddApplicationMessage(D3D12_MESSAGE_SEVERITY_ERROR, "RHI console error probe");
@@ -69,7 +71,7 @@ TEST(RhiCoreSettings, VulkanValidationOptionsAcrossSequentialCores) {
     ObjPtr<ICore> core = CreateCore(BACKEND_API_VULKAN, {enabled});
     ASSERT_TRUE(core);
     if (enabled) {
-      auto instance = static_cast<backend::vulkan::VulkanCore *>(core.Get())->Instance();
+      auto instance = rhi::QueryInterfacePtr<backend::vulkan::IVulkanCore>(core.Get()).Get()->Instance();
       EXPECT_NE(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"), nullptr);
     }
     ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();

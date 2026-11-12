@@ -16,7 +16,7 @@ enum class GameStage { kGameGoing, kMenu, kGameOver };
 
 class TwentyFourEight : public Application {
  public:
-  TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api);
+  TwentyFourEight(const std::string &title, int width, int height, rhi::BackendAPI api);
   void TransitStage(GameStage stage);
   void ResetGame();
 

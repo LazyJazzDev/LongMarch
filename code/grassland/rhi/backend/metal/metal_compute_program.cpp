@@ -1,30 +1,37 @@
 ﻿#include "grassland/rhi/backend/metal/metal_compute_program.h"
 
+#include <cstring>
+#include <spirv_msl.hpp>
+
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 
 namespace grassland::rhi::backend::metal {
-MetalComputeProgram::MetalComputeProgram(MetalDevice *device, const ComputeProgramDesc &desc)
-    : ComputeProgram(device, desc),
-      MetalProgramBase(device->NativeDevice(), desc_.pipeline_layout) {
+MetalComputeProgramImpl::MetalComputeProgramImpl(IMetalDevice *device, const ComputeProgramDesc &desc)
+    : device_(device),
+      desc_(desc),
+      shader_(ObjectPtr<IShader>::Retain(desc.compute_shader)) {
 }
 
-MTL::ComputePipelineState *MetalComputeProgram::NativePipeline() const {
+MTL::ComputePipelineState *MetalComputeProgramImpl::NativePipeline() const {
   return pipeline_.get();
 }
 
-MTL::Size MetalComputeProgram::ThreadGroupSize() const {
+MTL::Size MetalComputeProgramImpl::ThreadGroupSize() const {
   return threads_;
 }
 
-MetalComputeProgram *MetalComputeProgram::Create(MetalDevice *owner_device, const ComputeProgramDesc &desc) {
-  auto object = std::unique_ptr<MetalComputeProgram>(new MetalComputeProgram(owner_device, desc));
+rhi::IComputeProgram *MetalComputeProgramImpl::Create(IMetalDevice *owner_device, const ComputeProgramDesc &desc) {
+  auto object = std::unique_ptr<MetalComputeProgramImpl>(new MetalComputeProgramImpl(owner_device, desc));
   if (!object->ValidateLayout())
     return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   std::array<uint32_t, 3> threads{};
-  auto function = object->CompileFunction(object->desc_.compute_shader, {}, &threads);
+  auto function = CompileMetalFunction(owner_device->NativeDevice(), object->desc_.pipeline_layout,
+                                       object->desc_.compute_shader, {}, &threads);
   if (!function)
     return nullptr;
   auto device = owner_device->NativeDevice();
@@ -45,4 +52,31 @@ MetalComputeProgram *MetalComputeProgram::Create(MetalDevice *owner_device, cons
   object->pipeline_ = std::move(pipeline);
   return object.release();
 }
+
+rhi::IComputeProgram *IMetalComputeProgram::Create(IMetalDevice *device, const ComputeProgramDesc &desc) {
+  return MetalComputeProgramImpl::Create(device, desc);
+}
+
+const ComputeProgramDesc &MetalComputeProgramImpl::GetDesc() const {
+  return desc_;
+}
+
+IMetalDevice *MetalComputeProgramImpl::Owner() const {
+  return device_;
+}
+
+bool MetalComputeProgramImpl::ValidateLayout() const {
+  if (!desc_.compute_shader || desc_.compute_shader->GetStage() != SHADER_STAGE_COMPUTE ||
+      desc_.pipeline_layout.groups.size() > 8)
+    return false;
+  for (const auto &group : desc_.pipeline_layout.groups)
+    if (!ValidateBindingLayout(group))
+      return false;
+  return true;
+}
+
+const PipelineLayoutDesc &MetalComputeProgramImpl::BindingLayout() const {
+  return desc_.pipeline_layout;
+}
+
 }  // namespace grassland::rhi::backend::metal

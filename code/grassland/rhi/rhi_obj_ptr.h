@@ -75,4 +75,10 @@ class ObjPtr {
   T *object_{};
 };
 
+// Acquire one interface reference and release it automatically at the use site.
+template <typename Interface, typename Source>
+ObjPtr<Interface> QueryInterfacePtr(Source *source) noexcept {
+  return source ? source->template QueryInterface<Interface>() : nullptr;
+}
+
 }  // namespace grassland::rhi

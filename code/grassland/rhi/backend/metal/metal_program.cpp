@@ -1,5 +1,10 @@
 ﻿#include "grassland/rhi/backend/metal/metal_program.h"
 
+#include <cstring>
+#include <spirv_msl.hpp>
+#include <unordered_set>
+
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
@@ -7,21 +12,23 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-MetalProgram::MetalProgram(MetalDevice *device, const ProgramDesc &desc)
-    : Program(device, desc),
-      MetalProgramBase(device->NativeDevice(), desc_.pipeline_layout) {
+MetalProgramImpl::MetalProgramImpl(IMetalDevice *device, const ProgramDesc &desc)
+    : device_(device),
+      desc_(desc),
+      vertex_shader_(ObjectPtr<IShader>::Retain(desc.vertex_shader)),
+      fragment_shader_(ObjectPtr<IShader>::Retain(desc.fragment_shader)) {
 }
 
-MTL::RenderPipelineState *MetalProgram::NativePipeline() const {
+MTL::RenderPipelineState *MetalProgramImpl::NativePipeline() const {
   return pipeline_.get();
 }
 
-MTL::DepthStencilState *MetalProgram::NativeDepthStencil() const {
+MTL::DepthStencilState *MetalProgramImpl::NativeDepthStencil() const {
   return depth_stencil_.get();
 }
 
-MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc &desc) {
-  auto object = std::unique_ptr<MetalProgram>(new MetalProgram(owner_device, desc));
+rhi::IProgram *MetalProgramImpl::Create(IMetalDevice *owner_device, const ProgramDesc &desc) {
+  auto object = std::unique_ptr<MetalProgramImpl>(new MetalProgramImpl(owner_device, desc));
 
   if (!object->ValidateLayout() || object->desc_.vertex_bindings.size() > 31 - VertexBufferBase) {
     ReportError(-1, "Invalid Metal graphics program layout.");
@@ -44,7 +51,8 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
   NS::SharedPtr<MTL::Function> functions[2];
   const IShader *shaders[] = {object->desc_.vertex_shader, object->desc_.fragment_shader};
   for (int i = 0; i < 2; ++i) {
-    functions[i] = object->CompileFunction(shaders[i], object->desc_.vertex_attributes);
+    functions[i] = CompileMetalFunction(owner_device->NativeDevice(), object->desc_.pipeline_layout, shaders[i],
+                                        object->desc_.vertex_attributes);
     if (!functions[i])
       return nullptr;
   }
@@ -121,4 +129,89 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
   }
   return object.release();
 }
+
+rhi::IProgram *IMetalProgram::Create(IMetalDevice *device, const ProgramDesc &desc) {
+  return MetalProgramImpl::Create(device, desc);
+}
+
+const ProgramDesc &MetalProgramImpl::GetDesc() const {
+  return desc_;
+}
+
+IMetalDevice *MetalProgramImpl::Owner() const {
+  return device_;
+}
+
+bool MetalProgramImpl::ValidateLayout() const {
+  if (desc_.topology < PRIMITIVE_TOPOLOGY_TRIANGLE_LIST || desc_.topology > PRIMITIVE_TOPOLOGY_POINT_LIST ||
+      desc_.rasterizer.cull_mode < CULL_MODE_NONE || desc_.rasterizer.cull_mode > CULL_MODE_BACK ||
+      desc_.rasterizer.front_face < FRONT_FACE_COUNTER_CLOCKWISE ||
+      desc_.rasterizer.front_face > FRONT_FACE_CLOCKWISE || desc_.rasterizer.fill_mode < FILL_MODE_SOLID ||
+      desc_.rasterizer.fill_mode > FILL_MODE_WIREFRAME)
+    return false;
+  if (desc_.pipeline_layout.groups.size() > 8)
+    return false;
+  for (const auto &group : desc_.pipeline_layout.groups)
+    if (!ValidateBindingLayout(group))
+      return false;
+  if (!desc_.vertex_shader || !desc_.fragment_shader)
+    return false;
+  if (desc_.vertex_shader->GetStage() != SHADER_STAGE_VERTEX)
+    return false;
+  if (desc_.fragment_shader->GetStage() != SHADER_STAGE_FRAGMENT)
+    return false;
+  if (desc_.color_formats.size() > 8 || (desc_.color_formats.empty() && !IsDepthFormat(desc_.depth_stencil.format)))
+    return false;
+  for (auto format : desc_.color_formats)
+    if (!IsColorFormat(format))
+      return false;
+  if (!desc_.blend_states.empty() && desc_.blend_states.size() != desc_.color_formats.size())
+    return false;
+  for (size_t i = 0; i < desc_.blend_states.size(); ++i) {
+    if (desc_.blend_states[i].blend_enable &&
+        (IsSignedIntegerFormat(desc_.color_formats[i]) || IsUnsignedIntegerFormat(desc_.color_formats[i])))
+      return false;
+  }
+  for (const auto &blend : desc_.blend_states) {
+    for (auto factor : {blend.src_color, blend.dst_color, blend.src_alpha, blend.dst_alpha})
+      if (factor < BLEND_FACTOR_ZERO || factor > BLEND_FACTOR_ONE_MINUS_DST_ALPHA)
+        return false;
+    for (auto op : {blend.color_op, blend.alpha_op})
+      if (op < BLEND_OP_ADD || op > BLEND_OP_MAX)
+        return false;
+  }
+  const auto &depth = desc_.depth_stencil;
+  if (depth.format != IMAGE_FORMAT_UNKNOWN && !IsDepthFormat(depth.format))
+    return false;
+  if ((depth.depth_test || depth.depth_write || depth.stencil_test) && !IsDepthFormat(depth.format))
+    return false;
+  if (depth.stencil_test && !HasStencil(depth.format))
+    return false;
+  if (depth.depth_compare < COMPARE_NEVER || depth.depth_compare > COMPARE_ALWAYS)
+    return false;
+  for (auto face : {depth.front, depth.back}) {
+    if (face.compare < COMPARE_NEVER || face.compare > COMPARE_ALWAYS)
+      return false;
+    for (auto op : {face.fail_op, face.depth_fail_op, face.pass_op})
+      if (op < STENCIL_KEEP || op > STENCIL_DECREMENT_WRAP)
+        return false;
+  }
+  std::unordered_set<uint32_t> locations;
+  for (const auto &attribute : desc_.vertex_attributes) {
+    if (attribute.binding >= desc_.vertex_bindings.size())
+      return false;
+    auto size = InputTypeSize(attribute.type);
+    auto stride = desc_.vertex_bindings[attribute.binding].stride;
+    if (!size || attribute.offset > stride || size > stride - attribute.offset)
+      return false;
+    if (!locations.insert(attribute.location).second)
+      return false;
+  }
+  return true;
+}
+
+const PipelineLayoutDesc &MetalProgramImpl::BindingLayout() const {
+  return desc_.pipeline_layout;
+}
+
 }  // namespace grassland::rhi::backend::metal

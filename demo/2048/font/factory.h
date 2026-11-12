@@ -1,11 +1,11 @@
 ﻿#pragma once
 
+#include <glm/glm.hpp>
 #include <map>
 #include <string>
 #include <vector>
 
 #include "ft2build.h"
-#include "long_march.h"
 #include FT_FREETYPE_H
 
 namespace font {

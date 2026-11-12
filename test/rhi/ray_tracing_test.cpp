@@ -33,15 +33,16 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
   if (api == BACKEND_API_METAL) {
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto owner = static_cast<MetalDevice *>(device);
-    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<MetalQueue *>(queue_owner.Get());
+    auto owner = rhi::QueryInterfacePtr<IMetalDevice>(device).Get();
+    ObjPtr<IQueue> queue_owner = rhi::QueryInterfacePtr<IDevice>(owner)->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<IMetalQueue>(queue_owner.Get()).Get();
     auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(sizeof(output), MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
     std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
     auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
-    blit->copyFromBuffer(dynamic_cast<MetalBuffer *>(buffer)->NativeBuffer(), 0, readback.get(), 0, sizeof(output));
+    blit->copyFromBuffer(rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get()->NativeBuffer(), 0, readback.get(), 0,
+                         sizeof(output));
     blit->endEncoding();
     commands->commit();
     commands->waitUntilCompleted();
@@ -54,10 +55,10 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
-    auto owner = static_cast<D3D12Device *>(device);
-    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<D3D12Queue *>(queue_owner.Get());
-    auto source = dynamic_cast<D3D12Buffer *>(buffer)->NativeBuffer();
+    auto owner = rhi::QueryInterfacePtr<ID3D12Device>(device).Get();
+    ObjPtr<IQueue> queue_owner = rhi::QueryInterfacePtr<IDevice>(owner)->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<ID3D12Queue>(queue_owner.Get()).Get();
+    auto source = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get()->NativeBuffer();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_READBACK;
@@ -106,11 +107,11 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (api == BACKEND_API_VULKAN) {
     using namespace backend::vulkan;
-    auto owner = static_cast<VulkanDevice *>(device);
-    ObjPtr<IQueue> queue_owner = owner->GetQueue(QUEUE_TYPE_MAIN);
-    auto native_queue = static_cast<VulkanQueue *>(queue_owner.Get());
+    auto owner = rhi::QueryInterfacePtr<IVulkanDevice>(device).Get();
+    ObjPtr<IQueue> queue_owner = rhi::QueryInterfacePtr<IDevice>(owner)->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<IVulkanQueue>(queue_owner.Get()).Get();
     auto native = owner->NativeDevice();
-    auto source = dynamic_cast<VulkanBuffer *>(buffer)->NativeBuffer();
+    auto source = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get()->NativeBuffer();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     desc.size = sizeof(output);
     desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -188,8 +189,9 @@ class RhiRayTracing : public testing::TestWithParam<BackendAPI> {
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
       backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
-      ASSERT_TRUE(SUCCEEDED(
-          static_cast<backend::d3d12::D3D12Device *>(device)->NativeDevice()->QueryInterface(IID_PPV_ARGS(&messages))));
+      ASSERT_TRUE(
+          SUCCEEDED(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device).Get()->NativeDevice()->QueryInterface(
+              IID_PPV_ARGS(&messages))));
       for (UINT64 i = 0; i < messages->GetNumStoredMessages(); ++i) {
         SIZE_T size{};
         ASSERT_TRUE(SUCCEEDED(messages->GetMessage(i, nullptr, &size)));
@@ -286,19 +288,27 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
     abandoned.Release();
 #if defined(LONGMARCH_METAL_ENABLED)
     if (api == BACKEND_API_METAL)
-      EXPECT_EQ(static_cast<backend::metal::MetalTopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
+      EXPECT_EQ(rhi::QueryInterfacePtr<backend::metal::IMetalTopLevelAccelerationStructure>(tlas.Get())
+                    .Get()
+                    ->BottomLevels()[0]
+                    .Get(),
                 compact.Get());
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (api == BACKEND_API_D3D12)
-      EXPECT_EQ(static_cast<backend::d3d12::D3D12TopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
+      EXPECT_EQ(rhi::QueryInterfacePtr<backend::d3d12::ID3D12TopLevelAccelerationStructure>(tlas.Get())
+                    .Get()
+                    ->BottomLevels()[0]
+                    .Get(),
                 compact.Get());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     if (api == BACKEND_API_VULKAN)
-      EXPECT_EQ(
-          static_cast<backend::vulkan::VulkanTopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
-          compact.Get());
+      EXPECT_EQ(rhi::QueryInterfacePtr<backend::vulkan::IVulkanTopLevelAccelerationStructure>(tlas.Get())
+                    .Get()
+                    ->BottomLevels()[0]
+                    .Get(),
+                compact.Get());
 #endif
   }
   const char *source = R"(
@@ -755,11 +765,11 @@ TEST_P(RhiRayTracing, ScratchPoolSharesStorageAndShrinksAfterDemandExpires) {
   auto check = [](auto &pool) {
     auto initial_buffer = pool.Acquire(1);
     ASSERT_TRUE(initial_buffer);
-    EXPECT_EQ(initial_buffer->GetDesc().size, 65536u);
+    EXPECT_EQ(QueryInterfacePtr<IBuffer>(initial_buffer.Get())->GetDesc().size, 65536u);
     EXPECT_EQ(pool.Acquire(65536).Get(), initial_buffer.Get());
     auto large = pool.Acquire(700000);
     ASSERT_TRUE(large);
-    EXPECT_EQ(large->GetDesc().size, 1048576u);
+    EXPECT_EQ(QueryInterfacePtr<IBuffer>(large.Get())->GetDesc().size, 1048576u);
     EXPECT_EQ(pool.Acquire(1).Get(), large.Get());
     EXPECT_NE(large.Get(), initial_buffer.Get());
     EXPECT_FALSE(pool.Acquire(UINT64_MAX));
@@ -770,7 +780,7 @@ TEST_P(RhiRayTracing, ScratchPoolSharesStorageAndShrinksAfterDemandExpires) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1100));
     auto shrunk = pool.Acquire(65537);
     ASSERT_TRUE(shrunk);
-    EXPECT_EQ(shrunk->GetDesc().size, 131072u);
+    EXPECT_EQ(QueryInterfacePtr<IBuffer>(shrunk.Get())->GetDesc().size, 131072u);
     EXPECT_NE(shrunk.Get(), large.Get());
     EXPECT_EQ(pool.Acquire(1).Get(), shrunk.Get());
     // Old borrowers remain usable after replacement and clearing the cache.
@@ -780,20 +790,20 @@ TEST_P(RhiRayTracing, ScratchPoolSharesStorageAndShrinksAfterDemandExpires) {
     EXPECT_TRUE(shrunk->NativeBuffer());
     auto next = pool.Acquire(1);
     ASSERT_TRUE(next);
-    EXPECT_EQ(next->GetDesc().size, 65536u);
+    EXPECT_EQ(QueryInterfacePtr<IBuffer>(next.Get())->GetDesc().size, 65536u);
     EXPECT_NE(next.Get(), shrunk.Get());
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
-    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->ScratchPool());
+    check(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get()->ScratchPool());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN)
-    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->ScratchPool());
+    check(rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get()->ScratchPool());
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL)
-    check(static_cast<backend::metal::MetalDevice *>(device.Get())->ScratchPool());
+    check(rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get()->ScratchPool());
 #endif
   CheckNativeErrors(device.Get());
 }
@@ -838,15 +848,24 @@ TEST_P(RhiRayTracing, SharedScratchSurvivesResizingAndOutOfOrderContextSubmissio
       // Replace the cache while unsubmitted commands still reference the old buffer.
 #if defined(LONGMARCH_METAL_ENABLED)
       if (api == BACKEND_API_METAL)
-        ASSERT_TRUE(static_cast<backend::metal::MetalDevice *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
+        ASSERT_TRUE(rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get())
+                        .Get()
+                        ->ScratchPool()
+                        .Acquire(4 * 1024 * 1024));
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
       if (api == BACKEND_API_D3D12)
-        ASSERT_TRUE(static_cast<backend::d3d12::D3D12Device *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
+        ASSERT_TRUE(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get())
+                        .Get()
+                        ->ScratchPool()
+                        .Acquire(4 * 1024 * 1024));
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
       if (api == BACKEND_API_VULKAN)
-        ASSERT_TRUE(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
+        ASSERT_TRUE(rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get())
+                        .Get()
+                        ->ScratchPool()
+                        .Acquire(4 * 1024 * 1024));
 #endif
     }
   }

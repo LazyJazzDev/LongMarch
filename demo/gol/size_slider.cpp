@@ -42,7 +42,7 @@ void SizeSlider::Resize(glm::vec4 bounds, bool vertical) {
 }
 
 glm::vec2 SizeSlider::FramePosition(double x, double y) const {
-  const auto size = application_->GetWindow()->GetSize();
+  const auto size = application_->GetWindowSize();
   return glm::vec2{float(x), float(y)} * glm::vec2(application_->FramebufferSize()) /
          glm::vec2(glm::max(size, glm::ivec2{1}));
 }
@@ -54,7 +54,7 @@ bool SizeSlider::Contains(glm::vec2 p) const {
 void SizeSlider::OnMouseButton(int button, int action, int) {
   if (button != GLFW_MOUSE_BUTTON_LEFT)
     return;
-  const auto cursor = application_->GetWindow()->GetCursorPosition();
+  const auto cursor = application_->GetCursorPosition();
   const auto p = FramePosition(cursor.x, cursor.y);
   if (action == GLFW_PRESS) {
     focused_ = Contains(p);

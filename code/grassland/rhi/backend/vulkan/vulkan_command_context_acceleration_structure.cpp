@@ -1,4 +1,5 @@
 ﻿#include <algorithm>
+#include <cassert>
 #include <cstring>
 
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
@@ -6,7 +7,7 @@
 
 namespace grassland::rhi::backend::vulkan {
 namespace {
-uint64_t BufferAddress(VulkanDevice *device, VulkanBuffer *buffer) {
+uint64_t BufferAddress(IVulkanDevice *device, IVulkanBuffer *buffer) {
   VkBufferDeviceAddressInfo info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
   info.buffer = buffer->NativeBuffer();
   return vkGetBufferDeviceAddress(device->NativeDevice(), &info);
@@ -20,7 +21,7 @@ void AccelerationStructureBarrier(VkCommandBuffer command) {
                        0, nullptr, 0, nullptr);
 }
 
-uint64_t ScratchAlignment(VulkanDevice *device) {
+uint64_t ScratchAlignment(IVulkanDevice *device) {
   VkPhysicalDeviceAccelerationStructurePropertiesKHR as{
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR};
   VkPhysicalDeviceProperties2 properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &as};
@@ -29,11 +30,11 @@ uint64_t ScratchAlignment(VulkanDevice *device) {
 }
 }  // namespace
 
-bool VulkanCommandContext::CmdBuildBottomLevelAccelerationStructure(
+bool VulkanCommandContextImpl::CmdBuildBottomLevelAccelerationStructure(
     IBottomLevelAccelerationStructure *destination,
     const std::vector<AccelerationStructureGeometryBuffers> &geometries,
     AccelerationStructureBuildMode mode) {
-  auto target = dynamic_cast<VulkanBottomLevelAccelerationStructure *>(destination);
+  auto target = rhi::QueryInterfacePtr<IVulkanAccelerationStructure>(destination).Get();
   if (!target || target->Owner() != device_ || render_target_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
@@ -42,7 +43,7 @@ bool VulkanCommandContext::CmdBuildBottomLevelAccelerationStructure(
     return false;
   }
 #if !defined(NDEBUG)
-  if (!ValidateGeometryBuffers(target->GetDesc(), geometries, device_)) {
+  if (!ValidateGeometryBuffers(destination->GetDesc(), geometries)) {
     recording_failed_ = true;
     return false;
   }
@@ -62,21 +63,22 @@ bool VulkanCommandContext::CmdBuildBottomLevelAccelerationStructure(
     for (const auto &view : {geometry.data, geometry.indices}) {
       if (!view.buffer)
         continue;
-      auto buffer = dynamic_cast<VulkanBuffer *>(view.buffer);
-      if (!RetainResource(view.buffer))
+      auto buffer = rhi::QueryInterfacePtr<IVulkanBuffer>(view.buffer).Get();
+      assert(buffer && buffer->Owner() == device_);
+      if (!RetainResource(buffer))
         return false;
       if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_ACCESS_SHADER_READ_BIT))
         return false;
     }
   }
-  auto native = NativeGeometries(device_, target->GetDesc(), geometries);
+  auto native = NativeGeometries(device_, destination->GetDesc(), geometries);
   std::vector<VkAccelerationStructureBuildRangeInfoKHR> ranges(native.size());
   for (size_t i = 0; i < ranges.size(); ++i) {
-    if (target->GetDesc().aabbs.empty()) {
-      const auto &g = target->GetDesc().geometries[i];
+    if (destination->GetDesc().aabbs.empty()) {
+      const auto &g = destination->GetDesc().geometries[i];
       ranges[i].primitiveCount = (g.index_count ? g.index_count : g.vertex_count) / 3;
     } else
-      ranges[i].primitiveCount = target->GetDesc().aabbs[i].count;
+      ranges[i].primitiveCount = destination->GetDesc().aabbs[i].count;
   }
   VkAccelerationStructureBuildGeometryInfoKHR build{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
   build.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
@@ -96,15 +98,15 @@ bool VulkanCommandContext::CmdBuildBottomLevelAccelerationStructure(
   return true;
 }
 
-bool VulkanCommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *destination,
-                                                                 const std::vector<RayTracingInstance> &instances,
-                                                                 AccelerationStructureBuildMode mode) {
-  auto target = dynamic_cast<VulkanTopLevelAccelerationStructure *>(destination);
+bool VulkanCommandContextImpl::CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *destination,
+                                                                     const std::vector<RayTracingInstance> &instances,
+                                                                     AccelerationStructureBuildMode mode) {
+  auto target = rhi::QueryInterfacePtr<IVulkanTopLevelAccelerationStructure>(destination).Get();
   if (!target || target->Owner() != device_ || render_target_ ||
       (mode != ACCELERATION_STRUCTURE_BUILD && mode != ACCELERATION_STRUCTURE_UPDATE) ||
       (mode == ACCELERATION_STRUCTURE_UPDATE && !target->AllowsUpdate()) ||
       (mode == ACCELERATION_STRUCTURE_BUILD && target->IsCompactStorage()) ||
-      !ValidateInstances(target->GetDesc(), instances)) {
+      !ValidateInstances(destination->GetDesc(), instances)) {
     recording_failed_ = true;
     return false;
   }
@@ -120,7 +122,7 @@ bool VulkanCommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccele
   std::vector<VkAccelerationStructureInstanceKHR> native(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
-    auto blas = dynamic_cast<VulkanBottomLevelAccelerationStructure *>(instance.blas);
+    auto blas = rhi::QueryInterfacePtr<IVulkanAccelerationStructure>(instance.blas).Get();
     if (!blas || blas->Owner() != device_) {
       recording_failed_ = true;
       return false;
@@ -194,8 +196,8 @@ bool VulkanCommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccele
   return true;
 }
 
-bool VulkanCommandContext::CmdQueryCompactedSize(IAccelerationStructure *structure) {
-  auto target = dynamic_cast<VulkanAccelerationStructure *>(structure);
+bool VulkanCommandContextImpl::CmdQueryCompactedSize(IAccelerationStructure *structure) {
+  auto target = rhi::QueryInterfacePtr<IVulkanAccelerationStructure>(structure).Get();
   if (!target || target->Owner() != device_ || !target->AllowsCompaction() || render_target_) {
     recording_failed_ = true;
     return false;
@@ -210,10 +212,10 @@ bool VulkanCommandContext::CmdQueryCompactedSize(IAccelerationStructure *structu
   return true;
 }
 
-bool VulkanCommandContext::CmdCompactAccelerationStructure(IAccelerationStructure *source,
-                                                           IAccelerationStructure *destination) {
-  auto from = dynamic_cast<VulkanAccelerationStructure *>(source);
-  auto to = dynamic_cast<VulkanAccelerationStructure *>(destination);
+bool VulkanCommandContextImpl::CmdCompactAccelerationStructure(IAccelerationStructure *source,
+                                                               IAccelerationStructure *destination) {
+  auto from = rhi::QueryInterfacePtr<IVulkanAccelerationStructure>(source).Get();
+  auto to = rhi::QueryInterfacePtr<IVulkanAccelerationStructure>(destination).Get();
   if (!from || !to || from == to || from->Owner() != device_ || to->Owner() != device_ || !from->AllowsCompaction() ||
       !to->IsCompactStorage() || source->GetType() != destination->GetType() || render_target_) {
     recording_failed_ = true;
@@ -223,13 +225,13 @@ bool VulkanCommandContext::CmdCompactAccelerationStructure(IAccelerationStructur
     return false;
   if (!RetainResource(destination))
     return false;
-  if (auto top = dynamic_cast<VulkanTopLevelAccelerationStructure *>(source)) {
+  if (auto top = rhi::QueryInterfacePtr<IVulkanTopLevelAccelerationStructure>(source).Get()) {
     auto pending = as_dependencies_.find(top);
     auto dependencies = pending == as_dependencies_.end() ? top->BottomLevels() : pending->second;
     for (const auto &blas : dependencies)
       if (!RetainResource(blas.Get()))
         return false;
-    auto target = static_cast<VulkanTopLevelAccelerationStructure *>(destination);
+    auto target = rhi::QueryInterfacePtr<IVulkanTopLevelAccelerationStructure>(destination).Get();
     for (const auto &blas : target->BottomLevels())
       if (!RetainResource(blas.Get()))
         return false;

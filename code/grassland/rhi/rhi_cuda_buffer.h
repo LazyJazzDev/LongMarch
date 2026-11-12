@@ -2,6 +2,8 @@
 #include "grassland/rhi/rhi_buffer.h"
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
+LONGMARCH_RHI_INTERFACE(grassland::rhi::ICUDABuffer, grassland::rhi::IBuffer, "84bb4846-d7f3-478c-b73b-d69d1522ef0f")
+
 namespace grassland::rhi {
 // Fixed graphics allocation imported and mapped once into CUDA.
 // Use ICUDATimeline and submission Events to order CUDA and graphics access.

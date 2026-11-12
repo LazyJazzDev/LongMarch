@@ -26,7 +26,7 @@ BottomLevelAccelerationStructure::BottomLevelAccelerationStructure(
 }
 
 rhi::IBottomLevelAccelerationStructure *BottomLevelAccelerationStructure::Get() const noexcept {
-  return static_cast<rhi::IBottomLevelAccelerationStructure *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::IBottomLevelAccelerationStructure>(GetObject()).Get();
 }
 
 const rhi::BottomLevelAccelerationStructureDesc &BottomLevelAccelerationStructure::GetDesc() const {
@@ -40,7 +40,7 @@ TopLevelAccelerationStructure::TopLevelAccelerationStructure(rhi::ITopLevelAccel
 }
 
 rhi::ITopLevelAccelerationStructure *TopLevelAccelerationStructure::Get() const noexcept {
-  return static_cast<rhi::ITopLevelAccelerationStructure *>(GetObject());
+  return rhi::QueryInterfacePtr<rhi::ITopLevelAccelerationStructure>(GetObject()).Get();
 }
 
 const rhi::TopLevelAccelerationStructureDesc &TopLevelAccelerationStructure::GetDesc() const {

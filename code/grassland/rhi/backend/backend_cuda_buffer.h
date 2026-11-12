@@ -6,7 +6,7 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
-class CUDAMapping {
+class CUDAMapping final {
  public:
   explicit CUDAMapping(int device);
   CUDAMapping(const CUDAMapping &) = delete;

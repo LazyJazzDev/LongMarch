@@ -3,10 +3,9 @@
 #include "grassland/rhi/rhi_acceleration_structure.h"
 
 namespace grassland::rhi::backend {
-class Device;
+
 bool ValidateBottomLevelDesc(const BottomLevelAccelerationStructureDesc &desc);
 bool ValidateGeometryBuffers(const BottomLevelAccelerationStructureDesc &desc,
-                             const std::vector<AccelerationStructureGeometryBuffers> &buffers,
-                             Device *device);
+                             const std::vector<AccelerationStructureGeometryBuffers> &buffers);
 bool ValidateInstances(const TopLevelAccelerationStructureDesc &desc, const std::vector<RayTracingInstance> &instances);
 }  // namespace grassland::rhi::backend

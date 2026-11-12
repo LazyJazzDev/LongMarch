@@ -299,15 +299,15 @@ TEST_P(RhiDownload, TemporalPoolRetainsTokenLeaseAndShrinksExpiredDemand) {
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
-    check(static_cast<backend::d3d12::D3D12Device *>(device.Get()));
+    check(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN)
-    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get()));
+    check(rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get());
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL)
-    check(static_cast<backend::metal::MetalDevice *>(device.Get()));
+    check(rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get());
 #endif
 }
 

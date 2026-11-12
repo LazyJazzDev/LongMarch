@@ -26,7 +26,8 @@ TEST(RhiVulkanTimeline, ConcurrentLogicalQueueSubmissionsKeepSeparateTimelines) 
         return false;
       ObjPtr<ISubmissionToken> token = commands->Submit();
       if (!token || token->GetEvent().value != serial ||
-          token->GetEvent().timeline != static_cast<VulkanQueue *>(queue)->GetTimeline())
+          token->GetEvent().timeline !=
+              rhi::QueryInterfacePtr<ITimeline>(rhi::QueryInterfacePtr<IVulkanQueue>(queue)->GetTimeline()).Get())
         return false;
       tokens.push_back(std::move(token));
     }
@@ -51,7 +52,7 @@ TEST(RhiVulkanTimeline, CompletionValuesSurviveContextRecyclingAcrossQueues) {
   ASSERT_TRUE(queues[1]);
   std::array<Event, 2> first{};
   for (const auto &queue : queues) {
-    auto native = static_cast<VulkanQueue *>(queue.Get());
+    auto native = rhi::QueryInterfacePtr<IVulkanQueue>(queue.Get()).Get();
     EXPECT_EQ(native->Wait(0, 0), VK_SUCCESS);
     EXPECT_EQ(native->Wait(1, 0), VK_TIMEOUT);
   }
@@ -64,7 +65,9 @@ TEST(RhiVulkanTimeline, CompletionValuesSurviveContextRecyclingAcrossQueues) {
       ObjPtr<ISubmissionToken> token = context->Submit();
       ASSERT_TRUE(token);
       const auto event = token->GetEvent();
-      EXPECT_EQ(event.timeline, static_cast<VulkanQueue *>(queues[index].Get())->GetTimeline());
+      EXPECT_EQ(event.timeline, rhi::QueryInterfacePtr<ITimeline>(
+                                    rhi::QueryInterfacePtr<IVulkanQueue>(queues[index].Get())->GetTimeline())
+                                    .Get());
       EXPECT_EQ(event.value, uint64_t(batch * 4 + i / 2 + 1));
       if (!first[index].timeline)
         first[index] = event;
@@ -74,7 +77,10 @@ TEST(RhiVulkanTimeline, CompletionValuesSurviveContextRecyclingAcrossQueues) {
       ASSERT_TRUE(token->WaitHost());
     for (size_t index = 0; index < queues.size(); ++index) {
       uint64_t completed = 0;
-      ASSERT_TRUE(static_cast<VulkanQueue *>(queues[index].Get())->GetTimeline()->GetCompletedValue(completed));
+      ASSERT_TRUE(
+          rhi::QueryInterfacePtr<ITimeline>(rhi::QueryInterfacePtr<IVulkanQueue>(queues[index].Get())->GetTimeline())
+              .Get()
+              ->GetCompletedValue(completed));
       EXPECT_EQ(completed, uint64_t((batch + 1) * 4));
       EXPECT_TRUE(first[index].timeline->WaitHost(first[index].value));
     }

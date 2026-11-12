@@ -26,8 +26,15 @@ constexpr int kScoreBoardClicksToStartAi = 5;
 
 }  // namespace
 
-TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api)
+TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height, rhi::BackendAPI api)
     : Application(title, width, height, api) {
+}
+
+void TwentyFourEight::OnFramebufferResize() {
+  OnWindowSize();
+}
+
+void TwentyFourEight::CustomOnInit() {
   GetWindow()->KeyEvent().RegisterCallback([this](int key, int scancode, int action, int mods) {
     if (action != GLFW_PRESS) {
       return;
@@ -54,13 +61,7 @@ TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height
         break;
     }
   });
-}
 
-void TwentyFourEight::OnFramebufferResize() {
-  OnWindowSize();
-}
-
-void TwentyFourEight::CustomOnInit() {
   Application::CustomOnInit();
   clear_color_ = {250.0f / 255.0f, 248.0f / 255.0f, 240.0f / 255.0f, 1.0f};
   float arc_size = 1.0f / 16.0f;
@@ -565,7 +566,7 @@ void TwentyFourEight::OnUpdate(float t) {
           [](const NumberBlock &left, const NumberBlock &right) { return left.number < right.number; });
       if (reached != number_blocks_.end() && reached->number >= ai_stop_tile_) {
         LogInfo("2048 autoplay reached {}, closing for the screenshot", reached->number);
-        GetWindow()->RequestClose();
+        glfwSetWindowShouldClose(GetWindow()->GLFWWindow(), GLFW_TRUE);
       }
     }
 

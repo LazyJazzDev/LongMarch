@@ -2,25 +2,25 @@
 
 namespace grassland::rhi::backend {
 
-SubmissionToken::SubmissionToken(Event event) : event_(event) {
+SubmissionTokenImpl::SubmissionTokenImpl(Event event) : event_(event) {
 }
 
-Event SubmissionToken::GetEvent() const {
+Event SubmissionTokenImpl::GetEvent() const {
   return event_;
 }
 
-SubmissionStatus SubmissionToken::GetStatus() const {
+SubmissionStatus SubmissionTokenImpl::GetStatus() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return status_;
 }
 
-bool SubmissionToken::WaitHost() const {
+bool SubmissionTokenImpl::WaitHost() const {
   std::unique_lock<std::mutex> lock(mutex_);
   changed_.wait(lock, [&] { return status_ != SUBMISSION_STATUS_PENDING; });
   return status_ == SUBMISSION_STATUS_COMPLETED;
 }
 
-void SubmissionToken::Complete(SubmissionStatus status) {
+void SubmissionTokenImpl::Complete(SubmissionStatus status) {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     status_ = status;
@@ -28,4 +28,7 @@ void SubmissionToken::Complete(SubmissionStatus status) {
   changed_.notify_all();
 }
 
+IBackendSubmissionToken *IBackendSubmissionToken::Create(Event event) {
+  return new SubmissionTokenImpl(event);
+}
 }  // namespace grassland::rhi::backend

@@ -1,25 +1,52 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
+#include "grassland/rhi/backend/vulkan/vulkan_util.h"
+
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanWindow,
+                        grassland::rhi::backend::IBackendWindow,
+                        "2bd587e1-b088-4f5c-8138-3fd885407013")
 
 namespace grassland::rhi::backend::vulkan {
 
-class VulkanWindow final : public Window {
+class IVulkanWindow : public IBackendWindow {
  public:
-  ~VulkanWindow() override;
-  static VulkanWindow *Create(VulkanDevice *device, const WindowDesc &desc);
-  ObjectPtr<Image> AcquireNativeFrame() override;
-  bool RebuildNativeSwapChain(PresentMode mode) override;
+  virtual IVulkanQueue *OwnerQueue() const = 0;
+  virtual bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) = 0;
+  virtual bool RecordImGui(rhi::ICommandContext *commands,
+                           rhi::IImage *image,
+                           ColorSpace color_space,
+                           float white_scale) = 0;
+  virtual bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) = 0;
+  virtual const void *DeviceIdentity() const = 0;
+  virtual bool UpdateNextImage() = 0;
+  virtual void ReleaseNextImage() = 0;
+  static rhi::IWindow *Create(IVulkanDevice *device, const WindowDesc &desc);
+
+  virtual VkSemaphore RenderSemaphore() const = 0;
+  virtual VkResult PresentFrame() = 0;
+};
+
+}  // namespace grassland::rhi::backend::vulkan
+
+namespace grassland::rhi::backend::vulkan {
+class VulkanWindowImpl final : public Object<rhi::IWindow, IVulkanWindow> {
+ public:
+  ~VulkanWindowImpl() override;
+  static rhi::IWindow *Create(IVulkanDevice *device, const WindowDesc &desc);
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   VkSemaphore RenderSemaphore() const;
   VkResult PresentFrame();
 
  private:
-  VulkanWindow(VulkanDevice *device);
+  ObjectPtr<IVulkanImage> AcquireNativeFrame();
+  bool RebuildNativeSwapChain(PresentMode mode);
 
+  VulkanWindowImpl(IVulkanDevice *device);
   void DestroySwapchain();
-  VulkanDevice *device_;
+  IVulkanDevice *device_;
   VkSurfaceKHR surface_{};
   VkSwapchainKHR swapchain_{};
 
@@ -36,11 +63,128 @@ class VulkanWindow final : public Window {
   uint32_t current_sync_{};
   uint32_t current_image_{};
   std::vector<VkImage> images_;
-  std::vector<VulkanImage::Views> image_views_;
+  std::vector<VulkanImageViews> image_views_;
   std::vector<VkSemaphore> rendered_;
   std::vector<bool> initialized_images_;
   ImageDesc desc_;
   PresentMode mode_{PRESENT_MODE_VSYNC};
-};
 
+ public:
+  bool EnableImGui(bool enabled = true, const char *font_file_path = nullptr, float font_size = 13.0f) override;
+
+  ImGuiContext *GetImGuiContext() const override;
+
+  bool UpdateImGui(const std::function<void()> &callback) override;
+
+  const void *DeviceIdentity() const override;
+
+  bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) override;
+
+  bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) override;
+
+  bool RecordImGui(rhi::ICommandContext *commands,
+                   rhi::IImage *image,
+                   ColorSpace color_space,
+                   float white_scale) override;
+
+  rhi::IImage *GetNextImage() override;
+
+  IVulkanQueue *OwnerQueue() const override;
+
+  bool UpdateNextImage() override;
+
+  void ReleaseNextImage() override;
+
+  bool IsSwapChainInvalid() const override;
+
+  bool RebuildSwapChain() override;
+
+  bool SetPresentMode(PresentMode mode) override;
+
+  bool SetColorSpace(ColorSpace color_space) override;
+
+  ColorSpace GetColorSpace() const override;
+
+  float GetHDRReferenceWhiteScale() const override;
+
+  float GetHDRHeadroom() const override;
+
+  bool GetHDRReferenceWhiteNits(float &nits) const override;
+
+ private:
+  ColorSpace RequestedColorSpace() const;
+
+  void DestroyWindow();
+
+  bool InitializeWindow(IVulkanDevice *device, const WindowDesc &desc);
+
+ public:
+  GLFWwindow *GLFWWindow() const override;
+
+  bool ShouldClose() const override;
+
+  bool IsKeyDown(int key) const override;
+
+  bool SetTitle(const std::string &title) override;
+
+  EventManager<void(int, int)> &ResizeEvent() override;
+
+  EventManager<void(int, int)> &FramebufferResizeEvent() override;
+
+  EventManager<void(bool)> &CursorEnterEvent() override;
+
+  EventManager<void(bool)> &FocusEvent() override;
+
+  EventManager<void(double, double)> &MouseMoveEvent() override;
+
+  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override;
+
+  bool SupportsMagnifyGestures() const override {
+#if defined(__APPLE__)
+    return magnify_monitor_ != nullptr;
+#else
+    return false;
+#endif
+  }
+
+  EventManager<void(const MagnifyGesture &)> &MagnifyEvent() override {
+    return magnify_event_;
+  }
+
+  EventManager<void(double, double)> &ScrollEvent() override;
+
+  EventManager<void(int, int, int, int)> &KeyEvent() override;
+
+  EventManager<void(uint32_t)> &CharEvent() override;
+
+  EventManager<void(int, const char **)> &DropEvent() override;
+
+ private:
+  bool invalid_{true};
+
+  IVulkanQueue *queue_{};
+  std::unique_ptr<WindowImGui> imgui_{};
+  std::unique_ptr<ImagePresenter> presenter_{};
+  bool processing_imgui_{};
+  EventManager<void(int, int)> resize_event_{};
+  EventManager<void(int, int)> framebufferresize_event_{};
+  EventManager<void(bool)> cursorenter_event_{};
+  EventManager<void(bool)> focus_event_{};
+  EventManager<void(double, double)> mousemove_event_{};
+  EventManager<void(int, int, int, double, double)> mousebutton_event_{};
+  EventManager<void(const MagnifyGesture &)> magnify_event_;
+#if defined(__APPLE__)
+  void *magnify_monitor_{};
+#endif
+  EventManager<void(double, double)> scroll_event_{};
+  EventManager<void(int, int, int, int)> key_event_{};
+  EventManager<void(uint32_t)> char_event_{};
+  EventManager<void(int, const char **)> drop_event_{};
+  PresentMode requested_mode_{PRESENT_MODE_VSYNC};
+  ColorSpace requested_color_space_{COLOR_SPACE_SRGB_NONLINEAR};
+  ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
+  GLFWwindow *window_{};
+  std::mutex next_image_mutex_{};
+  ObjectPtr<IVulkanImage> next_image_{};
+};
 }  // namespace grassland::rhi::backend::vulkan

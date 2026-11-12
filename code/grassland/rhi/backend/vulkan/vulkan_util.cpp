@@ -1,4 +1,4 @@
-#if defined(LONGMARCH_CUDA_RUNTIME) && defined(_WIN32)
+﻿#if defined(LONGMARCH_CUDA_RUNTIME) && defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif

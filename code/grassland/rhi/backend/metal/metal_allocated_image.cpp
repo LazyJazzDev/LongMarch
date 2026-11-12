@@ -4,12 +4,15 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-MetalAllocatedImage::MetalAllocatedImage(MetalDevice *device, ImageDesc desc, NS::SharedPtr<MTL::Texture> texture)
-    : MetalImage(desc, device, texture.get()),
-      texture_(std::move(texture)) {
+MetalAllocatedImageImpl::MetalAllocatedImageImpl(IMetalDevice *device,
+                                                 ImageDesc desc,
+                                                 NS::SharedPtr<MTL::Texture> texture)
+    : texture_(std::move(texture)),
+      desc_(desc),
+      device_(device) {
 }
 
-MetalAllocatedImage *MetalAllocatedImage::Create(MetalDevice *device, const ImageDesc &desc) {
+IImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &desc) {
   const auto format = NativeImageFormat(desc.format);
   if (!desc.width || !desc.height || desc.width > 16384 || desc.height > 16384 || format == MTL::PixelFormatInvalid)
     return nullptr;
@@ -26,10 +29,34 @@ MetalAllocatedImage *MetalAllocatedImage::Create(MetalDevice *device, const Imag
     ReportError(-1, "Metal image allocation failed.");
     return nullptr;
   }
-  return new MetalAllocatedImage(device, desc, std::move(texture));
+  return new MetalAllocatedImageImpl(device, desc, std::move(texture));
 }
 
-bool MetalAllocatedImage::IsValid() const {
+bool MetalAllocatedImageImpl::IsValid() const {
   return bool(texture_);
+}
+
+IImage *CreateMetalAllocatedImage(IMetalDevice *device, const ImageDesc &desc) {
+  return MetalAllocatedImageImpl::Create(device, desc);
+}
+
+bool MetalAllocatedImageImpl::SupportsQueue(const IMetalQueue *) const {
+  return true;
+}
+
+const ImageDesc &MetalAllocatedImageImpl::GetDesc() const {
+  return desc_;
+}
+
+bool MetalAllocatedImageImpl::SupportsStorage() const {
+  return (texture_->usage() & MTL::TextureUsageShaderWrite) != 0;
+}
+
+const void *MetalAllocatedImageImpl::DeviceIdentity() const {
+  return device_;
+}
+
+MTL::Texture *MetalAllocatedImageImpl::NativeImage() const {
+  return texture_.get();
 }
 }  // namespace grassland::rhi::backend::metal

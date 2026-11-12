@@ -3,17 +3,25 @@
 #include "grassland/rhi/rhi_shader.h"
 
 namespace grassland::rhi::backend {
-class Shader final : public Object<IShader> {
+IShader *CreateShader(const ShaderDesc &desc, BackendAPI api);
+
+}  // namespace grassland::rhi::backend
+
+namespace grassland::rhi::backend {
+class ShaderImpl final : public Object<rhi::IShader> {
  public:
-  static Shader *Create(const ShaderDesc &desc, BackendAPI api);
+  static rhi::IShader *Create(const ShaderDesc &desc, BackendAPI api);
   ShaderStage GetStage() const override;
   const std::string &GetEntry() const override;
   const std::string &GetPreprocessedCode() const override;
 
  private:
-  explicit Shader(const ShaderDesc &desc);
+  explicit ShaderImpl(const ShaderDesc &desc);
   ShaderStage stage_;
   std::string entry_;
   std::string preprocessed_code_;
+
+ public:
+  ~ShaderImpl() override = default;
 };
 }  // namespace grassland::rhi::backend

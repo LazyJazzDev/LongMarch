@@ -1,16 +1,41 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/metal/metal_image.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDevice;
+IImage *CreateMetalAllocatedImage(IMetalDevice *device, const ImageDesc &desc);
 
-class MetalAllocatedImage final : public MetalImage {
+}  // namespace grassland::rhi::backend::metal
+
+namespace grassland::rhi::backend::metal {
+class MetalAllocatedImageImpl final : public Object<rhi::IImage, IMetalImage> {
  public:
-  static MetalAllocatedImage *Create(MetalDevice *device, const ImageDesc &desc);
+  static IImage *Create(IMetalDevice *device, const ImageDesc &desc);
   bool IsValid() const override;
 
  private:
-  MetalAllocatedImage(MetalDevice *device, ImageDesc desc, NS::SharedPtr<MTL::Texture> texture);
+  MetalAllocatedImageImpl(IMetalDevice *device, ImageDesc desc, NS::SharedPtr<MTL::Texture> texture);
   NS::SharedPtr<MTL::Texture> texture_;
+
+ public:
+  ~MetalAllocatedImageImpl() override = default;
+
+ public:
+  bool SupportsQueue(const IMetalQueue *queue) const override;
+
+  const ImageDesc &GetDesc() const override;
+
+ private:
+  ImageDesc desc_{};
+
+ public:
+  bool SupportsStorage() const override;
+
+  const void *DeviceIdentity() const override;
+
+  MTL::Texture *NativeImage() const override;
+
+ private:
+  const void *device_{};
 };
 }  // namespace grassland::rhi::backend::metal

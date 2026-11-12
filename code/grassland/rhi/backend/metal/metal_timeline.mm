@@ -1,24 +1,25 @@
+#include "grassland/rhi/backend/metal/metal_timeline.h"
 #import <Metal/Metal.h>
 
 #include <condition_variable>
 #include <mutex>
 
 #include "grassland/rhi/backend/metal/metal_device.h"
-#include "grassland/rhi/backend/metal/metal_timeline.h"
 
 namespace grassland::rhi::backend::metal {
-struct MetalTimeline::State {
+struct MetalTimelineImpl::CompletionState final {
   std::mutex mutex;
   std::condition_variable changed;
   bool failed{};
 };
 
-MetalTimeline::MetalTimeline(MetalDevice *device) : Timeline(device), state_(std::make_shared<State>()) {
+MetalTimelineImpl::MetalTimelineImpl(IMetalDevice *device) : state_(std::make_shared<CompletionState>()) {
+  InitializeTimeline(device);
 }
 
-std::unique_ptr<MetalTimeline> MetalTimeline::Create(MetalDevice *device) {
+ObjectPtr<IMetalTimeline> MetalTimelineImpl::Create(IMetalDevice *device) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto result = std::unique_ptr<MetalTimeline>(new MetalTimeline(device));
+  auto result = ObjectPtr<MetalTimelineImpl>::Adopt(new MetalTimelineImpl(device));
   result->gpu_event_ = NS::TransferPtr(device->NativeDevice()->newEvent());
   result->event_ = NS::TransferPtr(device->NativeDevice()->newSharedEvent());
   if (!result->gpu_event_ || !result->event_) {
@@ -28,13 +29,13 @@ std::unique_ptr<MetalTimeline> MetalTimeline::Create(MetalDevice *device) {
   return result;
 }
 
-bool MetalTimeline::GetCompletedValue(uint64_t &value) const {
+bool MetalTimelineImpl::GetCompletedValue(uint64_t &value) const {
   std::lock_guard<std::mutex> lock(state_->mutex);
   value = event_->signaledValue();
   return !state_->failed;
 }
 
-bool MetalTimeline::WaitHost(uint64_t value) const {
+bool MetalTimelineImpl::WaitHost(uint64_t value) const {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto listener = NS::TransferPtr(MTL::SharedEventListener::alloc()->init());
   if (!listener)
@@ -52,15 +53,15 @@ bool MetalTimeline::WaitHost(uint64_t value) const {
   return !state->failed;
 }
 
-MTL::Event *MetalTimeline::NativeEvent() const {
+MTL::Event *MetalTimelineImpl::NativeEvent() const {
   return gpu_event_.get();
 }
 
-MTL::SharedEvent *MetalTimeline::HostEvent() const {
+MTL::SharedEvent *MetalTimelineImpl::HostEvent() const {
   return event_.get();
 }
 
-void MetalTimeline::ObserveCompletion(MTL::CommandBuffer *commands, uint64_t value, std::function<void()> notify) {
+void MetalTimelineImpl::ObserveCompletion(MTL::CommandBuffer *commands, uint64_t value, std::function<void()> notify) {
   auto state = state_;
   auto host_event = event_;
   [(__bridge id<MTLCommandBuffer>)(void *)commands addCompletedHandler:^(id<MTLCommandBuffer> completed) {
@@ -79,7 +80,7 @@ void MetalTimeline::ObserveCompletion(MTL::CommandBuffer *commands, uint64_t val
   }];
 }
 
-void MetalTimeline::MarkFailed() {
+void MetalTimelineImpl::MarkFailed() {
   std::lock_guard<std::mutex> lock(state_->mutex);
   state_->failed = true;
   state_->changed.notify_all();

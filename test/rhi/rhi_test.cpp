@@ -1,14 +1,19 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
+#include <algorithm>
 #include <type_traits>
 #include <utility>
 
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_shader.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 #include "grassland/rhi/rhix/rhix.h"
 
 namespace grassland::rhix {
 using namespace rhi;
 namespace backend = rhi::backend;
+using namespace backend;
 
 namespace {
 
@@ -34,24 +39,9 @@ struct Calls {
   bool device_destroyed_before_core{};
 };
 
-class TestDevice final : public backend::Device {
+class TestDevice final : public backend::Object<rhi::IDevice> {
  public:
-  bool WaitNativeEvents(const std::vector<Event> &, bool) const override {
-    ADD_FAILURE();
-    return false;
-  }
-
-  void InterruptCollector() override {
-    ADD_FAILURE();
-  }
-
-  void WaitForProgress(const std::vector<Event> &) override {
-    ADD_FAILURE();
-  }
-
-  TestDevice(PhysicalDevice info, backend::Core *core, Calls &calls)
-      : backend::Device(std::move(info), core),
-        calls_(calls) {
+  TestDevice(PhysicalDevice info, Calls &calls) : calls_(calls), info_(std::move(info)) {
   }
 
   ~TestDevice() override {
@@ -59,11 +49,110 @@ class TestDevice final : public backend::Device {
     calls_.device_destroyed_before_core = calls_.core_destructions == 0;
   }
 
+  IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
+      const BottomLevelAccelerationStructureDesc &) override {
+    ReportError(-1, "Acceleration structures are unavailable for this backend.");
+    return nullptr;
+  }
+
+  ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
+      const TopLevelAccelerationStructureDesc &) override {
+    ReportError(-1, "Acceleration structures are unavailable for this backend.");
+    return nullptr;
+  }
+
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &) override {
+    ReportError(-1, "Ray tracing pipelines are unavailable for this backend.");
+    return nullptr;
+  }
+
+  rhi::IImage *CreateImage(const ImageDesc &) override {
+    ReportError(-1, "Independent images are not implemented for this backend.");
+    return nullptr;
+  }
+
+  rhi::IBuffer *CreateBuffer(const BufferDesc &) override {
+    ReportError(-1, "Buffers are not implemented for this backend.");
+    return nullptr;
+  }
+
+  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &) override {
+    ReportError(-1, "Compute programs are not implemented for this backend.");
+    return nullptr;
+  }
+
+  rhi::IProgram *CreateProgram(const ProgramDesc &) override {
+    ReportError(-1, "Graphics programs are not implemented for this backend.");
+    return nullptr;
+  }
+
+  rhi::IShader *CreateShader(const ShaderDesc &desc) override {
+    if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+        desc.stage > SHADER_STAGE_CALLABLE)
+      return nullptr;
+    return backend::CreateShader(desc, api_);
+  }
+
+  ISampler *CreateSampler(const SamplerDesc &) override {
+    ReportError(-1, "Samplers are not implemented for this backend.");
+    return nullptr;
+  }
+
+  IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &) override {
+    ReportError(-1, "Binding groups are not implemented for this backend.");
+    return nullptr;
+  }
+
+  int GetCUDADeviceIndex() const override {
+    return -1;
+  }
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  IBuffer *CreateCUDABuffer(const BufferDesc &) override {
+    return nullptr;
+  }
+
+  ICUDATimeline *CreateCUDATimeline() override {
+    return nullptr;
+  }
+#endif
+  std::string Name() const override {
+    return info_.name;
+  }
+
+  bool SupportRayTracingPipeline() const override {
+    return info_.ray_tracing_pipeline_feature;
+  }
+
+  bool SupportRayQuery() const override {
+    return info_.ray_query_feature;
+  }
+
+  bool SupportGeometryShader() const override {
+    return info_.geometry_shader_feature;
+  }
+
+  rhi::IWindow *CreateGLFWWindow(const WindowDesc &) override {
+    ReportError(-1, "Window creation is unavailable.");
+    return nullptr;
+  }
+
+  rhi::IQueue *GetQueue(QueueType) override {
+    ADD_FAILURE() << "Selection tests do not create queues.";
+    return nullptr;
+  }
+
+  bool WaitEvents(const std::vector<Event> &, bool) const override {
+    ADD_FAILURE() << "Selection tests do not submit GPU work.";
+    return false;
+  }
+
  private:
   Calls &calls_;
+  BackendAPI api_{};
+  PhysicalDevice info_{};
 };
 
-class TestCore final : public backend::Core {
+class TestCore final : public backend::Object<rhi::ICore> {
  public:
   TestCore(std::vector<PhysicalDevice> devices, Calls &calls, bool fail = false)
       : devices_(std::move(devices)),
@@ -88,13 +177,18 @@ class TestCore final : public backend::Core {
     ++calls_.creates;
     if (fail_)
       return {};
-    return new TestDevice(devices_.at(id), this, calls_);
+    return new TestDevice(devices_.at(id), calls_);
   }
 
  private:
   std::vector<PhysicalDevice> devices_;
   Calls &calls_;
   bool fail_;
+
+ public:
+  rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override {
+    return backend::CreateDeviceByAutoSelection(this, requirement);
+  }
 };
 
 TEST(RhiSelection, RequirementsAreIndependentFilters) {
@@ -184,7 +278,7 @@ TEST(RhiOwnership, CallerReleasesAllChildCopiesBeforeParent) {
   EXPECT_FALSE(copy);
   auto device = moved.CreateDevice(0);
   core = {};
-  EXPECT_TRUE((*static_cast<backend::Core *>((moved).Get())).IsUniquelyOwned());
+  EXPECT_TRUE((*static_cast<TestCore *>((moved).Get())).IsUniquelyOwned());
   EXPECT_EQ(calls.core_destructions, 0);
   Device shared = device;
   ObjectContainer &container = device;
@@ -234,10 +328,6 @@ TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinati
     auto device = core.CreateDevice(static_cast<int32_t>(id));
     ASSERT_TRUE(device) << devices[id].name;
     EXPECT_EQ(device.Name(), devices[id].name);
-    EXPECT_EQ(device.GetCUDADeviceIndex(), devices[id].cuda_device);
-#if !defined(LONGMARCH_CUDA_RUNTIME)
-    EXPECT_EQ(device.GetCUDADeviceIndex(), -1);
-#endif
     EXPECT_EQ(device.SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
     EXPECT_EQ(device.SupportRayQuery(), devices[id].ray_query_feature);
     EXPECT_EQ(device.SupportGeometryShader(), devices[id].geometry_shader_feature);
@@ -249,10 +339,6 @@ TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinati
     ASSERT_EQ(static_cast<bool>(device), id >= 0);
     if (id >= 0) {
       EXPECT_EQ(device.Name(), devices[id].name);
-      EXPECT_EQ(device.GetCUDADeviceIndex(), devices[id].cuda_device);
-#if !defined(LONGMARCH_CUDA_RUNTIME)
-      EXPECT_EQ(device.GetCUDADeviceIndex(), -1);
-#endif
       EXPECT_EQ(device.SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
       EXPECT_EQ(device.SupportRayQuery(), devices[id].ray_query_feature);
       EXPECT_EQ(device.SupportGeometryShader(), devices[id].geometry_shader_feature);

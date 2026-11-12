@@ -1,13 +1,17 @@
 ﻿#include "grassland/rhi/backend/backend_binding_group.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <mutex>
 #include <set>
+#include <thread>
 
-#include "grassland/rhi/backend/backend_buffer.h"
-#include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_buffer.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_image.h"
 
 namespace grassland::rhi::backend {
 std::vector<MappedBinding> MapBindings(const PipelineLayoutDesc &layout, BackendAPI api) {
@@ -56,214 +60,6 @@ bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b) {
         ((x.type == BINDING_STRUCTURED_BUFFER || x.type == BINDING_RW_STRUCTURED_BUFFER) && x.stride != it->stride))
       return false;
   }
-  return true;
-}
-
-BindingGroup::Version::Version(Device *device, const BindingLayoutDesc &layout) : device_(device), layout_(layout) {
-  std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
-  references_.resize(layout_.bindings.size());
-  for (size_t i = 0; i < layout_.bindings.size(); ++i)
-    references_[i].resize(layout_.bindings[i].count);
-}
-
-const BindingLayoutDesc &BindingGroup::Version::GetLayout() const {
-  return layout_;
-}
-
-const std::vector<std::vector<ObjectPtr<IObject>>> &BindingGroup::Version::GetReferences() const {
-  return references_;
-}
-
-bool BindingGroup::Version::IsComplete() const {
-  for (size_t i = 0; i < layout_.bindings.size(); ++i)
-    for (uint32_t j = 0; j < layout_.bindings[i].count; ++j)
-      if (!IsInitialized(i, j))
-        return false;
-  return true;
-}
-
-bool BindingGroup::Version::Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) {
-  // Retain the entire update before releasing old slots, including resource swaps.
-  std::vector<ObjectPtr<IObject>> references;
-  references.reserve(values.size());
-  for (const auto &value : values)
-    references.push_back(ObjectPtr<IObject>::Retain(value.buffer));
-  if (!WriteDescriptors(binding_index, first_element, values))
-    return false;
-  for (size_t i = 0; i < values.size(); ++i)
-    references_[binding_index][first_element + i] = std::move(references[i]);
-  return true;
-}
-
-bool BindingGroup::Version::Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) {
-  // Retain the entire update before releasing old slots, including resource swaps.
-  std::vector<ObjectPtr<IObject>> references;
-  references.reserve(values.size());
-  for (const auto &value : values)
-    references.push_back(ObjectPtr<IObject>::Retain(value));
-  if (!WriteDescriptors(binding_index, first_element, values))
-    return false;
-  for (size_t i = 0; i < values.size(); ++i)
-    references_[binding_index][first_element + i] = std::move(references[i]);
-  return true;
-}
-
-bool BindingGroup::Version::Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) {
-  std::vector<ObjectPtr<IObject>> references;
-  references.reserve(values.size());
-  for (auto value : values)
-    references.push_back(ObjectPtr<IObject>::Retain(value));
-  if (!WriteDescriptors(binding_index, first_element, values))
-    return false;
-  for (size_t i = 0; i < values.size(); ++i)
-    references_[binding_index][first_element + i] = std::move(references[i]);
-  return true;
-}
-
-BindingGroup::BindingGroup(Device *device, ObjectPtr<Version> version)
-    : device_(device),
-      layout_(version->GetLayout()),
-      version_(std::move(version)) {
-}
-
-const BindingLayoutDesc &BindingGroup::GetLayout() const {
-  return layout_;
-}
-
-Device *BindingGroup::Owner() const {
-  return device_;
-}
-
-BindingGroup::Version *BindingGroup::CurrentVersion() const {
-  return version_.Get();
-}
-
-const BindingDesc *BindingGroup::FindBinding(uint32_t binding,
-                                             uint32_t first_element,
-                                             size_t count,
-                                             size_t &binding_index) const {
-  for (binding_index = 0; binding_index < layout_.bindings.size(); ++binding_index) {
-    const auto &desc = layout_.bindings[binding_index];
-    if (desc.binding != binding)
-      continue;
-    if (!count || first_element > desc.count || count > desc.count - first_element)
-      return nullptr;
-    return &desc;
-  }
-  return nullptr;
-}
-
-bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element) {
-  size_t binding_index;
-  const auto *desc = FindBinding(binding, first_element, buffers.size(), binding_index);
-  if (!desc)
-    return false;
-  if (desc->type > BINDING_RW_BYTE_ADDRESS_BUFFER)
-    return false;
-  auto values = buffers;
-  for (auto &view : values) {
-    auto buffer = dynamic_cast<Buffer *>(view.buffer);
-    if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
-      return false;
-    if (!view.size)
-      view.size = buffer->GetDesc().size - view.offset;
-    if (view.size > buffer->GetDesc().size - view.offset)
-      return false;
-    if (desc->type == BINDING_STRUCTURED_BUFFER || desc->type == BINDING_RW_STRUCTURED_BUFFER) {
-      if (view.offset % desc->stride || view.size % desc->stride)
-        return false;
-    } else if (desc->type == BINDING_BYTE_ADDRESS_BUFFER || desc->type == BINDING_RW_BYTE_ADDRESS_BUFFER) {
-      if (view.offset % 4 || view.size % 4)
-        return false;
-    }
-  }
-  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
-  if (!next)
-    return false;
-  if (!next->Write(binding_index, first_element, values))
-    return false;
-  version_ = std::move(next);
-  return true;
-}
-
-bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element) {
-  size_t binding_index;
-  const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
-  if (!desc)
-    return false;
-  if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
-    return false;
-  for (auto value : images) {
-    auto image = dynamic_cast<Image *>(value);
-    if (!image || !image->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(image->GetDesc().format))
-      return false;
-    if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
-      return false;
-  }
-  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
-  if (!next)
-    return false;
-  if (!next->Write(binding_index, first_element, images))
-    return false;
-  version_ = std::move(next);
-  return true;
-}
-
-bool BindingGroup::BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element) {
-  size_t binding_index;
-  const auto *desc = FindBinding(binding, first_element, samplers.size(), binding_index);
-  if (!desc)
-    return false;
-  if (desc->type != BINDING_SAMPLER)
-    return false;
-  for (auto sampler : samplers) {
-    auto native = dynamic_cast<Sampler *>(sampler);
-    if (!native || native->DeviceIdentity() != device_)
-      return false;
-  }
-  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
-  if (!next)
-    return false;
-  if (!next->Write(binding_index, first_element, samplers))
-    return false;
-  version_ = std::move(next);
-  return true;
-}
-
-bool BindingGroup::Version::Write(size_t binding_index,
-                                  uint32_t first_element,
-                                  const std::vector<ITopLevelAccelerationStructure *> &values) {
-  std::vector<ObjectPtr<IObject>> references;
-  references.reserve(values.size());
-  for (auto value : values)
-    references.push_back(ObjectPtr<IObject>::Retain(value));
-  if (!WriteDescriptors(binding_index, first_element, values))
-    return false;
-  for (size_t i = 0; i < values.size(); ++i)
-    references_[binding_index][first_element + i] = std::move(references[i]);
-  return true;
-}
-
-bool BindingGroup::Version::WriteDescriptors(size_t, uint32_t, const std::vector<ITopLevelAccelerationStructure *> &) {
-  return false;
-}
-
-bool BindingGroup::BindResource(uint32_t binding,
-                                const std::vector<ITopLevelAccelerationStructure *> &structures,
-                                uint32_t first_element) {
-  size_t binding_index;
-  auto desc = FindBinding(binding, first_element, structures.size(), binding_index);
-  if (!desc || desc->type != BINDING_ACCELERATION_STRUCTURE)
-    return false;
-  for (auto structure : structures)
-    if (!structure)
-      return false;
-  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
-  if (!next)
-    return false;
-  if (!next->Write(binding_index, first_element, structures))
-    return false;
-  version_ = std::move(next);
   return true;
 }
 

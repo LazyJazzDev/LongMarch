@@ -8,7 +8,8 @@
 #include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDescriptorPool {
+class VulkanDescriptorPool final {
+  class LeaseImpl;
   // Uniform buffers, storage buffers, sampled images, storage images, samplers, acceleration structures.
   using Pattern = std::array<uint32_t, 6>;
 
@@ -24,17 +25,12 @@ class VulkanDescriptorPool {
   };
 
  public:
-  class Lease final : public Object<IObject> {
+  class ILease : public IObject {
    public:
-    Lease(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set);
-    ~Lease() override;
-    VkDescriptorSet Set() const;
-
-   private:
-    VulkanDescriptorPool *owner_;
-    Page *page_;
-    VkDescriptorSet set_;
+    virtual VkDescriptorSet Set() const = 0;
   };
+
+  using Lease = ILease;
 
   explicit VulkanDescriptorPool(VkDevice device);
   ~VulkanDescriptorPool();
@@ -49,3 +45,7 @@ class VulkanDescriptorPool {
 };
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::VulkanDescriptorPool::ILease,
+                        grassland::rhi::IObject,
+                        "4eacb408-4ddb-4df5-9846-c7fd2101efb2")
