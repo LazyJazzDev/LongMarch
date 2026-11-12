@@ -29,6 +29,7 @@ class RenderWorker {
     std::shared_ptr<const Film::Output> output;
     rhi::ObjPtr<rhi::ISubmissionToken> rendered;
     uint64_t revision{}, sequence{};
+    // Accepted samples for this revision; Film may retain earlier history.
     int samples{};
     bool hdr{};
 
@@ -143,6 +144,7 @@ class RenderWorker {
     }
     Request active;
     uint64_t sequence{};
+    int accepted_in_revision{};
 
     struct Batch {
       rhi::ObjPtr<rhi::ISubmissionToken> submitted;
@@ -183,12 +185,13 @@ class RenderWorker {
           return;
         }
         active = request;
+        accepted_in_revision = 0;
         std::lock_guard lock(mutex_);
         if (requested_.revision == active.revision)
           state_ = {active.revision, 0, {}};
       }
       auto *film = backend->GetFilm();
-      if (pending.size() == 2 || (active.sample_limit && film->info.accumulated_samples >= active.sample_limit)) {
+      if (pending.size() == 2 || (active.sample_limit && accepted_in_revision >= active.sample_limit)) {
         if (!pending.empty()) {
           if (!retire())
             return;
@@ -230,12 +233,11 @@ class RenderWorker {
         Fail("Cannot acquire Film output image");
         return;
       }
-      const int samples = active.sample_limit
-                              ? std::min(samples_per_batch_, active.sample_limit - film->info.accumulated_samples)
-                              : samples_per_batch_;
+      const int samples = active.sample_limit ? std::min(samples_per_batch_, active.sample_limit - accepted_in_revision)
+                                              : samples_per_batch_;
       // A held display image must not stall accumulation. Intermediate batches
       // may omit development; the final finite batch always publishes an image.
-      const bool final_batch = active.sample_limit && film->info.accumulated_samples + samples == active.sample_limit;
+      const bool final_batch = active.sample_limit && accepted_in_revision + samples == active.sample_limit;
       if (!frame && final_batch) {
         if (!pending.empty()) {
           if (!retire())
@@ -249,19 +251,28 @@ class RenderWorker {
       rhi::SubmitInfo dependencies;
       if (displayed)
         dependencies.waits.push_back(displayed->GetEvent());
+      const int accumulated_before = film->info.accumulated_samples;
       auto submitted = backend->Submit(samples, frame ? frame->Image() : nullptr, active.hdr, dependencies);
       if (!submitted) {
         Fail("Cannot submit rendering");
         return;
       }
+      const int accepted_samples = film->info.accumulated_samples - accumulated_before;
+      if (accepted_samples <= 0 || accepted_samples > samples) {
+        Fail("Render submission did not accept the requested sample progress");
+        return;
+      }
+      // A configuration may preserve temporal accumulation. Its finite budget
+      // counts newly accepted samples, independently of the Film history.
+      accepted_in_revision += accepted_samples;
       if (frame) {
         frame->revision = active.revision;
         frame->sequence = ++sequence;
         frame->hdr = active.hdr;
         frame->rendered = submitted;
-        frame->samples = film->info.accumulated_samples;
+        frame->samples = accepted_in_revision;
       }
-      pending.push_back({std::move(submitted), std::move(frame), active.revision, film->info.accumulated_samples});
+      pending.push_back({std::move(submitted), std::move(frame), active.revision, accepted_in_revision});
     }
     while (!pending.empty())
       if (!retire())

@@ -113,6 +113,85 @@ TEST_P(RenderWorkerTest, SnapshotsAndHeldOutputsMatchSynchronousRendering) {
   EXPECT_EQ(read(hdr->Image(), hdr->rendered.Get()), hdr_pixels);
 }
 
+// Temporal clients keep Film history when accepting a new scheduling budget.
+struct ContinuingScene {
+  struct Settings {};
+
+  std::unique_ptr<ThinLensScene> scene;
+
+  bool Configure(const Settings &) {
+    return true;
+  }
+
+  sparkium::Film *GetFilm() {
+    return scene->GetFilm();
+  }
+
+  ObjPtr<ISubmissionToken> Submit(int samples, IImage *image, bool hdr, const SubmitInfo &dependencies) {
+    return scene->Submit(samples, image, hdr, dependencies);
+  }
+};
+
+TEST_P(RenderWorkerTest, FiniteBudgetsPreserveExistingAccumulation) {
+  ObjPtr<ICore> native = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(native);
+  ObjPtr<IDevice> device = native->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  using ContinuingWorker = sparkium::RenderWorker<ContinuingScene>;
+  ContinuingWorker worker(
+      [&]() -> std::unique_ptr<ContinuingScene> {
+        auto scene = ThinLensScene::Create(device.Get(), 32, 24);
+        if (!scene || !scene->Configure({}))
+          return {};
+        scene->GetFilm()->info.persistence = 0.98f;
+        return std::make_unique<ContinuingScene>(ContinuingScene{std::move(scene)});
+      },
+      {}, 8, true);
+  auto wait = [&](uint64_t revision) {
+    std::shared_ptr<const ContinuingWorker::Frame> frame;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (std::chrono::steady_clock::now() < deadline && worker.GetState().error.empty()) {
+      frame = worker.Latest();
+      if (frame && frame->revision == revision && frame->samples == 8)
+        return frame;
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return std::shared_ptr<const ContinuingWorker::Frame>{};
+  };
+  ASSERT_TRUE(wait(1));
+  auto final = wait(worker.Configure({}, 8, true));
+  ASSERT_TRUE(final) << worker.GetState().error;
+  worker.Stop();
+  auto direct = ThinLensScene::Create(device.Get(), 32, 24);
+  ASSERT_TRUE(direct);
+  ASSERT_TRUE(direct->Configure({}));
+  direct->GetFilm()->info.persistence = 0.98f;
+  auto image = direct->GetFilm()->AcquireOutput(true);
+  ASSERT_TRUE(image);
+  auto submitted = direct->Submit(16, image->Image(), true, {});
+  ASSERT_TRUE(submitted);
+  ASSERT_TRUE(submitted->WaitHost());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ASSERT_TRUE(queue);
+  auto read = [&](IImage *source) {
+    std::vector<uint8_t> pixels;
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+    if (!commands)
+      return pixels;
+    ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(source);
+    ObjPtr<ISubmissionToken> completed = commands->Submit();
+    if (!download || !completed || !completed->WaitHost())
+      return pixels;
+    pixels.resize(download->GetSize());
+    if (!download->CopyTo(pixels.data(), pixels.size()))
+      pixels.clear();
+    return pixels;
+  };
+  const auto expected = read(image->Image());
+  ASSERT_EQ(expected.size(), 32u * 24u * 4u * sizeof(float));
+  EXPECT_EQ(read(final->Image()), expected);
+}
+
 std::vector<BackendAPI> Backends() {
   std::vector<BackendAPI> result;
 #if defined(LONGMARCH_VULKAN_ENABLED)
