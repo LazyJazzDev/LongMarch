@@ -296,7 +296,7 @@ rhi::IBuffer *VulkanDeviceImpl::CreateBuffer(const BufferDesc &desc) {
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-rhi::IBuffer *VulkanDeviceImpl::CreateCUDABuffer(const BufferDesc &desc) {
+rhi::ICUDABuffer *VulkanDeviceImpl::CreateCUDABuffer(const BufferDesc &desc) {
   return VulkanCUDABufferImpl::Create(this, desc);
 }
 

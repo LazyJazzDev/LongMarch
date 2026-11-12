@@ -107,7 +107,7 @@ class TestDevice final : public backend::Object<rhi::IDevice> {
     return -1;
   }
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  IBuffer *CreateCUDABuffer(const BufferDesc &) override {
+  ICUDABuffer *CreateCUDABuffer(const BufferDesc &) override {
     return nullptr;
   }
 

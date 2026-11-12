@@ -90,7 +90,7 @@ rhi::IBuffer *MetalDeviceImpl::CreateBuffer(const BufferDesc &desc) {
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-rhi::IBuffer *MetalDeviceImpl::CreateCUDABuffer(const BufferDesc &desc) {
+rhi::ICUDABuffer *MetalDeviceImpl::CreateCUDABuffer(const BufferDesc &desc) {
   return nullptr;
 }
 

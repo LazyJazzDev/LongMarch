@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12CUDABufferImpl final : public Object<rhi::ICUDABuffer, ID3D12Buffer> {
  public:
-  static rhi::IBuffer *Create(ID3D12Device *device, const BufferDesc &desc);
+  static rhi::ICUDABuffer *Create(ID3D12Device *device, const BufferDesc &desc);
   ~D3D12CUDABufferImpl() override = default;
   BufferDesc GetDesc() const override;
   void *GetDevicePointer() const override;

@@ -83,8 +83,7 @@ TEST_P(RhiCUDADevice, CUDADevicesExposeOrdinalBeforeBufferCreation) {
     ExpectCUDAProceduresLoaded(device.Get(), GetParam());
     int previous = -1;
     ASSERT_EQ(cudaGetDevice(&previous), cudaSuccess);
-    ObjPtr<IBuffer> buffer_base = device->CreateCUDABuffer({4096});
-    auto buffer = QueryInterfacePtr<ICUDABuffer>(buffer_base.Get());
+    ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({4096});
     ASSERT_TRUE(buffer);
     int current = -1;
     ASSERT_EQ(cudaGetDevice(&current), cudaSuccess);
@@ -112,9 +111,7 @@ TEST_P(RhiCUDADevice, NonCUDADevicesRejectCUDABufferCreation) {
     ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(i));
     ASSERT_TRUE(device);
     EXPECT_EQ(device->GetCUDADeviceIndex(), -1);
-    ObjPtr<IBuffer> buffer_base = device->CreateCUDABuffer({4096});
-    auto buffer = QueryInterfacePtr<ICUDABuffer>(buffer_base.Get());
-    EXPECT_FALSE(buffer_base);
+    ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({4096});
     EXPECT_FALSE(buffer);
   }
   if (!matches)
@@ -138,8 +135,7 @@ class RhiCUDABuffer : public testing::TestWithParam<BackendAPI> {
       device_ = core_->CreateDevice(static_cast<int32_t>(i));
       ASSERT_TRUE(device_);
       ASSERT_EQ(device_->GetCUDADeviceIndex(), adapters[i].cuda_device);
-      ObjPtr<IBuffer> base = device_->CreateCUDABuffer({65561});
-      buffer_ = QueryInterfacePtr<ICUDABuffer>(base.Get());
+      buffer_ = device_->CreateCUDABuffer({65561});
       ASSERT_TRUE(buffer_);
       return;
     }

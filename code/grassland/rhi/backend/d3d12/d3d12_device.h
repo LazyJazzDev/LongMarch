@@ -80,7 +80,7 @@ class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
     return info_.cuda_device;
   }
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  rhi::IBuffer *CreateCUDABuffer(const BufferDesc &desc) override;
+  rhi::ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) override;
   rhi::ICUDATimeline *CreateCUDATimeline() override;
 #endif
   D3D12TemporalBufferPool &UploadPool();

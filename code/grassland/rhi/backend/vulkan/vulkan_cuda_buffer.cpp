@@ -40,7 +40,7 @@ void *VulkanCUDABufferImpl::GetDevicePointer() const {
   return mapping_.Pointer();
 }
 
-rhi::IBuffer *VulkanCUDABufferImpl::Create(IVulkanDevice *device, const BufferDesc &desc) {
+rhi::ICUDABuffer *VulkanCUDABufferImpl::Create(IVulkanDevice *device, const BufferDesc &desc) {
   if (!desc.size)
     return nullptr;
   const int ordinal = device->GetPhysicalDevice().cuda_device;

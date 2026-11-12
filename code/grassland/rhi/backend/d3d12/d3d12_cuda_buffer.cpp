@@ -25,7 +25,7 @@ void *D3D12CUDABufferImpl::GetDevicePointer() const {
   return mapping_.Pointer();
 }
 
-rhi::IBuffer *D3D12CUDABufferImpl::Create(ID3D12Device *device, const BufferDesc &desc) {
+rhi::ICUDABuffer *D3D12CUDABufferImpl::Create(ID3D12Device *device, const BufferDesc &desc) {
   if (!desc.size)
     return nullptr;
   const int ordinal = device->GetPhysicalDevice().cuda_device;

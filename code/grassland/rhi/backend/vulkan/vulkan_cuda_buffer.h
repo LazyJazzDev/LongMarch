@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanCUDABufferImpl final : public Object<rhi::ICUDABuffer, IVulkanBuffer> {
  public:
-  static rhi::IBuffer *Create(IVulkanDevice *device, const BufferDesc &desc);
+  static rhi::ICUDABuffer *Create(IVulkanDevice *device, const BufferDesc &desc);
   ~VulkanCUDABufferImpl() override;
   BufferDesc GetDesc() const override;
   void *GetDevicePointer() const override;

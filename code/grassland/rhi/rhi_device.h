@@ -41,8 +41,8 @@ class IDevice : public IObject {
   virtual IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
   virtual int GetCUDADeviceIndex() const = 0;
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  // Owned buffer exposing ICUDABuffer through QueryInterface; null if unsupported.
-  virtual IBuffer *CreateCUDABuffer(const BufferDesc &desc) = 0;
+  // Owned CUDA buffer, also usable as IBuffer; null if unsupported.
+  virtual ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) = 0;
   virtual ICUDATimeline *CreateCUDATimeline() = 0;
 #endif
   virtual IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;

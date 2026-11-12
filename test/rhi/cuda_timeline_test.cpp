@@ -131,12 +131,9 @@ TEST_P(RhiCUDATimeline, NBodyCUDAAgreesWithCPUReference) {
     }
   }
   constexpr uint64_t bytes = count * sizeof(Vector);
-  ObjPtr<IBuffer> p_base = device->CreateCUDABuffer({bytes});
-  auto p = QueryInterfacePtr<ICUDABuffer>(p_base.Get());
-  ObjPtr<IBuffer> v_base = device->CreateCUDABuffer({bytes});
-  auto v = QueryInterfacePtr<ICUDABuffer>(v_base.Get());
-  ObjPtr<IBuffer> next_base = device->CreateCUDABuffer({bytes});
-  auto next = QueryInterfacePtr<ICUDABuffer>(next_base.Get());
+  ObjPtr<ICUDABuffer> p = device->CreateCUDABuffer({bytes});
+  ObjPtr<ICUDABuffer> v = device->CreateCUDABuffer({bytes});
+  ObjPtr<ICUDABuffer> next = device->CreateCUDABuffer({bytes});
   ASSERT_TRUE(p && v && next);
   NBodyCUDA cuda(device.Get());
   ASSERT_TRUE(cuda);
@@ -175,8 +172,7 @@ TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
   ObjPtr<ICUDATimeline> timeline = device->CreateCUDATimeline();
   ASSERT_TRUE(timeline);
   constexpr uint32_t count = 16387;
-  ObjPtr<IBuffer> buffer_base = device->CreateCUDABuffer({count * sizeof(uint32_t)});
-  auto buffer = QueryInterfacePtr<ICUDABuffer>(buffer_base.Get());
+  ObjPtr<ICUDABuffer> buffer = device->CreateCUDABuffer({count * sizeof(uint32_t)});
   ASSERT_TRUE(buffer);
   auto pointer = buffer->GetDevicePointer();
   CUDAStream stream;
