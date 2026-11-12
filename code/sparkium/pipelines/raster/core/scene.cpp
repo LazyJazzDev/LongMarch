@@ -1,6 +1,7 @@
 #include "sparkium/core/scene.h"
 
 #include "sparkium/core/film.h"
+#include "sparkium/core/renderer.h"
 #include "sparkium/pipelines/raster/core/camera.h"
 #include "sparkium/pipelines/raster/core/core.h"
 #include "sparkium/pipelines/raster/core/film.h"
@@ -33,13 +34,19 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), core_(DedicatedCast(scene.
       {0, rhi::BINDING_UNIFORM_BUFFER, 1});  // Camera Data
   ambient_light_program_desc.pipeline_layout.groups[1].bindings.push_back(
       {4, rhi::BINDING_UNIFORM_BUFFER, 1});  // Ambient Light Data
-  ambient_light_program_ = core_->GetDevice()->CreateProgram(ambient_light_program_desc);
+  ambient_light_description_ = std::make_shared<const rhi::ProgramDesc>(ambient_light_program_desc);
   ambient_light_group_ = core_->GetDevice()->CreateBindingGroup(ambient_light_program_desc.pipeline_layout.groups[1]);
 
   ambient_light_buffer_ = core_->GetDevice()->CreateBuffer({(sizeof(glm::vec3) + 255) & ~uint64_t(255)});
+  if (!(ambient_light_vs_ && ambient_light_ps_ && ambient_light_group_ && ambient_light_buffer_))
+    core_->ReportFailure("Cannot create raster resources");
 }
 
-bool Scene::RecordRender(rhi::ICommandContext *commands, ResourceUpdates::Cursor &updates, Camera *camera, Film *film) {
+bool Scene::RecordRender(sparkium::Renderer &renderer,
+                         rhi::ICommandContext *commands,
+                         ResourceUpdates::Cursor &updates,
+                         Camera *camera,
+                         Film *film) {
   for (auto &[entity, status] : entities_) {
     status.keep = false;
   }
@@ -66,8 +73,10 @@ bool Scene::RecordRender(rhi::ICommandContext *commands, ResourceUpdates::Cursor
     entities_.erase(entity);
   }
 
+  if (!core_->IsValid())
+    return false;
+
   render_callbacks_.clear();
-  shadow_map_callbacks_.clear();
   lighting_callbacks_.clear();
 
   core_->QueueUpload(ambient_light_buffer_.Get(), &settings.ambient_light, sizeof(glm::vec3));
@@ -85,13 +94,20 @@ bool Scene::RecordRender(rhi::ICommandContext *commands, ResourceUpdates::Cursor
 
   // Render Pass
 
-  commands->CmdClearImage(film->film_.GetRawImage(), {scene_.settings.ambient_light.r, scene_.settings.ambient_light.g,
-                                                      scene_.settings.ambient_light.b, 0.0f});
-  commands->CmdClearImage(film->film_.GetDepthImage(), rhi::ClearValue{rhi::ClearDepthStencilValue{1.0f, 0}});
-  commands->CmdClearImage(film->albedo_roughness_buffer_.Get(), {});
-  commands->CmdClearImage(film->position_specular_buffer_.Get(), {});
-  commands->CmdClearImage(film->normal_metallic_buffer_.Get(), {});
-  commands->CmdClearImage(film->film_.GetStencilImage(), rhi::ClearValue{0, 0, 0, 0});
+  if (!commands->CmdClearImage(
+          film->film_.GetRawImage(),
+          {scene_.settings.ambient_light.r, scene_.settings.ambient_light.g, scene_.settings.ambient_light.b, 0.0f}))
+    return false;
+  if (!commands->CmdClearImage(film->film_.GetDepthImage(), rhi::ClearValue{rhi::ClearDepthStencilValue{1.0f, 0}}))
+    return false;
+  if (!commands->CmdClearImage(film->albedo_roughness_buffer_.Get(), {}))
+    return false;
+  if (!commands->CmdClearImage(film->position_specular_buffer_.Get(), {}))
+    return false;
+  if (!commands->CmdClearImage(film->normal_metallic_buffer_.Get(), {}))
+    return false;
+  if (!commands->CmdClearImage(film->film_.GetStencilImage(), rhi::ClearValue{0, 0, 0, 0}))
+    return false;
   rhi::RenderingInfo rendering;
   rendering.color_attachments = {{film->film_.GetRawImage()},
                                  {film->albedo_roughness_buffer_.Get()},
@@ -99,7 +115,8 @@ bool Scene::RecordRender(rhi::ICommandContext *commands, ResourceUpdates::Cursor
                                  {film->normal_metallic_buffer_.Get()},
                                  {film->film_.GetStencilImage()}};
   rendering.depth_stencil.image = film->film_.GetDepthImage();
-  commands->CmdBeginRendering(rendering);
+  if (!commands->CmdBeginRendering(rendering))
+    return false;
   rhi::Scissor scissor{0, 0, static_cast<uint32_t>(film->film_.GetWidth()),
                        static_cast<uint32_t>(film->film_.GetHeight())};
   rhi::Viewport viewport;
@@ -109,56 +126,73 @@ bool Scene::RecordRender(rhi::ICommandContext *commands, ResourceUpdates::Cursor
   viewport.max_depth = 1.0f;
   viewport.width = static_cast<float>(film->film_.GetWidth());
   viewport.height = static_cast<float>(film->film_.GetHeight());
-  commands->CmdSetScissor(scissor);
-  commands->CmdSetViewport(viewport);
+  if (!commands->CmdSetScissor(scissor))
+    return false;
+  if (!commands->CmdSetViewport(viewport))
+    return false;
   for (auto &callback : render_callbacks_) {
-    callback(commands, camera->FarFieldBindings());
+    if (!callback(renderer, commands, camera->FarFieldBindings()))
+      return false;
   }
-  commands->CmdEndRendering();
-  commands->CmdClearImage(
-      film->film_.GetDepthImage(),
-      rhi::ClearValue{rhi::ClearDepthStencilValue{1.0f, 0}});  // Clear depth to 1.0 for the near field rendering
-  commands->CmdBeginRendering(rendering);
-  commands->CmdSetScissor(scissor);
-  commands->CmdSetViewport(viewport);
+  if (!commands->CmdEndRendering())
+    return false;
+  // Clear depth to 1.0 for the near field rendering.
+  if (!commands->CmdClearImage(film->film_.GetDepthImage(), rhi::ClearValue{rhi::ClearDepthStencilValue{1.0f, 0}}))
+    return false;
+  if (!commands->CmdBeginRendering(rendering))
+    return false;
+  if (!commands->CmdSetScissor(scissor))
+    return false;
+  if (!commands->CmdSetViewport(viewport))
+    return false;
   for (auto &callback : render_callbacks_) {
-    callback(commands, camera->NearFieldBindings());
+    if (!callback(renderer, commands, camera->NearFieldBindings()))
+      return false;
   }
-  commands->CmdEndRendering();
+  if (!commands->CmdEndRendering())
+    return false;
 
   // Lighting Pass
   rendering.color_attachments = {{film->film_.GetRawImage()}};
   rendering.depth_stencil = {};
-  commands->CmdBeginRendering(rendering);
-  commands->CmdSetScissor(scissor);
-  commands->CmdSetViewport(viewport);
-  commands->CmdBindProgram(ambient_light_program_.Get());
+  if (!commands->CmdBeginRendering(rendering))
+    return false;
+  if (!commands->CmdSetScissor(scissor))
+    return false;
+  if (!commands->CmdSetViewport(viewport))
+    return false;
+  if (!renderer.RecordProgram(commands, ambient_light_description_))
+    return false;
 
-  commands->CmdBindGroup(2, camera->NearFieldBindings());
-  ambient_light_group_->BindResource(4, ambient_light_buffer_.Get());
-  commands->CmdBindGroup(0, film->LightingBindings());
-  commands->CmdBindGroup(1, ambient_light_group_.Get());
-  commands->CmdDraw(6, 1, 0, 0);
+  if (!commands->CmdBindGroup(2, camera->NearFieldBindings()))
+    return false;
+  if (!ambient_light_group_ || !ambient_light_group_->BindResource(4, ambient_light_buffer_.Get()))
+    return false;
+  if (!commands->CmdBindGroup(0, film->LightingBindings()))
+    return false;
+  if (!commands->CmdBindGroup(1, ambient_light_group_.Get()))
+    return false;
+  if (!commands->CmdDraw(6, 1, 0, 0))
+    return false;
 
   for (auto &callback : lighting_callbacks_) {
-    callback(commands, camera, film);
+    if (!callback(renderer, commands, camera, film))
+      return false;
   }
 
-  commands->CmdEndRendering();
+  if (!commands->CmdEndRendering())
+    return false;
 
   return core_->IsValid();
 }
 
-void Scene::RegisterRenderCallback(const std::function<void(rhi::ICommandContext *, rhi::IBindingGroup *)> &callback) {
+void Scene::RegisterRenderCallback(
+    const std::function<bool(sparkium::Renderer &, rhi::ICommandContext *, rhi::IBindingGroup *)> &callback) {
   render_callbacks_.push_back(callback);
 }
 
-void Scene::RegisterShadowMapCallback(const std::function<void(rhi::ICommandContext *)> &callback) {
-  shadow_map_callbacks_.push_back(callback);
-}
-
 void Scene::RegisterLightingCallback(
-    const std::function<void(rhi::ICommandContext *, Camera *camera, Film *film)> &callback) {
+    const std::function<bool(sparkium::Renderer &, rhi::ICommandContext *, Camera *camera, Film *film)> &callback) {
   lighting_callbacks_.push_back(callback);
 }
 

@@ -22,6 +22,7 @@ class Renderer {
   bool RecordProgram(rhi::ICommandContext *commands,
                      const std::shared_ptr<const rhi::RayTracingProgramDesc> &description);
   bool RecordProgram(rhi::ICommandContext *commands, const std::shared_ptr<const rhi::ComputeProgramDesc> &description);
+  bool RecordProgram(rhi::ICommandContext *commands, const std::shared_ptr<const rhi::ProgramDesc> &description);
   // Records the batch's immutable parameter snapshot; the returned group belongs
   // to this Renderer and is used by its path-tracing command recording.
   rhi::IBindingGroup *RecordParameters(rhi::ICommandContext *commands, const Scene *scene, const Film *film);
@@ -42,6 +43,7 @@ class Renderer {
       map<std::weak_ptr<const Description>, rhi::ObjPtr<Program>, std::owner_less<std::weak_ptr<const Description>>>;
   ProgramCache<rhi::RayTracingProgramDesc, rhi::IRayTracingProgram> ray_tracing_programs_;
   ProgramCache<rhi::ComputeProgramDesc, rhi::IComputeProgram> compute_programs_;
+  ProgramCache<rhi::ProgramDesc, rhi::IProgram> graphics_programs_;
   Core *core_;
   rhi::ObjPtr<rhi::IQueue> queue_;
   rhi::ObjPtr<rhi::IQueue> compute_queue_;

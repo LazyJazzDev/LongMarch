@@ -11,7 +11,7 @@ class MaterialSpecular : public Material {
 
   void Sync() override;
 
-  void BindMaterialResources(rhi::IBindingGroup *group) override;
+  bool BindMaterialResources(rhi::IBindingGroup *group) override;
 
  private:
   sparkium::MaterialSpecular &material_;

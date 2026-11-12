@@ -13,7 +13,7 @@ class MaterialLight : public Material {
 
   glm::vec3 Emission() const override;
 
-  void BindMaterialResources(rhi::IBindingGroup *group) override;
+  bool BindMaterialResources(rhi::IBindingGroup *group) override;
 
  private:
   sparkium::MaterialLight &material_;

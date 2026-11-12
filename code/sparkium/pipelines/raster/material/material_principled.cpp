@@ -27,6 +27,8 @@ MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
   material_buffer_ =
       core_->GetDevice()->CreateBuffer({(sizeof(material_.info) + sizeof(TextureInfo) + 255) & ~uint64_t(255)});
   sampler_ = core_->GetDevice()->CreateSampler();
+  if (!(pixel_shader_ && material_buffer_ && sampler_))
+    core_->ReportFailure("Cannot create raster material resources");
 }
 
 rhi::IShader *MaterialPrincipled::PixelShader() {
@@ -55,8 +57,9 @@ void MaterialPrincipled::SetupProgram(rhi::ProgramDesc &program) {
   program.pipeline_layout.groups[1].bindings.push_back({4, rhi::BINDING_SAMPLER, 1});    // Material Data
 }
 
-void MaterialPrincipled::BindMaterialResources(rhi::IBindingGroup *group) {
-  group->BindResource(2, material_buffer_.Get());
+bool MaterialPrincipled::BindMaterialResources(rhi::IBindingGroup *group) {
+  if (!group || !group->BindResource(2, material_buffer_.Get()))
+    return false;
   std::vector<rhi::IImage *> textures(6);
   textures[0] = material_.textures.base_color;
   if (!textures[0])
@@ -77,8 +80,7 @@ void MaterialPrincipled::BindMaterialResources(rhi::IBindingGroup *group) {
   textures[5] = material_.textures.emission;
   if (!textures[5])
     textures[5] = core_->GetImage("white");
-  group->BindResource(3, textures);
-  group->BindResource(4, sampler_.Get());
+  return group->BindResource(3, textures) && group->BindResource(4, sampler_.Get());
 }
 
 }  // namespace sparkium::raster

@@ -5,7 +5,8 @@ namespace sparkium::raster {
 void Geometry::SetupProgram(rhi::ProgramDesc &program) {
 }
 
-void Geometry::DispatchDrawCalls(rhi::ICommandContext *cmd_ctx) {
+bool Geometry::DispatchDrawCalls(rhi::ICommandContext *cmd_ctx) {
+  return true;
 }
 
 }  // namespace sparkium::raster

@@ -24,16 +24,18 @@ bool Renderer::IsValid() const {
 }
 
 namespace {
-template <class Cache, class Description, class Create>
-auto ResolveProgram(Cache &cache, const std::shared_ptr<const Description> &description, Create create) {
-  // Weak ownership prevents retired scene versions from keeping cache entries
-  // alive forever and distinguishes new scenes even when allocator addresses repeat.
+template <class Cache>
+void PrunePrograms(Cache &cache) {
   for (auto it = cache.begin(); it != cache.end();) {
     if (it->first.expired())
       it = cache.erase(it);
     else
       ++it;
   }
+}
+
+template <class Cache, class Description, class Create>
+auto ResolveProgram(Cache &cache, const std::shared_ptr<const Description> &description, Create create) {
   auto found = cache.find(description);
   if (found != cache.end())
     return found->second.Get();
@@ -66,6 +68,16 @@ bool Renderer::RecordProgram(rhi::ICommandContext *commands,
          core_->ReportFailure("Cannot create or bind compute render program");
 }
 
+bool Renderer::RecordProgram(rhi::ICommandContext *commands,
+                             const std::shared_ptr<const rhi::ProgramDesc> &description) {
+  if (!IsValid() || !commands || !description)
+    return false;
+  auto *program = ResolveProgram(graphics_programs_, description,
+                                 [this](const auto &desc) { return core_->GetDevice()->CreateProgram(desc); });
+  return (program && commands->CmdBindProgram(program)) ||
+         core_->ReportFailure("Cannot create or bind graphics render program");
+}
+
 rhi::IBindingGroup *Renderer::RecordParameters(rhi::ICommandContext *commands, const Scene *scene, const Film *film) {
   if (!IsValid() || !commands || !scene || !film)
     return nullptr;
@@ -95,6 +107,10 @@ rhi::ObjPtr<rhi::ISubmissionToken> Renderer::Submit(Scene *scene,
   if (!IsValid() || !scene || !camera || !film || !film->IsValid() || scene->GetCore() != core_ ||
       camera->GetCore() != core_ || film->GetCore() != core_)
     return {};
+  // Prune once per batch, not once per draw: raster scenes can have many programs.
+  PrunePrograms(graphics_programs_);
+  PrunePrograms(ray_tracing_programs_);
+  PrunePrograms(compute_programs_);
   const auto resolved = core_->ResolveRenderPipeline(pipeline);
   auto *queue = compute_queue_ && resolved != RENDER_PIPELINE_RASTERIZATION ? compute_queue_.Get() : queue_.Get();
   if (resolved == RENDER_PIPELINE_RASTERIZATION && queue->GetType() == rhi::QUEUE_TYPE_COMPUTE)

@@ -11,7 +11,7 @@ class Material : public Object {
   virtual ~Material() = default;
   virtual rhi::IShader *PixelShader() = 0;
   virtual void SetupProgram(rhi::ProgramDesc &program);
-  virtual void BindMaterialResources(rhi::IBindingGroup *group);
+  virtual bool BindMaterialResources(rhi::IBindingGroup *group);
   virtual void Sync() = 0;
   virtual glm::vec3 Emission() const;
 

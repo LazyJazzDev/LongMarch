@@ -88,7 +88,7 @@ bool Core::RecordRender(Renderer &renderer,
     return false;
   switch (ResolveRenderPipeline(render_pipeline)) {
     case RENDER_PIPELINE_RASTERIZATION:
-      return raster::RecordRender(this, commands, updates, scene, camera, film);
+      return raster::RecordRender(this, renderer, commands, updates, scene, camera, film);
     case RENDER_PIPELINE_RAY_TRACING:
       return raytracing::RecordRender(this, renderer, commands, updates, scene, camera, film);
     case RENDER_PIPELINE_RAY_QUERY:

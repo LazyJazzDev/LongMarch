@@ -5,7 +5,8 @@ namespace sparkium::raster {
 void Material::SetupProgram(rhi::ProgramDesc &program) {
 }
 
-void Material::BindMaterialResources(rhi::IBindingGroup *group) {
+bool Material::BindMaterialResources(rhi::IBindingGroup *group) {
+  return true;
 }
 
 glm::vec3 Material::Emission() const {

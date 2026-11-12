@@ -21,6 +21,8 @@ GeometryMesh::GeometryMesh(sparkium::GeometryMesh &geometry)
   auto shaders_vfs = core_->GetShadersVFS();
   vertex_shader_ = core_->GetDevice()->CreateShader("geometry/mesh/vertex_shader.slang", "VSMain",
                                                     rhi::SHADER_STAGE_VERTEX, &shaders_vfs, {"."}, defines);
+  if (!vertex_shader_)
+    core_->ReportFailure("Cannot create raster geometry shader");
 }
 
 rhi::IShader *GeometryMesh::VertexShader() {
@@ -45,7 +47,7 @@ void GeometryMesh::SetupProgram(rhi::ProgramDesc &program) {
   }
 }
 
-void GeometryMesh::DispatchDrawCalls(rhi::ICommandContext *cmd_ctx) {
+bool GeometryMesh::DispatchDrawCalls(rhi::ICommandContext *cmd_ctx) {
   auto &header = geometry_.GetHeader();
   std::vector<rhi::IBuffer *> buffers;
   std::vector<uint64_t> offsets;
@@ -67,9 +69,10 @@ void GeometryMesh::DispatchDrawCalls(rhi::ICommandContext *cmd_ctx) {
     offsets.push_back(header.signal_offset);
   }
   for (uint32_t i = 0; i < buffers.size(); ++i)
-    cmd_ctx->CmdBindVertexBuffer(i, buffers[i], offsets[i]);
-  cmd_ctx->CmdBindIndexBuffer(geometry_.GetBuffer(), rhi::INDEX_FORMAT_UINT32, header.index_offset);
-  cmd_ctx->CmdDrawIndexed(geometry_.PrimitiveCount() * 3, 1, 0, 0, 0);
+    if (!cmd_ctx->CmdBindVertexBuffer(i, buffers[i], offsets[i]))
+      return false;
+  return cmd_ctx->CmdBindIndexBuffer(geometry_.GetBuffer(), rhi::INDEX_FORMAT_UINT32, header.index_offset) &&
+         cmd_ctx->CmdDrawIndexed(geometry_.PrimitiveCount() * 3, 1, 0, 0, 0);
 }
 
 glm::vec4 GeometryMesh::CentricArea(const glm::mat4x3 &affine) {

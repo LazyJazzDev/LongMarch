@@ -45,6 +45,7 @@ class Core : public Object {
 };
 
 bool RecordRender(sparkium::Core *core,
+                  sparkium::Renderer &renderer,
                   rhi::ICommandContext *commands,
                   ResourceUpdates::Cursor &updates,
                   sparkium::Scene *scene,

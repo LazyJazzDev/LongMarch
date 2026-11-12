@@ -1,4 +1,6 @@
 #pragma once
+#include <memory>
+
 #include "sparkium/pipelines/raster/core/entity.h"
 
 namespace sparkium::raster {
@@ -19,7 +21,7 @@ class EntityPointLight : public Entity {
   rhi::ObjPtr<rhi::IBuffer> point_light_buffer_;
   rhi::ObjPtr<rhi::IShader> point_light_vs_;
   rhi::ObjPtr<rhi::IShader> point_light_ps_;
-  rhi::ObjPtr<rhi::IProgram> point_light_program_;
+  std::shared_ptr<const rhi::ProgramDesc> point_light_description_;
   rhi::ObjPtr<rhi::IBindingGroup> point_light_group_;
 };
 

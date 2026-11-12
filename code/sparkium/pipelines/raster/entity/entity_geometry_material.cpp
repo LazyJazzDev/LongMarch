@@ -1,6 +1,7 @@
 #include "sparkium/pipelines/raster/entity/entity_geometry_material.h"
 
 #include "glm/gtc/matrix_transform.hpp"
+#include "sparkium/core/renderer.h"
 #include "sparkium/pipelines/raster/core/camera.h"
 #include "sparkium/pipelines/raster/core/core.h"
 #include "sparkium/pipelines/raster/core/film.h"
@@ -15,6 +16,10 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
       Entity(DedicatedCast(entity.GetCore())),
       geometry_(DedicatedCast(entity_.GetGeometry())),
       material_(DedicatedCast(entity_.GetMaterial())) {
+  if (!geometry_ || !material_) {
+    core_->ReportFailure("Cannot create raster geometry/material component");
+    return;
+  }
   instance_buffer_ = core_->GetDevice()->CreateBuffer({(sizeof(InstanceData) + 255) & ~uint64_t(255)});
   rhi::ProgramDesc render_program_desc;
   render_program_desc.rasterizer.cull_mode = rhi::CULL_MODE_BACK;
@@ -32,7 +37,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
   render_program_desc.pipeline_layout.groups[1].bindings.push_back(
       {2, rhi::BINDING_BYTE_ADDRESS_BUFFER, 1});  // Material Data
   material_->SetupProgram(render_program_desc);
-  render_program_ = core_->GetDevice()->CreateProgram(render_program_desc);
+  render_description_ = std::make_shared<const rhi::ProgramDesc>(render_program_desc);
   render_group_ = core_->GetDevice()->CreateBindingGroup(render_program_desc.pipeline_layout.groups[1]);
 
   point_light_buffer_ = core_->GetDevice()->CreateBuffer({(sizeof(PointLightData) + 255) & ~uint64_t(255)});
@@ -59,8 +64,11 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
       {0, rhi::BINDING_UNIFORM_BUFFER, 1});  // Camera Data
   point_light_program_desc.pipeline_layout.groups[1].bindings.push_back(
       {4, rhi::BINDING_BYTE_ADDRESS_BUFFER, 1});  // PointLightData
-  point_light_program_ = core_->GetDevice()->CreateProgram(point_light_program_desc);
+  point_light_description_ = std::make_shared<const rhi::ProgramDesc>(point_light_program_desc);
   point_light_group_ = core_->GetDevice()->CreateBindingGroup(point_light_program_desc.pipeline_layout.groups[1]);
+  if (!(instance_buffer_ && render_group_ && point_light_buffer_ && point_light_vs_ && point_light_ps_ &&
+        point_light_group_))
+    core_->ReportFailure("Cannot create raster resources");
 }
 
 void EntityGeometryMaterial::Update(Scene *scene) {
@@ -73,14 +81,20 @@ void EntityGeometryMaterial::Update(Scene *scene) {
   core_->QueueUpload(instance_buffer_.Get(), &instance_data, sizeof(InstanceData));
   material_->Sync();
 
-  scene->RegisterRenderCallback([this](rhi::ICommandContext *cmd_ctx, rhi::IBindingGroup *camera_bindings) {
-    cmd_ctx->CmdBindProgram(render_program_.Get());
-    cmd_ctx->CmdBindGroup(2, camera_bindings);
-    render_group_->BindResource(1, instance_buffer_.Get());
-    material_->BindMaterialResources(render_group_.Get());
-    cmd_ctx->CmdBindGroup(1, render_group_.Get());
-    geometry_->DispatchDrawCalls(cmd_ctx);
-  });
+  scene->RegisterRenderCallback(
+      [this](sparkium::Renderer &renderer, rhi::ICommandContext *cmd_ctx, rhi::IBindingGroup *camera_bindings) {
+        if (!renderer.RecordProgram(cmd_ctx, render_description_))
+          return false;
+        if (!cmd_ctx->CmdBindGroup(2, camera_bindings))
+          return false;
+        if (!render_group_ || !render_group_->BindResource(1, instance_buffer_.Get()))
+          return false;
+        if (!material_->BindMaterialResources(render_group_.Get()))
+          return false;
+        if (!cmd_ctx->CmdBindGroup(1, render_group_.Get()))
+          return false;
+        return geometry_->DispatchDrawCalls(cmd_ctx);
+      });
 
   if (entity_.raster_light) {
     glm::vec3 emission = material_->Emission();
@@ -89,15 +103,21 @@ void EntityGeometryMaterial::Update(Scene *scene) {
       point_light_data.emission = emission * glm::max(0.0f, centric_area.w) * 4.0f * glm::pi<float>();
       point_light_data.position = {centric_area.x, centric_area.y, centric_area.z};
       core_->QueueUpload(point_light_buffer_.Get(), &point_light_data, sizeof(PointLightData));
-      scene->RegisterLightingCallback([this](rhi::ICommandContext *cmd_ctx, Camera *camera, Film *film) {
-        cmd_ctx->CmdBindProgram(point_light_program_.Get());
+      scene->RegisterLightingCallback(
+          [this](sparkium::Renderer &renderer, rhi::ICommandContext *cmd_ctx, Camera *camera, Film *film) {
+            if (!renderer.RecordProgram(cmd_ctx, point_light_description_))
+              return false;
 
-        cmd_ctx->CmdBindGroup(2, camera->NearFieldBindings());
-        point_light_group_->BindResource(4, point_light_buffer_.Get());
-        cmd_ctx->CmdBindGroup(0, film->LightingBindings());
-        cmd_ctx->CmdBindGroup(1, point_light_group_.Get());
-        cmd_ctx->CmdDraw(6, 1, 0, 0);
-      });
+            if (!cmd_ctx->CmdBindGroup(2, camera->NearFieldBindings()))
+              return false;
+            if (!point_light_group_ || !point_light_group_->BindResource(4, point_light_buffer_.Get()))
+              return false;
+            if (!cmd_ctx->CmdBindGroup(0, film->LightingBindings()))
+              return false;
+            if (!cmd_ctx->CmdBindGroup(1, point_light_group_.Get()))
+              return false;
+            return cmd_ctx->CmdDraw(6, 1, 0, 0);
+          });
     }
   }
 }

@@ -10,7 +10,7 @@ class MaterialLambertian : public Material {
   rhi::IShader *PixelShader() override;
   void Sync() override;
   glm::vec3 Emission() const override;
-  void BindMaterialResources(rhi::IBindingGroup *group) override;
+  bool BindMaterialResources(rhi::IBindingGroup *group) override;
 
  private:
   sparkium::MaterialLambertian &material_;

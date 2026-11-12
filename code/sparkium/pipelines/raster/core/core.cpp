@@ -34,6 +34,7 @@ rhi::IImage *Core::GetImage(const std::string &name) {
 }
 
 bool RecordRender(sparkium::Core *core,
+                  sparkium::Renderer &renderer,
                   rhi::ICommandContext *commands,
                   ResourceUpdates::Cursor &updates,
                   sparkium::Scene *scene,
@@ -43,7 +44,8 @@ bool RecordRender(sparkium::Core *core,
   auto raster_scene = DedicatedCast(scene);
   auto raster_camera = DedicatedCast(camera);
   auto raster_film = DedicatedCast(film);
-  return raster_scene->RecordRender(commands, updates, raster_camera, raster_film);
+  return raster_core && raster_scene && raster_camera && raster_film && raster_core->IsValid() &&
+         raster_scene->RecordRender(renderer, commands, updates, raster_camera, raster_film);
 }
 
 Core *DedicatedCast(sparkium::Core *core) {

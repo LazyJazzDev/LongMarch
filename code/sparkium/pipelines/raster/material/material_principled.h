@@ -15,7 +15,7 @@ class MaterialPrincipled : public Material {
 
   void SetupProgram(rhi::ProgramDesc &program) override;
 
-  void BindMaterialResources(rhi::IBindingGroup *group) override;
+  bool BindMaterialResources(rhi::IBindingGroup *group) override;
 
  private:
   sparkium::MaterialPrincipled &material_;

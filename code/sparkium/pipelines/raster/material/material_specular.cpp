@@ -11,6 +11,8 @@ MaterialSpecular::MaterialSpecular(sparkium::MaterialSpecular &material)
   pixel_shader_ = core_->GetDevice()->CreateShader("material/specular/pixel_shader.slang", "PSMain",
                                                    rhi::SHADER_STAGE_FRAGMENT, &shaders_vfs, {"."}, {});
   material_buffer_ = core_->GetDevice()->CreateBuffer({(sizeof(glm::vec3) + 255) & ~uint64_t(255)});
+  if (!(pixel_shader_ && material_buffer_))
+    core_->ReportFailure("Cannot create raster material resources");
 }
 
 rhi::IShader *MaterialSpecular::PixelShader() {
@@ -21,8 +23,8 @@ void MaterialSpecular::Sync() {
   core_->QueueUpload(material_buffer_.Get(), &material_.base_color, sizeof(material_.base_color));
 }
 
-void MaterialSpecular::BindMaterialResources(rhi::IBindingGroup *group) {
-  group->BindResource(2, material_buffer_.Get());
+bool MaterialSpecular::BindMaterialResources(rhi::IBindingGroup *group) {
+  return group && group->BindResource(2, material_buffer_.Get());
 }
 
 }  // namespace sparkium::raster
