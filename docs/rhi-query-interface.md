@@ -159,9 +159,11 @@ claimed to be covered by them.
 
 ## Performance and deferred work
 
-`demo/rhi_stress` and the comparison scripts remain reusable tools for draw-heavy,
-shader-heavy and offscreen comparisons. Historical diagnosis and raw reports are
-preserved through fixed-revision links in [Issue #115](https://github.com/LazyJazzDev/LongMarch/issues/115).
+The synthetic stress demo and its paired-measurement and summary scripts have
+been removed. Historical diagnosis, benchmark source and raw reports remain
+available through Git history and fixed-revision links in
+[Issue #115](https://github.com/LazyJazzDev/LongMarch/issues/115).
+The independent RHIX offscreen comparison script remains available.
 The runtime UUID parsing regression described there has been fixed by forcing
 constant evaluation; those pre-fix timings do not describe current performance.
 [Issue #116](https://github.com/LazyJazzDev/LongMarch/issues/116) tracks shared
