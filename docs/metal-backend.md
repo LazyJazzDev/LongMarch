@@ -111,16 +111,16 @@ buffer. These reads/writes are now guarded. A sentinel regression test covers
 ## Diagnostics and current limits
 
 For the nbody compute demo, see the [Metal/Vulkan performance comparison](nbody-metal-vulkan-performance.md)
-and `scripts/profile_nbody.py`. The demo supports synchronized frame benchmarks,
-per-frame CPU/GPU timing CSVs, and deterministic particle-state readback.
+for historical results. The demo retains fixed-frame execution and deterministic
+particle-state readback; built-in timing and CSV output have been removed.
 
 Set `LONGMARCH_METAL_SHADER_DUMP=/path/to/directory` to save generated MSL and
 a Slang virtual-filesystem snapshot for debugging compiler failures. Native GPU
 command errors are checked when waiting for completion.
 
-Frame profiling supports `--profile timings.csv --profile-cpu-only` on Metal.
-Per-stage GPU timestamps still require Vulkan; Metal timings are not inferred
-from Vulkan measurements. Use Xcode GPU tools for native GPU captures.
+Performance analysis uses Nsight on supported platforms/APIs. Native Metal
+cannot be profiled with Nsight; report this limitation rather than substituting
+Vulkan measurements.
 
 Blender scene import, material graphs, and hair are added by the dependent
 `blender-align` branch. Their validation and scene-specific limits belong there.

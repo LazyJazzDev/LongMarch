@@ -8,8 +8,6 @@
 #include <numeric>
 #include <stdexcept>
 
-#include "grassland/graphics/frame_profile.h"
-
 #if defined(LONGMARCH_METAL_ENABLED)
 using namespace grassland;
 
@@ -173,13 +171,7 @@ TEST_F(MetalBackendTest, RayQueryMasksIDsUpdatesAndBindingSnapshots) {
   ASSERT_EQ(core->CreateBottomLevelAccelerationStructure(vertex.get(), index.get(), 12, &blas), 0);
   std::vector<graphics::RayTracingInstance> instances{blas->MakeInstance(glm::mat4x3(1), 42, 1)};
   ASSERT_EQ(core->CreateTopLevelAccelerationStructure(instances, &tlas), 0);
-  {
-    graphics::FrameProfile profile(core.get(), false);
-    profile.Begin();
-    ASSERT_EQ(tlas->UpdateInstances(instances), 0);
-    profile.Finish();
-    EXPECT_EQ(profile.counters["native_tlas_builds"], 0u);
-  }
+  ASSERT_EQ(tlas->UpdateInstances(instances), 0);
 
   std::unique_ptr<graphics::Shader> shader;
   ASSERT_EQ(core->CreateShader(R"(

@@ -1,5 +1,10 @@
 # Experimental Metal ray query
 
+> Historical report: built-in profiling and its CSV/script interfaces have been removed.
+> Commands and measurements below describe the earlier implementation at
+> [`b99233dc`](https://github.com/LazyJazzDev/LongMarch/tree/b99233dceffedba57c97770e37b2fd902da18c8b).
+> Use Nsight for new profiling; these timings are not current validation results.
+
 Branch `metal-ray-query` starts at `rt-fallback` commit `58e9023`.
 It adds a working native Metal acceleration-structure traversal path to the
 existing compute path tracer. The six basic JSON demos share the same material,

@@ -6,7 +6,6 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "grassland/graphics/frame_profile.h"
 #include "sparkium/pipelines/raytracing/core/camera.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"
@@ -65,7 +64,6 @@ void SoftwarePipeline::AddInstance(Geometry *geometry,
 }
 
 void SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
-  graphics::CpuProfileScope compile_profile("compile_builders");
   auto graphics = core_->GraphicsCore();
   builders_.clear();
   if (builder_shaders_.empty()) {
@@ -96,7 +94,6 @@ void SoftwarePipeline::CompileRenderer(const std::vector<MaterialCode> &material
                                        uint32_t hdr_count,
                                        const std::string &camera_file,
                                        const std::string &camera_entry) {
-  graphics::CpuProfileScope compile_profile("compile_renderer");
   const bool has_graph = std::any_of(materials.begin(), materials.end(),
                                      [](const MaterialCode &material) { return material.shader_graph; });
   std::ostringstream source;
@@ -245,7 +242,6 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
                               uint32_t hdr_count,
                               Camera *camera) {
   auto graphics = core_->GraphicsCore();
-  graphics::CpuProfileScope prepare_profile("software_prepare");
   const std::string camera_file = camera->ShaderFile();
   const std::string camera_entry = camera->EntryPoint();
   std::vector<GeometryLayout> geometries;
@@ -316,10 +312,6 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
         materials != material_sources_ || buffer_count_ != buffers.size() || sdr_count_ != sdr_count ||
         hdr_count_ != hdr_count)
       CompileRenderer(materials, buffers.size(), sdr_count, hdr_count, camera_file, camera_entry);
-    if (graphics::FrameProfile::active) {
-      graphics::FrameProfile::active->counters["native_ray_query"] = 1;
-      graphics::FrameProfile::active->counters["instances"] = instances_.size();
-    }
     return;
   }
   if (builders_.empty() || builder_buffer_count_ != buffers.size())
@@ -350,15 +342,6 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   if (!parameters_buffer_ || parameters_buffer_->Size() < parameter_bytes)
     graphics->CreateBuffer(parameter_bytes, graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
   parameters_buffer_->UploadData(parameters.data(), parameter_bytes);
-  prepare_profile.End();
-  if (graphics::FrameProfile::active) {
-    graphics::FrameProfile::active->counters["bvh_dispatches"] = passes.size();
-    graphics::FrameProfile::active->counters["blas_rebuilt"] = rebuild;
-    graphics::FrameProfile::active->counters["instances"] = instances_.size();
-    graphics::FrameProfile::active->counters["bvh_nodes"] = node_count;
-  }
-  graphics::CpuProfileScope record_profile("bvh_record");
-  graphics::GpuProfileScope build_profile(commands, "bvh_build");
   for (size_t i = 0; i < passes.size(); ++i) {
     commands->CmdBindComputeProgram(builders_[passes[i].kernel].get());
     commands->CmdBindResources(0, {nodes_.get()}, graphics::BIND_POINT_COMPUTE);

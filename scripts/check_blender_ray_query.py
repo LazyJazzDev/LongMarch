@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """Render complete Blender scenes with native ray queries and backend validation.
 
-Requires Pillow and the Blender LFS asset snapshot. Saves images, per-frame native
-query counters, logs, and results; any failed render or silent fallback fails.
+Requires Pillow and the Blender LFS asset snapshot. Saves images, pipeline-selection
+logs, and results; a failed render or non-native pipeline selection fails.
+This does not measure performance.
 """
 import argparse
-import csv
 import json
 import os
 from pathlib import Path
 import subprocess
-import time
 
 from check_rt_fallback import ROOT, read_scene
 
@@ -42,17 +41,14 @@ def main():
         scene = read_scene(ROOT / 'assets/scenes' / name / 'scene.json')
         scene['film'].update(width=args.size, height=args.size)
         scene['renderer'].update(samples_per_dispatch=args.spp, max_bounces=args.bounces)
-        path, png, log, profile = [output / (name + suffix) for suffix in ('.json', '.png', '.log', '.csv')]
-        path.write_text(json.dumps(scene, indent=2) + '\n')
+        path, png, log = [output / (name + suffix) for suffix in ('.json', '.png', '.log')]
+        path.write_text(json.dumps(scene, indent=2) + '\n', encoding='utf-8')
         png.unlink(missing_ok=True)
-        profile.unlink(missing_ok=True)
         command = [str(cli), str(path), '--backend', args.backend,
-                   '--frames', str(args.frames), '--debug', '--profile', str(profile),
-                   '--profile-cpu-only', '-o', str(png)]
+                   '--frames', str(args.frames), '--debug', '-o', str(png)]
         if args.pipeline != 'scene':
             command.extend(['--pipeline', args.pipeline])
-        started = time.monotonic()
-        with log.open('w') as stream:
+        with log.open('w', encoding='utf-8') as stream:
             try:
                 rc = subprocess.run(command, cwd=ROOT, env=env, stdout=stream,
                                     stderr=subprocess.STDOUT, timeout=args.timeout).returncode
@@ -60,25 +56,22 @@ def main():
                 rc = 'timeout'
         result = dict(scene=name, backend=args.backend, pipeline=args.pipeline, size=args.size, spp_per_frame=args.spp,
                       frames=args.frames, bounces=args.bounces, returncode=rc,
-                      wall_seconds=time.monotonic() - started, passed=False)
-        if rc == 0 and png.exists() and profile.exists():
-            with profile.open() as stream:
-                rows = list(csv.DictReader(stream))
-            query_frames = [int(r['frame']) for r in rows if r['domain'] == 'count'
-                            and r['stage'] == 'native_ray_query' and float(r['value']) == 1]
-            result['native_query_frames'] = query_frames
+                      passed=False)
+        if rc == 0 and png.exists():
+            result["native_query_selected"] = (
+                "Tracing: native ray query (compute, native AS)" in log.read_text(encoding="utf-8"))
             with Image.open(png) as loaded:
                 image = loaded.convert('RGB')
             result['rgb_mean'] = ImageStat.Stat(image).mean
             result['nonconstant'] = any(low != high for low, high in image.getextrema())
-            result['passed'] = (query_frames == list(range(args.frames))
+            result['passed'] = (result["native_query_selected"]
                                 and image.size == (args.size, args.size) and result['nonconstant'])
             tile = Image.new('RGB', (args.size, args.size + 32), '#202020')
             tile.paste(image, (0, 32))
             ImageDraw.Draw(tile).text((3, 2), name + '\n' + args.pipeline, fill='white')
             tiles.append(tile)
         results.append(result)
-        (output / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
+        (output / 'results.json').write_text(json.dumps(results, indent=2) + '\n', encoding='utf-8')
         print(json.dumps(result), flush=True)
     if tiles:
         sheet = Image.new('RGB', (args.size * len(tiles), args.size + 32))

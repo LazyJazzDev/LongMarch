@@ -1,5 +1,10 @@
 # Blender throughput: Slang versus the previous HLSL build
 
+> Historical report: built-in profiling and its CSV/script interfaces have been removed.
+> Commands and measurements below describe the earlier implementation at
+> [`b99233dc`](https://github.com/LazyJazzDev/LongMarch/tree/b99233dceffedba57c97770e37b2fd902da18c8b).
+> Use Nsight for new profiling; these timings are not current validation results.
+
 Measured on 2026-09-26, Windows x64, NVIDIA RTX 3090 Ti, driver 596.49,
 MSVC 19.44, Ninja Release.
 

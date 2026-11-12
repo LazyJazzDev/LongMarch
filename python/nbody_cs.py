@@ -1,13 +1,10 @@
 """Python counterpart of demo/nbody_cs: N-body simulation in a Slang compute shader.
 
 Uses the C++ demo's shaders and command line. Benchmark modes (compute, offscreen, window)
-wait for the GPU every frame and print the same RESULT line; initialization and warmup
-frames are excluded.
+wait for the GPU every frame. Use Nsight for profiling.
 """
 
-import json
 import sys
-import time
 
 import numpy as np
 from long_march import graphics
@@ -20,8 +17,8 @@ MODES = ("interactive", "compute", "offscreen", "window")
 
 HELP = """nbody_cs [--backend auto|metal|vulkan] [--mode interactive|compute|offscreen|window]
   [--particles N] [--frames N] [--warmup N] [--seed N] [--width W] [--height H]
-  [--csv path] [--state-output path] [--debug] [--no-gpu-timing]
-Benchmark modes wait for GPU completion each frame; initialization/warmup are excluded."""
+  [--state-output path] [--debug]
+Benchmark modes wait for GPU completion each frame; use Nsight for profiling."""
 
 
 class Options:
@@ -34,9 +31,7 @@ class Options:
         self.height = 1080
         self.seed = 1
         self.debug = False
-        self.gpu_timing = True
         self.mode = "interactive"
-        self.csv = ""
         self.state_output = ""
 
 
@@ -63,14 +58,10 @@ def parse_options(argv):
                 raise ValueError("unknown backend: " + name)
         elif arg in ("--particles", "--frames", "--warmup", "--seed", "--width", "--height"):
             setattr(options, arg[2:], int(value()))
-        elif arg == "--csv":
-            options.csv = value()
         elif arg == "--state-output":
             options.state_output = value()
         elif arg == "--debug":
             options.debug = True
-        elif arg == "--no-gpu-timing":
-            options.gpu_timing = False
         elif arg == "--mode":
             options.mode = value()
         elif arg == "--help":
@@ -101,8 +92,6 @@ class NBodyCS:
         self.window = None
         if options.mode in ("interactive", "window"):
             self.window = self.core.create_window(options.width, options.height, "NBodyCS", False, True)
-        self.profiler = None
-        self.gpu_ms = self.record_ms = self.submit_ms = self.wait_ms = 0.0
         self.fps_counter = nb.FPSCounter()
 
     def benchmark(self):
@@ -112,45 +101,19 @@ class NBodyCS:
         self.on_init()
         print(f"Backend: {graphics.backend_api_string(self.core.api())}, device: {self.core.device_name()}",
               flush=True)
-        if self.benchmark() and self.options.gpu_timing and self.core.api() == graphics.BACKEND_API_VULKAN:
-            self.profiler = graphics.FrameProfile(self.core)
-        csv = None
-        if self.options.csv:
-            csv = open(self.options.csv, "w", newline="\n")
-            csv.write("frame,wall_ms,gpu_ms,record_ms,submit_ms,wait_ms\n")
-
-        wall_times, gpu_times = [], []
         frame = -self.options.warmup
         while (not self.window or not self.window.should_close()) and (
                 not self.benchmark() or frame < self.options.frames):
-            start = time.perf_counter()
             self.on_update()
             self.on_render()
             if self.window:
                 graphics.Window.poll_events()
-            wall = (time.perf_counter() - start) * 1e3
-            if self.benchmark() and frame >= 0:
-                wall_times.append(wall)
-                gpu_times.append(self.gpu_ms)
-                if csv:
-                    csv.write(f"{frame},{wall:.6f},{self.gpu_ms:.6f},{self.record_ms:.6f},{self.submit_ms:.6f},"
-                              f"{self.wait_ms:.6f}\n")
             frame += 1
-        if csv:
-            csv.close()
         self.core.wait_gpu()
         if self.options.state_output:
             with open(self.options.state_output, "wb") as output:
                 output.write(self.particles_pos.download_data())
                 output.write(self.particles_vel.download_data())
-        if wall_times:
-            wall_ms, gpu_ms = np.mean(wall_times), np.mean(gpu_times)
-            result = (f'{{"backend":{json.dumps(graphics.backend_api_string(self.core.api()))},'
-                      f'"mode":{json.dumps(self.options.mode)},"particles":{self.n_particles},'
-                      f'"frames":{len(wall_times)},"warmup":{self.options.warmup},"seed":{self.options.seed},'
-                      f'"width":{self.options.width},"height":{self.options.height},"wall_ms":{wall_ms:.6f},'
-                      f'"gpu_ms":{gpu_ms:.6f},"fps_equivalent":{1000.0 / wall_ms:.6f}}}')
-            print("RESULT " + result, flush=True)
         if self.window:
             self.window.terminate_imgui()
         self.on_close()
@@ -216,11 +179,7 @@ class NBodyCS:
             self.window.set_title(f"NBody Compute Shader FPS: {self.fps_counter.tick_fps():.6f}")
 
     def on_render(self):
-        start = time.perf_counter()
-        if self.profiler:
-            self.profiler.begin()
         ctx = self.core.create_command_context()
-        gpu_scope = self.profiler.begin_gpu(ctx, "frame") if self.profiler else -1
         if not self.controls or self.controls.step:
             ctx.cmd_bind_compute_program(self.nbody_compute_program)
             ctx.cmd_bind_resources(0, [self.particles_pos], graphics.BIND_POINT_COMPUTE)
@@ -233,21 +192,9 @@ class NBodyCS:
             self.renderer.record(ctx, self.particles_pos, self.n_particles)
         if self.window:
             ctx.cmd_present(self.window, self.renderer.frame_image)
-        if self.profiler:
-            self.profiler.end_gpu(ctx, gpu_scope)
-        recorded = time.perf_counter()
         self.core.submit_command_context(ctx)
-        submitted = time.perf_counter()
         if self.benchmark():
             self.core.wait_gpu()
-            completed = time.perf_counter()
-            self.record_ms = (recorded - start) * 1e3
-            self.submit_ms = (submitted - recorded) * 1e3
-            self.wait_ms = (completed - submitted) * 1e3
-            self.gpu_ms = -1.0
-            if self.profiler:
-                self.profiler.finish()
-                self.gpu_ms = self.profiler.gpu_ms["frame"]
 
 
 def main(argv=None):

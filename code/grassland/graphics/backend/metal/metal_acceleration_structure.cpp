@@ -7,7 +7,6 @@
 
 #include "grassland/graphics/backend/metal/metal_buffer.h"
 #include "grassland/graphics/backend/metal/metal_core.h"
-#include "grassland/graphics/frame_profile.h"
 
 namespace grassland::graphics::backend {
 
@@ -47,7 +46,6 @@ MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
       aabbs.offset > buffer->Size() || aabbs.size > buffer->Size() - aabbs.offset ||
       uint64_t(count - 1) * stride + sizeof(RayTracingAABB) > aabbs.size)
     throw std::invalid_argument("invalid Metal AABB AS buffer range");
-  graphics::CpuProfileScope profile("native_blas_build");
   auto geometry = MTL::AccelerationStructureBoundingBoxGeometryDescriptor::descriptor();
   geometry->setBoundingBoxBuffer(buffer->Handle());
   geometry->setBoundingBoxBufferOffset(aabbs.offset);
@@ -60,8 +58,6 @@ MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
   const NS::Object *geometries[] = {geometry};
   descriptor->setGeometryDescriptors(NS::Array::array(geometries, 1));
   Build(descriptor);
-  if (graphics::FrameProfile::active)
-    ++graphics::FrameProfile::active->counters["native_blas_builds"];
 }
 
 MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
@@ -80,7 +76,6 @@ MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
       vertices.size > vertex->Size() - vertices.offset || indices.size > index->Size() - indices.offset ||
       uint64_t(vertex_count - 1) * stride + 12 > vertices.size || uint64_t(triangle_count) * 12 > indices.size)
     throw std::invalid_argument("invalid Metal triangle AS buffer ranges");
-  graphics::CpuProfileScope profile("native_blas_build");
   auto geometry = MTL::AccelerationStructureTriangleGeometryDescriptor::descriptor();
   geometry->setVertexBuffer(vertex->Handle());
   geometry->setVertexBufferOffset(vertices.offset);
@@ -97,8 +92,6 @@ MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
   const NS::Object *geometries[] = {geometry};
   descriptor->setGeometryDescriptors(NS::Array::array(geometries, 1));
   Build(descriptor);
-  if (graphics::FrameProfile::active)
-    ++graphics::FrameProfile::active->counters["native_blas_builds"];
 }
 
 MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
@@ -160,7 +153,6 @@ int MetalAccelerationStructure::UpdateInstances(const std::vector<RayTracingInst
     same = children[i].get() == children_[i].get();
   if (same)
     return 0;
-  graphics::CpuProfileScope profile("native_tlas_build");
   auto buffer = NS::TransferPtr(core_->Device()->newBuffer(
       std::max<size_t>(1, descriptors.size()) * sizeof(descriptors[0]), MTL::ResourceStorageModeShared));
   MetalCheck(buffer.get(), nullptr, "instance descriptor buffer");
@@ -178,8 +170,6 @@ int MetalAccelerationStructure::UpdateInstances(const std::vector<RayTracingInst
   Build(descriptor);
   instances_ = std::move(descriptors);
   children_ = std::move(children);
-  if (graphics::FrameProfile::active)
-    ++graphics::FrameProfile::active->counters["native_tlas_builds"];
   return 0;
 }
 }  // namespace grassland::graphics::backend

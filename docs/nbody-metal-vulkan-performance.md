@@ -1,5 +1,10 @@
 # nbody_cs：Metal 与 Vulkan 性能对比
 
+> Historical report: built-in profiling and its CSV/script interfaces have been removed.
+> Commands and measurements below describe the earlier implementation at
+> [`b99233dc`](https://github.com/LazyJazzDev/LongMarch/tree/b99233dceffedba57c97770e37b2fd902da18c8b).
+> Use Nsight for new profiling; these timings are not current validation results.
+
 测试日期：2026-09-16。机器：Apple M5 MacBook Pro，32 GB 内存，macOS 26.6.2（25G83），接入电源。使用 `rt-fallback` 工作区的 Release 双后端构建，Vulkan SDK 1.4.341.1，Apple Clang；Vulkan 在此机器上通过 MoltenVK 执行，最终也使用 Metal GPU。
 
 当前 Metal 已默认开启 fast math；最新测量见文末「追加实验」。以下基线保留开启前的数据，便于对照。
@@ -95,7 +100,7 @@ cmake-build-metal/demo/nbody_cs/demo_nbody_cs \
   --csv out/nbody-profile/example.csv
 ```
 
-脚本：[scripts/profile_nbody.py](../scripts/profile_nbody.py)。默认输出目录为 `out/nbody-profile/results`，包含每帧 CSV、stdout/stderr 日志、每次运行命令与结果 `runs.json`、三轮汇总 `summary.json`。严格浮点对照在 `out/nbody-profile/strict-math`。这些运行产物位于被 Git 忽略的 `out/`，本报告保存主要结果。
+脚本：[scripts/profile_nbody.py](https://github.com/LazyJazzDev/LongMarch/blob/b99233dceffedba57c97770e37b2fd902da18c8b/scripts/profile_nbody.py)。默认输出目录为 `out/nbody-profile/results`，包含每帧 CSV、stdout/stderr 日志、每次运行命令与结果 `runs.json`、三轮汇总 `summary.json`。严格浮点对照在 `out/nbody-profile/strict-math`。这些运行产物位于被 Git 忽略的 `out/`，本报告保存主要结果。
 
 ## 追加实验：Metal 默认开启 fast math
 

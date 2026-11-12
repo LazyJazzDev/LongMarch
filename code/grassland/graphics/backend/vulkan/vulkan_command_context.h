@@ -42,7 +42,6 @@ class VulkanCommandContext : public CommandContext {
   void CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) override;
   void CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z) override;
   // Optional profiling markers; the caller owns the query pool until GPU completion.
-  void CmdTimestamp(VkQueryPool pool, uint32_t index, uint32_t reset_count = 0);
   void CmdCopyBuffer(Buffer *dst_buffer,
                      Buffer *src_buffer,
                      uint64_t size,

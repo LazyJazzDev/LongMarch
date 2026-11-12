@@ -1,5 +1,10 @@
 # Blender performance after removing the D3D12/Vulkan wrapper layers
 
+> Historical report: built-in profiling and its CSV/script interfaces have been removed.
+> Commands and measurements below describe the earlier implementation at
+> [`b99233dc`](https://github.com/LazyJazzDev/LongMarch/tree/b99233dceffedba57c97770e37b2fd902da18c8b).
+> Use Nsight for new profiling; these timings are not current validation results.
+
 Compared `main` at `35215476f55592508ab726ad2382ba18b43afaa3` with the native
 graphics backend branch at `22d306cb4015e44e3d20f19330cbbb81d14dc89e`.
 The CLI and Sparkium renderer sources are identical between these revisions.
