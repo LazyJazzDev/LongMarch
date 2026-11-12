@@ -10,12 +10,12 @@
 namespace grassland::rhi::backend::metal {
 // Both backends consume the same DX-layout SPIR-V. Argument IDs come from the
 // complete C++ layout, so unused declarations never shift a captured version.
-bool CompileMetal(const IShader *shader,
-                  const PipelineLayoutDesc &layout,
-                  const std::vector<InputAttributeDesc> &attributes,
-                  std::string &source,
-                  std::string &entry,
-                  std::array<uint32_t, 3> *threads) {
+static bool CompileMetal(const IShader *shader,
+                         const PipelineLayoutDesc &layout,
+                         const std::vector<InputAttributeDesc> &attributes,
+                         std::string &source,
+                         std::string &entry,
+                         std::array<uint32_t, 3> *threads) {
   std::vector<uint8_t> code;
   if (!CompileSlang(shader, ShaderMacroHeader(layout, BACKEND_API_VULKAN, attributes), BACKEND_API_VULKAN, code,
                     &layout, threads))
@@ -79,4 +79,27 @@ bool CompileMetal(const IShader *shader,
   }
 }
 
+NS::SharedPtr<MTL::Function> CompileMetalFunction(MTL::Device *device,
+                                                  const PipelineLayoutDesc &layout,
+                                                  const IShader *shader,
+                                                  const std::vector<InputAttributeDesc> &attributes,
+                                                  std::array<uint32_t, 3> *threads) {
+  for (const auto &group : layout.groups)
+    if (!ValidateMetalBindingLayout(device, group))
+      return {};
+  std::string code, entry;
+  if (!CompileMetal(shader, layout, attributes, code, entry, threads))
+    return {};
+  NS::Error *error = nullptr;
+  auto library =
+      NS::TransferPtr(device->newLibrary(NS::String::string(code.c_str(), NS::UTF8StringEncoding), nullptr, &error));
+  if (!library) {
+    ReportMetalError(error, "Metal library compilation failed");
+    return {};
+  }
+  auto function = NS::TransferPtr(library->newFunction(NS::String::string(entry.c_str(), NS::UTF8StringEncoding)));
+  if (!function)
+    ReportError(-1, "Metal shader entry point not found.");
+  return function;
+}
 }  // namespace grassland::rhi::backend::metal

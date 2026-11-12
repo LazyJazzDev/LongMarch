@@ -41,8 +41,6 @@ class MetalComputeProgramImpl final : public Object<rhi::IComputeProgram, IMetal
 
   MTL::Size threads_{};
 
-  void InitializeComputeProgram(IMetalDevice *device, const ComputeProgramDesc &desc);
-
   bool ValidateLayout() const;
 
   IMetalDevice *device_{};
@@ -50,13 +48,5 @@ class MetalComputeProgramImpl final : public Object<rhi::IComputeProgram, IMetal
   ComputeProgramDesc desc_{};
 
   ObjectPtr<IShader> shader_{};
-
-  void InitializeMetalProgramBase(MTL::Device *device);
-
-  NS::SharedPtr<MTL::Function> CompileFunction(const IShader *shader,
-                                               const std::vector<InputAttributeDesc> &attributes = {},
-                                               std::array<uint32_t, 3> *threads = nullptr) const;
-
-  MTL::Device *native_device_{};
 };
 }  // namespace grassland::rhi::backend::metal

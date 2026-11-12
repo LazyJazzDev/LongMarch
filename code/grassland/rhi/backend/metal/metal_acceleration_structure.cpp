@@ -2,18 +2,9 @@
 
 #include <cstring>
 
-#include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-void MetalBottomLevelAccelerationStructureImpl::InitializeMetalAccelerationStructure(IMetalDevice *device) {
-  device_ = device;
-}
-
-void MetalTopLevelAccelerationStructureImpl::InitializeMetalAccelerationStructure(IMetalDevice *device) {
-  device_ = device;
-}
-
 IMetalDevice *MetalBottomLevelAccelerationStructureImpl::Owner() const {
   return device_;
 }
@@ -187,8 +178,8 @@ MTL::InstanceAccelerationStructureDescriptor *NativeInstances(const TopLevelAcce
 MetalBottomLevelAccelerationStructureImpl::MetalBottomLevelAccelerationStructureImpl(
     IMetalDevice *device,
     const BottomLevelAccelerationStructureDesc &desc)
-    : desc_(desc) {
-  InitializeMetalAccelerationStructure(device);
+    : desc_(desc),
+      device_(device) {
 }
 
 IBottomLevelAccelerationStructure *MetalBottomLevelAccelerationStructureImpl::Create(
@@ -219,8 +210,8 @@ const BottomLevelAccelerationStructureDesc &MetalBottomLevelAccelerationStructur
 MetalTopLevelAccelerationStructureImpl::MetalTopLevelAccelerationStructureImpl(
     IMetalDevice *device,
     const TopLevelAccelerationStructureDesc &desc)
-    : desc_(desc) {
-  InitializeMetalAccelerationStructure(device);
+    : desc_(desc),
+      device_(device) {
 }
 
 ITopLevelAccelerationStructure *MetalTopLevelAccelerationStructureImpl::Create(

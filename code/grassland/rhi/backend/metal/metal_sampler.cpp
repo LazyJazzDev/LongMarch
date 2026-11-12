@@ -1,7 +1,6 @@
 ﻿#include "grassland/rhi/backend/metal/metal_sampler.h"
 
 #include "grassland/rhi/backend/metal/metal_device.h"
-#include "grassland/rhi/backend/metal/metal_sampler.h"
 
 namespace grassland::rhi::backend::metal {
 MetalSamplerImpl::MetalSamplerImpl(IMetalDevice *device,

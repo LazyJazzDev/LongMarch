@@ -12,7 +12,6 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
-#include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"

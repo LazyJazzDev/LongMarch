@@ -24,8 +24,6 @@ class IMetalCommandContext : public IObject {
   virtual void BindDownloads(rhi::ISubmissionToken *submission) = 0;
   virtual void ReleaseDownloads() = 0;
   virtual bool Seal() = 0;
-  virtual const void *DeviceIdentity() const = 0;
-  virtual IMetalQueue *OwnerQueue() const = 0;
   virtual void MarkSubmitted() = 0;
   virtual bool WasSubmitted() const = 0;
   virtual void UpdatePresentedImages() = 0;
@@ -98,6 +96,8 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IMetal
                   uint64_t destination_offset,
                   uint64_t size);
   MetalCommandContextImpl(IMetalQueue *queue);
+  const void *DeviceIdentity() const;
+  IMetalQueue *OwnerQueue() const;
   bool EndRecording();
   std::vector<MTL::Resource *> AccelerationResources();
   std::unordered_map<IMetalTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
@@ -137,13 +137,6 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IMetal
                        uint32_t depth = 1,
                        IShaderBindingTable *sbt = nullptr) override;
 
- private:
-  bool PrepareRendering(const RenderingInfo &info);
-
-  bool RenderingMatches(const IProgram *program) const;
-
-  void InitializeCommandContext(IMetalQueue *queue);
-
  public:
   rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
 
@@ -155,26 +148,16 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IMetal
   // Call before encoding each resource use. Retains each exact object once.
   IDownloadToken *RegisterDownload(ObjectPtr<IMetalDownloadToken> token);
 
-  template <typename T, std::enable_if_t<!std::is_convertible_v<T *, rhi::IObject *>, int> = 0>
-  bool RetainResource(T *resource) {
-    return RetainResource(rhi::QueryInterfacePtr<rhi::IObject>(resource).Get());
-  }
-
   bool RetainResource(rhi::IObject *resource);
 
  public:
   bool Seal() override;
-
-  IMetalQueue *OwnerQueue() const override;
-
-  const void *DeviceIdentity() const override;
 
   void MarkSubmitted() override;
 
   bool WasSubmitted() const override;
 
  private:
-  RenderingInfo rendering_{};
   bool recording_failed_{};
   bool sealed_{};
   IMetalQueue *queue_{};

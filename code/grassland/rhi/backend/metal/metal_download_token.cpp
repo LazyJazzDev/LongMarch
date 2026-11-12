@@ -42,11 +42,11 @@ bool MetalDownloadTokenImpl::CopyData(void *destination) const {
 }
 
 IMetalDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size) {
-  return new MetalDownloadTokenImpl(lease, size);
+  return new MetalDownloadTokenImpl(std::move(lease), size);
 }
 
 IMetalDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease,
                                               const DownloadLayout &layout) {
-  return new MetalDownloadTokenImpl(lease, layout);
+  return new MetalDownloadTokenImpl(std::move(lease), layout);
 }
 }  // namespace grassland::rhi::backend::metal
