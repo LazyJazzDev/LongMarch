@@ -1,0 +1,1191 @@
+{
+  "affinity": {
+    "logical_processors": [
+      0,
+      1,
+      10,
+      11,
+      12,
+      13,
+      22,
+      23
+    ],
+    "mask": 12598275,
+    "topology": [
+      {
+        "group": 0,
+        "logical": 0,
+        "core": 0,
+        "efficiency": 1,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 1,
+        "core": 1,
+        "efficiency": 1,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 2,
+        "core": 2,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 3,
+        "core": 3,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 4,
+        "core": 4,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 5,
+        "core": 5,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 6,
+        "core": 6,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 7,
+        "core": 7,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 8,
+        "core": 8,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 9,
+        "core": 9,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 10,
+        "core": 10,
+        "efficiency": 1,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 11,
+        "core": 11,
+        "efficiency": 1,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 12,
+        "core": 12,
+        "efficiency": 1,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 13,
+        "core": 13,
+        "efficiency": 1,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 14,
+        "core": 14,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 15,
+        "core": 15,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 16,
+        "core": 16,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 17,
+        "core": 17,
+        "efficiency": 0,
+        "flags": 1
+      },
+      {
+        "group": 0,
+        "logical": 18,
+        "core": 18,
+        "efficiency": 0,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 19,
+        "core": 19,
+        "efficiency": 0,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 20,
+        "core": 20,
+        "efficiency": 0,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 21,
+        "core": 21,
+        "efficiency": 0,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 22,
+        "core": 22,
+        "efficiency": 1,
+        "flags": 0
+      },
+      {
+        "group": 0,
+        "logical": 23,
+        "core": 23,
+        "efficiency": 1,
+        "flags": 0
+      }
+    ]
+  },
+  "hashes": {
+    "main": "d0ee0d9831badb548054d74a1d897eae19d73f47faf4dbb04560fd0f6efb9427",
+    "pr": "25e251f9238509ac4a0cc5b479f223029fbae92d4a782596ec1773a8d8d4d8af",
+    "constant": "d95fa33e754b7ef44532122a926de36961d50d5b01750061b143df33b37ec605"
+  },
+  "samples": [
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 0.8397101,
+      "record_seconds": 0.8394601,
+      "wait_seconds": 0.0001097,
+      "started_unix": 1794456907.510181,
+      "process_seconds": 1.6160404682159424,
+      "label": "main",
+      "api": "vulkan",
+      "pair": 0
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 5.4552455,
+      "record_seconds": 5.4549932,
+      "wait_seconds": 0.0001445,
+      "started_unix": 1794456909.1262527,
+      "process_seconds": 6.761146783828735,
+      "label": "pr",
+      "api": "vulkan",
+      "pair": 0
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.0295966,
+      "record_seconds": 1.0292805,
+      "wait_seconds": 0.0001102,
+      "started_unix": 1794456915.8874254,
+      "process_seconds": 1.7679805755615234,
+      "label": "constant",
+      "api": "vulkan",
+      "pair": 0
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.4903792,
+      "record_seconds": 1.4901769,
+      "wait_seconds": 8.9e-05,
+      "started_unix": 1794456917.657703,
+      "process_seconds": 2.5274012088775635,
+      "label": "main",
+      "api": "d3d12",
+      "pair": 0
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 7.5423624,
+      "record_seconds": 7.5421047,
+      "wait_seconds": 0.000115,
+      "started_unix": 1794456920.1851287,
+      "process_seconds": 9.459621667861938,
+      "label": "pr",
+      "api": "d3d12",
+      "pair": 0
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.9522136,
+      "record_seconds": 1.9520062,
+      "wait_seconds": 8.88e-05,
+      "started_unix": 1794456929.6447737,
+      "process_seconds": 3.0381572246551514,
+      "label": "constant",
+      "api": "d3d12",
+      "pair": 0
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.0660322,
+      "record_seconds": 1.0658199,
+      "wait_seconds": 0.0001184,
+      "started_unix": 1794456932.6848967,
+      "process_seconds": 1.813734531402588,
+      "label": "constant",
+      "api": "vulkan",
+      "pair": 1
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 5.4914416,
+      "record_seconds": 5.4910928,
+      "wait_seconds": 0.0001409,
+      "started_unix": 1794456934.4986563,
+      "process_seconds": 6.763698577880859,
+      "label": "pr",
+      "api": "vulkan",
+      "pair": 1
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 0.8682763,
+      "record_seconds": 0.8680637,
+      "wait_seconds": 0.0001195,
+      "started_unix": 1794456941.2623782,
+      "process_seconds": 1.6011669635772705,
+      "label": "main",
+      "api": "vulkan",
+      "pair": 1
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.9602698,
+      "record_seconds": 1.9599044,
+      "wait_seconds": 8.89e-05,
+      "started_unix": 1794456942.8656955,
+      "process_seconds": 3.0545103549957275,
+      "label": "constant",
+      "api": "d3d12",
+      "pair": 1
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 7.5906649,
+      "record_seconds": 7.5902619,
+      "wait_seconds": 0.0001212,
+      "started_unix": 1794456945.920231,
+      "process_seconds": 9.519559144973755,
+      "label": "pr",
+      "api": "d3d12",
+      "pair": 1
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.4740124,
+      "record_seconds": 1.4738097,
+      "wait_seconds": 8.94e-05,
+      "started_unix": 1794456955.4398153,
+      "process_seconds": 2.4792377948760986,
+      "label": "main",
+      "api": "d3d12",
+      "pair": 1
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 0.8666187,
+      "record_seconds": 0.866403,
+      "wait_seconds": 0.0001169,
+      "started_unix": 1794456957.9209976,
+      "process_seconds": 1.5774109363555908,
+      "label": "main",
+      "api": "vulkan",
+      "pair": 2
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 5.4665214,
+      "record_seconds": 5.4662589,
+      "wait_seconds": 0.0001433,
+      "started_unix": 1794456959.4984336,
+      "process_seconds": 6.757909536361694,
+      "label": "pr",
+      "api": "vulkan",
+      "pair": 2
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.0352517,
+      "record_seconds": 1.0350309,
+      "wait_seconds": 0.0001258,
+      "started_unix": 1794456966.2563741,
+      "process_seconds": 1.7896509170532227,
+      "label": "constant",
+      "api": "vulkan",
+      "pair": 2
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.4832761,
+      "record_seconds": 1.4829068,
+      "wait_seconds": 8.97e-05,
+      "started_unix": 1794456968.0480049,
+      "process_seconds": 2.490021228790283,
+      "label": "main",
+      "api": "d3d12",
+      "pair": 2
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 7.5874062,
+      "record_seconds": 7.5869971,
+      "wait_seconds": 0.0001186,
+      "started_unix": 1794456970.538054,
+      "process_seconds": 9.531014919281006,
+      "label": "pr",
+      "api": "d3d12",
+      "pair": 2
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.9622423,
+      "record_seconds": 1.9620471,
+      "wait_seconds": 8.46e-05,
+      "started_unix": 1794456980.0690947,
+      "process_seconds": 3.041141986846924,
+      "label": "constant",
+      "api": "d3d12",
+      "pair": 2
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.0102504,
+      "record_seconds": 1.010032,
+      "wait_seconds": 0.0001207,
+      "started_unix": 1794456983.1125329,
+      "process_seconds": 1.7489283084869385,
+      "label": "constant",
+      "api": "vulkan",
+      "pair": 3
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 5.4370756,
+      "record_seconds": 5.4367941,
+      "wait_seconds": 0.0001442,
+      "started_unix": 1794456984.8614829,
+      "process_seconds": 6.70884370803833,
+      "label": "pr",
+      "api": "vulkan",
+      "pair": 3
+    },
+    {
+      "backend": "Vulkan",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 1000,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 0.8693969,
+      "record_seconds": 0.8691743,
+      "wait_seconds": 0.0001229,
+      "started_unix": 1794456991.5703511,
+      "process_seconds": 1.5963170528411865,
+      "label": "main",
+      "api": "vulkan",
+      "pair": 3
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.977676,
+      "record_seconds": 1.9774107,
+      "wait_seconds": 8.82e-05,
+      "started_unix": 1794456993.1688914,
+      "process_seconds": 3.0594427585601807,
+      "label": "constant",
+      "api": "d3d12",
+      "pair": 3
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 7.5603107,
+      "record_seconds": 7.5599054,
+      "wait_seconds": 0.0001152,
+      "started_unix": 1794456996.2283576,
+      "process_seconds": 9.480679035186768,
+      "label": "pr",
+      "api": "d3d12",
+      "pair": 3
+    },
+    {
+      "backend": "D3D12",
+      "grid": 64,
+      "width": 1280,
+      "height": 720,
+      "draws_per_frame": 4096,
+      "submissions_per_frame": 16,
+      "iterations": 1,
+      "frames": 800,
+      "warmup": 120,
+      "in_flight": 3,
+      "seconds": 1.4900845,
+      "record_seconds": 1.489883,
+      "wait_seconds": 9.22e-05,
+      "started_unix": 1794457005.7090588,
+      "process_seconds": 2.4929678440093994,
+      "label": "main",
+      "api": "d3d12",
+      "pair": 3
+    }
+  ],
+  "revisions": {
+    "main": "e233d265b4a9af8a6767ab2001b9357b38afbdeb",
+    "pr_rhi": "3a1fbc02c4644242dfe5dc9a5578c0518f399ff5",
+    "benchmark": "195fdf3cfb084475714c51182824f6d6b508eb8d",
+    "repository_head": "fc18ea1b3381850eabb41c7bad99564b2c42bf70"
+  },
+  "method": {
+    "rounds": 4,
+    "order": "main/pr/constant on even rounds; constant/pr/main on odd rounds",
+    "warmup": 120,
+    "priming_frames": 300,
+    "in_flight": 3,
+    "instrumentation_in_comparison": false,
+    "constant_variant_only_change": "return *ParseInterfaceID(Text); -> constexpr auto id = *ParseInterfaceID(Text); return id;",
+    "compiler": "MSVC 14.51.36231 /O2 /Ob2 /DNDEBUG",
+    "machine": "Windows / Core Ultra 7 270K Plus / RTX 5080 / NVIDIA 617.42",
+    "raw_capture_equal": {
+      "vulkan": true,
+      "d3d12": true
+    },
+    "runtime_dlls_equal": true
+  },
+  "summary": {
+    "vulkan": {
+      "mean_ms": {
+        "main": 0.8610005000000001,
+        "pr": 5.462571025,
+        "constant": 1.035282725
+      },
+      "range_ms": {
+        "main": [
+          0.8397101,
+          0.8693969
+        ],
+        "pr": [
+          5.4370756,
+          5.4914416
+        ],
+        "constant": [
+          1.0102504,
+          1.0660322
+        ]
+      },
+      "removed_excess_fraction": 0.9621254908398911,
+      "time_reduction_fraction": 0.8104770225848001,
+      "residual_vs_main_fraction": 0.20241826224258874
+    },
+    "d3d12": {
+      "mean_ms": {
+        "main": 1.8555475625,
+        "pr": 9.462732562500001,
+        "constant": 2.45387553125
+      },
+      "range_ms": {
+        "main": [
+          1.8425154999999998,
+          1.8629740000000001
+        ],
+        "pr": [
+          9.427953,
+          9.488331125
+        ],
+        "constant": [
+          2.440267,
+          2.472095
+        ]
+      },
+      "removed_excess_fraction": 0.9213469938288604,
+      "time_reduction_fraction": 0.7406800292576693,
+      "residual_vs_main_fraction": 0.32245358773981847
+    }
+  },
+  "instrumented_original": {
+    "vulkan": {
+      "timers": [
+        {
+          "name": "Vk.TransitionImage",
+          "calls": 17600,
+          "inclusive_seconds": 0.0039201,
+          "self_seconds": 0.0039201
+        },
+        {
+          "name": "Vk.EndRecording",
+          "calls": 1600,
+          "inclusive_seconds": 0.0042463,
+          "self_seconds": 0.0007494
+        },
+        {
+          "name": "Vk.UpdatePresentedImages",
+          "calls": 1600,
+          "inclusive_seconds": 2.7e-05,
+          "self_seconds": 2.7e-05
+        },
+        {
+          "name": "Vk.CmdUploadBuffer",
+          "calls": 1600,
+          "inclusive_seconds": 0.0051835,
+          "self_seconds": 0.0038834
+        },
+        {
+          "name": "Vk.CmdBindProgram",
+          "calls": 1600,
+          "inclusive_seconds": 0.0021852,
+          "self_seconds": 0.0010983
+        },
+        {
+          "name": "Vk.CmdBeginRendering",
+          "calls": 1600,
+          "inclusive_seconds": 0.003614,
+          "self_seconds": 0.0020735
+        },
+        {
+          "name": "Vk.CmdBindVertexBuffer",
+          "calls": 409600,
+          "inclusive_seconds": 0.1439656,
+          "self_seconds": 0.0525816
+        },
+        {
+          "name": "Vk.CmdBindIndexBuffer",
+          "calls": 409600,
+          "inclusive_seconds": 0.1394678,
+          "self_seconds": 0.0514212
+        },
+        {
+          "name": "Vk.CmdSetViewport",
+          "calls": 1600,
+          "inclusive_seconds": 0.0001517,
+          "self_seconds": 0.0001517
+        },
+        {
+          "name": "Vk.CmdSetScissor",
+          "calls": 1600,
+          "inclusive_seconds": 8.49e-05,
+          "self_seconds": 8.49e-05
+        },
+        {
+          "name": "Vk.CmdDrawIndexed",
+          "calls": 409600,
+          "inclusive_seconds": 0.0271752,
+          "self_seconds": 0.0189998
+        },
+        {
+          "name": "Vk.CmdEndRendering",
+          "calls": 1600,
+          "inclusive_seconds": 0.0024129,
+          "self_seconds": 0.0015864
+        },
+        {
+          "name": "Vk.TransitionBuffer",
+          "calls": 1232000,
+          "inclusive_seconds": 0.0196584,
+          "self_seconds": 0.0196584
+        },
+        {
+          "name": "Vk.CmdBindGroup",
+          "calls": 460800,
+          "inclusive_seconds": 0.4385017,
+          "self_seconds": 0.0967336
+        },
+        {
+          "name": "Vk.BindGroupVersion",
+          "calls": 460800,
+          "inclusive_seconds": 0.1679208,
+          "self_seconds": 0.0647459
+        },
+        {
+          "name": "Vk.ValidateGroups",
+          "calls": 409600,
+          "inclusive_seconds": 0.0081754,
+          "self_seconds": 0.0081754
+        },
+        {
+          "name": "Vk.PrepareRendering",
+          "calls": 1600,
+          "inclusive_seconds": 0.0007154,
+          "self_seconds": 0.0003196
+        },
+        {
+          "name": "Vk.InitializeCommandContext",
+          "calls": 1600,
+          "inclusive_seconds": 2.62e-05,
+          "self_seconds": 2.62e-05
+        },
+        {
+          "name": "Vk.BindDownloads",
+          "calls": 1600,
+          "inclusive_seconds": 3.25e-05,
+          "self_seconds": 3.25e-05
+        },
+        {
+          "name": "Vk.RetainResource",
+          "calls": 1288000,
+          "inclusive_seconds": 0.0491502,
+          "self_seconds": 0.0491502
+        },
+        {
+          "name": "Vk.Seal",
+          "calls": 1600,
+          "inclusive_seconds": 0.0043035,
+          "self_seconds": 5.72e-05
+        },
+        {
+          "name": "Vk.MarkSubmitted",
+          "calls": 3200,
+          "inclusive_seconds": 4.98e-05,
+          "self_seconds": 4.98e-05
+        },
+        {
+          "name": "QueryInterface",
+          "calls": 2216000,
+          "inclusive_seconds": 0.3923325,
+          "self_seconds": 0.3923325
+        }
+      ],
+      "result": {
+        "backend": "Vulkan",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 100,
+        "warmup": 30,
+        "in_flight": 3,
+        "seconds": 0.8340724,
+        "record_seconds": 0.8338548,
+        "wait_seconds": 3.09e-05
+      }
+    },
+    "d3d12": {
+      "timers": [
+        {
+          "name": "DX.TransitionResource",
+          "calls": 2913600,
+          "inclusive_seconds": 0.0781037,
+          "self_seconds": 0.0781037
+        },
+        {
+          "name": "DX.ClearColor",
+          "calls": 100,
+          "inclusive_seconds": 0.0002548,
+          "self_seconds": 0.0002159
+        },
+        {
+          "name": "DX.EndRecording",
+          "calls": 1600,
+          "inclusive_seconds": 0.010907,
+          "self_seconds": 0.0041249
+        },
+        {
+          "name": "DX.UpdatePresentedImages",
+          "calls": 1600,
+          "inclusive_seconds": 2.75e-05,
+          "self_seconds": 2.75e-05
+        },
+        {
+          "name": "DX.CmdUploadBuffer",
+          "calls": 1600,
+          "inclusive_seconds": 0.005921,
+          "self_seconds": 0.0045928
+        },
+        {
+          "name": "DX.CmdBindProgram",
+          "calls": 1600,
+          "inclusive_seconds": 0.0024399,
+          "self_seconds": 0.0012518
+        },
+        {
+          "name": "DX.CmdBeginRendering",
+          "calls": 1600,
+          "inclusive_seconds": 0.002481,
+          "self_seconds": 0.0006509
+        },
+        {
+          "name": "DX.CmdEndRendering",
+          "calls": 1600,
+          "inclusive_seconds": 0.0006915,
+          "self_seconds": 0.0006915
+        },
+        {
+          "name": "DX.CmdBindVertexBuffer",
+          "calls": 409600,
+          "inclusive_seconds": 0.1611891,
+          "self_seconds": 0.0558489
+        },
+        {
+          "name": "DX.CmdBindIndexBuffer",
+          "calls": 409600,
+          "inclusive_seconds": 0.1822257,
+          "self_seconds": 0.051636
+        },
+        {
+          "name": "DX.CmdSetViewport",
+          "calls": 1600,
+          "inclusive_seconds": 0.0001291,
+          "self_seconds": 0.0001291
+        },
+        {
+          "name": "DX.CmdSetScissor",
+          "calls": 1600,
+          "inclusive_seconds": 7.11e-05,
+          "self_seconds": 7.11e-05
+        },
+        {
+          "name": "DX.CmdDrawIndexed",
+          "calls": 409600,
+          "inclusive_seconds": 0.5399387,
+          "self_seconds": 0.0274626
+        },
+        {
+          "name": "DX.PrepareDrawBuffers",
+          "calls": 409600,
+          "inclusive_seconds": 0.1673267,
+          "self_seconds": 0.0597214
+        },
+        {
+          "name": "DX.CmdBindGroup",
+          "calls": 460800,
+          "inclusive_seconds": 0.3229189,
+          "self_seconds": 0.0997211
+        },
+        {
+          "name": "DX.PrepareGroups",
+          "calls": 409600,
+          "inclusive_seconds": 0.3451494,
+          "self_seconds": 0.1232617
+        },
+        {
+          "name": "DX.PrepareRendering",
+          "calls": 1600,
+          "inclusive_seconds": 0.0008273,
+          "self_seconds": 0.0004187
+        },
+        {
+          "name": "DX.InitializeCommandContext",
+          "calls": 1600,
+          "inclusive_seconds": 2.62e-05,
+          "self_seconds": 2.62e-05
+        },
+        {
+          "name": "DX.BindDownloads",
+          "calls": 1600,
+          "inclusive_seconds": 2.71e-05,
+          "self_seconds": 2.71e-05
+        },
+        {
+          "name": "DX.RetainResource",
+          "calls": 1294400,
+          "inclusive_seconds": 0.0465041,
+          "self_seconds": 0.0465041
+        },
+        {
+          "name": "DX.Seal",
+          "calls": 1600,
+          "inclusive_seconds": 0.0109802,
+          "self_seconds": 7.32e-05
+        },
+        {
+          "name": "DX.MarkSubmitted",
+          "calls": 3200,
+          "inclusive_seconds": 5.62e-05,
+          "self_seconds": 5.62e-05
+        },
+        {
+          "name": "QueryInterface",
+          "calls": 3392000,
+          "inclusive_seconds": 0.6752943,
+          "self_seconds": 0.6752943
+        }
+      ],
+      "result": {
+        "backend": "D3D12",
+        "grid": 64,
+        "width": 1280,
+        "height": 720,
+        "draws_per_frame": 4096,
+        "submissions_per_frame": 16,
+        "iterations": 1,
+        "frames": 100,
+        "warmup": 30,
+        "in_flight": 3,
+        "seconds": 1.307679,
+        "record_seconds": 1.307512,
+        "wait_seconds": 1.51e-05
+      }
+    }
+  },
+  "nsight": {
+    "version": "2026.3.2",
+    "trace": "nvtx,dx12",
+    "sample": "none",
+    "cpuctxsw": "none",
+    "frames": 10,
+    "warmup": 2,
+    "nvtx_window_ns": [
+      1267302780,
+      1741543859
+    ],
+    "cpu_sampling_limitation": "Requires administrator; disabled by profiler",
+    "vulkan_api_limitation": "Layer registration requires registry write permissions; capture failed",
+    "nvtx_ranges": [
+      {
+        "name": "DX.BindDownloads",
+        "calls": 160,
+        "inclusive_ns": 22835
+      },
+      {
+        "name": "DX.ClearColor",
+        "calls": 10,
+        "inclusive_ns": 56456
+      },
+      {
+        "name": "DX.CmdBeginRendering",
+        "calls": 160,
+        "inclusive_ns": 766686
+      },
+      {
+        "name": "DX.CmdBindGroup",
+        "calls": 46080,
+        "inclusive_ns": 91172433
+      },
+      {
+        "name": "DX.CmdBindIndexBuffer",
+        "calls": 40960,
+        "inclusive_ns": 61376158
+      },
+      {
+        "name": "DX.CmdBindProgram",
+        "calls": 160,
+        "inclusive_ns": 783355
+      },
+      {
+        "name": "DX.CmdBindVertexBuffer",
+        "calls": 40960,
+        "inclusive_ns": 68211019
+      },
+      {
+        "name": "DX.CmdDrawIndexed",
+        "calls": 40960,
+        "inclusive_ns": 214104237
+      },
+      {
+        "name": "DX.CmdEndRendering",
+        "calls": 160,
+        "inclusive_ns": 322064
+      },
+      {
+        "name": "DX.CmdSetScissor",
+        "calls": 160,
+        "inclusive_ns": 48527
+      },
+      {
+        "name": "DX.CmdSetViewport",
+        "calls": 160,
+        "inclusive_ns": 65018
+      },
+      {
+        "name": "DX.CmdUploadBuffer",
+        "calls": 160,
+        "inclusive_ns": 1524635
+      },
+      {
+        "name": "DX.EndRecording",
+        "calls": 160,
+        "inclusive_ns": 3579056
+      },
+      {
+        "name": "DX.InitializeCommandContext",
+        "calls": 160,
+        "inclusive_ns": 31510
+      },
+      {
+        "name": "DX.MarkSubmitted",
+        "calls": 320,
+        "inclusive_ns": 59254
+      },
+      {
+        "name": "DX.PrepareDrawBuffers",
+        "calls": 40960,
+        "inclusive_ns": 74664199
+      },
+      {
+        "name": "DX.PrepareGroups",
+        "calls": 40960,
+        "inclusive_ns": 116031398
+      },
+      {
+        "name": "DX.PrepareRendering",
+        "calls": 160,
+        "inclusive_ns": 342157
+      },
+      {
+        "name": "DX.RetainResource",
+        "calls": 129440,
+        "inclusive_ns": 32976912
+      },
+      {
+        "name": "DX.Seal",
+        "calls": 160,
+        "inclusive_ns": 3621023
+      },
+      {
+        "name": "DX.TransitionResource",
+        "calls": 291360,
+        "inclusive_ns": 68224304
+      },
+      {
+        "name": "DX.UpdatePresentedImages",
+        "calls": 160,
+        "inclusive_ns": 26017
+      },
+      {
+        "name": "QueryInterface",
+        "calls": 339200,
+        "inclusive_ns": 126263934
+      }
+    ]
+  }
+}

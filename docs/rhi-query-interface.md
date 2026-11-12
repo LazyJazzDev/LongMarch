@@ -177,8 +177,11 @@ including adjusted intervals. This does not mean CPU overhead disappeared:
 recording/submission wall time rises from 0.191 to 0.504 ms/frame on Vulkan and
 0.405 to 0.984 ms/frame on D3D12, while GPU work dominates total throughput.
 This timer includes allocations, synchronization and driver stalls; it does not
-isolate UUID lookup, reference counting, or CPU cycles. Attribution to a specific
-function requires profiling. The draw workload deliberately makes many separate
+isolate UUID lookup, reference counting, or CPU cycles. A subsequent
+[profiling and controlled experiment](rhi-draw-profile.md) identifies runtime
+UUID string parsing as the dominant regression; forcing constant evaluation
+removes 96.2%/92.1% of the excess over main on Vulkan/D3D12. That experimental
+change has not been applied to the production source. The draw workload deliberately makes many separate
 RHI calls rather than using instancing, so these ratios are not universal costs
 for production scenes. No Linux or Metal performance claim is made.
 
