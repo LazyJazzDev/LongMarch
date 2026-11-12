@@ -131,8 +131,7 @@ class Application {
   rhi::ObjPtr<rhi::ICommandContext> upload_context_;
   std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> submissions_;
   size_t submission_index_{};
-  rhi::ObjPtr<rhi::IBindingGroup> instance_group_, global_group_;
-  rhi::ObjPtr<rhi::IBindingGroup> resolve_group_, main_image_group_, second_image_group_;
+  rhi::ObjPtr<rhi::IBindingGroup> draw_group_, resolve_group_;
 
   rhi::ObjPtr<rhi::IShader> vertex_shader_;
   rhi::ObjPtr<rhi::IShader> pixel_shader_;
