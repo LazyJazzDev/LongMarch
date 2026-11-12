@@ -14,13 +14,13 @@ struct GlobalUniformObject {
 static const float kDicePlateOffset = 0.43;
 static const float kDicePerspectiveDistance = 0.6;
 
-[[vk::binding(0, 0)]] ByteAddressBuffer instance_infos : register(t0, space0);
-[[vk::binding(0, 1)]] ConstantBuffer<GlobalUniformObject> global_uniform : register(b0, space1);
+RHI_BYTE_ADDRESS_BUFFER(0, 0, instance_infos);
+RHI_UNIFORM(0, 1, GlobalUniformObject, global_uniform);
 
 struct VSInput {
-  [[vk::location(0)]] float2 position : TEXCOORD0;
-  [[vk::location(1)]] float4 color : TEXCOORD1;
-  [[vk::location(2)]] uint instance_id : TEXCOORD2;
+  RHI_INPUT(0, float2, position);
+  RHI_INPUT(1, float4, color);
+  RHI_INPUT(2, uint, instance_id);
 };
 
 struct PSInput {

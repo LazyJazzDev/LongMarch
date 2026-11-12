@@ -162,9 +162,9 @@ bool Application::OnInit() {
              "Compile demo shaders"))
     return false;
 
-  const rhi::BindingLayoutDesc instances{{{0, rhi::BINDING_BYTE_ADDRESS_BUFFER}}};
-  const rhi::BindingLayoutDesc uniform{{{0, rhi::BINDING_UNIFORM_BUFFER}}};
-  const rhi::BindingLayoutDesc image{{{0, rhi::BINDING_TEXTURE2D}}};
+  const rhi::BindingLayoutDesc draw_layout{{{0, rhi::BINDING_BYTE_ADDRESS_BUFFER}, {1, rhi::BINDING_UNIFORM_BUFFER}}};
+  const rhi::BindingLayoutDesc resolve_layout{
+      {{0, rhi::BINDING_UNIFORM_BUFFER}, {1, rhi::BINDING_TEXTURE2D}, {2, rhi::BINDING_TEXTURE2D}}};
   rhi::ProgramDesc desc;
   desc.vertex_shader = vertex_shader_.Get();
   desc.fragment_shader = pixel_shader_.Get();
@@ -174,22 +174,17 @@ bool Application::OnInit() {
                             {2, 1, rhi::INPUT_TYPE_UINT, 0}};
   desc.depth_stencil = {rhi::IMAGE_FORMAT_D32_SFLOAT, true, true};
   desc.rasterizer.cull_mode = rhi::CULL_MODE_NONE;
-  desc.pipeline_layout.groups = {instances, uniform};
+  desc.pipeline_layout.groups = {draw_layout};
   program_ = device_->CreateProgram(desc);
   rhi::ProgramDesc resolve;
   resolve.vertex_shader = resolve_vertex_shader_.Get();
   resolve.fragment_shader = resolve_pixel_shader_.Get();
   resolve.rasterizer.cull_mode = rhi::CULL_MODE_NONE;
-  resolve.pipeline_layout.groups = {uniform, image, image};
+  resolve.pipeline_layout.groups = {resolve_layout};
   resolve_program_ = device_->CreateProgram(resolve);
-  instance_group_ = device_->CreateBindingGroup(instances);
-  global_group_ = device_->CreateBindingGroup(uniform);
-  resolve_group_ = device_->CreateBindingGroup(uniform);
-  main_image_group_ = device_->CreateBindingGroup(image);
-  second_image_group_ = device_->CreateBindingGroup(image);
-  if (!Check(program_ && resolve_program_ && instance_group_ && global_group_ && resolve_group_ && main_image_group_ &&
-                 second_image_group_,
-             "Create render pipelines and bindings"))
+  draw_group_ = device_->CreateBindingGroup(draw_layout);
+  resolve_group_ = device_->CreateBindingGroup(resolve_layout);
+  if (!Check(program_ && resolve_program_ && draw_group_ && resolve_group_, "Create render pipelines and bindings"))
     return false;
 
   // D3D12 constant-buffer views require a 256-byte backing allocation.
@@ -266,15 +261,14 @@ bool Application::OnRender() {
     return false;
   auto *second_image = use_second_frame ? second_frame_.color_image.Get() : main_frame_.color_image.Get();
   if (!Check(resolve_group_->BindResource(0, resolve_uniform_buffer_.Get()) &&
-                 main_image_group_->BindResource(0, main_frame_.color_image.Get()) &&
-                 second_image_group_->BindResource(0, second_image),
+                 resolve_group_->BindResource(1, main_frame_.color_image.Get()) &&
+                 resolve_group_->BindResource(2, second_image),
              "Bind resolve resources"))
     return false;
   rhi::RenderingInfo rendering;
   rendering.color_attachments = {{present_image_.Get(), rhi::ATTACHMENT_LOAD_OP_DISCARD}};
   if (!Check(context->CmdBeginRendering(rendering) && context->CmdBindProgram(resolve_program_.Get()) &&
-                 context->CmdBindGroup(0, resolve_group_.Get()) && context->CmdBindGroup(1, main_image_group_.Get()) &&
-                 context->CmdBindGroup(2, second_image_group_.Get()) &&
+                 context->CmdBindGroup(0, resolve_group_.Get()) &&
                  context->CmdSetViewport({0, 0, float(framebuffer_size_.x), float(framebuffer_size_.y), 0, 1}) &&
                  context->CmdSetScissor({0, 0, uint32_t(framebuffer_size_.x), uint32_t(framebuffer_size_.y)}) &&
                  context->CmdDraw(3) && context->CmdEndRendering() &&
@@ -330,8 +324,8 @@ bool Application::RenderFrameTarget(rhi::ICommandContext *context, FrameTarget &
   }
 
   const auto extent = target.color_image->GetDesc();
-  if (!Check(instance_group_->BindResource(0, target.instance_buffer.Get()) &&
-                 global_group_->BindResource(0, global_uniform_buffer_.Get()),
+  if (!Check(draw_group_->BindResource(0, target.instance_buffer.Get()) &&
+                 draw_group_->BindResource(1, global_uniform_buffer_.Get()),
              "Bind scene resources"))
     return false;
   rhi::RenderingInfo rendering;
@@ -342,7 +336,7 @@ bool Application::RenderFrameTarget(rhi::ICommandContext *context, FrameTarget &
   rendering.depth_stencil.image = depth_image_.Get();
   rendering.depth_stencil.depth_load_op = rhi::ATTACHMENT_LOAD_OP_CLEAR;
   if (!Check(context->CmdBeginRendering(rendering) && context->CmdBindProgram(program_.Get()) &&
-                 context->CmdBindGroup(0, instance_group_.Get()) && context->CmdBindGroup(1, global_group_.Get()) &&
+                 context->CmdBindGroup(0, draw_group_.Get()) &&
                  context->CmdBindVertexBuffer(1, instance_index_buffer_.Get()) &&
                  context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}) &&
                  context->CmdSetScissor({0, 0, extent.width, extent.height}),
@@ -373,11 +367,8 @@ void Application::OnClose() {
   }
   main_frame_ = {};
   second_frame_ = {};
-  instance_group_.Release();
-  global_group_.Release();
+  draw_group_.Release();
   resolve_group_.Release();
-  main_image_group_.Release();
-  second_image_group_.Release();
   depth_image_.Release();
   present_image_.Release();
   instance_index_buffer_.Release();

@@ -4,9 +4,9 @@ struct ResolveParams {
   uint2 padding;
 };
 
-[[vk::binding(0, 0)]] ConstantBuffer<ResolveParams> params : register(b0, space0);
-[[vk::binding(0, 1)]] Texture2D<float4> main_frame : register(t0, space1);
-[[vk::binding(0, 2)]] Texture2D<float4> second_frame : register(t0, space2);
+RHI_UNIFORM(0, 0, ResolveParams, params);
+RHI_TEXTURE2D(0, 1, float4, main_frame);
+RHI_TEXTURE2D(0, 2, float4, second_frame);
 
 float4 VSMain(uint vertex_index : SV_VertexID) : SV_POSITION {
   // A single triangle covering the whole viewport.
