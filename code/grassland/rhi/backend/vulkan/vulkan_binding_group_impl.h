@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
  public:
   static VulkanBindingVersionImpl *Create(IVulkanDevice *device, const BindingLayoutDesc &layout);
-  ObjectPtr<IBackendBindingVersion> Clone() const override;
+  ObjectPtr<IVulkanBindingVersion> Clone() const override;
   bool IsInitialized(size_t binding_index, uint32_t element) const override;
   ~VulkanBindingVersionImpl() override;
   VkDescriptorSet Set() const;
@@ -49,7 +49,7 @@ class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
 };
 
-class VulkanBindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBindingGroup> {
+class VulkanBindingGroupImpl final : public Object<rhi::IBindingGroup, IVulkanBindingGroup> {
  public:
   using Version = IVulkanBindingVersion;
   static IBindingGroup *Create(IVulkanDevice *device, const BindingLayoutDesc &layout);
@@ -61,15 +61,15 @@ class VulkanBindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendB
   ~VulkanBindingGroupImpl() override = default;
 
  private:
-  void InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version);
+  void InitializeBindingGroup(IVulkanDevice *device, ObjectPtr<IVulkanBindingVersion> version);
 
  public:
   const BindingLayoutDesc &GetLayout() const override;
 
-  IBackendDevice *Owner() const override;
+  IVulkanDevice *Owner() const override;
 
   // Borrowed until the next mutation; the context retains it before recording use.
-  IBackendBindingVersion *CurrentVersion() const override;
+  IVulkanBindingVersion *CurrentVersion() const override;
 
  private:
   const BindingDesc *FindBinding(uint32_t binding, uint32_t first_element, size_t count, size_t &binding_index) const;
@@ -86,8 +86,8 @@ class VulkanBindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendB
                     uint32_t first_element = 0) override;
 
  private:
-  IBackendDevice *device_;
+  IVulkanDevice *device_;
   BindingLayoutDesc layout_;
-  ObjectPtr<IBackendBindingVersion> version_;
+  ObjectPtr<IVulkanBindingVersion> version_;
 };
 }  // namespace grassland::rhi::backend::vulkan

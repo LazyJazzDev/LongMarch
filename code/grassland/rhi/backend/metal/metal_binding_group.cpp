@@ -96,7 +96,7 @@ MetalBindingVersionImpl *MetalBindingVersionImpl::Create(IMetalDevice *device, c
   return result.release();
 }
 
-ObjectPtr<IBackendBindingVersion> MetalBindingVersionImpl::Clone() const {
+ObjectPtr<IMetalBindingVersion> MetalBindingVersionImpl::Clone() const {
   auto copy = ObjectPtr<MetalBindingVersionImpl>::Adopt(Create(device_, layout_));
   if (!copy)
     return {};
@@ -105,7 +105,7 @@ ObjectPtr<IBackendBindingVersion> MetalBindingVersionImpl::Clone() const {
   std::memcpy(copy->arguments_->contents(), arguments_->contents(), arguments_->length());
   std::memcpy(copy->sizes_->contents(), sizes_->contents(), sizes_->length());
   copy->encoder_->setBuffer(copy->sizes_.get(), 0, MetalArgumentCount(layout_));
-  return ObjectPtr<IBackendBindingVersion>::Retain(copy.Get());
+  return ObjectPtr<IMetalBindingVersion>::Retain(copy.Get());
 }
 
 bool MetalBindingVersionImpl::IsInitialized(size_t b, uint32_t e) const {
@@ -222,7 +222,7 @@ void MetalBindingVersionImpl::Bind(MTL::ComputeCommandEncoder *encoder, uint32_t
 }
 
 MetalBindingGroupImpl::MetalBindingGroupImpl(IMetalDevice *device, ObjectPtr<Version> version) {
-  InitializeBindingGroup(device, ObjectPtr<IBackendBindingVersion>::Retain(version.Get()));
+  InitializeBindingGroup(device, ObjectPtr<IMetalBindingVersion>::Retain(version.Get()));
 }
 
 IBindingGroup *MetalBindingGroupImpl::Create(IMetalDevice *device, const BindingLayoutDesc &layout) {
@@ -319,7 +319,7 @@ bool MetalBindingVersionImpl::Write(size_t binding_index,
   return true;
 }
 
-void MetalBindingGroupImpl::InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version) {
+void MetalBindingGroupImpl::InitializeBindingGroup(IMetalDevice *device, ObjectPtr<IMetalBindingVersion> version) {
   device_ = device;
   layout_ = version->GetLayout();
   version_ = std::move(version);
@@ -329,11 +329,11 @@ const BindingLayoutDesc &MetalBindingGroupImpl::GetLayout() const {
   return layout_;
 }
 
-IBackendDevice *MetalBindingGroupImpl::Owner() const {
+IMetalDevice *MetalBindingGroupImpl::Owner() const {
   return device_;
 }
 
-IBackendBindingVersion *MetalBindingGroupImpl::CurrentVersion() const {
+IMetalBindingVersion *MetalBindingGroupImpl::CurrentVersion() const {
   return version_.Get();
 }
 

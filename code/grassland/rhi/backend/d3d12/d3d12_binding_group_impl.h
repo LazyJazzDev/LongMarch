@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::d3d12 {
 class D3D12BindingVersionImpl final : public Object<ID3D12BindingVersion> {
  public:
   static D3D12BindingVersionImpl *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
-  ObjectPtr<IBackendBindingVersion> Clone() const override;
+  ObjectPtr<ID3D12BindingVersion> Clone() const override;
   bool IsInitialized(size_t binding_index, uint32_t element) const override;
   uint32_t ResourceCount() const;
   D3D12DescriptorPool::Lease *ResourceDescriptors() const;
@@ -54,7 +54,7 @@ class D3D12BindingVersionImpl final : public Object<ID3D12BindingVersion> {
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
 };
 
-class D3D12BindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBindingGroup> {
+class D3D12BindingGroupImpl final : public Object<rhi::IBindingGroup, ID3D12BindingGroup> {
  public:
   using Version = ID3D12BindingVersion;
   static IBindingGroup *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
@@ -66,15 +66,15 @@ class D3D12BindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBi
   ~D3D12BindingGroupImpl() override = default;
 
  private:
-  void InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version);
+  void InitializeBindingGroup(ID3D12Device *device, ObjectPtr<ID3D12BindingVersion> version);
 
  public:
   const BindingLayoutDesc &GetLayout() const override;
 
-  IBackendDevice *Owner() const override;
+  ID3D12Device *Owner() const override;
 
   // Borrowed until the next mutation; the context retains it before recording use.
-  IBackendBindingVersion *CurrentVersion() const override;
+  ID3D12BindingVersion *CurrentVersion() const override;
 
  private:
   const BindingDesc *FindBinding(uint32_t binding, uint32_t first_element, size_t count, size_t &binding_index) const;
@@ -91,8 +91,8 @@ class D3D12BindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBi
                     uint32_t first_element = 0) override;
 
  private:
-  IBackendDevice *device_;
+  ID3D12Device *device_;
   BindingLayoutDesc layout_;
-  ObjectPtr<IBackendBindingVersion> version_;
+  ObjectPtr<ID3D12BindingVersion> version_;
 };
 }  // namespace grassland::rhi::backend::d3d12

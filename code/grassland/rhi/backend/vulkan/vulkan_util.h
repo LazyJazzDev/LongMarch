@@ -11,6 +11,7 @@ namespace grassland::rhi::backend::vulkan {
 class IVulkanAccelerationStructure;
 class IVulkanAllocatedBuffer;
 class IVulkanBindingVersion;
+class IVulkanBindingGroup;
 class IVulkanBuffer;
 class IVulkanComputeProgram;
 class IVulkanCore;

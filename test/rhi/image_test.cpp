@@ -18,6 +18,7 @@
 #include "grassland/rhi/backend/backend_window_imgui.h"
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
+#include "native_binding_test_util.h"
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
@@ -1365,12 +1366,12 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 16, 16}}));
   // Fork only the buffer binding, then destroy the source version. Copied image
   // and sampler descriptors must keep their native handles valid for GPU use.
-  auto original = backend::ObjectPtr<backend::IBackendBindingVersion>::Retain(
-      rhi::QueryInterfacePtr<backend::IBackendBindingGroup>(material.Get()).Get()->CurrentVersion());
-  ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}}, 0));
-  EXPECT_NE(rhi::QueryInterfacePtr<backend::IBackendBindingGroup>(material.Get()).Get()->CurrentVersion(),
-            original.Get());
-  original.Reset();
+  WithNativeBindingGroup(material.Get(), [&](auto *native) {
+    auto original = RetainBindingVersion(native->CurrentVersion());
+    ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}}, 0));
+    EXPECT_NE(native->CurrentVersion(), original.Get());
+    original.Reset();
+  });
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   const uint32_t red_pixel = 0xff0000ff, green_pixel = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(red.Get(), &red_pixel, 4));

@@ -654,14 +654,14 @@ bool D3D12CommandContextImpl::PrepareDrawBuffers(bool indexed) {
 }
 
 bool D3D12CommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group) {
-  auto native = rhi::QueryInterfacePtr<IBackendBindingGroup>(group).Get();
+  auto native = rhi::QueryInterfacePtr<ID3D12BindingGroup>(group).Get();
   if (sealed_ || !binding_layout_ || !native || native->Owner() != device_ || index >= groups_.size() ||
       !SameBindingLayout(binding_layout_->groups[index], group->GetLayout()) ||
       !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
   }
-  auto version = rhi::QueryInterfacePtr<ID3D12BindingVersion>(native->CurrentVersion()).Get();
+  auto version = native->CurrentVersion();
   auto resources = version->ResourceDescriptors();
   if (version->ResourceCount() && !resources) {
     recording_failed_ = true;

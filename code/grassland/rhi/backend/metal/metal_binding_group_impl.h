@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::metal {
 class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
  public:
   static MetalBindingVersionImpl *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
-  ObjectPtr<IBackendBindingVersion> Clone() const override;
+  ObjectPtr<IMetalBindingVersion> Clone() const override;
   bool IsInitialized(size_t binding, uint32_t element) const override;
   void Bind(MTL::ComputeCommandEncoder *encoder, uint32_t group) const;
   void Bind(MTL::RenderCommandEncoder *encoder, uint32_t group) const;
@@ -52,7 +52,7 @@ class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
 };
 
-class MetalBindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBindingGroup> {
+class MetalBindingGroupImpl final : public Object<rhi::IBindingGroup, IMetalBindingGroup> {
  public:
   using Version = IMetalBindingVersion;
   static IBindingGroup *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
@@ -64,15 +64,15 @@ class MetalBindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBi
   ~MetalBindingGroupImpl() override = default;
 
  private:
-  void InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version);
+  void InitializeBindingGroup(IMetalDevice *device, ObjectPtr<IMetalBindingVersion> version);
 
  public:
   const BindingLayoutDesc &GetLayout() const override;
 
-  IBackendDevice *Owner() const override;
+  IMetalDevice *Owner() const override;
 
   // Borrowed until the next mutation; the context retains it before recording use.
-  IBackendBindingVersion *CurrentVersion() const override;
+  IMetalBindingVersion *CurrentVersion() const override;
 
  private:
   const BindingDesc *FindBinding(uint32_t binding, uint32_t first_element, size_t count, size_t &binding_index) const;
@@ -89,8 +89,8 @@ class MetalBindingGroupImpl final : public Object<rhi::IBindingGroup, IBackendBi
                     uint32_t first_element = 0) override;
 
  private:
-  IBackendDevice *device_;
+  IMetalDevice *device_;
   BindingLayoutDesc layout_;
-  ObjectPtr<IBackendBindingVersion> version_;
+  ObjectPtr<IMetalBindingVersion> version_;
 };
 }  // namespace grassland::rhi::backend::metal

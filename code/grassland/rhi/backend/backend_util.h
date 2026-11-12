@@ -7,8 +7,6 @@
 #include "grassland/rhi/rhi_obj_ptr.h"
 
 namespace grassland::rhi::backend {
-class IBackendBindingGroup;
-class IBackendBindingVersion;
 class IBackendBuffer;
 class IBackendCommandContext;
 class IBackendDevice;

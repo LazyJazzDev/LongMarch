@@ -12,6 +12,7 @@ namespace grassland::rhi::backend::d3d12 {
 class ID3D12AccelerationStructure;
 class ID3D12AllocatedBuffer;
 class ID3D12BindingVersion;
+class ID3D12BindingGroup;
 class ID3D12Buffer;
 class ID3D12ComputeProgram;
 class ID3D12Device;

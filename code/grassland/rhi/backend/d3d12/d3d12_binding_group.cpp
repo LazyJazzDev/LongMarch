@@ -55,7 +55,7 @@ D3D12BindingVersionImpl *D3D12BindingVersionImpl::Create(ID3D12Device *device, c
   return version.release();
 }
 
-ObjectPtr<IBackendBindingVersion> D3D12BindingVersionImpl::Clone() const {
+ObjectPtr<ID3D12BindingVersion> D3D12BindingVersionImpl::Clone() const {
   auto copy = ObjectPtr<D3D12BindingVersionImpl>::Adopt(Create(device_, layout_));
   if (!copy)
     return {};
@@ -333,7 +333,7 @@ bool D3D12BindingVersionImpl::Write(size_t binding_index,
   return true;
 }
 
-void D3D12BindingGroupImpl::InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version) {
+void D3D12BindingGroupImpl::InitializeBindingGroup(ID3D12Device *device, ObjectPtr<ID3D12BindingVersion> version) {
   device_ = device;
   layout_ = version->GetLayout();
   version_ = std::move(version);
@@ -343,11 +343,11 @@ const BindingLayoutDesc &D3D12BindingGroupImpl::GetLayout() const {
   return layout_;
 }
 
-IBackendDevice *D3D12BindingGroupImpl::Owner() const {
+ID3D12Device *D3D12BindingGroupImpl::Owner() const {
   return device_;
 }
 
-IBackendBindingVersion *D3D12BindingGroupImpl::CurrentVersion() const {
+ID3D12BindingVersion *D3D12BindingGroupImpl::CurrentVersion() const {
   return version_.Get();
 }
 

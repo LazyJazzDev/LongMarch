@@ -107,7 +107,7 @@ VulkanBindingVersionImpl *VulkanBindingVersionImpl::Create(IVulkanDevice *device
   return version.release();
 }
 
-ObjectPtr<IBackendBindingVersion> VulkanBindingVersionImpl::Clone() const {
+ObjectPtr<IVulkanBindingVersion> VulkanBindingVersionImpl::Clone() const {
   auto copy = ObjectPtr<VulkanBindingVersionImpl>::Adopt(Create(device_, layout_));
   if (!copy)
     return {};
@@ -394,7 +394,7 @@ bool VulkanBindingVersionImpl::Write(size_t binding_index,
   return true;
 }
 
-void VulkanBindingGroupImpl::InitializeBindingGroup(IBackendDevice *device, ObjectPtr<IBackendBindingVersion> version) {
+void VulkanBindingGroupImpl::InitializeBindingGroup(IVulkanDevice *device, ObjectPtr<IVulkanBindingVersion> version) {
   device_ = device;
   layout_ = version->GetLayout();
   version_ = std::move(version);
@@ -404,11 +404,11 @@ const BindingLayoutDesc &VulkanBindingGroupImpl::GetLayout() const {
   return layout_;
 }
 
-IBackendDevice *VulkanBindingGroupImpl::Owner() const {
+IVulkanDevice *VulkanBindingGroupImpl::Owner() const {
   return device_;
 }
 
-IBackendBindingVersion *VulkanBindingGroupImpl::CurrentVersion() const {
+IVulkanBindingVersion *VulkanBindingGroupImpl::CurrentVersion() const {
   return version_.Get();
 }
 

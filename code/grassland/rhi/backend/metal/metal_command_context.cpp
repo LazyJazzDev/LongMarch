@@ -308,14 +308,14 @@ bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
 }
 
 bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group) {
-  auto native = rhi::QueryInterfacePtr<IBackendBindingGroup>(group).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalBindingGroup>(group).Get();
   if (sealed_ || !native_program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
       !SameBindingLayout(group->GetLayout(), native_program_->BindingLayout().groups[index]) ||
       !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
   }
-  auto version = rhi::QueryInterfacePtr<IMetalBindingVersion>(native->CurrentVersion()).Get();
+  auto version = native->CurrentVersion();
   for (size_t binding = 0; binding < version->GetLayout().bindings.size(); ++binding) {
     const auto type = version->GetLayout().bindings[binding].type;
     if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
