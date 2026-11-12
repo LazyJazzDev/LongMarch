@@ -304,6 +304,10 @@ ColorSpace MetalWindowImpl::RequestedColorSpace() const {
 }
 
 void MetalWindowImpl::DestroyWindow() {
+#if defined(__APPLE__)
+  glfw::RemoveMagnifyEvents(magnify_monitor_);
+  magnify_monitor_ = nullptr;
+#endif
   imgui_.reset();
   glfw::UnregisterWindow(window_);
   glfw::DestroyWindow(window_);
@@ -317,6 +321,9 @@ bool MetalWindowImpl::InitializeWindow(IMetalDevice *device, const WindowDesc &d
   if (!window_)
     return false;
   glfw::RegisterWindow(this, this);
+#if defined(__APPLE__)
+  magnify_monitor_ = glfw::InstallMagnifyEvents(window_);
+#endif
   return true;
 }
 

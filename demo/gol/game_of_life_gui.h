@@ -16,12 +16,7 @@
 
 class GameOfLife : public Application {
  public:
-  GameOfLife(const char *title,
-             int width,
-             int height,
-             int cell_grid_width,
-             int cell_grid_height,
-             graphics::BackendAPI api);
+  GameOfLife(const char *title, int width, int height, int cell_grid_width, int cell_grid_height, rhi::BackendAPI api);
 
   ~GameOfLife() override;
 

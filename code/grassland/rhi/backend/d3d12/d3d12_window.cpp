@@ -510,6 +510,10 @@ ColorSpace D3D12WindowImpl::RequestedColorSpace() const {
 }
 
 void D3D12WindowImpl::DestroyWindow() {
+#if defined(__APPLE__)
+  glfw::RemoveMagnifyEvents(magnify_monitor_);
+  magnify_monitor_ = nullptr;
+#endif
   // ImGui restores native window hooks; the window must still exist here.
   imgui_.reset();
   presenter_.reset();
@@ -525,6 +529,9 @@ bool D3D12WindowImpl::InitializeWindow(ID3D12Device *device, const WindowDesc &d
   if (!window_)
     return false;
   glfw::RegisterWindow(this, this);
+#if defined(__APPLE__)
+  magnify_monitor_ = glfw::InstallMagnifyEvents(window_);
+#endif
   return true;
 }
 

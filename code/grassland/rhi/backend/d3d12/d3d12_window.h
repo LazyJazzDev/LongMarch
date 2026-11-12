@@ -124,6 +124,18 @@ class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
 
   EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override;
 
+  bool SupportsMagnifyGestures() const override {
+#if defined(__APPLE__)
+    return magnify_monitor_ != nullptr;
+#else
+    return false;
+#endif
+  }
+
+  EventManager<void(const MagnifyGesture &)> &MagnifyEvent() override {
+    return magnify_event_;
+  }
+
   EventManager<void(double, double)> &ScrollEvent() override;
 
   EventManager<void(int, int, int, int)> &KeyEvent() override;
@@ -145,6 +157,10 @@ class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
   EventManager<void(bool)> focus_event_{};
   EventManager<void(double, double)> mousemove_event_{};
   EventManager<void(int, int, int, double, double)> mousebutton_event_{};
+  EventManager<void(const MagnifyGesture &)> magnify_event_;
+#if defined(__APPLE__)
+  void *magnify_monitor_{};
+#endif
   EventManager<void(double, double)> scroll_event_{};
   EventManager<void(int, int, int, int)> key_event_{};
   EventManager<void(uint32_t)> char_event_{};

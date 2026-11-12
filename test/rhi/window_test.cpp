@@ -30,6 +30,43 @@ namespace {
 
 class RhiWindow : public testing::TestWithParam<BackendAPI> {};
 
+TEST_P(RhiWindow, MagnifyDispatchRetainsWindowAndIsolatesCallbacks) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto window = device.CreateGLFWWindow({160, 120, "Magnify dispatch"});
+  auto other = device.CreateGLFWWindow({160, 120, "Magnify isolation"});
+  ASSERT_TRUE(window);
+  ASSERT_TRUE(other);
+#ifndef __APPLE__
+  EXPECT_FALSE(window.SupportsMagnifyGestures());
+#endif
+  auto native = window.GLFWWindow();
+  int calls = 0, other_calls = 0, scroll_calls = 0;
+  other.MagnifyEvent().RegisterCallback([&](const MagnifyGesture &) { ++other_calls; });
+  window.ScrollEvent().RegisterCallback([&](double, double) { ++scroll_calls; });
+  window.MagnifyEvent().RegisterCallback([&](const MagnifyGesture &) { window.Release(); }, 200);
+  window.MagnifyEvent().RegisterCallback(
+      [&](const MagnifyGesture &event) {
+        ++calls;
+        EXPECT_DOUBLE_EQ(event.scale, 1.25);
+        EXPECT_DOUBLE_EQ(event.x, 40.0);
+        EXPECT_DOUBLE_EQ(event.y, 60.0);
+        EXPECT_EQ(event.phase, MagnifyPhase::kBegin);
+      },
+      100);
+  backend::glfw::DispatchMagnifyEvent(native, {1.25, 40.0, 60.0, MagnifyPhase::kBegin});
+  EXPECT_FALSE(window);
+  EXPECT_EQ(calls, 1);
+  EXPECT_EQ(other_calls, 0);
+  EXPECT_EQ(scroll_calls, 0);
+  backend::glfw::DispatchMagnifyEvent(native, {});
+  EXPECT_EQ(calls, 1);
+}
+
 TEST_P(RhiWindow, ReferenceWhiteQueryDoesNotReplaceTheCurrentFrame) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP();

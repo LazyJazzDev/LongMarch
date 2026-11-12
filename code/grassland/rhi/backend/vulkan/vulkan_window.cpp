@@ -714,6 +714,10 @@ ColorSpace VulkanWindowImpl::RequestedColorSpace() const {
 }
 
 void VulkanWindowImpl::DestroyWindow() {
+#if defined(__APPLE__)
+  glfw::RemoveMagnifyEvents(magnify_monitor_);
+  magnify_monitor_ = nullptr;
+#endif
   // ImGui restores native window hooks; the window must still exist here.
   imgui_.reset();
   presenter_.reset();
@@ -729,6 +733,9 @@ bool VulkanWindowImpl::InitializeWindow(IVulkanDevice *device, const WindowDesc 
   if (!window_)
     return false;
   glfw::RegisterWindow(this, this);
+#if defined(__APPLE__)
+  magnify_monitor_ = glfw::InstallMagnifyEvents(window_);
+#endif
   return true;
 }
 

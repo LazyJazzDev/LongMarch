@@ -2,12 +2,12 @@
 
 The 2048 puzzle game, ported from the GUI of
 [Yao-class-cpp-studio/Assignment-3](https://github.com/Yao-class-cpp-studio/Assignment-3)
-to `grassland::graphics`. The original targeted the legacy grassland Vulkan
+to `grassland::rhi`. The original targeted the legacy grassland Vulkan
 wrapper; this version runs on every LongMarch backend (Vulkan, D3D12, Metal).
 
 ```sh
-cmake --build build --target demo_2048
-build/demo/2048/demo_2048
+cmake --build cmake-build-release --target demo_2048
+cmake-build-release/demo/2048/demo_2048
 ```
 
 Use the arrow keys to move the blocks. **MENU** opens the menu with
@@ -77,3 +77,16 @@ into a second frame that the resolve pass blends over the board.
 The `application/` layer is shared in copy with `demo/gol`: models are drawn as
 instances in framebuffer pixel coordinates with depth testing, rendered into a
 supersampled target, and resolved to the window for anti-aliasing.
+
+## RHI rendering
+
+The renderer uses RHI device resources, immutable programs and binding groups,
+command-context uploads, the Main queue, and submission/download tokens. Mesh
+replacement relies on RHI resource retention; two submission slots bound the
+number of frames in flight. The existing supersampling, depth ordering and
+second-frame transitions are preserved. PNG export reads the resolved RGBA8
+image through an RHI download token.
+
+The demos link `grassland_rhi` and utility dependencies directly, without the
+legacy `grassland_graphics` renderer. Window input uses RHI events and GLFW
+queries. The application owns an RHI `IWindow` directly.

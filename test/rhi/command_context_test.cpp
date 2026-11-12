@@ -434,6 +434,14 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::ITestWind
     return mousebutton_event_;
   }
 
+  bool SupportsMagnifyGestures() const override {
+    return false;
+  }
+
+  EventManager<void(const MagnifyGesture &)> &MagnifyEvent() override {
+    return magnify_event_;
+  }
+
   EventManager<void(double, double)> &ScrollEvent() override {
     return scroll_event_;
   }
@@ -463,6 +471,7 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::ITestWind
   EventManager<void(bool)> focus_event_{};
   EventManager<void(double, double)> mousemove_event_{};
   EventManager<void(int, int, int, double, double)> mousebutton_event_{};
+  EventManager<void(const MagnifyGesture &)> magnify_event_;
   EventManager<void(double, double)> scroll_event_{};
   EventManager<void(int, int, int, int)> key_event_{};
   EventManager<void(uint32_t)> char_event_{};

@@ -156,6 +156,12 @@ void RegisterWindow(IWindow *window, IBackendWindow *backend) {
   });
 }
 
+void DispatchMagnifyEvent(GLFWwindow *native, const MagnifyGesture &gesture) {
+  auto [window, backend] = FindWindow(native);
+  if (window)
+    window->MagnifyEvent().InvokeCallbacks(gesture);
+}
+
 void UnregisterWindow(GLFWwindow *window) {
   std::lock_guard<std::mutex> lock(Get().mutex);
   Get().windows.erase(window);
