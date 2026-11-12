@@ -57,6 +57,18 @@ to actual backend interfaces, rather than requiring production common facets
 solely for test inspection. All native interfaces remain stateless, single-chain
 interfaces; only final implementations instantiate Object and own state.
 
+### Cleanup validation
+
+At `6d119ff7`, Windows Release built successfully. With window tests enabled,
+220 tests passed and two were skipped. Another 14 ray-tracing tests passed;
+the two known DXR compacted-BLAS update cases were excluded. The library has
+90 distinct registered interface UUIDs, and pre-commit passed.
+
+On Meshy-PC-3090, GCC and Clang each checked 92 RHI/test translation units from
+an isolated source snapshot with `-fsyntax-only -fno-rtti`; both reported zero
+failures. This is compiler validation, not a Linux runtime test. Metal sources
+were migrated and reviewed, but this cleanup has not been compiled on macOS.
+
 ## Identification and implementation
 
 `InterfaceID` contains two `uint64_t` values. `ParseInterfaceID` accepts the
