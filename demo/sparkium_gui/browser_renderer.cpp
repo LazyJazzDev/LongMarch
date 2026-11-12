@@ -19,7 +19,10 @@ BrowserRenderer::BrowserRenderer(IDevice *device)
 }
 
 BrowserRenderer::~BrowserRenderer() {
-  stopping_ = true;
+  {
+    std::lock_guard lock(mutex_);
+    stopping_ = true;
+  }
   condition_.notify_all();
   thread_.join();
 }

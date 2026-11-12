@@ -122,6 +122,13 @@ int main(int argc, char **argv) {
     while (!window->ShouldClose() && (!frame_limit || presented_frames < frame_limit)) {
       if (!rhi::PollEvents())
         return 1;
+      auto &pending = ui_pending[ui_index % ui_pending.size()];
+      if (pending && pending->GetStatus() == rhi::SUBMISSION_STATUS_PENDING) {
+        glfwWaitEventsTimeout(0.001);
+        continue;
+      }
+      if (pending && pending->GetStatus() != rhi::SUBMISSION_STATUS_COMPLETED)
+        return 1;
       if (hdr_requested != hdr_active) {
         bool changed = false;
         if (!hdr_requested)
@@ -275,9 +282,6 @@ int main(int argc, char **argv) {
         return 1;
       if (window->IsSwapChainInvalid())
         continue;
-      auto &pending = ui_pending[ui_index++ % ui_pending.size()];
-      if (pending && !pending->WaitHost())
-        return 1;
       auto frame = renderer.Latest();
       rhi::ObjPtr<rhi::ICommandContext> commands = main_queue->CreateCommandContext();
       if (!commands)
@@ -288,17 +292,24 @@ int main(int argc, char **argv) {
         if (!commands->CmdPresentImage(window.Get(), frame->Image(),
                                        frame->hdr ? rhi::COLOR_SPACE_BT709_LINEAR : rhi::COLOR_SPACE_SRGB_NONLINEAR))
           return 1;
-      } else if (!commands->CmdPresent(window.Get()))
-        return 1;
+      } else {
+        rhi::ObjPtr<rhi::IImage> background = window->GetNextImage();
+        if (!background || !commands->CmdClearImage(background.Get(), {0, 0, 0, 1}) ||
+            !commands->CmdPresent(window.Get()))
+          return 1;
+      }
       pending = commands->Submit(dependencies);
       if (!pending)
         return 1;
+      ++ui_index;
       if (frame) {
         renderer.Presented(frame, pending);
         ++presented_frames;
       } else if (!state.error.empty() && frame_limit)
         return 1;
     }
+    if (window->ShouldClose())
+      glfwHideWindow(window->GLFWWindow());
     for (const auto &pending : ui_pending)
       if (pending && !pending->WaitHost())
         return 1;

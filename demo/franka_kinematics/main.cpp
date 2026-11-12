@@ -149,8 +149,12 @@ int main(int argc, char **argv) {
           dependencies.waits.push_back(frame->rendered->GetEvent());
           if (!commands->CmdPresentImage(window.Get(), frame->Image(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
             return 1;
-        } else if (!commands->CmdPresent(window.Get()))
-          return 1;
+        } else {
+          rhi::ObjPtr<rhi::IImage> background = window->GetNextImage();
+          if (!background || !commands->CmdClearImage(background.Get(), {0.0f, 0.0f, 0.0f, 1.0f}) ||
+              !commands->CmdPresent(window.Get()))
+            return 1;
+        }
         completion = commands->Submit(dependencies);
         if (!completion)
           return 1;
@@ -160,6 +164,8 @@ int main(int argc, char **argv) {
         next_presentation = std::chrono::steady_clock::now() + presentation_interval;
       }
     }
+    if (window && window->ShouldClose())
+      glfwHideWindow(window->GLFWWindow());
     worker.Stop();
     if (const auto state = worker.GetState(); !state.error.empty()) {
       std::cerr << state.error << '\n';

@@ -50,8 +50,7 @@ class RenderWorker {
                bool hdr = false,
                int samples_per_batch = 4)
       : factory_(std::move(factory)),
-        requested_{1, settings, sample_limit, hdr},
-        samples_per_batch_(samples_per_batch),
+        requested_{1, settings, sample_limit, hdr, samples_per_batch},
         thread_([this] {
           try {
             Run();
@@ -66,15 +65,20 @@ class RenderWorker {
   }
 
   void Stop() {
-    stopping_ = true;
+    {
+      std::lock_guard lock(mutex_);
+      stopping_ = true;
+    }
     condition_.notify_all();
     if (thread_.joinable())
       thread_.join();
   }
 
-  uint64_t Configure(const Settings &settings, int sample_limit = 0, bool hdr = false) {
+  // A zero batch size retains the previous request's scheduling policy.
+  uint64_t Configure(const Settings &settings, int sample_limit = 0, bool hdr = false, int samples_per_batch = 0) {
     std::lock_guard lock(mutex_);
-    requested_ = {requested_.revision + 1, settings, sample_limit, hdr};
+    requested_ = {requested_.revision + 1, settings, sample_limit, hdr,
+                  samples_per_batch ? samples_per_batch : requested_.samples_per_batch};
     condition_.notify_all();
     return requested_.revision;
   }
@@ -118,6 +122,7 @@ class RenderWorker {
     Settings settings;
     int sample_limit{};
     bool hdr{};
+    int samples_per_batch{};
   };
 
   struct Slot {
@@ -133,10 +138,6 @@ class RenderWorker {
   }
 
   void Run() {
-    if (samples_per_batch_ <= 0 || samples_per_batch_ > 8) {
-      Fail("Invalid render batch size");
-      return;
-    }
     auto backend = factory_();
     if (!backend || !backend->GetFilm() || !backend->GetFilm()->IsValid()) {
       Fail("Cannot create render backend");
@@ -180,6 +181,10 @@ class RenderWorker {
         while (!pending.empty())
           if (!retire())
             return;
+        if (request.samples_per_batch <= 0 || request.samples_per_batch > 32) {
+          Fail("Invalid render batch size");
+          return;
+        }
         if (request.sample_limit < 0 || !backend->Configure(request.settings)) {
           Fail("Invalid render configuration");
           return;
@@ -233,8 +238,9 @@ class RenderWorker {
         Fail("Cannot acquire Film output image");
         return;
       }
-      const int samples = active.sample_limit ? std::min(samples_per_batch_, active.sample_limit - accepted_in_revision)
-                                              : samples_per_batch_;
+      const int samples = active.sample_limit
+                              ? std::min(active.samples_per_batch, active.sample_limit - accepted_in_revision)
+                              : active.samples_per_batch;
       // A held display image must not stall accumulation. Intermediate batches
       // may omit development; the final finite batch always publishes an image.
       const bool final_batch = active.sample_limit && accepted_in_revision + samples == active.sample_limit;
@@ -283,7 +289,6 @@ class RenderWorker {
   mutable std::mutex mutex_;
   std::condition_variable condition_;
   Request requested_;
-  int samples_per_batch_;
   State state_;
   std::array<Slot, 3> slots_;
   std::shared_ptr<Frame> latest_;

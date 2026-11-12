@@ -1,4 +1,4 @@
-file(GLOB_RECURSE DEMO_SOURCES "*.cpp" "*.h")
+set(DEMO_SOURCES main.cpp practium_scene.cpp practium_scene.h)
 
 add_executable(${DEMO_NAME} ${DEMO_SOURCES})
 

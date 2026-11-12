@@ -6,6 +6,7 @@
 #include <thread>
 
 #include "../../demo/franka_kinematics/franka_scene.h"
+#include "../../demo/practium_hello/practium_scene.h"
 #include "../../demo/thin_lens/thin_lens_scene.h"
 
 namespace {
@@ -264,6 +265,90 @@ TEST_P(RenderWorkerTest, FrankaSnapshotsPreserveJointHistoryAndPipelineSwitches)
   EXPECT_EQ(read(resumed->Image(), resumed->rendered.Get()), reference(8));
   worker.Stop();
   EXPECT_EQ(read(first->Image(), first->rendered.Get()), original);
+}
+
+TEST_P(RenderWorkerTest, PractiumBatchesPreservePhysicsStepsAndResetSequence) {
+  ObjPtr<ICore> native = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(native);
+  ObjPtr<IDevice> device = native->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ASSERT_TRUE(queue);
+  auto direct = PractiumDemoScene::Create(device.Get(), 48, 36);
+  ASSERT_TRUE(direct);
+  PractiumDemoScene::Settings settings;
+  settings.pause = false;
+  settings.ray_tracing = true;
+  using PhysicsWorker = sparkium::RenderWorker<PractiumDemoScene>;
+  PhysicsWorker worker([&] { return PractiumDemoScene::Create(device.Get(), 48, 36); }, settings, 96, true, 8);
+  auto wait = [&](uint64_t revision, int samples) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    while (std::chrono::steady_clock::now() < deadline && worker.GetState().error.empty()) {
+      auto frame = worker.Latest();
+      if (frame && frame->revision == revision && frame->samples == samples)
+        return frame;
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return std::shared_ptr<const PhysicsWorker::Frame>{};
+  };
+  auto read = [&](IImage *source, ISubmissionToken *rendered) {
+    std::vector<uint8_t> pixels;
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+    if (!commands)
+      return pixels;
+    ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(source);
+    SubmitInfo dependencies;
+    dependencies.waits.push_back(rendered->GetEvent());
+    ObjPtr<ISubmissionToken> done = commands->Submit(dependencies);
+    if (!download || !done || !done->WaitHost())
+      return pixels;
+    pixels.resize(download->GetSize());
+    if (!download->CopyTo(pixels.data(), pixels.size()))
+      pixels.clear();
+    return pixels;
+  };
+  auto reference = [&](int cycles) {
+    EXPECT_TRUE(direct->Configure(settings));
+    auto output = direct->GetFilm()->AcquireOutput(true);
+    if (!output)
+      return std::vector<uint8_t>{};
+    ObjPtr<ISubmissionToken> submitted;
+    for (int i = 0; i < cycles; ++i) {
+      submitted = direct->Submit(settings.ray_tracing ? 32 : 1, output->Image(), true, {});
+      if (!submitted)
+        return std::vector<uint8_t>{};
+    }
+    return read(output->Image(), submitted.Get());
+  };
+  auto moving = wait(1, 96);
+  ASSERT_TRUE(moving) << worker.GetState().error;
+  const auto moving_pixels = read(moving->Image(), moving->rendered.Get());
+  ASSERT_EQ(moving_pixels.size(), 48u * 36u * 4u * sizeof(float));
+  EXPECT_EQ(moving_pixels, reference(3));
+  moving.reset();
+  settings.pause = true;
+  auto paused = wait(worker.Configure(settings, 64, true, 32), 64);
+  ASSERT_TRUE(paused) << worker.GetState().error;
+  EXPECT_EQ(read(paused->Image(), paused->rendered.Get()), reference(2));
+  paused.reset();
+  settings.day_light = false;
+  settings.ray_tracing = false;
+  settings.reset_sequence = 1;
+  ASSERT_TRUE(direct->Configure(settings));
+  settings.reset_sequence = 2;
+  auto reset = wait(worker.Configure(settings, 3, true, 1), 3);
+  ASSERT_TRUE(reset) << worker.GetState().error;
+  const auto reset_pixels = read(reset->Image(), reset->rendered.Get());
+  EXPECT_EQ(reset_pixels, reference(3));
+  EXPECT_NE(reset_pixels, moving_pixels);
+  reset.reset();
+  settings.pause = false;
+  settings.day_light = true;
+  settings.ray_tracing = true;
+  auto resumed = wait(worker.Configure(settings, 32, true, 8), 32);
+  ASSERT_TRUE(resumed) << worker.GetState().error;
+  EXPECT_EQ(read(resumed->Image(), resumed->rendered.Get()), reference(1));
+  worker.Stop();
 }
 
 std::vector<BackendAPI> Backends() {
