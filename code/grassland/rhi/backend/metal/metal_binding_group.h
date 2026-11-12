@@ -14,7 +14,6 @@ class IMetalBindingVersion : public IObject {
   virtual bool IsUniquelyOwned() const noexcept = 0;
   virtual const BindingLayoutDesc &GetLayout() const = 0;
   virtual const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const = 0;
-  virtual bool IsInitialized(size_t binding_index, uint32_t element) const = 0;
   virtual bool IsComplete() const = 0;
   virtual ObjectPtr<IMetalBindingVersion> Clone() const = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) = 0;
@@ -25,7 +24,6 @@ class IMetalBindingVersion : public IObject {
                      const std::vector<ITopLevelAccelerationStructure *> &values) = 0;
   static IMetalBindingVersion *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
 
-  virtual bool IsInitialized(size_t binding, uint32_t element) const = 0;
   virtual void Bind(MTL::ComputeCommandEncoder *encoder, uint32_t group) const = 0;
   virtual void Bind(MTL::RenderCommandEncoder *encoder, uint32_t group) const = 0;
 };
@@ -54,11 +52,11 @@ class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
  public:
   static MetalBindingVersionImpl *Create(IMetalDevice *device, const BindingLayoutDesc &layout);
   ObjectPtr<IMetalBindingVersion> Clone() const override;
-  bool IsInitialized(size_t binding, uint32_t element) const override;
   void Bind(MTL::ComputeCommandEncoder *encoder, uint32_t group) const;
   void Bind(MTL::RenderCommandEncoder *encoder, uint32_t group) const;
 
  private:
+  bool IsInitialized(size_t binding, uint32_t element) const;
   IMetalDevice *device_;
   MetalBindingVersionImpl(IMetalDevice *device, const BindingLayoutDesc &layout);
   bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<BufferView> &values);
@@ -136,6 +134,7 @@ class MetalBindingGroupImpl final : public Object<rhi::IBindingGroup, IMetalBind
                     uint32_t first_element = 0) override;
 
  private:
+  bool IsInitialized(size_t binding, uint32_t element) const;
   IMetalDevice *device_;
   BindingLayoutDesc layout_;
   ObjectPtr<IMetalBindingVersion> version_;

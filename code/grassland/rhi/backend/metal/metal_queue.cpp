@@ -7,7 +7,6 @@
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
-#include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend::metal {
@@ -59,8 +58,7 @@ bool MetalQueueImpl::WaitIdle() {
   return true;
 }
 
-MetalQueueImpl::MetalQueueImpl(IMetalDevice *device, QueueType type) {
-  InitializeQueue(device, type);
+MetalQueueImpl::MetalQueueImpl(IMetalDevice *device, QueueType type) : device_(device), type_(type) {
 }
 
 IMetalQueue *IMetalQueue::Create(IMetalDevice *device, QueueType type, MTL::CommandBufferDescriptor *descriptor) {
@@ -74,11 +72,13 @@ ObjectPtr<IBackendSubmissionToken> MetalQueueImpl::Submit(const ObjectPtr<IMetal
   SubmitInfo native_info;
   native_info.waits.reserve(info.waits.size());
   for (const auto &wait : info.waits) {
+#if !defined(NDEBUG)
     auto timeline = rhi::QueryInterfacePtr<IMetalTimeline>(wait.timeline).Get();
     if (!timeline || timeline->Owner() != device_) {
       ReportError(-1, "Submission waits require a timeline from this device.");
       return {};
     }
+#endif
     // A submit waits for all dependencies; Vulkan requires unique semaphore handles.
     auto existing = std::find_if(native_info.waits.begin(), native_info.waits.end(),
                                  [&](const Event &event) { return event.timeline == wait.timeline; });
@@ -87,8 +87,8 @@ ObjectPtr<IBackendSubmissionToken> MetalQueueImpl::Submit(const ObjectPtr<IMetal
     else
       existing->value = std::max(existing->value, wait.value);
   }
-  std::unique_lock<std::mutex> queue_lock(*mutex_);
-  const Event signal{rhi::QueryInterfacePtr<ITimeline>(GetTimeline()).Get(), NextSerial()};
+  std::unique_lock<std::mutex> queue_lock(mutex_);
+  const Event signal{rhi::QueryInterfacePtr<ITimeline>(GetTimeline()).Get(), ++serial_};
   auto completion = ObjectPtr<IBackendSubmissionToken>::Adopt(IBackendSubmissionToken::Create(signal));
   // Register before native submission, while the collector cannot take the list.
   auto entry = pending_.insert(pending_.end(), {commands, completion});
@@ -122,7 +122,7 @@ ObjectPtr<IBackendSubmissionToken> MetalQueueImpl::Submit(const ObjectPtr<IMetal
 bool MetalQueueImpl::CollectCompleted(uint64_t completed, bool timeline_valid) {
   std::list<Submission> work;
   {
-    std::lock_guard<std::mutex> lock(*mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     work.splice(work.end(), pending_);
   }
   // Polling may submit a recovery signal; releasing resources may acquire other
@@ -139,23 +139,13 @@ bool MetalQueueImpl::CollectCompleted(uint64_t completed, bool timeline_valid) {
     it->completion->Complete(status);
     it = work.erase(it);
   }
-  std::lock_guard<std::mutex> lock(*mutex_);
+  std::lock_guard<std::mutex> lock(mutex_);
   pending_.splice(pending_.begin(), work);
   return pending_.empty();
 }
 
-void MetalQueueImpl::InitializeQueue(IMetalDevice *device, QueueType type, std::shared_ptr<std::mutex> mutex) {
-  device_ = device;
-  type_ = type;
-  mutex_ = std::move(mutex);
-}
-
 std::mutex &MetalQueueImpl::QueueMutex() {
-  return *mutex_;
-}
-
-uint64_t MetalQueueImpl::NextSerial() {
-  return ++serial_;
+  return mutex_;
 }
 
 IMetalDevice *MetalQueueImpl::Owner() const {

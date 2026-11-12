@@ -20,9 +20,6 @@ class MetalAllocatedImageImpl final : public Object<rhi::IImage, IMetalImage> {
  public:
   ~MetalAllocatedImageImpl() override = default;
 
- private:
-  void InitializeImage(ImageDesc desc, IMetalQueue *queue = nullptr);
-
  public:
   bool SupportsQueue(const IMetalQueue *queue) const override;
 
@@ -30,9 +27,6 @@ class MetalAllocatedImageImpl final : public Object<rhi::IImage, IMetalImage> {
 
  private:
   ImageDesc desc_{};
-  IMetalQueue *queue_{};
-
-  void InitializeMetalImage(ImageDesc desc, const void *device, MTL::Texture *image, IMetalQueue *queue = nullptr);
 
  public:
   bool SupportsStorage() const override;

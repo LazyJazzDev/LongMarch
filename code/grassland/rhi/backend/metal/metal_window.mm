@@ -1,6 +1,7 @@
 ﻿#include "grassland/rhi/backend/metal/metal_window.h"
+#include "grassland/rhi/backend/backend_image_presenter.h"
+#include "grassland/rhi/backend/backend_window_imgui.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
-#include "grassland/rhi/backend/metal/metal_window.h"
 
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
@@ -45,8 +46,10 @@ MetalWindowImpl::MetalWindowImpl(IMetalDevice *device) : device_(device) {
 MetalWindowImpl::~MetalWindowImpl() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(queue_->QueueMutex());
-  queue_->WaitIdle();
+  if (queue_) {
+    std::lock_guard<std::mutex> lock(queue_->QueueMutex());
+    queue_->WaitIdle();
+  }
   valid_ = false;
   ReleaseNextImage();
   if (GLFWWindow())

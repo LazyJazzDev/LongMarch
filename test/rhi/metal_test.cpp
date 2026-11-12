@@ -17,6 +17,104 @@ namespace backend = rhi::backend;
 
 namespace {
 
+// Uses the same independent frontend/native interface layout as real images.
+// The backing image owns native storage; this object lets the test observe whether
+// a command retains the same wrapper once across both interface entry paths.
+class RetentionProbeImage final : public backend::Object<IImage, backend::metal::IMetalImage> {
+ public:
+  RetentionProbeImage(backend::metal::IMetalDevice *device, IImage *backing, bool &destroyed)
+      : device_(device),
+        backing_(backing),
+        destroyed_(destroyed) {
+  }
+
+  ~RetentionProbeImage() override {
+    destroyed_ = true;
+  }
+
+  const ImageDesc &GetDesc() const override {
+    return backing_->GetDesc();
+  }
+
+  bool IsValid() const override {
+    return backing_->IsValid();
+  }
+
+  bool SupportsQueue(const backend::metal::IMetalQueue *) const override {
+    return true;
+  }
+
+  bool SupportsStorage() const override {
+    return true;
+  }
+
+  const void *DeviceIdentity() const override {
+    return device_;
+  }
+
+  MTL::Texture *NativeImage() const override {
+    return rhi::QueryInterfacePtr<backend::metal::IMetalImage>(backing_.Get())->NativeImage();
+  }
+
+ private:
+  backend::metal::IMetalDevice *device_;
+  ObjPtr<IImage> backing_;
+  bool &destroyed_;
+};
+
+TEST(RhiMetal, FrontendAndNativeImageUsesShareOneRetentionEntry) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  auto core = rhix::CreateCore(BACKEND_API_METAL);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto window = device.CreateGLFWWindow({160, 120, "Metal canonical resource identity"});
+  ASSERT_TRUE(window);
+  bool destroyed = false;
+  auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get());
+  ObjPtr<IImage> backing = device.Get()->CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ASSERT_TRUE(backing);
+  auto probe = new RetentionProbeImage(native.Get(), backing.Detach(), destroyed);
+  ObjPtr<IImage> image = probe;
+  auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
+  std::array<uint8_t, 64> pixels{};
+  ASSERT_TRUE(context.Get()->CmdUploadImage(image.Get(), pixels.data(), 16));
+  // Disabled ImGui still records frontend resource ownership, without drawing.
+  ASSERT_TRUE(context.Get()->CmdDrawImGui(window.Get(), image.Get()));
+  image.Release();
+  EXPECT_FALSE(destroyed);
+  EXPECT_TRUE(probe->IsUniquelyOwned());
+  context.Release();
+  EXPECT_TRUE(destroyed);
+}
+
+TEST(RhiMetal, ExplicitWindowDrawingRejectsAnActiveRenderPass) {
+#ifdef NDEBUG
+  GTEST_SKIP() << "Command-state diagnostics are Debug-only.";
+#else
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  auto core = rhix::CreateCore(BACKEND_API_METAL);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto window = device.CreateGLFWWindow({160, 120, "Metal render-pass diagnostics"});
+  ASSERT_TRUE(window);
+  auto image = device.CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ASSERT_TRUE(image);
+  for (bool present : {false, true}) {
+    auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
+    rhi::RenderingInfo info;
+    info.color_attachments.push_back({image.Get()});
+    ASSERT_TRUE(context.Get()->CmdBeginRendering(info));
+    if (present)
+      EXPECT_FALSE(context.Get()->CmdPresentImage(window.Get(), image.Get(), COLOR_SPACE_SRGB_NONLINEAR));
+    else
+      EXPECT_FALSE(context.Get()->CmdDrawImGui(window.Get(), image.Get()));
+    EXPECT_FALSE(std::move(context).Submit());
+  }
+#endif
+}
+
 TEST(RhiMetal, NativeCompilationErrorsReachConsole) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto core = rhix::CreateCore(BACKEND_API_METAL, {true});
@@ -48,7 +146,7 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     auto device = core.CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
     auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get();
-    ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+    ObjPtr<IQueue> queue_owner = device.Get()->GetQueue(QUEUE_TYPE_MAIN);
     auto native_queue = rhi::QueryInterfacePtr<backend::metal::IMetalQueue>(queue_owner.Get()).Get();
     auto commands = native_queue->CreateCommandBuffer();
     ASSERT_TRUE(commands);
@@ -202,7 +300,7 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
     ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
   }
   auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get();
-  ObjPtr<IQueue> queue_owner = native->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> queue_owner = device.Get()->GetQueue(QUEUE_TYPE_MAIN);
   auto native_queue = rhi::QueryInterfacePtr<backend::metal::IMetalQueue>(queue_owner.Get()).Get();
   auto readback = NS::TransferPtr(native->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
   ASSERT_TRUE(readback);

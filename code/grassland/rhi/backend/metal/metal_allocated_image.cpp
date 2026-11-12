@@ -7,8 +7,9 @@ namespace grassland::rhi::backend::metal {
 MetalAllocatedImageImpl::MetalAllocatedImageImpl(IMetalDevice *device,
                                                  ImageDesc desc,
                                                  NS::SharedPtr<MTL::Texture> texture)
-    : texture_(std::move(texture)) {
-  InitializeMetalImage(desc, device, texture_.get());
+    : texture_(std::move(texture)),
+      desc_(desc),
+      device_(device) {
 }
 
 IImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &desc) {
@@ -39,25 +40,12 @@ IImage *CreateMetalAllocatedImage(IMetalDevice *device, const ImageDesc &desc) {
   return MetalAllocatedImageImpl::Create(device, desc);
 }
 
-void MetalAllocatedImageImpl::InitializeImage(ImageDesc desc, IMetalQueue *queue) {
-  desc_ = desc;
-  queue_ = queue;
-}
-
-bool MetalAllocatedImageImpl::SupportsQueue(const IMetalQueue *queue) const {
-  return !queue_ || queue_ == queue;
+bool MetalAllocatedImageImpl::SupportsQueue(const IMetalQueue *) const {
+  return true;
 }
 
 const ImageDesc &MetalAllocatedImageImpl::GetDesc() const {
   return desc_;
-}
-
-void MetalAllocatedImageImpl::InitializeMetalImage(ImageDesc desc,
-                                                   const void *device,
-                                                   MTL::Texture *image,
-                                                   IMetalQueue *queue) {
-  InitializeImage(desc, queue);
-  device_ = device;
 }
 
 bool MetalAllocatedImageImpl::SupportsStorage() const {

@@ -362,8 +362,8 @@ the stress measurements explicitly identify the current RHI revision above.
   separate. Registered parent chains cover the full interface ancestry without duplicate
   inheritance paths (except the intentional independent `IObject` roots). The IDs are
   unchanged. Members and implementation methods belong to final classes.
-- Metal source was migrated, but no macOS build or runtime validation was
-  available. Windows/Linux checks do not substitute for that validation.
+- At the initial migration stage, Metal had no macOS build/runtime validation.
+  The later macOS follow-up below supplies that coverage.
 
 
 ## Semantic-audit corrections
@@ -427,3 +427,32 @@ and excluded only D3D12's two previously identified compacted-BLAS update cases.
 The final cleanup also passed the Debug full run. On Meshy-PC-3090, GCC and Clang
 each passed syntax checks for 91 translation units with RTTI disabled, using an
 isolated source snapshot. This follow-up does not claim new Linux GPU runtime coverage.
+
+
+## Metal audit follow-up
+
+Metal now builds after correcting native-interface declarations, vertex-buffer
+binding constants, frontend image identities and complete-type includes. It uses
+the same canonical resource-retention identity and phased window teardown as the
+other backends. Debug diagnostics retain their pre-refactor scope; Buffer ownership
+assertions and Scratch capacity caching remain intentional.
+
+Unused native hooks, initialization wrappers, duplicate state and empty translation
+units were removed. Graphics and compute pipelines share Metal shader compilation.
+Explicit ImGui/presentation commands now inspect the actual active render target,
+rather than an unused rendering-description member.
+
+Validation on macOS 27.0.1 / Apple M5:
+
+- Release and Debug builds of `test_rhi`, `demo_rhix_hello` and
+  `demo_rhi_multiqueue` pass.
+- With desktop tests enabled, the 142-case selection covers Metal parameterizations
+  and shared non-Vulkan-specific suites: Release 137 passed / 5 skipped;
+  Debug 139 passed / 3 skipped. Skips are test applicability, Debug-only diagnostics
+  and unavailable ray-tracing-pipeline capabilities. This is not a full Vulkan run.
+- New regressions verify canonical retention across frontend/native image uses and
+  rejection of explicit window drawing during an active render pass (Debug).
+- Release `demo_rhi_multiqueue metal event`: 0 incorrect frames out of 32 and
+  0 incorrect values out of 2,097,152.
+
+These checks validate functionality; they do not establish a performance comparison.

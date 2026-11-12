@@ -18,7 +18,6 @@ class IMetalAccelerationStructure : public IObject {
   virtual MTL::AccelerationStructure *NativeStructure() const = 0;
   virtual MTL::Buffer *CompactionQuery() const = 0;
   virtual uint64_t ScratchSize(AccelerationStructureBuildMode mode) const = 0;
-  virtual uint64_t ReadCompactedSize() const = 0;
   virtual bool AllowsUpdate() const = 0;
   virtual bool AllowsCompaction() const = 0;
   virtual bool IsCompactStorage() const = 0;
@@ -64,8 +63,6 @@ class MetalBottomLevelAccelerationStructureImpl final
 
   uint64_t ScratchSize(AccelerationStructureBuildMode mode) const override;
 
-  uint64_t ReadCompactedSize() const override;
-
   bool AllowsUpdate() const override;
 
   bool AllowsCompaction() const override;
@@ -73,6 +70,7 @@ class MetalBottomLevelAccelerationStructureImpl final
   bool IsCompactStorage() const override;
 
  private:
+  uint64_t ReadCompactedSize() const;
   MetalBottomLevelAccelerationStructureImpl(IMetalDevice *device, const BottomLevelAccelerationStructureDesc &desc);
 
   BottomLevelAccelerationStructureDesc desc_;
@@ -86,8 +84,6 @@ class MetalBottomLevelAccelerationStructureImpl final
   uint64_t build_scratch_{}, update_scratch_{};
 
   bool allow_update_{}, allow_compaction_{}, compact_{};
-
-  void InitializeMetalAccelerationStructure(IMetalDevice *device);
 
   bool Allocate(MTL::AccelerationStructureDescriptor *descriptor,
                 bool update,
@@ -120,8 +116,6 @@ class MetalTopLevelAccelerationStructureImpl final
 
   uint64_t ScratchSize(AccelerationStructureBuildMode mode) const override;
 
-  uint64_t ReadCompactedSize() const override;
-
   bool AllowsUpdate() const override;
 
   bool AllowsCompaction() const override;
@@ -129,6 +123,7 @@ class MetalTopLevelAccelerationStructureImpl final
   bool IsCompactStorage() const override;
 
  private:
+  uint64_t ReadCompactedSize() const;
   MetalTopLevelAccelerationStructureImpl(IMetalDevice *device, const TopLevelAccelerationStructureDesc &desc);
 
   TopLevelAccelerationStructureDesc desc_;
@@ -144,8 +139,6 @@ class MetalTopLevelAccelerationStructureImpl final
   uint64_t build_scratch_{}, update_scratch_{};
 
   bool allow_update_{}, allow_compaction_{}, compact_{};
-
-  void InitializeMetalAccelerationStructure(IMetalDevice *device);
 
   bool Allocate(MTL::AccelerationStructureDescriptor *descriptor,
                 bool update,

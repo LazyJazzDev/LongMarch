@@ -12,6 +12,7 @@ LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::metal::IMetalProgram,
 namespace grassland::rhi::backend::metal {
 class IMetalProgram : public IMetalProgramBase {
  public:
+  static constexpr uint32_t VertexBufferBase = 8;
   static rhi::IProgram *Create(IMetalDevice *device, const ProgramDesc &desc);
   virtual MTL::RenderPipelineState *NativePipeline() const = 0;
   virtual MTL::DepthStencilState *NativeDepthStencil() const = 0;
@@ -28,8 +29,6 @@ class MetalProgramImpl final : public Object<rhi::IProgram, IMetalProgram> {
 
   MTL::DepthStencilState *NativeDepthStencil() const;
 
-  static constexpr uint32_t VertexBufferBase = 8;
-
   ~MetalProgramImpl() override = default;
 
   const ProgramDesc &GetDesc() const override;
@@ -45,8 +44,6 @@ class MetalProgramImpl final : public Object<rhi::IProgram, IMetalProgram> {
 
   NS::SharedPtr<MTL::DepthStencilState> depth_stencil_;
 
-  void InitializeProgram(IMetalDevice *device, const ProgramDesc &desc);
-
   bool ValidateLayout() const;
 
   IMetalDevice *device_{};
@@ -56,13 +53,5 @@ class MetalProgramImpl final : public Object<rhi::IProgram, IMetalProgram> {
   ObjectPtr<IShader> vertex_shader_{};
 
   ObjectPtr<IShader> fragment_shader_{};
-
-  void InitializeMetalProgramBase(MTL::Device *device);
-
-  NS::SharedPtr<MTL::Function> CompileFunction(const IShader *shader,
-                                               const std::vector<InputAttributeDesc> &attributes = {},
-                                               std::array<uint32_t, 3> *threads = nullptr) const;
-
-  MTL::Device *native_device_{};
 };
 }  // namespace grassland::rhi::backend::metal

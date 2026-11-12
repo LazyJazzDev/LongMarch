@@ -9,13 +9,14 @@
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
-#include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-MetalProgramImpl::MetalProgramImpl(IMetalDevice *device, const ProgramDesc &desc) {
-  InitializeProgram(device, desc);
-  InitializeMetalProgramBase(device->NativeDevice());
+MetalProgramImpl::MetalProgramImpl(IMetalDevice *device, const ProgramDesc &desc)
+    : device_(device),
+      desc_(desc),
+      vertex_shader_(ObjectPtr<IShader>::Retain(desc.vertex_shader)),
+      fragment_shader_(ObjectPtr<IShader>::Retain(desc.fragment_shader)) {
 }
 
 MTL::RenderPipelineState *MetalProgramImpl::NativePipeline() const {
@@ -50,7 +51,8 @@ rhi::IProgram *MetalProgramImpl::Create(IMetalDevice *owner_device, const Progra
   NS::SharedPtr<MTL::Function> functions[2];
   const IShader *shaders[] = {object->desc_.vertex_shader, object->desc_.fragment_shader};
   for (int i = 0; i < 2; ++i) {
-    functions[i] = object->CompileFunction(shaders[i], object->desc_.vertex_attributes);
+    functions[i] = CompileMetalFunction(owner_device->NativeDevice(), object->desc_.pipeline_layout, shaders[i],
+                                        object->desc_.vertex_attributes);
     if (!functions[i])
       return nullptr;
   }
@@ -132,13 +134,6 @@ rhi::IProgram *IMetalProgram::Create(IMetalDevice *device, const ProgramDesc &de
   return MetalProgramImpl::Create(device, desc);
 }
 
-void MetalProgramImpl::InitializeProgram(IMetalDevice *device, const ProgramDesc &desc) {
-  device_ = device;
-  desc_ = desc;
-  vertex_shader_ = ObjectPtr<IShader>::Retain(desc.vertex_shader);
-  fragment_shader_ = ObjectPtr<IShader>::Retain(desc.fragment_shader);
-}
-
 const ProgramDesc &MetalProgramImpl::GetDesc() const {
   return desc_;
 }
@@ -215,33 +210,8 @@ bool MetalProgramImpl::ValidateLayout() const {
   return true;
 }
 
-void MetalProgramImpl::InitializeMetalProgramBase(MTL::Device *device) {
-  native_device_ = device;
-}
-
 const PipelineLayoutDesc &MetalProgramImpl::BindingLayout() const {
   return desc_.pipeline_layout;
 }
 
-NS::SharedPtr<MTL::Function> MetalProgramImpl::CompileFunction(const IShader *shader,
-                                                               const std::vector<InputAttributeDesc> &attributes,
-                                                               std::array<uint32_t, 3> *threads) const {
-  for (const auto &group : (desc_.pipeline_layout).groups)
-    if (!ValidateMetalBindingLayout(native_device_, group))
-      return {};
-  std::string code, entry;
-  if (!CompileMetal(shader, desc_.pipeline_layout, attributes, code, entry, threads))
-    return {};
-  NS::Error *error = nullptr;
-  auto library = NS::TransferPtr(
-      native_device_->newLibrary(NS::String::string(code.c_str(), NS::UTF8StringEncoding), nullptr, &error));
-  if (!library) {
-    ReportMetalError(error, "Metal library compilation failed");
-    return {};
-  }
-  auto function = NS::TransferPtr(library->newFunction(NS::String::string(entry.c_str(), NS::UTF8StringEncoding)));
-  if (!function)
-    ReportError(-1, "Metal shader entry point not found.");
-  return function;
-}
 }  // namespace grassland::rhi::backend::metal

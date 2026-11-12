@@ -61,7 +61,7 @@ class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
   void InterruptCollector();
   bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const;
   void WaitForProgress(const std::vector<Event> &next);
-  MetalDeviceImpl(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device);
+  MetalDeviceImpl(PhysicalDevice info, NS::SharedPtr<MTL::Device> device);
   NS::SharedPtr<MTL::Device> device_;
 
   struct WaitState {
@@ -79,14 +79,8 @@ class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
  public:
   IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
 
- private:
-  void InitializeDevice(PhysicalDevice info, IMetalCore *core, BackendAPI api = BACKEND_API_DEFAULT);
-
  public:
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;
-
- private:
-  void DestroyDevice();
 
  public:
   std::string Name() const override;
@@ -102,8 +96,6 @@ class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
   const PhysicalDevice &GetPhysicalDevice() const noexcept override;
 
  private:
-  IMetalCore *OwnerCore() const;
-
   // Called once after native device resources and all queues are initialized.
   void StartCollector();
 
@@ -117,8 +109,6 @@ class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
 
   std::array<ObjectPtr<IMetalQueue>, 2> queues_{};
   std::atomic<bool> stopping_{};
-  BackendAPI api_{};
-  IMetalCore *core_{};
   PhysicalDevice info_{};
   std::thread collector_{};
 };

@@ -18,14 +18,10 @@ namespace grassland::rhi::backend::metal {
 class IMetalQueue : public IObject {
  public:
   virtual std::mutex &QueueMutex() = 0;
-  virtual  // Called under QueueMutex, in native submission order.
-      uint64_t
-      NextSerial() = 0;
   virtual ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IMetalCommandContext> &commands,
                                                     const SubmitInfo &info) = 0;
-  virtual  // Called only by the device collector; returns whether this queue is drained.
-      bool
-      CollectCompleted(uint64_t completed, bool timeline_valid) = 0;
+  // Called only by the device collector; returns whether this queue is drained.
+  virtual bool CollectCompleted(uint64_t completed, bool timeline_valid) = 0;
   virtual IMetalDevice *Owner() const = 0;
   static IMetalQueue *Create(IMetalDevice *device, QueueType type, MTL::CommandBufferDescriptor *descriptor);
   virtual MTL::CommandQueue *NativeQueue() const = 0;
@@ -61,16 +57,7 @@ class MetalQueueImpl final : public Object<rhi::IQueue, IMetalQueue> {
   // Called only by the device collector; returns whether this queue is drained.
   bool CollectCompleted(uint64_t completed, bool timeline_valid) override;
 
- private:
-  void InitializeQueue(IMetalDevice *device,
-                       QueueType type,
-                       std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>());
-
- public:
   std::mutex &QueueMutex() override;
-
-  // Called under QueueMutex, in native submission order.
-  uint64_t NextSerial() override;
 
   IMetalDevice *Owner() const override;
 
@@ -85,8 +72,7 @@ class MetalQueueImpl final : public Object<rhi::IQueue, IMetalQueue> {
   std::list<Submission> pending_{};
   IMetalDevice *device_{};
   QueueType type_{};
-  // Logical queues that share a native queue also share its host synchronization.
-  std::shared_ptr<std::mutex> mutex_{};
+  std::mutex mutex_;
   uint64_t serial_{};
 };
 }  // namespace grassland::rhi::backend::metal

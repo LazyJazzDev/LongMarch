@@ -17,7 +17,6 @@
 #include "grassland/rhi/backend/metal/metal_command_context.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_core.h"
-#include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
@@ -29,7 +28,7 @@
 namespace grassland::rhi::backend::metal {
 
 rhi::IDevice *MetalDeviceImpl::Create(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device) {
-  auto object = std::unique_ptr<MetalDeviceImpl>(new MetalDeviceImpl(std::move(info), core, std::move(device)));
+  auto object = std::unique_ptr<MetalDeviceImpl>(new MetalDeviceImpl(std::move(info), std::move(device)));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   object->wait_state_->listener = NS::TransferPtr(MTL::SharedEventListener::alloc()->init());
   if (!object->wait_state_->listener) {
@@ -49,10 +48,10 @@ rhi::IDevice *MetalDeviceImpl::Create(PhysicalDevice info, IMetalCore *core, NS:
   return object.release();
 }
 
-MetalDeviceImpl::MetalDeviceImpl(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device)
+MetalDeviceImpl::MetalDeviceImpl(PhysicalDevice info, NS::SharedPtr<MTL::Device> device)
     : device_(std::move(device)),
-      temporal_buffers_(this, TEMPORAL_BUFFER_UPLOAD) {
-  InitializeDevice(std::move(info), core, BACKEND_API_METAL);
+      temporal_buffers_(this, TEMPORAL_BUFFER_UPLOAD),
+      info_(std::move(info)) {
 }
 
 MetalDeviceImpl::~MetalDeviceImpl() {
@@ -61,8 +60,6 @@ MetalDeviceImpl::~MetalDeviceImpl() {
   scratch_.Clear();
   for (auto &queue : queues_)
     queue.Reset();
-
-  DestroyDevice();
 }
 
 MetalScratchPool &MetalDeviceImpl::ScratchPool() {
@@ -129,21 +126,11 @@ IRayTracingProgram *MetalDeviceImpl::CreateRayTracingProgram(const RayTracingPro
   return nullptr;
 }
 
-void MetalDeviceImpl::InitializeDevice(PhysicalDevice info, IMetalCore *core, BackendAPI api) {
-  api_ = api;
-  core_ = core;
-  info_ = std::move(info);
-}
-
 rhi::IShader *MetalDeviceImpl::CreateShader(const ShaderDesc &desc) {
   if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
       desc.stage > SHADER_STAGE_CALLABLE)
     return nullptr;
-  return backend::CreateShader(desc, api_);
-}
-
-void MetalDeviceImpl::DestroyDevice() {
-  ShutdownQueues();
+  return backend::CreateShader(desc, BACKEND_API_METAL);
 }
 
 std::string MetalDeviceImpl::Name() const {
@@ -178,10 +165,6 @@ const PhysicalDevice &MetalDeviceImpl::GetPhysicalDevice() const noexcept {
   return info_;
 }
 
-IMetalCore *MetalDeviceImpl::OwnerCore() const {
-  return core_;
-}
-
 void MetalDeviceImpl::StartCollector() {
   collector_ = std::thread([this] { Collect(); });
 }
@@ -192,11 +175,13 @@ bool MetalDeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_all
   std::vector<Event> unique;
   unique.reserve(events.size());
   for (const auto &event : events) {
+#if !defined(NDEBUG)
     auto timeline = rhi::QueryInterfacePtr<IMetalTimeline>(event.timeline).Get();
     if (!timeline || timeline->Owner() != this) {
       ReportError(-1, "Host waits require timelines from this device.");
       return false;
     }
+#endif
     auto found = std::find_if(unique.begin(), unique.end(),
                               [&](const Event &other) { return other.timeline == event.timeline; });
     if (found == unique.end())
