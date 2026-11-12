@@ -2,6 +2,6 @@ file(GLOB SOURCES "*.cpp" "*.h")
 
 add_library(${CONTRADIUM_SUBLIB_NAME} ${SOURCES})
 
-target_link_libraries(${CONTRADIUM_SUBLIB_NAME} PUBLIC Grassland Snowberg)
+target_link_libraries(${CONTRADIUM_SUBLIB_NAME} PUBLIC grassland_rhi grassland_math grassland_physics grassland_util)
 list(APPEND CONTRADIUM_LIBS ${CONTRADIUM_SUBLIB_NAME})
 set(CONTRADIUM_LIBS ${CONTRADIUM_LIBS} PARENT_SCOPE)

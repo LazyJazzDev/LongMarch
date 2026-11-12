@@ -1,10 +1,12 @@
-﻿#include <long_march.h>
+#include <imgui.h>
 
 #include <random>
 
+#include "../sparkium_backend.h"
 #include "glm/gtc/matrix_transform.hpp"
+#include "practium/practium.h"
 
-using namespace long_march;
+using namespace grassland;
 
 class AreaLight {
   const uint32_t indices[6] = {0, 2, 1, 0, 3, 2};
@@ -53,13 +55,40 @@ class AreaLight {
   sparkium::MaterialLight light_;
 };
 
-int main() {
-  std::unique_ptr<graphics::Core> core_;
+int main(int argc, char **argv) {
+  auto backend = rhi::BACKEND_API_DEFAULT;
+  int frame_limit = 0;
+  try {
+    for (int i = 1; i < argc; ++i) {
+      const std::string argument = argv[i];
+      if (argument == "--backend" && i + 1 < argc)
+        backend = ParseSparkiumBackend(argv[++i]);
+      else if (argument == "--frames" && i + 1 < argc) {
+        frame_limit = std::stoi(argv[++i]);
+        if (frame_limit <= 0)
+          return 2;
+      } else
+        return 2;
+    }
+  } catch (const std::exception &error) {
+    std::cerr << error.what() << '\n';
+    return 2;
+  }
 
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
-
-  practium::Core practium_core(core_.get());
+  rhi::ObjPtr<rhi::ICore> rhi_core = rhi::CreateCore(backend);
+  if (!rhi_core)
+    return 1;
+  rhi::ObjPtr<rhi::IDevice> device = rhi_core->CreateDeviceByAutoSelection();
+  if (!device)
+    return 1;
+  rhi::ObjPtr<rhi::IQueue> queue = device->GetQueue(rhi::QUEUE_TYPE_MAIN);
+  if (!queue)
+    return 1;
+  auto owner = practium::Core::Create(device.Get());
+  if (!owner)
+    return 1;
+  auto &practium_core = *owner;
+  sparkium::Renderer renderer(practium_core.GetRenderCore(), rhi::QUEUE_TYPE_MAIN);
 
   practium::Scene scene(&practium_core);
 
@@ -131,20 +160,28 @@ int main() {
     sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
   }
 
-  graphics::Extent2D extent{640, 480};
+  glm::uvec2 extent{640, 480};
 
-  sparkium::Film film(practium_core.GetRenderCore(), extent.width, extent.height);
+  sparkium::Film film(practium_core.GetRenderCore(), extent.x, extent.y);
   scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 32;
   sparkium::CameraPinhole camera(
       practium_core.GetRenderCore(),
       glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
       glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  std::unique_ptr<graphics::Image> srgb_image;
-  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
-
-  std::unique_ptr<graphics::Window> window;
-  core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Practium Hello", &window);
+  rhi::ObjPtr<rhi::IImage> srgb_image =
+      device->CreateImage({static_cast<uint32_t>(film.GetWidth()), static_cast<uint32_t>(film.GetHeight()),
+                           rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  rhi::ObjPtr<rhi::ICommandContext> initialize = queue->CreateCommandContext();
+  if (!film.IsValid() || !srgb_image || !initialize || !initialize->CmdClearImage(srgb_image.Get(), {}))
+    return 1;
+  rhi::ObjPtr<rhi::ISubmissionToken> initialized = initialize->Submit();
+  if (!initialized)
+    return 1;
+  rhi::ObjPtr<rhi::IWindow> window =
+      device->CreateGLFWWindow({film.GetWidth(), film.GetHeight(), "Practium Hello", rhi::PRESENT_MODE_CONTINUOUS});
+  if (!window || !window->EnableImGui(true, nullptr, 20.0f))
+    return 1;
 
   AreaLight area_light(practium_core.GetRenderCore(), glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
                        glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
@@ -154,9 +191,15 @@ int main() {
   bool ray_tracing = false;
   bool pause = true;
   bool day_light = true;
-  window->InitImGui(nullptr, 20.0f);
+  std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> pending;
+  int rendered = 0;
 
-  while (!window->ShouldClose()) {
+  while (!window->ShouldClose() && (!frame_limit || rendered < frame_limit)) {
+    auto &completion = pending[rendered++ % pending.size()];
+    if (completion && !completion->WaitHost())
+      return 1;
+    if (!rhi::PollEvents())
+      return 1;
     if (!pause) {
       scene.Step();
       film.info.persistence = 0.98f;
@@ -164,44 +207,52 @@ int main() {
       film.info.persistence = 1.0f;
     }
 
-    window->BeginImGuiFrame();
-    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
-    ImGui::SetNextWindowBgAlpha(0.3);
-    ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-    if (ImGui::Checkbox("Day Light", &day_light)) {
-      scene.GetRenderScene()->SetEntityActive(area_light, day_light);
-    }
-    ImGui::Checkbox("Pause", &pause);
-    ImGui::Checkbox("Ray Tracing", &ray_tracing);
-    if (ray_tracing && !core_->DeviceRayTracingSupport()) {
-      ImGui::Text("Ray Tracing not supported on this device!");
-    }
-    if (ImGui::Button("Reset")) {
-      for (int i = 0; i < num_spheres; i++) {
-        Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
-                                std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng)};
-        auto sphere_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(sphere_entities[i].get());
-        sphere_pbd_entity->SetPosition(position);
-        sphere_pbd_entity->SetVelocity({0.0f, 0.0f, 0.0f});
-        sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
-      }
-    }
-    ImGui::End();
-    window->EndImGuiFrame();
+    if (!window->UpdateImGui([&] {
+          ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+          ImGui::SetNextWindowBgAlpha(0.3);
+          ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+          if (ImGui::Checkbox("Day Light", &day_light)) {
+            scene.GetRenderScene()->SetEntityActive(area_light, day_light);
+          }
+          ImGui::Checkbox("Pause", &pause);
+          ImGui::Checkbox("Ray Tracing", &ray_tracing);
+          if (ray_tracing && !device->SupportRayTracingPipeline() && !device->SupportRayQuery()) {
+            ImGui::Text("Ray Tracing not supported on this device!");
+          }
+          if (ImGui::Button("Reset")) {
+            for (int i = 0; i < num_spheres; i++) {
+              Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
+                                      std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng)};
+              auto sphere_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(sphere_entities[i].get());
+              sphere_pbd_entity->SetPosition(position);
+              sphere_pbd_entity->SetVelocity({0.0f, 0.0f, 0.0f});
+              sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
+            }
+          }
+          ImGui::End();
+        }))
+      return 1;
 
     scene.SyncRenderState();
-    practium_core.GetRenderCore()->Render(
-        scene.GetRenderScene(), &camera, &film,
-        ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
-    film.Develop(srgb_image.get());
-
-    std::unique_ptr<graphics::CommandContext> cmd_ctx;
-    core_->CreateCommandContext(&cmd_ctx);
-    cmd_ctx->CmdPresent(window.get(), srgb_image.get());
-    core_->SubmitCommandContext(cmd_ctx.get());
-
-    grassland::graphics::Window::PollEvents();
+    completion = renderer.Submit(scene.GetRenderScene(), &camera, &film,
+                                 ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION,
+                                 srgb_image.Get());
+    if (!completion)
+      return 1;
+    if (window->IsSwapChainInvalid() && !window->RebuildSwapChain())
+      return 1;
+    if (!window->IsSwapChainInvalid()) {
+      rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+      if (!commands || !commands->CmdPresentImage(window.Get(), srgb_image.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
+        return 1;
+      completion = commands->Submit();
+      if (!completion)
+        return 1;
+    }
   }
 
+  for (const auto &completion : pending)
+    if (completion && !completion->WaitHost())
+      return 1;
   return 0;
 }

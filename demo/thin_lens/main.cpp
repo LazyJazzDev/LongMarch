@@ -1,4 +1,4 @@
-﻿#include <long_march.h>
+﻿#include <imgui.h>
 
 #include <cmath>
 #include <filesystem>
@@ -6,14 +6,15 @@
 #include <iostream>
 
 #include "../sparkium_backend.h"
+#include "sparkium/sparkium.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-using namespace long_march;
+using namespace grassland;
 
 int main(int argc, char **argv) {
   try {
-    auto backend = graphics::BACKEND_API_DEFAULT;
+    auto backend = rhi::BACKEND_API_DEFAULT;
     bool headless = false, pinhole_mode = false;
     int frames = 0, blades = 6;
     float aperture = 0.22f, focus = 5.4f, geometry_offset = 0.1f;
@@ -55,11 +56,20 @@ int main(int argc, char **argv) {
     if (headless && frames == 0)
       throw std::invalid_argument("--headless requires --frames");
 
-    std::unique_ptr<graphics::Core> graphics;
-    if (graphics::CreateCore(backend, graphics::Core::Settings{}, &graphics) ||
-        graphics->InitializeLogicalDeviceAutoSelect(false))
-      throw std::runtime_error("cannot initialize graphics device");
-    sparkium::Core core(graphics.get());
+    rhi::ObjPtr<rhi::ICore> rhi_core = rhi::CreateCore(backend);
+    if (!rhi_core)
+      return 1;
+    rhi::ObjPtr<rhi::IDevice> device = rhi_core->CreateDeviceByAutoSelection();
+    if (!device)
+      return 1;
+    auto core_owner = sparkium::Core::Create(device.Get());
+    if (!core_owner)
+      return 1;
+    auto &core = *core_owner;
+    sparkium::Renderer renderer(&core, rhi::QUEUE_TYPE_MAIN);
+    rhi::ObjPtr<rhi::IQueue> queue = device->GetQueue(rhi::QUEUE_TYPE_MAIN);
+    if (!queue)
+      return 1;
     sparkium::Scene scene(&core);
     scene.settings.samples_per_dispatch = 8;
     scene.settings.max_bounces = 4;
@@ -118,96 +128,122 @@ int main(int argc, char **argv) {
     lens.focus_distance = focus;
     lens.aperture_blades = blades;
     sparkium::CameraPinhole pinhole(&core, view, lens.fovy, lens.aspect);
-    std::unique_ptr<graphics::Image> image;
-    graphics->CreateImage(width, height, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-    std::unique_ptr<graphics::Window> window;
+    rhi::ObjPtr<rhi::IImage> image = device->CreateImage({width, height, rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+    rhi::ObjPtr<rhi::ICommandContext> initialize = queue->CreateCommandContext();
+    if (!film.IsValid() || !image || !initialize || !initialize->CmdClearImage(image.Get(), {}))
+      return 1;
+    rhi::ObjPtr<rhi::ISubmissionToken> initialized = initialize->Submit();
+    if (!initialized)
+      return 1;
+    rhi::ObjPtr<rhi::IWindow> window;
     if (!headless) {
-      graphics->CreateWindowObject(width, height, "Sparkium - Thin Lens", &window);
-      window->InitImGui(nullptr, 18.0f);
-      ImGui::GetIO().IniFilename = nullptr;
+      window = device->CreateGLFWWindow({width, height, "Sparkium - Thin Lens", rhi::PRESENT_MODE_CONTINUOUS});
+      if (!window || !window->EnableImGui(true, nullptr, 18.0f))
+        return 1;
     }
-    const auto pipeline = graphics->DeviceRayQuerySupport()     ? sparkium::RENDER_PIPELINE_RAY_QUERY
-                          : graphics->DeviceRayTracingSupport() ? sparkium::RENDER_PIPELINE_RAY_TRACING
+    const auto pipeline = device->SupportRayQuery()             ? sparkium::RENDER_PIPELINE_RAY_QUERY
+                          : device->SupportRayTracingPipeline() ? sparkium::RENDER_PIPELINE_RAY_TRACING
                                                                 : sparkium::RENDER_PIPELINE_RT_FALLBACK;
-    std::cout << "Device: " << graphics->DeviceName() << ", pipeline: " << int(pipeline) << std::endl;
+    std::cout << "Device: " << device->Name() << ", pipeline: " << int(pipeline) << std::endl;
     int rendered = 0;
+    std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> pending;
     while ((!window || !window->ShouldClose()) && (!frames || rendered < frames)) {
+      auto &completion = pending[rendered % pending.size()];
+      if (completion && !completion->WaitHost())
+        return 1;
       if (window) {
-        window->BeginImGuiFrame();
-        ImGui::SetNextWindowPos({16, 16}, ImGuiCond_Always);
-        ImGui::SetNextWindowSize({330, 0}, ImGuiCond_Always);
-        ImGui::SetNextWindowBgAlpha(0.92f);
-        ImGui::Begin("Thin Lens", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
-        ImGui::TextWrapped("Focus one subject. Watch the background lights change into aperture-shaped bokeh.");
-        ImGui::PushItemWidth(160.0f);
-        bool changed = ImGui::Checkbox("Pinhole comparison", &pinhole_mode);
-        ImGui::BeginDisabled(pinhole_mode);
-        changed |= ImGui::SliderFloat("Focus", &lens.focus_distance, 2.5f, 13.0f, "%.2f");
-        if (ImGui::Button("Near / orange")) {
-          lens.focus_distance = 3.4f;
-          changed = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Mid / teal")) {
-          lens.focus_distance = 5.4f;
-          changed = true;
-        }
-        if (ImGui::Button("Far / blue")) {
-          lens.focus_distance = 8.4f;
-          changed = true;
-        }
-        changed |= ImGui::SliderFloat("Aperture radius", &lens.aperture_radius, 0.0f, 0.45f, "%.3f");
-        int shape = lens.aperture_blades == 0 ? 0 : lens.aperture_blades - 2;
-        if (ImGui::Combo("Shape", &shape, "Circle\0Triangle\0Square\0Pentagon\0Hexagon\0Heptagon\0Octagon\0")) {
-          lens.aperture_blades = shape == 0 ? 0 : shape + 2;
-          changed = true;
-        }
-        changed |= ImGui::SliderAngle("Rotation", &lens.aperture_rotation, 0, 180);
-        changed |= ImGui::SliderFloat("Horizontal ratio", &lens.aperture_ratio, 0.4f, 2.5f, "%.2f");
-        ImGui::EndDisabled();
-        if (ImGui::SliderFloat("Geometry offset", &geometry_offset, 0.0f, 1.0f, "%.3f")) {
-          sphere.SetShadowTerminatorGeometryOffset(geometry_offset);
-          changed = true;
-        }
-        if (ImGui::Button("Reset lens")) {
-          pinhole_mode = false;
-          lens.aperture_radius = 0.22f;
-          lens.focus_distance = 5.4f;
-          lens.aperture_blades = 6;
-          lens.aperture_rotation = 0;
-          lens.aperture_ratio = 1;
-          changed = true;
-        }
-        if (changed)
-          film.Reset();
-        ImGui::Text("Samples: %d", film.info.accumulated_samples);
-        ImGui::TextWrapped("Larger aperture = shallower depth of field. Zero aperture matches a pinhole.");
-        ImGui::PopItemWidth();
-        ImGui::End();
-        window->EndImGuiFrame();
+        if (!rhi::PollEvents())
+          return 1;
+        if (!window->UpdateImGui([&] {
+              ImGui::GetIO().IniFilename = nullptr;
+              ImGui::SetNextWindowPos({16, 16}, ImGuiCond_Always);
+              ImGui::SetNextWindowSize({330, 0}, ImGuiCond_Always);
+              ImGui::SetNextWindowBgAlpha(0.92f);
+              ImGui::Begin("Thin Lens", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
+              ImGui::TextWrapped("Focus one subject. Watch the background lights change into aperture-shaped bokeh.");
+              ImGui::PushItemWidth(160.0f);
+              bool changed = ImGui::Checkbox("Pinhole comparison", &pinhole_mode);
+              ImGui::BeginDisabled(pinhole_mode);
+              changed |= ImGui::SliderFloat("Focus", &lens.focus_distance, 2.5f, 13.0f, "%.2f");
+              if (ImGui::Button("Near / orange")) {
+                lens.focus_distance = 3.4f;
+                changed = true;
+              }
+              ImGui::SameLine();
+              if (ImGui::Button("Mid / teal")) {
+                lens.focus_distance = 5.4f;
+                changed = true;
+              }
+              if (ImGui::Button("Far / blue")) {
+                lens.focus_distance = 8.4f;
+                changed = true;
+              }
+              changed |= ImGui::SliderFloat("Aperture radius", &lens.aperture_radius, 0.0f, 0.45f, "%.3f");
+              int shape = lens.aperture_blades == 0 ? 0 : lens.aperture_blades - 2;
+              if (ImGui::Combo("Shape", &shape, "Circle\0Triangle\0Square\0Pentagon\0Hexagon\0Heptagon\0Octagon\0")) {
+                lens.aperture_blades = shape == 0 ? 0 : shape + 2;
+                changed = true;
+              }
+              changed |= ImGui::SliderAngle("Rotation", &lens.aperture_rotation, 0, 180);
+              changed |= ImGui::SliderFloat("Horizontal ratio", &lens.aperture_ratio, 0.4f, 2.5f, "%.2f");
+              ImGui::EndDisabled();
+              if (ImGui::SliderFloat("Geometry offset", &geometry_offset, 0.0f, 1.0f, "%.3f")) {
+                sphere.SetShadowTerminatorGeometryOffset(geometry_offset);
+                changed = true;
+              }
+              if (ImGui::Button("Reset lens")) {
+                pinhole_mode = false;
+                lens.aperture_radius = 0.22f;
+                lens.focus_distance = 5.4f;
+                lens.aperture_blades = 6;
+                lens.aperture_rotation = 0;
+                lens.aperture_ratio = 1;
+                changed = true;
+              }
+              if (changed)
+                film.Reset();
+              ImGui::Text("Samples: %d", film.info.accumulated_samples);
+              ImGui::TextWrapped("Larger aperture = shallower depth of field. Zero aperture matches a pinhole.");
+              ImGui::PopItemWidth();
+              ImGui::End();
+            }))
+          return 1;
       }
-      core.Render(&scene, pinhole_mode ? static_cast<sparkium::Camera *>(&pinhole) : &lens, &film, pipeline);
-      film.Develop(image.get());
+      completion = renderer.Submit(&scene, pinhole_mode ? static_cast<sparkium::Camera *>(&pinhole) : &lens, &film,
+                                   pipeline, image.Get());
+      if (!completion)
+        return 1;
       if (window) {
-        std::unique_ptr<graphics::CommandContext> commands;
-        graphics->CreateCommandContext(&commands);
-        commands->CmdPresent(window.get(), image.get());
-        graphics->SubmitCommandContext(commands.get());
-        graphics::Window::PollEvents();
+        if (window->IsSwapChainInvalid() && !window->RebuildSwapChain())
+          return 1;
+        if (!window->IsSwapChainInvalid()) {
+          rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+          if (!commands || !commands->CmdPresentImage(window.Get(), image.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
+            return 1;
+          completion = commands->Submit();
+          if (!completion)
+            return 1;
+        }
       }
       ++rendered;
     }
-    graphics->WaitGPU();
+    for (const auto &completion : pending)
+      if (completion && !completion->WaitHost())
+        return 1;
     if (!output.empty()) {
       if (output.has_parent_path())
         std::filesystem::create_directories(output.parent_path());
       std::vector<uint8_t> pixels(width * height * 4);
-      image->DownloadData(pixels.data());
+      rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+      if (!commands)
+        return 1;
+      rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadImage(image.Get());
+      rhi::ObjPtr<rhi::ISubmissionToken> downloaded = commands->Submit();
+      if (!readback || !downloaded || !downloaded->WaitHost() || !readback->CopyTo(pixels.data(), pixels.size()))
+        return 1;
       if (!stbi_write_png(output.string().c_str(), width, height, 4, pixels.data(), width * 4))
         throw std::runtime_error("cannot save output image");
     }
-    if (window)
-      window->TerminateImGui();
     return 0;
   } catch (const std::exception &error) {
     std::cerr << "thin_lens: " << error.what() << '\n';

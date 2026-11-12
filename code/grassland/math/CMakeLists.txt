@@ -16,3 +16,6 @@ set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
 target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC ${MIKKTSPACE_LIB_NAME} ${TINYOBJLOADER_LIB_NAME} grassland_util)
+
+# MeshSDF uses the explicitly instantiated point/line signed-distance derivatives.
+target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE grassland_physics_diff_kernel)

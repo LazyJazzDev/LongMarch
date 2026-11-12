@@ -1,10 +1,16 @@
-﻿#include "practium/core/core.h"
+#include "practium/core/core.h"
 
 namespace practium {
 
-Core::Core(graphics::Core *core) : core_(core) {
-  render_core_ = std::make_unique<sparkium::Core>(core_);
-  physics_core_ = std::make_unique<contradium::Core>(core_);
+std::unique_ptr<Core> Core::Create(rhi::IDevice *device) {
+  if (!device)
+    return {};
+  std::unique_ptr<Core> result(new Core);
+  result->render_core_ = sparkium::Core::Create(device);
+  if (!result->render_core_)
+    return {};
+  result->physics_core_ = std::make_unique<contradium::Core>(device);
+  return result;
 }
 
 sparkium::Core *Core::GetRenderCore() const {

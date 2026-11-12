@@ -1,4 +1,7 @@
-﻿#include <long_march.h>
+#include <imgui.h>
+
+#include "../sparkium_backend.h"
+#include "sparkium/sparkium.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <random>
@@ -9,7 +12,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "stb_image_write.h"
 
-using namespace long_march;
+using namespace grassland;
 
 struct CombinedMesh {
   std::vector<std::unique_ptr<sparkium::GeometryMesh>> meshes;
@@ -122,8 +125,7 @@ struct CombinedMesh {
     meshes.clear();
     materials.clear();
   }
-
-} combined_mesh[11];
+};
 
 glm::mat4 xyz_rpy_trans(const glm::vec3 &xyz, const glm::vec3 &rpy) {
   glm::mat4 t = glm::translate(glm::mat4(1.0f), xyz);
@@ -186,7 +188,26 @@ class AreaLight {
   sparkium::MaterialLight light_;
 };
 
-int main() {
+int main(int argc, char **argv) {
+  auto backend = rhi::BACKEND_API_DEFAULT;
+  int frame_limit = 0;
+  try {
+    for (int i = 1; i < argc; ++i) {
+      const std::string argument = argv[i];
+      if (argument == "--backend" && i + 1 < argc)
+        backend = ParseSparkiumBackend(argv[++i]);
+      else if (argument == "--frames" && i + 1 < argc) {
+        frame_limit = std::stoi(argv[++i]);
+        if (frame_limit <= 0)
+          return 2;
+      } else
+        return 2;
+    }
+  } catch (const std::exception &error) {
+    std::cerr << error.what() << '\n';
+    return 2;
+  }
+
   std::string link_paths[] = {FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link0.dae"),
                               FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link1.dae"),
                               FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link2.dae"),
@@ -199,12 +220,21 @@ int main() {
                               FindAssetFile("urdfs/franka_fr3/meshes/robot_ee/franka_hand_white/visual/finger.dae"),
                               FindAssetFile("urdfs/franka_fr3/meshes/robot_ee/franka_hand_white/visual/finger.dae")};
 
-  std::unique_ptr<graphics::Core> core_;
-
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
-  sparkium::Core sparkium_core(core_.get());
-  sparkium_core.GetShadersVFS().Print();
+  rhi::ObjPtr<rhi::ICore> rhi_core = rhi::CreateCore(backend);
+  if (!rhi_core)
+    return 1;
+  rhi::ObjPtr<rhi::IDevice> device = rhi_core->CreateDeviceByAutoSelection();
+  if (!device)
+    return 1;
+  rhi::ObjPtr<rhi::IQueue> queue = device->GetQueue(rhi::QUEUE_TYPE_MAIN);
+  if (!queue)
+    return 1;
+  auto owner = sparkium::Core::Create(device.Get());
+  if (!owner)
+    return 1;
+  auto &sparkium_core = *owner;
+  sparkium::Renderer renderer(&sparkium_core, rhi::QUEUE_TYPE_MAIN);
+  CombinedMesh combined_mesh[11];
 
   sparkium::Scene scene(&sparkium_core);
   scene.settings.samples_per_dispatch = 32;
@@ -249,11 +279,20 @@ int main() {
     combined_mesh[i].PutInScene(&scene);
   }
 
-  std::unique_ptr<graphics::Image> srgb_image;
-  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
+  rhi::ObjPtr<rhi::IImage> srgb_image =
+      device->CreateImage({static_cast<uint32_t>(film.GetWidth()), static_cast<uint32_t>(film.GetHeight()),
+                           rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  rhi::ObjPtr<rhi::ICommandContext> initialize = queue->CreateCommandContext();
+  if (!film.IsValid() || !srgb_image || !initialize || !initialize->CmdClearImage(srgb_image.Get(), {}))
+    return 1;
+  rhi::ObjPtr<rhi::ISubmissionToken> initialized = initialize->Submit();
+  if (!initialized)
+    return 1;
+  rhi::ObjPtr<rhi::IWindow> window =
+      device->CreateGLFWWindow({film.GetWidth(), film.GetHeight(), "Franka Kinematics", rhi::PRESENT_MODE_CONTINUOUS});
+  if (!window || !window->EnableImGui(true, nullptr, 20.0f))
+    return 1;
 
-  std::unique_ptr<graphics::Window> window;
-  core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparkium", &window);
   FPSCounter fps_counter;
 
   JointInfo joints[] = {{-2.7437f, 2.7437f, 0.0f},      {-1.7837f, 1.7837f, 0.0f}, {-2.9007f, 2.9007f, 0.0f},
@@ -261,27 +300,34 @@ int main() {
                         {-3.0159f, 3.01599f, 0.0f},     {0.0f, 0.04f, 0.0f}};
 
   bool ray_tracing = true;
-  window->InitImGui(nullptr, 20.0f);
-  while (!window->ShouldClose()) {
-    window->BeginImGuiFrame();
-    if (ImGui::Begin("Franka Joint Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-      ImGui::Checkbox("Ray Tracing", &ray_tracing);
-      if (ray_tracing && !core_->DeviceRayTracingSupport()) {
-        ImGui::Text("Ray Tracing not supported on this device!");
-      }
-      ImGui::Separator();
-      if (ImGui::Button("Center")) {
-        for (auto &j : joints) {
-          j.value = (j.upper_bound + j.lower_bound) * 0.5f;
-        }
-      }
-      for (int i = 0; i < 8; i++) {
-        ImGui::SliderFloat(("Joint " + std::to_string(i + 1)).c_str(), &joints[i].value, joints[i].lower_bound,
-                           joints[i].upper_bound);
-      }
-    }
-    ImGui::End();
-    window->EndImGuiFrame();
+  std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> pending;
+  int rendered = 0;
+  while (!window->ShouldClose() && (!frame_limit || rendered < frame_limit)) {
+    auto &completion = pending[rendered++ % pending.size()];
+    if (completion && !completion->WaitHost())
+      return 1;
+    if (!rhi::PollEvents())
+      return 1;
+    if (!window->UpdateImGui([&] {
+          if (ImGui::Begin("Franka Joint Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Checkbox("Ray Tracing", &ray_tracing);
+            if (ray_tracing && !device->SupportRayTracingPipeline() && !device->SupportRayQuery()) {
+              ImGui::Text("Ray Tracing not supported on this device!");
+            }
+            ImGui::Separator();
+            if (ImGui::Button("Center")) {
+              for (auto &j : joints) {
+                j.value = (j.upper_bound + j.lower_bound) * 0.5f;
+              }
+            }
+            for (int i = 0; i < 8; i++) {
+              ImGui::SliderFloat(("Joint " + std::to_string(i + 1)).c_str(), &joints[i].value, joints[i].lower_bound,
+                                 joints[i].upper_bound);
+            }
+          }
+          ImGui::End();
+        }))
+      return 1;
     glm::mat4 combined_mat = glm::mat4(1.0f);
     combined_mesh[1].SetTransformation(combined_mat);
     combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.333f}, {});
@@ -321,14 +367,22 @@ int main() {
     // area_light.position = glm::mat3{glm::rotate(glm::mat4{1.0f}, glm::radians(0.3f), glm::vec3{0.0f, 1.0f,
     // 0.0f})} * area_light.position; if (area_light.position.y < 0.0) area_light.position = -area_light.position;
     // area_light.direction = -area_light.position;
-    sparkium_core.Render(&scene, &camera, &film,
-                         ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
-    film.Develop(srgb_image.get());
-    std::unique_ptr<graphics::CommandContext> cmd_context;
-    core_->CreateCommandContext(&cmd_context);
-    cmd_context->CmdPresent(window.get(), srgb_image.get());
-    core_->SubmitCommandContext(cmd_context.get());
-    grassland::graphics::Window::PollEvents();
+    completion = renderer.Submit(&scene, &camera, &film,
+                                 ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION,
+                                 srgb_image.Get());
+    if (!completion)
+      return 1;
+    if (window->IsSwapChainInvalid() && !window->RebuildSwapChain())
+      return 1;
+    if (!window->IsSwapChainInvalid()) {
+      rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+      if (!commands || !commands->CmdPresentImage(window.Get(), srgb_image.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
+        return 1;
+      completion = commands->Submit();
+      if (!completion)
+        return 1;
+    }
+
     float fps = fps_counter.TickFPS();
     char fps_buf[16];
     sprintf(fps_buf, "%.2f", fps);
@@ -338,12 +392,21 @@ int main() {
     window->SetTitle(std::string("Franka Kinematics - ") + fps_buf + "frames/s" + " - " + rps_buf + "Mrays/s");
   }
 
+  for (const auto &completion : pending)
+    if (completion && !completion->WaitHost())
+      return 1;
+
   for (auto &cm : combined_mesh) {
     cm.Clear();
   }
 
-  film.Develop(srgb_image.get());
   std::vector<uint8_t> image_data(film.GetWidth() * film.GetHeight() * 4);
-  srgb_image->DownloadData(image_data.data());
+  rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+  if (!commands)
+    return 1;
+  rhi::ObjPtr<rhi::IDownloadToken> download = commands->CmdDownloadImage(srgb_image.Get());
+  rhi::ObjPtr<rhi::ISubmissionToken> downloaded = commands->Submit();
+  if (!download || !downloaded || !downloaded->WaitHost() || !download->CopyTo(image_data.data(), image_data.size()))
+    return 1;
   stbi_write_bmp("output.bmp", film.GetWidth(), film.GetHeight(), 4, image_data.data());
 }
