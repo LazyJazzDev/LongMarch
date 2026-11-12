@@ -62,19 +62,10 @@ TEST(SparkiumWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
       const glm::ivec2 size{film->GetWidth(), film->GetHeight()};
       loaded->GetScene()->settings.samples_per_dispatch = 1;
       loaded->GetScene()->settings.max_bounces = 1;
-      ObjPtr<IImage> source = device->CreateImage(
-          {uint32_t(size.x), uint32_t(size.y), hdr ? IMAGE_FORMAT_R32G32B32A32_SFLOAT : IMAGE_FORMAT_R8G8B8A8_UNORM});
+      auto source = film->AcquireOutput(hdr);
       ASSERT_TRUE(source);
-      {
-        ObjPtr<ICommandContext> initialize = queue->CreateCommandContext();
-        ASSERT_TRUE(initialize);
-        ASSERT_TRUE(initialize->CmdClearImage(source.Get(), {}));
-        ObjPtr<ISubmissionToken> done = initialize->Submit();
-        ASSERT_TRUE(done);
-        ASSERT_TRUE(done->WaitHost());
-      }
       auto rendered =
-          renderer.Submit(loaded->GetScene(), camera, film, sparkium::RENDER_PIPELINE_AUTO, source.Get(), hdr);
+          renderer.Submit(loaded->GetScene(), camera, film, sparkium::RENDER_PIPELINE_AUTO, source->Image(), hdr);
       ASSERT_TRUE(rendered);
       ASSERT_TRUE(rendered->WaitHost());
       const auto samples = film->info.accumulated_samples;
@@ -103,8 +94,8 @@ TEST(SparkiumWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
         }));
         ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
         ASSERT_TRUE(commands);
-        ASSERT_TRUE(commands->CmdClearImage(source.Get(), {0.5f, 0.5f, 0.5f, 1.0f}));
-        ASSERT_TRUE(commands->CmdPresentImage(window.Get(), source.Get(),
+        ASSERT_TRUE(commands->CmdClearImage(source->Image(), {0.5f, 0.5f, 0.5f, 1.0f}));
+        ASSERT_TRUE(commands->CmdPresentImage(window.Get(), source->Image(),
                                               hdr ? COLOR_SPACE_EXTENDED_SRGB_LINEAR : COLOR_SPACE_SRGB_NONLINEAR));
         ObjPtr<IDownloadToken> readback;
         if (hdr) {
@@ -120,8 +111,8 @@ TEST(SparkiumWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
         EXPECT_EQ(film->info.accumulated_samples, samples);
         EXPECT_EQ(camera->view, view);
         EXPECT_EQ(camera->aspect, aspect);
-        EXPECT_EQ(source->GetDesc().width, size.x);
-        EXPECT_EQ(source->GetDesc().height, size.y);
+        EXPECT_EQ(source->Image()->GetDesc().width, size.x);
+        EXPECT_EQ(source->Image()->GetDesc().height, size.y);
         hdr ? ++hdr_frames : ++sdr_frames;
         if (hdr) {
           // Both corners catch a stale square target, cropping and unwritten borders.

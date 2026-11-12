@@ -24,6 +24,27 @@ bool Film::IsValid() const {
          tone_mapping_group_;
 }
 
+std::shared_ptr<const Film::Output> Film::AcquireOutput(bool linear_hdr) {
+  if (!IsValid())
+    return {};
+  const auto format = linear_hdr ? rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT : rhi::IMAGE_FORMAT_R8G8B8A8_UNORM;
+  for (auto &output : outputs_) {
+    if (output && output.use_count() != 1)
+      continue;
+    if (!output || output->image_->GetDesc().format != format) {
+      auto replacement = std::shared_ptr<Output>(new Output);
+      replacement->image_ = core_->GetDevice()->CreateImage({extent_.x, extent_.y, format});
+      if (!replacement->image_) {
+        core_->ReportFailure("Cannot create Film output image");
+        return {};
+      }
+      output = std::move(replacement);
+    }
+    return output;
+  }
+  return {};
+}
+
 bool Film::PrepareAccumulation() {
   if (accumulation_group_)
     return true;
@@ -82,6 +103,10 @@ bool Film::RecordDevelop(rhi::ICommandContext *commands, rhi::IImage *target, bo
       target->GetDesc().format !=
           (linear_hdr ? rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT : rhi::IMAGE_FORMAT_R8G8B8A8_UNORM))
     return false;
+  for (const auto &output : outputs_)
+    if (output && output->image_.Get() == target && !output->initialized_)
+      if (!commands->CmdClearImage(target, {}))
+        return false;
   return commands->CmdUploadBuffer(tone_mapping_buffer_.Get(), 0, &info.view_transform,
                                    sizeof(int) + sizeof(float) * 3) &&
          tone_mapping_group_->BindResource(0, raw_image_.Get()) && tone_mapping_group_->BindResource(1, target) &&
@@ -91,7 +116,10 @@ bool Film::RecordDevelop(rhi::ICommandContext *commands, rhi::IImage *target, bo
          commands->CmdDispatch((extent_.x + 7) / 8, (extent_.y + 7) / 8, 1);
 }
 
-void Film::AcceptRender(int samples) {
+void Film::AcceptRender(int samples, rhi::IImage *target) {
+  for (const auto &output : outputs_)
+    if (output && output->image_.Get() == target)
+      output->initialized_ = true;
   reset_pending_ = false;
   info.accumulated_samples += samples;
 }

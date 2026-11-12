@@ -110,7 +110,7 @@ rhi::ObjPtr<rhi::ISubmissionToken> Renderer::Submit(Scene *scene,
     core_->ReportFailure("Pending resource updates changed during submission");
     return submission;
   }
-  film->AcceptRender(samples);
+  film->AcceptRender(samples, output);
   return submission;
 }
 

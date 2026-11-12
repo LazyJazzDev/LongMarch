@@ -169,14 +169,8 @@ int main(int argc, char **argv) {
       glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
       glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  rhi::ObjPtr<rhi::IImage> srgb_image =
-      device->CreateImage({static_cast<uint32_t>(film.GetWidth()), static_cast<uint32_t>(film.GetHeight()),
-                           rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
-  rhi::ObjPtr<rhi::ICommandContext> initialize = queue->CreateCommandContext();
-  if (!film.IsValid() || !srgb_image || !initialize || !initialize->CmdClearImage(srgb_image.Get(), {}))
-    return 1;
-  rhi::ObjPtr<rhi::ISubmissionToken> initialized = initialize->Submit();
-  if (!initialized)
+  auto output_image = film.AcquireOutput();
+  if (!output_image)
     return 1;
   rhi::ObjPtr<rhi::IWindow> window =
       device->CreateGLFWWindow({film.GetWidth(), film.GetHeight(), "Practium Hello", rhi::PRESENT_MODE_CONTINUOUS});
@@ -236,14 +230,14 @@ int main(int argc, char **argv) {
     scene.SyncRenderState();
     completion = renderer.Submit(scene.GetRenderScene(), &camera, &film,
                                  ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION,
-                                 srgb_image.Get());
+                                 output_image->Image());
     if (!completion)
       return 1;
     if (window->IsSwapChainInvalid() && !window->RebuildSwapChain())
       return 1;
     if (!window->IsSwapChainInvalid()) {
       rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
-      if (!commands || !commands->CmdPresentImage(window.Get(), srgb_image.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
+      if (!commands || !commands->CmdPresentImage(window.Get(), output_image->Image(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
         return 1;
       completion = commands->Submit();
       if (!completion)

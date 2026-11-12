@@ -128,12 +128,8 @@ int main(int argc, char **argv) {
     lens.focus_distance = focus;
     lens.aperture_blades = blades;
     sparkium::CameraPinhole pinhole(&core, view, lens.fovy, lens.aspect);
-    rhi::ObjPtr<rhi::IImage> image = device->CreateImage({width, height, rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
-    rhi::ObjPtr<rhi::ICommandContext> initialize = queue->CreateCommandContext();
-    if (!film.IsValid() || !image || !initialize || !initialize->CmdClearImage(image.Get(), {}))
-      return 1;
-    rhi::ObjPtr<rhi::ISubmissionToken> initialized = initialize->Submit();
-    if (!initialized)
+    auto output_image = film.AcquireOutput();
+    if (!output_image)
       return 1;
     rhi::ObjPtr<rhi::IWindow> window;
     if (!headless) {
@@ -210,7 +206,7 @@ int main(int argc, char **argv) {
           return 1;
       }
       completion = renderer.Submit(&scene, pinhole_mode ? static_cast<sparkium::Camera *>(&pinhole) : &lens, &film,
-                                   pipeline, image.Get());
+                                   pipeline, output_image->Image());
       if (!completion)
         return 1;
       if (window) {
@@ -218,7 +214,8 @@ int main(int argc, char **argv) {
           return 1;
         if (!window->IsSwapChainInvalid()) {
           rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
-          if (!commands || !commands->CmdPresentImage(window.Get(), image.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
+          if (!commands ||
+              !commands->CmdPresentImage(window.Get(), output_image->Image(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
             return 1;
           completion = commands->Submit();
           if (!completion)
@@ -237,7 +234,7 @@ int main(int argc, char **argv) {
       rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
       if (!commands)
         return 1;
-      rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadImage(image.Get());
+      rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadImage(output_image->Image());
       rhi::ObjPtr<rhi::ISubmissionToken> downloaded = commands->Submit();
       if (!readback || !downloaded || !downloaded->WaitHost() || !readback->CopyTo(pixels.data(), pixels.size()))
         return 1;

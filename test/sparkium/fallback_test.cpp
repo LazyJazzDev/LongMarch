@@ -400,6 +400,52 @@ RHI_BYTE_ADDRESS_BUFFER(0, 0, camera_data);
     EXPECT_NEAR(moved[0][c], float(c + 2), 1e-6f);
 }
 
+TEST_F(SoftwareBVHTest, FilmOutputLeasesPreserveCompletedImages) {
+  sparkium::Scene scene(core.get());
+  scene.settings.samples_per_dispatch = 1;
+  scene.settings.max_bounces = 1;
+  scene.settings.background_color = {0.1f, 0.2f, 0.3f};
+  sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 1.0f);
+  auto film = std::make_unique<sparkium::Film>(core.get(), 8, 8);
+  auto first = film->AcquireOutput();
+  auto second = film->AcquireOutput();
+  auto third = film->AcquireOutput();
+  ASSERT_TRUE(first && second && third);
+  EXPECT_FALSE(film->AcquireOutput());
+  EXPECT_TRUE(core->IsValid());
+  auto submit = [&](const std::shared_ptr<const sparkium::Film::Output> &output, bool hdr) {
+    auto token =
+        renderer->Submit(&scene, &camera, film.get(), sparkium::RENDER_PIPELINE_RT_FALLBACK, output->Image(), hdr);
+    ASSERT_TRUE(token);
+    ASSERT_TRUE(token->WaitHost());
+  };
+  submit(first, false);
+  std::vector<uint8_t> original(8 * 8 * 4), retained(original.size());
+  Download(first->Image(), original);
+  EXPECT_TRUE(std::any_of(original.begin(), original.end(), [](uint8_t value) { return value != 0; }));
+  second.reset();
+  auto hdr = film->AcquireOutput(true);
+  ASSERT_TRUE(hdr);
+  EXPECT_EQ(hdr->Image()->GetDesc().format, rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT);
+  // Discarded development must not publish successful image initialization.
+  {
+    rhi::ObjPtr<rhi::ICommandContext> discarded = queue->CreateCommandContext();
+    ASSERT_TRUE(discarded);
+    ASSERT_TRUE(film->RecordDevelop(discarded.Get(), hdr->Image(), true));
+  }
+  scene.settings.background_color = {0.7f, 0.1f, 0.2f};
+  film->Reset();
+  submit(hdr, true);
+  std::vector<glm::vec4> pixels(64);
+  Download(hdr->Image(), pixels);
+  EXPECT_GT(pixels[0].x, pixels[0].y);
+  EXPECT_FLOAT_EQ(pixels[0].w, 1.0f);
+  // Output ownership survives a scene/Film replacement while the UI holds a lease.
+  film.reset();
+  Download(first->Image(), retained);
+  EXPECT_EQ(retained, original);
+}
+
 TEST_F(SoftwareBVHTest, CameraModelsSwitchWithoutStalePrograms) {
   std::vector<Vector3<float>> positions{{-1, -1, 0}, {1, -1, 0}, {0, 1, 0}};
   uint32_t indices[]{0, 1, 2};

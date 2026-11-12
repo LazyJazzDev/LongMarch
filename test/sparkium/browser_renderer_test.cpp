@@ -52,7 +52,7 @@ class BrowserRendererTest : public testing::TestWithParam<BackendAPI> {
   std::vector<uint8_t> Read(BrowserRenderer &renderer, const std::shared_ptr<const BrowserRenderer::Frame> &frame) {
     ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_MAIN);
     ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
-    ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(frame->image.Get());
+    ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(frame->Image());
     if (!download)
       return {};
     SubmitInfo waits;
@@ -90,14 +90,14 @@ TEST_P(BrowserRendererTest, HeldImagesStayImmutableAcrossConfigurationAndReload)
   ASSERT_TRUE(second);
   EXPECT_NE(Read(renderer, second), original);
   EXPECT_EQ(Read(renderer, first), original);
-  EXPECT_NE(first->image.Get(), second->image.Get());
+  EXPECT_NE(first->Image(), second->Image());
   const auto revision = second->revision;
   second.reset();
   settings.hdr = true;
   renderer.Configure(settings, false);
   auto hdr = WaitFrame(renderer, [&](const auto &frame) { return frame.revision > revision && frame.hdr; });
   ASSERT_TRUE(hdr);
-  EXPECT_EQ(hdr->image->GetDesc().format, IMAGE_FORMAT_R32G32B32A32_SFLOAT);
+  EXPECT_EQ(hdr->Image()->GetDesc().format, IMAGE_FORMAT_R32G32B32A32_SFLOAT);
   EXPECT_EQ(Read(renderer, first), original);
   const auto hdr_revision = hdr->revision;
   hdr.reset();
@@ -114,8 +114,8 @@ TEST_P(BrowserRendererTest, HeldImagesStayImmutableAcrossConfigurationAndReload)
   auto reloaded = WaitFrame(renderer, [&](const auto &frame) { return frame.revision > hdr_revision; });
   ASSERT_TRUE(reloaded);
   EXPECT_FALSE(reloaded->hdr);
-  EXPECT_EQ(reloaded->image->GetDesc().width, 24u);
-  EXPECT_EQ(reloaded->image->GetDesc().height, 20u);
+  EXPECT_EQ(reloaded->Image()->GetDesc().width, 24u);
+  EXPECT_EQ(reloaded->Image()->GetDesc().height, 20u);
   const auto resized = Read(renderer, reloaded);
   ASSERT_EQ(resized.size(), 24u * 20u * 4u);
   for (size_t i = 0; i < resized.size(); ++i)

@@ -279,14 +279,8 @@ int main(int argc, char **argv) {
     combined_mesh[i].PutInScene(&scene);
   }
 
-  rhi::ObjPtr<rhi::IImage> srgb_image =
-      device->CreateImage({static_cast<uint32_t>(film.GetWidth()), static_cast<uint32_t>(film.GetHeight()),
-                           rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
-  rhi::ObjPtr<rhi::ICommandContext> initialize = queue->CreateCommandContext();
-  if (!film.IsValid() || !srgb_image || !initialize || !initialize->CmdClearImage(srgb_image.Get(), {}))
-    return 1;
-  rhi::ObjPtr<rhi::ISubmissionToken> initialized = initialize->Submit();
-  if (!initialized)
+  auto output_image = film.AcquireOutput();
+  if (!output_image)
     return 1;
   rhi::ObjPtr<rhi::IWindow> window =
       device->CreateGLFWWindow({film.GetWidth(), film.GetHeight(), "Franka Kinematics", rhi::PRESENT_MODE_CONTINUOUS});
@@ -369,14 +363,14 @@ int main(int argc, char **argv) {
     // area_light.direction = -area_light.position;
     completion = renderer.Submit(&scene, &camera, &film,
                                  ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION,
-                                 srgb_image.Get());
+                                 output_image->Image());
     if (!completion)
       return 1;
     if (window->IsSwapChainInvalid() && !window->RebuildSwapChain())
       return 1;
     if (!window->IsSwapChainInvalid()) {
       rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
-      if (!commands || !commands->CmdPresentImage(window.Get(), srgb_image.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
+      if (!commands || !commands->CmdPresentImage(window.Get(), output_image->Image(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
         return 1;
       completion = commands->Submit();
       if (!completion)
@@ -404,7 +398,7 @@ int main(int argc, char **argv) {
   rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
   if (!commands)
     return 1;
-  rhi::ObjPtr<rhi::IDownloadToken> download = commands->CmdDownloadImage(srgb_image.Get());
+  rhi::ObjPtr<rhi::IDownloadToken> download = commands->CmdDownloadImage(output_image->Image());
   rhi::ObjPtr<rhi::ISubmissionToken> downloaded = commands->Submit();
   if (!download || !downloaded || !downloaded->WaitHost() || !download->CopyTo(image_data.data(), image_data.size()))
     return 1;

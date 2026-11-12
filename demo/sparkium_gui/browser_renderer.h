@@ -29,7 +29,12 @@ class BrowserRenderer {
   };
 
   struct Frame {
-    grassland::rhi::ObjPtr<grassland::rhi::IImage> image;
+    std::shared_ptr<const sparkium::Film::Output> output;
+
+    grassland::rhi::IImage *Image() const {
+      return output ? output->Image() : nullptr;
+    }
+
     grassland::rhi::ObjPtr<grassland::rhi::ISubmissionToken> rendered;
     uint64_t revision{}, sequence{};
     int samples{};

@@ -285,7 +285,7 @@ int main(int argc, char **argv) {
       rhi::SubmitInfo dependencies;
       if (frame) {
         dependencies.waits.push_back(frame->rendered->GetEvent());
-        if (!commands->CmdPresentImage(window.Get(), frame->image.Get(),
+        if (!commands->CmdPresentImage(window.Get(), frame->Image(),
                                        frame->hdr ? rhi::COLOR_SPACE_BT709_LINEAR : rhi::COLOR_SPACE_SRGB_NONLINEAR))
           return 1;
       } else if (!commands->CmdPresent(window.Get()))

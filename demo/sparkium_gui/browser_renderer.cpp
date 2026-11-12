@@ -78,7 +78,6 @@ void BrowserRenderer::Run() {
   std::unique_ptr<sparkium::Core> core;
   std::unique_ptr<sparkium::JsonScene> scene;
   std::unique_ptr<sparkium::Renderer> renderer;
-  ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_ASSIST);
   Request active;
   Settings settings;
   uint64_t sequence{};
@@ -181,8 +180,11 @@ void BrowserRenderer::Run() {
           state_.error = "Presentation submission failed";
           return;
         }
+        // Return the retired image lease to its Film, reusing the frame metadata.
         if (!slot.frame)
           slot.frame = std::make_shared<Frame>();
+        else
+          slot.frame->output.reset();
         frame = slot.frame;
         displayed = slot.displayed;
         break;
@@ -198,22 +200,15 @@ void BrowserRenderer::Run() {
       }
       continue;
     }
-    const auto width = static_cast<uint32_t>(scene->GetFilm()->GetWidth());
-    const auto height = static_cast<uint32_t>(scene->GetFilm()->GetHeight());
-    const auto format = settings.hdr ? IMAGE_FORMAT_R32G32B32A32_SFLOAT : IMAGE_FORMAT_R8G8B8A8_UNORM;
-    if (!frame->image || frame->image->GetDesc().width != width || frame->image->GetDesc().height != height ||
-        frame->image->GetDesc().format != format) {
-      frame->image = device_->CreateImage({width, height, format});
-      ObjPtr<ICommandContext> initialize = queue ? queue->CreateCommandContext() : nullptr;
-      if (!frame->image || !initialize || !initialize->CmdClearImage(frame->image.Get(), {})) {
-        Fail(active.revision, "Cannot initialize display image");
+    frame->output = scene->GetFilm()->AcquireOutput(settings.hdr);
+    if (!frame->output) {
+      if (!scene->GetFilm()->IsValid()) {
+        Fail(active.revision, "Cannot acquire Film output image");
         return;
       }
-      ObjPtr<ISubmissionToken> initialized = initialize->Submit();
-      if (!initialized) {
-        Fail(active.revision, "Cannot submit display initialization");
-        return;
-      }
+      std::unique_lock lock(mutex_);
+      condition_.wait_for(lock, std::chrono::milliseconds(1));
+      continue;
     }
     SubmitInfo dependencies;
     if (displayed)
@@ -225,7 +220,7 @@ void BrowserRenderer::Run() {
     frame->sequence = ++sequence;
     frame->hdr = settings.hdr;
     frame->rendered = renderer->Submit(scene->GetScene(), scene->GetCamera(), scene->GetFilm(), settings.pipeline,
-                                       frame->image.Get(), settings.hdr, dependencies);
+                                       frame->Image(), settings.hdr, dependencies);
     if (!frame->rendered) {
       Fail(active.revision, "Cannot submit rendering");
       return;

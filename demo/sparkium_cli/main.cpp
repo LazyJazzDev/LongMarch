@@ -124,16 +124,12 @@ int main(int argc, char **argv) {
         return 1;
     }
     auto download = [&](bool hdr) -> rhi::ObjPtr<rhi::IDownloadToken> {
-      rhi::ObjPtr<rhi::IImage> image =
-          device->CreateImage({static_cast<uint32_t>(film->GetWidth()), static_cast<uint32_t>(film->GetHeight()),
-                               hdr ? rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT : rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+      auto output_image = film->AcquireOutput(hdr);
       rhi::ObjPtr<rhi::IQueue> queue = device->GetQueue(rhi::QUEUE_TYPE_ASSIST);
       rhi::ObjPtr<rhi::ICommandContext> commands = queue ? queue->CreateCommandContext() : nullptr;
-      // Initialize the fresh attachment before its first storage-image write.
-      if (!image || !commands || !commands->CmdClearImage(image.Get(), {}) ||
-          !film->RecordDevelop(commands.Get(), image.Get(), hdr))
+      if (!output_image || !commands || !film->RecordDevelop(commands.Get(), output_image->Image(), hdr))
         return {};
-      rhi::ObjPtr<rhi::IDownloadToken> result = commands->CmdDownloadImage(image.Get());
+      rhi::ObjPtr<rhi::IDownloadToken> result = commands->CmdDownloadImage(output_image->Image());
       if (!result)
         return {};
       rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
