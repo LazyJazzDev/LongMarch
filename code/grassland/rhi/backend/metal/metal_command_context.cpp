@@ -695,7 +695,7 @@ IDownloadToken *MetalCommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uint
     recording_failed_ = true;
     return nullptr;
   }
-  return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(CreateMetalDownloadToken(std::move(lease), size)));
+  return RegisterDownload(ObjectPtr<IMetalDownloadToken>::Adopt(CreateMetalDownloadToken(std::move(lease), size)));
 }
 
 IDownloadToken *MetalCommandContextImpl::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
@@ -751,7 +751,7 @@ IDownloadToken *MetalCommandContextImpl::CmdDownloadImage(IImage *image, const I
                           MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height);
   }
   blit->endEncoding();
-  return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(CreateMetalDownloadToken(
+  return RegisterDownload(ObjectPtr<IMetalDownloadToken>::Adopt(CreateMetalDownloadToken(
       std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 
@@ -888,7 +888,7 @@ void MetalCommandContextImpl::ReleaseDownloads() {
   downloads_.clear();
 }
 
-IDownloadToken *MetalCommandContextImpl::RegisterDownload(ObjectPtr<IBackendDownloadToken> token) {
+IDownloadToken *MetalCommandContextImpl::RegisterDownload(ObjectPtr<IMetalDownloadToken> token) {
   downloads_.push_back(token);
   return rhi::QueryInterfacePtr<IDownloadToken>(token.Get()).Detach();
 }

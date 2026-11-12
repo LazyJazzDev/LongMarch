@@ -4,8 +4,17 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-IBackendDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size);
-IBackendDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease,
-                                                 const DownloadLayout &layout);
+class IVulkanDownloadToken : public IObject {
+ public:
+  virtual void BindSubmission(rhi::ISubmissionToken *submission) = 0;
+};
+
+IVulkanDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size);
+IVulkanDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease,
+                                                const DownloadLayout &layout);
 
 }  // namespace grassland::rhi::backend::vulkan
+
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanDownloadToken,
+                        grassland::rhi::IObject,
+                        "3f66ba7b-d5cc-45bb-a829-d4840a94feb1")

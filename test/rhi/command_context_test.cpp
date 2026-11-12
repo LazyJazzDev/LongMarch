@@ -808,22 +808,13 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
     return nullptr;
   }
 
-  void BindDownloads(rhi::ISubmissionToken *submission) override {
-    for (const auto &token : downloads_)
-      token->BindSubmission(submission);
+  // This mock rejects downloads; native download ownership is tested separately.
+  void BindDownloads(rhi::ISubmissionToken *) override {
   }
 
   void ReleaseDownloads() override {
-    downloads_.clear();
   }
 
- private:
-  IDownloadToken *RegisterDownload(ObjectPtr<IBackendDownloadToken> token) {
-    downloads_.push_back(token);
-    return rhi::QueryInterfacePtr<rhi::IDownloadToken>(token.Get()).Detach();
-  }
-
- public:
   IDownloadToken *CmdDownloadBuffer(IBuffer *, uint64_t, uint64_t) override {
     recording_failed_ = true;
     return nullptr;
@@ -982,7 +973,6 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
   IBackendQueue *queue_{};
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
   bool submitted_{};
-  std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};
 };
 
 class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQueue> {

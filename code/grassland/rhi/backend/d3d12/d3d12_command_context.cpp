@@ -937,7 +937,7 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uint
     recording_failed_ = true;
     return nullptr;
   }
-  return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(CreateD3D12DownloadToken(std::move(lease), size)));
+  return RegisterDownload(ObjectPtr<ID3D12DownloadToken>::Adopt(CreateD3D12DownloadToken(std::move(lease), size)));
 }
 
 IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
@@ -1003,8 +1003,7 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const I
       layout.stencil_offset = stencil.Offset + uint64_t(region.y) * stencil.Footprint.RowPitch + region.x;
       layout.stencil_pitch = stencil.Footprint.RowPitch;
     }
-    return RegisterDownload(
-        ObjectPtr<IBackendDownloadToken>::Adopt(CreateD3D12DownloadToken(std::move(lease), layout)));
+    return RegisterDownload(ObjectPtr<ID3D12DownloadToken>::Adopt(CreateD3D12DownloadToken(std::move(lease), layout)));
   }
   const uint64_t pitch =
       (packed + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) & ~(uint64_t(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) - 1);
@@ -1027,7 +1026,7 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const I
   dst.PlacedFootprint.Footprint = {native->NativeImage()->GetDesc().Format, width, height, 1, static_cast<UINT>(pitch)};
   D3D12_BOX box{region.x, region.y, 0, region.x + width, region.y + height, 1};
   list_->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
-  return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(
+  return RegisterDownload(ObjectPtr<ID3D12DownloadToken>::Adopt(
       CreateD3D12DownloadToken(std::move(lease), DownloadLayout{0, pitch, packed, height})));
 }
 
@@ -1154,7 +1153,7 @@ void D3D12CommandContextImpl::ReleaseDownloads() {
   downloads_.clear();
 }
 
-IDownloadToken *D3D12CommandContextImpl::RegisterDownload(ObjectPtr<IBackendDownloadToken> token) {
+IDownloadToken *D3D12CommandContextImpl::RegisterDownload(ObjectPtr<ID3D12DownloadToken> token) {
   downloads_.push_back(token);
   return rhi::QueryInterfacePtr<IDownloadToken>(token.Get()).Detach();
 }

@@ -129,7 +129,7 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBacke
 
  private:
   // Call before encoding each resource use. Retains each exact object once.
-  IDownloadToken *RegisterDownload(ObjectPtr<IBackendDownloadToken> token);
+  IDownloadToken *RegisterDownload(ObjectPtr<ID3D12DownloadToken> token);
 
   template <typename T, std::enable_if_t<!std::is_convertible_v<T *, rhi::IObject *>, int> = 0>
   bool RetainResource(T *resource) {
@@ -156,6 +156,6 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBacke
   ID3D12Queue *queue_{};
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
   bool submitted_{};
-  std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};
+  std::vector<ObjectPtr<ID3D12DownloadToken>> downloads_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

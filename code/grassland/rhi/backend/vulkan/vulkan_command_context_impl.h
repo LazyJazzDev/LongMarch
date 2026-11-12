@@ -123,7 +123,7 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBack
 
  private:
   // Call before encoding each resource use. Retains each exact object once.
-  IDownloadToken *RegisterDownload(ObjectPtr<IBackendDownloadToken> token);
+  IDownloadToken *RegisterDownload(ObjectPtr<IVulkanDownloadToken> token);
 
   template <typename T, std::enable_if_t<!std::is_convertible_v<T *, rhi::IObject *>, int> = 0>
   bool RetainResource(T *resource) {
@@ -150,6 +150,6 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBack
   IVulkanQueue *queue_{};
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
   bool submitted_{};
-  std::vector<ObjectPtr<IBackendDownloadToken>> downloads_{};
+  std::vector<ObjectPtr<IVulkanDownloadToken>> downloads_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

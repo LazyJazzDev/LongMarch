@@ -10,7 +10,6 @@ namespace grassland::rhi::backend {
 class IBackendBuffer;
 class IBackendCommandContext;
 class IBackendDevice;
-class IBackendDownloadToken;
 class IBackendImage;
 class IBackendQueue;
 class IBackendShaderBindingTable;

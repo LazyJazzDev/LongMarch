@@ -16,6 +16,7 @@ class IVulkanBuffer;
 class IVulkanComputeProgram;
 class IVulkanCore;
 class IVulkanDevice;
+class IVulkanDownloadToken;
 class IVulkanImage;
 class IVulkanProgram;
 class IVulkanProgramBase;

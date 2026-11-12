@@ -911,7 +911,7 @@ IDownloadToken *VulkanCommandContextImpl::CmdDownloadBuffer(IBuffer *buffer, uin
   }
   if (!TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
     return nullptr;
-  return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(CreateVulkanDownloadToken(std::move(lease), size)));
+  return RegisterDownload(ObjectPtr<IVulkanDownloadToken>::Adopt(CreateVulkanDownloadToken(std::move(lease), size)));
 }
 
 IDownloadToken *VulkanCommandContextImpl::CmdDownloadImage(IImage *image, const ImageDownloadRegion &region) {
@@ -969,7 +969,7 @@ IDownloadToken *VulkanCommandContextImpl::CmdDownloadImage(IImage *image, const 
   }
   if (!TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT))
     return nullptr;
-  return RegisterDownload(ObjectPtr<IBackendDownloadToken>::Adopt(CreateVulkanDownloadToken(
+  return RegisterDownload(ObjectPtr<IVulkanDownloadToken>::Adopt(CreateVulkanDownloadToken(
       std::move(lease), DownloadLayout{0, pitch, packed, height, stencil ? pitch * height : 0, stencil ? width : 0})));
 }
 
@@ -1096,7 +1096,7 @@ void VulkanCommandContextImpl::ReleaseDownloads() {
   downloads_.clear();
 }
 
-IDownloadToken *VulkanCommandContextImpl::RegisterDownload(ObjectPtr<IBackendDownloadToken> token) {
+IDownloadToken *VulkanCommandContextImpl::RegisterDownload(ObjectPtr<IVulkanDownloadToken> token) {
   downloads_.push_back(token);
   return rhi::QueryInterfacePtr<IDownloadToken>(token.Get()).Detach();
 }

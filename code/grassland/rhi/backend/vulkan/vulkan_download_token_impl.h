@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackendDownloadToken> {
+class VulkanDownloadTokenImpl final : public Object<rhi::IDownloadToken, IVulkanDownloadToken> {
  public:
   VulkanDownloadTokenImpl(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size);
 
@@ -34,7 +34,7 @@ class VulkanDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBacken
   }
 
  private:
-  bool CopyData(void *destination) const override;
+  bool CopyData(void *destination) const;
 
   ObjectPtr<IVulkanTemporalBufferLease> lease_;
 

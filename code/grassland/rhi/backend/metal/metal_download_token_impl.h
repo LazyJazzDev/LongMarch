@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackendDownloadToken> {
+class MetalDownloadTokenImpl final : public Object<rhi::IDownloadToken, IMetalDownloadToken> {
  public:
   MetalDownloadTokenImpl(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size);
 
@@ -34,7 +34,7 @@ class MetalDownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackend
   }
 
  private:
-  bool CopyData(void *destination) const override;
+  bool CopyData(void *destination) const;
 
   ObjectPtr<IMetalTemporalBufferLease> lease_;
 

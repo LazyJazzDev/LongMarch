@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12DownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackendDownloadToken> {
+class D3D12DownloadTokenImpl final : public Object<rhi::IDownloadToken, ID3D12DownloadToken> {
  public:
   D3D12DownloadTokenImpl(ObjectPtr<ID3D12TemporalBufferLease> lease, uint64_t size);
 
@@ -34,7 +34,7 @@ class D3D12DownloadTokenImpl final : public Object<rhi::IDownloadToken, IBackend
   }
 
  private:
-  bool CopyData(void *destination) const override;
+  bool CopyData(void *destination) const;
 
   ObjectPtr<ID3D12TemporalBufferLease> lease_;
 

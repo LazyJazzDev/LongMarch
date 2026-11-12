@@ -43,12 +43,12 @@ bool MetalDownloadTokenImpl::CopyData(void *destination) const {
   return true;
 }
 
-IBackendDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size) {
+IMetalDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size) {
   return new MetalDownloadTokenImpl(lease, size);
 }
 
-IBackendDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease,
-                                                const DownloadLayout &layout) {
+IMetalDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease,
+                                              const DownloadLayout &layout) {
   return new MetalDownloadTokenImpl(lease, layout);
 }
 }  // namespace grassland::rhi::backend::metal

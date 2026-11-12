@@ -38,12 +38,12 @@ bool VulkanDownloadTokenImpl::CopyData(void *destination) const {
   return true;
 }
 
-IBackendDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size) {
+IVulkanDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease, uint64_t size) {
   return new VulkanDownloadTokenImpl(lease, size);
 }
 
-IBackendDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease,
-                                                 const DownloadLayout &layout) {
+IVulkanDownloadToken *CreateVulkanDownloadToken(ObjectPtr<IVulkanTemporalBufferLease> lease,
+                                                const DownloadLayout &layout) {
   return new VulkanDownloadTokenImpl(lease, layout);
 }
 }  // namespace grassland::rhi::backend::vulkan
