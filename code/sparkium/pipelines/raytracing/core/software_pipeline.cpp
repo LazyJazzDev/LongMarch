@@ -4,7 +4,6 @@
 #include <array>
 #include <limits>
 #include <sstream>
-#include <stdexcept>
 
 #include "sparkium/core/render_layout.h"
 #include "sparkium/pipelines/raytracing/core/camera.h"
@@ -18,7 +17,7 @@ uint32_t LeafCount(size_t count) {
   // 64 threads per group, at most 65535 groups on baseline Vulkan/D3D12.
   // Rounding to a power of two limits each tree to 2^21 actual leaves.
   if (count > (uint32_t(1) << 21))
-    throw std::runtime_error("software BVH exceeds 2097152 leaves per tree");
+    return 0;
   uint32_t result = 1;
   while (result < count)
     result *= 2;
@@ -49,7 +48,7 @@ static_assert(sizeof(GPUInstance) == 112, "Slang software instance layout change
 
 SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query) : core_(core), ray_query_(ray_query) {
   if (ray_query_ && !core_->GetDevice()->SupportRayQuery())
-    throw std::runtime_error("native ray queries are unavailable on the selected backend");
+    core_->ReportFailure("native ray queries are unavailable on the selected backend");
   static_assert(sizeof(BuildParameters) == 256, "uniform buffer alignment");
 }
 
@@ -249,6 +248,8 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
                                      uint32_t sdr_count,
                                      uint32_t hdr_count,
                                      Camera *camera) {
+  if (!core_->IsValid() || !commands || !camera)
+    return false;
   auto device = core_->GetDevice();
   const std::string camera_file = camera->ShaderFile();
   const std::string camera_entry = camera->EntryPoint();
@@ -259,6 +260,8 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
   if (16ull + instances_.size() * sizeof(GPUInstance) > std::numeric_limits<uint32_t>::max())
     return core_->ReportFailure("software instance byte address overflow");
   const uint32_t tlas_leaves = ray_query_ ? 1 : LeafCount(instances_.size());
+  if (!tlas_leaves)
+    return core_->ReportFailure("software BVH exceeds 2097152 leaves per tree");
   uint64_t node_count = uint64_t(tlas_leaves) * 2 - 1;
   uint32_t max_leaves = tlas_leaves;
   for (const auto &instance : instances_) {
@@ -266,6 +269,8 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
                                  [&](const GeometryLayout &g) { return g.geometry == instance.geometry; });
     if (geometry == geometries.end()) {
       const uint32_t count = instance.geometry->PrimitiveCount(), leaves = ray_query_ ? 1 : LeafCount(count);
+      if (!leaves)
+        return core_->ReportFailure("software BVH exceeds 2097152 leaves per tree");
       if (node_count + uint64_t(leaves) * 2 - 1 > std::numeric_limits<uint32_t>::max() / 32u)
         return core_->ReportFailure("software BVH node address overflow");
       geometries.push_back(

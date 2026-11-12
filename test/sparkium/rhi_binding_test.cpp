@@ -2,9 +2,13 @@
 
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/virtual_file_system.h"
+#include "sparkium/core/camera.h"
 #include "sparkium/core/render_layout.h"
 #include "sparkium/core/resource_updates.h"
+#include "sparkium/material/material_shader_graph.h"
+#include "sparkium/pipelines/raytracing/core/camera.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
+#include "sparkium/pipelines/raytracing/material/material_shader_graph.h"
 
 namespace {
 using namespace grassland;
@@ -42,6 +46,61 @@ TEST_P(SparkiumBindingTest, InvalidGeometryLightShaderReturnsFailureWithoutThrow
   });
   EXPECT_FALSE(core->IsValid());
   EXPECT_EQ(tracing->GetGeometryLightPowerProgram("#error invalid geometry for failure regression", ""), nullptr);
+}
+
+TEST_P(SparkiumBindingTest, InvalidMaterialHitShadersReturnFailureWithoutThrowing) {
+  if (!device_->SupportRayTracingPipeline())
+    GTEST_SKIP() << "Native hit shaders are unavailable";
+  auto core = sparkium::Core::Create(device_.Get());
+  ASSERT_TRUE(core);
+  sparkium::MaterialShaderGraph material(core.get(), "#error invalid material for failure regression", {});
+  sparkium::raytracing::MaterialShaderGraph tracing(material);
+  ASSERT_TRUE(core->IsValid());
+  EXPECT_NO_THROW(tracing.PrepareHitShaders());
+  EXPECT_FALSE(core->IsValid());
+  EXPECT_EQ(tracing.RenderClosestHitShader(), nullptr);
+  EXPECT_EQ(tracing.ShadowClosestHitShader(), nullptr);
+  EXPECT_EQ(tracing.ShadowAnyHitShader(), nullptr);
+  EXPECT_NO_THROW(tracing.PrepareHitShaders());
+}
+
+TEST_P(SparkiumBindingTest, InvalidCameraShaderReturnsFailureWithoutThrowing) {
+  if (!device_->SupportRayTracingPipeline())
+    GTEST_SKIP() << "Native callable shaders are unavailable";
+  auto core = sparkium::Core::Create(device_.Get());
+  ASSERT_TRUE(core);
+  auto *tracing = sparkium::raytracing::DedicatedCast(core.get());
+  ASSERT_TRUE(tracing);
+
+  class InvalidCamera : public sparkium::raytracing::Camera {
+   public:
+    explicit InvalidCamera(sparkium::raytracing::Core *core)
+        : Camera(core, "missing-camera-for-failure-regression.slang", "CameraMain") {
+    }
+
+    IBuffer *Buffer() override {
+      return nullptr;
+    }
+  } camera(tracing);
+
+  EXPECT_NO_THROW({ EXPECT_EQ(camera.Shader(), nullptr); });
+  EXPECT_FALSE(core->IsValid());
+  EXPECT_EQ(camera.Shader(), nullptr);
+}
+
+TEST_P(SparkiumBindingTest, UnsupportedCameraReturnsFailureWithoutThrowing) {
+  auto core = sparkium::Core::Create(device_.Get());
+  ASSERT_TRUE(core);
+
+  class UnsupportedCamera : public sparkium::Camera {
+   public:
+    explicit UnsupportedCamera(sparkium::Core *core) : Camera(core, glm::mat4(1.0f), 1.0f, 1.0f) {
+    }
+  } camera(core.get());
+
+  EXPECT_NO_THROW({ EXPECT_EQ(sparkium::raytracing::DedicatedCast(&camera), nullptr); });
+  EXPECT_FALSE(core->IsValid());
+  EXPECT_EQ(sparkium::raytracing::DedicatedCast(static_cast<sparkium::Camera *>(nullptr)), nullptr);
 }
 
 TEST_P(SparkiumBindingTest, UploadSnapshotsSurviveCanceledRecordingAndAcceptOnlyRecordedPrefix) {

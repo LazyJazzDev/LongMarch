@@ -173,10 +173,12 @@ bool RecordRender(sparkium::Core *core,
                   sparkium::Film *film,
                   bool software,
                   bool ray_query) {
-  auto rt_core = DedicatedCast(core);
+  if (!core || !core->IsValid() || !scene || !camera || !film || !commands)
+    return false;
   auto rt_scene = DedicatedCast(scene);
   auto rt_camera = DedicatedCast(camera);
-  return rt_scene->RecordRender(renderer, commands, updates, rt_camera, film, software, ray_query);
+  return core->IsValid() && rt_scene && rt_camera &&
+         rt_scene->RecordRender(renderer, commands, updates, rt_camera, film, software, ray_query);
 }
 
 }  // namespace sparkium::raytracing

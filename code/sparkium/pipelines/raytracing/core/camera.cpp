@@ -1,7 +1,5 @@
 #include "sparkium/pipelines/raytracing/core/camera.h"
 
-#include <stdexcept>
-
 #include "sparkium/camera/cameras.h"
 #include "sparkium/core/render_layout.h"
 #include "sparkium/pipelines/raytracing/camera/camera_pinhole.h"
@@ -17,12 +15,16 @@ Camera::Camera(Core *core, const std::string &shader_file, const std::string &en
 }
 
 rhi::IShader *Camera::Shader() {
+  if (!core_->IsValid())
+    return nullptr;
   if (!camera_shader_ && core_->GetDevice()->SupportRayTracingPipeline()) {
     auto shaders_vfs = core_->GetShadersVFS();
     camera_shader_ = core_->GetDevice()->CreateShader(shader_file_, entry_point_, rhi::SHADER_STAGE_CALLABLE,
                                                       &shaders_vfs, {"."}, {});
-    if (!camera_shader_)
-      throw std::runtime_error("failed to compile camera shader");
+    if (!camera_shader_) {
+      core_->ReportFailure("failed to compile camera shader");
+      return nullptr;
+    }
   }
   return camera_shader_.Get();
 }
@@ -44,7 +46,9 @@ const std::string &Camera::EntryPoint() const {
 Camera *DedicatedCast(sparkium::Camera *camera) {
   DEDICATED_CAST(camera, sparkium::CameraPinhole, CameraPinhole);
   DEDICATED_CAST(camera, sparkium::CameraThinLens, CameraThinLens);
-  throw std::invalid_argument("unsupported ray tracing camera model");
+  if (camera)
+    camera->GetCore()->ReportFailure("unsupported ray tracing camera model");
+  return nullptr;
 }
 
 }  // namespace sparkium::raytracing

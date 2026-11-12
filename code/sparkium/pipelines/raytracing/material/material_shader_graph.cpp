@@ -1,7 +1,5 @@
 #include "sparkium/pipelines/raytracing/material/material_shader_graph.h"
 
-#include <stdexcept>
-
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/scene.h"
 
@@ -19,6 +17,8 @@ MaterialShaderGraph::MaterialShaderGraph(sparkium::MaterialShaderGraph &material
 }
 
 void MaterialShaderGraph::PrepareHitShaders() {
+  if (!core_->IsValid())
+    return;
   if (closest_hit_shader_ && shadow_closest_hit_shader_ && shadow_any_hit_shader_)
     return;
   auto vfs = core_->GetShadersVFS();
@@ -32,7 +32,7 @@ void MaterialShaderGraph::PrepareHitShaders() {
   shadow_any_hit_shader_ = core_->GetDevice()->CreateShader("geometry/mesh/hit_group.slang", "ShadowAnyHit",
                                                             rhi::SHADER_STAGE_ANY_HIT, &vfs, {"."});
   if (!closest_hit_shader_ || !shadow_closest_hit_shader_ || !shadow_any_hit_shader_)
-    throw std::runtime_error("failed to compile shader graph material");
+    core_->ReportFailure("failed to compile shader graph material");
 }
 
 const CodeLines *MaterialShaderGraph::GraphImpl() const {

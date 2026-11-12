@@ -13,19 +13,25 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
   geometry_ = DedicatedCast(entity_.GetGeometry());
   material_ = DedicatedCast(entity_.GetMaterial());
 
-  if (!geometry_ || !material_)
-    throw std::runtime_error("ray tracing requires supported geometry and material components");
+  if (!geometry_ || !material_) {
+    core_->ReportFailure("ray tracing requires supported geometry and material components");
+    return;
+  }
 
   light_geom_mat_ = std::make_unique<LightGeometryMaterial>(core_, geometry_, material_, entity_.transform);
 }
 
 void EntityGeometryMaterial::PrepareHitGroups() {
+  if (!core_->IsValid())
+    return;
   if (hit_groups_.render_group.closest_hit)
     return;
   if (!core_->GetDevice()->SupportRayTracingPipeline())
     return;
 
   core_->PrepareBuiltinHitShaders();
+  if (!core_->IsValid())
+    return;
   if (dynamic_cast<GeometryMesh *>(geometry_)) {
     if (dynamic_cast<MaterialLambertian *>(material_)) {
       hit_groups_.render_group.closest_hit = core_->GetShader("mesh_lambertian_chit");
@@ -42,6 +48,8 @@ void EntityGeometryMaterial::PrepareHitGroups() {
       hit_groups_.shadow_group.closest_hit = core_->GetShader("mesh_specular_shadow_chit");
     } else if (auto graph = dynamic_cast<MaterialShaderGraph *>(material_)) {
       graph->PrepareHitShaders();
+      if (!core_->IsValid())
+        return;
       hit_groups_.render_group.closest_hit = graph->RenderClosestHitShader();
       hit_groups_.shadow_group.closest_hit = graph->ShadowClosestHitShader();
       hit_groups_.shadow_group.any_hit = graph->ShadowAnyHitShader();
@@ -59,20 +67,30 @@ void EntityGeometryMaterial::PrepareHitGroups() {
     hit_groups_.render_group.closest_hit = closest_hit_shader_.Get();
     hit_groups_.shadow_group.closest_hit = shadow_closest_hit_shader_.Get();
   }
+  if (!hit_groups_.render_group.closest_hit || !hit_groups_.shadow_group.closest_hit)
+    core_->ReportFailure("failed to prepare geometry material hit shaders");
 }
 
 void EntityGeometryMaterial::Update(Scene *scene) {
-  if (!geometry_ || !material_ || geometry_->PrimitiveCount() == 0)
+  if (!core_->IsValid() || !geometry_ || !material_ || geometry_->PrimitiveCount() == 0)
     return;
   material_->Update(scene);
+  if (!core_->IsValid())
+    return;
   int32_t light_index = scene->RegisterLight(light_geom_mat_.get());
+  if (!core_->IsValid())
+    return;
   int32_t instance_index;
   if (scene->SoftwareTracing()) {
-    if (!dynamic_cast<GeometryMesh *>(geometry_))
-      throw std::runtime_error("compute ray tracing currently requires triangle geometry");
+    if (!dynamic_cast<GeometryMesh *>(geometry_)) {
+      core_->ReportFailure("compute ray tracing currently requires triangle geometry");
+      return;
+    }
     instance_index = scene->RegisterSoftwareInstance(geometry_, material_, entity_.GetTransformation(), light_index);
   } else {
     PrepareHitGroups();
+    if (!core_->IsValid())
+      return;
     instance_index = scene->RegisterInstance(
         geometry_->BLAS(), entity_.GetTransformation(), scene->RegisterHitGroup(hit_groups_),
         scene->RegisterBuffer(geometry_->Buffer()), scene->RegisterBuffer(material_->Buffer()), light_index);

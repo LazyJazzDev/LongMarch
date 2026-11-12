@@ -220,7 +220,12 @@ int32_t Scene::RegisterHitGroup(const InstanceHitGroups &hit_group) {
 }
 
 bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Cursor &updates, Camera *camera) {
-  if (!software_tracing_ && (callable_shaders_.empty() || callable_shaders_[0] != camera->Shader()))
+  if (!core_->IsValid() || !commands || !camera)
+    return false;
+  auto *camera_shader = software_tracing_ ? nullptr : camera->Shader();
+  if (!software_tracing_ && !camera_shader)
+    return false;
+  if (!software_tracing_ && (callable_shaders_.empty() || callable_shaders_[0] != camera_shader))
     pipeline_dirty_ = true;
   for (auto &[entity, status] : entities_) {
     status.keep = false;
@@ -230,6 +235,8 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
   for (auto *entity : scene_.GetEntityOrder()) {
     const auto &status = scene_.GetEntities().at(entity);
     auto rt_entity = DedicatedCast(entity);
+    if (!core_->IsValid())
+      return false;
     if (rt_entity) {
       entities_[rt_entity].keep = true;
       entities_[rt_entity].active = status.active;
@@ -277,11 +284,13 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
     callable_shaders_.clear();
     callable_shader_map_.clear();
     if (!software_tracing_)
-      RegisterCallableShader(camera->Shader());
+      RegisterCallableShader(camera_shader);
   }
   for (auto *entity : ordered_entities) {
     if (entities_.at(entity).active) {
       entity->Update(this);
+      if (!core_->IsValid())
+        return false;
     }
   }
   if (!core_->RecordUpdates(commands, updates))
