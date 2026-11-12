@@ -1,3 +1,5 @@
+#include "grassland/rhi/rhi.h"
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -8,11 +10,8 @@
 #include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_queue.h"
-#include "grassland/rhi/rhix/rhix.h"
 
-namespace grassland::rhix {
-using namespace rhi;
-namespace backend = rhi::backend;
+namespace grassland::rhi {
 using namespace backend;
 
 namespace {
@@ -209,72 +208,64 @@ TEST(RhiSelection, RankingPrefersHardwareThenMemoryAndFeaturesWithStableTies) {
 
 TEST(RhiCore, AutoSelectionForwardsOnlyTheSelectedIdAndPreservesAllFeatures) {
   Calls calls;
-  auto core = Core(new TestCore(
+  auto core = ObjPtr<ICore>(new TestCore(
       std::vector<PhysicalDevice>{MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_DEDICATED, 24, false, false, true),
                                   MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_INTEGRATED, 8, true, true, true)},
       calls));
-  auto device = core.CreateDeviceByAutoSelection({false, true, false});
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection({false, true, false});
   ASSERT_TRUE(device);
   EXPECT_EQ(calls.selected, 1);
   EXPECT_EQ(calls.creates, 1);
-  EXPECT_TRUE(device.SupportRayTracingPipeline());
-  EXPECT_TRUE(device.SupportRayQuery());
-  EXPECT_TRUE(device.SupportGeometryShader());
-  auto explicit_device = core.CreateDevice(0);
+  EXPECT_TRUE(device->SupportRayTracingPipeline());
+  EXPECT_TRUE(device->SupportRayQuery());
+  EXPECT_TRUE(device->SupportGeometryShader());
+  ObjPtr<IDevice> explicit_device = core->CreateDevice(0);
   ASSERT_TRUE(explicit_device);
   EXPECT_EQ(calls.selected, 0);
-  EXPECT_FALSE(explicit_device.SupportRayQuery());
-  EXPECT_TRUE(explicit_device.SupportGeometryShader());
+  EXPECT_FALSE(explicit_device->SupportRayQuery());
+  EXPECT_TRUE(explicit_device->SupportGeometryShader());
 }
 
 TEST(RhiCore, InvalidIdsAndUnmatchedRequirementsNeverReachTheBackend) {
   Calls calls;
-  auto core = Core(new TestCore(
+  auto core = ObjPtr<ICore>(new TestCore(
       std::vector<PhysicalDevice>{MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_DEDICATED, 8, false, false, true)}, calls));
 #if !defined(NDEBUG)
-  EXPECT_FALSE(core.CreateDevice(-1));
-  EXPECT_FALSE(core.CreateDevice(1));
+  EXPECT_FALSE(ObjPtr<IDevice>(core->CreateDevice(-1)));
+  EXPECT_FALSE(ObjPtr<IDevice>(core->CreateDevice(1)));
 #endif
-  EXPECT_FALSE(core.CreateDeviceByAutoSelection({true, false, false}));
+  EXPECT_FALSE(ObjPtr<IDevice>(core->CreateDeviceByAutoSelection({true, false, false})));
   EXPECT_EQ(calls.creates, 0);
 }
 
 TEST(RhiCore, CreationFailureIsEmptyAndDoesNotSilentlyChooseAnotherDevice) {
   Calls calls;
   auto info = MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_DEDICATED, 8, true, true, true);
-  auto core = Core(new TestCore(std::vector<PhysicalDevice>{info, info}, calls, true));
-  EXPECT_FALSE(core.CreateDeviceByAutoSelection());
+  auto core = ObjPtr<ICore>(new TestCore(std::vector<PhysicalDevice>{info, info}, calls, true));
+  EXPECT_FALSE(ObjPtr<IDevice>(core->CreateDeviceByAutoSelection()));
   EXPECT_EQ(calls.selected, 0);
   EXPECT_EQ(calls.creates, 1);
 }
 
 TEST(RhiOwnership, CallerReleasesAllChildCopiesBeforeParent) {
-  static_assert(std::is_base_of_v<ObjectContainer, Core>);
-  static_assert(std::is_base_of_v<ObjectContainer, Device>);
-  static_assert(std::is_base_of_v<ObjectContainer, Window>);
-  static_assert(std::is_base_of_v<ObjectContainer, Image>);
-  static_assert(std::is_base_of_v<ObjectContainer, Queue>);
-  static_assert(std::is_base_of_v<ObjectContainer, SubmissionToken>);
-  static_assert(std::is_base_of_v<ObjectContainer, CommandContext>);
-  static_assert(sizeof(Core) == sizeof(ObjPtr<rhi::IObject>));
-  static_assert(sizeof(Image) == sizeof(ObjPtr<rhi::IObject>));
+  static_assert(sizeof(ObjPtr<ICore>) == sizeof(ObjPtr<rhi::IObject>));
+  static_assert(sizeof(ObjPtr<IImage>) == sizeof(ObjPtr<rhi::IObject>));
   Calls calls;
-  auto core = Core(new TestCore(
+  auto core = ObjPtr<ICore>(new TestCore(
       std::vector<PhysicalDevice>{MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_DEDICATED, 8, true, true, true)}, calls));
-  Core copy = core;
-  Core moved = std::move(copy);
+  ObjPtr<ICore> copy = core;
+  ObjPtr<ICore> moved = std::move(copy);
   EXPECT_FALSE(copy);
-  auto device = moved.CreateDevice(0);
+  ObjPtr<IDevice> device = moved->CreateDevice(0);
   core = {};
   EXPECT_TRUE((*static_cast<TestCore *>((moved).Get())).IsUniquelyOwned());
   EXPECT_EQ(calls.core_destructions, 0);
-  Device shared = device;
-  ObjectContainer &container = device;
-  container.Release();
-  container.Release();  // Empty release is safe and does not affect another copy.
+  ObjPtr<IDevice> shared = device;
+  device.Release();
+  device.Release();  // Empty release is safe and does not affect another copy.
   EXPECT_FALSE(device);
-  EXPECT_EQ(shared.Name(), "Test device");
-  EXPECT_TRUE(shared.SupportRayQuery());
+  EXPECT_EQ(shared->Name(), "Test device");
+  EXPECT_TRUE(shared->SupportRayQuery());
   EXPECT_EQ(calls.device_destructions, 0);
   shared.Release();
   EXPECT_EQ(calls.core_destructions, 0);
@@ -284,58 +275,47 @@ TEST(RhiOwnership, CallerReleasesAllChildCopiesBeforeParent) {
   EXPECT_TRUE(calls.device_destroyed_before_core);
 }
 
-TEST(RhiCore, EmptyHandlesAndUnavailableBackendFailSafely) {
-#if !defined(NDEBUG)
-  Core core;
-  EXPECT_TRUE(core.GetPhysicalDevices().empty());
-  EXPECT_FALSE(core.CreateDevice(0));
-  EXPECT_FALSE(core.CreateDeviceByAutoSelection());
-  Device device;
-  EXPECT_TRUE(device.Name().empty());
-  EXPECT_FALSE(device.SupportGeometryShader());
-  EXPECT_FALSE(device.SupportRayQuery());
-  EXPECT_FALSE(device.SupportRayTracingPipeline());
-#endif
-  EXPECT_FALSE(rhix::CreateCore(static_cast<BackendAPI>(-1)));
+TEST(RhiCore, UnavailableBackendFailsSafely) {
+  EXPECT_FALSE(rhi::CreateCore(static_cast<BackendAPI>(-1)));
 }
 
 class RhiNative : public testing::TestWithParam<BackendAPI> {};
 
 TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinations) {
-  auto core = rhix::CreateCore(GetParam());
+  ObjPtr<ICore> core = rhi::CreateCore(GetParam());
   ASSERT_TRUE(core);
-  const auto devices = core.GetPhysicalDevices();
+  const auto devices = core->GetPhysicalDevices();
   if (devices.empty())
     GTEST_SKIP() << "No compatible devices on this machine";
-  EXPECT_EQ(devices.size(), core.GetPhysicalDevices().size());
+  EXPECT_EQ(devices.size(), core->GetPhysicalDevices().size());
 #if !defined(NDEBUG)
-  EXPECT_FALSE(core.CreateDevice(-1));
-  EXPECT_FALSE(core.CreateDevice(static_cast<int32_t>(devices.size())));
+  EXPECT_FALSE(ObjPtr<IDevice>(core->CreateDevice(-1)));
+  EXPECT_FALSE(ObjPtr<IDevice>(core->CreateDevice(static_cast<int32_t>(devices.size()))));
 #endif
   for (size_t id = 0; id < devices.size(); ++id) {
-    auto device = core.CreateDevice(static_cast<int32_t>(id));
+    ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(id));
     ASSERT_TRUE(device) << devices[id].name;
-    EXPECT_EQ(device.Name(), devices[id].name);
-    EXPECT_EQ(device.SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
-    EXPECT_EQ(device.SupportRayQuery(), devices[id].ray_query_feature);
-    EXPECT_EQ(device.SupportGeometryShader(), devices[id].geometry_shader_feature);
+    EXPECT_EQ(device->Name(), devices[id].name);
+    EXPECT_EQ(device->SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
+    EXPECT_EQ(device->SupportRayQuery(), devices[id].ray_query_feature);
+    EXPECT_EQ(device->SupportGeometryShader(), devices[id].geometry_shader_feature);
   }
   for (unsigned mask = 0; mask < 8; ++mask) {
     DeviceFeatureRequirement requirement{bool(mask & 1), bool(mask & 2), bool(mask & 4)};
     const auto id = backend::SelectPhysicalDevice(devices, requirement);
-    auto device = core.CreateDeviceByAutoSelection(requirement);
+    ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(requirement);
     ASSERT_EQ(static_cast<bool>(device), id >= 0);
     if (id >= 0) {
-      EXPECT_EQ(device.Name(), devices[id].name);
-      EXPECT_EQ(device.SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
-      EXPECT_EQ(device.SupportRayQuery(), devices[id].ray_query_feature);
-      EXPECT_EQ(device.SupportGeometryShader(), devices[id].geometry_shader_feature);
+      EXPECT_EQ(device->Name(), devices[id].name);
+      EXPECT_EQ(device->SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
+      EXPECT_EQ(device->SupportRayQuery(), devices[id].ray_query_feature);
+      EXPECT_EQ(device->SupportGeometryShader(), devices[id].geometry_shader_feature);
     }
   }
-  auto device = core.CreateDeviceByAutoSelection();
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto name = device.Name();
-  EXPECT_EQ(device.Name(), name);
+  auto name = device->Name();
+  EXPECT_EQ(device->Name(), name);
   device.Release();
   core.Release();
 }
@@ -357,4 +337,4 @@ std::vector<BackendAPI> NativeBackends() {
 INSTANTIATE_TEST_SUITE_P(Backends, RhiNative, testing::ValuesIn(NativeBackends()));
 
 }  // namespace
-}  // namespace grassland::rhix
+}  // namespace grassland::rhi

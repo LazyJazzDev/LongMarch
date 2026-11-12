@@ -9,11 +9,9 @@
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
-#include "grassland/rhi/rhix/rhix.h"
+#include "grassland/rhi/rhi.h"
 
-namespace grassland::rhix {
-using namespace rhi;
-namespace backend = rhi::backend;
+namespace grassland::rhi {
 
 namespace {
 
@@ -65,10 +63,10 @@ class RetentionProbeImage final : public backend::Object<IImage, backend::metal:
 TEST(RhiMetal, FrontendAndNativeImageUsesShareOneRetentionEntry) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP();
-  auto core = rhix::CreateCore(BACKEND_API_METAL);
-  auto device = core.CreateDeviceByAutoSelection();
+  ObjPtr<ICore> core = rhi::CreateCore(BACKEND_API_METAL);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto window = device.CreateGLFWWindow({160, 120, "Metal canonical resource identity"});
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Metal canonical resource identity"});
   ASSERT_TRUE(window);
   bool destroyed = false;
   auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get());
@@ -76,7 +74,7 @@ TEST(RhiMetal, FrontendAndNativeImageUsesShareOneRetentionEntry) {
   ASSERT_TRUE(backing);
   auto probe = new RetentionProbeImage(native.Get(), backing.Detach(), destroyed);
   ObjPtr<IImage> image = probe;
-  auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
+  ObjPtr<ICommandContext> context = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   std::array<uint8_t, 64> pixels{};
   ASSERT_TRUE(context.Get()->CmdUploadImage(image.Get(), pixels.data(), 16));
   // Disabled ImGui still records frontend resource ownership, without drawing.
@@ -94,15 +92,15 @@ TEST(RhiMetal, ExplicitWindowDrawingRejectsAnActiveRenderPass) {
 #else
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP();
-  auto core = rhix::CreateCore(BACKEND_API_METAL);
-  auto device = core.CreateDeviceByAutoSelection();
+  ObjPtr<ICore> core = rhi::CreateCore(BACKEND_API_METAL);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto window = device.CreateGLFWWindow({160, 120, "Metal render-pass diagnostics"});
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Metal render-pass diagnostics"});
   ASSERT_TRUE(window);
-  auto image = device.CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> image = device->CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(image);
   for (bool present : {false, true}) {
-    auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
+    ObjPtr<ICommandContext> context = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     rhi::RenderingInfo info;
     info.color_attachments.push_back({image.Get()});
     ASSERT_TRUE(context.Get()->CmdBeginRendering(info));
@@ -110,16 +108,17 @@ TEST(RhiMetal, ExplicitWindowDrawingRejectsAnActiveRenderPass) {
       EXPECT_FALSE(context.Get()->CmdPresentImage(window.Get(), image.Get(), COLOR_SPACE_SRGB_NONLINEAR));
     else
       EXPECT_FALSE(context.Get()->CmdDrawImGui(window.Get(), image.Get()));
-    EXPECT_FALSE(std::move(context).Submit());
+    EXPECT_FALSE(ObjPtr<ISubmissionToken>(context->Submit()));
+    context.Release();
   }
 #endif
 }
 
 TEST(RhiMetal, NativeCompilationErrorsReachConsole) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto core = rhix::CreateCore(BACKEND_API_METAL, {true});
+  ObjPtr<ICore> core = rhi::CreateCore(BACKEND_API_METAL, {true});
   ASSERT_TRUE(core);
-  auto device = core.CreateDeviceByAutoSelection();
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get();
   NS::Error *error = nullptr;
@@ -141,9 +140,9 @@ TEST(RhiMetal, NativeCompilationErrorsReachConsole) {
 TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   for (bool enabled : {CoreDesc{}.enable_debug, false, true, false}) {
-    auto core = rhix::CreateCore(BACKEND_API_METAL, {enabled});
+    ObjPtr<ICore> core = rhi::CreateCore(BACKEND_API_METAL, {enabled});
     ASSERT_TRUE(core);
-    auto device = core.CreateDeviceByAutoSelection();
+    ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
     auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get();
     ObjPtr<IQueue> queue_owner = device.Get()->GetQueue(QUEUE_TYPE_MAIN);
@@ -164,24 +163,25 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     ASSERT_EQ(commands->status(), MTL::CommandBufferStatusCompleted);
     for (size_t i = 0; i < 256; ++i)
       EXPECT_EQ(static_cast<const uint8_t *>(buffer->contents())[i], 0x5a);
-    auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
-    auto context = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
+    ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+    ObjPtr<ICommandContext> context = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(queue);
     ASSERT_TRUE(context);
-    auto done = std::move(context).Submit();
+    ObjPtr<ISubmissionToken> done = context->Submit();
+    context.Release();
     ASSERT_TRUE(done);
-    EXPECT_TRUE(done.WaitHost());
+    EXPECT_TRUE(done->WaitHost());
   }
 }
 
 TEST(RhiMetal, CapabilitiesMatchNativeDeviceAndEnumerationRemainsStable) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto core = rhix::CreateCore(BACKEND_API_METAL);
+  ObjPtr<ICore> core = rhi::CreateCore(BACKEND_API_METAL);
   ASSERT_TRUE(core);
-  const auto devices = core.GetPhysicalDevices();
+  const auto devices = core->GetPhysicalDevices();
   ASSERT_FALSE(devices.empty());
   for (size_t id = 0; id < devices.size(); ++id) {
-    auto device = core.CreateDevice(static_cast<int32_t>(id));
+    ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(id));
     ASSERT_TRUE(device);
     auto native = QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get())->NativeDevice();
     ASSERT_NE(native, nullptr);
@@ -193,23 +193,23 @@ TEST(RhiMetal, CapabilitiesMatchNativeDeviceAndEnumerationRemainsStable) {
               native->hasUnifiedMemory() ? PHYSICAL_DEVICE_TYPE_INTEGRATED : PHYSICAL_DEVICE_TYPE_DEDICATED);
     EXPECT_EQ(devices[id].dedicated_memory, 0u);
   }
-  const auto again = core.GetPhysicalDevices();
+  const auto again = core->GetPhysicalDevices();
   ASSERT_EQ(again.size(), devices.size());
   for (size_t id = 0; id < devices.size(); ++id) {
     EXPECT_EQ(again[id].name, devices[id].name);
     EXPECT_EQ(again[id].unified_memory, devices[id].unified_memory);
     EXPECT_EQ(again[id].ray_query_feature, devices[id].ray_query_feature);
   }
-  EXPECT_FALSE(core.CreateDeviceByAutoSelection({true, false, false}));
-  EXPECT_FALSE(core.CreateDeviceByAutoSelection({false, false, true}));
+  EXPECT_FALSE(ObjPtr<IDevice>(core->CreateDeviceByAutoSelection({true, false, false})));
+  EXPECT_FALSE(ObjPtr<IDevice>(core->CreateDeviceByAutoSelection({false, false, true})));
 }
 
 TEST(RhiMetal, NativeDeviceExecutesWorkBeforeParentRelease) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto core = rhix::CreateCore(BACKEND_API_METAL);
+  ObjPtr<ICore> core = rhi::CreateCore(BACKEND_API_METAL);
   ASSERT_TRUE(core);
-  auto first = core.CreateDeviceByAutoSelection();
-  auto device = core.CreateDeviceByAutoSelection();
+  ObjPtr<IDevice> first = core->CreateDeviceByAutoSelection();
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(first);
   ASSERT_TRUE(device);
   first = {};
@@ -279,32 +279,33 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Requires a desktop.";
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto core = rhix::CreateCore(BACKEND_API_METAL);
-  auto device = core.CreateDeviceByAutoSelection();
+  ObjPtr<ICore> core = rhi::CreateCore(BACKEND_API_METAL);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto queue = device.GetQueue(QUEUE_TYPE_MAIN);
-  auto first = device.CreateGLFWWindow({160, 120, "Metal readback A"});
-  auto second = device.CreateGLFWWindow({160, 120, "Metal readback B"});
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IWindow> first = device->CreateGLFWWindow({160, 120, "Metal readback A"});
+  ObjPtr<IWindow> second = device->CreateGLFWWindow({160, 120, "Metal readback B"});
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
-  auto a = first.GetNextImage();
-  auto b = second.GetNextImage();
-  auto clear = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
-  ASSERT_TRUE(clear.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
-  ASSERT_TRUE(clear.CmdClearImage(b, {0.0f, 1.0f, 0.0f, 1.0f}));
-  ASSERT_TRUE(clear.CmdClearImage(a, {0.6f, 0.7f, 0.8f, 1.0f}));
-  auto done = std::move(clear).Submit();
-  ASSERT_TRUE(done.WaitHost());
+  ObjPtr<IImage> a = first->GetNextImage();
+  ObjPtr<IImage> b = second->GetNextImage();
+  ObjPtr<ICommandContext> clear = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+  ASSERT_TRUE(clear->CmdClearImage(a.Get(), {1.0f, 0.0f, 0.0f, 1.0f}));
+  ASSERT_TRUE(clear->CmdClearImage(b.Get(), {0.0f, 1.0f, 0.0f, 1.0f}));
+  ASSERT_TRUE(clear->CmdClearImage(a.Get(), {0.6f, 0.7f, 0.8f, 1.0f}));
+  ObjPtr<ISubmissionToken> done = clear->Submit();
+  clear.Release();
+  ASSERT_TRUE(done->WaitHost());
   {
-    auto abandoned = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
-    ASSERT_TRUE(abandoned.CmdClearImage(a, {1.0f, 0.0f, 0.0f, 1.0f}));
+    ObjPtr<ICommandContext> abandoned = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+    ASSERT_TRUE(abandoned->CmdClearImage(a.Get(), {1.0f, 0.0f, 0.0f, 1.0f}));
   }
   auto native = rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get();
   ObjPtr<IQueue> queue_owner = device.Get()->GetQueue(QUEUE_TYPE_MAIN);
   auto native_queue = rhi::QueryInterfacePtr<backend::metal::IMetalQueue>(queue_owner.Get()).Get();
   auto readback = NS::TransferPtr(native->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
   ASSERT_TRUE(readback);
-  auto check = [&](const Image &image, std::array<int, 4> expected) {
+  auto check = [&](const ObjPtr<IImage> &image, std::array<int, 4> expected) {
     auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
     auto texture = rhi::QueryInterfacePtr<backend::metal::IMetalImage>(image.Get()).Get()->NativeImage();
@@ -322,31 +323,32 @@ TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   check(b, {0, 255, 0, 255});
   a.Release();
   b.Release();
-  std::vector<Image> old_images;
+  std::vector<ObjPtr<IImage>> old_images;
   for (int i = 0; i < 12; ++i) {
-    old_images.push_back(first.GetNextImage());
-    auto present = device.GetQueue(QUEUE_TYPE_MAIN).CreateCommandContext();
-    ASSERT_TRUE(present.CmdPresent(first));
-    auto presented = std::move(present).Submit();
+    old_images.push_back(first->GetNextImage());
+    ObjPtr<ICommandContext> present = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+    ASSERT_TRUE(present->CmdPresent(first.Get()));
+    ObjPtr<ISubmissionToken> presented = present->Submit();
+    present.Release();
     ASSERT_TRUE(presented);
-    ASSERT_TRUE(presented.WaitHost());
+    ASSERT_TRUE(presented->WaitHost());
   }
 }
 
 TEST(RhiMetal, ResizeAndRestoreAfterModeChangeWhileMinimized) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Requires a desktop.";
-  auto core = rhix::CreateCore(BACKEND_API_METAL);
-  auto device = core.CreateDeviceByAutoSelection();
-  auto window = device.CreateGLFWWindow({160, 120, "Metal resize test", PRESENT_MODE_CONTINUOUS});
+  ObjPtr<ICore> core = rhi::CreateCore(BACKEND_API_METAL);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Metal resize test", PRESENT_MODE_CONTINUOUS});
   ASSERT_TRUE(window);
-  EXPECT_EQ(window.GetPresentMode(), PRESENT_MODE_CONTINUOUS);
+  EXPECT_EQ(window->GetPresentMode(), PRESENT_MODE_CONTINUOUS);
   int user_data = 42;
-  glfwSetWindowUserPointer(window.GLFWWindow(), &user_data);
-  glfwSetWindowSize(window.GLFWWindow(), 300, 200);
+  glfwSetWindowUserPointer(window->GLFWWindow(), &user_data);
+  glfwSetWindowSize(window->GLFWWindow(), 300, 200);
   auto poll_until = [&](auto predicate) {
     for (int i = 0; i < 200; ++i) {
-      if (!Window::PollEvents())
+      if (!rhi::PollEvents())
         return false;
       if (predicate())
         return true;
@@ -356,22 +358,22 @@ TEST(RhiMetal, ResizeAndRestoreAfterModeChangeWhileMinimized) {
   };
   ASSERT_TRUE(poll_until([&] {
     int width, height;
-    glfwGetFramebufferSize(window.GLFWWindow(), &width, &height);
-    auto image = window.GetNextImage();
-    return image && image.GetDesc().width == width && image.GetDesc().height == height;
+    glfwGetFramebufferSize(window->GLFWWindow(), &width, &height);
+    ObjPtr<IImage> image = window->GetNextImage();
+    return image && image->GetDesc().width == width && image->GetDesc().height == height;
   }));
-  EXPECT_EQ(glfwGetWindowUserPointer(window.GLFWWindow()), &user_data);
-  EXPECT_EQ(window.GetPresentMode(), PRESENT_MODE_CONTINUOUS);
-  ASSERT_TRUE(window.SetPresentMode(PRESENT_MODE_VSYNC));
-  glfwIconifyWindow(window.GLFWWindow());
-  ASSERT_TRUE(poll_until([&] { return glfwGetWindowAttrib(window.GLFWWindow(), GLFW_ICONIFIED); }));
-  EXPECT_FALSE(window.GetNextImage());
-  ASSERT_TRUE(window.SetPresentMode(PRESENT_MODE_CONTINUOUS));
-  glfwRestoreWindow(window.GLFWWindow());
-  ASSERT_TRUE(poll_until([&] { return !glfwGetWindowAttrib(window.GLFWWindow(), GLFW_ICONIFIED); }));
-  EXPECT_TRUE(window.GetNextImage());
-  EXPECT_EQ(window.GetPresentMode(), PRESENT_MODE_CONTINUOUS);
+  EXPECT_EQ(glfwGetWindowUserPointer(window->GLFWWindow()), &user_data);
+  EXPECT_EQ(window->GetPresentMode(), PRESENT_MODE_CONTINUOUS);
+  ASSERT_TRUE(window->SetPresentMode(PRESENT_MODE_VSYNC));
+  glfwIconifyWindow(window->GLFWWindow());
+  ASSERT_TRUE(poll_until([&] { return glfwGetWindowAttrib(window->GLFWWindow(), GLFW_ICONIFIED); }));
+  EXPECT_FALSE(ObjPtr<IImage>(window->GetNextImage()));
+  ASSERT_TRUE(window->SetPresentMode(PRESENT_MODE_CONTINUOUS));
+  glfwRestoreWindow(window->GLFWWindow());
+  ASSERT_TRUE(poll_until([&] { return !glfwGetWindowAttrib(window->GLFWWindow(), GLFW_ICONIFIED); }));
+  EXPECT_TRUE(ObjPtr<IImage>(window->GetNextImage()));
+  EXPECT_EQ(window->GetPresentMode(), PRESENT_MODE_CONTINUOUS);
 }
 
 }  // namespace
-}  // namespace grassland::rhix
+}  // namespace grassland::rhi

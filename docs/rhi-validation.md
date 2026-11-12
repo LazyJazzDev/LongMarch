@@ -32,7 +32,7 @@ before a command buffer completes; they are not forwarded through an RHI callbac
 
 ## Format-aware image clears
 
-RHI and RHIX use CmdClearImage(image, ClearValue). ColorAttachmentInfo and
+RHI uses CmdClearImage(image, ClearValue). ColorAttachmentInfo and
 DepthStencilAttachmentInfo store ClearColorValue and ClearDepthStencilValue
 respectively in clear_value. The image format selects the
 union member; initialize color.float32 for UNORM/SFLOAT colors, color.int32 for
@@ -90,7 +90,6 @@ std::vector<uint8_t> cpu(pixels->GetSize());
 if (!pixels->CopyTo(cpu.data(), cpu.size())) return false;
 ```
 
-RHIX exposes the same operations through `CommandContext` and `DownloadToken`.
 Query status only after the submission call has returned, and publish tokens to
 other threads only after submission. `GetStatus()` delegates to the associated
 SubmissionToken, or returns PENDING when no submission is associated. The caller
@@ -124,10 +123,7 @@ left-to-right and top-to-bottom without row padding. Color values retain their n
 encoding, including BGRA channel order, packed 10-bit channels and half floats.
 Depth readback tests use D32 only. Stencil-bearing images are not read back by default;
 stencil rendering tests verify the color output instead. All demo depth attachments
-use pure D32 float depth. RHIX cube capture downloads both color and D32 depth each frame,
-then saves the final matching pair at exit. `cube_depth.bin` retains float32 device
-depth; `cube_depth.png` is an 8-bit grayscale preview of depth 0–1, without gamma
-conversion or linearization.
+use pure D32 float depth.
 
 D16 returns uint16 normalized depth; D32 returns float depth. D24S8 readback is forbidden.
 D3D12 requires a full-subresource transfer for depth images; the token crops the
@@ -151,34 +147,21 @@ does not publish a second completion state to each DownloadToken.
 headless mode or capture options. Its launcher selects one backend, demo and device;
 each module owns its window loop. Use the RHI download tests for readback validation.
 
-`demo_rhix_hello` retains `--save-last-frame DIR`:
+Offscreen rendering and readback are covered by `test_rhi`:
 
 ```text
-demo_rhix_hello --backend d3d12 --all --headless --frames 30 --save-last-frame out/readback/d3d12
+test_rhi --gtest_filter=*RhiRasterizer*:*RhiDownload*
+python test/rhi/test_vulkan_rendering_paths.py path/to/test_rhi
 ```
 
-Each rendered module saves `<module>.png`, `<module>.bin` and `<module>.txt` at normal
-exit. The binary file contains the exact compact pixels; the text file records extent,
-format, color space, row pitch and reference-white scale. PNG is an SDR preview:
-HDR is decoded relative to the window's reference white, converted to sRGB and clipped
-to its range. Use the binary file to inspect unclipped HDR values. Modules skipped
-for unavailable features or headless window requirements produce no capture. Different invocations should use separate
-directories to preserve previous results.
+The Python check uses the Vulkan SDK API-dump, validation and Profiles layers to
+verify core dynamic rendering, KHR dynamic rendering and render-pass fallback.
+It runs the existing offscreen winding/culling regression and rejects any WSI calls.
 
-With --save-last-frame, every module records an image download after CmdPresent on
-every rendered frame (after rendering in headless mode), and directly retains only
-the newest DownloadToken and its image metadata. The render loop does not query,
-wait on, or copy this token. Normal exit waits on the final token, copies its pixels
-to CPU memory, and writes the files. Without the option, no image download, CPU
-image copy, or file output is performed. Each demo owns its recording/exit flow;
-save_image only encodes already downloaded CPU pixels.
-
-Both nbody modules download GPU velocities asynchronously and plot a 100-bin speed
+The RHI nbody module downloads GPU velocities asynchronously and plots a 100-bin speed
 histogram using the same binning and peak normalization as `nbody_cs`. Only one
 velocity download is pending at a time. Zero maximum speed is handled explicitly;
-non-finite velocities fail the demo. In RHIX, with frame capture enabled, `nbody_speeds.csv`
-contains the latest completed histogram, including bin edges, particle counts and
-normalized values. The curve can lag rendering by a frame or more while the GPU is
+non-finite velocities fail the demo. The curve can lag rendering by a frame or more while the GPU is
 busy. `*RhiDownload*` tests cover byte ranges, color/depth/stencil rectangles, compact
 rows, early token release, retained snapshots, abandoned recordings, rejected
 submissions remaining unassociated, direct and concurrent waits after releasing the
@@ -213,7 +196,7 @@ channel count. Vulkan checks the required color-format features before allocatio
 Attributes use `InputAttributeDesc`, whose `type` member selects the `InputType`.
 Each component occupies 32 bits. `InputTypeSize` returns the byte size; existing
 vertex binding, attribute location, offset, and stride semantics are unchanged.
-All RHI/RHIX call sites use the new names; old enum/type aliases are not retained.
+All RHI call sites use the new names; old enum/type aliases are not retained.
 
 Integer render targets require matching integer shader outputs and cannot enable
 blending. Clear values remain numeric floats in the public API (not reinterpreted

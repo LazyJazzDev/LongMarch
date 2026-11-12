@@ -267,10 +267,9 @@ an accidental second output-white adjustment in the presentation shader.
 - [GLFW build options](https://www.glfw.org/docs/latest/compile_guide.html)
 - [Vulkan HDR metadata](https://registry.khronos.org/vulkan/specs/latest/man/html/VK_EXT_hdr_metadata.html)
 
-## RHI / rhix HDR windows
+## RHI HDR windows
 
-The RHI and rhix hello HDR modules require a window; explicit headless requests
-are rejected, and headless `--all` runs skip HDR. They use a fixed 203-nit Linux PQ content reference
+The RHI hello HDR module requires a window. It uses a fixed 203-nit Linux PQ content reference
 white, linear scale 1 and unknown-headroom default 10. On Linux,
 `GetHDRReferenceWhiteNits` returns false without modifying its argument. RHI does
 not query Wayland color-management feedback or add protocol build dependencies.
@@ -278,8 +277,8 @@ These constants describe demo encoding policy, not measured display brightness.
 The optional Sparkium diagnostic described above remains separate.
 
 RHI exposes `COLOR_SPACE_BT709_LINEAR` when Vulkan advertises
-`RGBA16_FLOAT + BT709_LINEAR_EXT`. Both hello HDR demos show this as **Linear
-Rec.709** and write linear values directly, without PQ or sRGB encoding or scRGB
+`RGBA16_FLOAT + BT709_LINEAR_EXT`. The hello HDR demo shows this as **Linear
+Rec.709** and writes linear values directly, without PQ or sRGB encoding or scRGB
 white compensation. This is separate from scRGB; the compositor determines the
 luminance mapping. The existing Sparkium negotiation policy is unchanged.
 
