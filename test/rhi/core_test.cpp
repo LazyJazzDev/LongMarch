@@ -1,6 +1,6 @@
 ﻿#include <gtest/gtest.h>
 
-#include "grassland/rhi/rhix/rhix.h"
+#include "grassland/rhi/rhi.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include <d3d12sdklayers.h>
 
@@ -22,7 +22,7 @@ TEST(RhiCoreSettings, DefaultFollowsBuildConfiguration) {
 #if defined(LONGMARCH_D3D12_ENABLED)
 TEST(RhiCoreSettings, D3D12OverridesDefaultAcrossSequentialCores) {
   for (bool enabled : {false, true, false}) {
-    auto core = rhix::CreateCore(BACKEND_API_D3D12, {enabled});
+    ObjPtr<ICore> core = rhi::CreateCore(BACKEND_API_D3D12, {enabled});
     ASSERT_TRUE(core);
     ObjPtr<IDevice> device = core.Get()->CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);

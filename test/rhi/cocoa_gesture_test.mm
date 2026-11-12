@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 #include "grassland/rhi/backend/backend_glfw_helper.h"
-#include "grassland/rhi/rhix/rhix.h"
+#include "grassland/rhi/rhi.h"
 #define GLFW_EXPOSE_NATIVE_COCOA
 #import <Cocoa/Cocoa.h>
 #include <GLFW/glfw3native.h>
@@ -25,24 +25,24 @@ void CheckMagnify(grassland::rhi::BackendAPI api) {
     GTEST_SKIP() << "Requires a desktop.";
   using namespace grassland;
   using namespace grassland::rhi;
-  auto core = rhix::CreateCore(api);
+  ObjPtr<ICore> core = rhi::CreateCore(api);
   ASSERT_TRUE(core);
-  auto device = core.CreateDeviceByAutoSelection();
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto window = device.CreateGLFWWindow({320, 240, "RHI magnify test"});
-  auto other = device.CreateGLFWWindow({320, 240, "RHI gesture isolation"});
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "RHI magnify test"});
+  ObjPtr<IWindow> other = device->CreateGLFWWindow({320, 240, "RHI gesture isolation"});
   ASSERT_TRUE(window);
   ASSERT_TRUE(other);
-  ASSERT_TRUE(window.SupportsMagnifyGestures());
-  ASSERT_TRUE(other.SupportsMagnifyGestures());
+  ASSERT_TRUE(window->SupportsMagnifyGestures());
+  ASSERT_TRUE(other->SupportsMagnifyGestures());
   ASSERT_TRUE(rhi::PollEvents());
-  auto native = window.GLFWWindow();
+  auto native = window->GLFWWindow();
   NSWindow *cocoa = glfwGetCocoaWindow(native);
   std::vector<MagnifyGesture> events;
   int other_events = 0, scroll_events = 0;
-  auto callback = window.MagnifyEvent().RegisterCallback([&](const auto &event) { events.push_back(event); });
-  other.MagnifyEvent().RegisterCallback([&](const auto &) { ++other_events; });
-  window.ScrollEvent().RegisterCallback([&](double, double) { ++scroll_events; });
+  auto callback = window->MagnifyEvent().RegisterCallback([&](const auto &event) { events.push_back(event); });
+  other->MagnifyEvent().RegisterCallback([&](const auto &) { ++other_events; });
+  window->ScrollEvent().RegisterCallback([&](double, double) { ++scroll_events; });
   @autoreleasepool {
     auto event = [[[RHIMagnifyTestEvent alloc] init] autorelease];
     event.type = NSEventTypeMagnify;
@@ -58,7 +58,7 @@ void CheckMagnify(grassland::rhi::BackendAPI api) {
     for (int i = 0; i < 4; ++i) {
       event.phase = phases[i];
       event.magnification = 0.25;
-      rhi::backend::glfw::DispatchCocoaMagnifyEvent(other.GLFWWindow(), (NSEvent *)event);
+      rhi::backend::glfw::DispatchCocoaMagnifyEvent(other->GLFWWindow(), (NSEvent *)event);
       rhi::backend::glfw::DispatchCocoaMagnifyEvent(native, (NSEvent *)event);
       ASSERT_EQ(events.size(), i + 1);
       EXPECT_EQ(events.back().phase, expected[i]);
@@ -75,24 +75,24 @@ void CheckMagnify(grassland::rhi::BackendAPI api) {
     EXPECT_EQ(events.size(), 5);
     EXPECT_EQ(other_events, 0);
     EXPECT_EQ(scroll_events, 0);
-    window.MagnifyEvent().UnregisterCallback(callback);
+    window->MagnifyEvent().UnregisterCallback(callback);
     event.type = NSEventTypeMagnify;
     rhi::backend::glfw::DispatchCocoaMagnifyEvent(native, (NSEvent *)event);
     EXPECT_EQ(events.size(), 5);
     // Dropping the last external reference must not destroy the registry while
     // callbacks are running. The dispatcher's temporary retain covers both.
     bool continued = false;
-    window.MagnifyEvent().RegisterCallback([&](const auto &) { window.Release(); }, 200);
-    window.MagnifyEvent().RegisterCallback([&](const auto &) { continued = true; }, 100);
+    window->MagnifyEvent().RegisterCallback([&](const auto &) { window.Release(); }, 200);
+    window->MagnifyEvent().RegisterCallback([&](const auto &) { continued = true; }, 100);
     rhi::backend::glfw::DispatchCocoaMagnifyEvent(native, (NSEvent *)event);
     EXPECT_FALSE(window);
     EXPECT_TRUE(continued);
     // A stale registry key is ignored without dereferencing its old GLFW handle.
     rhi::backend::glfw::DispatchMagnifyEvent(native, {});
   }
-  auto replacement = device.CreateGLFWWindow({320, 240, "RHI gesture recreation"});
+  ObjPtr<IWindow> replacement = device->CreateGLFWWindow({320, 240, "RHI gesture recreation"});
   ASSERT_TRUE(replacement);
-  EXPECT_TRUE(replacement.SupportsMagnifyGestures());
+  EXPECT_TRUE(replacement->SupportsMagnifyGestures());
   EXPECT_TRUE(rhi::PollEvents());
 }
 }  // namespace

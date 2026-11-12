@@ -15,5 +15,3 @@ if(WIN32)
 endif()
 
 add_subdirectory(backend)
-
-add_subdirectory(rhix)

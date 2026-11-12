@@ -15,7 +15,6 @@
 #endif
 
 #include "grassland/rhi/rhi.h"
-#include "grassland/rhi/rhix/rhix.h"
 
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
@@ -83,22 +82,23 @@ float4 PSMain():SV_Target0 { return settings.color; }
 }
 
 TEST_P(RhiProgram, DiskAndMemoryShadersUseOfficialPreprocessing) {
-  auto core = rhix::CreateCore(GetParam());
+  ObjPtr<ICore> core = rhi::CreateCore(GetParam());
   ASSERT_TRUE(core);
-  auto device = core.CreateDeviceByAutoSelection();
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   const auto filename = (std::filesystem::path(__FILE__).parent_path() / "shaders/include_compute.slang").string();
-  auto shader = device.CreateShader(filename, "CSMain", SHADER_STAGE_COMPUTE);
+  ObjPtr<IShader> shader = device->CreateShader(filename, "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(shader);
-  auto program = device.CreateComputeProgram({shader.Get()});
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get()});
   ASSERT_TRUE(program);
-  auto memory = device.CreateShaderFromSource("[numthreads(1,1,1)] void CSMain() {}", "CSMain", SHADER_STAGE_COMPUTE);
+  ObjPtr<IShader> memory =
+      device->CreateShaderFromSource("[numthreads(1,1,1)] void CSMain() {}", "CSMain", SHADER_STAGE_COMPUTE);
   ASSERT_TRUE(memory);
-  EXPECT_EQ(memory.GetStage(), SHADER_STAGE_COMPUTE);
-  EXPECT_EQ(memory.GetEntry(), "CSMain");
-  EXPECT_NE(memory.GetPreprocessedCode().find("CSMain"), std::string::npos);
+  EXPECT_EQ(memory->GetStage(), SHADER_STAGE_COMPUTE);
+  EXPECT_EQ(memory->GetEntry(), "CSMain");
+  EXPECT_NE(memory->GetPreprocessedCode().find("CSMain"), std::string::npos);
   // The helper's temporary VFS has already been destroyed.
-  EXPECT_TRUE(device.CreateComputeProgram({memory.Get()}));
+  EXPECT_TRUE(ObjPtr<IComputeProgram>(device->CreateComputeProgram({memory.Get()})));
   VirtualFileSystem fs;
   fs.WriteFile("lib/settings.slang", "#if ENABLED\n#define GROUP_SIZE 1\n#else\n#error missing define\n#endif\n");
   fs.WriteFile("main.slang", "#include <settings.slang>\n[numthreads(GROUP_SIZE,1,1)] void CSMain() {}");
@@ -108,25 +108,25 @@ TEST_P(RhiProgram, DiskAndMemoryShadersUseOfficialPreprocessing) {
   desc.file_system = &fs;
   desc.include_paths = {"lib"};
   desc.defines = {{"ENABLED", "1"}};
-  auto configured = device.CreateShader(desc);
+  ObjPtr<IShader> configured = device->CreateShader(desc);
   ASSERT_TRUE(configured);
-  EXPECT_TRUE(device.CreateComputeProgram({configured.Get()}));
-  auto file_overload =
-      device.CreateShader("main.slang", "CSMain", SHADER_STAGE_COMPUTE, &fs, {"lib"}, {{"ENABLED", "1"}});
+  EXPECT_TRUE(ObjPtr<IComputeProgram>(device->CreateComputeProgram({configured.Get()})));
+  ObjPtr<IShader> file_overload =
+      device->CreateShader("main.slang", "CSMain", SHADER_STAGE_COMPUTE, &fs, {"lib"}, {{"ENABLED", "1"}});
   ASSERT_TRUE(file_overload);
-  EXPECT_TRUE(device.CreateComputeProgram({file_overload.Get()}));
+  EXPECT_TRUE(ObjPtr<IComputeProgram>(device->CreateComputeProgram({file_overload.Get()})));
   const std::string source_with_include =
       "#if ENABLED != 7\n#error missing define\n#endif\n"
       "#include <include_settings.slang>\n[numthreads(GROUP_SIZE,1,1)] void CSMain() {}";
   const std::vector<std::string> disk_paths{std::filesystem::path(filename).parent_path().generic_u8string()};
-  auto source_overload = device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, disk_paths,
-                                                       {{"ENABLED", "7"}});
+  ObjPtr<IShader> source_overload = device->CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE,
+                                                                   disk_paths, {{"ENABLED", "7"}});
   ASSERT_TRUE(source_overload);
-  EXPECT_TRUE(device.CreateComputeProgram({source_overload.Get()}));
-  EXPECT_FALSE(
-      device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, {}, {{"ENABLED", "7"}}));
-  EXPECT_FALSE(device.CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, disk_paths,
-                                             {{"ENABLED", "0"}}));
+  EXPECT_TRUE(ObjPtr<IComputeProgram>(device->CreateComputeProgram({source_overload.Get()})));
+  EXPECT_FALSE(ObjPtr<IShader>(
+      device->CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE, {}, {{"ENABLED", "7"}})));
+  EXPECT_FALSE(ObjPtr<IShader>(device->CreateShaderFromSource(source_with_include, "CSMain", SHADER_STAGE_COMPUTE,
+                                                              disk_paths, {{"ENABLED", "0"}})));
 }
 
 TEST_P(RhiProgram, ShaderPreprocessingReportsMissingIncludesAndDirectiveErrors) {
