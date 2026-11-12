@@ -75,7 +75,7 @@ class Scene : public Object {
   rhi::ObjPtr<rhi::IShader> raygen_shader_;
   rhi::ObjPtr<rhi::IShader> default_miss_shader_;
   rhi::ObjPtr<rhi::IShader> shadow_miss_shader_;
-  rhi::ObjPtr<rhi::IRayTracingProgram> rt_program_;
+  std::shared_ptr<const rhi::RayTracingProgramDesc> render_description_;
   NativeTLAS tlas_;
   std::map<Entity *, EntityStatus> entities_;
 

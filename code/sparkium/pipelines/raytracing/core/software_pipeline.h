@@ -18,8 +18,8 @@ class SoftwarePipeline {
                      uint32_t hdr_count,
                      Camera *camera);
 
-  rhi::IComputeProgram *Program() const {
-    return render_program_.Get();
+  std::shared_ptr<const rhi::ComputeProgramDesc> RenderDescription() const {
+    return render_description_;
   }
 
   rhi::ITopLevelAccelerationStructure *AccelerationStructure() const {
@@ -105,7 +105,7 @@ class SoftwarePipeline {
   std::vector<rhi::ObjPtr<rhi::IShader>> builder_shaders_;
   std::vector<rhi::ObjPtr<rhi::IComputeProgram>> builders_;
   rhi::ObjPtr<rhi::IShader> render_shader_;
-  rhi::ObjPtr<rhi::IComputeProgram> render_program_;
+  std::shared_ptr<const rhi::ComputeProgramDesc> render_description_;
   rhi::ObjPtr<rhi::IBindingGroup> render_group_, build_group_;
 };
 }  // namespace sparkium::raytracing

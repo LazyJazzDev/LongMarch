@@ -192,7 +192,6 @@ float Transmission(HitRecord hit, float3 direction) {
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("software_materials.slang", source.str());
   vfs.WriteFile("software_camera.slang", "#include \"" + camera_file + "\"\n");
-  render_program_.Release();
   std::vector<std::pair<std::string, std::string>> defines{{"SOFTWARE_DATA_BUFFER_COUNT", std::to_string(buffers)}};
   defines.emplace_back("SPARKIUM_CAMERA_ENTRY", camera_entry);
   if (ray_query_)
@@ -206,17 +205,17 @@ float Transmission(HitRecord hit, float3 direction) {
   rhi::ComputeProgramDesc desc;
   desc.compute_shader = render_shader_.Get();
   desc.pipeline_layout = RayTracingLayout(!ray_query_, buffers, sdr_count, hdr_count);
-  render_program_ = core_->GetDevice()->CreateComputeProgram(desc);
-  if (!render_program_)
-    return core_->ReportFailure("failed to create compute path tracing pipeline");
   render_group_ = core_->GetDevice()->CreateBindingGroup(desc.pipeline_layout.groups[SPARKIUM_GROUP_SCENE]);
+  if (!render_group_)
+    return core_->ReportFailure("failed to create compute path tracing bindings");
+  render_description_ = std::make_shared<const rhi::ComputeProgramDesc>(std::move(desc));
   camera_file_ = camera_file;
   camera_entry_ = camera_entry;
   material_sources_ = materials;
   buffer_count_ = buffers;
   sdr_count_ = sdr_count;
   hdr_count_ = hdr_count;
-  return render_program_ && render_group_;
+  return true;
 }
 
 void SoftwarePipeline::AppendBuild(std::vector<BuildPass> &passes, BuildParameters parameters) {
@@ -335,7 +334,7 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
       return false;
     if (!native_tlas_.Record(device, commands, updates, native_instances))
       return core_->ReportFailure("failed to build native ray query TLAS");
-    if (!render_program_ || camera_file_ != camera_file || camera_entry_ != camera_entry ||
+    if (!render_description_ || camera_file_ != camera_file || camera_entry_ != camera_entry ||
         materials != material_sources_ || buffer_count_ != buffers.size() || sdr_count_ != sdr_count ||
         hdr_count_ != hdr_count)
       if (!CompileRenderer(materials, buffers.size(), sdr_count, hdr_count, camera_file, camera_entry))
@@ -345,7 +344,7 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
   if (builders_.empty() || builder_buffer_count_ != buffers.size())
     if (!CompileBuilders(buffers.size()))
       return false;
-  if (!render_program_ || camera_file_ != camera_file || camera_entry_ != camera_entry ||
+  if (!render_description_ || camera_file_ != camera_file || camera_entry_ != camera_entry ||
       materials != material_sources_ || buffer_count_ != buffers.size() || sdr_count_ != sdr_count ||
       hdr_count_ != hdr_count)
     if (!CompileRenderer(materials, buffers.size(), sdr_count, hdr_count, camera_file, camera_entry))

@@ -98,8 +98,8 @@ bool Scene::RecordRender(sparkium::Renderer &renderer,
       !scene_group->BindResource(SPARKIUM_SCENE_SAMPLERS, std::vector{linear_sampler_.Get(), nearest_sampler_.Get()}) ||
       !core_->RecordUpdates(commands, updates) || !film->RecordReset(commands))
     return false;
-  if (!(software ? commands->CmdBindComputeProgram(software_pipeline_->Program())
-                 : commands->CmdBindRayTracingProgram(rt_program_.Get())))
+  if (!(software ? renderer.RecordProgram(commands, software_pipeline_->RenderDescription())
+                 : renderer.RecordProgram(commands, render_description_)))
     return false;
   if (!commands->CmdBindGroup(SPARKIUM_GROUP_FILM, film->AccumulationGroup()) ||
       !commands->CmdBindGroup(SPARKIUM_GROUP_SCENE, scene_group) ||
@@ -324,7 +324,7 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
     RegisterBuffer(camera->Buffer());
 
   if (pipeline_dirty_ || buffers_.size() > buffer_capacity_ || sdr_images_.size() > sdr_image_capacity_ ||
-      hdr_images_.size() > hdr_image_capacity_ || (!software_tracing_ && !rt_program_)) {
+      hdr_images_.size() > hdr_image_capacity_ || (!software_tracing_ && !render_description_)) {
     if (!software_tracing_) {
       rhi::RayTracingProgramDesc desc;
       desc.ray_generation = raygen_shader_.Get();
@@ -338,12 +338,10 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
       }
       desc.callable_shaders = callable_shaders_;
       desc.pipeline_layout = RayTracingLayout(false, buffers_.size(), sdr_images_.size(), hdr_images_.size());
-      rt_program_ = core_->GetDevice()->CreateRayTracingProgram(desc);
-      if (!rt_program_)
-        return core_->ReportFailure("failed to create ray tracing pipeline");
       render_group_ = core_->GetDevice()->CreateBindingGroup(desc.pipeline_layout.groups[SPARKIUM_GROUP_SCENE]);
       if (!render_group_)
         return core_->ReportFailure("failed to create ray tracing scene bindings");
+      render_description_ = std::make_shared<const rhi::RayTracingProgramDesc>(std::move(desc));
     }
 
     if (buffers_.size() > buffer_capacity_ || !gather_light_power_program_) {

@@ -435,6 +435,13 @@ TEST_F(SoftwareBVHTest, CameraModelsSwitchWithoutStalePrograms) {
     lens.aperture_radius = 0.5f;
     EXPECT_NE(render(&lens, pipeline), reference);
     EXPECT_EQ(render(&pinhole, pipeline), reference);
+    // A prepared scene must work with independent Renderer-owned program caches,
+    // including switching back to a renderer that already used this scene version.
+    auto previous_renderer = std::move(renderer);
+    renderer = std::make_unique<sparkium::Renderer>(core.get());
+    EXPECT_EQ(render(&pinhole, pipeline), reference);
+    renderer.swap(previous_renderer);
+    EXPECT_EQ(render(&pinhole, pipeline), reference);
   }
 }
 
