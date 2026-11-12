@@ -11,6 +11,11 @@ target_link_libraries(sparkium_rhi_test PRIVATE Sparkium grassland_rhi GTest::gt
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_rhi_test)
 add_test(NAME sparkium_rhi COMMAND sparkium_rhi_test)
 
+add_executable(sparkium_browser_test browser_renderer_test.cpp ../../demo/sparkium_gui/browser_renderer.cpp)
+target_link_libraries(sparkium_browser_test PRIVATE Sparkium grassland_rhi GTest::gtest_main)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_browser_test)
+add_test(NAME sparkium_browser COMMAND sparkium_browser_test)
+
 # Optional diagnostic only: no Wayland protocol/header dependency for normal
 # builds, including Linux/X11, Windows and macOS.
 option(LONGMARCH_ENABLE_WAYLAND_COLOR_PROBE "Build the native Wayland reference-white diagnostic" OFF)
