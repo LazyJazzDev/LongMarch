@@ -20,8 +20,9 @@ target_link_libraries(sparkium_browser_test PRIVATE Sparkium grassland_rhi GTest
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_browser_test)
 add_test(NAME sparkium_browser COMMAND sparkium_browser_test)
 
-add_executable(sparkium_worker_test render_worker_test.cpp ../../demo/thin_lens/thin_lens_scene.cpp)
-target_link_libraries(sparkium_worker_test PRIVATE Sparkium grassland_rhi GTest::gtest_main)
+add_executable(sparkium_worker_test render_worker_test.cpp ../../demo/thin_lens/thin_lens_scene.cpp
+    ../../demo/franka_kinematics/franka_scene.cpp)
+target_link_libraries(sparkium_worker_test PRIVATE Sparkium grassland_rhi GTest::gtest_main ${ASSIMP_LIB_NAME})
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_worker_test)
 add_test(NAME sparkium_worker COMMAND sparkium_worker_test)
 

@@ -1,4 +1,4 @@
-file(GLOB_RECURSE DEMO_SOURCES "*.cpp" "*.h")
+set(DEMO_SOURCES main.cpp franka_scene.cpp franka_scene.h)
 
 add_executable(${DEMO_NAME} ${DEMO_SOURCES})
 

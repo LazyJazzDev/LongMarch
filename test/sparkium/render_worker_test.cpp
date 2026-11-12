@@ -5,6 +5,7 @@
 #include <chrono>
 #include <thread>
 
+#include "../../demo/franka_kinematics/franka_scene.h"
 #include "../../demo/thin_lens/thin_lens_scene.h"
 
 namespace {
@@ -190,6 +191,79 @@ TEST_P(RenderWorkerTest, FiniteBudgetsPreserveExistingAccumulation) {
   const auto expected = read(image->Image());
   ASSERT_EQ(expected.size(), 32u * 24u * 4u * sizeof(float));
   EXPECT_EQ(read(final->Image()), expected);
+}
+
+TEST_P(RenderWorkerTest, FrankaSnapshotsPreserveJointHistoryAndPipelineSwitches) {
+  ObjPtr<ICore> native = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(native);
+  ObjPtr<IDevice> device = native->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ASSERT_TRUE(queue);
+  auto direct = FrankaScene::Create(device.Get(), 48, 24);
+  ASSERT_TRUE(direct);
+  FrankaScene::Settings settings;
+  using FrankaWorker = sparkium::RenderWorker<FrankaScene>;
+  FrankaWorker worker([&] { return FrankaScene::Create(device.Get(), 48, 24); }, settings, 8, true);
+  auto wait = [&](uint64_t revision, int samples) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    while (std::chrono::steady_clock::now() < deadline && worker.GetState().error.empty()) {
+      auto frame = worker.Latest();
+      if (frame && frame->revision == revision && frame->samples == samples)
+        return frame;
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return std::shared_ptr<const FrankaWorker::Frame>{};
+  };
+  auto read = [&](IImage *source, ISubmissionToken *rendered) {
+    std::vector<uint8_t> pixels;
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+    if (!commands)
+      return pixels;
+    ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(source);
+    SubmitInfo dependencies;
+    dependencies.waits.push_back(rendered->GetEvent());
+    ObjPtr<ISubmissionToken> done = commands->Submit(dependencies);
+    if (!download || !done || !done->WaitHost())
+      return pixels;
+    pixels.resize(download->GetSize());
+    if (!download->CopyTo(pixels.data(), pixels.size()))
+      pixels.clear();
+    return pixels;
+  };
+  auto reference = [&](int samples) {
+    EXPECT_TRUE(direct->Configure(settings));
+    auto output = direct->GetFilm()->AcquireOutput(true);
+    if (!output)
+      return std::vector<uint8_t>{};
+    auto submitted = direct->Submit(samples, output->Image(), true, {});
+    return submitted ? read(output->Image(), submitted.Get()) : std::vector<uint8_t>{};
+  };
+  auto first = wait(1, 8);
+  ASSERT_TRUE(first) << worker.GetState().error;
+  auto original = read(first->Image(), first->rendered.Get());
+  ASSERT_EQ(original.size(), 48u * 24u * 4u * sizeof(float));
+  EXPECT_EQ(original, reference(8));
+  for (size_t i = 0; i < settings.joints.size(); ++i)
+    settings.joints[i] = (FrankaScene::joint_lower[i] + FrankaScene::joint_upper[i]) * 0.5f;
+  auto moved = wait(worker.Configure(settings, 8, true), 8);
+  ASSERT_TRUE(moved) << worker.GetState().error;
+  auto moved_pixels = read(moved->Image(), moved->rendered.Get());
+  EXPECT_EQ(moved_pixels, reference(8));
+  EXPECT_NE(moved_pixels, original);
+  EXPECT_EQ(read(first->Image(), first->rendered.Get()), original);
+  moved.reset();
+  settings.ray_tracing = false;
+  auto raster = wait(worker.Configure(settings, 1, true), 1);
+  ASSERT_TRUE(raster) << worker.GetState().error;
+  EXPECT_EQ(read(raster->Image(), raster->rendered.Get()), reference(1));
+  raster.reset();
+  settings.ray_tracing = true;
+  auto resumed = wait(worker.Configure(settings, 8, true), 8);
+  ASSERT_TRUE(resumed) << worker.GetState().error;
+  EXPECT_EQ(read(resumed->Image(), resumed->rendered.Get()), reference(8));
+  worker.Stop();
+  EXPECT_EQ(read(first->Image(), first->rendered.Get()), original);
 }
 
 std::vector<BackendAPI> Backends() {
