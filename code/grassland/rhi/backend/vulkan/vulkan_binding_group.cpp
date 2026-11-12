@@ -185,7 +185,7 @@ bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
   native_images.reserve(images.size());
   for (auto image : images) {
     auto native_image = rhi::QueryInterfacePtr<IVulkanImage>(image);
-    if (!native_image)
+    if (!native_image || !native_image->BindingView())
       return false;
     native_images.push_back(native_image.Get());
   }

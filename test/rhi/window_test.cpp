@@ -461,6 +461,28 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
   EXPECT_EQ(mouse_events, 2);
 }
 
+TEST_P(RhiWindow, SwapchainImagesCannotBeBoundAsTextures) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 on a desktop.";
+  if (GetParam() != BACKEND_API_VULKAN && GetParam() != BACKEND_API_D3D12)
+    GTEST_SKIP();
+  ObjPtr<ICore> core = rhi::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({128, 128, "Texture binding contract"});
+  ASSERT_TRUE(window);
+  ObjPtr<IImage> frame = window->GetNextImage();
+  ASSERT_TRUE(frame);
+  ObjPtr<IImage> texture = device->CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ASSERT_TRUE(texture);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup({{{0, BINDING_TEXTURE2D, 2}}});
+  ASSERT_TRUE(group);
+  EXPECT_FALSE(group->BindResource(0, std::vector<IImage *>{texture.Get(), frame.Get()}));
+  EXPECT_TRUE(group->BindResource(0, std::vector<IImage *>{texture.Get(), texture.Get()}));
+  EXPECT_FALSE(group->BindResource(0, frame.Get()));
+}
+
 TEST_P(RhiWindow, SwapchainRejectsAssistQueueDuringRecording) {
 #if defined(NDEBUG)
   GTEST_SKIP() << "Invalid queue diagnostics require a debug build.";

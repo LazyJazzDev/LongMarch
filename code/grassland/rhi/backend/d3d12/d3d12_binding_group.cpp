@@ -16,6 +16,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
+#include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_buffer.h"
 #include "grassland/rhi/rhi_device.h"
@@ -175,7 +176,7 @@ bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
   native_images.reserve(images.size());
   for (auto image : images) {
     auto native_image = rhi::QueryInterfacePtr<ID3D12Image>(image);
-    if (!native_image)
+    if (!native_image || rhi::QueryInterfacePtr<ID3D12SwapChainImage>(image))
       return false;
     native_images.push_back(native_image.Get());
   }

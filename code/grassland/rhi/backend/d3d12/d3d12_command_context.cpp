@@ -1181,9 +1181,13 @@ bool D3D12CommandContextImpl::RetainResource(rhi::IObject *resource) {
 #endif
   if (recording_failed_)
     return false;
+  auto identity = rhi::QueryInterfacePtr<rhi::IObject>(resource);
+  if (!identity)
+    return false;
+  resource = identity.Get();
   if (resources_.find(resource) != resources_.end())
     return true;
-  resources_.emplace(resource, ObjectPtr<rhi::IObject>::Retain(resource));
+  resources_.emplace(resource, ObjectPtr<rhi::IObject>::Adopt(identity.Detach()));
 
   return true;
 }
