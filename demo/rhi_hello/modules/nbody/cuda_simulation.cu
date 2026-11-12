@@ -5,6 +5,12 @@
 namespace {
 constexpr unsigned block_size = 128;
 
+__device__ float RsqrtFTZ(float x) {
+  float result;
+  asm("rsqrt.approx.ftz.f32 %0, %1;" : "=f"(result) : "f"(x));
+  return result;
+}
+
 __global__ void NBodyStep(const float3 *positions,
                           float3 *velocities,
                           float3 *next_positions,
@@ -22,8 +28,8 @@ __global__ void NBodyStep(const float3 *positions,
 #pragma unroll 128
     for (unsigned i = 0; i < remaining; ++i) {
       const float3 difference = make_float3(position.x - tile[i].x, position.y - tile[i].y, position.z - tile[i].z);
-      float inverse = rsqrtf(difference.x * difference.x + difference.y * difference.y + difference.z * difference.z +
-                             0.00125f * 0.00125f);
+      float inverse = RsqrtFTZ(difference.x * difference.x + difference.y * difference.y + difference.z * difference.z +
+                               0.00125f * 0.00125f);
       const float force = inverse * inverse * inverse * (-delta_t * gravity);
       acceleration.x += difference.x * force;
       acceleration.y += difference.y * force;
