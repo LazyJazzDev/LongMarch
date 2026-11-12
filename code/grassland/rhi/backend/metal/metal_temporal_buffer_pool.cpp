@@ -3,25 +3,6 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalTemporalBufferLeaseImpl final : public Object<rhi::IBuffer, IMetalTemporalBufferLease> {
- public:
-  MetalTemporalBufferLeaseImpl(MetalTemporalBufferPool *pool, IMetalAllocatedBuffer *buffer, size_t level);
-  ~MetalTemporalBufferLeaseImpl() override;
-  BufferDesc GetDesc() const override;
-  MTL::Buffer *NativeBuffer() const override;
-  bool Read(void *data, uint64_t size, uint64_t offset = 0);
-  bool Write(const void *data, uint64_t size);
-
- private:
-  MetalTemporalBufferPool *pool_;
-  IMetalAllocatedBuffer *buffer_;
-  size_t level_;
-
- public:
-  IMetalDevice *Owner() const override {
-    return buffer_->Owner();
-  }
-};
 
 IMetalTemporalBufferLease *IMetalTemporalBufferLease::Create(MetalTemporalBufferPool *pool,
                                                              IMetalAllocatedBuffer *buffer,

@@ -21,4 +21,24 @@ class IMetalTemporalBufferLease : public IMetalBuffer {
   static void ReturnBuffer(MetalTemporalBufferPool *pool, IMetalAllocatedBuffer *buffer, size_t level);
 };
 
+class MetalTemporalBufferLeaseImpl final : public Object<rhi::IBuffer, IMetalTemporalBufferLease> {
+ public:
+  MetalTemporalBufferLeaseImpl(MetalTemporalBufferPool *pool, IMetalAllocatedBuffer *buffer, size_t level);
+  ~MetalTemporalBufferLeaseImpl() override;
+  BufferDesc GetDesc() const override;
+  MTL::Buffer *NativeBuffer() const override;
+  bool Read(void *data, uint64_t size, uint64_t offset = 0);
+  bool Write(const void *data, uint64_t size);
+
+ private:
+  MetalTemporalBufferPool *pool_;
+  IMetalAllocatedBuffer *buffer_;
+  size_t level_;
+
+ public:
+  IMetalDevice *Owner() const override {
+    return buffer_->Owner();
+  }
+};
+
 }  // namespace grassland::rhi::backend::metal
