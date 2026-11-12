@@ -210,10 +210,12 @@ struct PractiumDemoScene::State {
     }
     const int batch_samples = std::min(samples, remaining_samples);
     scene.GetRenderScene()->settings.samples_per_dispatch = batch_samples;
-    auto submitted = renderer->Submit(
-        scene.GetRenderScene(), camera.get(), film.get(),
-        settings.ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION, output, hdr,
-        dependencies);
+    auto submitted = renderer->Submit(scene.GetRenderScene(), camera.get(), film.get(),
+                                      settings.ray_tracing ? (owner->GetRenderCore()->GetDevice()->SupportRayQuery()
+                                                                  ? sparkium::RENDER_PIPELINE_RAY_QUERY
+                                                                  : sparkium::RENDER_PIPELINE_RT_FALLBACK)
+                                                           : sparkium::RENDER_PIPELINE_RASTERIZATION,
+                                      output, hdr, dependencies);
     if (submitted && owner->GetRenderCore()->IsValid())
       remaining_samples -= batch_samples;
     return submitted;

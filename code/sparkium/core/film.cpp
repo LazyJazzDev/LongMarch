@@ -122,6 +122,11 @@ void Film::AcceptRender(int samples, rhi::IImage *target) {
       output->initialized_ = true;
   reset_pending_ = false;
   info.accumulated_samples += samples;
+  accepted_sample_count_ += samples;
+}
+
+uint64_t Film::GetAcceptedSampleCount() const {
+  return accepted_sample_count_;
 }
 
 Core *Film::GetCore() const {

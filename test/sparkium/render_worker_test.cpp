@@ -284,6 +284,28 @@ TEST_P(RenderWorkerTest, FrankaSnapshotsPreserveJointHistoryAndPipelineSwitches)
   EXPECT_EQ(read(first->Image(), first->rendered.Get()), original);
 }
 
+TEST_P(RenderWorkerTest, PractiumFirstTracingSubmissionPreservesRevisionProgress) {
+  ObjPtr<ICore> native = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(native);
+  ObjPtr<IDevice> device = native->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  PractiumDemoScene::Settings settings;
+  settings.ray_tracing = false;
+  using PhysicsWorker = sparkium::RenderWorker<PractiumDemoScene>;
+  PhysicsWorker worker([&] { return PractiumDemoScene::Create(device.Get(), 48, 36); }, settings, 64, false, 1);
+  auto raster = worker.WaitForFrame(1, 64);
+  ASSERT_TRUE(raster) << worker.GetState().error;
+  EXPECT_EQ(raster->samples, 64);
+  settings.ray_tracing = true;
+  const auto revision = worker.Configure(settings, 32, false, 8);
+  auto traced = worker.WaitForFrame(revision, 32);
+  ASSERT_TRUE(traced) << worker.GetState().error;
+  EXPECT_EQ(traced->revision, revision);
+  EXPECT_EQ(traced->samples, 32);
+  EXPECT_TRUE(traced->rendered->WaitHost());
+  worker.Stop();
+}
+
 TEST_P(RenderWorkerTest, PractiumBatchesPreservePhysicsStepsAndResetSequence) {
   ObjPtr<ICore> native = CreateCore(GetParam(), {true});
   ASSERT_TRUE(native);

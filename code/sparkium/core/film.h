@@ -27,6 +27,8 @@ class Film : public Object {
   // Only the submission owner may advance the CPU accumulation state, after
   // the corresponding render submission has been accepted.
   void AcceptRender(int samples, rhi::IImage *output = nullptr);
+  // Monotonic accepted work; unlike accumulation history, Reset does not clear it.
+  uint64_t GetAcceptedSampleCount() const;
   rhi::IBindingGroup *AccumulationGroup() const;
 
   class Output {
@@ -74,6 +76,7 @@ class Film : public Object {
   std::array<std::shared_ptr<Output>, kOutputSlots> outputs_;
   Core *core_;
   bool reset_pending_{true};
+  uint64_t accepted_sample_count_{};
   rhi::ObjPtr<rhi::IImage> accumulated_color_, accumulated_samples_;
   rhi::ObjPtr<rhi::IBindingGroup> accumulation_group_, resolve_group_;
 

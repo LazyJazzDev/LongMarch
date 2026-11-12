@@ -267,20 +267,20 @@ class RenderWorker {
       rhi::SubmitInfo dependencies;
       if (displayed)
         dependencies.waits.push_back(displayed->GetEvent());
-      const int accumulated_before = film->info.accumulated_samples;
+      const auto accepted_before = film->GetAcceptedSampleCount();
       auto submitted = backend->Submit(samples, frame ? frame->Image() : nullptr, active.hdr, dependencies);
       if (!submitted) {
         Fail("Cannot submit rendering");
         return;
       }
-      const int accepted_samples = film->info.accumulated_samples - accumulated_before;
-      if (accepted_samples <= 0 || accepted_samples > samples) {
+      const auto accepted_samples = film->GetAcceptedSampleCount() - accepted_before;
+      if (accepted_samples == 0 || accepted_samples > static_cast<uint64_t>(samples)) {
         Fail("Render submission did not accept the requested sample progress");
         return;
       }
       // A configuration may preserve temporal accumulation. Its finite budget
       // counts newly accepted samples, independently of the Film history.
-      accepted_in_revision += accepted_samples;
+      accepted_in_revision += static_cast<int>(accepted_samples);
       if (frame) {
         frame->revision = active.revision;
         frame->sequence = ++sequence;
