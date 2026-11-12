@@ -456,3 +456,81 @@ Validation on macOS 27.0.1 / Apple M5:
   0 incorrect values out of 2,097,152.
 
 These checks validate functionality; they do not establish a performance comparison.
+
+
+## Window gestures after the demo migration
+
+The PR incorporates main `6fe5197c` (#117), including the unchanged RHI versions
+of 2048 and Game of Life. `IWindow::SupportsMagnifyGestures()` and
+`IWindow::MagnifyEvent()` are forwarded by rhix. Gesture event storage and the
+Cocoa monitor belong to each final native window implementation, not to a
+shared stateful Window base. Non-Apple windows report no native magnify support.
+
+GLFW dispatch retains the frontend window while invoking callbacks and uses the
+registered frontend interface directly. A callback may release the last external
+window reference without invalidating later callbacks in the same dispatch.
+Native monitor teardown occurs before GLFW window destruction. The existing
+Cocoa conversion test covers phase, scale, coordinates, window isolation and
+callback lifetime on macOS; the new backend-parameterized dispatch test covers
+retention, isolation and stale registry keys on Windows as well.
+
+Windows Release validation after integration: 238 passed, 2 Debug-only skips,
+with only the two previously documented D3D12 compacted-BLAS cases excluded.
+Both demos build on Windows. Native macOS gesture tests were not executed in
+this Windows follow-up; earlier Metal validation above predates this integration.
+
+
+## 2048 and Game of Life performance against updated main
+
+Measured on Windows with Intel Core Ultra 7 270K Plus, NVIDIA RTX 5080,
+driver 617.42, MSVC 14.51.36231 Release (`/O2 /Ob2 /DNDEBUG`). Baseline:
+main `6fe5197c`; PR: `90f53ac2`. Demo source is identical between revisions;
+both builds use the same C++ feature definitions and identical runtime DLLs.
+
+Each case has eight paired rounds, alternating main/PR execution order, after
+one discarded priming round. Each process warms up for two seconds after
+initialization and measures 4,000 frames. The original continuous presentation
+mode, two submission slots, depth rendering and 3x-per-axis supersampling stay
+enabled. 2048 uses 720x960 and a fixed seed of 1, with AI disabled; gol uses
+1280x720 and a paused 256x256 grid initialized at density 0.3 with seed 0.
+This measures fixed-scene rendering, not AI search or evolving simulation cost.
+
+Timing uses identical temporary steady_clock instrumentation in both demo Run
+loops. Full-frame time includes frame-slot waiting, event polling, OnUpdate and
+OnRender. The render column measures OnRender, including submission/presentation
+and any waits inside them; it is **not** a GPU timestamp. Startup, shader
+compilation, final draining and PNG export are excluded. Values below average
+the eight per-run means; smaller is better. Positive deltas mean slower PR runs.
+
+| Demo | Backend | main frame (ms) | PR frame (ms) | Change | main OnRender (ms) | PR OnRender (ms) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 2048 | vulkan | 0.1161 | 0.1196 | +3.10% | 0.1067 | 0.1104 |
+| 2048 | d3d12 | 0.2510 | 0.2646 | +5.43% | 0.2062 | 0.2120 |
+| gol | vulkan | 0.3783 | 0.3871 | +2.32% | 0.1583 | 0.1647 |
+| gol | d3d12 | 0.4529 | 0.4758 | +5.06% | 0.2042 | 0.2108 |
+
+Run-to-run variation is material for these sub-millisecond frames:
+
+| Demo | Backend | main run-mean range (ms) | PR run-mean range (ms) |
+| --- | --- | ---: | ---: |
+| 2048 | vulkan | 0.1092?0.1297 | 0.1051?0.1455 |
+| 2048 | d3d12 | 0.2237?0.2830 | 0.2272?0.2991 |
+| gol | vulkan | 0.3677?0.3833 | 0.3696?0.4244 |
+| gol | d3d12 | 0.4176?0.5137 | 0.4364?0.5295 |
+
+The measured aggregate frame overhead is about 2?5%; OnRender increases by
+roughly 4?7 microseconds. Paired rounds fluctuate in both directions, so these
+numbers do not establish a precise intrinsic QueryInterface overhead or a GPU
+regression. The unchanged shaders and matching outputs support functional
+parity, not a claim of identical GPU execution time.
+
+All four main/PR PNG pairs are byte-identical. The final gol/D3D12 pair was
+completed separately after an earlier process exited successfully without
+producing a timing sample; that incomplete run is not counted. All 64 measured
+runs have exactly 4,000 samples. Temporary instrumentation and fixed-seed edits
+were removed after measurement; no benchmark behavior is added to the demos.
+
+Local reproducibility artifacts are under `out/query-interface/demo-comparison/`:
+`instrument.py`, `run-steady.py`, `metadata.json`, `build-comparison.json`,
+`final/samples.json`, per-run logs/PNGs, and `summary.json`. These temporary
+artifacts are not repository assets. macOS/Metal performance was not measured.
