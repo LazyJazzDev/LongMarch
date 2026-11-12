@@ -80,9 +80,8 @@ Grid navigation:
 - Ctrl + two-finger scrolling or mouse wheel zooms around the pointer (1x–12x).
 - Ctrl + `+` / `-` zooms in/out.
 - Ctrl + `0` restores the fitted, centered view; Shift + wheel pans horizontally.
-- Native pinch zoom uses the shared demo window helper on top of the RHI-owned
-  GLFW window (macOS). The Cocoa implementation is retained; this migration
-  has not been validated on macOS.
+- Native pinch zoom uses the RHI window magnify event on macOS, with either
+  the Metal or Vulkan backend.
 - Windows/Linux retain Ctrl + scrolling; driver-emulated pinch only works if
   GLFW can observe both the scrolling and Ctrl key state.
 - The controls stay fixed; cells outside the grid viewport are clipped and cannot be clicked.
@@ -118,9 +117,9 @@ uses the existing buffer without allocating a second grid.
 The `application/` layer replaces the old Vulkan renderer: models are drawn as
 instances in framebuffer pixel coordinates with depth testing, rendered into a
 supersampled target, and resolved to the window for anti-aliasing (the original
-used MSAA, which `grassland::graphics` does not expose).
+used MSAA).
 
-## RHI rendering and validation
+## RHI rendering
 
 The renderer uses RHI device resources, immutable programs and binding groups,
 command-context uploads, the Main queue, and submission/download tokens. Mesh
@@ -132,9 +131,3 @@ image through an RHI download token.
 The demos link `grassland_rhi` and utility dependencies directly, without the
 legacy `grassland_graphics` renderer. Window input uses RHI events and GLFW
 queries. The application owns an RHI `IWindow` directly.
-
-`LONGMARCH_DEMO_SEED=1` fixes 2048's spawn seed; normal launches use a time-based seed.
-Temporary benchmark instrumentation and the offscreen environment switch have been removed.
-
-See [migration validation](../../docs/demo-rhi-migration.md) for baseline setup,
-image comparisons, replay coverage and performance measurements.

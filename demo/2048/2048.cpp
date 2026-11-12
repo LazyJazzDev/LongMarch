@@ -1,7 +1,6 @@
 ﻿#include "2048.h"
 
 #include <algorithm>
-#include <cstdlib>
 
 namespace {
 
@@ -343,10 +342,7 @@ void TwentyFourEight::ResetGame() {
   // A new game always returns control to the player and cancels pending AI work.
   SetAiEnabled(false);
   number_blocks_.clear();
-  // Reproducible screenshots/replays without changing normal game randomness.
-  const char *validation_seed = std::getenv("LONGMARCH_DEMO_SEED");
-  random_device_ = std::mt19937(validation_seed ? uint32_t(std::strtoul(validation_seed, nullptr, 10))
-                                                : uint32_t(std::time(nullptr)));
+  random_device_ = std::mt19937(int(std::time(nullptr)));
   GenRandomBlock();
   GenRandomBlock();
   score_ = 0;

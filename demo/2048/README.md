@@ -78,7 +78,7 @@ The `application/` layer is shared in copy with `demo/gol`: models are drawn as
 instances in framebuffer pixel coordinates with depth testing, rendered into a
 supersampled target, and resolved to the window for anti-aliasing.
 
-## RHI rendering and validation
+## RHI rendering
 
 The renderer uses RHI device resources, immutable programs and binding groups,
 command-context uploads, the Main queue, and submission/download tokens. Mesh
@@ -90,9 +90,3 @@ image through an RHI download token.
 The demos link `grassland_rhi` and utility dependencies directly, without the
 legacy `grassland_graphics` renderer. Window input uses RHI events and GLFW
 queries. The application owns an RHI `IWindow` directly.
-
-`LONGMARCH_DEMO_SEED=1` fixes 2048's spawn seed; normal launches use a time-based seed.
-Temporary benchmark instrumentation and the offscreen environment switch have been removed.
-
-See [migration validation](../../docs/demo-rhi-migration.md) for baseline setup,
-image comparisons, replay coverage and performance measurements.
