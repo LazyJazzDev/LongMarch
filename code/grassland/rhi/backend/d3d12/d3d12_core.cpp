@@ -18,6 +18,10 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ::ID3D12Device *device, PhysicalDevi
   }
   info = {};
   info.name = WStringToString(desc.Description);
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (device->GetNodeCount() == 1)
+    info.cuda_device = FindCUDADeviceByLUID(&desc.AdapterLuid);
+#endif
   info.dedicated_memory = desc.DedicatedVideoMemory;
   info.unified_memory = desc.SharedSystemMemory;
   D3D12_FEATURE_DATA_ARCHITECTURE architecture{};

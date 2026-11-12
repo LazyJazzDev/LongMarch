@@ -21,4 +21,25 @@ class ID3D12TemporalBufferLease : public ID3D12Buffer {
   static void ReturnBuffer(D3D12TemporalBufferPool *pool, ID3D12AllocatedBuffer *buffer, size_t level);
 };
 
+class D3D12TemporalBufferLeaseImpl final : public Object<rhi::IBuffer, ID3D12TemporalBufferLease> {
+ public:
+  D3D12TemporalBufferLeaseImpl(D3D12TemporalBufferPool *pool, ID3D12AllocatedBuffer *buffer, size_t level);
+  ~D3D12TemporalBufferLeaseImpl() override;
+  BufferDesc GetDesc() const override;
+  ID3D12Resource *NativeBuffer() const override;
+  D3D12_RESOURCE_STATES DefaultState() const override;
+  bool Read(void *data, uint64_t size, uint64_t offset = 0);
+  bool Write(const void *data, uint64_t size, uint64_t offset = 0);
+
+ private:
+  D3D12TemporalBufferPool *pool_;
+  ID3D12AllocatedBuffer *buffer_;
+  size_t level_;
+
+ public:
+  ID3D12Device *Owner() const override {
+    return buffer_->Owner();
+  }
+};
+
 }  // namespace grassland::rhi::backend::d3d12

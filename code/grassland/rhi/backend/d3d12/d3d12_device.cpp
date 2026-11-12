@@ -6,6 +6,8 @@
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_cuda_buffer.h"
+#include "grassland/rhi/backend/d3d12/d3d12_cuda_timeline.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
@@ -260,6 +262,16 @@ rhi::IBuffer *D3D12DeviceImpl::CreateBuffer(const BufferDesc &desc) {
   auto buffer = ObjectPtr<ID3D12AllocatedBuffer>::Adopt(ID3D12AllocatedBuffer::Create(this, desc));
   return rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach();
 }
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+rhi::ICUDABuffer *D3D12DeviceImpl::CreateCUDABuffer(const BufferDesc &desc) {
+  return D3D12CUDABufferImpl::Create(this, desc);
+}
+
+rhi::ICUDATimeline *D3D12DeviceImpl::CreateCUDATimeline() {
+  return rhi::QueryInterfacePtr<rhi::ICUDATimeline>(CreateD3D12CUDATimeline(this).Get()).Detach();
+}
+#endif
 
 rhi::IWindow *D3D12DeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
   return ID3D12Window::Create(this, desc);

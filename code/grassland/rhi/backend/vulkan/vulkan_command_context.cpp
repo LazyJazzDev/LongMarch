@@ -26,6 +26,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_cuda_buffer.h"
 #include "grassland/rhi/rhi_image.h"
 #include "grassland/rhi/rhi_program.h"
 #include "grassland/rhi/rhi_queue.h"
@@ -56,6 +57,10 @@ VulkanCommandContextImpl::VulkanCommandContextImpl(IVulkanQueue *queue) : device
 }
 
 VulkanCommandContextImpl::~VulkanCommandContextImpl() {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (cuda_acquire_)
+    vkFreeCommandBuffers(device_->NativeDevice(), pool_, 1, &cuda_acquire_);
+#endif
   if (reusable_) {
     device_->RecycleCommandResources(pool_, command_);
     return;
@@ -191,6 +196,46 @@ bool VulkanCommandContextImpl::EndRecording() {
                           VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT))
       return false;
   }
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  // Acquire in a preamble so first use inside a rendering scope is also covered.
+  // Release at the end of this command buffer before its queue timeline signal.
+  std::vector<VkBufferMemoryBarrier> external;
+  for (const auto &entry : buffer_states_) {
+    if (!QueryInterfacePtr<ICUDABuffer>(entry.first))
+      continue;
+    VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+    barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    barrier.srcQueueFamilyIndex = device_->QueueFamily();
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
+    barrier.buffer = entry.first->NativeBuffer();
+    barrier.size = VK_WHOLE_SIZE;
+    external.push_back(barrier);
+  }
+  if (!external.empty()) {
+    vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
+                         nullptr, uint32_t(external.size()), external.data(), 0, nullptr);
+    VkCommandBufferAllocateInfo allocation{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    allocation.commandPool = pool_;
+    allocation.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocation.commandBufferCount = 1;
+    if (!Check(vkAllocateCommandBuffers(device_->NativeDevice(), &allocation, &cuda_acquire_),
+               "Allocate CUDA ownership preamble"))
+      return false;
+    VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    if (!Check(vkBeginCommandBuffer(cuda_acquire_, &begin), "Begin CUDA ownership preamble"))
+      return false;
+    for (auto &barrier : external) {
+      barrier.dstAccessMask = barrier.srcAccessMask;
+      barrier.srcAccessMask = 0;
+      std::swap(barrier.srcQueueFamilyIndex, barrier.dstQueueFamilyIndex);
+    }
+    vkCmdPipelineBarrier(cuda_acquire_, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+                         nullptr, uint32_t(external.size()), external.data(), 0, nullptr);
+    if (!Check(vkEndCommandBuffer(cuda_acquire_), "End CUDA ownership preamble"))
+      return false;
+  }
+#endif
   for (auto &entry : image_states_) {
     const auto layout = entry.first->DefaultLayout();
     const auto access = layout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
@@ -235,6 +280,13 @@ IVulkanCommandContext::SubmitResult VulkanCommandContextImpl::SubmitNative(const
   submit.pNext = &timeline;
   submit.commandBufferCount = 1;
   submit.pCommandBuffers = &command_;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  const VkCommandBuffer commands[]{cuda_acquire_, command_};
+  if (cuda_acquire_) {
+    submit.commandBufferCount = 2;
+    submit.pCommandBuffers = commands;
+  }
+#endif
   submit.waitSemaphoreCount = static_cast<uint32_t>(waited.size());
   submit.pWaitSemaphores = waited.data();
   submit.pWaitDstStageMask = stages.data();
@@ -701,8 +753,13 @@ bool VulkanCommandContextImpl::CmdEndRendering() {
 bool VulkanCommandContextImpl::TransitionBuffer(IVulkanBuffer *buffer,
                                                 VkPipelineStageFlags stages,
                                                 VkAccessFlags access) {
-  if (render_target_)
-    return true;  // Graphics buffer accesses are synchronized by the explicit scope boundaries.
+  if (render_target_) {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+    if (QueryInterfacePtr<ICUDABuffer>(buffer))
+      buffer_states_.try_emplace(buffer, BufferState{stages, access});
+#endif
+    return true;
+  }  // Graphics buffer accesses are synchronized by the explicit scope boundaries.
   auto known = buffer_states_.find(buffer);
   constexpr VkAccessFlags reads =
       VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;

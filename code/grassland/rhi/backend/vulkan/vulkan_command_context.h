@@ -138,6 +138,9 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
   IVulkanDevice *device_;
   VkCommandPool pool_{};
   VkCommandBuffer command_{};
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  VkCommandBuffer cuda_acquire_{};
+#endif
   bool submission_failed_{};
   bool reusable_{};
 

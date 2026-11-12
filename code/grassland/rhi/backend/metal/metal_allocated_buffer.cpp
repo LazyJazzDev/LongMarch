@@ -5,30 +5,6 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalAllocatedBufferImpl final : public Object<rhi::IBuffer, IMetalAllocatedBuffer> {
- public:
-  static IMetalAllocatedBuffer *Create(IMetalDevice *device,
-                                       const BufferDesc &desc,
-                                       bool upload = false,
-                                       bool download = false);
-  MTL::Buffer *NativeBuffer() const override;
-  bool Read(void *data, uint64_t size, uint64_t offset = 0);
-  bool Write(const void *data, uint64_t size);
-
- private:
-  MetalAllocatedBufferImpl(IMetalDevice *device, const BufferDesc &desc);
-  NS::SharedPtr<MTL::Buffer> buffer_;
-
-  IMetalDevice *device_;
-  BufferDesc desc_;
-
- public:
-  BufferDesc GetDesc() const override {
-    return desc_;
-  }
-
-  IMetalDevice *Owner() const override;
-};
 
 IMetalAllocatedBuffer *IMetalAllocatedBuffer::Create(IMetalDevice *device,
                                                      const BufferDesc &desc,

@@ -19,6 +19,8 @@
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
+#include "grassland/rhi/backend/vulkan/vulkan_cuda_buffer.h"
+#include "grassland/rhi/backend/vulkan/vulkan_cuda_timeline.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
@@ -292,6 +294,16 @@ rhi::IBuffer *VulkanDeviceImpl::CreateBuffer(const BufferDesc &desc) {
   auto buffer = ObjectPtr<IVulkanAllocatedBuffer>::Adopt(IVulkanAllocatedBuffer::Create(this, desc));
   return rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach();
 }
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+rhi::ICUDABuffer *VulkanDeviceImpl::CreateCUDABuffer(const BufferDesc &desc) {
+  return VulkanCUDABufferImpl::Create(this, desc);
+}
+
+rhi::ICUDATimeline *VulkanDeviceImpl::CreateCUDATimeline() {
+  return rhi::QueryInterfacePtr<rhi::ICUDATimeline>(CreateVulkanCUDATimeline(this).Get()).Detach();
+}
+#endif
 
 rhi::IComputeProgram *VulkanDeviceImpl::CreateComputeProgram(const ComputeProgramDesc &desc) {
   return IVulkanComputeProgram::Create(this, desc);

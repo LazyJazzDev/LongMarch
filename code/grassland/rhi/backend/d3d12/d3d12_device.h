@@ -75,6 +75,14 @@ class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
+
+  int GetCUDADeviceIndex() const override {
+    return info_.cuda_device;
+  }
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  rhi::ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) override;
+  rhi::ICUDATimeline *CreateCUDATimeline() override;
+#endif
   D3D12TemporalBufferPool &UploadPool();
   D3D12TemporalBufferPool &DownloadPool();
   D3D12ScratchPool &ScratchPool();

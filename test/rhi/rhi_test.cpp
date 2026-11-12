@@ -102,6 +102,18 @@ class TestDevice final : public backend::Object<rhi::IDevice> {
     return nullptr;
   }
 
+  int GetCUDADeviceIndex() const override {
+    return -1;
+  }
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  ICUDABuffer *CreateCUDABuffer(const BufferDesc &) override {
+    return nullptr;
+  }
+
+  ICUDATimeline *CreateCUDATimeline() override {
+    return nullptr;
+  }
+#endif
   std::string Name() const override {
     return info_.name;
   }

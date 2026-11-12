@@ -39,6 +39,12 @@ class IDevice : public IObject {
   virtual ISampler *CreateSampler(const SamplerDesc &desc = {}) = 0;
   virtual IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) = 0;
   virtual IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
+  virtual int GetCUDADeviceIndex() const = 0;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  // Owned CUDA buffer, also usable as IBuffer; null if unsupported.
+  virtual ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) = 0;
+  virtual ICUDATimeline *CreateCUDATimeline() = 0;
+#endif
   virtual IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;
   virtual IProgram *CreateProgram(const ProgramDesc &desc) = 0;
   virtual IShader *CreateShader(const ShaderDesc &desc) = 0;

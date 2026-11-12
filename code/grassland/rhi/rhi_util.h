@@ -59,6 +59,10 @@ class IBottomLevelAccelerationStructure;
 class ITopLevelAccelerationStructure;
 class IBindingGroup;
 class IBuffer;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+class ICUDABuffer;
+class ICUDATimeline;
+#endif
 class ICommandContext;
 class IComputeProgram;
 class ICore;
@@ -114,6 +118,8 @@ struct PhysicalDevice {
   bool ray_tracing_pipeline_feature{};
   bool ray_query_feature{};
   bool geometry_shader_feature{};
+  // Process-local CUDA ordinal; -1 when unavailable.
+  int cuda_device{-1};
 };
 
 typedef enum {

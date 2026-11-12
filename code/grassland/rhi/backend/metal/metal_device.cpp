@@ -89,6 +89,16 @@ rhi::IBuffer *MetalDeviceImpl::CreateBuffer(const BufferDesc &desc) {
   return rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach();
 }
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+rhi::ICUDABuffer *MetalDeviceImpl::CreateCUDABuffer(const BufferDesc &desc) {
+  return nullptr;
+}
+
+rhi::ICUDATimeline *MetalDeviceImpl::CreateCUDATimeline() {
+  return nullptr;
+}
+#endif
+
 rhi::IImage *MetalDeviceImpl::CreateImage(const ImageDesc &desc) {
   return CreateMetalAllocatedImage(this, desc);
 }

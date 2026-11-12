@@ -40,6 +40,14 @@ class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
   static rhi::IDevice *Create(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device);
   ~MetalDeviceImpl() override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
+
+  int GetCUDADeviceIndex() const override {
+    return info_.cuda_device;
+  }
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  rhi::ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) override;
+  rhi::ICUDATimeline *CreateCUDATimeline() override;
+#endif
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;

@@ -3,25 +3,6 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanTemporalBufferLeaseImpl final : public Object<rhi::IBuffer, IVulkanTemporalBufferLease> {
- public:
-  VulkanTemporalBufferLeaseImpl(VulkanTemporalBufferPool *pool, IVulkanAllocatedBuffer *buffer, size_t level);
-  ~VulkanTemporalBufferLeaseImpl() override;
-  BufferDesc GetDesc() const override;
-  VkBuffer NativeBuffer() const override;
-  bool Read(void *data, uint64_t size, uint64_t offset = 0);
-  bool Write(const void *data, uint64_t size);
-
- private:
-  VulkanTemporalBufferPool *pool_;
-  IVulkanAllocatedBuffer *buffer_;
-  size_t level_;
-
- public:
-  IVulkanDevice *Owner() const override {
-    return buffer_->Owner();
-  }
-};
 
 IVulkanTemporalBufferLease *IVulkanTemporalBufferLease::Create(VulkanTemporalBufferPool *pool,
                                                                IVulkanAllocatedBuffer *buffer,

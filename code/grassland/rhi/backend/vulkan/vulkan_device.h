@@ -77,6 +77,14 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
   bool SupportsSwapchain() const;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
+
+  int GetCUDADeviceIndex() const override {
+    return info_.cuda_device;
+  }
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  rhi::ICUDABuffer *CreateCUDABuffer(const BufferDesc &desc) override;
+  rhi::ICUDATimeline *CreateCUDATimeline() override;
+#endif
   VulkanTemporalBufferPool &UploadPool();
   VulkanTemporalBufferPool &DownloadPool();
   VulkanScratchPool &ScratchPool();

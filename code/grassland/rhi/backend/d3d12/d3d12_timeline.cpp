@@ -1,5 +1,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_timeline.h"
 
+#include "grassland/rhi/backend/d3d12/d3d12_cuda_timeline.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
@@ -37,6 +38,10 @@ ID3D12Fence *D3D12TimelineImpl::NativeFence() const {
 }
 
 ObjectPtr<ID3D12Timeline> ID3D12Timeline::Create(ID3D12Device *device) {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (device->GetPhysicalDevice().cuda_device >= 0)
+    return CreateD3D12CUDATimeline(device);
+#endif
   return D3D12TimelineImpl::Create(device);
 }
 }  // namespace grassland::rhi::backend::d3d12

@@ -5,11 +5,38 @@
 #include <utility>
 
 #include "grassland/rhi/rhi_obj_ptr.h"
+#if defined(LONGMARCH_CUDA_RUNTIME)
+#include <cuda_runtime_api.h>
+#endif
 
 namespace grassland::rhi::backend {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+bool CheckCUDA(cudaError_t error, const char *operation);
+
+class CUDADeviceScope {
+ public:
+  explicit CUDADeviceScope(int device);
+  CUDADeviceScope(const CUDADeviceScope &) = delete;
+  CUDADeviceScope &operator=(const CUDADeviceScope &) = delete;
+  ~CUDADeviceScope();
+  explicit operator bool() const;
+
+ private:
+  int previous_{-1};
+  bool valid_{};
+};
+
+// Match a CUDA Runtime UUID or Windows adapter LUID without changing current device.
+int FindCUDADeviceByUUID(const void *uuid);
+#if defined(_WIN32)
+int FindCUDADeviceByLUID(const void *luid);
+#endif
+#endif
+
 class IBackendShaderBindingTable;
 class IBackendSubmissionToken;
 class IBackendWindow;
+class IBackendCUDATimeline;
 }  // namespace grassland::rhi::backend
 
 namespace grassland::rhi::backend {

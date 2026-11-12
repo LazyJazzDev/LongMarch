@@ -21,3 +21,8 @@ foreach(MODULE IN LISTS RHI_HELLO_MODULES)
     endforeach()
 endforeach()
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(${DEMO_NAME})
+
+if (LONGMARCH_CUDA_ENABLED)
+    target_compile_definitions(${DEMO_NAME} PRIVATE LONGMARCH_CUDA_ENABLED)
+    target_sources(${DEMO_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/modules/nbody/cuda_simulation.cu)
+endif ()

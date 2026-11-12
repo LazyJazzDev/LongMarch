@@ -1,5 +1,6 @@
 #include "grassland/rhi/backend/vulkan/vulkan_timeline.h"
 
+#include "grassland/rhi/backend/vulkan/vulkan_cuda_timeline.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
@@ -41,6 +42,10 @@ VkSemaphore VulkanTimelineImpl::NativeSemaphore() const {
 }
 
 ObjectPtr<IVulkanTimeline> IVulkanTimeline::Create(IVulkanDevice *device) {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (device->GetPhysicalDevice().cuda_device >= 0)
+    return CreateVulkanCUDATimeline(device);
+#endif
   return VulkanTimelineImpl::Create(device);
 }
 }  // namespace grassland::rhi::backend::vulkan

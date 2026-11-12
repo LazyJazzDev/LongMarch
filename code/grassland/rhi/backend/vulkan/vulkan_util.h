@@ -88,9 +88,13 @@ class DeviceFeatures final {
   bool TimelineSemaphore() const;
   bool ScalarBlockLayout() const;
   bool DynamicRendering() const;
+  bool ExternalMemory() const;
+  bool ExternalSemaphore() const;
 
  private:
   bool valid_{false};
+  bool external_memory_{};
+  bool external_semaphore_{};
   VkPhysicalDeviceFeatures2 features_{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
   std::vector<const char *> extensions_;
   VkPhysicalDeviceVulkan11Features v11_{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES};
