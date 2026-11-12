@@ -3,8 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanRayTracingProgramImpl final
-    : public Object<rhi::IRayTracingProgram, IVulkanRayTracingProgram, IBackendRayTracingProgram> {
+class VulkanRayTracingProgramImpl final : public Object<rhi::IRayTracingProgram, IVulkanRayTracingProgram> {
  public:
   static rhi::IRayTracingProgram *Create(IVulkanDevice *device, const RayTracingProgramDesc &desc);
 
@@ -18,7 +17,7 @@ class VulkanRayTracingProgramImpl final
 
   const RayTracingProgramDesc &GetDesc() const override;
 
-  IBackendDevice *Owner() const override;
+  IVulkanDevice *Owner() const override;
 
   VkPipelineLayout NativeLayout() const override;
 

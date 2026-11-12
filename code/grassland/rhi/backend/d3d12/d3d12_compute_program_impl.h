@@ -3,8 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12ComputeProgramImpl final
-    : public Object<rhi::IComputeProgram, ID3D12ComputeProgram, IBackendComputeProgram> {
+class D3D12ComputeProgramImpl final : public Object<rhi::IComputeProgram, ID3D12ComputeProgram> {
  public:
   static rhi::IComputeProgram *Create(ID3D12Device *device, const ComputeProgramDesc &desc);
 
@@ -14,7 +13,7 @@ class D3D12ComputeProgramImpl final
 
   const ComputeProgramDesc &GetDesc() const override;
 
-  IBackendDevice *Owner() const override;
+  ID3D12Device *Owner() const override;
 
   ID3D12RootSignature *NativeRootSignature() const override;
 
@@ -25,11 +24,11 @@ class D3D12ComputeProgramImpl final
 
   ComPtr<ID3D12PipelineState> pipeline_;
 
-  void InitializeComputeProgram(IBackendDevice *device, const ComputeProgramDesc &desc);
+  void InitializeComputeProgram(ID3D12Device *device, const ComputeProgramDesc &desc);
 
   bool ValidateLayout() const;
 
-  IBackendDevice *device_{};
+  ID3D12Device *device_{};
 
   ComputeProgramDesc desc_{};
 

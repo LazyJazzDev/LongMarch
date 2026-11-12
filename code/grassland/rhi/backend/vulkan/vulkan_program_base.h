@@ -9,6 +9,7 @@ namespace grassland::rhi::backend::vulkan {
 // Layout ownership only; the owning Device must outlive the Program.
 class IVulkanProgramBase : public IObject {
  public:
+  virtual IVulkanDevice *Owner() const = 0;
   virtual VkPipelineLayout NativeLayout() const = 0;
 };
 }  // namespace grassland::rhi::backend::vulkan

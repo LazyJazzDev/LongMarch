@@ -182,7 +182,7 @@ const RayTracingProgramDesc &D3D12RayTracingProgramImpl::GetDesc() const {
   return desc_;
 }
 
-IBackendDevice *D3D12RayTracingProgramImpl::Owner() const {
+ID3D12Device *D3D12RayTracingProgramImpl::Owner() const {
   return device_;
 }
 

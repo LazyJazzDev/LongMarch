@@ -14,7 +14,7 @@ VulkanSamplerImpl::~VulkanSamplerImpl() {
 }
 
 rhi::ISampler *VulkanSamplerImpl::Create(IVulkanDevice *device, const SamplerDesc &desc) {
-  if (!Validate(desc))
+  if (!ValidateSamplerDesc(desc))
     return nullptr;
   auto sampler = ObjectPtr<VulkanSamplerImpl>::Adopt(new VulkanSamplerImpl(device, desc));
   const VkSamplerAddressMode modes[] = {VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,

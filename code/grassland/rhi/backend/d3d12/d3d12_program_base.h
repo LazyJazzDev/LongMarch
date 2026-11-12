@@ -11,6 +11,7 @@ namespace grassland::rhi::backend::d3d12 {
 // Layout ownership only; object identity and reference counting belong to the concrete Program.
 class ID3D12ProgramBase : public IObject {
  public:
+  virtual ID3D12Device *Owner() const = 0;
   virtual ID3D12RootSignature *NativeRootSignature() const = 0;
   virtual uint32_t RootParameter(uint32_t group, bool sampler) const = 0;
 };

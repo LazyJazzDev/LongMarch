@@ -16,7 +16,7 @@ MTL::SamplerState *MetalSamplerImpl::NativeSampler() const {
 }
 
 rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc &desc) {
-  if (!Validate(desc))
+  if (!ValidateSamplerDesc(desc))
     return nullptr;
 
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());

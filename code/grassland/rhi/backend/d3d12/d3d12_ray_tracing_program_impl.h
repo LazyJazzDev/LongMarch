@@ -3,8 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12RayTracingProgramImpl final
-    : public Object<rhi::IRayTracingProgram, ID3D12RayTracingProgram, IBackendRayTracingProgram> {
+class D3D12RayTracingProgramImpl final : public Object<rhi::IRayTracingProgram, ID3D12RayTracingProgram> {
  public:
   static rhi::IRayTracingProgram *Create(ID3D12Device *device, const RayTracingProgramDesc &desc);
 
@@ -18,7 +17,7 @@ class D3D12RayTracingProgramImpl final
 
   const RayTracingProgramDesc &GetDesc() const override;
 
-  IBackendDevice *Owner() const override;
+  ID3D12Device *Owner() const override;
 
   ID3D12RootSignature *NativeRootSignature() const override;
 

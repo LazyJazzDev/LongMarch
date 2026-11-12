@@ -368,8 +368,7 @@ bool D3D12CommandContextImpl::CopyBuffer(ID3D12Buffer *src,
 
 bool D3D12CommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
   auto native = rhi::QueryInterfacePtr<ID3D12ComputeProgram>(program).Get();
-  if (sealed_ || rendering_active_ || !native ||
-      rhi::QueryInterfacePtr<IBackendComputeProgram>(native)->Owner() != device_) {
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }
@@ -408,7 +407,7 @@ bool D3D12CommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 
 bool D3D12CommandContextImpl::CmdBindProgram(IProgram *program) {
   auto native = rhi::QueryInterfacePtr<ID3D12Program>(program).Get();
-  if (!native || rhi::QueryInterfacePtr<IBackendProgram>(native)->Owner() != device_ || sealed_) {
+  if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -861,8 +860,7 @@ bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
 
 bool D3D12CommandContextImpl::CmdBindRayTracingProgram(IRayTracingProgram *program) {
   auto native = rhi::QueryInterfacePtr<ID3D12RayTracingProgram>(program).Get();
-  if (sealed_ || rendering_active_ || !native ||
-      rhi::QueryInterfacePtr<IBackendRayTracingProgram>(native)->Owner() != device_) {
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }

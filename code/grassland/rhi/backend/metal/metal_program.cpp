@@ -132,7 +132,7 @@ rhi::IProgram *IMetalProgram::Create(IMetalDevice *device, const ProgramDesc &de
   return MetalProgramImpl::Create(device, desc);
 }
 
-void MetalProgramImpl::InitializeProgram(IBackendDevice *device, const ProgramDesc &desc) {
+void MetalProgramImpl::InitializeProgram(IMetalDevice *device, const ProgramDesc &desc) {
   device_ = device;
   desc_ = desc;
   vertex_shader_ = ObjectPtr<IShader>::Retain(desc.vertex_shader);
@@ -143,7 +143,7 @@ const ProgramDesc &MetalProgramImpl::GetDesc() const {
   return desc_;
 }
 
-IBackendDevice *MetalProgramImpl::Owner() const {
+IMetalDevice *MetalProgramImpl::Owner() const {
   return device_;
 }
 

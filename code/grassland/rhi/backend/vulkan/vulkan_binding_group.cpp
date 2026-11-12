@@ -497,7 +497,7 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
   if (desc->type != BINDING_SAMPLER)
     return false;
   for (auto sampler : samplers) {
-    auto native = rhi::QueryInterfacePtr<IBackendSampler>(sampler).Get();
+    auto native = rhi::QueryInterfacePtr<IVulkanSampler>(sampler).Get();
     if (!native || native->DeviceIdentity() != device_)
       return false;
   }

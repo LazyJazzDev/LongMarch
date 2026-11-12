@@ -198,7 +198,7 @@ rhi::IProgram *IVulkanProgram::Create(IVulkanDevice *device, const ProgramDesc &
   return VulkanProgramImpl::Create(device, desc);
 }
 
-void VulkanProgramImpl::InitializeProgram(IBackendDevice *device, const ProgramDesc &desc) {
+void VulkanProgramImpl::InitializeProgram(IVulkanDevice *device, const ProgramDesc &desc) {
   device_ = device;
   desc_ = desc;
   vertex_shader_ = ObjectPtr<IShader>::Retain(desc.vertex_shader);
@@ -209,7 +209,7 @@ const ProgramDesc &VulkanProgramImpl::GetDesc() const {
   return desc_;
 }
 
-IBackendDevice *VulkanProgramImpl::Owner() const {
+IVulkanDevice *VulkanProgramImpl::Owner() const {
   return device_;
 }
 

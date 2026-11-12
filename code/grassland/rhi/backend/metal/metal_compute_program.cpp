@@ -56,7 +56,7 @@ rhi::IComputeProgram *IMetalComputeProgram::Create(IMetalDevice *device, const C
   return MetalComputeProgramImpl::Create(device, desc);
 }
 
-void MetalComputeProgramImpl::InitializeComputeProgram(IBackendDevice *device, const ComputeProgramDesc &desc) {
+void MetalComputeProgramImpl::InitializeComputeProgram(IMetalDevice *device, const ComputeProgramDesc &desc) {
   device_ = device;
   desc_ = desc;
   shader_ = ObjectPtr<IShader>::Retain(desc.compute_shader);
@@ -66,7 +66,7 @@ const ComputeProgramDesc &MetalComputeProgramImpl::GetDesc() const {
   return desc_;
 }
 
-IBackendDevice *MetalComputeProgramImpl::Owner() const {
+IMetalDevice *MetalComputeProgramImpl::Owner() const {
   return device_;
 }
 

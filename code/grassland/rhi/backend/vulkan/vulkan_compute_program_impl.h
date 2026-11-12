@@ -3,8 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanComputeProgramImpl final
-    : public Object<rhi::IComputeProgram, IVulkanComputeProgram, IBackendComputeProgram> {
+class VulkanComputeProgramImpl final : public Object<rhi::IComputeProgram, IVulkanComputeProgram> {
  public:
   static rhi::IComputeProgram *Create(IVulkanDevice *device, const ComputeProgramDesc &desc);
 
@@ -14,7 +13,7 @@ class VulkanComputeProgramImpl final
 
   const ComputeProgramDesc &GetDesc() const override;
 
-  IBackendDevice *Owner() const override;
+  IVulkanDevice *Owner() const override;
 
   VkPipelineLayout NativeLayout() const override;
 
@@ -23,11 +22,11 @@ class VulkanComputeProgramImpl final
 
   VkPipeline pipeline_{};
 
-  void InitializeComputeProgram(IBackendDevice *device, const ComputeProgramDesc &desc);
+  void InitializeComputeProgram(IVulkanDevice *device, const ComputeProgramDesc &desc);
 
   bool ValidateLayout() const;
 
-  IBackendDevice *device_{};
+  IVulkanDevice *device_{};
 
   ComputeProgramDesc desc_{};
 

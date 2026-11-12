@@ -9,7 +9,7 @@ D3D12SamplerImpl::D3D12SamplerImpl(ID3D12Device *device, const SamplerDesc &desc
 }
 
 rhi::ISampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc &desc) {
-  if (!Validate(desc))
+  if (!ValidateSamplerDesc(desc))
     return nullptr;
   auto sampler = ObjectPtr<D3D12SamplerImpl>::Adopt(new D3D12SamplerImpl(device, desc));
   sampler->descriptor_ = device->SamplerDescriptorStorage().Acquire(1);

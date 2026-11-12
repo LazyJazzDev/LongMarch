@@ -221,7 +221,7 @@ const RayTracingProgramDesc &VulkanRayTracingProgramImpl::GetDesc() const {
   return desc_;
 }
 
-IBackendDevice *VulkanRayTracingProgramImpl::Owner() const {
+IVulkanDevice *VulkanRayTracingProgramImpl::Owner() const {
   return device_;
 }
 

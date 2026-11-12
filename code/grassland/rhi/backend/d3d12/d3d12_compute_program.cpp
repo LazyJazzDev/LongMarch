@@ -43,7 +43,7 @@ rhi::IComputeProgram *ID3D12ComputeProgram::Create(ID3D12Device *device, const C
   return D3D12ComputeProgramImpl::Create(device, desc);
 }
 
-void D3D12ComputeProgramImpl::InitializeComputeProgram(IBackendDevice *device, const ComputeProgramDesc &desc) {
+void D3D12ComputeProgramImpl::InitializeComputeProgram(ID3D12Device *device, const ComputeProgramDesc &desc) {
   device_ = device;
   desc_ = desc;
   shader_ = ObjectPtr<IShader>::Retain(desc.compute_shader);
@@ -53,7 +53,7 @@ const ComputeProgramDesc &D3D12ComputeProgramImpl::GetDesc() const {
   return desc_;
 }
 
-IBackendDevice *D3D12ComputeProgramImpl::Owner() const {
+ID3D12Device *D3D12ComputeProgramImpl::Owner() const {
   return device_;
 }
 

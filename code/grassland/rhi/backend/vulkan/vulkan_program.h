@@ -1,7 +1,7 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program_base.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
+#include "grassland/rhi/rhi_program.h"
 
 LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanProgram,
                         grassland::rhi::backend::vulkan::IVulkanProgramBase,

@@ -107,7 +107,7 @@ rhi::IProgram *ID3D12Program::Create(ID3D12Device *device, const ProgramDesc &de
   return D3D12ProgramImpl::Create(device, desc);
 }
 
-void D3D12ProgramImpl::InitializeProgram(IBackendDevice *device, const ProgramDesc &desc) {
+void D3D12ProgramImpl::InitializeProgram(ID3D12Device *device, const ProgramDesc &desc) {
   device_ = device;
   desc_ = desc;
   vertex_shader_ = ObjectPtr<IShader>::Retain(desc.vertex_shader);
@@ -118,7 +118,7 @@ const ProgramDesc &D3D12ProgramImpl::GetDesc() const {
   return desc_;
 }
 
-IBackendDevice *D3D12ProgramImpl::Owner() const {
+ID3D12Device *D3D12ProgramImpl::Owner() const {
   return device_;
 }
 

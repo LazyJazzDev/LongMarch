@@ -337,7 +337,7 @@ bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group)
 
 bool MetalCommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
   auto native = rhi::QueryInterfacePtr<IMetalComputeProgram>(program).Get();
-  if (sealed_ || encoder_ || !native || rhi::QueryInterfacePtr<IBackendComputeProgram>(program)->Owner() != device_) {
+  if (sealed_ || encoder_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }
@@ -384,7 +384,7 @@ bool MetalCommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 
 bool MetalCommandContextImpl::CmdBindProgram(IProgram *program) {
   auto native = rhi::QueryInterfacePtr<IMetalProgram>(program).Get();
-  if (!native || rhi::QueryInterfacePtr<IBackendProgram>(program)->Owner() != device_ || sealed_) {
+  if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }

@@ -1,7 +1,7 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
+#include "grassland/rhi/rhi_program.h"
 
 LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12Program,
                         grassland::rhi::backend::d3d12::ID3D12ProgramBase,

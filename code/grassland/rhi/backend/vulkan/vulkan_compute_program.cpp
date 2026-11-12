@@ -68,7 +68,7 @@ rhi::IComputeProgram *IVulkanComputeProgram::Create(IVulkanDevice *device, const
   return VulkanComputeProgramImpl::Create(device, desc);
 }
 
-void VulkanComputeProgramImpl::InitializeComputeProgram(IBackendDevice *device, const ComputeProgramDesc &desc) {
+void VulkanComputeProgramImpl::InitializeComputeProgram(IVulkanDevice *device, const ComputeProgramDesc &desc) {
   device_ = device;
   desc_ = desc;
   shader_ = ObjectPtr<IShader>::Retain(desc.compute_shader);
@@ -78,7 +78,7 @@ const ComputeProgramDesc &VulkanComputeProgramImpl::GetDesc() const {
   return desc_;
 }
 
-IBackendDevice *VulkanComputeProgramImpl::Owner() const {
+IVulkanDevice *VulkanComputeProgramImpl::Owner() const {
   return device_;
 }
 

@@ -1,9 +1,9 @@
 ﻿#pragma once
 #include <Metal/Metal.hpp>
 
-#include "grassland/rhi/backend/backend_program.h"
 #include "grassland/rhi/backend/metal/metal_program_base.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
+#include "grassland/rhi/rhi_program.h"
 
 LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::metal::IMetalProgram,
                         grassland::rhi::backend::metal::IMetalProgramBase,

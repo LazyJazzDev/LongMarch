@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanProgramImpl final : public Object<rhi::IProgram, IVulkanProgram, IBackendProgram> {
+class VulkanProgramImpl final : public Object<rhi::IProgram, IVulkanProgram> {
  public:
   static rhi::IProgram *Create(IVulkanDevice *device, const ProgramDesc &desc);
 
@@ -13,7 +13,7 @@ class VulkanProgramImpl final : public Object<rhi::IProgram, IVulkanProgram, IBa
 
   const ProgramDesc &GetDesc() const override;
 
-  IBackendDevice *Owner() const override;
+  IVulkanDevice *Owner() const override;
 
   VkPipelineLayout NativeLayout() const override;
 
@@ -22,11 +22,11 @@ class VulkanProgramImpl final : public Object<rhi::IProgram, IVulkanProgram, IBa
 
   VkPipeline pipeline_{};
 
-  void InitializeProgram(IBackendDevice *device, const ProgramDesc &desc);
+  void InitializeProgram(IVulkanDevice *device, const ProgramDesc &desc);
 
   bool ValidateLayout() const;
 
-  IBackendDevice *device_{};
+  IVulkanDevice *device_{};
 
   ProgramDesc desc_{};
 

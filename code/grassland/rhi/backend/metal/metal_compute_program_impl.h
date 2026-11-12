@@ -3,8 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalComputeProgramImpl final
-    : public Object<rhi::IComputeProgram, IMetalComputeProgram, IBackendComputeProgram> {
+class MetalComputeProgramImpl final : public Object<rhi::IComputeProgram, IMetalComputeProgram> {
  public:
   static rhi::IComputeProgram *Create(IMetalDevice *device, const ComputeProgramDesc &desc);
 
@@ -16,7 +15,7 @@ class MetalComputeProgramImpl final
 
   const ComputeProgramDesc &GetDesc() const override;
 
-  IBackendDevice *Owner() const override;
+  IMetalDevice *Owner() const override;
 
   const PipelineLayoutDesc &BindingLayout() const override;
 
@@ -27,11 +26,11 @@ class MetalComputeProgramImpl final
 
   MTL::Size threads_{};
 
-  void InitializeComputeProgram(IBackendDevice *device, const ComputeProgramDesc &desc);
+  void InitializeComputeProgram(IMetalDevice *device, const ComputeProgramDesc &desc);
 
   bool ValidateLayout() const;
 
-  IBackendDevice *device_{};
+  IMetalDevice *device_{};
 
   ComputeProgramDesc desc_{};
 

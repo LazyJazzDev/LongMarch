@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalProgramImpl final : public Object<rhi::IProgram, IMetalProgram, IBackendProgram> {
+class MetalProgramImpl final : public Object<rhi::IProgram, IMetalProgram> {
  public:
   static rhi::IProgram *Create(IMetalDevice *device, const ProgramDesc &desc);
 
@@ -17,7 +17,7 @@ class MetalProgramImpl final : public Object<rhi::IProgram, IMetalProgram, IBack
 
   const ProgramDesc &GetDesc() const override;
 
-  IBackendDevice *Owner() const override;
+  IMetalDevice *Owner() const override;
 
   const PipelineLayoutDesc &BindingLayout() const override;
 
@@ -28,11 +28,11 @@ class MetalProgramImpl final : public Object<rhi::IProgram, IMetalProgram, IBack
 
   NS::SharedPtr<MTL::DepthStencilState> depth_stencil_;
 
-  void InitializeProgram(IBackendDevice *device, const ProgramDesc &desc);
+  void InitializeProgram(IMetalDevice *device, const ProgramDesc &desc);
 
   bool ValidateLayout() const;
 
-  IBackendDevice *device_{};
+  IMetalDevice *device_{};
 
   ProgramDesc desc_{};
 

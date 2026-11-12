@@ -352,8 +352,7 @@ bool VulkanCommandContextImpl::CopyBuffer(IVulkanBuffer *src,
 
 bool VulkanCommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
   auto native = rhi::QueryInterfacePtr<IVulkanComputeProgram>(program).Get();
-  if (sealed_ || render_target_ || !native ||
-      rhi::QueryInterfacePtr<IBackendComputeProgram>(native)->Owner() != device_) {
+  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }
@@ -396,7 +395,7 @@ bool VulkanCommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 
 bool VulkanCommandContextImpl::CmdBindProgram(IProgram *program) {
   auto native = rhi::QueryInterfacePtr<IVulkanProgram>(program).Get();
-  if (!native || rhi::QueryInterfacePtr<IBackendProgram>(native)->Owner() != device_ || sealed_) {
+  if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
     return false;
   }
@@ -830,8 +829,7 @@ bool VulkanCommandContextImpl::ValidateGroups() {
 
 bool VulkanCommandContextImpl::CmdBindRayTracingProgram(IRayTracingProgram *program) {
   auto native = rhi::QueryInterfacePtr<IVulkanRayTracingProgram>(program).Get();
-  if (sealed_ || render_target_ || !native ||
-      rhi::QueryInterfacePtr<IBackendRayTracingProgram>(native)->Owner() != device_) {
+  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }

@@ -13,6 +13,7 @@ namespace grassland::rhi::backend::metal {
 // Shared argument-buffer layout and shader translation; no IObject/refcount base.
 class IMetalProgramBase : public IObject {
  public:
+  virtual IMetalDevice *Owner() const = 0;
   virtual const PipelineLayoutDesc &BindingLayout() const = 0;
 };
 
