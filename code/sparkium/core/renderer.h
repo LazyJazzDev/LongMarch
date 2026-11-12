@@ -11,7 +11,9 @@ namespace sparkium {
 // caller; accepted commands retain their GPU resources through completion.
 class Renderer {
  public:
-  explicit Renderer(Core *core, rhi::QueueType queue = rhi::QUEUE_TYPE_ASSIST);
+  // Automatic routing uses Compute for tracing and Assist for rasterization.
+  explicit Renderer(Core *core);
+  Renderer(Core *core, rhi::QueueType queue);
 
   bool IsValid() const;
   // Immutable descriptions identify a scene's shader/layout version. Programs
@@ -23,6 +25,9 @@ class Renderer {
   // Records the batch's immutable parameter snapshot; the returned group belongs
   // to this Renderer and is used by its path-tracing command recording.
   rhi::IBindingGroup *RecordParameters(rhi::ICommandContext *commands, const Scene *scene, const Film *film);
+  // Consecutive submissions on this Renderer are ordered even when routing
+  // changes queues. External users of the same resources must supply their
+  // completion events; readback/presentation must wait on the returned token.
   rhi::ObjPtr<rhi::ISubmissionToken> Submit(Scene *scene,
                                             Camera *camera,
                                             Film *film,
@@ -39,6 +44,9 @@ class Renderer {
   ProgramCache<rhi::ComputeProgramDesc, rhi::IComputeProgram> compute_programs_;
   Core *core_;
   rhi::ObjPtr<rhi::IQueue> queue_;
+  rhi::ObjPtr<rhi::IQueue> compute_queue_;
+  rhi::ObjPtr<rhi::ISubmissionToken> last_submission_;
+  rhi::IQueue *last_queue_ = nullptr;
   rhi::ObjPtr<rhi::IBuffer> parameters_;
   rhi::ObjPtr<rhi::IBindingGroup> bindings_;
 };

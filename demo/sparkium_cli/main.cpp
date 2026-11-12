@@ -132,7 +132,11 @@ int main(int argc, char **argv) {
       rhi::ObjPtr<rhi::IDownloadToken> result = commands->CmdDownloadImage(output_image->Image());
       if (!result)
         return {};
-      rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+      rhi::SubmitInfo dependencies;
+      for (const auto &rendered : pending)
+        if (rendered)
+          dependencies.waits.push_back(rendered->GetEvent());
+      rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit(dependencies);
       if (!submitted || !submitted->WaitHost())
         return {};
       return result;

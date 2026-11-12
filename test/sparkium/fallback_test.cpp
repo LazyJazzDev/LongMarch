@@ -90,7 +90,11 @@ class SoftwareBVHTest : public testing::Test {
               sparkium::Camera *camera,
               sparkium::Film *film,
               sparkium::RenderPipeline pipeline) {
-    auto submitted = renderer->Submit(scene, camera, film, pipeline);
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    auto submitted = renderer->Submit(scene, camera, film, pipeline, nullptr, false, dependencies);
+    last_submission = submitted;
     ASSERT_TRUE(submitted);
     ASSERT_TRUE(submitted->WaitHost());
   }
@@ -101,7 +105,11 @@ class SoftwareBVHTest : public testing::Test {
     ASSERT_TRUE(commands);
     rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadImage(image);
     ASSERT_TRUE(readback);
-    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit(dependencies);
+    last_submission = submitted;
     ASSERT_TRUE(submitted);
     ASSERT_TRUE(submitted->WaitHost());
     ASSERT_TRUE(readback->CopyTo(pixels.data(), pixels.size() * sizeof(T)));
@@ -112,7 +120,11 @@ class SoftwareBVHTest : public testing::Test {
     rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdUploadImage(image, pixels.data(), image->GetDesc().width * sizeof(T)));
-    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit(dependencies);
+    last_submission = submitted;
     ASSERT_TRUE(submitted);
     ASSERT_TRUE(submitted->WaitHost());
   }
@@ -122,11 +134,16 @@ class SoftwareBVHTest : public testing::Test {
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(image, {}));
     ASSERT_TRUE(film.RecordDevelop(commands.Get(), image, hdr));
-    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit(dependencies);
+    last_submission = submitted;
     ASSERT_TRUE(submitted);
     ASSERT_TRUE(submitted->WaitHost());
   }
 
+  rhi::ObjPtr<rhi::ISubmissionToken> last_submission;
   rhi::BackendAPI api{};
   rhi::ObjPtr<rhi::ICore> native_core;
   rhi::ObjPtr<rhi::IDevice> device;
@@ -414,8 +431,12 @@ TEST_F(SoftwareBVHTest, FilmOutputLeasesPreserveCompletedImages) {
   EXPECT_FALSE(film->AcquireOutput());
   EXPECT_TRUE(core->IsValid());
   auto submit = [&](const std::shared_ptr<const sparkium::Film::Output> &output, bool hdr) {
-    auto token =
-        renderer->Submit(&scene, &camera, film.get(), sparkium::RENDER_PIPELINE_RT_FALLBACK, output->Image(), hdr);
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    auto token = renderer->Submit(&scene, &camera, film.get(), sparkium::RENDER_PIPELINE_RT_FALLBACK, output->Image(),
+                                  hdr, dependencies);
+    last_submission = token;
     ASSERT_TRUE(token);
     ASSERT_TRUE(token->WaitHost());
   };

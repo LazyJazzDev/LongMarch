@@ -143,16 +143,21 @@ TEST_P(BrowserRendererTest, SplittingBatchesPreservesAccumulation) {
   auto render = [&](int samples, int batches) {
     scene->GetFilm()->Reset();
     scene->GetScene()->settings.samples_per_dispatch = samples;
+    ObjPtr<ISubmissionToken> rendered;
     for (int batch = 0; batch < batches; ++batch) {
       auto submitted = renderer.Submit(scene->GetScene(), scene->GetCamera(), scene->GetFilm(),
                                        sparkium::RENDER_PIPELINE_RT_FALLBACK);
       if (!submitted)
         return std::vector<uint8_t>{};
+      rendered = submitted;
     }
     ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_ASSIST);
     ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(scene->GetFilm()->GetRawImage());
-    ObjPtr<ISubmissionToken> submitted = commands->Submit();
+    SubmitInfo dependencies;
+    if (rendered)
+      dependencies.waits.push_back(rendered->GetEvent());
+    ObjPtr<ISubmissionToken> submitted = commands->Submit(dependencies);
     if (!download || !submitted || !submitted->WaitHost())
       return std::vector<uint8_t>{};
     std::vector<uint8_t> bytes(download->GetSize());
@@ -164,6 +169,59 @@ TEST_P(BrowserRendererTest, SplittingBatchesPreservesAccumulation) {
   ASSERT_EQ(single.size(), 32u * 32u * 4u * sizeof(float));
   EXPECT_EQ(render(2, 4), single);
   EXPECT_EQ(scene->GetFilm()->info.accumulated_samples, 8);
+}
+
+TEST_P(BrowserRendererTest, QueueSwitchingPreservesAccumulationWithoutHostWaits) {
+  {
+    std::ofstream file(path_);
+    file << R"({"format":"sparkium-scene","version":1,
+      "renderer":{"samples_per_dispatch":2,"max_bounces":3,"background_color":[0.2,0.4,0.8]},
+      "film":{"width":32,"height":32,"persistence":0.97},
+      "camera":{"eye":[0,0,4],"target":[0,0,0]},
+      "materials":{"surface":{"type":"lambertian","base_color":[0.7,0.3,0.2]}},
+      "geometries":{"sphere":{"type":"sphere","longitude_segments":12}},
+      "entities":[{"type":"mesh","geometry":"sphere","material":"surface"}]})";
+    ASSERT_TRUE(file.good());
+  }
+  auto core = sparkium::Core::Create(device_.Get());
+  ASSERT_TRUE(core);
+  std::string error;
+  auto scene = sparkium::JsonScene::Load(core.get(), path_, &error);
+  ASSERT_TRUE(scene) << error;
+  sparkium::Renderer automatic(core.get());
+  sparkium::Renderer graphics(core.get(), QUEUE_TYPE_ASSIST);
+  ObjPtr<ISubmissionToken> previous;
+  auto render = [&](sparkium::Renderer &renderer) {
+    scene->GetFilm()->Reset();
+    ObjPtr<ISubmissionToken> rendered;
+    for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RASTERIZATION,
+                          sparkium::RENDER_PIPELINE_RT_FALLBACK}) {
+      SubmitInfo waits;
+      if (previous)
+        waits.waits.push_back(previous->GetEvent());
+      rendered =
+          renderer.Submit(scene->GetScene(), scene->GetCamera(), scene->GetFilm(), pipeline, nullptr, false, waits);
+      previous = nullptr;
+      if (!rendered)
+        return std::vector<uint8_t>{};
+    }
+    ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_MAIN);
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+    ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(scene->GetFilm()->GetRawImage());
+    SubmitInfo dependencies;
+    dependencies.waits.push_back(rendered->GetEvent());
+    ObjPtr<ISubmissionToken> submitted = commands->Submit(dependencies);
+    previous = submitted;
+    if (!download || !submitted || !submitted->WaitHost())
+      return std::vector<uint8_t>{};
+    std::vector<uint8_t> bytes(download->GetSize());
+    if (!download->CopyTo(bytes.data(), bytes.size()))
+      return std::vector<uint8_t>{};
+    return bytes;
+  };
+  const auto reference = render(graphics);
+  ASSERT_FALSE(reference.empty());
+  EXPECT_EQ(render(automatic), reference);
 }
 
 std::vector<BackendAPI> Backends() {

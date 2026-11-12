@@ -7,6 +7,13 @@
 
 namespace sparkium {
 
+Renderer::Renderer(Core *core) : Renderer(core, rhi::QUEUE_TYPE_ASSIST) {
+  if (IsValid())
+    compute_queue_ = core_->GetDevice()->GetQueue(rhi::QUEUE_TYPE_COMPUTE);
+  if (!compute_queue_)
+    queue_ = nullptr;
+}
+
 Renderer::Renderer(Core *core, rhi::QueueType queue)
     : core_(core),
       queue_(core ? core->GetDevice()->GetQueue(queue) : nullptr) {
@@ -89,10 +96,13 @@ rhi::ObjPtr<rhi::ISubmissionToken> Renderer::Submit(Scene *scene,
       camera->GetCore() != core_ || film->GetCore() != core_)
     return {};
   const auto resolved = core_->ResolveRenderPipeline(pipeline);
+  auto *queue = compute_queue_ && resolved != RENDER_PIPELINE_RASTERIZATION ? compute_queue_.Get() : queue_.Get();
+  if (resolved == RENDER_PIPELINE_RASTERIZATION && queue->GetType() == rhi::QUEUE_TYPE_COMPUTE)
+    return {};
   const int samples = resolved == RENDER_PIPELINE_RASTERIZATION ? 1 : scene->settings.samples_per_dispatch;
   if (samples <= 0)
     return {};
-  rhi::ObjPtr<rhi::ICommandContext> commands = queue_->CreateCommandContext();
+  rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
   auto updates = core_->BeginUpdates();
   if (!commands || !core_->RecordRender(*this, commands.Get(), updates, scene, camera, film, resolved) ||
       (output && !film->RecordDevelop(commands.Get(), output, linear_hdr))) {
@@ -101,11 +111,16 @@ rhi::ObjPtr<rhi::ISubmissionToken> Renderer::Submit(Scene *scene,
     core_->ReportFailure("Cannot record render submission");
     return {};
   }
-  rhi::ObjPtr<rhi::ISubmissionToken> submission = commands->Submit(dependencies);
+  auto waits = dependencies;
+  if (last_submission_ && last_queue_ != queue)
+    waits.waits.push_back(last_submission_->GetEvent());
+  rhi::ObjPtr<rhi::ISubmissionToken> submission = commands->Submit(waits);
   if (!submission) {
     core_->ReportFailure("Cannot submit render commands");
     return {};
   }
+  last_submission_ = submission;
+  last_queue_ = queue;
   if (!core_->AcceptUpdates(updates)) {
     core_->ReportFailure("Pending resource updates changed during submission");
     return submission;

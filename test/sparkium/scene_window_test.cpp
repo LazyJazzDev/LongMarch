@@ -102,7 +102,9 @@ TEST(SparkiumWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
           readback = commands->CmdDownloadImage(target.Get());
           ASSERT_TRUE(readback);
         }
-        ObjPtr<ISubmissionToken> done = commands->Submit();
+        SubmitInfo dependencies;
+        dependencies.waits.push_back(rendered->GetEvent());
+        ObjPtr<ISubmissionToken> done = commands->Submit(dependencies);
         ASSERT_TRUE(done);
         ASSERT_TRUE(done->WaitHost());
         EXPECT_EQ(loaded->GetFilm(), film);
