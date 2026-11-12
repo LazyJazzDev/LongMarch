@@ -298,7 +298,7 @@ int RunNBody(grassland::rhi::IDevice *device) {
               ImGui::SeparatorText("Control");
 #if defined(LONGMARCH_CUDA_ENABLED)
               if (cuda) {
-                if (ImGui::Button(cuda_active ? "Use Graphics Compute" : "Use CUDA Compute")) {
+                if (ImGui::Button(cuda_active ? "Switch to: Computer Shader" : "Switch to: CUDA Kernel")) {
                   cuda_active = !cuda_active;
                   fps.Reset();
                   std::cout << "nbody: compute " << (cuda_active ? "CUDA" : "Graphics") << '\n';
