@@ -92,18 +92,19 @@ void GameOfLife::CustomOnInit() {
   height_slider_ = std::make_unique<SizeSlider>(this, 'H', cell_grid_height_, &white_rect_model.value(),
                                                 [this](int value) { requested_height_ = value; });
   OnWindowSize();
-  magnify_callback_ = GetWindow()->MagnifyEvent().RegisterCallback([this](const demo::MagnifyGesture &gesture) {
-    if (gesture.phase == demo::MagnifyPhase::kCancel)
-      return;
-    const glm::vec2 point = FramePosition({gesture.x, gesture.y});
-    if (point.x < playground_left_ || point.x >= playground_right_ || point.y < playground_top_ ||
-        point.y >= playground_bottom_)
-      return;
-    const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f,
-                           (playground_top_ + playground_bottom_) * 0.5f};
-    grid_view_.Zoom(float(gesture.scale), point - center);
-    LayoutCells();
-  });
+  magnify_callback_ =
+      GetWindow()->MagnifyEvent().RegisterCallback([this](const grassland::rhi::MagnifyGesture &gesture) {
+        if (gesture.phase == grassland::rhi::MagnifyPhase::kCancel)
+          return;
+        const glm::vec2 point = FramePosition({gesture.x, gesture.y});
+        if (point.x < playground_left_ || point.x >= playground_right_ || point.y < playground_top_ ||
+            point.y >= playground_bottom_)
+          return;
+        const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f,
+                               (playground_top_ + playground_bottom_) * 0.5f};
+        grid_view_.Zoom(float(gesture.scale), point - center);
+        LayoutCells();
+      });
   scroll_callback_ = GetWindow()->ScrollEvent().RegisterCallback([this](double x, double y) { ScrollGrid(x, y); });
   pan_button_callback_ =
       GetWindow()->MouseButtonEvent().RegisterCallback([this](int button, int action, int, double x, double y) {

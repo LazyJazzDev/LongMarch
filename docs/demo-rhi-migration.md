@@ -1,7 +1,7 @@
 # 2048 / Game of Life RHI 迁移验证
 
 验证日期：2026-11-12。旧版基线为 `e233d265`（main，PR #113），迁移分支为
-`migrate-demos-rhi`。所有修改在独立 worktree 中完成。
+`migrate-demos-rhi`。初始迁移在独立 worktree 中完成，本机补充验证与手势迁移在主工作目录的该功能分支上完成。
 
 ## 实现
 
@@ -15,7 +15,7 @@ tinyfiledialogs，不再通过 `LongMarch` 间接依赖旧 `grassland_graphics` 
 - 保留原 Slang shader、深度排序、逐轴 3x 超采样及第二帧混合过渡。
 - 截图通过 RHI download token 读取 resolve 后的 RGBA8 图像；呈现显式声明 sRGB 编码。
 - 可预期初始化、录制、提交和截图失败返回失败状态，进程返回非零，不把空资源当作成功。
-- `demo/demo_window.*` 仅提供 RHI 窗口的 GLFW 输入便利接口与 Cocoa 捏合事件桥接。
+- `demo/demo_window.*` 仅提供 RHI 窗口的 GLFW 输入便利接口。原生捏合事件由 RHI 公共窗口层提供，GoL 只注册业务回调。
 
 ## 行为一致性
 
@@ -37,7 +37,7 @@ tinyfiledialogs，不再通过 `LongMarch` 间接依赖旧 `grassland_graphics` 
 - 31 项 GoL 测试通过，覆盖演化、边界、文件格式、网格尺寸/视图和模拟时钟。
 - 2048 AI 模型核对 512 个随机棋盘及各方向；1 ms 搜索预算的单局冒烟达到 2048。
   这不是 AI 策略强度的统计评估。
-- macOS/Metal 与原生捏合：保留代码实现，按用户要求暂不构建或验证。
+- 原 PR 的 macOS/Metal 验证空缺由下方本机验证补充。
 
 ### 回放截图
 
@@ -120,3 +120,38 @@ python scripts/compare_ui_demo_images.py out/demo-comparison out/demo-replay
 回放需要 `xdotool` 和 `libX11`，图像比较需要 Pillow。比较脚本默认容差为 0，输出
 `images.json`；尺寸不一致、缺少配对或差异超过容差均失败。性能脚本输出每次日志、
 `results.json`、`summary.json` 和首轮两版 PNG。
+
+## RHI 原生捏合接口
+
+`rhi::IWindow` 与 `rhix::Window` 提供 `SupportsMagnifyGestures()` 和 `MagnifyEvent()`。
+事件使用 `rhi::MagnifyGesture`：`scale` 是相对上一次事件的增量缩放（1 表示不变），
+`x/y` 为窗口内容区左上角起算的逻辑坐标，与鼠标移动事件一致；`phase` 区分开始、更新、结束和取消。
+取消事件的 scale 为 1，不自动撤销已处理的更新。Scroll / Ctrl+scroll 保持独立，不重复合成手势。
+
+macOS 由 RHI 公共窗口层接收 Cocoa 事件，适用于 Metal 和 Vulkan；其他平台可注册回调但暂不产生原生捏合事件，能力查询返回 false。
+监听器随窗口创建、销毁；分派通过窗口注册表获取临时强引用，允许回调期间释放窗口，且不会串到其他窗口。
+GoL 的焦点缩放及网格视图逻辑仍留在应用内。demo 不再编译 Objective-C++ 事件桥接或直接链接 Cocoa。
+
+## macOS / Metal 本机验证补充
+
+Apple M5，macOS 27.0.1，CLion Release/Ninja。基线 `e233d265`，迁移版 `532078e0`；
+同一构建配置依次构建、保存二进制后交替测量，无并行构建干扰。两版使用相同本地素材。
+预热 120 帧、测量 6000 帧，每场景每版 3 次，取中位数。此次保持屏幕原生 Retina 缩放：
+2048 输出 **1440×1920**（内部 4320×5760），GoL 输出 **2560×1440**（内部 7680×4320）。
+因此不要将绝对 FPS 与上文 Windows/Linux 较低分辨率的数据直接比较。
+
+| Metal 场景 | graphics FPS | RHI FPS | 变化 |
+| --- | ---: | ---: | ---: |
+| 2048 | 469.003 | 715.453 | +52.55% |
+| GoL 128² | 513.617 | 640.532 | +24.71% |
+| GoL 256² | 496.196 | 622.491 | +25.45% |
+
+18 次原始结果、环境及截图数值比较见 [macOS 原始数据](benchmarks/demo-rhi-migration-macos.json)。
+三组新旧 resolve 输出逐像素一致（最大通道差值 0）。图像仅用于本机数值比较，未作为 UI 截图发布。
+计时仍是关闭呈现的应用帧循环吞吐；没有测量 GPU timestamp，没有锁频，也未将提升归因于单一原因。
+
+手势迁移后的 Release / Debug 构建通过。两种配置下各运行 5 项事件/窗口回归测试全部通过，
+包括 Metal、Vulkan 原生窗口的阶段/坐标转换、多窗口隔离、回调取消注册、回调释放最后外部窗口引用和窗口重建。
+事件载荷由测试合成，坐标转换使用真实 NSWindow/NSView；未宣称完成物理触控板的人工捏合验收。
+Release 两个 demo 在 Metal、Vulkan 各呈现 240 帧并正常退出；Debug 两个 demo 在 Metal 各呈现 240 帧。
+最终 Metal 的 2048、GoL 128² 输出与迁移手势前的捕获仍逐像素一致。

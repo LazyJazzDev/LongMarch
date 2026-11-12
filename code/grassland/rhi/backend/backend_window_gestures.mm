@@ -1,4 +1,5 @@
-#include "demo_window.h"
+#include "grassland/rhi/backend/backend_glfw_helper.h"
+#include "grassland/rhi/rhi_window.h"
 
 #import <Cocoa/Cocoa.h>
 #define GLFW_EXPOSE_NATIVE_COCOA
@@ -7,11 +8,11 @@
 
 #include <algorithm>
 
-namespace demo {
-void DispatchMagnifyEvent(Window *window, NSEvent *event) {
-  if (!window->GLFWWindow() || event.type != NSEventTypeMagnify)
+namespace grassland::rhi::backend::glfw {
+void DispatchCocoaMagnifyEvent(GLFWwindow *window, NSEvent *event) {
+  if (!window || event.type != NSEventTypeMagnify)
     return;
-  NSWindow *native_window = glfwGetCocoaWindow(window->GLFWWindow());
+  NSWindow *native_window = glfwGetCocoaWindow(window);
   if (event.window != native_window)
     return;
   NSView *view = native_window.contentView;
@@ -26,14 +27,15 @@ void DispatchMagnifyEvent(Window *window, NSEvent *event) {
     phase = MagnifyPhase::kBegin;
   // Cocoa reports an incremental fractional change, not a cumulative scale.
   const double scale = phase == MagnifyPhase::kCancel ? 1.0 : std::max(0.001, 1.0 + double(event.magnification));
-  window->MagnifyEvent().InvokeCallbacks(MagnifyGesture{
-      scale, point.x - bounds.origin.x, view.isFlipped ? point.y - bounds.origin.y : NSMaxY(bounds) - point.y, phase});
+  DispatchMagnifyEvent(window,
+                       MagnifyGesture{scale, point.x - bounds.origin.x,
+                                      view.isFlipped ? point.y - bounds.origin.y : NSMaxY(bounds) - point.y, phase});
 }
 
-void *InstallMagnifyEvents(Window *window) {
+void *InstallMagnifyEvents(GLFWwindow *window) {
   id monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskMagnify
                                                      handler:^NSEvent *(NSEvent *event) {
-                                                       DispatchMagnifyEvent(window, event);
+                                                       DispatchCocoaMagnifyEvent(window, event);
                                                        return event;
                                                      }];
   return [monitor retain];
@@ -45,4 +47,4 @@ void RemoveMagnifyEvents(void *monitor) {
     [(id)monitor release];
   }
 }
-}  // namespace demo
+}  // namespace grassland::rhi::backend::glfw

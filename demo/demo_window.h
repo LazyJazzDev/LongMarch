@@ -6,15 +6,8 @@
 
 namespace demo {
 
-enum class MagnifyPhase { kBegin, kUpdate, kEnd, kCancel };
-
-struct MagnifyGesture {
-  double scale, x, y;
-  MagnifyPhase phase{MagnifyPhase::kUpdate};
-};
-
 // Demo input conveniences around an owned RHI window. Rendering and all event
-// delivery except Cocoa pinch gestures remain in RHI/GLFW.
+// delivery, including native gestures, remain in RHI/GLFW.
 class Window {
  public:
   explicit Window(grassland::rhi::IWindow *window);
@@ -79,18 +72,11 @@ class Window {
   }
 
   auto &MagnifyEvent() {
-    return magnify_event_;
+    return window_->MagnifyEvent();
   }
 
  private:
   grassland::rhi::ObjPtr<grassland::rhi::IWindow> window_;
-  grassland::EventManager<void(const MagnifyGesture &)> magnify_event_;
-  void *magnify_monitor_{};
 };
-
-#if defined(__APPLE__)
-void *InstallMagnifyEvents(Window *window);
-void RemoveMagnifyEvents(void *monitor);
-#endif
 
 }  // namespace demo

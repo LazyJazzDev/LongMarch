@@ -10,6 +10,16 @@
 #include "grassland/util/event_manager.h"
 
 namespace grassland::rhi {
+enum class MagnifyPhase { kBegin, kUpdate, kEnd, kCancel };
+
+// Incremental scale (1 means unchanged), with a focal point in window content
+// coordinates: logical units, origin at the top left, like MouseMoveEvent.
+// Cancel reports scale 1; it does not undo previously delivered updates.
+struct MagnifyGesture {
+  double scale{1.0}, x{}, y{};
+  MagnifyPhase phase{MagnifyPhase::kUpdate};
+};
+
 class IImage;
 class ICommandContext;
 // Window operations and presentation run on the main thread.
@@ -29,6 +39,11 @@ class IWindow : public IObject {
   virtual EventManager<void(double, double)> &MouseMoveEvent() = 0;
   virtual EventManager<void(int, int, int, double, double)> &MouseButtonEvent() = 0;
   virtual EventManager<void(double, double)> &ScrollEvent() = 0;
+  // Native platform support, not whether a trackpad is connected. Currently
+  // implemented on macOS for every RHI backend; other platforms emit no events.
+  // Scroll (including Ctrl+scroll) remains separate and is never synthesized here.
+  virtual bool SupportsMagnifyGestures() const = 0;
+  virtual EventManager<void(const MagnifyGesture &)> &MagnifyEvent() = 0;
   virtual EventManager<void(int, int, int, int)> &KeyEvent() = 0;
   virtual EventManager<void(uint32_t)> &CharEvent() = 0;
   virtual EventManager<void(int, const char **)> &DropEvent() = 0;

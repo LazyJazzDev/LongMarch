@@ -3,16 +3,9 @@
 namespace demo {
 
 Window::Window(grassland::rhi::IWindow *window) : window_(window) {
-#if defined(__APPLE__)
-  magnify_monitor_ = InstallMagnifyEvents(this);
-#endif
 }
 
-Window::~Window() {
-#if defined(__APPLE__)
-  RemoveMagnifyEvents(magnify_monitor_);
-#endif
-}
+Window::~Window() = default;
 
 glm::ivec2 Window::GetSize() const {
   glm::ivec2 size{};

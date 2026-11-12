@@ -1,0 +1,289 @@
+{
+  "environment": {
+    "baseline": "e233d265b4a9af8a6767ab2001b9357b38afbdeb",
+    "candidate": "532078e0de897aa24f8e6503841f20ce9849ff1d",
+    "backend": "Metal",
+    "device": "Apple M5",
+    "os": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434\n",
+    "configuration": "CLion Release/Ninja, shared cmake-build-release cache; each binary copied before switching source",
+    "assets": "cc5cc7c5238b8455924a579f75739cdfa73cfde7 (same local assets for both variants; pre-existing assets state preserved)",
+    "warmup_frames": 120,
+    "measured_frames": 6000,
+    "repeats": 3,
+    "resolution": {
+      "2048": [
+        1440,
+        1920
+      ],
+      "gol": [
+        2560,
+        1440
+      ]
+    },
+    "supersampling_per_axis": 3,
+    "presentation": false,
+    "timing": "application throughput, GPU drained at measurement boundaries; not GPU timestamps",
+    "limitations": "No clock locking. Background system services remain. No simultaneous build during benchmark."
+  },
+  "results": [
+    {
+      "case": "2048",
+      "variant": "baseline",
+      "repeat": 0,
+      "frames": 6000,
+      "elapsed_ms": 12793.1,
+      "fps": 469.003,
+      "cpu_p50_ms": 2.11458,
+      "cpu_p95_ms": 2.29192
+    },
+    {
+      "case": "2048",
+      "variant": "rhi",
+      "repeat": 0,
+      "frames": 6000,
+      "elapsed_ms": 8402.55,
+      "fps": 714.069,
+      "cpu_p50_ms": 1.37538,
+      "cpu_p95_ms": 1.66842
+    },
+    {
+      "case": "2048",
+      "variant": "rhi",
+      "repeat": 1,
+      "frames": 6000,
+      "elapsed_ms": 8386.3,
+      "fps": 715.453,
+      "cpu_p50_ms": 1.37646,
+      "cpu_p95_ms": 1.66808
+    },
+    {
+      "case": "2048",
+      "variant": "baseline",
+      "repeat": 1,
+      "frames": 6000,
+      "elapsed_ms": 12736.4,
+      "fps": 471.089,
+      "cpu_p50_ms": 2.11329,
+      "cpu_p95_ms": 2.23671
+    },
+    {
+      "case": "2048",
+      "variant": "baseline",
+      "repeat": 2,
+      "frames": 6000,
+      "elapsed_ms": 12871.1,
+      "fps": 466.161,
+      "cpu_p50_ms": 2.121,
+      "cpu_p95_ms": 2.36454
+    },
+    {
+      "case": "2048",
+      "variant": "rhi",
+      "repeat": 2,
+      "frames": 6000,
+      "elapsed_ms": 8383.71,
+      "fps": 715.673,
+      "cpu_p50_ms": 1.38246,
+      "cpu_p95_ms": 1.58175
+    },
+    {
+      "case": "gol-128",
+      "variant": "baseline",
+      "repeat": 0,
+      "frames": 6000,
+      "elapsed_ms": 11607.7,
+      "fps": 516.898,
+      "cpu_p50_ms": 1.92129,
+      "cpu_p95_ms": 2.02733
+    },
+    {
+      "case": "gol-128",
+      "variant": "rhi",
+      "repeat": 0,
+      "frames": 6000,
+      "elapsed_ms": 9093.25,
+      "fps": 659.83,
+      "cpu_p50_ms": 1.49329,
+      "cpu_p95_ms": 1.82275
+    },
+    {
+      "case": "gol-128",
+      "variant": "rhi",
+      "repeat": 1,
+      "frames": 6000,
+      "elapsed_ms": 9527.35,
+      "fps": 629.766,
+      "cpu_p50_ms": 1.56083,
+      "cpu_p95_ms": 1.89396
+    },
+    {
+      "case": "gol-128",
+      "variant": "baseline",
+      "repeat": 1,
+      "frames": 6000,
+      "elapsed_ms": 11704.9,
+      "fps": 512.604,
+      "cpu_p50_ms": 1.92904,
+      "cpu_p95_ms": 2.13287
+    },
+    {
+      "case": "gol-128",
+      "variant": "baseline",
+      "repeat": 2,
+      "frames": 6000,
+      "elapsed_ms": 11681.8,
+      "fps": 513.617,
+      "cpu_p50_ms": 1.92696,
+      "cpu_p95_ms": 2.07196
+    },
+    {
+      "case": "gol-128",
+      "variant": "rhi",
+      "repeat": 2,
+      "frames": 6000,
+      "elapsed_ms": 9367.21,
+      "fps": 640.532,
+      "cpu_p50_ms": 1.54808,
+      "cpu_p95_ms": 1.78492
+    },
+    {
+      "case": "gol-256",
+      "variant": "baseline",
+      "repeat": 0,
+      "frames": 6000,
+      "elapsed_ms": 12092,
+      "fps": 496.196,
+      "cpu_p50_ms": 1.9935,
+      "cpu_p95_ms": 2.18763
+    },
+    {
+      "case": "gol-256",
+      "variant": "rhi",
+      "repeat": 0,
+      "frames": 6000,
+      "elapsed_ms": 9641.34,
+      "fps": 622.32,
+      "cpu_p50_ms": 1.58767,
+      "cpu_p95_ms": 2.03754
+    },
+    {
+      "case": "gol-256",
+      "variant": "rhi",
+      "repeat": 1,
+      "frames": 6000,
+      "elapsed_ms": 9638.69,
+      "fps": 622.491,
+      "cpu_p50_ms": 1.59633,
+      "cpu_p95_ms": 1.93813
+    },
+    {
+      "case": "gol-256",
+      "variant": "baseline",
+      "repeat": 1,
+      "frames": 6000,
+      "elapsed_ms": 12124.7,
+      "fps": 494.856,
+      "cpu_p50_ms": 2.00546,
+      "cpu_p95_ms": 2.167
+    },
+    {
+      "case": "gol-256",
+      "variant": "baseline",
+      "repeat": 2,
+      "frames": 6000,
+      "elapsed_ms": 12070.5,
+      "fps": 497.079,
+      "cpu_p50_ms": 1.99721,
+      "cpu_p95_ms": 2.1295
+    },
+    {
+      "case": "gol-256",
+      "variant": "rhi",
+      "repeat": 2,
+      "frames": 6000,
+      "elapsed_ms": 9615.38,
+      "fps": 624.001,
+      "cpu_p50_ms": 1.59367,
+      "cpu_p95_ms": 1.87538
+    }
+  ],
+  "summary": [
+    {
+      "case": "2048",
+      "median_fps": {
+        "baseline": 469.003,
+        "rhi": 715.453
+      },
+      "change_percent": 52.547638288028
+    },
+    {
+      "case": "gol-128",
+      "median_fps": {
+        "baseline": 513.617,
+        "rhi": 640.532
+      },
+      "change_percent": 24.710046591137
+    },
+    {
+      "case": "gol-256",
+      "median_fps": {
+        "baseline": 496.196,
+        "rhi": 622.491
+      },
+      "change_percent": 25.452643713371327
+    }
+  ],
+  "images": [
+    {
+      "baseline": "2048-baseline-0.png",
+      "candidate": "2048-rhi-0.png",
+      "size": [
+        1440,
+        1920
+      ],
+      "max_difference": 0,
+      "mean_difference": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "changed_pixels": 0,
+      "passed": true
+    },
+    {
+      "baseline": "gol-128-baseline-0.png",
+      "candidate": "gol-128-rhi-0.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "max_difference": 0,
+      "mean_difference": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "changed_pixels": 0,
+      "passed": true
+    },
+    {
+      "baseline": "gol-256-baseline-0.png",
+      "candidate": "gol-256-rhi-0.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "max_difference": 0,
+      "mean_difference": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "changed_pixels": 0,
+      "passed": true
+    }
+  ]
+}
