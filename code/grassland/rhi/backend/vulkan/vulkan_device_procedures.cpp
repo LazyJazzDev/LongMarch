@@ -3,6 +3,36 @@
 namespace grassland::rhi::backend::vulkan {
 bool DeviceProcedures::Load(VkDevice device, uint32_t api_version, const DeviceFeatures &enabled) {
   *this = {};
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (enabled.ExternalSemaphore()) {
+#if defined(_WIN32)
+    GetSemaphoreWin32HandleKHR =
+        reinterpret_cast<PFN_vkGetSemaphoreWin32HandleKHR>(vkGetDeviceProcAddr(device, "vkGetSemaphoreWin32HandleKHR"));
+    if (!GetSemaphoreWin32HandleKHR)
+      return false;
+#else
+    GetSemaphoreFdKHR = reinterpret_cast<PFN_vkGetSemaphoreFdKHR>(vkGetDeviceProcAddr(device, "vkGetSemaphoreFdKHR"));
+    if (!GetSemaphoreFdKHR)
+      return false;
+#endif
+  }
+  if (enabled.ExternalMemory()) {
+#if defined(_WIN32)
+    GetMemoryWin32HandleKHR =
+        reinterpret_cast<PFN_vkGetMemoryWin32HandleKHR>(vkGetDeviceProcAddr(device, "vkGetMemoryWin32HandleKHR"));
+    if (!GetMemoryWin32HandleKHR) {
+      ReportError(-1, "Required Vulkan entry point vkGetMemoryWin32HandleKHR is unavailable.");
+      return false;
+    }
+#else
+    GetMemoryFdKHR = reinterpret_cast<PFN_vkGetMemoryFdKHR>(vkGetDeviceProcAddr(device, "vkGetMemoryFdKHR"));
+    if (!GetMemoryFdKHR) {
+      ReportError(-1, "Required Vulkan entry point vkGetMemoryFdKHR is unavailable.");
+      return false;
+    }
+#endif
+  }
+#endif
   if (enabled.DynamicRendering()) {
     CmdBeginRendering = reinterpret_cast<PFN_vkCmdBeginRendering>(vkGetDeviceProcAddr(
         device, api_version >= VK_API_VERSION_1_3 ? "vkCmdBeginRendering" : "vkCmdBeginRenderingKHR"));

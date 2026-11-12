@@ -11,7 +11,7 @@ class Film : public Object {
 
   Core *GetCore() const;
 
-  glm::uvec2 GetExtent();
+  graphics::Extent2D GetExtent();
   int GetWidth() const;
   int GetHeight() const;
 
@@ -27,24 +27,23 @@ class Film : public Object {
   } info;
 
   // HDR output is linear sRGB with artistic grading and an extended Filmic look.
-  void Develop(rhi::IImage *targ_image, bool linear_hdr = false);
+  void Develop(graphics::Image *targ_image, bool linear_hdr = false);
 
   void RegisterResetCallback(const std::function<void()> &callback);
 
-  rhi::IImage *GetRawImage() const;
-  rhi::IImage *GetDepthImage() const;
-  rhi::IImage *GetStencilImage() const;
+  graphics::Image *GetRawImage() const;
+  graphics::Image *GetDepthImage() const;
+  graphics::Image *GetStencilImage() const;
 
  private:
   Core *core_;
-  glm::uvec2 extent_;
-  rhi::ObjPtr<rhi::IImage> raw_image_;
-  rhi::ObjPtr<rhi::IImage> depth_image_;
-  rhi::ObjPtr<rhi::IImage> stencil_image_;
-  rhi::ObjPtr<rhi::IBuffer> tone_mapping_buffer_;
+  graphics::Extent2D extent_;
+  std::unique_ptr<graphics::Image> raw_image_;
+  std::unique_ptr<graphics::Image> depth_image_;
+  std::unique_ptr<graphics::Image> stencil_image_;
+  std::unique_ptr<graphics::Buffer> tone_mapping_buffer_;
 
   std::vector<std::function<void()>> reset_callbacks_;
-  rhi::ObjPtr<rhi::IBindingGroup> tone_mapping_group_;
 };
 
 }  // namespace sparkium

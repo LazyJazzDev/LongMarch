@@ -9,12 +9,15 @@
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
@@ -25,13 +28,16 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
   if (api == BACKEND_API_METAL) {
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto owner = static_cast<MetalDevice *>(device);
+    auto owner = rhi::QueryInterfacePtr<IMetalDevice>(device).Get();
+    ObjPtr<IQueue> queue_owner = rhi::QueryInterfacePtr<IDevice>(owner)->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<IMetalQueue>(queue_owner.Get()).Get();
     auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(sizeof(output), MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
-    std::lock_guard<std::mutex> lock(owner->QueueMutex());
-    auto commands = NS::RetainPtr(owner->NativeQueue()->commandBuffer());
+    std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+    auto commands = NS::RetainPtr(native_queue->NativeQueue()->commandBuffer());
     auto blit = commands->blitCommandEncoder();
-    blit->copyFromBuffer(static_cast<MetalBuffer *>(buffer)->NativeBuffer(), 0, readback.get(), 0, sizeof(output));
+    blit->copyFromBuffer(rhi::QueryInterfacePtr<IMetalBuffer>(buffer).Get()->NativeBuffer(), 0, readback.get(), 0,
+                         sizeof(output));
     blit->endEncoding();
     commands->commit();
     commands->waitUntilCompleted();
@@ -44,8 +50,10 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
-    auto owner = static_cast<D3D12Device *>(device);
-    auto source = static_cast<D3D12Buffer *>(buffer)->NativeBuffer();
+    auto owner = rhi::QueryInterfacePtr<ID3D12Device>(device).Get();
+    ObjPtr<IQueue> queue_owner = rhi::QueryInterfacePtr<IDevice>(owner)->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<ID3D12Queue>(queue_owner.Get()).Get();
+    auto source = rhi::QueryInterfacePtr<ID3D12Buffer>(buffer).Get()->NativeBuffer();
     auto native = owner->NativeDevice();
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_READBACK;
@@ -77,10 +85,10 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     list->ResourceBarrier(1, &barrier);
     ASSERT_TRUE(SUCCEEDED(list->Close()));
     {
-      std::lock_guard<std::mutex> lock(owner->QueueMutex());
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
       ID3D12CommandList *lists[] = {list.Get()};
-      owner->NativeQueue()->ExecuteCommandLists(1, lists);
-      ASSERT_TRUE(owner->WaitIdle());
+      native_queue->NativeQueue()->ExecuteCommandLists(1, lists);
+      ASSERT_TRUE(native_queue->WaitIdle());
     }
     void *mapped{};
     D3D12_RANGE range{0, sizeof(output)};
@@ -94,9 +102,11 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (api == BACKEND_API_VULKAN) {
     using namespace backend::vulkan;
-    auto owner = static_cast<VulkanDevice *>(device);
+    auto owner = rhi::QueryInterfacePtr<IVulkanDevice>(device).Get();
+    ObjPtr<IQueue> queue_owner = rhi::QueryInterfacePtr<IDevice>(owner)->GetQueue(QUEUE_TYPE_MAIN);
+    auto native_queue = rhi::QueryInterfacePtr<IVulkanQueue>(queue_owner.Get()).Get();
     auto native = owner->NativeDevice();
-    auto source = static_cast<VulkanBuffer *>(buffer)->NativeBuffer();
+    auto source = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get()->NativeBuffer();
     VkBufferCreateInfo desc{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     desc.size = sizeof(output);
     desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -142,9 +152,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     ASSERT_EQ(vkEndCommandBuffer(commands), VK_SUCCESS);
     uint64_t value{};
     {
-      std::lock_guard<std::mutex> lock(owner->QueueMutex());
-      value = owner->NextSerial();
-      auto semaphore = owner->Timeline();
+      std::lock_guard<std::mutex> lock(native_queue->QueueMutex());
+      value = native_queue->NextSerial();
+      auto semaphore = native_queue->GetTimeline()->NativeSemaphore();
       VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
       timeline.signalSemaphoreValueCount = 1;
       timeline.pSignalSemaphoreValues = &value;
@@ -154,9 +164,9 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
       submit.pCommandBuffers = &commands;
       submit.signalSemaphoreCount = 1;
       submit.pSignalSemaphores = &semaphore;
-      ASSERT_EQ(vkQueueSubmit(owner->NativeQueue(), 1, &submit, {}), VK_SUCCESS);
+      ASSERT_EQ(vkQueueSubmit(native_queue->NativeQueue(), 1, &submit, {}), VK_SUCCESS);
     }
-    ASSERT_EQ(owner->Wait(value), VK_SUCCESS);
+    ASSERT_EQ(native_queue->Wait(value), VK_SUCCESS);
     void *mapped{};
     ASSERT_EQ(vkMapMemory(native, memory, 0, sizeof(output), 0, &mapped), VK_SUCCESS);
     std::memcpy(output.data(), mapped, sizeof(output));
@@ -176,9 +186,9 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   EXPECT_EQ(device->CreateBuffer({0}), nullptr);
-  ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_TRANSFER);
+  ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(transfer);
-  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(graphics);
   std::array<uint32_t, 16> expected{};
   for (uint32_t i = 0; i < expected.size(); ++i)
@@ -187,22 +197,25 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ASSERT_TRUE(source);
   ObjPtr<IBuffer> target = device->CreateBuffer({sizeof(expected)});
   ASSERT_TRUE(target);
-  ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+  ObjPtr<ICommandContext> upload = transfer->CreateCommandContext();
   ASSERT_TRUE(upload);
   auto bytes = expected;
   ASSERT_TRUE(upload->CmdUploadBuffer(source.Get(), 0, bytes.data(), sizeof(bytes)));
   bytes.fill(0);
-  ObjPtr<ISubmissionToken> ready = transfer->Submit(upload.Get());
+  ObjPtr<ISubmissionToken> ready = upload->Submit();
   ASSERT_TRUE(ready);
   upload.Release();
-  ObjPtr<ICommandContext> copy = device->CreateCommandContext();
+  ObjPtr<ICommandContext> copy = graphics->CreateCommandContext();
   ASSERT_TRUE(copy);
   ASSERT_TRUE(copy->CmdCopyBuffer(source.Get(), 0, target.Get(), 0, sizeof(expected)));
   source.Release();
   SubmitInfo info;
-  info.waits = {ready.Get()};
-  ObjPtr<ISubmissionToken> done = graphics->Submit(copy.Get(), info);
+  const auto event = ready->GetEvent();
+  info.waits = {{event.timeline, 0}, event, event};
+  ready.Release();
+  ObjPtr<ISubmissionToken> done = copy->Submit(info);
   ASSERT_TRUE(done);
+  info.waits.clear();
   copy.Release();
   ASSERT_TRUE(done->WaitHost());
   std::array<uint32_t, 16> actual{};
@@ -226,7 +239,7 @@ TEST_P(RhiBuffer, AbandonedUploadsReturnStorageAndLeasesDoNotOverlap) {
     EXPECT_NE(identity, second->NativeBuffer());
     first.Reset();
     {
-      ObjPtr<ICommandContext> context = device->CreateCommandContext();
+      ObjPtr<ICommandContext> context = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
       std::array<uint32_t, 16> bytes{};
       ASSERT_TRUE(context->CmdUploadBuffer(target.Get(), 0, bytes.data(), sizeof(bytes)));
     }
@@ -238,15 +251,15 @@ TEST_P(RhiBuffer, AbandonedUploadsReturnStorageAndLeasesDoNotOverlap) {
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
-    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->UploadPool());
+    check(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get()->UploadPool());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN)
-    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
+    check(rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get()->UploadPool());
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL)
-    check(static_cast<backend::metal::MetalDevice *>(device.Get())->UploadPool());
+    check(rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get()->UploadPool());
 #endif
 }
 
@@ -260,12 +273,12 @@ TEST_P(RhiBuffer, UploadClassesReuseIndependentlyAndReleaseExpiredPeakCapacity) 
     EXPECT_FALSE(pool.Acquire(UINT64_MAX));
     auto large = pool.Acquire(65537);
     ASSERT_TRUE(large);
-    EXPECT_EQ(large->GetDesc().size, 131072u);
+    EXPECT_EQ(QueryInterfacePtr<IBuffer>(large.Get())->GetDesc().size, 131072u);
     auto large_identity = large->NativeBuffer();
     large.Reset();
     auto first = pool.Acquire(1);
     ASSERT_TRUE(first);
-    EXPECT_EQ(first->GetDesc().size, 65536u);
+    EXPECT_EQ(QueryInterfacePtr<IBuffer>(first.Get())->GetDesc().size, 65536u);
     auto second = pool.Acquire(65536);
     auto third = pool.Acquire(64);
     auto fourth = pool.Acquire(64);
@@ -305,15 +318,15 @@ TEST_P(RhiBuffer, UploadClassesReuseIndependentlyAndReleaseExpiredPeakCapacity) 
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
-    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->UploadPool());
+    check(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get()->UploadPool());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN)
-    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
+    check(rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get()->UploadPool());
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL)
-    check(static_cast<backend::metal::MetalDevice *>(device.Get())->UploadPool());
+    check(rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get()->UploadPool());
 #endif
 }
 
@@ -322,7 +335,7 @@ TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) 
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_TRANSFER);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_ASSIST);
   ASSERT_TRUE(queue);
   std::array<uint32_t, 16> expected{};
   for (uint32_t i = 0; i < expected.size(); ++i)
@@ -332,28 +345,30 @@ TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) 
   auto check = [&](auto &pool) {
     auto lease = pool.Acquire(sizeof(expected));
     ASSERT_TRUE(lease);
-    EXPECT_EQ(lease->Owner(), device.Get());
+    EXPECT_EQ(lease->Owner(), QueryInterfacePtr<std::remove_pointer_t<decltype(lease->Owner())>>(device.Get()).Get());
     ASSERT_TRUE(lease->Write(expected.data(), sizeof(expected)));
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
-      auto upload = dynamic_cast<backend::d3d12::D3D12TemporalBufferPool::Lease *>(lease.Get());
+      auto upload = rhi::QueryInterfacePtr<backend::d3d12::ID3D12TemporalBufferLease>(lease.Get()).Get();
       ASSERT_TRUE(upload);
       expected[7] = 12345;
       ASSERT_TRUE(upload->Write(&expected[7], sizeof(uint32_t), 7 * sizeof(uint32_t)));
-      EXPECT_FALSE(upload->Write(expected.data(), sizeof(uint32_t), upload->GetDesc().size - 1));
+      EXPECT_FALSE(
+          upload->Write(expected.data(), sizeof(uint32_t), QueryInterfacePtr<IBuffer>(upload)->GetDesc().size - 1));
       EXPECT_FALSE(upload->Write(expected.data(), sizeof(uint32_t), UINT64_MAX));
     }
 #endif
     auto alias = lease;
     lease.Reset();
     EXPECT_EQ(pool.GetBufferCounts(sizeof(expected)).second, 1u);
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
-    ASSERT_TRUE(commands->CmdCopyBuffer(alias.Get(), 0, target.Get(), 0, sizeof(expected)));
+    ASSERT_TRUE(
+        commands->CmdCopyBuffer(QueryInterfacePtr<IBuffer>(alias.Get()).Get(), 0, target.Get(), 0, sizeof(expected)));
     alias.Reset();
     // The common resource table keeps the lease occupied after all caller references go away.
     EXPECT_EQ(pool.GetBufferCounts(sizeof(expected)).second, 1u);
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     commands.Release();
     ASSERT_TRUE(done->WaitHost());
@@ -367,15 +382,15 @@ TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) 
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
-    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->UploadPool());
+    check(rhi::QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get()).Get()->UploadPool());
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (GetParam() == BACKEND_API_VULKAN)
-    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
+    check(rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get()->UploadPool());
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
   if (GetParam() == BACKEND_API_METAL)
-    check(static_cast<backend::metal::MetalDevice *>(device.Get())->UploadPool());
+    check(rhi::QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get()).Get()->UploadPool());
 #endif
 }
 
@@ -395,7 +410,7 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   std::string source;
   std::string body;
@@ -412,7 +427,7 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
   desc.compute_shader = shader.Get();
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
   ASSERT_TRUE(program);
-  ObjPtr<ICommandContext> context = device->CreateCommandContext();
+  ObjPtr<ICommandContext> context = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->CmdBindComputeProgram(program.Get()));
   std::array<ObjPtr<IBuffer>, 8> buffers;
@@ -425,7 +440,7 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
     ASSERT_TRUE(context->CmdBindGroup(i, group.Get()));
   }
   ASSERT_TRUE(context->CmdDispatch(1));
-  ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+  ObjPtr<ISubmissionToken> token = context->Submit();
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   for (uint32_t i = 0; i < buffers.size(); ++i) {
@@ -443,7 +458,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   const std::string source = R"(
     RHI_RW_STRUCTURED_BUFFER(0, 0, uint, values);
@@ -471,7 +486,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   std::array<uint32_t, 16> input{};
   for (uint32_t i = 0; i < 16; ++i)
     input[i] = i;
-  ObjPtr<ICommandContext> ctx = device->CreateCommandContext();
+  ObjPtr<ICommandContext> ctx = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(ctx);
   ASSERT_TRUE(ctx->CmdUploadBuffer(first.Get(), 0, input.data(), sizeof(input)));
   ASSERT_TRUE(ctx->CmdUploadBuffer(second.Get(), 0, input.data(), sizeof(input)));
@@ -487,7 +502,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   first.Release();
   group.Release();
   program.Release();
-  ObjPtr<ISubmissionToken> token = queue->Submit(ctx.Get());
+  ObjPtr<ISubmissionToken> token = ctx->Submit();
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   std::array<uint32_t, 16> actual{};
@@ -505,12 +520,12 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, second.Get()));
-  ctx = device->CreateCommandContext();
+  ctx = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(ctx);
   ASSERT_TRUE(ctx->CmdBindComputeProgram(program.Get()));
   ASSERT_TRUE(ctx->CmdBindGroup(0, group.Get()));
   ASSERT_TRUE(ctx->CmdDispatch(4));
-  token = queue->Submit(ctx.Get());
+  token = ctx->Submit();
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   ReadBuffer(device.Get(), second.Get(), GetParam(), actual);
@@ -523,7 +538,7 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
     RHI_RW_STRUCTURED_BUFFER(0, 0, uint, values);
@@ -544,7 +559,7 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, buffer.Get()));
-  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, values.data(), sizeof(values)));
   ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
@@ -553,7 +568,7 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
   ASSERT_TRUE(commands->CmdDispatch(0, 2, 2));
   ASSERT_TRUE(commands->CmdDispatch(2, 0, 2));
   ASSERT_TRUE(commands->CmdDispatch(2, 2, 0));
-  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
+  ObjPtr<ISubmissionToken> token = commands->Submit();
   ASSERT_TRUE(token);
   ASSERT_TRUE(token->WaitHost());
   ReadBuffer(device.Get(), buffer.Get(), GetParam(), values);

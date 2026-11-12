@@ -1,8 +1,8 @@
 """Exercise native, KHR and fallback rendering on a dynamic-rendering-capable GPU.
 
 Requires the Vulkan SDK API-dump, validation and Profiles layers.
-A desktop is only required without --headless.
-Usage: python test_vulkan_rendering_paths.py <rhi_hello> [<rhix_hello>] [--headless]
+Runs existing offscreen rasterizer tests; no desktop is required.
+Usage: python test_vulkan_rendering_paths.py <test_rhi>
 Profiles only constrain capabilities; the real driver still executes the commands.
 """
 
@@ -15,7 +15,7 @@ import subprocess
 import tempfile
 
 
-def check_path(executable, mode, directory, headless=False):
+def check_path(executable, mode, directory):
     settings = [
         "khronos_validation.validate_sync = true",
         "khronos_validation.debug_action = VK_DBG_LAYER_ACTION_LOG_MSG",
@@ -59,12 +59,10 @@ def check_path(executable, mode, directory, headless=False):
     env = os.environ.copy()
     env["VK_INSTANCE_LAYERS"] = os.pathsep.join(layers)
     env["VK_LAYER_SETTINGS_PATH"] = str(directory)
-    scenes = subprocess.check_output([str(executable), "--list"], text=True).splitlines()
-    triangle = next(scene for scene in scenes if scene.endswith("triangle"))
+    env.pop("LONGMARCH_RHI_WINDOW_TESTS", None)
     result = subprocess.run(
-        [str(executable), "--backend", "vulkan", "--frames", "3"]
-        + (["--headless", "--all"] if headless else ["--module", triangle]),
-        env=env, capture_output=True, timeout=60,
+        [str(executable), "--gtest_filter=Backends/RhiRasterizer.WindingCullAndViewportAgreeWithGraphicsConvention/*"],
+        env=env, capture_output=True, timeout=120,
     )
     output = (result.stdout + result.stderr).decode("utf-8", errors="replace")
     if result.returncode or re.search(r"Validation Error|VUID-|SYNC-HAZARD|PROFILES ERROR", output):
@@ -74,32 +72,26 @@ def check_path(executable, mode, directory, headless=False):
         "khr": ("vkCmdBeginRenderingKHR(", "vkCmdEndRenderingKHR("),
         "fallback": ("vkCmdBeginRenderPass(", "vkCmdEndRenderPass("),
     }
-    scenes = subprocess.check_output([str(executable), "--list"], text=True).splitlines()
-    rendering_scenes = len([scene for scene in scenes if scene not in ("window", "hello_window")])
-    for path, pair in commands.items():
-        for command in pair:
-            count = output.count(command)
-            expected = (63 * rendering_scenes if headless else 3) if path == mode else 0
-            if count != expected:
-                raise RuntimeError(f"{executable.name}/{mode}: {command} count {count}, expected {expected}\n{output}")
+    for path, (begin, end) in commands.items():
+        count = output.count(begin)
+        if output.count(end) != count or (count > 0) != (path == mode):
+            raise RuntimeError(f"{executable.name}/{mode}: unexpected {path} begin/end counts\n{output}")
     for command in ("vkCreateRenderPass(", "vkCreateFramebuffer("):
         if bool(output.count(command)) != (mode == "fallback"):
             raise RuntimeError(f"{executable.name}/{mode}: unexpected {command} usage\n{output}")
-    if headless:
-        for command in ("vkCreateSwapchainKHR(", "vkAcquireNextImageKHR(", "vkQueuePresentKHR(",
-                        "vkCreateWin32SurfaceKHR(", "vkCreateXlibSurfaceKHR(", "vkCreateXcbSurfaceKHR(",
-                        "vkCreateWaylandSurfaceKHR("):
-            if command in output:
-                raise RuntimeError(f"Headless rendering used {command}")
-    print(f"{executable.name}/{mode}/headless={headless}: passed", flush=True)
+    for command in ("vkCreateSwapchainKHR(", "vkAcquireNextImageKHR(", "vkQueuePresentKHR(",
+                    "vkCreateWin32SurfaceKHR(", "vkCreateXlibSurfaceKHR(", "vkCreateXcbSurfaceKHR(",
+                    "vkCreateWaylandSurfaceKHR(", "vkCreateMetalSurfaceEXT("):
+        if command in output:
+            raise RuntimeError(f"Offscreen rendering used {command}")
+    print(f"{executable.name}/{mode}: passed", flush=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executables", nargs="+", type=Path)
-    parser.add_argument("--headless", action="store_true")
     args = parser.parse_args()
     for executable in args.executables:
         for mode in ("core", "khr", "fallback"):
             with tempfile.TemporaryDirectory(prefix="longmarch-rendering-") as temporary:
-                check_path(executable.resolve(), mode, Path(temporary), args.headless)
+                check_path(executable.resolve(), mode, Path(temporary))

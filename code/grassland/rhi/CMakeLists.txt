@@ -14,6 +14,9 @@ if(WIN32)
     target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE dxgi)
 endif()
 
-add_subdirectory(backend)
+if (LONGMARCH_CUDA_RUNTIME)
+    target_compile_definitions(grassland_rhi PUBLIC LONGMARCH_CUDA_RUNTIME)
+    target_link_libraries(grassland_rhi PUBLIC CUDA::cudart_static)
+endif ()
 
-add_subdirectory(rhix)
+add_subdirectory(backend)

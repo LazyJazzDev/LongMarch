@@ -3,17 +3,19 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
-MetalSampler::MetalSampler(MetalDevice *device, const SamplerDesc &desc, NS::SharedPtr<MTL::SamplerState> sampler)
-    : Sampler(desc, device),
-      sampler_(std::move(sampler)) {
+MetalSamplerImpl::MetalSamplerImpl(IMetalDevice *device,
+                                   const SamplerDesc &desc,
+                                   NS::SharedPtr<MTL::SamplerState> sampler)
+    : sampler_(std::move(sampler)) {
+  InitializeSampler(desc, device);
 }
 
-MTL::SamplerState *MetalSampler::NativeSampler() const {
+MTL::SamplerState *MetalSamplerImpl::NativeSampler() const {
   return sampler_.get();
 }
 
-MetalSampler *MetalSampler::Create(MetalDevice *device, const SamplerDesc &desc) {
-  if (!Validate(desc))
+rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc &desc) {
+  if (!ValidateSamplerDesc(desc))
     return nullptr;
 
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
@@ -32,6 +34,10 @@ MetalSampler *MetalSampler::Create(MetalDevice *device, const SamplerDesc &desc)
     ReportError(-1, "Metal sampler creation failed.");
     return nullptr;
   }
-  return new MetalSampler(device, desc, std::move(sampler));
+  return new MetalSamplerImpl(device, desc, std::move(sampler));
+}
+
+rhi::ISampler *IMetalSampler::Create(IMetalDevice *device, const SamplerDesc &desc) {
+  return MetalSamplerImpl::Create(device, desc);
 }
 }  // namespace grassland::rhi::backend::metal

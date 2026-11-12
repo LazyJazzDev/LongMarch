@@ -1,38 +1,24 @@
-﻿#include "../../module.h"
-
 #include <fmt/format.h>
 
 #include <chrono>
 #include <iostream>
 #include <thread>
 
-#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/fps_counter.h"
 #include "imgui.h"
 
-int RunImGui(grassland::rhi::BackendAPI api,
-             int frames,
-             bool headless,
-             const char *font_file,
-             float font_size,
-             const std::string &capture_directory) {
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
+int RunImGui(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
-  if (headless) {
-    std::cout << "imgui: skipped (requires a window for platform input)\n";
-    return 0;
-  }
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
-    return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
-  ObjPtr<IDownloadToken> last_frame;
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  float last_frame_white_scale = 1.0f;
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
   PresentMode requested = PRESENT_MODE_VSYNC;
@@ -41,7 +27,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
   ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "ImGui - I: toggle UI recording; P: VSync"});
   if (!window)
     return 1;
-  if (!window->EnableImGui(true, font_file, font_size))
+  if (!window->EnableImGui())
     return 1;
   window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
     if (action != GLFW_PRESS)
@@ -61,7 +47,7 @@ int RunImGui(grassland::rhi::BackendAPI api,
   bool show_demo = true;
   grassland::FPSCounter fps;
   auto title_time = std::chrono::steady_clock::now();
-  for (int rendered = 0; !frames || rendered < frames;) {
+  while (true) {
     if (!PollEvents())
       return 1;
     if (window->ShouldClose())
@@ -95,26 +81,16 @@ int RunImGui(grassland::rhi::BackendAPI api,
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
-    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     if (!commands)
       return 1;
-    if (!commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
-      return 1;
-    if (!commands->CmdPresent(window.Get()))
-      return 1;
-    if (!capture_directory.empty()) {
-      last_frame = commands->CmdDownloadImage(image.Get());
-      if (!last_frame)
-        return 1;
-      last_frame_desc = image->GetDesc();
-      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
-    }
-    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    RETURN_IF_FAIL(commands->CmdClearImage(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}));
+    RETURN_IF_FAIL(commands->CmdPresent(window.Get()));
+
+    ObjPtr<ISubmissionToken> done = commands->Submit();
 
     if (!done)
       return 1;
-    ++rendered;
     fps.TickFrame();
     auto now = std::chrono::steady_clock::now();
     if (now - title_time >= std::chrono::milliseconds(250)) {
@@ -123,13 +99,8 @@ int RunImGui(grassland::rhi::BackendAPI api,
       title_time = now;
     }
   }
-  if (!capture_directory.empty()) {
-    if (!last_frame || !last_frame->WaitHost())
-      return 1;
-    std::vector<uint8_t> pixels(last_frame->GetSize());
-    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "imgui", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
-      return 1;
-  }
+
   return 0;
 }
+
+#undef RETURN_IF_FAIL

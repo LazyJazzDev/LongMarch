@@ -1,13 +1,35 @@
-﻿// Include Vulkan before GLFW declares its surface functions.
-#define GLFW_INCLUDE_VULKAN
+﻿#define GLFW_INCLUDE_VULKAN
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
-
+// Include Vulkan before GLFW declares its surface functions.
 #include <cstdlib>
 #include <optional>
 
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <cmath>
+#include <list>
+#include <mutex>
+#include <thread>
+
+#include "grassland/rhi/backend/backend_image_presenter.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
+#include "grassland/rhi/backend/backend_window.h"
+#include "grassland/rhi/backend/backend_window_imgui.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
+#define GLFW_INCLUDE_NONE
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#include <dxgi1_6.h>
+#include <wrl/client.h>
+#endif
 
 namespace grassland::rhi::backend::vulkan {
 
@@ -34,21 +56,26 @@ std::optional<WindowPresentationOption> PresentationFormat(VkSurfaceFormatKHR na
 }
 }  // namespace
 
-VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
+VulkanWindowImpl::VulkanWindowImpl(IVulkanDevice *device) : device_(device) {
 }
 
-VulkanWindow::~VulkanWindow() {
+VulkanWindowImpl::~VulkanWindowImpl() {
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  vkDeviceWaitIdle(device_->NativeDevice());
+  // No callbacks or resource destructors may run while holding the submission lock.
+  // queue_ can be null when window initialization failed before assigning it.
+  if (queue_) {
+    std::lock_guard<std::mutex> lock(queue_->QueueMutex());
+    Check(vkQueueWaitIdle(queue_->NativeQueue()), "Wait for window queue shutdown");
+  }
   ReleaseNextImage();
   DestroySwapchain();
   if (surface_)
     vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);
+  DestroyWindow();
 }
 
-VulkanWindow *VulkanWindow::Create(VulkanDevice *device, const WindowDesc &desc) {
-  auto object = std::unique_ptr<VulkanWindow>(new VulkanWindow(device));
+rhi::IWindow *VulkanWindowImpl::Create(IVulkanDevice *device, const WindowDesc &desc) {
+  auto object = std::unique_ptr<VulkanWindowImpl>(new VulkanWindowImpl(device));
   if (!object->device_->SupportsSwapchain()) {
     ReportError(-1, "VK_KHR_swapchain is unavailable.");
     return nullptr;
@@ -71,11 +98,8 @@ VulkanWindow *VulkanWindow::Create(VulkanDevice *device, const WindowDesc &desc)
   return object.release();
 }
 
-const void *VulkanWindow::DeviceIdentity() const {
-  return device_;
-}
-
-ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
+ObjectPtr<IVulkanImage> VulkanWindowImpl::AcquireNativeFrame() {
+  auto queue = queue_;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
@@ -87,7 +111,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   auto &sync = acquire_sync_[current_sync_];
   const auto native = device_->NativeDevice();
   if (sync.submission_value) {
-    const auto status = device_->Wait(sync.submission_value);
+    const auto status = queue->Wait(sync.submission_value);
     if (!Check(status, "Acquire frame synchronization"))
       return {};
     sync.submission_value = 0;
@@ -107,6 +131,26 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       vkAcquireNextImageKHR(device_->NativeDevice(), swapchain_, UINT64_MAX, semaphore, fence, &current_image_);
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
     sync.acquired = true;
+    {
+      std::lock_guard<std::mutex> lock(queue->QueueMutex());
+      const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+      const uint64_t binary_value = 0;
+      const auto value = queue->NextSerial();
+      const auto completed = queue->GetTimeline()->NativeSemaphore();
+      VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
+      timeline.waitSemaphoreValueCount = timeline.signalSemaphoreValueCount = 1;
+      timeline.pWaitSemaphoreValues = &binary_value;
+      timeline.pSignalSemaphoreValues = &value;
+      VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+      submit.pNext = &timeline;
+      submit.waitSemaphoreCount = submit.signalSemaphoreCount = 1;
+      submit.pWaitSemaphores = &semaphore;
+      submit.pWaitDstStageMask = &stage;
+      submit.pSignalSemaphores = &completed;
+      if (!Check(vkQueueSubmit(queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE), "Consume swapchain acquisition"))
+        return {};
+      sync.submission_value = value;
+    }
     const auto image = images_[current_image_];
     if (!initialized_images_[current_image_]) {
       // Establish the fixed default layout before exposing this image to recording.
@@ -115,7 +159,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       auto status = vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
       if (!Check(status, "Acquire frame synchronization"))
         return {};
-      std::lock_guard<std::mutex> lock(device_->QueueMutex());
+      std::lock_guard<std::mutex> lock(queue->QueueMutex());
       VkCommandPool pool{};
       VkCommandBuffer commands{};
       status = [&]() -> VkResult {
@@ -147,8 +191,8 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
         status = vkEndCommandBuffer(commands);
         if (status != VK_SUCCESS)
           return status;
-        const auto semaphore = device_->Timeline();
-        const auto value = device_->NextSerial();
+        const auto semaphore = queue->GetTimeline()->NativeSemaphore();
+        const auto value = queue->NextSerial();
         VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
         timeline.signalSemaphoreValueCount = 1;
         timeline.pSignalSemaphoreValues = &value;
@@ -158,11 +202,11 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
         submit.pSignalSemaphores = &semaphore;
         submit.commandBufferCount = 1;
         submit.pCommandBuffers = &commands;
-        status = vkQueueSubmit(device_->NativeQueue(), 1, &submit, VK_NULL_HANDLE);
+        status = vkQueueSubmit(queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE);
         if (status != VK_SUCCESS)
           return status;
         // Submitted commands must finish before their temporary pool is destroyed.
-        if (!Check(device_->Wait(value), "Wait for image initialization"))
+        if (!Check(queue->Wait(value), "Wait for image initialization"))
           std::abort();
         return VK_SUCCESS;
       }();
@@ -180,24 +224,16 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     Check(result, "vkAcquireNextImageKHR");
     return {};
   }
-  return ObjectPtr<Image>::Adopt(
-      new VulkanSwapChainImage(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
+  return ObjectPtr<IVulkanImage>::Adopt(
+      IVulkanSwapChainImage::Create(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
 }
 
-VkSemaphore VulkanWindow::AcquireSemaphore() const {
-  const auto &sync = acquire_sync_[current_sync_];
-  return sync.submission_value ? VK_NULL_HANDLE : sync.semaphore;
-}
-
-void VulkanWindow::MarkAcquireWaitSubmitted(uint64_t value) {
-  acquire_sync_[current_sync_].submission_value = value;
-}
-
-VkSemaphore VulkanWindow::RenderSemaphore() const {
+VkSemaphore VulkanWindowImpl::RenderSemaphore() const {
   return rendered_[current_image_];
 }
 
-VkResult VulkanWindow::PresentFrame() {
+VkResult VulkanWindowImpl::PresentFrame() {
+  auto queue = queue_;
   const auto rendered = RenderSemaphore();
   VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
   present.waitSemaphoreCount = 1;
@@ -205,7 +241,7 @@ VkResult VulkanWindow::PresentFrame() {
   present.swapchainCount = 1;
   present.pSwapchains = &swapchain_;
   present.pImageIndices = &current_image_;
-  const auto result = vkQueuePresentKHR(device_->NativeQueue(), &present);
+  const auto result = vkQueuePresentKHR(queue->NativeQueue(), &present);
   // The prepared frame has been presented; this slot is reused only after
   // its acquire fence and consuming submission have completed.
   current_sync_ = (current_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
@@ -214,7 +250,7 @@ VkResult VulkanWindow::PresentFrame() {
   return result;
 }
 
-std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOptions() const {
+std::vector<WindowPresentationOption> VulkanWindowImpl::GetSupportedPresentationOptions() const {
   const auto physical = device_->NativePhysicalDevice();
   VkSurfaceCapabilitiesKHR caps{};
   if (!Check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface_, &caps), "Surface capabilities"))
@@ -255,15 +291,15 @@ std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOpti
   return options;
 }
 
-PresentMode VulkanWindow::GetPresentMode() const {
+PresentMode VulkanWindowImpl::GetPresentMode() const {
   return mode_;
 }
 
-void VulkanWindow::DestroySwapchain() {
+void VulkanWindowImpl::DestroySwapchain() {
   for (auto image : images_)
     device_->RenderTargets().Retire(image);
   image_views_.clear();
-  // Device idle covers submitted waits; acquisition itself is a presentation-engine operation.
+  // Main queue idle covers submitted waits; acquisition itself is a presentation-engine operation.
   for (auto &sync : acquire_sync_) {
     if (sync.acquired)
       vkWaitForFences(device_->NativeDevice(), 1, &sync.fence, VK_TRUE, UINT64_MAX);
@@ -286,7 +322,8 @@ void VulkanWindow::DestroySwapchain() {
   swapchain_ = VK_NULL_HANDLE;
 }
 
-bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
+bool VulkanWindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
+  auto queue = queue_;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
   int width, height;
@@ -362,9 +399,9 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   }
   create.presentMode = mode;
   create.clipped = VK_TRUE;
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
+  std::lock_guard<std::mutex> lock(queue->QueueMutex());
   if (swapchain_) {
-    if (!Check(vkDeviceWaitIdle(device), "Wait before swapchain replacement"))
+    if (!Check(vkQueueWaitIdle(queue->NativeQueue()), "Wait before swapchain replacement"))
       return false;
   }
   DestroySwapchain();
@@ -396,5 +433,373 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   desc_ = {create.imageExtent.width, create.imageExtent.height, image_format};
   mode_ = mode == VK_PRESENT_MODE_FIFO_KHR ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
   return true;
+}
+
+rhi::IWindow *IVulkanWindow::Create(IVulkanDevice *device, const WindowDesc &desc) {
+  return VulkanWindowImpl::Create(device, desc);
+}
+
+bool VulkanWindowImpl::EnableImGui(bool enabled, const char *font_file_path, float font_size) {
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+  if (!enabled) {
+    imgui_.reset();
+    return true;
+  }
+  if (!imgui_)
+    imgui_ =
+        WindowImGui::Create(rhi::QueryInterfacePtr<rhi::IDevice>(device_).Get(), window_, font_file_path, font_size);
+  return bool(imgui_);
+}
+
+ImGuiContext *VulkanWindowImpl::GetImGuiContext() const {
+  return imgui_ ? imgui_->Context() : nullptr;
+}
+
+bool VulkanWindowImpl::UpdateImGui(const std::function<void()> &callback) {
+  if (!imgui_)
+    return true;
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+
+  struct ProcessingScope {
+    bool &flag;
+
+    ProcessingScope(bool &value) : flag(value) {
+      flag = true;
+    }
+
+    ~ProcessingScope() {
+      flag = false;
+    }
+  } scope(processing_imgui_);
+
+  return imgui_->Update(callback);
+}
+
+const void *VulkanWindowImpl::DeviceIdentity() const {
+  return device_;
+}
+
+bool VulkanWindowImpl::RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) {
+  ObjPtr<IImage> frame = GetNextImage();
+  if (!frame)
+    return false;
+  if (!presenter_)
+    presenter_ = std::make_unique<ImagePresenter>(rhi::QueryInterfacePtr<rhi::IDevice>(device_).Get());
+  return presenter_->Record(commands, image, frame.Get(), color_space, GetColorSpace(), GetHDRReferenceWhiteScale());
+}
+
+bool VulkanWindowImpl::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
+  return RecordImGui(commands, image, GetColorSpace(), GetHDRReferenceWhiteScale());
+}
+
+bool VulkanWindowImpl::RecordImGui(rhi::ICommandContext *commands,
+                                   rhi::IImage *image,
+                                   ColorSpace color_space,
+                                   float white_scale) {
+  if (!imgui_)
+    return true;
+  if (!glfw::IsWindowThread() || processing_imgui_)
+    return false;
+
+  struct ProcessingScope {
+    bool &flag;
+
+    ProcessingScope(bool &value) : flag(value) {
+      flag = true;
+    }
+
+    ~ProcessingScope() {
+      flag = false;
+    }
+  } scope(processing_imgui_);
+
+  return imgui_->Record(commands, image, color_space, white_scale);
+}
+
+rhi::IImage *VulkanWindowImpl::GetNextImage() {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread()) {
+    ReportError(-1, "GetNextImage must run on the window thread.");
+    std::abort();
+  }
+#endif
+  if (invalid_)
+    return nullptr;
+  int width, height;
+  glfwGetFramebufferSize(window_, &width, &height);
+  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+    return nullptr;
+  std::lock_guard<std::mutex> lock(next_image_mutex_);
+#if !defined(NDEBUG)
+  if (!next_image_) {
+    ReportError(-1, "No prepared swapchain image for a drawable window.");
+    std::abort();
+  }
+#endif
+  return rhi::QueryInterfacePtr<IImage>(next_image_.Get()).Detach();
+}
+
+IVulkanQueue *VulkanWindowImpl::OwnerQueue() const {
+  return queue_;
+}
+
+bool VulkanWindowImpl::UpdateNextImage() {
+  auto image = AcquireNativeFrame();
+  std::lock_guard<std::mutex> lock(next_image_mutex_);
+  next_image_ = std::move(image);
+  int width, height;
+  glfwGetFramebufferSize(window_, &width, &height);
+  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+    return true;
+  // A native OUT_OF_DATE result defers recovery to an explicit rebuild.
+  if (next_image_ || invalid_)
+    return true;
+  invalid_ = true;
+  return false;
+}
+
+void VulkanWindowImpl::ReleaseNextImage() {
+  std::lock_guard<std::mutex> lock(next_image_mutex_);
+  next_image_.Reset();
+}
+
+bool VulkanWindowImpl::IsSwapChainInvalid() const {
+  return invalid_;
+}
+
+bool VulkanWindowImpl::RebuildSwapChain() {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  const auto options = GetSupportedPresentationOptions();
+  if (std::none_of(options.begin(), options.end(),
+                   [&](const auto &option) { return option.color_space == requested_color_space_; })) {
+    ReportError(-1, "Requested swapchain color space is unavailable.");
+    return false;
+  }
+  invalid_ = true;
+  ReleaseNextImage();
+  if (!RebuildNativeSwapChain(requested_mode_))
+    return false;
+  int width, height;
+  glfwGetFramebufferSize(window_, &width, &height);
+  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+    return true;
+  color_space_ = requested_color_space_;
+  invalid_ = false;
+  if (UpdateNextImage())
+    return true;
+  invalid_ = true;
+  return false;
+}
+
+bool VulkanWindowImpl::SetPresentMode(PresentMode mode) {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  requested_mode_ = mode;
+  return RebuildSwapChain();
+}
+
+bool VulkanWindowImpl::SetColorSpace(ColorSpace color_space) {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  const auto options = GetSupportedPresentationOptions();
+  if (std::none_of(options.begin(), options.end(),
+                   [&](const auto &option) { return option.color_space == color_space; }))
+    return false;
+  const auto previous = requested_color_space_;
+  requested_color_space_ = color_space;
+  if (RebuildSwapChain())
+    return true;
+  requested_color_space_ = previous;
+  return false;
+}
+
+ColorSpace VulkanWindowImpl::GetColorSpace() const {
+  return color_space_;
+}
+
+float VulkanWindowImpl::GetHDRReferenceWhiteScale() const {
+#ifdef _WIN32
+  float nits;
+  return GetHDRReferenceWhiteNits(nits) ? nits / 80.0f : 1.0f;
+#else
+  // Linux uses fixed source encoding parameters; macOS uses relative EDR.
+  return 1.0f;
+#endif
+}
+
+float VulkanWindowImpl::GetHDRHeadroom() const {
+#ifdef __APPLE__
+  return CocoaHDRHeadroom(GLFWWindow());
+#endif
+#ifdef _WIN32
+  float white;
+  if (!GetHDRReferenceWhiteNits(white))
+    return 10.0f;
+  const auto monitor = MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST);
+  Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+  if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+    return 10.0f;
+  for (UINT a = 0;; ++a) {
+    Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+    if (factory->EnumAdapters1(a, &adapter) != S_OK)
+      break;
+    for (UINT o = 0;; ++o) {
+      Microsoft::WRL::ComPtr<IDXGIOutput> output;
+      if (adapter->EnumOutputs(o, &output) != S_OK)
+        break;
+      Microsoft::WRL::ComPtr<IDXGIOutput6> output6;
+      DXGI_OUTPUT_DESC1 desc{};
+      if (FAILED(output.As(&output6)) || FAILED(output6->GetDesc1(&desc)) || desc.Monitor != monitor)
+        continue;
+      const float ratio = desc.MaxLuminance / white;
+      return std::isfinite(ratio) && ratio > 0.0f ? std::max(1.0f, ratio) : 10.0f;
+    }
+  }
+#endif
+  return 10.0f;
+}
+
+bool VulkanWindowImpl::GetHDRReferenceWhiteNits(float &nits) const {
+  if (!glfw::IsWindowThread())
+    return false;
+#ifdef _WIN32
+  MONITORINFOEXW monitor{};
+  monitor.cbSize = sizeof(monitor);
+  if (!GetMonitorInfoW(MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST), &monitor))
+    return false;
+  UINT32 path_count{}, mode_count{};
+  if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count) != ERROR_SUCCESS)
+    return false;
+  std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+  std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+  if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &path_count, paths.data(), &mode_count, modes.data(), nullptr) !=
+      ERROR_SUCCESS)
+    return false;
+  for (UINT32 i = 0; i < path_count; ++i) {
+    const auto &path = paths[i];
+    DISPLAYCONFIG_SOURCE_DEVICE_NAME source{};
+    source.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, sizeof(source), path.sourceInfo.adapterId,
+                     path.sourceInfo.id};
+    if (DisplayConfigGetDeviceInfo(&source.header) != ERROR_SUCCESS ||
+        wcscmp(source.viewGdiDeviceName, monitor.szDevice))
+      continue;
+    DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO color{};
+    color.header = {DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO, sizeof(color), path.targetInfo.adapterId,
+                    path.targetInfo.id};
+    if (DisplayConfigGetDeviceInfo(&color.header) != ERROR_SUCCESS || !color.advancedColorEnabled)
+      return false;
+    DISPLAYCONFIG_SDR_WHITE_LEVEL white{};
+    white.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, sizeof(white), path.targetInfo.adapterId,
+                    path.targetInfo.id};
+    if (DisplayConfigGetDeviceInfo(&white.header) != ERROR_SUCCESS || !white.SDRWhiteLevel)
+      return false;
+    nits = 80.0f * (white.SDRWhiteLevel / 1000.0f);
+    return true;
+  }
+#endif
+  return false;
+}
+
+ColorSpace VulkanWindowImpl::RequestedColorSpace() const {
+  return requested_color_space_;
+}
+
+void VulkanWindowImpl::DestroyWindow() {
+#if defined(__APPLE__)
+  glfw::RemoveMagnifyEvents(magnify_monitor_);
+  magnify_monitor_ = nullptr;
+#endif
+  // ImGui restores native window hooks; the window must still exist here.
+  imgui_.reset();
+  presenter_.reset();
+  glfw::UnregisterWindow(window_);
+  glfw::DestroyWindow(window_);
+}
+
+bool VulkanWindowImpl::InitializeWindow(IVulkanDevice *device, const WindowDesc &desc) {
+  queue_ = device->GetNativeQueue(QUEUE_TYPE_MAIN);
+  requested_mode_ = desc.present_mode;
+  requested_color_space_ = desc.color_space;
+  window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
+  if (!window_)
+    return false;
+  glfw::RegisterWindow(this, this);
+#if defined(__APPLE__)
+  magnify_monitor_ = glfw::InstallMagnifyEvents(window_);
+#endif
+  return true;
+}
+
+GLFWwindow *VulkanWindowImpl::GLFWWindow() const {
+  return window_;
+}
+
+bool VulkanWindowImpl::ShouldClose() const {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return true;
+#endif
+  return glfwWindowShouldClose(window_);
+}
+
+bool VulkanWindowImpl::IsKeyDown(int key) const {
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  return glfwGetKey(window_, key) == GLFW_PRESS;
+}
+
+bool VulkanWindowImpl::SetTitle(const std::string &title) {
+  return glfw::SetWindowTitle(window_, title.c_str());
+}
+
+EventManager<void(int, int)> &VulkanWindowImpl::ResizeEvent() {
+  return resize_event_;
+}
+
+EventManager<void(int, int)> &VulkanWindowImpl::FramebufferResizeEvent() {
+  return framebufferresize_event_;
+}
+
+EventManager<void(bool)> &VulkanWindowImpl::CursorEnterEvent() {
+  return cursorenter_event_;
+}
+
+EventManager<void(bool)> &VulkanWindowImpl::FocusEvent() {
+  return focus_event_;
+}
+
+EventManager<void(double, double)> &VulkanWindowImpl::MouseMoveEvent() {
+  return mousemove_event_;
+}
+
+EventManager<void(int, int, int, double, double)> &VulkanWindowImpl::MouseButtonEvent() {
+  return mousebutton_event_;
+}
+
+EventManager<void(double, double)> &VulkanWindowImpl::ScrollEvent() {
+  return scroll_event_;
+}
+
+EventManager<void(int, int, int, int)> &VulkanWindowImpl::KeyEvent() {
+  return key_event_;
+}
+
+EventManager<void(uint32_t)> &VulkanWindowImpl::CharEvent() {
+  return char_event_;
+}
+
+EventManager<void(int, const char **)> &VulkanWindowImpl::DropEvent() {
+  return drop_event_;
 }
 }  // namespace grassland::rhi::backend::vulkan

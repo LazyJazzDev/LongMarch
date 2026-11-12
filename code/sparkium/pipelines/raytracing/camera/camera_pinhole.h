@@ -13,11 +13,11 @@ struct CameraPinholeData {
 class CameraPinhole : public Camera {
  public:
   explicit CameraPinhole(sparkium::CameraPinhole &camera);
-  rhi::IBuffer *Buffer() override;
+  graphics::Buffer *Buffer() override;
 
  private:
   sparkium::CameraPinhole &camera_;
-  rhi::ObjPtr<rhi::IBuffer> buffer_;
+  std::unique_ptr<graphics::Buffer> buffer_;
 };
 
 }  // namespace sparkium::raytracing

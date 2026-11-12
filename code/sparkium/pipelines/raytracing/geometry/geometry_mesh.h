@@ -9,15 +9,15 @@ class GeometryMesh : public Geometry {
 
   GeometryMesh(sparkium::GeometryMesh &geometry);
 
-  rhi::IBuffer *Buffer() override;
-  rhi::IBottomLevelAccelerationStructure *BLAS() override;
+  graphics::Buffer *Buffer() override;
+  graphics::AccelerationStructure *BLAS() override;
   const CodeLines &ClosestHitShaderImpl() const override;
   int PrimitiveCount() override;
   const CodeLines &SamplerImpl() const override;
 
  private:
   sparkium::GeometryMesh &geometry_;
-  rhi::ObjPtr<rhi::IBottomLevelAccelerationStructure> blas_;
+  std::unique_ptr<graphics::AccelerationStructure> blas_;
   CodeLines sampler_implementation_;
   CodeLines closest_hit_shader_implementation_;
 };

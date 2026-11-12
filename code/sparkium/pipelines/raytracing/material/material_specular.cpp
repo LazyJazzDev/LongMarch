@@ -8,14 +8,14 @@ namespace sparkium::raytracing {
 MaterialSpecular::MaterialSpecular(sparkium::MaterialSpecular &material)
     : material_(material),
       Material(DedicatedCast(material.GetCore())) {
-  material_buffer_ = core_->GetDevice()->CreateBuffer({sizeof(material_.base_color)});
+  core_->GraphicsCore()->CreateBuffer(sizeof(material_.base_color), graphics::BUFFER_TYPE_STATIC, &material_buffer_);
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/specular/sampler.slang");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/specular/evaluator.slang");
 }
 
-rhi::IBuffer *MaterialSpecular::Buffer() {
+graphics::Buffer *MaterialSpecular::Buffer() {
   SyncMaterialData();
-  return material_buffer_.Get();
+  return material_buffer_.get();
 }
 
 const CodeLines &MaterialSpecular::SamplerImpl() const {
@@ -27,9 +27,9 @@ const CodeLines &MaterialSpecular::EvaluatorImpl() const {
 }
 
 void MaterialSpecular::SyncMaterialData() {
-  std::vector<uint8_t> data(material_buffer_->GetDesc().size);
+  std::vector<uint8_t> data(material_buffer_->Size());
   std::memcpy(data.data(), &material_.base_color, sizeof(material_.base_color));
-  UploadBuffer(core_->GetDevice(), material_buffer_.Get(), data.data(), data.size());
+  material_buffer_->UploadData(data.data(), data.size());
 }
 
 }  // namespace sparkium::raytracing

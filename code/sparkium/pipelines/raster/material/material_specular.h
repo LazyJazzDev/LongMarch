@@ -7,16 +7,16 @@ class MaterialSpecular : public Material {
  public:
   MaterialSpecular(sparkium::MaterialSpecular &material);
 
-  rhi::IShader *PixelShader() override;
+  graphics::Shader *PixelShader() override;
 
   void Sync() override;
 
-  void BindMaterialResources(rhi::IBindingGroup *group) override;
+  void BindMaterialResources(graphics::CommandContext *cmd_ctx) override;
 
  private:
   sparkium::MaterialSpecular &material_;
-  rhi::ObjPtr<rhi::IShader> pixel_shader_;
-  rhi::ObjPtr<rhi::IBuffer> material_buffer_;
+  std::unique_ptr<graphics::Shader> pixel_shader_;
+  std::unique_ptr<graphics::Buffer> material_buffer_;
 };
 
 }  // namespace sparkium::raster

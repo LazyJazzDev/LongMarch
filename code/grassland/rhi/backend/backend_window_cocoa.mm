@@ -4,14 +4,25 @@
 #define GLFW_EXPOSE_NATIVE_COCOA
 #import <Cocoa/Cocoa.h>
 #include <GLFW/glfw3native.h>
+#import <QuartzCore/QuartzCore.h>
 
 namespace grassland::rhi::backend {
 
-float Window::GetHDRHeadroom() const {
+void glfw::DestroyCocoaWindow(GLFWwindow *window) {
+  @autoreleasepool {
+    // Closing must not leave an animated window onscreen when the caller stops pumping events.
+    [glfwGetCocoaWindow(window) setAnimationBehavior:NSWindowAnimationBehaviorNone];
+    glfwDestroyWindow(window);
+    [NSApp updateWindows];
+    [CATransaction flush];
+  }
+}
+
+float CocoaHDRHeadroom(GLFWwindow *window) {
   if (!glfw::IsWindowThread())
     return 10.0f;
   @autoreleasepool {
-    auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
+    auto screen = [glfwGetCocoaWindow(window) screen];
     if (screen) {
       const float headroom = screen.maximumExtendedDynamicRangeColorComponentValue;
       if (std::isfinite(headroom) && headroom >= 1.0f)

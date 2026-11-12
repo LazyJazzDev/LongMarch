@@ -1,22 +1,19 @@
-﻿#include "../../module.h"
-
-#include <fmt/format.h>
-
-#include <array>
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
-#include <iostream>
-#include <map>
 #include <string>
 #include <thread>
 
-#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
-#include "grassland/util/fps_counter.h"
-#include "grassland/util/virtual_file_system.h"
+
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
 
 namespace {
-#include "built_in_shaders.inl"
+#include "shaders/cube.slang.h"
 
 struct Vertex {
   float position[3];
@@ -24,43 +21,18 @@ struct Vertex {
 };
 }  // namespace
 
-int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std::string &capture_directory) {
+int RunCube(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
 
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "RHI cube - Escape: close"});
+  if (!window)
     return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
-  ObjPtr<IDownloadToken> last_frame;
-  ObjPtr<IDownloadToken> last_depth;
-  ImageDesc last_depth_desc{};
-  ImageDesc last_frame_desc{};
-  ColorSpace last_frame_space = COLOR_SPACE_SRGB_NONLINEAR;
-  float last_frame_white_scale = 1.0f;
-  PresentMode requested = PRESENT_MODE_VSYNC;
-  bool present_mode_changed = false;
-  ObjPtr<IWindow> window;
-  if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI cube - P: toggle VSync"});
-    if (!window)
-      return 1;
-  }
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
-  std::array<ObjPtr<IImage>, 3> targets;
-  std::array<ObjPtr<ISubmissionToken>, 3> pending;
-  if (headless) {
-    for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_R8G8B8A8_UNORM});
-      if (!target)
-        return 1;
-    }
-  }
-  const auto &embedded = shader_list.at("modules/cube/shaders/cube.slang");
-  std::string source(embedded.first, embedded.second);
+
+  std::string source(reinterpret_cast<const char *>(shaders_cube_slang), shaders_cube_slang_len);
   ObjPtr<IShader> vertex_shader = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   if (!vertex_shader)
     return 1;
@@ -73,11 +45,7 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
   desc.vertex_bindings = {{sizeof(Vertex), false}};
   desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}, {1, 0, INPUT_TYPE_FLOAT3, 12}};
   {
-    ObjPtr<IImage> image;
-    if (headless)
-      image = targets[0];
-    else
-      image = window->GetNextImage();
+    ObjPtr<IImage> image = window->GetNextImage();
     if (!image)
       return 1;
     desc.color_formats = {image->GetDesc().format};
@@ -111,92 +79,46 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
   ObjPtr<IImage> depth;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
-    ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+    ObjPtr<ICommandContext> upload = queue->CreateCommandContext();
     if (!upload)
       return 1;
-    if (!upload->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)))
-      return 1;
-    if (!upload->CmdUploadBuffer(index_buffer.Get(), 0, indices, sizeof(indices)))
-      return 1;
-    ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
+    RETURN_IF_FAIL(upload->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)));
+    RETURN_IF_FAIL(upload->CmdUploadBuffer(index_buffer.Get(), 0, indices, sizeof(indices)));
+    ObjPtr<ISubmissionToken> uploaded = upload->Submit();
     if (!uploaded)
       return 1;
-    if (headless) {
-      if (!uploaded->WaitHost())
+  }
+
+  window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
+    if (action != GLFW_PRESS)
+      return;
+    if (key == GLFW_KEY_ESCAPE)
+      glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+  });
+
+  const auto animation_start = std::chrono::steady_clock::now();
+  while (true) {
+    if (!PollEvents())
+      return 1;
+    if (window->ShouldClose())
+      break;
+    if (window->IsSwapChainInvalid()) {
+      if (!window->RebuildSwapChain())
         return 1;
     }
-  }
-  if (!headless) {
-    window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
-      if (action != GLFW_PRESS)
-        return;
-      if (key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
-      if (key == GLFW_KEY_P) {
-        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        present_mode_changed = true;
-      }
-    });
-  }
-  grassland::FPSCounter fps;
-  auto title_time = std::chrono::steady_clock::now();
-  // Warm up allocations and pipelines before measuring completed GPU work.
-  auto benchmark_start = std::chrono::steady_clock::now();
-  int rendered = headless ? -60 : 0;
-  while (!frames || rendered < frames) {
-    if (!headless) {
-      if (!PollEvents())
-        break;
-      if (window->ShouldClose())
-        break;
-      if (window->IsSwapChainInvalid()) {
-        if (!window->RebuildSwapChain())
-          return 1;
-      }
-      if (present_mode_changed) {
-        present_mode_changed = false;
-        if (!window->SetPresentMode(requested))
-          return 1;
-      }
-    }
-    const size_t slot = (static_cast<int64_t>(rendered) + 60) % targets.size();
-    if (headless) {
-      if (rendered == 0) {
-        for (auto &token : pending) {
-          if (token) {
-            if (!token->WaitHost())
-              return 1;
-            token = {};
-          }
-        }
-        benchmark_start = std::chrono::steady_clock::now();
-      }
-      if (pending[slot]) {
-        if (!pending[slot]->WaitHost())
-          return 1;
-        pending[slot] = {};
-      }
-    }
-    ObjPtr<IImage> image;
-    if (headless)
-      image = targets[slot];
-    else
-      image = window->GetNextImage();
+
+    ObjPtr<IImage> image = window->GetNextImage();
     if (!image) {
-      if (headless)
-        return 1;
-      fps.Reset();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
     auto extent = image->GetDesc();
-    ObjPtr<ICommandContext> context = device->CreateCommandContext();
+    ObjPtr<ICommandContext> context = queue->CreateCommandContext();
     if (!context)
       return 1;
+
     // GPU copies and draws are ordered on the same queue; the upload takes a CPU snapshot.
-    const float angle =
-        headless ? float(rendered + 60) * .01f
-                 : float(std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count());
+    const float angle = std::chrono::duration<float>(std::chrono::steady_clock::now() - animation_start).count();
 
     struct Uniform {
       glm::mat4 model, view, projection;
@@ -205,90 +127,36 @@ int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless, const std
     ubo.model = glm::rotate(glm::mat4(1), angle, glm::vec3(0, 1, 0));
     ubo.view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0), glm::vec3(0, 1, 0));
     ubo.projection = glm::perspectiveZO(glm::radians(45.0f), float(extent.width) / extent.height, 3.5f, 6.5f);
-    if (!context->CmdUploadBuffer(uniform.Get(), 0, &ubo, sizeof(ubo)))
-      return 1;
+    RETURN_IF_FAIL(context->CmdUploadBuffer(uniform.Get(), 0, &ubo, sizeof(ubo)));
     if (!depth || depth->GetDesc().width != extent.width || depth->GetDesc().height != extent.height) {
       depth = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_D32_SFLOAT});
       if (!depth)
         return 1;
     }
-    if (!context->CmdBindProgram(program.Get()))
-      return 1;
-    if (!context->CmdBindGroup(0, group.Get()))
-      return 1;
+    RETURN_IF_FAIL(context->CmdBindProgram(program.Get()));
+    RETURN_IF_FAIL(context->CmdBindGroup(0, group.Get()));
     grassland::rhi::RenderingInfo render;
     render.color_attachments = {{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {.6f, .7f, .8f, 1}}};
     render.depth_stencil.image = depth.Get();
     render.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-    if (!context->CmdBeginRendering(render))
-      return 1;
-    if (!context->CmdBindVertexBuffer(0, vertex_buffer.Get()))
-      return 1;
-    if (!context->CmdBindIndexBuffer(index_buffer.Get()))
-      return 1;
-    if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
-      return 1;
-    if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
-      return 1;
-    if (!context->CmdDrawIndexed(36))
-      return 1;
-    if (!context->CmdEndRendering())
-      return 1;
-    if (!headless) {
-      if (!context->CmdPresent(window.Get()))
-        return 1;
-    }
-    if (!capture_directory.empty()) {
-      last_frame = context->CmdDownloadImage(image.Get());
-      if (!last_frame)
-        return 1;
-      last_depth = context->CmdDownloadImage(depth.Get());
-      if (!last_depth)
-        return 1;
-      last_depth_desc = depth->GetDesc();
-      last_frame_desc = image->GetDesc();
-      last_frame_space = window ? window->GetColorSpace() : COLOR_SPACE_SRGB_NONLINEAR;
-      last_frame_white_scale = window ? window->GetHDRReferenceWhiteScale() : 1.0f;
-    }
-    ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+    RETURN_IF_FAIL(context->CmdBeginRendering(render));
+    RETURN_IF_FAIL(context->CmdBindVertexBuffer(0, vertex_buffer.Get()));
+    RETURN_IF_FAIL(context->CmdBindIndexBuffer(index_buffer.Get()));
+    RETURN_IF_FAIL(
+        context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}));
+    RETURN_IF_FAIL(context->CmdSetScissor({0, 0, extent.width, extent.height}));
+    RETURN_IF_FAIL(context->CmdDrawIndexed(36));
+    RETURN_IF_FAIL(context->CmdEndRendering());
+
+    RETURN_IF_FAIL(context->CmdPresent(window.Get()));
+
+    ObjPtr<ISubmissionToken> token = context->Submit();
 
     if (!token)
       return 1;
-    if (headless)
-      pending[slot] = std::move(token);
-    ++rendered;
-    fps.TickFrame();
-    auto now = std::chrono::steady_clock::now();
-    if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window->SetTitle(fmt::format("RHI cube - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
-        return 1;
-      title_time = now;
-    }
   }
-  if (headless) {
-    for (const auto &token : pending) {
-      if (token) {
-        if (!token->WaitHost())
-          return 1;
-      }
-    }
-    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format("cube: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
-                             rendered, seconds, rendered / seconds);
-  }
-  if (!capture_directory.empty()) {
-    if (!last_frame || !last_frame->WaitHost())
-      return 1;
-    std::vector<uint8_t> pixels(last_frame->GetSize());
-    if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "cube", pixels, last_frame_desc, last_frame_space, last_frame_white_scale))
-      return 1;
-    if (!last_depth || !last_depth->WaitHost())
-      return 1;
-    pixels.resize(last_depth->GetSize());
-    if (!last_depth->CopyTo(pixels.data(), pixels.size()) ||
-        !SaveImage(capture_directory, "cube_depth", pixels, last_depth_desc, COLOR_SPACE_SRGB_NONLINEAR, 1.0f))
-      return 1;
-  }
+
   return 0;
 }
+
+#undef RETURN_IF_FAIL

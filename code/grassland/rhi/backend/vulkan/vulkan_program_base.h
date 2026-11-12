@@ -1,22 +1,15 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanProgramBase,
+                        grassland::rhi::IObject,
+                        "267525b2-441a-4f53-a2e2-826fd05cd6d2")
+
 namespace grassland::rhi::backend::vulkan {
 // Layout ownership only; the owning Device must outlive the Program.
-class VulkanProgramBase {
+class IVulkanProgramBase : public IObject {
  public:
-  VkPipelineLayout NativeLayout() const;
-
- protected:
-  explicit VulkanProgramBase(VkDevice device);
-  ~VulkanProgramBase();
-  VulkanProgramBase(const VulkanProgramBase &) = delete;
-  VulkanProgramBase &operator=(const VulkanProgramBase &) = delete;
-  bool CreateLayout(const PipelineLayoutDesc &desc);
-
- private:
-  VkDevice layout_device_;
-  std::vector<VkDescriptorSetLayout> set_layouts_;
-  VkPipelineLayout layout_{};
+  virtual IVulkanDevice *Owner() const = 0;
+  virtual VkPipelineLayout NativeLayout() const = 0;
 };
 }  // namespace grassland::rhi::backend::vulkan

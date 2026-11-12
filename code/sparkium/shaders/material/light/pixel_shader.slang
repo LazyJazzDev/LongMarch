@@ -17,7 +17,7 @@ struct MaterialLight {
   float3 emission;
 };
 
-RHI_BYTE_ADDRESS_BUFFER(0, 2, material_data);
+ByteAddressBuffer material_data : register(t0, space2);
 
 PSOutput PSMain(PSInput input) {
   PSOutput output;

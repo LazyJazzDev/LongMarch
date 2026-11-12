@@ -8,103 +8,155 @@
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12AccelerationStructure::D3D12AccelerationStructure(D3D12Device *device) : device_(device) {
+void D3D12BottomLevelAccelerationStructureImpl::InitializeD3D12AccelerationStructure(ID3D12Device *device) {
+  device_ = device;
 }
 
-D3D12Device *D3D12AccelerationStructure::Owner() const {
+void D3D12TopLevelAccelerationStructureImpl::InitializeD3D12AccelerationStructure(ID3D12Device *device) {
+  device_ = device;
+}
+
+ID3D12Device *D3D12BottomLevelAccelerationStructureImpl::Owner() const {
   return device_;
 }
 
-uint64_t D3D12AccelerationStructure::ScratchSize(AccelerationStructureBuildMode mode) const {
+ID3D12Device *D3D12TopLevelAccelerationStructureImpl::Owner() const {
+  return device_;
+}
+
+uint64_t D3D12BottomLevelAccelerationStructureImpl::ScratchSize(AccelerationStructureBuildMode mode) const {
   return mode == ACCELERATION_STRUCTURE_UPDATE ? update_scratch_ : build_scratch_;
 }
 
-bool D3D12AccelerationStructure::AllowsUpdate() const {
+uint64_t D3D12TopLevelAccelerationStructureImpl::ScratchSize(AccelerationStructureBuildMode mode) const {
+  return mode == ACCELERATION_STRUCTURE_UPDATE ? update_scratch_ : build_scratch_;
+}
+
+bool D3D12BottomLevelAccelerationStructureImpl::AllowsUpdate() const {
   return allow_update_;
 }
 
-bool D3D12AccelerationStructure::AllowsCompaction() const {
+bool D3D12TopLevelAccelerationStructureImpl::AllowsUpdate() const {
+  return allow_update_;
+}
+
+bool D3D12BottomLevelAccelerationStructureImpl::AllowsCompaction() const {
   return allow_compaction_;
 }
 
-bool D3D12AccelerationStructure::IsCompactStorage() const {
+bool D3D12TopLevelAccelerationStructureImpl::AllowsCompaction() const {
+  return allow_compaction_;
+}
+
+bool D3D12BottomLevelAccelerationStructureImpl::IsCompactStorage() const {
   return compact_;
 }
 
-D3D12BottomLevelAccelerationStructure::D3D12BottomLevelAccelerationStructure(
-    D3D12Device *device,
-    const BottomLevelAccelerationStructureDesc &desc)
-    : D3D12AccelerationStructure(device),
-      desc_(desc) {
+bool D3D12TopLevelAccelerationStructureImpl::IsCompactStorage() const {
+  return compact_;
 }
 
-const BottomLevelAccelerationStructureDesc &D3D12BottomLevelAccelerationStructure::GetDesc() const {
+D3D12BottomLevelAccelerationStructureImpl::D3D12BottomLevelAccelerationStructureImpl(
+    ID3D12Device *device,
+    const BottomLevelAccelerationStructureDesc &desc)
+    : desc_(desc) {
+  InitializeD3D12AccelerationStructure(device);
+}
+
+const BottomLevelAccelerationStructureDesc &D3D12BottomLevelAccelerationStructureImpl::GetDesc() const {
   return desc_;
 }
 
-AccelerationStructureType D3D12BottomLevelAccelerationStructure::GetType() const {
+AccelerationStructureType D3D12BottomLevelAccelerationStructureImpl::GetType() const {
   return ACCELERATION_STRUCTURE_BOTTOM_LEVEL;
 }
 
-uint64_t D3D12BottomLevelAccelerationStructure::GetCompactedSize() const {
+uint64_t D3D12BottomLevelAccelerationStructureImpl::GetCompactedSize() const {
   return ReadCompactedSize();
 }
 
-D3D12TopLevelAccelerationStructure::D3D12TopLevelAccelerationStructure(D3D12Device *device,
-                                                                       const TopLevelAccelerationStructureDesc &desc)
-    : D3D12AccelerationStructure(device),
-      desc_(desc) {
+D3D12TopLevelAccelerationStructureImpl::D3D12TopLevelAccelerationStructureImpl(
+    ID3D12Device *device,
+    const TopLevelAccelerationStructureDesc &desc)
+    : desc_(desc) {
+  InitializeD3D12AccelerationStructure(device);
 }
 
-const TopLevelAccelerationStructureDesc &D3D12TopLevelAccelerationStructure::GetDesc() const {
+const TopLevelAccelerationStructureDesc &D3D12TopLevelAccelerationStructureImpl::GetDesc() const {
   return desc_;
 }
 
-AccelerationStructureType D3D12TopLevelAccelerationStructure::GetType() const {
+AccelerationStructureType D3D12TopLevelAccelerationStructureImpl::GetType() const {
   return ACCELERATION_STRUCTURE_TOP_LEVEL;
 }
 
-uint64_t D3D12TopLevelAccelerationStructure::GetCompactedSize() const {
+uint64_t D3D12TopLevelAccelerationStructureImpl::GetCompactedSize() const {
   return ReadCompactedSize();
 }
 
-const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &D3D12TopLevelAccelerationStructure::BottomLevels()
+const std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> &D3D12TopLevelAccelerationStructureImpl::BottomLevels()
     const {
   return bottom_levels_;
 }
 
-void D3D12TopLevelAccelerationStructure::CommitDependencies(
+void D3D12TopLevelAccelerationStructureImpl::CommitDependencies(
     std::vector<ObjectPtr<IBottomLevelAccelerationStructure>> references) {
   bottom_levels_ = std::move(references);
 }
 
-D3D12AccelerationStructure::~D3D12AccelerationStructure() {
+void D3D12BottomLevelAccelerationStructureImpl::DestroyD3D12AccelerationStructure() {
   resource_.Reset();
   query_buffer_.Reset();
   query_output_.Reset();
 }
 
-ID3D12Resource *D3D12AccelerationStructure::NativeResource() const {
+void D3D12TopLevelAccelerationStructureImpl::DestroyD3D12AccelerationStructure() {
+  resource_.Reset();
+  query_buffer_.Reset();
+  query_output_.Reset();
+}
+
+ID3D12Resource *D3D12BottomLevelAccelerationStructureImpl::NativeResource() const {
   return resource_.Get();
 }
 
-ID3D12Resource *D3D12AccelerationStructure::CompactionReadback() const {
+ID3D12Resource *D3D12TopLevelAccelerationStructureImpl::NativeResource() const {
+  return resource_.Get();
+}
+
+ID3D12Resource *D3D12BottomLevelAccelerationStructureImpl::CompactionReadback() const {
   return query_buffer_.Get();
 }
 
-ID3D12Resource *D3D12AccelerationStructure::CompactionOutput() const {
+ID3D12Resource *D3D12TopLevelAccelerationStructureImpl::CompactionReadback() const {
+  return query_buffer_.Get();
+}
+
+ID3D12Resource *D3D12BottomLevelAccelerationStructureImpl::CompactionOutput() const {
   return query_output_.Get();
 }
 
-D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS D3D12AccelerationStructure::NativeInputs() const {
+ID3D12Resource *D3D12TopLevelAccelerationStructureImpl::CompactionOutput() const {
+  return query_output_.Get();
+}
+
+D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS D3D12BottomLevelAccelerationStructureImpl::NativeInputs() const {
   return inputs_;
 }
 
-uint64_t D3D12AccelerationStructure::Address() const {
+D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS D3D12TopLevelAccelerationStructureImpl::NativeInputs() const {
+  return inputs_;
+}
+
+uint64_t D3D12BottomLevelAccelerationStructureImpl::Address() const {
   return resource_->GetGPUVirtualAddress();
 }
 
-uint64_t D3D12AccelerationStructure::ReadCompactedSize() const {
+uint64_t D3D12TopLevelAccelerationStructureImpl::Address() const {
+  return resource_->GetGPUVirtualAddress();
+}
+
+uint64_t D3D12BottomLevelAccelerationStructureImpl::ReadCompactedSize() const {
   if (!query_buffer_)
     return 0;
   void *data{};
@@ -118,8 +170,75 @@ uint64_t D3D12AccelerationStructure::ReadCompactedSize() const {
   return result;
 }
 
-bool D3D12AccelerationStructure::Allocate(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &inputs,
-                                          uint64_t compacted_size) {
+uint64_t D3D12TopLevelAccelerationStructureImpl::ReadCompactedSize() const {
+  if (!query_buffer_)
+    return 0;
+  void *data{};
+  D3D12_RANGE range{0, sizeof(uint64_t)};
+  if (!Check(query_buffer_->Map(0, &range, &data), "Map compacted size"))
+    return 0;
+  uint64_t result{};
+  std::memcpy(&result, data, sizeof(result));
+  D3D12_RANGE written{0, 0};
+  query_buffer_->Unmap(0, &written);
+  return result;
+}
+
+bool D3D12BottomLevelAccelerationStructureImpl::Allocate(
+    const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &inputs,
+    uint64_t compacted_size) {
+  ComPtr<ID3D12Device5> device;
+  if (!Check(device_->NativeDevice()->QueryInterface(IID_PPV_ARGS(&device)), "Query ray tracing device"))
+    return false;
+  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO sizes{};
+  device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &sizes);
+  if (!sizes.ResultDataMaxSizeInBytes)
+    return false;
+  inputs_ = inputs;
+  inputs_.pGeometryDescs = nullptr;
+  allow_update_ = (inputs.Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE) != 0;
+  allow_compaction_ = (inputs.Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION) != 0;
+  compact_ = compacted_size != 0;
+  if (compact_ && !allow_compaction_)
+    return false;
+  build_scratch_ = sizes.ScratchDataSizeInBytes;
+  update_scratch_ = sizes.UpdateScratchDataSizeInBytes;
+  D3D12_RESOURCE_DESC info{};
+  info.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+  info.Width = compacted_size ? compacted_size : sizes.ResultDataMaxSizeInBytes;
+  constexpr uint64_t alignment = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT;
+  if (info.Width > UINT64_MAX - alignment + 1)
+    return false;
+  info.Width = (info.Width + alignment - 1) & ~(alignment - 1);
+  info.Height = info.DepthOrArraySize = info.MipLevels = info.SampleDesc.Count = 1;
+  info.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+  info.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+  D3D12MA::ALLOCATION_DESC memory{};
+  memory.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+  if (!Check(
+          device_->Allocator()->CreateResource(&memory, &info, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                                               nullptr, &allocation_, IID_PPV_ARGS(&resource_)),
+          "Allocate acceleration structure"))
+    return false;
+  if (allow_compaction_) {
+    info.Width = sizeof(uint64_t);
+    if (!Check(device_->Allocator()->CreateResource(&memory, &info, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr,
+                                                    &query_output_allocation_, IID_PPV_ARGS(&query_output_)),
+               "Allocate compacted size output"))
+      return false;
+    memory.HeapType = D3D12_HEAP_TYPE_READBACK;
+    info.Flags = D3D12_RESOURCE_FLAG_NONE;
+    if (!Check(device_->Allocator()->CreateResource(&memory, &info, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                                    &query_allocation_, IID_PPV_ARGS(&query_buffer_)),
+               "Allocate compacted size readback"))
+      return false;
+  }
+  return true;
+}
+
+bool D3D12TopLevelAccelerationStructureImpl::Allocate(
+    const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &inputs,
+    uint64_t compacted_size) {
   ComPtr<ID3D12Device5> device;
   if (!Check(device_->NativeDevice()->QueryInterface(IID_PPV_ARGS(&device)), "Query ray tracing device"))
     return false;
@@ -170,7 +289,7 @@ bool D3D12AccelerationStructure::Allocate(const D3D12_BUILD_RAYTRACING_ACCELERAT
 }
 
 std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> NativeGeometries(
-    D3D12Device *,
+    ID3D12Device *,
     const BottomLevelAccelerationStructureDesc &desc,
     const std::vector<AccelerationStructureGeometryBuffers> &buffers) {
   std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> result;
@@ -189,12 +308,14 @@ std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> NativeGeometries(
                                                               : DXGI_FORMAT_R32_UINT;
     if (!buffers.empty()) {
       tri.VertexBuffer.StartAddress =
-          static_cast<D3D12Buffer *>(buffers[i].data.buffer)->NativeBuffer()->GetGPUVirtualAddress() +
+          rhi::QueryInterfacePtr<ID3D12Buffer>(buffers[i].data.buffer).Get()->NativeBuffer()->GetGPUVirtualAddress() +
           buffers[i].data.offset;
       if (g.index_count)
-        tri.IndexBuffer =
-            static_cast<D3D12Buffer *>(buffers[i].indices.buffer)->NativeBuffer()->GetGPUVirtualAddress() +
-            buffers[i].indices.offset;
+        tri.IndexBuffer = rhi::QueryInterfacePtr<ID3D12Buffer>(buffers[i].indices.buffer)
+                              .Get()
+                              ->NativeBuffer()
+                              ->GetGPUVirtualAddress() +
+                          buffers[i].indices.offset;
     }
     result.push_back(native);
   }
@@ -207,23 +328,23 @@ std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> NativeGeometries(
     native.AABBs.AABBs.StrideInBytes = g.stride;
     if (!buffers.empty())
       native.AABBs.AABBs.StartAddress =
-          static_cast<D3D12Buffer *>(buffers[i].data.buffer)->NativeBuffer()->GetGPUVirtualAddress() +
+          rhi::QueryInterfacePtr<ID3D12Buffer>(buffers[i].data.buffer).Get()->NativeBuffer()->GetGPUVirtualAddress() +
           buffers[i].data.offset;
     result.push_back(native);
   }
   return result;
 }
 
-D3D12BottomLevelAccelerationStructure *D3D12BottomLevelAccelerationStructure::Create(
-    D3D12Device *device,
+IBottomLevelAccelerationStructure *D3D12BottomLevelAccelerationStructureImpl::Create(
+    ID3D12Device *device,
     const BottomLevelAccelerationStructureDesc &desc) {
-  if (!device->SupportRayTracingPipeline() && !device->SupportRayQuery())
+  if (!device->GetPhysicalDevice().ray_tracing_pipeline_feature && !device->GetPhysicalDevice().ray_query_feature)
     return nullptr;
   if (!ValidateBottomLevelDesc(desc))
     return nullptr;
   auto geometries = NativeGeometries(device, desc);
-  auto object =
-      std::unique_ptr<D3D12BottomLevelAccelerationStructure>(new D3D12BottomLevelAccelerationStructure(device, desc));
+  auto object = std::unique_ptr<D3D12BottomLevelAccelerationStructureImpl>(
+      new D3D12BottomLevelAccelerationStructureImpl(device, desc));
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs{};
   inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
   inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
@@ -239,13 +360,13 @@ D3D12BottomLevelAccelerationStructure *D3D12BottomLevelAccelerationStructure::Cr
   return object.release();
 }
 
-D3D12TopLevelAccelerationStructure *D3D12TopLevelAccelerationStructure::Create(
-    D3D12Device *device,
+ITopLevelAccelerationStructure *D3D12TopLevelAccelerationStructureImpl::Create(
+    ID3D12Device *device,
     const TopLevelAccelerationStructureDesc &desc) {
-  if (!device->SupportRayTracingPipeline() && !device->SupportRayQuery())
+  if (!device->GetPhysicalDevice().ray_tracing_pipeline_feature && !device->GetPhysicalDevice().ray_query_feature)
     return nullptr;
   auto object =
-      std::unique_ptr<D3D12TopLevelAccelerationStructure>(new D3D12TopLevelAccelerationStructure(device, desc));
+      std::unique_ptr<D3D12TopLevelAccelerationStructureImpl>(new D3D12TopLevelAccelerationStructureImpl(device, desc));
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs{};
   inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
   inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
@@ -258,5 +379,26 @@ D3D12TopLevelAccelerationStructure *D3D12TopLevelAccelerationStructure::Create(
   if (!object->Allocate(inputs, desc.compacted_size))
     return nullptr;
   return object.release();
+}
+
+IBottomLevelAccelerationStructure *CreateD3D12BottomLevelAccelerationStructure(
+    ID3D12Device *device,
+    const BottomLevelAccelerationStructureDesc &desc) {
+  return D3D12BottomLevelAccelerationStructureImpl::Create(device, desc);
+}
+
+ITopLevelAccelerationStructure *ID3D12TopLevelAccelerationStructure::Create(
+    ID3D12Device *device,
+    const TopLevelAccelerationStructureDesc &desc) {
+  return D3D12TopLevelAccelerationStructureImpl::Create(device, desc);
+}
+
+D3D12BottomLevelAccelerationStructureImpl::~D3D12BottomLevelAccelerationStructureImpl() {
+  DestroyD3D12AccelerationStructure();
+}
+
+D3D12TopLevelAccelerationStructureImpl::~D3D12TopLevelAccelerationStructureImpl() {
+  // Retain referenced BLAS until the TLAS native storage has been destroyed.
+  DestroyD3D12AccelerationStructure();
 }
 }  // namespace grassland::rhi::backend::d3d12

@@ -5,10 +5,11 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-D3D12Core::D3D12Core() = default;
+D3D12CoreImpl::D3D12CoreImpl() {
+}
 
 namespace {
-bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice &info) {
+bool DescribeDevice(IDXGIAdapter1 *adapter, ::ID3D12Device *device, PhysicalDevice &info) {
   DXGI_ADAPTER_DESC1 desc{};
   const HRESULT result = adapter->GetDesc1(&desc);
   if (FAILED(result)) {
@@ -17,6 +18,10 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice
   }
   info = {};
   info.name = WStringToString(desc.Description);
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (device->GetNodeCount() == 1)
+    info.cuda_device = FindCUDADeviceByLUID(&desc.AdapterLuid);
+#endif
   info.dedicated_memory = desc.DedicatedVideoMemory;
   info.unified_memory = desc.SharedSystemMemory;
   D3D12_FEATURE_DATA_ARCHITECTURE architecture{};
@@ -38,7 +43,7 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice
 
 }  // namespace
 
-D3D12Core::~D3D12Core() {
+D3D12CoreImpl::~D3D12CoreImpl() {
   adapters_.clear();
   factory_.Reset();
   if (debug_controller_) {
@@ -47,8 +52,8 @@ D3D12Core::~D3D12Core() {
   }
 }
 
-D3D12Core *D3D12Core::CreateD3D12Core(const CoreDesc &desc) {
-  auto core = std::unique_ptr<D3D12Core>(new D3D12Core());
+ICore *D3D12CoreImpl::CreateD3D12Core(const CoreDesc &desc) {
+  auto core = std::unique_ptr<D3D12CoreImpl>(new D3D12CoreImpl());
   if (desc.enable_debug) {
     if (!Check(D3D12GetDebugInterface(IID_PPV_ARGS(&core->debug_controller_)), "Get D3D12 debug interface"))
       return nullptr;
@@ -68,7 +73,7 @@ D3D12Core *D3D12Core::CreateD3D12Core(const CoreDesc &desc) {
       ReportError(result, "DXGI adapter enumeration failed.");
       return {};
     }
-    ComPtr<ID3D12Device> probe;
+    ComPtr<::ID3D12Device> probe;
     if (FAILED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&probe))))
       continue;
     PhysicalDevice info{};
@@ -79,14 +84,14 @@ D3D12Core *D3D12Core::CreateD3D12Core(const CoreDesc &desc) {
   return core.release();
 }
 
-std::vector<PhysicalDevice> D3D12Core::GetPhysicalDevices() const {
+std::vector<PhysicalDevice> D3D12CoreImpl::GetPhysicalDevices() const {
   std::vector<PhysicalDevice> devices;
   for (const auto &adapter : adapters_)
     devices.push_back(adapter.info);
   return devices;
 }
 
-rhi::IDevice *D3D12Core::CreateDevice(int32_t device_idx) {
+rhi::IDevice *D3D12CoreImpl::CreateDevice(int32_t device_idx) {
 #if !defined(NDEBUG)
   if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
     ReportError(-1, "Physical device ID is out of range.");
@@ -94,7 +99,7 @@ rhi::IDevice *D3D12Core::CreateDevice(int32_t device_idx) {
   }
 #endif
   const auto &adapter = adapters_[device_idx];
-  ComPtr<ID3D12Device> device;
+  ComPtr<::ID3D12Device> device;
   const HRESULT result = D3D12CreateDevice(adapter.native.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
   if (FAILED(result)) {
     ReportError(result, "D3D12CreateDevice failed.");
@@ -104,7 +109,10 @@ rhi::IDevice *D3D12Core::CreateDevice(int32_t device_idx) {
   PhysicalDevice info{};
   if (!DescribeDevice(adapter.native.Get(), device.Get(), info))
     return {};
-  return D3D12Device::Create(std::move(info), this, std::move(device));
+  return ID3D12Device::Create(std::move(info), this, std::move(device));
 }
 
+ICore *CreateD3D12Core(const CoreDesc &desc) {
+  return D3D12CoreImpl::CreateD3D12Core(desc);
+}
 }  // namespace grassland::rhi::backend::d3d12

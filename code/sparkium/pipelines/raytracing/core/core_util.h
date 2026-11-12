@@ -20,7 +20,7 @@ class Film;
 
 struct GeometryRegistration {
   int32_t data_index;
-  rhi::IBottomLevelAccelerationStructure *blas;
+  graphics::AccelerationStructure *blas;
 };
 
 struct InstanceRegistration {
@@ -52,8 +52,8 @@ struct BlellochScanMetadata {
 };
 
 struct InstanceHitGroups {
-  rhi::RayTracingHitGroup render_group;
-  rhi::RayTracingHitGroup shadow_group;
+  graphics::HitGroup render_group;
+  graphics::HitGroup shadow_group;
 };
 
 }  // namespace sparkium::raytracing

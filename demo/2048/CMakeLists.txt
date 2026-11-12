@@ -1,6 +1,10 @@
 file(GLOB_RECURSE DEMO_SOURCES CONFIGURE_DEPENDS "*.cpp" "*.h")
 add_executable(${DEMO_NAME} ${DEMO_SOURCES})
 target_include_directories(${DEMO_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/2048_lib)
-target_link_libraries(${DEMO_NAME} PRIVATE LongMarch)
+target_link_libraries(${DEMO_NAME} PRIVATE grassland_rhi grassland_util glm::glm)
 PACK_SHADER_CODE(${DEMO_NAME})
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(${DEMO_NAME})
+
+
+target_include_directories(${DEMO_NAME} PRIVATE ${STB_INC_DIR})
+target_link_libraries(${DEMO_NAME} PRIVATE Freetype::Freetype)

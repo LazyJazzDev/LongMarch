@@ -2,8 +2,6 @@
 
 #include <cmath>
 
-#include "grassland/rhi/backend/backend_device.h"
-
 namespace grassland::rhi::backend {
 namespace {
 constexpr const char *shader = R"(
@@ -69,7 +67,7 @@ float4 PSMain(Varying input) : SV_Target0 {
 )";
 }
 
-ImagePresenter::ImagePresenter(Device *device) : device_(device) {
+ImagePresenter::ImagePresenter(IDevice *device) : device_(device) {
 }
 
 bool ImagePresenter::Record(ICommandContext *commands,

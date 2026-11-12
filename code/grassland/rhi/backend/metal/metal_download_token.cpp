@@ -5,19 +5,20 @@
 #include <vector>
 
 namespace grassland::rhi::backend::metal {
-MetalDownloadToken::MetalDownloadToken(ObjectPtr<MetalTemporalBufferLease> lease, uint64_t size)
-    : MetalDownloadToken(std::move(lease), DownloadLayout{0, size, size, 1}) {
+MetalDownloadTokenImpl::MetalDownloadTokenImpl(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size)
+    : MetalDownloadTokenImpl(std::move(lease), DownloadLayout{0, size, size, 1}) {
 }
 
-MetalDownloadToken::MetalDownloadToken(ObjectPtr<MetalTemporalBufferLease> lease, const DownloadLayout &layout)
-    : DownloadToken(layout.row_bytes * layout.rows),
-      lease_(std::move(lease)),
+MetalDownloadTokenImpl::MetalDownloadTokenImpl(ObjectPtr<IMetalTemporalBufferLease> lease, const DownloadLayout &layout)
+    : lease_(std::move(lease)),
       layout_(layout) {
+  InitializeDownloadToken(layout.row_bytes * layout.rows);
 }
 
-MetalDownloadToken::~MetalDownloadToken() = default;
+MetalDownloadTokenImpl::~MetalDownloadTokenImpl() {
+}
 
-bool MetalDownloadToken::CopyData(void *destination) const {
+bool MetalDownloadTokenImpl::CopyData(void *destination) const {
   auto output = static_cast<uint8_t *>(destination);
   if (!layout_.stencil_pitch && layout_.row_pitch == layout_.row_bytes)
     return lease_->Read(output, GetSize(), layout_.offset);
@@ -38,5 +39,14 @@ bool MetalDownloadToken::CopyData(void *destination) const {
       return false;
   }
   return true;
+}
+
+IMetalDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease, uint64_t size) {
+  return new MetalDownloadTokenImpl(std::move(lease), size);
+}
+
+IMetalDownloadToken *CreateMetalDownloadToken(ObjectPtr<IMetalTemporalBufferLease> lease,
+                                              const DownloadLayout &layout) {
+  return new MetalDownloadTokenImpl(std::move(lease), layout);
 }
 }  // namespace grassland::rhi::backend::metal

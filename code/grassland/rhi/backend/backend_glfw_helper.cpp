@@ -17,12 +17,17 @@ namespace grassland::rhi::backend {
 
 namespace glfw {
 namespace {
+struct RegisteredWindow {
+  IWindow *window;
+  IBackendWindow *backend;
+};
+
 struct State {
   std::thread::id thread;
   bool initialized{};
   std::mutex mutex;
   std::vector<GLFWwindow *> destroyed;
-  std::unordered_map<GLFWwindow *, Window *> windows;
+  std::unordered_map<GLFWwindow *, RegisteredWindow> windows;
   bool resize_failed{};
 
   ~State() {
@@ -36,22 +41,24 @@ State &Get() {
   return state;
 }
 
-ObjectPtr<Window> FindWindow(GLFWwindow *native) {
+std::pair<ObjectPtr<IWindow>, IBackendWindow *> FindWindow(GLFWwindow *native) {
   std::lock_guard<std::mutex> lock(Get().mutex);
   const auto it = Get().windows.find(native);
-  return it == Get().windows.end() ? ObjectPtr<Window>{} : ObjectPtr<Window>::Retain(it->second);
+  if (it == Get().windows.end())
+    return {};
+  return {ObjectPtr<IWindow>::Retain(it->second.window), it->second.backend};
 }
 
 }  // namespace
 
-void RegisterWindow(Window *window) {
+void RegisterWindow(IWindow *window, IBackendWindow *backend) {
   auto native = window->GLFWWindow();
   {
     std::lock_guard<std::mutex> lock(Get().mutex);
-    Get().windows.emplace(native, window);
+    Get().windows.emplace(native, RegisteredWindow{window, backend});
   }
   glfwSetFramebufferSizeCallback(native, [](GLFWwindow *native, int width, int height) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
     if (!window->RebuildSwapChain())
@@ -59,51 +66,51 @@ void RegisterWindow(Window *window) {
     window->FramebufferResizeEvent().InvokeCallbacks(width, height);
   });
   glfwSetWindowIconifyCallback(native, [](GLFWwindow *native, int iconified) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (window && !iconified && !window->RebuildSwapChain())
       Get().resize_failed = true;
   });
   glfwSetWindowSizeCallback(native, [](GLFWwindow *native, int width, int height) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
     window->ResizeEvent().InvokeCallbacks(width, height);
   });
   glfwSetCursorEnterCallback(native, [](GLFWwindow *native, int entered) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
-    if (auto context = window->GetImGuiContext()) {
+    if (auto context = backend->GetImGuiContext()) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_CursorEnterCallback(native, entered);
     }
     window->CursorEnterEvent().InvokeCallbacks(bool(entered));
   });
   glfwSetWindowFocusCallback(native, [](GLFWwindow *native, int focused) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
-    if (auto context = window->GetImGuiContext()) {
+    if (auto context = backend->GetImGuiContext()) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_WindowFocusCallback(native, focused);
     }
     window->FocusEvent().InvokeCallbacks(bool(focused));
   });
   glfwSetCursorPosCallback(native, [](GLFWwindow *native, double x, double y) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
-    if (auto context = window->GetImGuiContext()) {
+    if (auto context = backend->GetImGuiContext()) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_CursorPosCallback(native, x, y);
     }
     window->MouseMoveEvent().InvokeCallbacks(x, y);
   });
   glfwSetMouseButtonCallback(native, [](GLFWwindow *native, int button, int action, int mods) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
-    if (auto context = window->GetImGuiContext()) {
+    if (auto context = backend->GetImGuiContext()) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_MouseButtonCallback(native, button, action, mods);
     }
@@ -112,41 +119,47 @@ void RegisterWindow(Window *window) {
     window->MouseButtonEvent().InvokeCallbacks(button, action, mods, x, y);
   });
   glfwSetScrollCallback(native, [](GLFWwindow *native, double x, double y) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
-    if (auto context = window->GetImGuiContext()) {
+    if (auto context = backend->GetImGuiContext()) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_ScrollCallback(native, x, y);
     }
     window->ScrollEvent().InvokeCallbacks(x, y);
   });
   glfwSetKeyCallback(native, [](GLFWwindow *native, int key, int scancode, int action, int mods) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
-    if (auto context = window->GetImGuiContext()) {
+    if (auto context = backend->GetImGuiContext()) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_KeyCallback(native, key, scancode, action, mods);
     }
     window->KeyEvent().InvokeCallbacks(key, scancode, action, mods);
   });
   glfwSetCharCallback(native, [](GLFWwindow *native, unsigned int codepoint) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
-    if (auto context = window->GetImGuiContext()) {
+    if (auto context = backend->GetImGuiContext()) {
       ImGuiContextScope scope(context);
       ImGui_ImplGlfw_CharCallback(native, codepoint);
     }
     window->CharEvent().InvokeCallbacks(codepoint);
   });
   glfwSetDropCallback(native, [](GLFWwindow *native, int count, const char **paths) {
-    auto window = FindWindow(native);
+    auto [window, backend] = FindWindow(native);
     if (!window)
       return;
     window->DropEvent().InvokeCallbacks(count, paths);
   });
+}
+
+void DispatchMagnifyEvent(GLFWwindow *native, const MagnifyGesture &gesture) {
+  auto [window, backend] = FindWindow(native);
+  if (window)
+    window->MagnifyEvent().InvokeCallbacks(gesture);
 }
 
 void UnregisterWindow(GLFWwindow *window) {
@@ -222,7 +235,7 @@ bool PollEvents() {
     destroyed.swap(Get().destroyed);
   }
   for (auto window : destroyed)
-    glfwDestroyWindow(window);
+    DestroyWindow(window);
   glfwPollEvents();
   std::lock_guard<std::mutex> lock(Get().mutex);
   return !Get().resize_failed;
@@ -267,9 +280,13 @@ bool SetWindowTitle(GLFWwindow *window, const char *title) {
 void DestroyWindow(GLFWwindow *window) {
   if (!window)
     return;
-  if (IsWindowThread())
+  if (IsWindowThread()) {
+#if defined(__APPLE__)
+    DestroyCocoaWindow(window);
+#else
     glfwDestroyWindow(window);
-  else {
+#endif
+  } else {
     std::lock_guard<std::mutex> lock(Get().mutex);
     Get().destroyed.push_back(window);
   }

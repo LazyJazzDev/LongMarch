@@ -3,7 +3,6 @@
 #include <type_traits>
 
 #include "grassland/rhi/rhi.h"
-#include "grassland/rhi/rhix/rhix_core.h"
 
 namespace grassland::rhi {
 namespace {
@@ -17,6 +16,20 @@ struct Counts {
 class PublicCore final : public rhi::ICore {
  public:
   explicit PublicCore(Counts &counts) : counts_(counts) {
+  }
+
+  bool QueryInterface(InterfaceID id, void **output) noexcept override {
+    if (!output)
+      return false;
+    *output = nullptr;
+    if (id == uuid<ICore>())
+      *output = static_cast<ICore *>(this);
+    else if (id == uuid<IObject>())
+      *output = static_cast<IObject *>(this);
+    else
+      return false;
+    AddRef();
+    return true;
   }
 
   void AddRef() noexcept override {
@@ -97,14 +110,14 @@ TEST(RhiObjPtr, RawReplacementAndNullDoNotRetain) {
   EXPECT_FALSE(ObjPtr<rhi::ICore>::Retain(nullptr));
 }
 
-TEST(RhixWrappers, DotSyntaxUsesOnlyPublicInterfaceAndAdoptsRawPointer) {
+TEST(RhiObjPtr, PublicInterfaceCallsPreserveAdoptedOwnership) {
   Counts counts;
-  rhix::Core core = new PublicCore(counts);
+  rhi::ObjPtr<ICore> core = new PublicCore(counts);
   EXPECT_EQ(counts.retains, 0);
-  EXPECT_TRUE(core.GetPhysicalDevices().empty());
-  EXPECT_FALSE(core.CreateDevice(0));
-  rhix::Core copy = core;
-  rhix::Core moved = std::move(copy);
+  EXPECT_TRUE(core->GetPhysicalDevices().empty());
+  EXPECT_FALSE(ObjPtr<IDevice>(core->CreateDevice(0)));
+  rhi::ObjPtr<ICore> copy = core;
+  rhi::ObjPtr<ICore> moved = std::move(copy);
   EXPECT_FALSE(copy);
   core.Release();
   EXPECT_EQ(counts.destroyed, 0);

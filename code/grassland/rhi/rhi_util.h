@@ -1,11 +1,84 @@
 ﻿#pragma once
-
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace grassland::rhi {
+struct InterfaceID {
+  uint64_t high{};
+  uint64_t low{};
+
+  constexpr bool operator==(InterfaceID other) const noexcept {
+    return high == other.high && low == other.low;
+  }
+
+  constexpr bool operator!=(InterfaceID other) const noexcept {
+    return !(*this == other);
+  }
+};
+
+// Canonical UUID spelling, interpreted in textual order, independent of host endianness.
+// This is a value representation, not the Windows GUID memory layout.
+constexpr std::optional<InterfaceID> ParseInterfaceID(std::string_view text) noexcept {
+  if (text.size() != 36)
+    return std::nullopt;
+  InterfaceID result;
+  unsigned digits = 0;
+  for (unsigned i = 0; i < text.size(); ++i) {
+    if (i == 8 || i == 13 || i == 18 || i == 23) {
+      if (text[i] != '-')
+        return std::nullopt;
+      continue;
+    }
+    const char c = text[i];
+    unsigned value{};
+    if (c >= '0' && c <= '9')
+      value = unsigned(c - '0');
+    else if (c >= 'a' && c <= 'f')
+      value = unsigned(c - 'a') + 10;
+    else if (c >= 'A' && c <= 'F')
+      value = unsigned(c - 'A') + 10;
+    else
+      return std::nullopt;
+    auto &half = digits++ < 16 ? result.high : result.low;
+    half = (half << 4) | value;
+  }
+  return result;
+}
+
+template <typename T>
+InterfaceID uuid() = delete;
+
+template <typename T>
+struct InterfaceTraits;
+class IAccelerationStructure;
+class IBottomLevelAccelerationStructure;
+class ITopLevelAccelerationStructure;
+class IBindingGroup;
+class IBuffer;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+class ICUDABuffer;
+class ICUDATimeline;
+#endif
+class ICommandContext;
+class IComputeProgram;
+class ICore;
+class IDevice;
+class IDownloadToken;
+class IImage;
+class IObject;
+class IProgram;
+class IQueue;
+class IShaderBindingTable;
+class IRayTracingProgram;
+class ISampler;
+class IShader;
+class ISubmissionToken;
+class ITimeline;
+class IWindow;
 
 typedef enum {
   BACKEND_API_D3D12 = 0,
@@ -45,6 +118,8 @@ struct PhysicalDevice {
   bool ray_tracing_pipeline_feature{};
   bool ray_query_feature{};
   bool geometry_shader_feature{};
+  // Process-local CUDA ordinal; -1 when unavailable.
+  int cuda_device{-1};
 };
 
 typedef enum {
@@ -56,8 +131,8 @@ std::string to_string(PresentMode value);
 std::string PresentModeName(PresentMode value);
 
 typedef enum {
-  QUEUE_TYPE_GRAPHICS,
-  QUEUE_TYPE_TRANSFER,
+  QUEUE_TYPE_MAIN,
+  QUEUE_TYPE_ASSIST,
 } QueueType;
 
 std::string to_string(QueueType value);
@@ -338,3 +413,16 @@ std::string to_string(AccelerationStructureType value);
 std::string to_string(AccelerationStructureBuildMode value);
 
 }  // namespace grassland::rhi
+
+// Register in the owning interface header at global namespace scope.
+#define LONGMARCH_RHI_INTERFACE(Type, Parent, Text)                  \
+  template <>                                                        \
+  inline grassland::rhi::InterfaceID grassland::rhi::uuid<Type>() {  \
+    constexpr auto parsed = grassland::rhi::ParseInterfaceID(Text);  \
+    static_assert(parsed.has_value(), "Invalid RHI interface UUID"); \
+    return *parsed;                                                  \
+  }                                                                  \
+  template <>                                                        \
+  struct grassland::rhi::InterfaceTraits<Type> {                     \
+    using Base = Parent;                                             \
+  };

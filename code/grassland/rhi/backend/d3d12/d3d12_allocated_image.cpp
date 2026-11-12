@@ -6,23 +6,24 @@
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12AllocatedImage::D3D12AllocatedImage(D3D12Device *device,
-                                         ImageDesc desc,
-                                         ComPtr<ID3D12Resource> image,
-                                         ComPtr<D3D12MA::Allocation> allocation,
-                                         ObjectPtr<D3D12DescriptorPool::Lease> attachment)
-    : D3D12Image(desc, device, image.Get(), std::move(attachment)),
-      allocation_(std::move(allocation)),
+D3D12AllocatedImageImpl::D3D12AllocatedImageImpl(ID3D12Device *device,
+                                                 ImageDesc desc,
+                                                 ComPtr<ID3D12Resource> image,
+                                                 ComPtr<D3D12MA::Allocation> allocation,
+                                                 ObjectPtr<D3D12DescriptorPool::Lease> attachment)
+    : allocation_(std::move(allocation)),
       image_(std::move(image)) {
+  InitializeD3D12Image(desc, device, image_.Get(), std::move(attachment));
 }
 
-D3D12AllocatedImage::~D3D12AllocatedImage() = default;
+D3D12AllocatedImageImpl::~D3D12AllocatedImageImpl() {
+}
 
-bool D3D12AllocatedImage::IsValid() const {
+bool D3D12AllocatedImageImpl::IsValid() const {
   return true;
 }
 
-D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const ImageDesc &desc) {
+IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &desc) {
   if (!desc.width || !desc.height)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
@@ -58,6 +59,55 @@ D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const Imag
   auto attachment = CreateAttachmentView(device, image.Get());
   if (!attachment)
     return nullptr;
-  return new D3D12AllocatedImage(device, desc, std::move(image), std::move(allocation), std::move(attachment));
+  return new D3D12AllocatedImageImpl(device, desc, std::move(image), std::move(allocation), std::move(attachment));
+}
+
+IImage *CreateD3D12AllocatedImage(ID3D12Device *device, const ImageDesc &desc) {
+  return D3D12AllocatedImageImpl::Create(device, desc);
+}
+
+void D3D12AllocatedImageImpl::InitializeImage(ImageDesc desc, ID3D12Queue *queue) {
+  desc_ = desc;
+  queue_ = queue;
+}
+
+bool D3D12AllocatedImageImpl::SupportsQueue(const ID3D12Queue *queue) const {
+  return !queue_ || queue_ == queue;
+}
+
+const ImageDesc &D3D12AllocatedImageImpl::GetDesc() const {
+  return desc_;
+}
+
+void D3D12AllocatedImageImpl::InitializeD3D12Image(ImageDesc desc,
+                                                   const void *device,
+                                                   ID3D12Resource *image,
+                                                   ObjectPtr<D3D12DescriptorPool::Lease> attachment,
+                                                   D3D12_RESOURCE_STATES default_state,
+                                                   ID3D12Queue *queue) {
+  InitializeImage(desc, queue);
+  attachment_ = std::move(attachment);
+  device_ = device;
+  default_state_ = default_state;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12AllocatedImageImpl::AttachmentView() const {
+  return attachment_->CPU();
+}
+
+bool D3D12AllocatedImageImpl::SupportsStorage() const {
+  return (image_->GetDesc().Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) != 0;
+}
+
+const void *D3D12AllocatedImageImpl::DeviceIdentity() const {
+  return device_;
+}
+
+ID3D12Resource *D3D12AllocatedImageImpl::NativeImage() const {
+  return image_.Get();
+}
+
+D3D12_RESOURCE_STATES D3D12AllocatedImageImpl::DefaultState() const {
+  return default_state_;
 }
 }  // namespace grassland::rhi::backend::d3d12

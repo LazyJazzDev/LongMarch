@@ -1,6 +1,4 @@
-﻿#define STB_IMAGE_STATIC
-#define STB_IMAGE_IMPLEMENTATION
-#include "sparkium/scene_io/json_scene.h"
+﻿#include "sparkium/scene_io/json_scene.h"
 
 #include <algorithm>
 #include <array>
@@ -18,29 +16,9 @@
 #include "rapidjson/istreamwrapper.h"
 #include "sparkium/camera/cameras.h"
 #include "sparkium/core/core.h"
-#include "stb_image.h"
 
 namespace sparkium {
 namespace {
-rhi::IImage *LoadTexture(rhi::IDevice *device, const std::string &path) {
-  int width{}, height{}, channels{};
-  void *data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-  auto format = rhi::IMAGE_FORMAT_R8G8B8A8_UNORM;
-  if (!data) {
-    data = stbi_loadf(path.c_str(), &width, &height, &channels, 4);
-    format = rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT;
-  }
-  if (!data)
-    return nullptr;
-  rhi::ObjPtr<rhi::IImage> image =
-      device->CreateImage({static_cast<uint32_t>(width), static_cast<uint32_t>(height), format});
-  const bool uploaded = UploadImage(device, image.Get(), data);
-  stbi_image_free(data);
-  if (!uploaded)
-    return nullptr;
-  return image.Detach();
-}
-
 using Value = rapidjson::Value;
 
 const Value &RequireObject(const Value &value) {
@@ -834,7 +812,7 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
         principled->emission_color = Vec3Member(spec, "emission_color", principled->emission_color);
         if (spec.HasMember("textures")) {
           const auto &textures = RequireObject(spec["textures"]);
-          const std::pair<const char *, rhi::IImage **> slots[] = {
+          const std::pair<const char *, graphics::Image **> slots[] = {
               {"normal", &principled->textures.normal},
               {"base_color", &principled->textures.base_color},
               {"metallic", &principled->textures.metallic},
@@ -846,12 +824,11 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
           for (auto [slot, destination] : slots) {
             if (!textures.HasMember(slot))
               continue;
-            auto image = rhi::ObjPtr<rhi::IImage>{};
+            auto image = std::unique_ptr<graphics::Image>{};
             auto asset = Resolve(path, ReadString(textures[slot]));
-            image = LoadTexture(core->GetDevice(), asset.string());
-            if (!image)
+            if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
               throw std::runtime_error("cannot load texture: " + asset.string());
-            *destination = image.Get();
+            *destination = image.get();
             result->images_.push_back(std::move(image));
           }
           principled->textures.normal_reverse_y = BoolMember(textures, "normal_reverse_y", false);
@@ -861,18 +838,17 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
         const auto &graph = RequireObject(Member(spec, "graph"));
         const auto &nodes = RequireObject(Member(graph, "nodes"));
         std::map<std::string, int> texture_slots;
-        std::vector<rhi::IImage *> textures;
+        std::vector<graphics::Image *> textures;
         for (auto node = nodes.MemberBegin(); node != nodes.MemberEnd(); ++node) {
           if (!RequireObject(node->value).HasMember("type") ||
               std::string(ReadString(node->value["type"])) != "image_texture")
             continue;
           auto asset = Resolve(path, ReadString(Member(node->value, "path")));
-          auto image = rhi::ObjPtr<rhi::IImage>{};
-          image = LoadTexture(core->GetDevice(), asset.string());
-          if (!image)
+          auto image = std::unique_ptr<graphics::Image>{};
+          if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
             throw std::runtime_error("cannot load shader graph texture: " + asset.string());
           texture_slots[ReadString(node->name)] = static_cast<int>(textures.size());
-          textures.push_back(image.Get());
+          textures.push_back(image.get());
           result->images_.push_back(std::move(image));
         }
         auto code = ShaderGraphCompiler(graph, texture_slots).Compile();

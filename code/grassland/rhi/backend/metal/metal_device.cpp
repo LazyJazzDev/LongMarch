@@ -1,5 +1,16 @@
 ﻿#include "grassland/rhi/backend/metal/metal_device.h"
 
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <list>
+#include <mutex>
+#include <thread>
+
+#include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_shader.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
@@ -11,126 +22,214 @@
 #include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend::metal {
 
-MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device) {
-  auto object = std::unique_ptr<MetalDevice>(new MetalDevice(std::move(info), core, std::move(device)));
+rhi::IDevice *MetalDeviceImpl::Create(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device) {
+  auto object = std::unique_ptr<MetalDeviceImpl>(new MetalDeviceImpl(std::move(info), std::move(device)));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  object->command_buffer_descriptor_ = NS::TransferPtr(MTL::CommandBufferDescriptor::alloc()->init());
-  object->command_buffer_descriptor_->setRetainedReferences(true);
-  object->command_buffer_descriptor_->setErrorOptions(static_cast<MetalCore *>(core)->DebugEnabled()
-                                                          ? MTL::CommandBufferErrorOptionEncoderExecutionStatus
-                                                          : MTL::CommandBufferErrorOptionNone);
-  object->queue_ = NS::TransferPtr(object->device_->newCommandQueue());
-  if (!object->queue_) {
-    ReportError(-1, "Metal command queue creation failed.");
+  object->wait_state_->listener = NS::TransferPtr(MTL::SharedEventListener::alloc()->init());
+  if (!object->wait_state_->listener) {
+    ReportError(-1, "Create Metal progress listener failed.");
     return nullptr;
   }
+  auto descriptor = NS::TransferPtr(MTL::CommandBufferDescriptor::alloc()->init());
+  descriptor->setRetainedReferences(true);
+  descriptor->setErrorOptions(core->DebugEnabled() ? MTL::CommandBufferErrorOptionEncoderExecutionStatus
+                                                   : MTL::CommandBufferErrorOptionNone);
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
+    object->queues_[type] = ObjectPtr<IMetalQueue>::Adopt(IMetalQueue::Create(object.get(), type, descriptor.get()));
+    if (!object->queues_[type])
+      return nullptr;
+  }
+  object->StartCollector();
   return object.release();
 }
 
-MetalDevice::MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device)
-    : Device(std::move(info), core, BACKEND_API_METAL),
-      device_(std::move(device)),
-      temporal_buffers_(this, TEMPORAL_BUFFER_UPLOAD) {
+MetalDeviceImpl::MetalDeviceImpl(PhysicalDevice info, NS::SharedPtr<MTL::Device> device)
+    : device_(std::move(device)),
+      temporal_buffers_(this, TEMPORAL_BUFFER_UPLOAD),
+      info_(std::move(info)) {
 }
 
-MetalDevice::~MetalDevice() {
+MetalDeviceImpl::~MetalDeviceImpl() {
   ShutdownQueues();
   temporal_buffers_.Clear();
   scratch_.Clear();
+  for (auto &queue : queues_)
+    queue.Reset();
 }
 
-MetalScratchPool &MetalDevice::ScratchPool() {
+MetalScratchPool &MetalDeviceImpl::ScratchPool() {
   return scratch_;
 }
 
-IBottomLevelAccelerationStructure *MetalDevice::CreateBottomLevelAccelerationStructure(
+IBottomLevelAccelerationStructure *MetalDeviceImpl::CreateBottomLevelAccelerationStructure(
     const BottomLevelAccelerationStructureDesc &desc) {
-  return MetalBottomLevelAccelerationStructure::Create(this, desc);
+  return CreateMetalBottomLevelAccelerationStructure(this, desc);
 }
 
-ITopLevelAccelerationStructure *MetalDevice::CreateTopLevelAccelerationStructure(
+ITopLevelAccelerationStructure *MetalDeviceImpl::CreateTopLevelAccelerationStructure(
     const TopLevelAccelerationStructureDesc &desc) {
-  return MetalTopLevelAccelerationStructure::Create(this, desc);
+  return IMetalTopLevelAccelerationStructure::Create(this, desc);
 }
 
-MTL::Device *MetalDevice::NativeDevice() const noexcept {
+MTL::Device *MetalDeviceImpl::NativeDevice() const noexcept {
   return device_.get();
 }
 
-MTL::CommandQueue *MetalDevice::NativeQueue() const {
-  return queue_.get();
+rhi::IWindow *MetalDeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
+  return IMetalWindow::Create(this, desc);
 }
 
-std::mutex &MetalDevice::QueueMutex() {
-  return queue_mutex_;
+rhi::IBuffer *MetalDeviceImpl::CreateBuffer(const BufferDesc &desc) {
+  auto buffer = ObjectPtr<IMetalAllocatedBuffer>::Adopt(IMetalAllocatedBuffer::Create(this, desc));
+  return rhi::QueryInterfacePtr<IBuffer>(buffer.Get()).Detach();
 }
 
-NS::SharedPtr<MTL::CommandBuffer> MetalDevice::CreateCommandBuffer() {
-  return NS::RetainPtr(queue_->commandBuffer(command_buffer_descriptor_.get()));
+#if defined(LONGMARCH_CUDA_RUNTIME)
+rhi::ICUDABuffer *MetalDeviceImpl::CreateCUDABuffer(const BufferDesc &desc) {
+  return nullptr;
 }
 
-bool MetalDevice::WaitIdle() {
-  // Caller serializes this marker with commits using QueueMutex().
-  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto marker = CreateCommandBuffer();
-  if (!marker) {
-    ReportError(-1, "Metal idle marker allocation failed.");
-    return false;
-  }
-  marker->commit();
-  marker->waitUntilCompleted();
-  if (marker->status() != MTL::CommandBufferStatusCompleted) {
-    ReportMetalError(marker->error(), "Metal idle marker failed",
-                     static_cast<MetalCore *>(OwnerCore())->DebugEnabled());
-    return false;
-  }
-  return true;
+rhi::ICUDATimeline *MetalDeviceImpl::CreateCUDATimeline() {
+  return nullptr;
+}
+#endif
+
+rhi::IImage *MetalDeviceImpl::CreateImage(const ImageDesc &desc) {
+  return CreateMetalAllocatedImage(this, desc);
 }
 
-rhi::IWindow *MetalDevice::CreateGLFWWindow(const WindowDesc &desc) {
-  return MetalWindow::Create(this, desc);
+IComputeProgram *MetalDeviceImpl::CreateComputeProgram(const ComputeProgramDesc &desc) {
+  return IMetalComputeProgram::Create(this, desc);
 }
 
-rhi::ICommandContext *MetalDevice::CreateCommandContext() {
-  return MetalCommandContext::Create(this);
+rhi::IProgram *MetalDeviceImpl::CreateProgram(const ProgramDesc &desc) {
+  return IMetalProgram::Create(this, desc);
 }
 
-rhi::IQueue *MetalDevice::GetQueue(QueueType type) {
-  return new MetalQueue(this, type);
+rhi::IBindingGroup *MetalDeviceImpl::CreateBindingGroup(const BindingLayoutDesc &layout) {
+  return CreateMetalBindingGroup(this, layout);
 }
 
-rhi::IBuffer *MetalDevice::CreateBuffer(const BufferDesc &desc) {
-  return MetalAllocatedBuffer::Create(this, desc);
+ISampler *MetalDeviceImpl::CreateSampler(const SamplerDesc &desc) {
+  return IMetalSampler::Create(this, desc);
 }
 
-rhi::IImage *MetalDevice::CreateImage(const ImageDesc &desc) {
-  return MetalAllocatedImage::Create(this, desc);
-}
-
-IComputeProgram *MetalDevice::CreateComputeProgram(const ComputeProgramDesc &desc) {
-  return MetalComputeProgram::Create(this, desc);
-}
-
-rhi::IProgram *MetalDevice::CreateProgram(const ProgramDesc &desc) {
-  return MetalProgram::Create(this, desc);
-}
-
-rhi::IBindingGroup *MetalDevice::CreateBindingGroup(const BindingLayoutDesc &layout) {
-  return MetalBindingGroup::Create(this, layout);
-}
-
-ISampler *MetalDevice::CreateSampler(const SamplerDesc &desc) {
-  return MetalSampler::Create(this, desc);
-}
-
-MetalTemporalBufferPool &MetalDevice::UploadPool() {
+MetalTemporalBufferPool &MetalDeviceImpl::UploadPool() {
   return temporal_buffers_;
 }
 
-MetalTemporalBufferPool &MetalDevice::DownloadPool() {
+MetalTemporalBufferPool &MetalDeviceImpl::DownloadPool() {
   return temporal_buffers_;
+}
+
+rhi::IDevice *IMetalDevice::Create(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device) {
+  return MetalDeviceImpl::Create(info, core, device);
+}
+
+IRayTracingProgram *MetalDeviceImpl::CreateRayTracingProgram(const RayTracingProgramDesc &) {
+  ReportError(-1, "Ray tracing pipelines are unavailable for this backend.");
+  return nullptr;
+}
+
+rhi::IShader *MetalDeviceImpl::CreateShader(const ShaderDesc &desc) {
+  if (desc.filename.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+      desc.stage > SHADER_STAGE_CALLABLE)
+    return nullptr;
+  return backend::CreateShader(desc, BACKEND_API_METAL);
+}
+
+std::string MetalDeviceImpl::Name() const {
+  return info_.name;
+}
+
+bool MetalDeviceImpl::SupportRayTracingPipeline() const {
+  return info_.ray_tracing_pipeline_feature;
+}
+
+bool MetalDeviceImpl::SupportRayQuery() const {
+  return info_.ray_query_feature;
+}
+
+bool MetalDeviceImpl::SupportGeometryShader() const {
+  return info_.geometry_shader_feature;
+}
+
+IMetalQueue *MetalDeviceImpl::GetNativeQueue(QueueType type) const {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return queues_[type].Get();
+}
+
+rhi::IQueue *MetalDeviceImpl::GetQueue(QueueType type) {
+  if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST)
+    return nullptr;
+  return rhi::QueryInterfacePtr<IQueue>(queues_[type].Get()).Detach();
+}
+
+const PhysicalDevice &MetalDeviceImpl::GetPhysicalDevice() const noexcept {
+  return info_;
+}
+
+void MetalDeviceImpl::StartCollector() {
+  collector_ = std::thread([this] { Collect(); });
+}
+
+bool MetalDeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_all) const {
+  if (events.empty())
+    return wait_all;
+  std::vector<Event> unique;
+  unique.reserve(events.size());
+  for (const auto &event : events) {
+#if !defined(NDEBUG)
+    auto timeline = rhi::QueryInterfacePtr<IMetalTimeline>(event.timeline).Get();
+    if (!timeline || timeline->Owner() != this) {
+      ReportError(-1, "Host waits require timelines from this device.");
+      return false;
+    }
+#endif
+    auto found = std::find_if(unique.begin(), unique.end(),
+                              [&](const Event &other) { return other.timeline == event.timeline; });
+    if (found == unique.end())
+      unique.push_back(event);
+    else
+      found->value = wait_all ? std::max(found->value, event.value) : std::min(found->value, event.value);
+  }
+  return WaitNativeEvents(unique, wait_all);
+}
+
+void MetalDeviceImpl::Collect() {
+  std::vector<Event> next;
+  next.reserve(queues_.size());
+  for (;;) {
+    next.clear();
+    bool empty = true;
+    for (const auto &queue : queues_) {
+      if (!queue)
+        continue;
+      uint64_t completed = 0;
+      auto timeline = rhi::QueryInterfacePtr<ITimeline>(queue->GetTimeline());
+      const bool timeline_valid = timeline->GetCompletedValue(completed);
+      if (timeline_valid && completed != UINT64_MAX)
+        next.push_back({timeline.Get(), completed + 1});
+      if (!queue->CollectCompleted(completed, timeline_valid))
+        empty = false;
+    }
+    if (stopping_ && empty)
+      return;
+    WaitForProgress(next);
+  }
+}
+
+void MetalDeviceImpl::ShutdownQueues() {
+  if (!collector_.joinable())
+    return;
+  stopping_ = true;
+  InterruptCollector();
+  collector_.join();
 }
 }  // namespace grassland::rhi::backend::metal

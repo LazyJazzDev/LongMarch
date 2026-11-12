@@ -3,16 +3,18 @@
 #include <vk_mem_alloc.h>
 
 #include <cstdlib>
+#include <utility>
 
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanAllocatedImage::VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc)
-    : VulkanImage(desc, device, VK_IMAGE_LAYOUT_GENERAL),
-      device_(device) {
+VulkanAllocatedImageImpl::VulkanAllocatedImageImpl(IVulkanDevice *device, ImageDesc desc) : device_(device) {
+  InitializeVulkanImage(desc, device, VK_IMAGE_LAYOUT_GENERAL);
 }
 
-VulkanAllocatedImage::~VulkanAllocatedImage() {
+VulkanAllocatedImageImpl::~VulkanAllocatedImageImpl() {
   if (image_) {
     device_->RenderTargets().Retire(image_);
     views_.Reset();
@@ -20,27 +22,27 @@ VulkanAllocatedImage::~VulkanAllocatedImage() {
   }
 }
 
-VkImageView VulkanAllocatedImage::AttachmentView() const {
+VkImageView VulkanAllocatedImageImpl::AttachmentView() const {
   return views_.Attachment();
 }
 
-VkImageView VulkanAllocatedImage::BindingView() const {
+VkImageView VulkanAllocatedImageImpl::BindingView() const {
   return views_.Binding();
 }
 
-bool VulkanAllocatedImage::IsValid() const {
+bool VulkanAllocatedImageImpl::IsValid() const {
   return true;
 }
 
-bool VulkanAllocatedImage::SupportsStorage() const {
+bool VulkanAllocatedImageImpl::SupportsStorage() const {
   return storage_;
 }
 
-VkImage VulkanAllocatedImage::NativeImage() const {
+VkImage VulkanAllocatedImageImpl::NativeImage() const {
   return image_;
 }
 
-VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const ImageDesc &desc) {
+IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc &desc) {
   if (!desc.width || !desc.height)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
@@ -56,7 +58,7 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     if ((properties.optimalTilingFeatures & required) != required)
       return nullptr;
   }
-  auto image = std::unique_ptr<VulkanAllocatedImage>(new VulkanAllocatedImage(device, desc));
+  auto image = std::unique_ptr<VulkanAllocatedImageImpl>(new VulkanAllocatedImageImpl(device, desc));
   VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
   info.imageType = VK_IMAGE_TYPE_2D;
   info.format = format;
@@ -80,7 +82,8 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
   // Establish the fixed default layout once, before exposing the resource.
   // Temporary initialization commands are outside the rendering loop.
   const auto native = device->NativeDevice();
-  std::lock_guard<std::mutex> lock(device->QueueMutex());
+  auto queue = device->GetNativeQueue(QUEUE_TYPE_MAIN);
+  std::lock_guard<std::mutex> lock(queue->QueueMutex());
   VkCommandPool pool{};
   const auto status = [&]() -> VkResult {
     VkCommandPoolCreateInfo create{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
@@ -113,8 +116,8 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     status = vkEndCommandBuffer(commands);
     if (status != VK_SUCCESS)
       return status;
-    const auto semaphore = device->Timeline();
-    const auto value = device->NextSerial();
+    const auto semaphore = queue->GetTimeline()->NativeSemaphore();
+    const auto value = queue->NextSerial();
     VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
     timeline.signalSemaphoreValueCount = 1;
     timeline.pSignalSemaphoreValues = &value;
@@ -124,10 +127,10 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     submit.pSignalSemaphores = &semaphore;
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &commands;
-    status = vkQueueSubmit(device->NativeQueue(), 1, &submit, VK_NULL_HANDLE);
+    status = vkQueueSubmit(queue->NativeQueue(), 1, &submit, VK_NULL_HANDLE);
     if (status != VK_SUCCESS)
       return status;
-    if (!Check(device->Wait(value), "Wait for image initialization"))
+    if (!Check(queue->Wait(value), "Wait for image initialization"))
       std::abort();
     return VK_SUCCESS;
   }();
@@ -136,5 +139,42 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
   if (!Check(status, "Initialize image layout"))
     return nullptr;
   return image.release();
+}
+
+IImage *CreateVulkanAllocatedImage(IVulkanDevice *device, const ImageDesc &desc) {
+  return VulkanAllocatedImageImpl::Create(device, desc);
+}
+
+void VulkanAllocatedImageImpl::InitializeImage(ImageDesc desc, IVulkanQueue *queue) {
+  desc_ = desc;
+  queue_ = queue;
+}
+
+bool VulkanAllocatedImageImpl::SupportsQueue(const IVulkanQueue *queue) const {
+  return !queue_ || queue_ == queue;
+}
+
+const ImageDesc &VulkanAllocatedImageImpl::GetDesc() const {
+  return desc_;
+}
+
+void VulkanAllocatedImageImpl::InitializeVulkanImage(ImageDesc desc,
+                                                     const void *device,
+                                                     VkImageLayout default_layout,
+                                                     IVulkanQueue *queue) {
+  InitializeImage(desc, queue);
+  default_layout_ = default_layout;
+}
+
+VkImageAspectFlags VulkanAllocatedImageImpl::Aspect() const {
+  return ImageAspect(desc_.format);
+}
+
+VkImageLayout VulkanAllocatedImageImpl::DefaultLayout() const {
+  return default_layout_;
+}
+
+const void *VulkanAllocatedImageImpl::DeviceIdentity() const {
+  return device_;
 }
 }  // namespace grassland::rhi::backend::vulkan

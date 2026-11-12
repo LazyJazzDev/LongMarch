@@ -1,4 +1,7 @@
 ﻿#include "grassland/rhi/backend/metal/metal_window.h"
+#include "grassland/rhi/backend/backend_image_presenter.h"
+#include "grassland/rhi/backend/backend_window_imgui.h"
+#include "grassland/rhi/backend/metal/metal_queue.h"
 
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
@@ -37,23 +40,27 @@ CGColorSpaceRef CreatePresentationColorSpace(ColorSpace space) {
 }
 }  // namespace
 
-MetalWindow::MetalWindow(MetalDevice *device) : device_(device) {
+MetalWindowImpl::MetalWindowImpl(IMetalDevice *device) : device_(device) {
 }
 
-MetalWindow::~MetalWindow() {
+MetalWindowImpl::~MetalWindowImpl() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   glfw::UnregisterWindow(GLFWWindow());
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  device_->WaitIdle();
+  if (queue_) {
+    std::lock_guard<std::mutex> lock(queue_->QueueMutex());
+    queue_->WaitIdle();
+  }
   valid_ = false;
   ReleaseNextImage();
   if (GLFWWindow())
     [[glfwGetCocoaWindow(GLFWWindow()) contentView] setLayer:nil];
   layer_.reset();
+
+  DestroyWindow();
 }
 
-MetalWindow *MetalWindow::Create(MetalDevice *device, const WindowDesc &desc) {
-  auto object = std::unique_ptr<MetalWindow>(new MetalWindow(device));
+rhi::IWindow *MetalWindowImpl::Create(IMetalDevice *device, const WindowDesc &desc) {
+  auto object = std::unique_ptr<MetalWindowImpl>(new MetalWindowImpl(device));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   if (!object->InitializeWindow(device, desc))
     return nullptr;
@@ -73,10 +80,10 @@ MetalWindow *MetalWindow::Create(MetalDevice *device, const WindowDesc &desc) {
   return object.release();
 }
 
-bool MetalWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
+bool MetalWindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  if (!device_->WaitIdle())
+  std::lock_guard<std::mutex> lock(queue_->QueueMutex());
+  if (!queue_->WaitIdle())
     return false;
   auto layer = (CAMetalLayer *)layer_.get();
   layer.displaySyncEnabled = requested_mode != PRESENT_MODE_CONTINUOUS;
@@ -109,7 +116,7 @@ bool MetalWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   return true;
 }
 
-ObjectPtr<Image> MetalWindow::AcquireNativeFrame() {
+ObjectPtr<IMetalImage> MetalWindowImpl::AcquireNativeFrame() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   int width, height;
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
@@ -126,14 +133,14 @@ ObjectPtr<Image> MetalWindow::AcquireNativeFrame() {
     ReportError(-1, "CAMetalLayer::nextDrawable failed.");
     return {};
   }
-  return ObjectPtr<Image>::Adopt(new MetalSwapChainImage(desc_, this, generation_, drawable.get()));
+  return ObjectPtr<IMetalImage>::Adopt(IMetalSwapChainImage::Create(desc_, this, generation_, drawable.get()));
 }
 
-PresentMode MetalWindow::GetPresentMode() const {
+PresentMode MetalWindowImpl::GetPresentMode() const {
   return mode_;
 }
 
-std::vector<WindowPresentationOption> MetalWindow::GetSupportedPresentationOptions() const {
+std::vector<WindowPresentationOption> MetalWindowImpl::GetSupportedPresentationOptions() const {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   std::vector<WindowPresentationOption> options;
   // EDR content is accepted even on SDR displays; current display headroom controls
@@ -149,12 +156,8 @@ std::vector<WindowPresentationOption> MetalWindow::GetSupportedPresentationOptio
   return options;
 }
 
-bool MetalWindow::IsFrameValid(uint64_t generation) const {
+bool MetalWindowImpl::IsFrameValid(uint64_t generation) const {
   return valid_ && generation_ == generation;
-}
-
-const void *MetalWindow::DeviceIdentity() const {
-  return device_;
 }
 
 }  // namespace grassland::rhi::backend::metal

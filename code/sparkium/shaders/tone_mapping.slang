@@ -1,9 +1,9 @@
 #include "tone_mapping_functions.slang"
-RHI_TEXTURE2D(0, 0, float4, accumulated_color);
+Texture2D<float4> accumulated_color : register(t0, space0);
 #ifdef SPARKIUM_HDR_OUTPUT
-[[vk::image_format("rgba32f")]] RHI_RW_TEXTURE2D(0, 1, float4, output);
+[[vk::image_format("rgba32f")]] RWTexture2D<float4> output : register(u0, space1);
 #else
-[[vk::image_format("rgba8")]] RHI_RW_TEXTURE2D(0, 1, float4, output);
+[[vk::image_format("rgba8")]] RWTexture2D<float4> output : register(u0, space1);
 #endif
 
 struct ToneMappingSettings {
@@ -13,7 +13,7 @@ struct ToneMappingSettings {
   float contrast;
 };
 
-RHI_UNIFORM(0, 2, ToneMappingSettings, settings);
+ConstantBuffer<ToneMappingSettings> settings : register(b0, space2);
 
 float3 FilmicCurve(float3 color) {
   // Smooth shoulder/toe approximation for legacy Blender Filmic scenes.

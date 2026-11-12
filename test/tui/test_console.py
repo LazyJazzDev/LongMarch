@@ -164,6 +164,19 @@ class Console:
 
 
 class NativeMenuTests(unittest.TestCase):
+    def test_message_box_scroll_resize_and_reuse(self):
+        with Console(PROBE, ("--message-box",), "Message box probe") as terminal:
+            terminal.wait_text("[ OK ]")
+            terminal.key(0x22, repeat=6)
+            terminal.wait_text("END_OF_MESSAGE")
+            terminal.resize(60, 18)
+            terminal.wait_text("[ OK ]")
+            terminal.key(0x0D)
+            terminal.wait_text("Second message")
+            terminal.wait_text("Reusable message box")
+            terminal.key(0x1B)
+            terminal.finish(20)
+
     def test_keyboard_selection_and_restore(self):
         with Console() as terminal:
             terminal.key(0x28)
@@ -237,24 +250,23 @@ class NativeMenuTests(unittest.TestCase):
             terminal.key(0x0D)
             terminal.finish(22)
 
-    def test_demo_default_menu_and_one_frame(self):
+    def test_demo_default_and_explicit_selection_menus(self):
         for executable in DEMOS:
             with self.subTest(executable=executable):
-                with Console(executable, initial_title="API Selection") as terminal:
+                help_text = subprocess.check_output([executable, "--help"], text=True)
+                device_args = ("--device", "auto") if "--device" in help_text else ()
+                with Console(executable, device_args, initial_title="API Selection") as terminal:
                     terminal.key(0x0D)
                     terminal.wait_text("Module Selection")
                     terminal.key(0x1B)
                     terminal.finish(0)
-                with Console(executable, ("--module", "window", "--frames", "1"), "API Selection") as terminal:
-                    terminal.key(0x0D)
-                    terminal.finish(0)
-                with Console(executable, ("--all", "--headless"), "API Selection") as terminal:
+                with Console(executable, ("--module", "window"), "API Selection") as terminal:
                     terminal.key(0x1B)
                     terminal.finish(0)
-                # Select the first module through the real menu, then render one frame.
-                with Console(executable, ("--backend", "d3d12", "--frames", "1")) as terminal:
-                    terminal.key(0x0D)
+                with Console(executable, ("--backend", "d3d12", *device_args)) as terminal:
+                    terminal.key(0x1B)
                     terminal.finish(0)
+
 
 
 if __name__ == "__main__":

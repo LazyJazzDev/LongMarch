@@ -1,24 +1,49 @@
 ﻿#pragma once
+#include <array>
 #include <unordered_map>
 
-#include "grassland/rhi/backend/backend_command_context.h"
+#include "grassland/rhi/backend/backend_download_token.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalProgram;
-class MetalComputeProgram;
-class MetalProgramBase;
-class MetalBuffer;
-class MetalImage;
-class MetalWindow;
-class MetalSwapChainImage;
-
-class MetalCommandContext final : public CommandContext {
+class IMetalCommandContext : public IObject {
  public:
-  static MetalCommandContext *Create(MetalDevice *device);
-  ~MetalCommandContext() override;
+  typedef enum {
+    SUBMIT_RESULT_REJECTED,
+    SUBMIT_RESULT_SUBMITTED,
+    SUBMIT_RESULT_FAILED_IN_FLIGHT,
+  } SubmitResult;
+
+ public:
+  virtual void BindDownloads(rhi::ISubmissionToken *submission) = 0;
+  virtual void ReleaseDownloads() = 0;
+  virtual bool Seal() = 0;
+  virtual void MarkSubmitted() = 0;
+  virtual bool WasSubmitted() const = 0;
+  virtual void UpdatePresentedImages() = 0;
+  virtual SubmitResult SubmitNative(const SubmitInfo &info, Event signal) = 0;
+  virtual SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) = 0;
+};
+
+ICommandContext *CreateMetalCommandContext(IMetalQueue *queue);
+
+}  // namespace grassland::rhi::backend::metal
+
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::metal::IMetalCommandContext,
+                        grassland::rhi::IObject,
+                        "780df097-069f-45ea-ba33-7ec47b6c22b4")
+
+namespace grassland::rhi::backend::metal {
+class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IMetalCommandContext> {
+ public:
+  static ICommandContext *Create(IMetalQueue *queue);
+  ~MetalCommandContextImpl() override;
   bool CmdBuildBottomLevelAccelerationStructure(
       IBottomLevelAccelerationStructure *destination,
       const std::vector<AccelerationStructureGeometryBuffers> &geometries,
@@ -59,40 +84,85 @@ class MetalCommandContext final : public CommandContext {
                       uint32_t first_instance = 0) override;
   bool CmdClearImage(rhi::IImage *image, const ClearValue &value) override;
   bool CmdPresent(rhi::IWindow *window) override;
-  SubmitResult SubmitNative() override;
-  SubmissionStatus WaitForProgress() override;
+  void UpdatePresentedImages() override;
+  SubmitResult SubmitNative(const SubmitInfo &info, Event signal) override;
+  SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
-  MetalCommandContext(MetalDevice *device);
-
-  bool EndRecording() override;
+  // Inputs and ranges have been validated by the recording entry point.
+  bool CopyBuffer(IMetalBuffer *source,
+                  uint64_t source_offset,
+                  IMetalBuffer *destination,
+                  uint64_t destination_offset,
+                  uint64_t size);
+  MetalCommandContextImpl(IMetalQueue *queue);
+  const void *DeviceIdentity() const;
+  IMetalQueue *OwnerQueue() const;
+  bool EndRecording();
   std::vector<MTL::Resource *> AccelerationResources();
-  std::unordered_map<MetalTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
+  std::unordered_map<IMetalTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
       as_dependencies_;
   void ApplyBindings();
   void ApplyScissor();
   bool ValidateDraw(bool indexed);
-  MetalProgram *program_{};
-  MetalComputeProgram *compute_program_{};
-  MetalProgramBase *native_program_{};
-  MetalImage *render_target_{};
+  IProgram *program_{};
+  IMetalComputeProgram *compute_program_{};
+  IMetalProgramBase *native_program_{};
+  IImage *render_target_{};
   std::vector<ImageFormat> color_formats_;
   std::vector<IImage *> color_targets_;
   ImageFormat depth_format_{IMAGE_FORMAT_UNKNOWN};
-  std::vector<MetalBindingGroup::Version *> groups_;
+  std::vector<IMetalBindingVersion *> groups_;
   NS::SharedPtr<MTL::RenderCommandEncoder> encoder_;
-  std::vector<std::pair<MetalBuffer *, uint64_t>> vertex_buffers_;
-  MetalBuffer *index_{};
+  std::vector<std::pair<IMetalBuffer *, uint64_t>> vertex_buffers_;
+  IMetalBuffer *index_{};
   uint64_t index_offset_{};
   IndexFormat index_format_{INDEX_FORMAT_UINT32};
   Viewport viewport_{};
   Scissor scissor_{};
   bool viewport_set_{}, scissor_set_{};
-
-  MetalDevice *device_;
+  IMetalDevice *device_;
   NS::SharedPtr<MTL::CommandBuffer> commands_;
-  std::vector<std::pair<MetalWindow *, MetalSwapChainImage *>> presents_;
-  bool submission_failed_{};
-};
+  std::vector<std::pair<IMetalWindow *, IMetalSwapChainImage *>> presents_;
 
+ public:
+  bool CmdDrawImGui(IWindow *window, IImage *target) override;
+
+  bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override;
+
+  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
+
+  bool CmdDispatchRays(uint32_t width,
+                       uint32_t height,
+                       uint32_t depth = 1,
+                       IShaderBindingTable *sbt = nullptr) override;
+
+ public:
+  rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override;
+
+  void BindDownloads(rhi::ISubmissionToken *submission) override;
+
+  void ReleaseDownloads() override;
+
+ private:
+  // Call before encoding each resource use. Retains each exact object once.
+  IDownloadToken *RegisterDownload(ObjectPtr<IMetalDownloadToken> token);
+
+  bool RetainResource(rhi::IObject *resource);
+
+ public:
+  bool Seal() override;
+
+  void MarkSubmitted() override;
+
+  bool WasSubmitted() const override;
+
+ private:
+  bool recording_failed_{};
+  bool sealed_{};
+  IMetalQueue *queue_{};
+  std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
+  bool submitted_{};
+  std::vector<ObjectPtr<IMetalDownloadToken>> downloads_{};
+};
 }  // namespace grassland::rhi::backend::metal

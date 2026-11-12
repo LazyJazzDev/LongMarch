@@ -1,6 +1,6 @@
 # Window callbacks and ImGui
 
-`IWindow` and `rhix::Window` expose the same callback registries as the basic
+`IWindow` exposes the same callback registries as the basic
 input events in `graphics::Window`: `ResizeEvent`, `FramebufferResizeEvent`,
 `CursorEnterEvent`, `FocusEvent`, `MouseMoveEvent`, `MouseButtonEvent`,
 `ScrollEvent`, `KeyEvent`, `CharEvent` and `DropEvent`. RegisterCallback returns
@@ -66,14 +66,12 @@ including when input and output use the same color space.
 SDR output clamps to [0,1]; linear HDR retains values above 1. No scene tone mapping
 is added by this API. Source and destination may alias only when no conversion or white scaling is required.
 
-The RHI/RHIX nbody demos perform particle accumulation and scene highlight processing
-in RGBA32 float, composite ImGui into their linear `frame_image`, and present through
-this conversion. Headless nbody captures now contain RGBA32 linear pixels; PNG previews
-are still encoded as sRGB. The independent graphics nbody demos are unchanged.
+The RHI nbody demo performs particle accumulation and scene highlight processing
+in RGBA32 float, composites ImGui into its linear `frame_image`, and presents through
+this conversion. The independent graphics nbody demos are unchanged.
 
-The rhix equivalents use `window.EnableImGui()` and `window.UpdateImGui(callback)`.
 Initialization accepts a font file and pixel size:
-`window->EnableImGui(true, "fonts/MyFont.ttf", 24.0f)` (rhix uses `.`).
+`window->EnableImGui(true, "fonts/MyFont.ttf", 24.0f)`.
 The defaults are `nullptr` and 13 pixels. A null path selects the built-in font
 at the requested size; a file font uses the ChineseFull glyph range, matching
 graphics D3D12/Vulkan (the font must contain the desired glyphs). Font data is

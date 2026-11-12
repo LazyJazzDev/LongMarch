@@ -32,12 +32,12 @@ class GeometryMesh : public Geometry {
   float GetShadowTerminatorGeometryOffset() const;
 
   int PrimitiveCount() override;
-  rhi::IBuffer *GetBuffer() const;
+  graphics::Buffer *GetBuffer() const;
   const Header &GetHeader() const;
 
  private:
   Header header_{};
-  rhi::ObjPtr<rhi::IBuffer> geometry_buffer_;
+  std::unique_ptr<graphics::Buffer> geometry_buffer_;
   int primitive_count_;
 };
 

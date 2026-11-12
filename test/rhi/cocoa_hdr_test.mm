@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstdlib>
-#include "grassland/rhi/rhix/rhix.h"
+#include <thread>
+#include "grassland/rhi/rhi.h"
 #define GLFW_EXPOSE_NATIVE_COCOA
 #import <Cocoa/Cocoa.h>
 #include <GLFW/glfw3native.h>
@@ -19,25 +21,77 @@ TEST(RhiCocoaHDR, AllBackendsQueryTheWindowScreen) {
 #endif
   for (auto backend : backends) {
     SCOPED_TRACE(int(backend));
-    auto core = grassland::rhix::CreateCore(backend);
+    ObjPtr<ICore> core = grassland::rhi::CreateCore(backend);
     ASSERT_TRUE(core);
-    auto device = core.CreateDeviceByAutoSelection();
+    ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
-    auto window = device.CreateGLFWWindow({320, 240, "Shared Cocoa HDR query"});
+    ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "Shared Cocoa HDR query"});
     ASSERT_TRUE(window);
-    for (const auto &option : window.GetSupportedPresentationOptions()) {
-      ASSERT_TRUE(window.SetColorSpace(option.color_space));
-      auto screen = [glfwGetCocoaWindow(window.GLFWWindow()) screen];
+    for (const auto &option : window->GetSupportedPresentationOptions()) {
+      ASSERT_TRUE(window->SetColorSpace(option.color_space));
+      auto screen = [glfwGetCocoaWindow(window->GLFWWindow()) screen];
       ASSERT_NE(screen, nil);
       const float expected = screen.maximumExtendedDynamicRangeColorComponentValue;
-      EXPECT_FLOAT_EQ(window.GetHDRHeadroom(), expected);
-      EXPECT_FLOAT_EQ(window.GetHDRReferenceWhiteScale(), 1.0f);
+      EXPECT_FLOAT_EQ(window->GetHDRHeadroom(), expected);
+      EXPECT_FLOAT_EQ(window->GetHDRReferenceWhiteScale(), 1.0f);
       float nits = -1.0f;
-      EXPECT_FALSE(window.GetHDRReferenceWhiteNits(nits));
+      EXPECT_FALSE(window->GetHDRReferenceWhiteNits(nits));
       EXPECT_FLOAT_EQ(nits, -1.0f);
       std::cout << "HDR query: backend=" << int(backend) << " color_space=" << int(option.color_space)
-                << " headroom=" << window.GetHDRHeadroom() << " NSScreen=" << expected
-                << " white_scale=" << window.GetHDRReferenceWhiteScale() << " nits=unavailable\n";
+                << " headroom=" << window->GetHDRHeadroom() << " NSScreen=" << expected
+                << " white_scale=" << window->GetHDRReferenceWhiteScale() << " nits=unavailable\n";
+    }
+  }
+}
+
+TEST(RhiCocoaWindow, DestructionRemovesWindowWithoutFurtherEventPolling) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  using namespace grassland::rhi;
+  const auto is_onscreen = [](CGWindowID number) {
+    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
+    bool found = false;
+    for (NSDictionary *window in (NSArray *)windows) {
+      if ([window[(NSString *)kCGWindowNumber] unsignedIntValue] == number) {
+        found = true;
+        break;
+      }
+    }
+    if (windows)
+      CFRelease(windows);
+    return found;
+  };
+  std::vector<BackendAPI> backends;
+#ifdef LONGMARCH_VULKAN_ENABLED
+  backends.push_back(BACKEND_API_VULKAN);
+#endif
+#ifdef LONGMARCH_METAL_ENABLED
+  backends.push_back(BACKEND_API_METAL);
+#endif
+  for (auto backend : backends) {
+    SCOPED_TRACE(int(backend));
+    ObjPtr<ICore> core = CreateCore(backend);
+    ASSERT_TRUE(core);
+    ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+    ASSERT_TRUE(device);
+    // Keep Core/Device alive between demos, just like the interactive launcher.
+    for (int demo = 0; demo < 2; ++demo) {
+      ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "Cocoa destruction regression"});
+      ASSERT_TRUE(window);
+      ASSERT_TRUE(PollEvents());
+      const CGWindowID number = [glfwGetCocoaWindow(window->GLFWWindow()) windowNumber];
+      for (int attempt = 0; attempt < 50 && !is_onscreen(number); ++attempt) {
+        ASSERT_TRUE(PollEvents());
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      ASSERT_TRUE(is_onscreen(number));
+      glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+      window.Release();
+      // WindowServer may process the request asynchronously. Do not pump the app's run loop:
+      // a caller can be blocked in a terminal menu after the last window is released.
+      for (int attempt = 0; attempt < 50 && is_onscreen(number); ++attempt)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      EXPECT_FALSE(is_onscreen(number));
     }
   }
 }

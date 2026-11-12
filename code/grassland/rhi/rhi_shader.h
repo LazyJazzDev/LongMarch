@@ -2,13 +2,15 @@
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/util/file_system.h"
 
+LONGMARCH_RHI_INTERFACE(grassland::rhi::IShader, grassland::rhi::IObject, "e047fbee-32cb-43b5-8ffa-323e42a45e29")
+
 namespace grassland::rhi {
 struct ShaderDesc {
   std::string filename{"main.slang"};
   std::string entry_point;
   ShaderStage stage{SHADER_STAGE_VERTEX};
   // Borrowed only during CreateShader; never stored by Shader. nullptr uses disk.
-  const FileSystem *file_system{};
+  FileSystem *file_system{};
   std::vector<std::string> include_paths;
   std::vector<std::pair<std::string, std::string>> defines;
 };

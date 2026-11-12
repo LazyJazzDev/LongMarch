@@ -4,17 +4,29 @@
 #include <limits>
 
 namespace grassland::rhi::backend::vulkan {
-VulkanDescriptorPool::Lease::Lease(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set)
+class VulkanDescriptorPool::LeaseImpl final : public Object<VulkanDescriptorPool::ILease> {
+ public:
+  LeaseImpl(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set);
+  ~LeaseImpl() override;
+  VkDescriptorSet Set() const;
+
+ private:
+  VulkanDescriptorPool *owner_;
+  Page *page_;
+  VkDescriptorSet set_;
+};
+
+VulkanDescriptorPool::LeaseImpl::LeaseImpl(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set)
     : owner_(owner),
       page_(page),
       set_(set) {
 }
 
-VulkanDescriptorPool::Lease::~Lease() {
+VulkanDescriptorPool::LeaseImpl::~LeaseImpl() {
   owner_->ReleaseSet(page_, set_);
 }
 
-VkDescriptorSet VulkanDescriptorPool::Lease::Set() const {
+VkDescriptorSet VulkanDescriptorPool::LeaseImpl::Set() const {
   return set_;
 }
 
@@ -84,7 +96,7 @@ ObjectPtr<VulkanDescriptorPool::Lease> VulkanDescriptorPool::Acquire(VkDescripto
     return {};
   --page->available_sets;
   try {
-    return ObjectPtr<Lease>::Adopt(new Lease(this, page, set));
+    return ObjectPtr<Lease>::Adopt(new LeaseImpl(this, page, set));
   } catch (const std::bad_alloc &) {
     if (Check(vkFreeDescriptorSets(device_, page->pool, 1, &set), "Free descriptor set"))
       ++page->available_sets;

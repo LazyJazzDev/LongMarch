@@ -1,37 +1,23 @@
-﻿#include "../../module.h"
-
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <iostream>
 #include <thread>
 
-#include "../../save_image.h"
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
 
-int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
-                        int frames,
-                        bool headless,
-                        const char *font_file,
-                        float font_size,
-                        const std::string &capture_directory) {
+// Evaluate once and stop recording immediately when a command fails.
+#define RETURN_IF_FAIL(expression) \
+  do {                             \
+    if (!(expression))             \
+      return 1;                    \
+  } while (false)
+
+int RunImGuiMultiWindow(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
-  if (headless) {
-    std::cout << "imgui_multi_window: skipped (requires desktop windows)\n";
-    return 0;
-  }
-  ObjPtr<ICore> core = CreateCore(api);
-  if (!core)
-    return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  if (!device)
-    return 1;
-  std::array<ObjPtr<IDownloadToken>, 2> last_frames;
-  std::array<ImageDesc, 2> last_frame_descs{};
-  std::array<ColorSpace, 2> last_frame_spaces{};
-  std::array<float, 2> last_frame_white_scales{};
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   if (!queue)
     return 1;
 
@@ -45,7 +31,7 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
     if (!windows[i])
       return 1;
     glfwSetWindowPos(windows[i]->GLFWWindow(), 60 + int(i) * 620, 100);
-    if (!windows[i]->EnableImGui(true, font_file, font_size))
+    if (!windows[i]->EnableImGui())
       return 1;
     windows[i]->KeyEvent().RegisterCallback([&, i](int key, int, int action, int) {
       if (action != GLFW_PRESS)
@@ -63,9 +49,9 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
   float speed = 1.0f, amplitude = 0.7f, phase = 0.0f;
   bool paused = false;
 
-  for (int rendered = 0; !frames || rendered < frames;) {
+  while (true) {
     if (!PollEvents())
-      break;
+      return 1;
     // Collect all UI feedback before recording any window's scene commands.
     if (windows[0] && !windows[0]->ShouldClose() && !windows[0]->UpdateImGui([&] {
           if (!visible[0])
@@ -129,22 +115,13 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
       ObjPtr<IImage> image = window->GetNextImage();
       if (!image)
         continue;
-      ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+      ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
       if (!commands)
         return 1;
-      if (!commands->CmdClearImage(image.Get(), colors[i]))
-        return 1;
-      if (!commands->CmdPresent(window.Get()))
-        return 1;
-      if (!capture_directory.empty()) {
-        last_frames[i] = commands->CmdDownloadImage(image.Get());
-        if (!last_frames[i])
-          return 1;
-        last_frame_descs[i] = image->GetDesc();
-        last_frame_spaces[i] = window->GetColorSpace();
-        last_frame_white_scales[i] = window->GetHDRReferenceWhiteScale();
-      }
-      pending[i] = queue->Submit(commands.Get());
+      RETURN_IF_FAIL(commands->CmdClearImage(image.Get(), colors[i]));
+      RETURN_IF_FAIL(commands->CmdPresent(window.Get()));
+
+      pending[i] = commands->Submit();
 
       if (!pending[i])
         return 1;
@@ -152,28 +129,18 @@ int RunImGuiMultiWindow(grassland::rhi::BackendAPI api,
     }
     if (!open)
       break;
-    if (submitted)
-      ++rendered;
-    else
+    if (!submitted)
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
+
   for (auto &token : pending) {
     if (token) {
       if (!token->WaitHost())
         return 1;
     }
   }
-  if (!capture_directory.empty()) {
-    for (size_t i = 0; i < last_frames.size(); ++i) {
-      auto &last_frame = last_frames[i];
-      if (!last_frame || !last_frame->WaitHost())
-        return 1;
-      std::vector<uint8_t> pixels(last_frame->GetSize());
-      if (!last_frame->CopyTo(pixels.data(), pixels.size()) ||
-          !SaveImage(capture_directory, "imgui_multi_window_" + std::to_string(i), pixels, last_frame_descs[i],
-                     last_frame_spaces[i], last_frame_white_scales[i]))
-        return 1;
-    }
-  }
+
   return 0;
 }
+
+#undef RETURN_IF_FAIL

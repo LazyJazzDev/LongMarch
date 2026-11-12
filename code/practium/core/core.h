@@ -5,14 +5,14 @@ namespace practium {
 
 class Core {
  public:
-  Core(rhi::IDevice *core);
+  Core(graphics::Core *core);
 
   sparkium::Core *GetRenderCore() const;
 
   contradium::Core *GetPhysicsCore() const;
 
  private:
-  rhi::IDevice *core_;
+  graphics::Core *core_;
   std::unique_ptr<sparkium::Core> render_core_;
   std::unique_ptr<contradium::Core> physics_core_;
 };

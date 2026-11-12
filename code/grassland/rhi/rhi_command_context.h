@@ -5,9 +5,19 @@
 #include "grassland/rhi/rhi_download_token.h"
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_ray_tracing_program.h"
+#include "grassland/rhi/rhi_submission_token.h"
 #include "grassland/rhi/rhi_util.h"
 
+LONGMARCH_RHI_INTERFACE(grassland::rhi::ICommandContext,
+                        grassland::rhi::IObject,
+                        "e0282821-ea9e-4756-bfae-325ef3f00fbb")
+
 namespace grassland::rhi {
+struct SubmitInfo {
+  // Borrowed for the duration of Submit.
+  std::vector<Event> waits;
+};
+
 class IBuffer;
 class IProgram;
 class IComputeProgram;
@@ -50,6 +60,9 @@ class IWindow;
 
 class ICommandContext : public IObject {
  public:
+  // Ends recording and submits to the bound queue. Accepted work retains its
+  // resources until completion. Returns an owned token, or nullptr on failure.
+  virtual ISubmissionToken *Submit(const SubmitInfo &info = {}) = 0;
   // AS build/copy/query and DispatchRays require no active rendering scope.
   // Modifying contexts for one AS must be submitted before recording later uses
   // in another context; Build/Update retain inputs and rent scratch automatically.

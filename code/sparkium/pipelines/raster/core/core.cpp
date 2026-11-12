@@ -9,27 +9,27 @@ namespace sparkium::raster {
 Core::Core(sparkium::Core &core) : core_(core) {
 }
 
-rhi::IDevice *Core::GetDevice() const {
-  return core_.GetDevice();
+graphics::Core *Core::GraphicsCore() const {
+  return core_.GraphicsCore();
 }
 
 const VirtualFileSystem &Core::GetShadersVFS() const {
   return core_.GetShadersVFS();
 }
 
-rhi::IShader *Core::GetShader(const std::string &name) {
+graphics::Shader *Core::GetShader(const std::string &name) {
   return core_.GetShader(name);
 }
 
-rhi::IComputeProgram *Core::GetComputeProgram(const std::string &name) {
+graphics::ComputeProgram *Core::GetComputeProgram(const std::string &name) {
   return core_.GetComputeProgram(name);
 }
 
-rhi::IBuffer *Core::GetBuffer(const std::string &name) {
+graphics::Buffer *Core::GetBuffer(const std::string &name) {
   return core_.GetBuffer(name);
 }
 
-rhi::IImage *Core::GetImage(const std::string &name) {
+graphics::Image *Core::GetImage(const std::string &name) {
   return core_.GetImage(name);
 }
 

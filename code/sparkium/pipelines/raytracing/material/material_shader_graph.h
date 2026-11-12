@@ -8,32 +8,32 @@ class MaterialShaderGraph : public Material {
  public:
   explicit MaterialShaderGraph(sparkium::MaterialShaderGraph &material);
   void PrepareHitShaders();
-  rhi::IBuffer *Buffer() override;
+  graphics::Buffer *Buffer() override;
   const CodeLines &SamplerImpl() const override;
   const CodeLines &EvaluatorImpl() const override;
   const CodeLines *GraphImpl() const override;
   void Update(Scene *scene) override;
 
-  rhi::IShader *RenderClosestHitShader() const {
-    return closest_hit_shader_.Get();
+  graphics::Shader *RenderClosestHitShader() const {
+    return closest_hit_shader_.get();
   }
 
-  rhi::IShader *ShadowClosestHitShader() const {
-    return shadow_closest_hit_shader_.Get();
+  graphics::Shader *ShadowClosestHitShader() const {
+    return shadow_closest_hit_shader_.get();
   }
 
-  rhi::IShader *ShadowAnyHitShader() const {
-    return shadow_any_hit_shader_.Get();
+  graphics::Shader *ShadowAnyHitShader() const {
+    return shadow_any_hit_shader_.get();
   }
 
  private:
   sparkium::MaterialShaderGraph &material_;
-  rhi::ObjPtr<rhi::IBuffer> material_buffer_;
+  std::unique_ptr<graphics::Buffer> material_buffer_;
   CodeLines sampler_implementation_;
   CodeLines evaluator_implementation_;
-  rhi::ObjPtr<rhi::IShader> closest_hit_shader_;
-  rhi::ObjPtr<rhi::IShader> shadow_closest_hit_shader_;
-  rhi::ObjPtr<rhi::IShader> shadow_any_hit_shader_;
+  std::unique_ptr<graphics::Shader> closest_hit_shader_;
+  std::unique_ptr<graphics::Shader> shadow_closest_hit_shader_;
+  std::unique_ptr<graphics::Shader> shadow_any_hit_shader_;
 };
 
 }  // namespace sparkium::raytracing

@@ -1,7 +1,7 @@
 """POSIX PTY integration checks: test_pty.py <probe> [demo ...].
 
 Runs isolated pseudo-terminals; does not change the user's terminal. Optional
-hello demos must support --backend metal --frames 1 (macOS smoke tests).
+hello demos use Metal menu selection and the unsupported ray-pipeline path on macOS.
 """
 import fcntl
 import os
@@ -90,6 +90,38 @@ class Terminal:
 
 
 class PtyMenuTest(unittest.TestCase):
+    def test_message_box_blocks_scrolls_resizes_and_reuses(self):
+        with Terminal([PROBE, "--message-box"], columns=32, rows=8) as terminal:
+            terminal.until(lambda: b"First message line" in terminal.output)
+            terminal.until(lambda: b"[ OK ]" in terminal.output)
+            self.assertIn(b"+" + b"-" * 26 + b"+", terminal.output)
+            self.assertNotIn(b"continue |", terminal.output)
+            terminal.read(0.15)
+            self.assertIsNone(terminal.process.poll())
+            terminal.output = b""
+            terminal.send(b"\x1b[6~" * 100)
+            terminal.until(lambda: b"END_OF_MESSAGE" in terminal.output)
+            terminal.resize(60, 12)
+            terminal.until(lambda: b"\x1b[12;1H" in terminal.output)
+            terminal.send(b"\r")
+            terminal.until(lambda: b"Second message" in terminal.output)
+            # At 60x12 the short second dialog is centered: OK is row 8, columns 28-33.
+            terminal.until(lambda: b"[ OK ]" in terminal.output)
+            terminal.send(b"\x1b[<0;29;8M\x1b[<0;29;8m")
+            terminal.finish(20)
+
+    def test_message_box_console_and_eof(self):
+        for text, expected in (("\n\n", 20), ("", 0)):
+            result = subprocess.run([PROBE, "--message-box"], input=text, text=True,
+                                    capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+            self.assertIn("Press Enter to continue", result.stdout)
+            self.assertIn("+" + "-" * 74 + "+", result.stdout)
+            self.assertIn("| Message box probe", result.stdout)
+            self.assertIn("| First message line", result.stdout)
+            self.assertNotIn("\x1b", result.stdout)
+
+
     def test_core_callbacks_colors_clipping_and_queue(self):
         core = str(pathlib.Path(PROBE).with_name("tui_core_probe"))
         with Terminal([core], columns=20, rows=6) as terminal:
@@ -278,10 +310,10 @@ class PtyMenuTest(unittest.TestCase):
     @unittest.skipUnless(DEMOS, "Pass demo executables for macOS Metal launch checks")
     def test_demo_redirected_number_and_name_selection(self):
         for demo in DEMOS:
-            for choice in ("1\n", "triangle\n"):
+            for choice in ("7\n", "raytracing\n"):
                 with self.subTest(demo=demo, choice=choice), tempfile.TemporaryDirectory(prefix="longmarch-tui-") as directory:
                     result = subprocess.run(
-                        [demo, "--backend", "metal", "--frames", "1"], input=choice,
+                        [demo, "--backend", "metal"], input=choice,
                         text=True, capture_output=True, timeout=30, cwd=directory,
                     )
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -291,9 +323,9 @@ class PtyMenuTest(unittest.TestCase):
     @unittest.skipUnless(DEMOS, "Pass demo executables for macOS Metal launch checks")
     def test_demo_default_menu_launch(self):
         for demo in DEMOS:
-            with self.subTest(demo=demo), Terminal([demo, "--backend", "metal", "--frames", "1"]) as terminal:
+            with self.subTest(demo=demo), Terminal([demo, "--backend", "metal"]) as terminal:
                 terminal.until(lambda: b"\x1b[7m" in terminal.output)
-                terminal.send(b"\r")
+                terminal.send(b"\x1b")
                 terminal.finish(0)
 
 

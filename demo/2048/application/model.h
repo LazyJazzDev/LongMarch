@@ -49,12 +49,12 @@ class DeviceModel {
   DeviceModel(Application *app, const Model &model);
   ~DeviceModel();
 
-  [[nodiscard]] graphics::Buffer *VertexBuffer() const {
-    return vertex_buffer_.get();
+  [[nodiscard]] rhi::IBuffer *VertexBuffer() const {
+    return vertex_buffer_.Get();
   }
 
-  [[nodiscard]] graphics::Buffer *IndexBuffer() const {
-    return index_buffer_.get();
+  [[nodiscard]] rhi::IBuffer *IndexBuffer() const {
+    return index_buffer_.Get();
   }
 
   [[nodiscard]] uint32_t IndexCount() const {
@@ -66,8 +66,8 @@ class DeviceModel {
 
  private:
   Application *app_{};
-  std::unique_ptr<graphics::Buffer> vertex_buffer_;
-  std::unique_ptr<graphics::Buffer> index_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> vertex_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> index_buffer_;
   uint32_t index_count_{};
 };
 

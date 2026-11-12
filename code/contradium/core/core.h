@@ -1,15 +1,14 @@
 ﻿#pragma once
 #include "contradium/core/core_util.h"
-#include "grassland/rhi/rhi_device.h"
 
 namespace contradium {
 
 class Core {
  public:
-  Core(rhi::IDevice *core);
+  Core(graphics::Core *core);
 
  private:
-  rhi::IDevice *core_;
+  graphics::Core *core_;
 };
 
 }  // namespace contradium

@@ -3,10 +3,10 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanScratchPool::VulkanScratchPool(VulkanDevice *device) : device_(device) {
+VulkanScratchPool::VulkanScratchPool(IVulkanDevice *device) : device_(device) {
 }
 
-ObjectPtr<VulkanAllocatedBuffer> VulkanScratchPool::Acquire(uint64_t size) {
+ObjectPtr<IVulkanAllocatedBuffer> VulkanScratchPool::Acquire(uint64_t size) {
   if (size > (uint64_t(1) << 63))
     return {};
   std::lock_guard<std::mutex> lock(mutex_);
@@ -21,13 +21,14 @@ ObjectPtr<VulkanAllocatedBuffer> VulkanScratchPool::Acquire(uint64_t size) {
     peaks_.pop_front();
 
   const auto demand = peaks_.front().first;
-  const auto current = buffer_ ? buffer_->GetDesc().size : 0;
+  const auto current = capacity_;
   if (!buffer_ || size > current || demand < current / 2) {
     uint64_t capacity = 65536;
     while (capacity < demand)
       capacity *= 2;
     if (capacity != current) {
-      auto storage = ObjectPtr<VulkanAllocatedBuffer>::Adopt(VulkanAllocatedBuffer::Create(device_, {capacity}, false));
+      auto storage =
+          ObjectPtr<IVulkanAllocatedBuffer>::Adopt(IVulkanAllocatedBuffer::Create(device_, {capacity}, false));
       if (!storage) {
         // Shrinking is optional; a failed growth must not return undersized storage.
         if (size <= current)
@@ -35,6 +36,7 @@ ObjectPtr<VulkanAllocatedBuffer> VulkanScratchPool::Acquire(uint64_t size) {
         return {};
       }
       buffer_ = std::move(storage);
+      capacity_ = capacity;
     }
   }
   return buffer_;
@@ -43,6 +45,7 @@ ObjectPtr<VulkanAllocatedBuffer> VulkanScratchPool::Acquire(uint64_t size) {
 void VulkanScratchPool::Clear() {
   std::lock_guard<std::mutex> lock(mutex_);
   buffer_.Reset();
+  capacity_ = 0;
   peaks_.clear();
 }
 }  // namespace grassland::rhi::backend::vulkan

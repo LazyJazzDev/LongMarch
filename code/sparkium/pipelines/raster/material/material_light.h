@@ -7,18 +7,18 @@ class MaterialLight : public Material {
  public:
   MaterialLight(sparkium::MaterialLight &material);
 
-  rhi::IShader *PixelShader() override;
+  graphics::Shader *PixelShader() override;
 
   void Sync() override;
 
   glm::vec3 Emission() const override;
 
-  void BindMaterialResources(rhi::IBindingGroup *group) override;
+  void BindMaterialResources(graphics::CommandContext *cmd_ctx) override;
 
  private:
   sparkium::MaterialLight &material_;
-  rhi::ObjPtr<rhi::IShader> pixel_shader_;
-  rhi::ObjPtr<rhi::IBuffer> material_buffer_;
+  std::unique_ptr<graphics::Shader> pixel_shader_;
+  std::unique_ptr<graphics::Buffer> material_buffer_;
 };
 
 }  // namespace sparkium::raster

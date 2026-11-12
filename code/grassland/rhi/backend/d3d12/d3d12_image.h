@@ -1,33 +1,24 @@
 #pragma once
-#include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
+#include "grassland/rhi/backend/d3d12/d3d12_util.h"
+#include "grassland/rhi/rhi_image.h"
+
+LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12Image,
+                        grassland::rhi::IObject,
+                        "85eb3c59-b643-4c32-b41f-66ed7e262a3e")
 
 namespace grassland::rhi::backend::d3d12 {
 
-class D3D12Device;
-
 // Common resource access; derived classes define ownership and validity.
-class D3D12Image : public Image {
+class ID3D12Image : public IObject {
  public:
-  static ObjectPtr<D3D12DescriptorPool::Lease> CreateAttachmentView(D3D12Device *device, ID3D12Resource *image);
-  D3D12_CPU_DESCRIPTOR_HANDLE AttachmentView() const;
-  bool SupportsStorage() const override;
-  const void *DeviceIdentity() const override;
-  ID3D12Resource *NativeImage() const;
-  D3D12_RESOURCE_STATES DefaultState() const;
-
- protected:
-  D3D12Image(ImageDesc desc,
-             const void *device,
-             ID3D12Resource *image,
-             ObjectPtr<D3D12DescriptorPool::Lease> attachment,
-             D3D12_RESOURCE_STATES default_state = D3D12_RESOURCE_STATE_COMMON);
-
- private:
-  ObjectPtr<D3D12DescriptorPool::Lease> attachment_;
-  const void *device_;
-  ID3D12Resource *image_;
-  D3D12_RESOURCE_STATES default_state_;
+  virtual bool SupportsQueue(const ID3D12Queue *queue) const = 0;
+  virtual bool SupportsStorage() const = 0;
+  virtual const void *DeviceIdentity() const = 0;
+  static ObjectPtr<D3D12DescriptorPool::Lease> CreateAttachmentView(ID3D12Device *device, ID3D12Resource *image);
+  virtual D3D12_CPU_DESCRIPTOR_HANDLE AttachmentView() const = 0;
+  virtual ID3D12Resource *NativeImage() const = 0;
+  virtual D3D12_RESOURCE_STATES DefaultState() const = 0;
 };
 
 }  // namespace grassland::rhi::backend::d3d12

@@ -34,7 +34,7 @@ IDevice::~IDevice() = default;
 IShader *IDevice::CreateShader(const std::string &filename,
                                const std::string &entry_point,
                                ShaderStage stage,
-                               const FileSystem *fs,
+                               FileSystem *fs,
                                const std::vector<std::string> &include_paths,
                                const std::vector<std::pair<std::string, std::string>> &defines) {
   ShaderDesc desc;

@@ -12,7 +12,7 @@ GeometryMesh::GeometryMesh(sparkium::GeometryMesh &geometry)
   closest_hit_shader_implementation_ = CodeLines(vfs, "geometry/mesh/hit_group.slang");
 }
 
-rhi::IBuffer *GeometryMesh::Buffer() {
+graphics::Buffer *GeometryMesh::Buffer() {
   return geometry_.GetBuffer();
 }
 
@@ -28,33 +28,16 @@ const CodeLines &GeometryMesh::SamplerImpl() const {
   return sampler_implementation_;
 }
 
-rhi::IBottomLevelAccelerationStructure *GeometryMesh::BLAS() {
+graphics::AccelerationStructure *GeometryMesh::BLAS() {
   if (!blas_) {
     auto header = geometry_.GetHeader();
 
-    rhi::BottomLevelAccelerationStructureDesc desc;
-    desc.geometries.push_back(
-        {header.num_vertices, header.position_stride, header.num_indices, rhi::INDEX_FORMAT_UINT32, false});
-    blas_ = core_->GetDevice()->CreateBottomLevelAccelerationStructure(desc);
-    if (!blas_)
-      return nullptr;
-    rhi::ObjPtr<rhi::ICommandContext> commands = core_->GetDevice()->CreateCommandContext();
-    if (!commands) {
-      blas_.Release();
-      return nullptr;
-    }
-    if (!commands->CmdBuildBottomLevelAccelerationStructure(
-            blas_.Get(),
-            {{{geometry_.GetBuffer(), header.position_offset}, {geometry_.GetBuffer(), header.index_offset}}})) {
-      blas_.Release();
-      return nullptr;
-    }
-    if (!Execute(core_->GetDevice(), commands.Get())) {
-      blas_.Release();
-      return nullptr;
-    }
+    core_->GraphicsCore()->CreateBottomLevelAccelerationStructure(
+        geometry_.GetBuffer()->Range(header.position_offset), geometry_.GetBuffer()->Range(header.index_offset),
+        header.num_vertices, header.position_stride, header.num_indices / 3, graphics::RAYTRACING_GEOMETRY_FLAG_NONE,
+        &blas_);
   }
-  return blas_.Get();
+  return blas_.get();
 }
 
 }  // namespace sparkium::raytracing

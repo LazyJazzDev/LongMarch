@@ -7,10 +7,12 @@ namespace sparkium::raytracing {
 CameraThinLens::CameraThinLens(sparkium::CameraThinLens &camera)
     : Camera(DedicatedCast(camera.GetCore()), "camera/thin_lens.slang", "CameraThinLens"),
       camera_(camera) {
-  buffer_ = camera_.GetCore()->GetDevice()->CreateBuffer({sizeof(CameraThinLensData)});
+  DedicatedCast(camera.GetCore())
+      ->GraphicsCore()
+      ->CreateBuffer(sizeof(CameraThinLensData), graphics::BUFFER_TYPE_STATIC, &buffer_);
 }
 
-rhi::IBuffer *CameraThinLens::Buffer() {
+graphics::Buffer *CameraThinLens::Buffer() {
   CameraThinLensData data{};
   data.world_to_camera = camera_.view;
   data.camera_to_world = glm::inverse(camera_.view);
@@ -20,8 +22,8 @@ rhi::IBuffer *CameraThinLens::Buffer() {
   data.aperture_blades = camera_.aperture_blades;
   data.aperture_rotation = camera_.aperture_rotation;
   data.aperture_ratio = camera_.aperture_ratio;
-  UploadBuffer(camera_.GetCore()->GetDevice(), buffer_.Get(), &data, sizeof(data));
-  return buffer_.Get();
+  buffer_->UploadData(&data, sizeof(data));
+  return buffer_.get();
 }
 
 }  // namespace sparkium::raytracing
