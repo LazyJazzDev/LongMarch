@@ -18,7 +18,11 @@ class VulkanTemporalBufferLeaseImpl final : public Object<rhi::IBuffer, IVulkanT
   size_t level_;
 
  public:
-  IBackendDevice *Owner() const override {
+  const void *DeviceIdentity() const override {
+    return Owner();
+  }
+
+  IVulkanDevice *Owner() const override {
     return buffer_->Owner();
   }
 };

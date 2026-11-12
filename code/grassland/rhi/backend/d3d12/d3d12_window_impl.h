@@ -7,7 +7,7 @@ class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
  public:
   ~D3D12WindowImpl() override;
   static rhi::IWindow *Create(ID3D12Device *device, const WindowDesc &desc);
-  ObjectPtr<IBackendImage> AcquireNativeFrame() override;
+  ObjectPtr<ID3D12Image> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
@@ -46,7 +46,7 @@ class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
 
   rhi::IImage *GetNextImage() override;
 
-  IBackendQueue *OwnerQueue() const override;
+  ID3D12Queue *OwnerQueue() const override;
 
   bool UpdateNextImage() override;
 
@@ -126,6 +126,6 @@ class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
   ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
   GLFWwindow *window_{};
   std::mutex next_image_mutex_{};
-  ObjectPtr<IBackendImage> next_image_{};
+  ObjectPtr<ID3D12Image> next_image_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

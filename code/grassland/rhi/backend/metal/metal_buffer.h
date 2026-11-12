@@ -11,6 +11,7 @@ LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::metal::IMetalBuffer,
 namespace grassland::rhi::backend::metal {
 class IMetalBuffer : public IBackendBuffer {
  public:
+  virtual IMetalDevice *Owner() const = 0;
   virtual MTL::Buffer *NativeBuffer() const = 0;
 };
 }  // namespace grassland::rhi::backend::metal

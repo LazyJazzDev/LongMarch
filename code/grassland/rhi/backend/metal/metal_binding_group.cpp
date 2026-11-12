@@ -1,13 +1,15 @@
 ﻿#include "grassland/rhi/backend/metal/metal_binding_group.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cstring>
+#include <mutex>
 #include <set>
+#include <thread>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_buffer.h"
-#include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_binding_group_impl.h"
@@ -15,6 +17,8 @@
 #include "grassland/rhi/backend/metal/metal_image.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_image.h"
 
 namespace grassland::rhi::backend::metal {
 uint32_t MetalArgumentCount(const BindingLayoutDesc &layout) {
@@ -363,7 +367,7 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
     return false;
   auto values = buffers;
   for (auto &view : values) {
-    auto buffer = rhi::QueryInterfacePtr<IBackendBuffer>(view.buffer).Get();
+    auto buffer = rhi::QueryInterfacePtr<IMetalBuffer>(view.buffer).Get();
     if (!buffer || buffer->Owner() != device_ || view.offset >= view.buffer->GetDesc().size)
       return false;
     if (!view.size)
@@ -397,7 +401,7 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
   if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
     return false;
   for (auto value : images) {
-    auto image = rhi::QueryInterfacePtr<IBackendImage>(value).Get();
+    auto image = rhi::QueryInterfacePtr<IMetalImage>(value).Get();
     if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())

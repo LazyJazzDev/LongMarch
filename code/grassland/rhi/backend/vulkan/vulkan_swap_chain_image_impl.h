@@ -18,10 +18,10 @@ class VulkanSwapChainImageImpl final : public Object<rhi::IImage, IVulkanSwapCha
   VkImage image_{};
   VkImageView attachment_{};
 
-  void InitializeImage(ImageDesc desc, IBackendQueue *queue = nullptr);
+  void InitializeImage(ImageDesc desc, IVulkanQueue *queue = nullptr);
 
  public:
-  bool SupportsQueue(const IBackendQueue *queue) const override;
+  bool SupportsQueue(const IVulkanQueue *queue) const override;
 
   bool SupportsStorage() const override;
 
@@ -29,12 +29,12 @@ class VulkanSwapChainImageImpl final : public Object<rhi::IImage, IVulkanSwapCha
 
  private:
   ImageDesc desc_{};
-  IBackendQueue *queue_{};
+  IVulkanQueue *queue_{};
 
   void InitializeVulkanImage(ImageDesc desc,
                              const void *device,
                              VkImageLayout default_layout,
-                             IBackendQueue *queue = nullptr);
+                             IVulkanQueue *queue = nullptr);
 
  public:
   VkImageAspectFlags Aspect() const override;

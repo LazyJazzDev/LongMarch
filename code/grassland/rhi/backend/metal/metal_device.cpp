@@ -1,13 +1,17 @@
 ﻿#include "grassland/rhi/backend/metal/metal_device.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <list>
+#include <mutex>
+#include <thread>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/rhi/backend/backend_shader_impl.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
@@ -21,6 +25,8 @@
 #include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend::metal {
 
@@ -188,7 +194,7 @@ bool MetalDeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_all
   std::vector<Event> unique;
   unique.reserve(events.size());
   for (const auto &event : events) {
-    auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+    auto timeline = rhi::QueryInterfacePtr<IMetalTimeline>(event.timeline).Get();
     if (!timeline || timeline->Owner() != this) {
       ReportError(-1, "Host waits require timelines from this device.");
       return false;

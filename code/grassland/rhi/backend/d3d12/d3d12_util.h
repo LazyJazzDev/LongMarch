@@ -16,6 +16,7 @@ class ID3D12BindingGroup;
 class ID3D12Buffer;
 class ID3D12ComputeProgram;
 class ID3D12Device;
+class ID3D12CommandContext;
 class ID3D12DownloadToken;
 class ID3D12Image;
 class ID3D12Program;

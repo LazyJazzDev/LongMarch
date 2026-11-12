@@ -18,6 +18,45 @@ When retaining the resulting raw pointer afterward, the original object must
 remain alive, just as with the previous borrowed casts. RHIX containers forward
 queries to the underlying RHI object; their ordinary `Get()` remains borrowed.
 
+## Shared backend interface audit
+
+Common backend interfaces are retained only for actual shared consumers or a
+single API-independent service implementation. Matching method names across
+Vulkan, D3D12, and Metal are insufficient justification for another interface.
+
+Of the original 16 `IBackend*` interfaces, 12 have been removed:
+
+| Removed interface | Current home |
+| --- | --- |
+| Program, ComputeProgram, RayTracingProgram | Native ProgramBase owns the typed device query |
+| Sampler | Native sampler; descriptor validation remains a free shared function |
+| BindingGroup, BindingVersion | Native binding group/version; CurrentVersion returns the native type directly |
+| DownloadToken | Native download token; CopyData is private to the final implementation |
+| Device | Native device; collector wait helpers are private implementation methods |
+| Queue, CommandContext | Native submission protocols; EndRecording is private implementation detail |
+| Timeline | Native timeline with typed device ownership |
+| Image | Native image, including queue eligibility and storage support |
+
+The remaining four interfaces have concrete shared responsibilities:
+
+- `IBackendBuffer::DeviceIdentity`: `ValidateGeometryBuffers` checks ownership
+  without knowing the API. Native buffer interfaces separately expose typed Owner.
+- `IBackendWindow::GetImGuiContext`: the shared GLFW registry and callbacks need
+  this capability. Frame acquisition, presentation, queue identity, and ImGui
+  recording now belong to native window interfaces.
+- `IBackendSubmissionToken`: the producer facet of the single shared
+  `SubmissionTokenImpl`, paired with frontend `ISubmissionToken`. Queues complete
+  the same API-independent status object; they do not access its implementation.
+- `IBackendShaderBindingTable`: internal regions of the single shared
+  `ShaderBindingTableImpl`, paired with frontend `IShaderBindingTable`. Keeping
+  this service interface avoids duplicating the shared object or exposing its
+  concrete storage to native consumers.
+
+Mock queue/device protocols live only in the test target. Native tests dispatch
+to actual backend interfaces, rather than requiring production common facets
+solely for test inspection. All native interfaces remain stateless, single-chain
+interfaces; only final implementations instantiate Object and own state.
+
 ## Identification and implementation
 
 `InterfaceID` contains two `uint64_t` values. `ParseInterfaceID` accepts the
@@ -36,9 +75,8 @@ multiple-definition errors. No separate declaration macro or `.cpp` registration
 is needed. Parsing remains constexpr and invalid UUID literals fail at compile
 time. Unregistered
 types cannot instantiate it. There is no runtime registration map, allocation,
-RTTI, or compiler-specific UUID extension. The 93 remaining library IDs are UUIDv4 values and remain unchanged for the
-same interfaces. The 18 removed aggregate/factory-only interfaces no longer
-have UUID registrations.
+RTTI, or compiler-specific UUID extension. The 90 current library IDs are unique UUIDv4 values. Surviving interfaces
+retain their IDs; removed interfaces have no registrations.
 
 Every inheritable RHI object layer is a data-free interface. Virtual contracts
 remain pure. The final implementation directly declares its members and
@@ -296,7 +334,8 @@ the stress measurements explicitly identify the current RHI revision above.
   to avoid the previously observed repeated-Vulkan-load/static-TLS problem.
 - Clang syntax checks passed for 88 RHI/test translation units. Six interface
   tests executed successfully with both GCC and Clang with RTTI disabled.
-- Audit: 93 surviving library UUID registrations remain unique and unchanged.
+- Historical audit before the shared-backend cleanup: 93 UUID registrations were unique.
+  The current count and interface retention rationale are documented above.
   RHI contains no `dynamic_cast` or virtual inheritance. All 22 former state
   wrappers/accessors are absent. The audit checked 88 non-root named interfaces
   plus four nested lease interfaces and 63 final `Object<...>` implementations.

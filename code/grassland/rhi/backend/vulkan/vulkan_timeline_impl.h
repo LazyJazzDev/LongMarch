@@ -15,7 +15,7 @@ class VulkanTimelineImpl final : public Object<rhi::ITimeline, IVulkanTimeline> 
 
   VkSemaphore NativeSemaphore() const;
 
-  IBackendDevice *Owner() const override {
+  IVulkanDevice *Owner() const override {
     return owner_;
   }
 
@@ -26,10 +26,10 @@ class VulkanTimelineImpl final : public Object<rhi::ITimeline, IVulkanTimeline> 
 
   VkSemaphore semaphore_{};
 
-  void InitializeTimeline(IBackendDevice *device) {
+  void InitializeTimeline(IVulkanDevice *device) {
     owner_ = device;
   }
 
-  IBackendDevice *owner_{};
+  IVulkanDevice *owner_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

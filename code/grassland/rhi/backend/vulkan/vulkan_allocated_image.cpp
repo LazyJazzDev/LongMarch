@@ -146,12 +146,12 @@ IImage *CreateVulkanAllocatedImage(IVulkanDevice *device, const ImageDesc &desc)
   return VulkanAllocatedImageImpl::Create(device, desc);
 }
 
-void VulkanAllocatedImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+void VulkanAllocatedImageImpl::InitializeImage(ImageDesc desc, IVulkanQueue *queue) {
   desc_ = desc;
   queue_ = queue;
 }
 
-bool VulkanAllocatedImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+bool VulkanAllocatedImageImpl::SupportsQueue(const IVulkanQueue *queue) const {
   return !queue_ || queue_ == queue;
 }
 
@@ -162,7 +162,7 @@ const ImageDesc &VulkanAllocatedImageImpl::GetDesc() const {
 void VulkanAllocatedImageImpl::InitializeVulkanImage(ImageDesc desc,
                                                      const void *device,
                                                      VkImageLayout default_layout,
-                                                     IBackendQueue *queue) {
+                                                     IVulkanQueue *queue) {
   InitializeImage(desc, queue);
   default_layout_ = default_layout;
 }

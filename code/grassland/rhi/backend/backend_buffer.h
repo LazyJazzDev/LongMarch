@@ -9,6 +9,6 @@ LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::IBackendBuffer,
 namespace grassland::rhi::backend {
 class IBackendBuffer : public IObject {
  public:
-  virtual IBackendDevice *Owner() const = 0;
+  virtual const void *DeviceIdentity() const = 0;
 };
 }  // namespace grassland::rhi::backend

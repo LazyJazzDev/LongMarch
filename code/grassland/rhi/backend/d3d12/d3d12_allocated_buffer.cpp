@@ -37,7 +37,11 @@ class D3D12AllocatedBufferImpl final : public Object<rhi::IBuffer, ID3D12Allocat
     return desc_;
   }
 
-  IBackendDevice *Owner() const override;
+  const void *DeviceIdentity() const override {
+    return Owner();
+  }
+
+  ID3D12Device *Owner() const override;
 };
 
 ID3D12AllocatedBuffer *ID3D12AllocatedBuffer::Create(ID3D12Device *device,
@@ -47,7 +51,7 @@ ID3D12AllocatedBuffer *ID3D12AllocatedBuffer::Create(ID3D12Device *device,
   return D3D12AllocatedBufferImpl::Create(device, desc, upload, download);
 }
 
-IBackendDevice *D3D12AllocatedBufferImpl::Owner() const {
+ID3D12Device *D3D12AllocatedBufferImpl::Owner() const {
   return device_;
 }
 

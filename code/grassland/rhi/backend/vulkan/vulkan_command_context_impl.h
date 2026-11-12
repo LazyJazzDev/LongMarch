@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
-class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBackendCommandContext> {
+class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulkanCommandContext> {
  public:
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
@@ -77,7 +77,7 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBack
   IVulkanImage *render_target_{};
   std::vector<IVulkanBuffer *> vertex_buffers_;
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
-  bool EndRecording() override;
+  bool EndRecording();
   bool TransitionBuffer(IVulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct BufferState {
@@ -135,7 +135,7 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IBack
  public:
   bool Seal() override;
 
-  IBackendQueue *OwnerQueue() const override;
+  IVulkanQueue *OwnerQueue() const override;
 
   const void *DeviceIdentity() const override;
 

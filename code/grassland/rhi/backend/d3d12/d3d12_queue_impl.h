@@ -19,7 +19,7 @@ class D3D12QueueImpl final : public Object<rhi::IQueue, ID3D12Queue> {
  public:
   ~D3D12QueueImpl() override = default;
 
-  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IBackendCommandContext> &commands,
+  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<ID3D12CommandContext> &commands,
                                             const SubmitInfo &info) override;
 
   // Called only by the device collector; returns whether this queue is drained.
@@ -42,7 +42,7 @@ class D3D12QueueImpl final : public Object<rhi::IQueue, ID3D12Queue> {
 
  private:
   struct Submission {
-    ObjectPtr<IBackendCommandContext> commands;
+    ObjectPtr<ID3D12CommandContext> commands;
     ObjectPtr<IBackendSubmissionToken> completion;
   };
 

@@ -10,6 +10,7 @@ namespace grassland::rhi::backend::vulkan {
 // Resource access only. Derived classes define allocation ownership (standalone or future pool leases).
 class IVulkanBuffer : public IBackendBuffer {
  public:
+  virtual IVulkanDevice *Owner() const = 0;
   virtual VkBuffer NativeBuffer() const = 0;
 };
 }  // namespace grassland::rhi::backend::vulkan

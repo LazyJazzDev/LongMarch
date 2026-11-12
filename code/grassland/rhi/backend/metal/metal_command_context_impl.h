@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
-class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IBackendCommandContext> {
+class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IMetalCommandContext> {
  public:
   static ICommandContext *Create(IMetalQueue *queue);
   ~MetalCommandContextImpl() override;
@@ -59,7 +59,7 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IBacke
                   uint64_t destination_offset,
                   uint64_t size);
   MetalCommandContextImpl(IMetalQueue *queue);
-  bool EndRecording() override;
+  bool EndRecording();
   std::vector<MTL::Resource *> AccelerationResources();
   std::unordered_map<IMetalTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
       as_dependencies_;
@@ -126,7 +126,7 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IBacke
  public:
   bool Seal() override;
 
-  IBackendQueue *OwnerQueue() const override;
+  IMetalQueue *OwnerQueue() const override;
 
   const void *DeviceIdentity() const override;
 

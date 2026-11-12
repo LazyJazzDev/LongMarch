@@ -27,7 +27,11 @@ class MetalAllocatedBufferImpl final : public Object<rhi::IBuffer, IMetalAllocat
     return desc_;
   }
 
-  IBackendDevice *Owner() const override;
+  const void *DeviceIdentity() const override {
+    return Owner();
+  }
+
+  IMetalDevice *Owner() const override;
 };
 
 IMetalAllocatedBuffer *IMetalAllocatedBuffer::Create(IMetalDevice *device,
@@ -37,7 +41,7 @@ IMetalAllocatedBuffer *IMetalAllocatedBuffer::Create(IMetalDevice *device,
   return MetalAllocatedBufferImpl::Create(device, desc, upload, download);
 }
 
-IBackendDevice *MetalAllocatedBufferImpl::Owner() const {
+IMetalDevice *MetalAllocatedBufferImpl::Owner() const {
   return device_;
 }
 

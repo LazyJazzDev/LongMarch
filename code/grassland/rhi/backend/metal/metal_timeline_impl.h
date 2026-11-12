@@ -21,7 +21,7 @@ class MetalTimelineImpl final : public Object<rhi::ITimeline, IMetalTimeline> {
 
   ~MetalTimelineImpl() override = default;
 
-  IBackendDevice *Owner() const override {
+  IMetalDevice *Owner() const override {
     return owner_;
   }
 
@@ -36,10 +36,10 @@ class MetalTimelineImpl final : public Object<rhi::ITimeline, IMetalTimeline> {
 
   NS::SharedPtr<MTL::SharedEvent> event_;
 
-  void InitializeTimeline(IBackendDevice *device) {
+  void InitializeTimeline(IMetalDevice *device) {
     owner_ = device;
   }
 
-  IBackendDevice *owner_{};
+  IMetalDevice *owner_{};
 };
 }  // namespace grassland::rhi::backend::metal

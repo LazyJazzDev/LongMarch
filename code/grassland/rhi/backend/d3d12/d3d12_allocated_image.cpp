@@ -67,12 +67,12 @@ IImage *CreateD3D12AllocatedImage(ID3D12Device *device, const ImageDesc &desc) {
   return D3D12AllocatedImageImpl::Create(device, desc);
 }
 
-void D3D12AllocatedImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+void D3D12AllocatedImageImpl::InitializeImage(ImageDesc desc, ID3D12Queue *queue) {
   desc_ = desc;
   queue_ = queue;
 }
 
-bool D3D12AllocatedImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+bool D3D12AllocatedImageImpl::SupportsQueue(const ID3D12Queue *queue) const {
   return !queue_ || queue_ == queue;
 }
 
@@ -85,7 +85,7 @@ void D3D12AllocatedImageImpl::InitializeD3D12Image(ImageDesc desc,
                                                    ID3D12Resource *image,
                                                    ObjectPtr<D3D12DescriptorPool::Lease> attachment,
                                                    D3D12_RESOURCE_STATES default_state,
-                                                   IBackendQueue *queue) {
+                                                   ID3D12Queue *queue) {
   InitializeImage(desc, queue);
   attachment_ = std::move(attachment);
   device_ = device;

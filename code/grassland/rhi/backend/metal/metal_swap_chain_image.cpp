@@ -43,12 +43,12 @@ IMetalSwapChainImage *IMetalSwapChainImage::Create(ImageDesc desc,
   return new MetalSwapChainImageImpl(desc, window, generation, drawable);
 }
 
-void MetalSwapChainImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+void MetalSwapChainImageImpl::InitializeImage(ImageDesc desc, IMetalQueue *queue) {
   desc_ = desc;
   queue_ = queue;
 }
 
-bool MetalSwapChainImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+bool MetalSwapChainImageImpl::SupportsQueue(const IMetalQueue *queue) const {
   return !queue_ || queue_ == queue;
 }
 
@@ -59,7 +59,7 @@ const ImageDesc &MetalSwapChainImageImpl::GetDesc() const {
 void MetalSwapChainImageImpl::InitializeMetalImage(ImageDesc desc,
                                                    const void *device,
                                                    MTL::Texture *image,
-                                                   IBackendQueue *queue) {
+                                                   IMetalQueue *queue) {
   InitializeImage(desc, queue);
   device_ = device;
   image_ = image;

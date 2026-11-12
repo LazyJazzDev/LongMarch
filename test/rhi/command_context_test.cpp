@@ -1,15 +1,22 @@
+#include "mock_backend_interfaces.h"
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
+#include <list>
+#include <mutex>
+#include <thread>
 
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image_presenter.h"
-#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #ifdef _WIN32
@@ -26,14 +33,18 @@
 #include <future>
 #include <system_error>
 #include <type_traits>
+#include <unordered_map>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
-#include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/backend/backend_download_token.h"
 #include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/rhi/backend/backend_shader_impl.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_image.h"
 #include "grassland/rhi/rhi_program.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 #include "grassland/rhi/rhix/rhix.h"
 
 namespace grassland::rhix {
@@ -59,7 +70,7 @@ struct Gate {
   int windows_destroyed{};
 };
 
-class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendWindow> {
+class TestWindow final : public backend::Object<rhi::IWindow, backend::ITestWindow> {
  public:
   explicit TestWindow(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
   }
@@ -71,7 +82,7 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendW
     DestroyWindow();
   }
 
-  ObjectPtr<backend::IBackendImage> AcquireNativeFrame() override {
+  ObjectPtr<backend::ITestImage> AcquireNativeFrame() override {
     return {};
   }
 
@@ -200,7 +211,7 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendW
     return rhi::QueryInterfacePtr<rhi::IImage>(next_image_.Get()).Detach();
   }
 
-  IBackendQueue *OwnerQueue() const override {
+  ITestQueue *OwnerQueue() const override {
     return queue_;
   }
 
@@ -361,9 +372,9 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendW
     glfw::DestroyWindow(window_);
   }
 
-  bool InitializeWindow(IBackendDevice *device, const WindowDesc &desc) {
+  bool InitializeWindow(ITestDevice *device, const WindowDesc &desc) {
     device_ = device;
-    queue_ = rhi::QueryInterfacePtr<IBackendQueue>(
+    queue_ = rhi::QueryInterfacePtr<ITestQueue>(
                  ObjectPtr<IQueue>::Adopt(rhi::QueryInterfacePtr<IDevice>(device)->GetQueue(QUEUE_TYPE_MAIN)).Get())
                  .Get();
     requested_mode_ = desc.present_mode;
@@ -442,8 +453,8 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendW
 
  private:
   bool invalid_{true};
-  IBackendDevice *device_{};
-  IBackendQueue *queue_{};
+  ITestDevice *device_{};
+  ITestQueue *queue_{};
   std::unique_ptr<WindowImGui> imgui_{};
   std::unique_ptr<ImagePresenter> presenter_{};
   bool processing_imgui_{};
@@ -462,12 +473,12 @@ class TestWindow final : public backend::Object<rhi::IWindow, backend::IBackendW
   ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
   GLFWwindow *window_{};
   std::mutex next_image_mutex_{};
-  ObjectPtr<IBackendImage> next_image_{};
+  ObjectPtr<ITestImage> next_image_{};
 };
 
-class TestImage final : public backend::Object<rhi::IImage, backend::IBackendImage> {
+class TestImage final : public backend::Object<rhi::IImage, backend::ITestImage> {
  public:
-  explicit TestImage(std::shared_ptr<Gate> gate, backend::IBackendWindow *window = nullptr)
+  explicit TestImage(std::shared_ptr<Gate> gate, backend::ITestWindow *window = nullptr)
       : gate_(std::move(gate)),
         window_(window) {
     InitializeImage({16, 16, IMAGE_FORMAT_R8G8B8A8_UNORM});
@@ -493,12 +504,12 @@ class TestImage final : public backend::Object<rhi::IImage, backend::IBackendIma
 
  private:
   std::shared_ptr<Gate> gate_;
-  backend::IBackendWindow *window_;
+  backend::ITestWindow *window_;
 
   ImageDesc desc_{};
-  backend::IBackendQueue *queue_{};
+  backend::ITestQueue *queue_{};
 
-  void InitializeImage(ImageDesc desc, backend::IBackendQueue *queue = nullptr) {
+  void InitializeImage(ImageDesc desc, backend::ITestQueue *queue = nullptr) {
     desc_ = desc;
     queue_ = queue;
   }
@@ -512,7 +523,7 @@ class TestImage final : public backend::Object<rhi::IImage, backend::IBackendIma
     return false;
   }
 
-  bool SupportsQueue(const backend::IBackendQueue *queue) const override {
+  bool SupportsQueue(const backend::ITestQueue *queue) const override {
     return !queue_ || queue_ == queue;
   }
 };
@@ -531,9 +542,9 @@ class TestResource final : public backend::Object<rhi::IObject> {
   std::shared_ptr<Gate> gate_;
 };
 
-class TestTimeline final : public backend::Object<rhi::ITimeline, backend::IBackendTimeline> {
+class TestTimeline final : public backend::Object<rhi::ITimeline, backend::ITestTimeline> {
  public:
-  TestTimeline(backend::IBackendDevice *device, std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
+  TestTimeline(backend::ITestDevice *device, std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
     InitializeTimeline(device);
   }
 
@@ -556,7 +567,7 @@ class TestTimeline final : public backend::Object<rhi::ITimeline, backend::IBack
     gate_->changed.notify_all();
   }
 
-  backend::IBackendDevice *Owner() const override {
+  backend::ITestDevice *Owner() const override {
     return owner_;
   }
 
@@ -565,19 +576,19 @@ class TestTimeline final : public backend::Object<rhi::ITimeline, backend::IBack
 
   std::shared_ptr<Gate> gate_;
 
-  void InitializeTimeline(backend::IBackendDevice *device) {
+  void InitializeTimeline(backend::ITestDevice *device) {
     owner_ = device;
   }
 
-  backend::IBackendDevice *owner_{};
+  backend::ITestDevice *owner_{};
 };
 
-class TestCommandContext final : public backend::Object<rhi::ICommandContext, backend::IBackendCommandContext> {
+class TestCommandContext final : public backend::Object<rhi::ICommandContext, backend::ITestCommandContext> {
  public:
   TestCommandContext(rhi::IQueue *queue, std::shared_ptr<Gate> gate, bool fail_after_submit = false)
       : gate_(std::move(gate)),
         fail_after_submit_(fail_after_submit) {
-    InitializeCommandContext(rhi::QueryInterfacePtr<backend::IBackendQueue>(queue).Get());
+    InitializeCommandContext(rhi::QueryInterfacePtr<backend::ITestQueue>(queue).Get());
   }
 
   std::vector<ClearValue> recorded_values;
@@ -653,8 +664,8 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
 
  public:
   bool CmdDrawImGui(IWindow *window, IImage *target) override {
-    auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
-    auto image = rhi::QueryInterfacePtr<IBackendImage>(target).Get();
+    auto native = rhi::QueryInterfacePtr<ITestWindow>(window).Get();
+    auto image = rhi::QueryInterfacePtr<ITestImage>(target).Get();
     if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
         (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) ||
         !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
@@ -679,8 +690,8 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
   }
 
   bool CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) override {
-    auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
-    auto image = rhi::QueryInterfacePtr<IBackendImage>(frame_img).Get();
+    auto native = rhi::QueryInterfacePtr<ITestWindow>(window).Get();
+    auto image = rhi::QueryInterfacePtr<ITestImage>(frame_img).Get();
     if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
         (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) ||
         !glfw::IsWindowThread() || sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
@@ -751,7 +762,7 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
     }
     std::vector<IImage *> images;
     auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
-      auto native = rhi::QueryInterfacePtr<IBackendImage>(image).Get();
+      auto native = rhi::QueryInterfacePtr<ITestImage>(image).Get();
       if (!native || !rhi::QueryInterfacePtr<IImage>(native)->IsValid() ||
           (native->DeviceIdentity() != DeviceIdentity() || !native->SupportsQueue(OwnerQueue())) ||
           IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
@@ -793,14 +804,14 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
            (rendering_.depth_stencil.image ? rendering_.depth_stencil.image->GetDesc().format : IMAGE_FORMAT_UNKNOWN);
   }
 
-  void InitializeCommandContext(IBackendQueue *queue) {
+  void InitializeCommandContext(ITestQueue *queue) {
     queue_ = queue;
   }
 
  public:
   rhi::ISubmissionToken *Submit(const rhi::SubmitInfo &info = {}) override {
     try {
-      auto submission = queue_->Submit(ObjectPtr<IBackendCommandContext>::Retain(this), info);
+      auto submission = queue_->Submit(ObjectPtr<ITestCommandContext>::Retain(this), info);
       return rhi::QueryInterfacePtr<rhi::ISubmissionToken>(submission.Get()).Detach();
     } catch (const std::system_error &error) {
       ReportError(error.code().value(), error.what());
@@ -863,7 +874,7 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
     return true;
   }
 
-  IBackendQueue *OwnerQueue() const override {
+  ITestQueue *OwnerQueue() const override {
     return queue_;
   }
 
@@ -970,12 +981,12 @@ class TestCommandContext final : public backend::Object<rhi::ICommandContext, ba
   rhi::RenderingInfo rendering_{};
   bool recording_failed_{};
   bool sealed_{};
-  IBackendQueue *queue_{};
+  ITestQueue *queue_{};
   std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_{};
   bool submitted_{};
 };
 
-class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQueue> {
+class TestQueue final : public backend::Object<rhi::IQueue, backend::ITestQueue> {
  public:
   TestTimeline *GetTimeline() const override {
     return timeline_.get();
@@ -985,7 +996,7 @@ class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQue
     return new TestCommandContext(this, gate_);
   }
 
-  TestQueue(backend::IBackendDevice *device, QueueType type, std::shared_ptr<Gate> gate)
+  TestQueue(backend::ITestDevice *device, QueueType type, std::shared_ptr<Gate> gate)
       : gate_(std::move(gate)),
         timeline_(std::make_unique<TestTimeline>(device, gate_)) {
     InitializeQueue(device, type);
@@ -996,14 +1007,14 @@ class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQue
   std::unique_ptr<TestTimeline> timeline_;
 
  public:
-  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IBackendCommandContext> &commands,
+  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<ITestCommandContext> &commands,
                                             const SubmitInfo &info) override {
     if (!commands->Seal())
       return {};
     SubmitInfo native_info;
     native_info.waits.reserve(info.waits.size());
     for (const auto &wait : info.waits) {
-      auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(wait.timeline).Get();
+      auto timeline = rhi::QueryInterfacePtr<ITestTimeline>(wait.timeline).Get();
       if (!timeline || timeline->Owner() != device_) {
         ReportError(-1, "Submission waits require a timeline from this device.");
         return {};
@@ -1021,11 +1032,11 @@ class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQue
     auto completion = ObjectPtr<IBackendSubmissionToken>::Adopt(IBackendSubmissionToken::Create(signal));
     // Register before native submission, while the collector cannot take the list.
     auto entry = pending_.insert(pending_.end(), {commands, completion});
-    IBackendCommandContext::SubmitResult result;
+    ITestCommandContext::SubmitResult result;
     try {
       commands->BindDownloads(rhi::QueryInterfacePtr<rhi::ISubmissionToken>(completion.Get()).Get());
       result = commands->SubmitNative(native_info, signal);
-      if (result == IBackendCommandContext::SUBMIT_RESULT_REJECTED) {
+      if (result == ITestCommandContext::SUBMIT_RESULT_REJECTED) {
         pending_.erase(entry);
         completion->Complete(SUBMISSION_STATUS_FAILED);
         commands->ReleaseDownloads();
@@ -1043,10 +1054,9 @@ class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQue
     queue_lock.unlock();
     // The caller's context reference keeps it alive while the collector retires it.
     // Next-frame preparation belongs to the Window, not this submission's result.
-    if (result == IBackendCommandContext::SUBMIT_RESULT_SUBMITTED)
+    if (result == ITestCommandContext::SUBMIT_RESULT_SUBMITTED)
       commands->UpdatePresentedImages();
-    return result == IBackendCommandContext::SUBMIT_RESULT_SUBMITTED ? completion
-                                                                     : ObjectPtr<IBackendSubmissionToken>{};
+    return result == ITestCommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<IBackendSubmissionToken>{};
   }
 
   bool CollectCompleted(uint64_t completed, bool timeline_valid) override {
@@ -1075,7 +1085,7 @@ class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQue
   }
 
  private:
-  void InitializeQueue(IBackendDevice *device,
+  void InitializeQueue(ITestDevice *device,
                        QueueType type,
                        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>()) {
     device_ = device;
@@ -1092,7 +1102,7 @@ class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQue
     return ++serial_;
   }
 
-  IBackendDevice *Owner() const override {
+  ITestDevice *Owner() const override {
     return device_;
   }
 
@@ -1102,25 +1112,25 @@ class TestQueue final : public backend::Object<rhi::IQueue, backend::IBackendQue
 
  private:
   struct Submission {
-    ObjectPtr<IBackendCommandContext> commands;
+    ObjectPtr<ITestCommandContext> commands;
     ObjectPtr<IBackendSubmissionToken> completion;
   };
 
   std::list<Submission> pending_{};
-  IBackendDevice *device_{};
+  ITestDevice *device_{};
   QueueType type_{};
   // Logical queues that share a native queue also share its host synchronization.
   std::shared_ptr<std::mutex> mutex_{};
   uint64_t serial_{};
 };
 
-class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendDevice> {
+class TestDevice final : public backend::Object<rhi::IDevice, backend::ITestDevice> {
  public:
   explicit TestDevice(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
     InitializeDevice({}, {});
 
     for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST})
-      queues_[type] = ObjectPtr<backend::IBackendQueue>::Adopt(new TestQueue(this, type, gate_));
+      queues_[type] = ObjectPtr<backend::ITestQueue>::Adopt(new TestQueue(this, type, gate_));
     StartCollector();
   }
 
@@ -1292,7 +1302,7 @@ class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendD
     std::vector<Event> unique;
     unique.reserve(events.size());
     for (const auto &event : events) {
-      auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+      auto timeline = rhi::QueryInterfacePtr<ITestTimeline>(event.timeline).Get();
       if (!timeline || timeline->Owner() != this) {
         ReportError(-1, "Host waits require timelines from this device.");
         return false;
@@ -1339,7 +1349,7 @@ class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendD
     collector_.join();
   }
 
-  std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
+  std::array<ObjectPtr<ITestQueue>, 2> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
   ICore *core_{};

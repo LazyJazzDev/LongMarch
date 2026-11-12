@@ -39,7 +39,7 @@ void CheckIndependentRetirement(BackendAPI api) {
           rhi::QueryInterfacePtr<backend::vulkan::IVulkanQueue>(assist.Get()).Get()->NativeQueue())
     GTEST_SKIP() << "Independent GPU progress requires distinct native queues.";
 #endif
-  backend::ObjectPtr<backend::IBackendTimeline> gate;
+  backend::ObjectPtr<IObject> gate;
 
   struct GateRelease {
     std::function<void()> open;

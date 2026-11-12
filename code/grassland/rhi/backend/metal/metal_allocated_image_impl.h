@@ -16,18 +16,18 @@ class MetalAllocatedImageImpl final : public Object<rhi::IImage, IMetalImage> {
   ~MetalAllocatedImageImpl() override = default;
 
  private:
-  void InitializeImage(ImageDesc desc, IBackendQueue *queue = nullptr);
+  void InitializeImage(ImageDesc desc, IMetalQueue *queue = nullptr);
 
  public:
-  bool SupportsQueue(const IBackendQueue *queue) const override;
+  bool SupportsQueue(const IMetalQueue *queue) const override;
 
   const ImageDesc &GetDesc() const override;
 
  private:
   ImageDesc desc_{};
-  IBackendQueue *queue_{};
+  IMetalQueue *queue_{};
 
-  void InitializeMetalImage(ImageDesc desc, const void *device, MTL::Texture *image, IBackendQueue *queue = nullptr);
+  void InitializeMetalImage(ImageDesc desc, const void *device, MTL::Texture *image, IMetalQueue *queue = nullptr);
 
  public:
   bool SupportsStorage() const override;

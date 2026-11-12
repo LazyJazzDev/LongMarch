@@ -1,15 +1,21 @@
 #include "grassland/rhi/backend/metal/metal_window.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
+#include <list>
+#include <mutex>
+#include <thread>
 
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image_presenter.h"
-#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
 #include "grassland/rhi/backend/metal/metal_window_impl.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #ifdef _WIN32
@@ -126,7 +132,7 @@ rhi::IImage *MetalWindowImpl::GetNextImage() {
   return rhi::QueryInterfacePtr<IImage>(next_image_.Get()).Detach();
 }
 
-IBackendQueue *MetalWindowImpl::OwnerQueue() const {
+IMetalQueue *MetalWindowImpl::OwnerQueue() const {
   return queue_;
 }
 

@@ -1,11 +1,14 @@
 ﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
 
+#include <array>
 #include <cstring>
+#include <list>
+#include <mutex>
 #include <system_error>
+#include <unordered_map>
 
-#include "grassland/rhi/backend/backend_command_context.h"
-#include "grassland/rhi/backend/backend_image.h"
-#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_download_token.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/metal/metal_command_context_impl.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
@@ -16,7 +19,12 @@
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_image.h"
 #include "grassland/rhi/rhi_program.h"
+#include "grassland/rhi/rhi_queue.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend::metal {
 
@@ -150,7 +158,7 @@ bool MetalCommandContextImpl::EndRecording() {
   return true;
 }
 
-IBackendCommandContext::SubmitResult MetalCommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
+IMetalCommandContext::SubmitResult MetalCommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
@@ -760,8 +768,8 @@ ICommandContext *CreateMetalCommandContext(IMetalQueue *queue) {
 }
 
 bool MetalCommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
-  auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
-  auto image = rhi::QueryInterfacePtr<IBackendImage>(target).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalWindow>(window).Get();
+  auto image = rhi::QueryInterfacePtr<IMetalImage>(target).Get();
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
       (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
       sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
@@ -786,8 +794,8 @@ bool MetalCommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
 }
 
 bool MetalCommandContextImpl::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) {
-  auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
-  auto image = rhi::QueryInterfacePtr<IBackendImage>(frame_img).Get();
+  auto native = rhi::QueryInterfacePtr<IMetalWindow>(window).Get();
+  auto image = rhi::QueryInterfacePtr<IMetalImage>(frame_img).Get();
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
       (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
       sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
@@ -823,7 +831,7 @@ bool MetalCommandContextImpl::PrepareRendering(const RenderingInfo &info) {
   }
   std::vector<IImage *> images;
   auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
-    auto native = rhi::QueryInterfacePtr<IBackendImage>(image).Get();
+    auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
     if (!native || !image->IsValid() ||
         (native->DeviceIdentity() != DeviceIdentity() || !native->SupportsQueue(OwnerQueue())) ||
         IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
@@ -871,7 +879,7 @@ void MetalCommandContextImpl::InitializeCommandContext(IMetalQueue *queue) {
 
 rhi::ISubmissionToken *MetalCommandContextImpl::Submit(const rhi::SubmitInfo &info) {
   try {
-    auto submission = queue_->Submit(ObjectPtr<IBackendCommandContext>::Retain(this), info);
+    auto submission = queue_->Submit(ObjectPtr<IMetalCommandContext>::Retain(this), info);
     return rhi::QueryInterfacePtr<ISubmissionToken>(submission.Get()).Detach();
   } catch (const std::system_error &error) {
     ReportError(error.code().value(), error.what());
@@ -924,7 +932,7 @@ bool MetalCommandContextImpl::Seal() {
   return true;
 }
 
-IBackendQueue *MetalCommandContextImpl::OwnerQueue() const {
+IMetalQueue *MetalCommandContextImpl::OwnerQueue() const {
   return queue_;
 }
 

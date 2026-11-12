@@ -113,7 +113,7 @@ bool MetalWindowImpl::RebuildNativeSwapChain(PresentMode requested_mode) {
   return true;
 }
 
-ObjectPtr<IBackendImage> MetalWindowImpl::AcquireNativeFrame() {
+ObjectPtr<IMetalImage> MetalWindowImpl::AcquireNativeFrame() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   int width, height;
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
@@ -130,7 +130,7 @@ ObjectPtr<IBackendImage> MetalWindowImpl::AcquireNativeFrame() {
     ReportError(-1, "CAMetalLayer::nextDrawable failed.");
     return {};
   }
-  return ObjectPtr<IBackendImage>::Adopt(IMetalSwapChainImage::Create(desc_, this, generation_, drawable.get()));
+  return ObjectPtr<IMetalImage>::Adopt(IMetalSwapChainImage::Create(desc_, this, generation_, drawable.get()));
 }
 
 PresentMode MetalWindowImpl::GetPresentMode() const {

@@ -13,6 +13,18 @@ namespace grassland::rhi::backend::metal {
 
 class IMetalWindow : public IBackendWindow {
  public:
+  virtual IMetalQueue *OwnerQueue() const = 0;
+  virtual bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) = 0;
+  virtual bool RecordImGui(rhi::ICommandContext *commands,
+                           rhi::IImage *image,
+                           ColorSpace color_space,
+                           float white_scale) = 0;
+  virtual bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) = 0;
+  virtual const void *DeviceIdentity() const = 0;
+  virtual bool UpdateNextImage() = 0;
+  virtual void ReleaseNextImage() = 0;
+  virtual ObjectPtr<IMetalImage> AcquireNativeFrame() = 0;
+  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
   static rhi::IWindow *Create(IMetalDevice *device, const WindowDesc &desc);
 
   virtual bool IsFrameValid(uint64_t generation) const = 0;

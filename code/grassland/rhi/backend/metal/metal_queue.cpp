@@ -1,11 +1,14 @@
 ﻿#include "grassland/rhi/backend/metal/metal_queue.h"
 
 #include <algorithm>
+#include <list>
+#include <mutex>
 
-#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_queue_impl.h"
+#include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend::metal {
 
@@ -64,14 +67,14 @@ IMetalQueue *IMetalQueue::Create(IMetalDevice *device, QueueType type, MTL::Comm
   return MetalQueueImpl::Create(device, type, descriptor);
 }
 
-ObjectPtr<IBackendSubmissionToken> MetalQueueImpl::Submit(const ObjectPtr<IBackendCommandContext> &commands,
+ObjectPtr<IBackendSubmissionToken> MetalQueueImpl::Submit(const ObjectPtr<IMetalCommandContext> &commands,
                                                           const SubmitInfo &info) {
   if (!commands->Seal())
     return {};
   SubmitInfo native_info;
   native_info.waits.reserve(info.waits.size());
   for (const auto &wait : info.waits) {
-    auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(wait.timeline).Get();
+    auto timeline = rhi::QueryInterfacePtr<IMetalTimeline>(wait.timeline).Get();
     if (!timeline || timeline->Owner() != device_) {
       ReportError(-1, "Submission waits require a timeline from this device.");
       return {};
@@ -89,11 +92,11 @@ ObjectPtr<IBackendSubmissionToken> MetalQueueImpl::Submit(const ObjectPtr<IBacke
   auto completion = ObjectPtr<IBackendSubmissionToken>::Adopt(IBackendSubmissionToken::Create(signal));
   // Register before native submission, while the collector cannot take the list.
   auto entry = pending_.insert(pending_.end(), {commands, completion});
-  IBackendCommandContext::SubmitResult result;
+  IMetalCommandContext::SubmitResult result;
   try {
     commands->BindDownloads(rhi::QueryInterfacePtr<rhi::ISubmissionToken>(completion.Get()).Get());
     result = commands->SubmitNative(native_info, signal);
-    if (result == IBackendCommandContext::SUBMIT_RESULT_REJECTED) {
+    if (result == IMetalCommandContext::SUBMIT_RESULT_REJECTED) {
       pending_.erase(entry);
       completion->Complete(SUBMISSION_STATUS_FAILED);
       commands->ReleaseDownloads();
@@ -111,9 +114,9 @@ ObjectPtr<IBackendSubmissionToken> MetalQueueImpl::Submit(const ObjectPtr<IBacke
   queue_lock.unlock();
   // The caller's context reference keeps it alive while the collector retires it.
   // Next-frame preparation belongs to the Window, not this submission's result.
-  if (result == IBackendCommandContext::SUBMIT_RESULT_SUBMITTED)
+  if (result == IMetalCommandContext::SUBMIT_RESULT_SUBMITTED)
     commands->UpdatePresentedImages();
-  return result == IBackendCommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<IBackendSubmissionToken>{};
+  return result == IMetalCommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<IBackendSubmissionToken>{};
 }
 
 bool MetalQueueImpl::CollectCompleted(uint64_t completed, bool timeline_valid) {

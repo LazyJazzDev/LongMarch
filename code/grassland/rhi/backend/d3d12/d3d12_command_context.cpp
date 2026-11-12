@@ -1,15 +1,18 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
+#include <list>
+#include <mutex>
 #include <system_error>
+#include <unordered_map>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
-#include "grassland/rhi/backend/backend_command_context.h"
+#include "grassland/rhi/backend/backend_download_token.h"
 #include "grassland/rhi/backend/backend_glfw_helper.h"
-#include "grassland/rhi/backend/backend_image.h"
-#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
@@ -22,7 +25,12 @@
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
+#include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_image.h"
 #include "grassland/rhi/rhi_program.h"
+#include "grassland/rhi/rhi_queue.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend::d3d12 {
 
@@ -224,7 +232,7 @@ bool D3D12CommandContextImpl::EndRecording() {
   return closed_;
 }
 
-IBackendCommandContext::SubmitResult D3D12CommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
+ID3D12CommandContext::SubmitResult D3D12CommandContextImpl::SubmitNative(const SubmitInfo &info, Event signal) {
   auto queue = queue_;
 #if !defined(NDEBUG)
   if (!presents_.empty() && !glfw::IsWindowThread()) {
@@ -1035,8 +1043,8 @@ ICommandContext *CreateD3D12CommandContext(ID3D12Queue *queue) {
 }
 
 bool D3D12CommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
-  auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
-  auto image = rhi::QueryInterfacePtr<IBackendImage>(target).Get();
+  auto native = rhi::QueryInterfacePtr<ID3D12Window>(window).Get();
+  auto image = rhi::QueryInterfacePtr<ID3D12Image>(target).Get();
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
       (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
       sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
@@ -1061,8 +1069,8 @@ bool D3D12CommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
 }
 
 bool D3D12CommandContextImpl::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) {
-  auto native = rhi::QueryInterfacePtr<IBackendWindow>(window).Get();
-  auto image = rhi::QueryInterfacePtr<IBackendImage>(frame_img).Get();
+  auto native = rhi::QueryInterfacePtr<ID3D12Window>(window).Get();
+  auto image = rhi::QueryInterfacePtr<ID3D12Image>(frame_img).Get();
   if (!native || !image || native->DeviceIdentity() != DeviceIdentity() ||
       (image->DeviceIdentity() != DeviceIdentity() || !image->SupportsQueue(OwnerQueue())) || !glfw::IsWindowThread() ||
       sealed_ || !rendering_.color_attachments.empty() || rendering_.depth_stencil.image) {
@@ -1088,7 +1096,7 @@ bool D3D12CommandContextImpl::PrepareRendering(const RenderingInfo &info) {
   }
   std::vector<IImage *> images;
   auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
-    auto native = rhi::QueryInterfacePtr<IBackendImage>(image).Get();
+    auto native = rhi::QueryInterfacePtr<ID3D12Image>(image).Get();
     if (!native || !image->IsValid() ||
         (native->DeviceIdentity() != DeviceIdentity() || !native->SupportsQueue(OwnerQueue())) ||
         IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
@@ -1136,7 +1144,7 @@ void D3D12CommandContextImpl::InitializeCommandContext(ID3D12Queue *queue) {
 
 rhi::ISubmissionToken *D3D12CommandContextImpl::Submit(const rhi::SubmitInfo &info) {
   try {
-    auto submission = queue_->Submit(ObjectPtr<IBackendCommandContext>::Retain(this), info);
+    auto submission = queue_->Submit(ObjectPtr<ID3D12CommandContext>::Retain(this), info);
     return rhi::QueryInterfacePtr<ISubmissionToken>(submission.Get()).Detach();
   } catch (const std::system_error &error) {
     ReportError(error.code().value(), error.what());
@@ -1189,7 +1197,7 @@ bool D3D12CommandContextImpl::Seal() {
   return true;
 }
 
-IBackendQueue *D3D12CommandContextImpl::OwnerQueue() const {
+ID3D12Queue *D3D12CommandContextImpl::OwnerQueue() const {
   return queue_;
 }
 

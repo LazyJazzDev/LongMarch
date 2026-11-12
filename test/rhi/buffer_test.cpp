@@ -345,7 +345,7 @@ TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) 
   auto check = [&](auto &pool) {
     auto lease = pool.Acquire(sizeof(expected));
     ASSERT_TRUE(lease);
-    EXPECT_EQ(lease->Owner(), QueryInterfacePtr<backend::IBackendDevice>(device.Get()).Get());
+    EXPECT_EQ(lease->Owner(), QueryInterfacePtr<std::remove_pointer_t<decltype(lease->Owner())>>(device.Get()).Get());
     ASSERT_TRUE(lease->Write(expected.data(), sizeof(expected)));
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {

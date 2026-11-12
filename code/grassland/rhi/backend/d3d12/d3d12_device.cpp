@@ -21,12 +21,18 @@
 #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <list>
+#include <mutex>
+#include <thread>
 
 #include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/rhi/backend/backend_shader_impl.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend::d3d12 {
 bool D3D12DeviceImpl::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
@@ -361,7 +367,7 @@ bool D3D12DeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_all
   std::vector<Event> unique;
   unique.reserve(events.size());
   for (const auto &event : events) {
-    auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+    auto timeline = rhi::QueryInterfacePtr<ID3D12Timeline>(event.timeline).Get();
     if (!timeline || timeline->Owner() != this) {
       ReportError(-1, "Host waits require timelines from this device.");
       return false;

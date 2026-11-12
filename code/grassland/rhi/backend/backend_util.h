@@ -8,13 +8,8 @@
 
 namespace grassland::rhi::backend {
 class IBackendBuffer;
-class IBackendCommandContext;
-class IBackendDevice;
-class IBackendImage;
-class IBackendQueue;
 class IBackendShaderBindingTable;
 class IBackendSubmissionToken;
-class IBackendTimeline;
 class IBackendWindow;
 }  // namespace grassland::rhi::backend
 
@@ -166,7 +161,5 @@ class ObjectPtr final {
  private:
   T *ptr_{nullptr};
 };
-
-class IBackendDevice;
 
 }  // namespace grassland::rhi::backend

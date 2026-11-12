@@ -19,7 +19,7 @@ class VulkanQueueImpl final : public Object<rhi::IQueue, IVulkanQueue> {
  public:
   ~VulkanQueueImpl() override = default;
 
-  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IBackendCommandContext> &commands,
+  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IVulkanCommandContext> &commands,
                                             const SubmitInfo &info) override;
 
   // Called only by the device collector; returns whether this queue is drained.
@@ -42,7 +42,7 @@ class VulkanQueueImpl final : public Object<rhi::IQueue, IVulkanQueue> {
 
  private:
   struct Submission {
-    ObjectPtr<IBackendCommandContext> commands;
+    ObjectPtr<IVulkanCommandContext> commands;
     ObjectPtr<IBackendSubmissionToken> completion;
   };
 

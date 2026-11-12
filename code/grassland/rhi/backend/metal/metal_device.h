@@ -1,20 +1,25 @@
 ﻿#pragma once
 #include <Metal/Metal.hpp>
+#include <array>
+#include <atomic>
 #include <condition_variable>
+#include <mutex>
+#include <thread>
 
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/metal/metal_scratch_pool.h"
 #include "grassland/rhi/backend/metal/metal_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
+#include "grassland/rhi/rhi_device.h"
 
 LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::metal::IMetalDevice,
-                        grassland::rhi::backend::IBackendDevice,
+                        grassland::rhi::IObject,
                         "0edf854d-4ccc-4b02-8c0c-030ded3b67dc")
 
 namespace grassland::rhi::backend::metal {
 
-class IMetalDevice : public IBackendDevice {
+class IMetalDevice : public IObject {
  public:
+  virtual const PhysicalDevice &GetPhysicalDevice() const noexcept = 0;
   // Borrowed queue owned by this device.
   virtual IMetalQueue *GetNativeQueue(QueueType type) const = 0;
   static rhi::IDevice *Create(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device);

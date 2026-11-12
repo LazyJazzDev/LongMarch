@@ -48,12 +48,12 @@ IVulkanSwapChainImage *IVulkanSwapChainImage::Create(ImageDesc desc,
   return new VulkanSwapChainImageImpl(desc, window, image, attachment);
 }
 
-void VulkanSwapChainImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+void VulkanSwapChainImageImpl::InitializeImage(ImageDesc desc, IVulkanQueue *queue) {
   desc_ = desc;
   queue_ = queue;
 }
 
-bool VulkanSwapChainImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+bool VulkanSwapChainImageImpl::SupportsQueue(const IVulkanQueue *queue) const {
   return !queue_ || queue_ == queue;
 }
 
@@ -68,7 +68,7 @@ const ImageDesc &VulkanSwapChainImageImpl::GetDesc() const {
 void VulkanSwapChainImageImpl::InitializeVulkanImage(ImageDesc desc,
                                                      const void *device,
                                                      VkImageLayout default_layout,
-                                                     IBackendQueue *queue) {
+                                                     IVulkanQueue *queue) {
   InitializeImage(desc, queue);
   device_ = device;
   default_layout_ = default_layout;

@@ -11,13 +11,19 @@
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cmath>
+#include <list>
+#include <mutex>
+#include <thread>
 
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image_presenter.h"
-#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 #define GLFW_INCLUDE_NONE
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -91,7 +97,7 @@ rhi::IWindow *VulkanWindowImpl::Create(IVulkanDevice *device, const WindowDesc &
   return object.release();
 }
 
-ObjectPtr<IBackendImage> VulkanWindowImpl::AcquireNativeFrame() {
+ObjectPtr<IVulkanImage> VulkanWindowImpl::AcquireNativeFrame() {
   auto queue = queue_;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
@@ -217,7 +223,7 @@ ObjectPtr<IBackendImage> VulkanWindowImpl::AcquireNativeFrame() {
     Check(result, "vkAcquireNextImageKHR");
     return {};
   }
-  return ObjectPtr<IBackendImage>::Adopt(
+  return ObjectPtr<IVulkanImage>::Adopt(
       IVulkanSwapChainImage::Create(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
 }
 
@@ -534,7 +540,7 @@ rhi::IImage *VulkanWindowImpl::GetNextImage() {
   return rhi::QueryInterfacePtr<IImage>(next_image_.Get()).Detach();
 }
 
-IBackendQueue *VulkanWindowImpl::OwnerQueue() const {
+IVulkanQueue *VulkanWindowImpl::OwnerQueue() const {
   return queue_;
 }
 

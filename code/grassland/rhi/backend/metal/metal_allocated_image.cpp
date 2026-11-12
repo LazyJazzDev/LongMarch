@@ -40,12 +40,12 @@ IImage *CreateMetalAllocatedImage(IMetalDevice *device, const ImageDesc &desc) {
   return MetalAllocatedImageImpl::Create(device, desc);
 }
 
-void MetalAllocatedImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+void MetalAllocatedImageImpl::InitializeImage(ImageDesc desc, IMetalQueue *queue) {
   desc_ = desc;
   queue_ = queue;
 }
 
-bool MetalAllocatedImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+bool MetalAllocatedImageImpl::SupportsQueue(const IMetalQueue *queue) const {
   return !queue_ || queue_ == queue;
 }
 
@@ -56,7 +56,7 @@ const ImageDesc &MetalAllocatedImageImpl::GetDesc() const {
 void MetalAllocatedImageImpl::InitializeMetalImage(ImageDesc desc,
                                                    const void *device,
                                                    MTL::Texture *image,
-                                                   IBackendQueue *queue) {
+                                                   IMetalQueue *queue) {
   InitializeImage(desc, queue);
   device_ = device;
 }

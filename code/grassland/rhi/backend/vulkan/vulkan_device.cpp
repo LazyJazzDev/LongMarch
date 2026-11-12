@@ -3,13 +3,17 @@
 #include <vk_mem_alloc.h>
 
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <list>
+#include <mutex>
+#include <thread>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/rhi/backend/backend_shader_impl.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_binding_group_impl.h"
@@ -22,6 +26,8 @@
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend::vulkan {
 bool VulkanDeviceImpl::WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const {
@@ -395,7 +401,7 @@ bool VulkanDeviceImpl::WaitEvents(const std::vector<Event> &events, bool wait_al
   std::vector<Event> unique;
   unique.reserve(events.size());
   for (const auto &event : events) {
-    auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+    auto timeline = rhi::QueryInterfacePtr<IVulkanTimeline>(event.timeline).Get();
     if (!timeline || timeline->Owner() != this) {
       ReportError(-1, "Host waits require timelines from this device.");
       return false;

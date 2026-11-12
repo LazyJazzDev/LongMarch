@@ -12,6 +12,7 @@ class IMetalBuffer;
 class IMetalComputeProgram;
 class IMetalCore;
 class IMetalDevice;
+class IMetalCommandContext;
 class IMetalDownloadToken;
 class IMetalImage;
 class IMetalProgram;

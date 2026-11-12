@@ -7,7 +7,7 @@ class MetalWindowImpl final : public Object<rhi::IWindow, IMetalWindow> {
  public:
   ~MetalWindowImpl() override;
   static rhi::IWindow *Create(IMetalDevice *device, const WindowDesc &desc);
-  ObjectPtr<IBackendImage> AcquireNativeFrame() override;
+  ObjectPtr<IMetalImage> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
@@ -42,7 +42,7 @@ class MetalWindowImpl final : public Object<rhi::IWindow, IMetalWindow> {
 
   rhi::IImage *GetNextImage() override;
 
-  IBackendQueue *OwnerQueue() const override;
+  IMetalQueue *OwnerQueue() const override;
 
   bool UpdateNextImage() override;
 
@@ -122,6 +122,6 @@ class MetalWindowImpl final : public Object<rhi::IWindow, IMetalWindow> {
   ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
   GLFWwindow *window_{};
   std::mutex next_image_mutex_{};
-  ObjectPtr<IBackendImage> next_image_{};
+  ObjectPtr<IMetalImage> next_image_{};
 };
 }  // namespace grassland::rhi::backend::metal

@@ -11,6 +11,18 @@ namespace grassland::rhi::backend::vulkan {
 
 class IVulkanWindow : public IBackendWindow {
  public:
+  virtual IVulkanQueue *OwnerQueue() const = 0;
+  virtual bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) = 0;
+  virtual bool RecordImGui(rhi::ICommandContext *commands,
+                           rhi::IImage *image,
+                           ColorSpace color_space,
+                           float white_scale) = 0;
+  virtual bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) = 0;
+  virtual const void *DeviceIdentity() const = 0;
+  virtual bool UpdateNextImage() = 0;
+  virtual void ReleaseNextImage() = 0;
+  virtual ObjectPtr<IVulkanImage> AcquireNativeFrame() = 0;
+  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
   static rhi::IWindow *Create(IVulkanDevice *device, const WindowDesc &desc);
 
   virtual VkSemaphore RenderSemaphore() const = 0;

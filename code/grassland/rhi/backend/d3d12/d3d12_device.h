@@ -1,22 +1,27 @@
 ﻿#pragma once
 #include <d3d12sdklayers.h>
 
+#include <array>
+#include <atomic>
+#include <mutex>
+#include <thread>
 #include <tuple>
 
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_scratch_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_transient_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
+#include "grassland/rhi/rhi_device.h"
 
 LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12Device,
-                        grassland::rhi::backend::IBackendDevice,
+                        grassland::rhi::IObject,
                         "d258bd31-2295-4f22-9c98-bd0133662c47")
 
 namespace grassland::rhi::backend::d3d12 {
-class ID3D12Device : public IBackendDevice {
+class ID3D12Device : public IObject {
  public:
+  virtual const PhysicalDevice &GetPhysicalDevice() const noexcept = 0;
   // Borrowed queue owned by this device.
   virtual ID3D12Queue *GetNativeQueue(QueueType type) const = 0;
   static rhi::IDevice *Create(PhysicalDevice info, ICore *core, ComPtr<::ID3D12Device> device);

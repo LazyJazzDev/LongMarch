@@ -3,7 +3,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBackendCommandContext> {
+class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12CommandContext> {
  public:
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
@@ -90,7 +90,7 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBacke
   ID3D12Buffer *index_buffer_{};
   bool PrepareDrawBuffers(bool indexed);
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
-  bool EndRecording() override;
+  bool EndRecording();
   bool TransitionResource(ID3D12Resource *resource, D3D12_RESOURCE_STATES state, D3D12_RESOURCE_STATES default_state);
 
   struct ResourceState {
@@ -141,7 +141,7 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, IBacke
  public:
   bool Seal() override;
 
-  IBackendQueue *OwnerQueue() const override;
+  ID3D12Queue *OwnerQueue() const override;
 
   const void *DeviceIdentity() const override;
 

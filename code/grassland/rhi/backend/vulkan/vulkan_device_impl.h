@@ -41,9 +41,9 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
   void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command);
 
  private:
-  void InterruptCollector() override;
-  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
-  void WaitForProgress(const std::vector<Event> &next) override;
+  void InterruptCollector();
+  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const;
+  void WaitForProgress(const std::vector<Event> &next);
   VulkanTemporalBufferPool upload_pool_;
   VulkanTemporalBufferPool download_pool_;
   VulkanScratchPool scratch_pool_;

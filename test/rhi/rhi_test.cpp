@@ -1,16 +1,23 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <list>
+#include <mutex>
+#include <thread>
 #include <type_traits>
 #include <utility>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_shader.h"
 #include "grassland/rhi/backend/backend_shader_impl.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 #include "grassland/rhi/rhix/rhix.h"
+#include "mock_backend_interfaces.h"
 
 namespace grassland::rhix {
 using namespace rhi;
@@ -41,7 +48,7 @@ struct Calls {
   bool device_destroyed_before_core{};
 };
 
-class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendDevice> {
+class TestDevice final : public backend::Object<rhi::IDevice, backend::ITestDevice> {
  public:
   bool WaitNativeEvents(const std::vector<Event> &, bool) const override {
     ADD_FAILURE();
@@ -185,7 +192,7 @@ class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendD
     std::vector<Event> unique;
     unique.reserve(events.size());
     for (const auto &event : events) {
-      auto timeline = rhi::QueryInterfacePtr<IBackendTimeline>(event.timeline).Get();
+      auto timeline = rhi::QueryInterfacePtr<ITestTimeline>(event.timeline).Get();
       if (!timeline || timeline->Owner() != this) {
         ReportError(-1, "Host waits require timelines from this device.");
         return false;
@@ -232,7 +239,7 @@ class TestDevice final : public backend::Object<rhi::IDevice, backend::IBackendD
     collector_.join();
   }
 
-  std::array<ObjectPtr<IBackendQueue>, 2> queues_{};
+  std::array<ObjectPtr<ITestQueue>, 2> queues_{};
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
   ICore *core_{};

@@ -18,7 +18,11 @@ class MetalTemporalBufferLeaseImpl final : public Object<rhi::IBuffer, IMetalTem
   size_t level_;
 
  public:
-  IBackendDevice *Owner() const override {
+  const void *DeviceIdentity() const override {
+    return Owner();
+  }
+
+  IMetalDevice *Owner() const override {
     return buffer_->Owner();
   }
 };

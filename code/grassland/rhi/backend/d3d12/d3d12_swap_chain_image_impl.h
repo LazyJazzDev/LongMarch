@@ -21,23 +21,23 @@ class D3D12SwapChainImageImpl final : public Object<rhi::IImage, ID3D12SwapChain
   bool present_requested_{};
 #endif
 
-  void InitializeImage(ImageDesc desc, IBackendQueue *queue = nullptr);
+  void InitializeImage(ImageDesc desc, ID3D12Queue *queue = nullptr);
 
  public:
-  bool SupportsQueue(const IBackendQueue *queue) const override;
+  bool SupportsQueue(const ID3D12Queue *queue) const override;
 
   const ImageDesc &GetDesc() const override;
 
  private:
   ImageDesc desc_{};
-  IBackendQueue *queue_{};
+  ID3D12Queue *queue_{};
 
   void InitializeD3D12Image(ImageDesc desc,
                             const void *device,
                             ID3D12Resource *image,
                             ObjectPtr<D3D12DescriptorPool::Lease> attachment,
                             D3D12_RESOURCE_STATES default_state = D3D12_RESOURCE_STATE_COMMON,
-                            IBackendQueue *queue = nullptr);
+                            ID3D12Queue *queue = nullptr);
 
  public:
   D3D12_CPU_DESCRIPTOR_HANDLE AttachmentView() const override;

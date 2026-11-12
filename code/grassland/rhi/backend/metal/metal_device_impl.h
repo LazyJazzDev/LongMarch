@@ -27,9 +27,9 @@ class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
   void NotifyTimelineFailure();
 
  private:
-  void InterruptCollector() override;
-  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
-  void WaitForProgress(const std::vector<Event> &next) override;
+  void InterruptCollector();
+  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const;
+  void WaitForProgress(const std::vector<Event> &next);
   MetalDeviceImpl(PhysicalDevice info, IMetalCore *core, NS::SharedPtr<MTL::Device> device);
   NS::SharedPtr<MTL::Device> device_;
 

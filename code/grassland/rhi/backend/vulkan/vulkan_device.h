@@ -1,21 +1,26 @@
 ﻿#pragma once
+#include <array>
+#include <atomic>
+#include <mutex>
+#include <thread>
 #include <tuple>
 
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device_procedures.h"
 #include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_scratch_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_temporal_buffer_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
+#include "grassland/rhi/rhi_device.h"
 
 LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanDevice,
-                        grassland::rhi::backend::IBackendDevice,
+                        grassland::rhi::IObject,
                         "96a1c412-20e1-40bc-b542-d515f9a41965")
 
 namespace grassland::rhi::backend::vulkan {
-class IVulkanDevice : public IBackendDevice {
+class IVulkanDevice : public IObject {
  public:
+  virtual const PhysicalDevice &GetPhysicalDevice() const noexcept = 0;
   // Borrowed queue owned by this device.
   virtual IVulkanQueue *GetNativeQueue(QueueType type) const = 0;
   static rhi::IDevice *CreateVulkanDevice(grassland::rhi::PhysicalDevice info,

@@ -43,12 +43,12 @@ ID3D12SwapChainImage *ID3D12SwapChainImage::Create(ImageDesc desc,
   return new D3D12SwapChainImageImpl(desc, window, generation, image, attachment);
 }
 
-void D3D12SwapChainImageImpl::InitializeImage(ImageDesc desc, IBackendQueue *queue) {
+void D3D12SwapChainImageImpl::InitializeImage(ImageDesc desc, ID3D12Queue *queue) {
   desc_ = desc;
   queue_ = queue;
 }
 
-bool D3D12SwapChainImageImpl::SupportsQueue(const IBackendQueue *queue) const {
+bool D3D12SwapChainImageImpl::SupportsQueue(const ID3D12Queue *queue) const {
   return !queue_ || queue_ == queue;
 }
 
@@ -61,7 +61,7 @@ void D3D12SwapChainImageImpl::InitializeD3D12Image(ImageDesc desc,
                                                    ID3D12Resource *image,
                                                    ObjectPtr<D3D12DescriptorPool::Lease> attachment,
                                                    D3D12_RESOURCE_STATES default_state,
-                                                   IBackendQueue *queue) {
+                                                   ID3D12Queue *queue) {
   InitializeImage(desc, queue);
   attachment_ = std::move(attachment);
   device_ = device;

@@ -31,7 +31,11 @@ class VulkanAllocatedBufferImpl final : public Object<rhi::IBuffer, IVulkanAlloc
     return desc_;
   }
 
-  IBackendDevice *Owner() const override;
+  const void *DeviceIdentity() const override {
+    return Owner();
+  }
+
+  IVulkanDevice *Owner() const override;
 };
 
 IVulkanAllocatedBuffer *IVulkanAllocatedBuffer::Create(IVulkanDevice *device,
@@ -41,7 +45,7 @@ IVulkanAllocatedBuffer *IVulkanAllocatedBuffer::Create(IVulkanDevice *device,
   return VulkanAllocatedBufferImpl::Create(device, desc, upload, download);
 }
 
-IBackendDevice *VulkanAllocatedBufferImpl::Owner() const {
+IVulkanDevice *VulkanAllocatedBufferImpl::Owner() const {
   return device_;
 }
 

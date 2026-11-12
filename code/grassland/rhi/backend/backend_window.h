@@ -2,8 +2,8 @@
 #include <mutex>
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
-#include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/rhi_image.h"
 #include "grassland/rhi/rhi_window.h"
 
 struct ImGuiContext;
@@ -22,19 +22,7 @@ class ImagePresenter;
 
 class IBackendWindow : public IObject {
  public:
-  virtual IBackendQueue *OwnerQueue() const = 0;
   virtual ImGuiContext *GetImGuiContext() const = 0;
-  virtual bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) = 0;
-  virtual bool RecordImGui(rhi::ICommandContext *commands,
-                           rhi::IImage *image,
-                           ColorSpace color_space,
-                           float white_scale) = 0;
-  virtual bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) = 0;
-  virtual const void *DeviceIdentity() const = 0;
-  virtual bool UpdateNextImage() = 0;
-  virtual void ReleaseNextImage() = 0;
-  virtual ObjectPtr<IBackendImage> AcquireNativeFrame() = 0;
-  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
 };
 
 }  // namespace grassland::rhi::backend

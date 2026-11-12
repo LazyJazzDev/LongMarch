@@ -15,7 +15,7 @@ class D3D12TimelineImpl final : public Object<rhi::ITimeline, ID3D12Timeline> {
 
   ~D3D12TimelineImpl() override = default;
 
-  IBackendDevice *Owner() const override {
+  ID3D12Device *Owner() const override {
     return owner_;
   }
 
@@ -24,10 +24,10 @@ class D3D12TimelineImpl final : public Object<rhi::ITimeline, ID3D12Timeline> {
 
   ComPtr<ID3D12Fence> fence_;
 
-  void InitializeTimeline(IBackendDevice *device) {
+  void InitializeTimeline(ID3D12Device *device) {
     owner_ = device;
   }
 
-  IBackendDevice *owner_{};
+  ID3D12Device *owner_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

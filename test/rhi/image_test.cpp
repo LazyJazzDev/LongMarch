@@ -2,23 +2,26 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <glm/gtc/packing.hpp>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 #include "format_support.h"
 #include "grassland/rhi/backend/backend_binding_group.h"
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image_presenter.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
 #include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhi_device.h"
 #include "imgui.h"
 #include "native_binding_test_util.h"
+#include "native_image_test_util.h"
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
@@ -349,7 +352,6 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
       continue;
     ObjPtr<IImage> image = device->CreateImage({16, 16, format});
     ASSERT_TRUE(image);
-    const auto native = rhi::QueryInterfacePtr<backend::IBackendImage>(image.Get()).Get();
     bool supported = false;
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
@@ -371,7 +373,7 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
       EXPECT_FALSE(backend::metal::SupportsImageStorage(IMAGE_FORMAT_UNKNOWN));
     }
 #endif
-    EXPECT_EQ(native->SupportsStorage(), supported);
+    EXPECT_EQ(NativeImageSupportsStorage(image.Get()), supported);
     if (IsDepthFormat(format))
       EXPECT_FALSE(supported);
     BindingLayoutDesc layout{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}};
@@ -682,8 +684,7 @@ TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
   ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
   const uint32_t green = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), &green, 4));
-  ASSERT_TRUE(
-      rhi::QueryInterfacePtr<backend::IBackendWindow>(window.Get()).Get()->RecordImGui(commands.Get(), target.Get()));
+  ASSERT_TRUE(RecordNativeImGui(window.Get(), commands.Get(), target.Get()));
   ASSERT_TRUE(window->EnableImGui(false));
   texture.Release();
   ObjPtr<ISubmissionToken> done = commands->Submit();
@@ -853,8 +854,7 @@ TEST_P(RhiImage, ImGuiEmptyFrameDoesNotReplayPreviousDraws) {
     ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
-    ASSERT_TRUE(
-        rhi::QueryInterfacePtr<backend::IBackendWindow>(window.Get()).Get()->RecordImGui(commands.Get(), target.Get()));
+    ASSERT_TRUE(RecordNativeImGui(window.Get(), commands.Get(), target.Get()));
     ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done);
     ASSERT_TRUE(done->WaitHost());
@@ -892,8 +892,7 @@ TEST_P(RhiImage, ImGuiBuffersPreserveQueuedFramesAcrossReuseAndGrowth) {
     ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), {0.0f, 0.0f, 1.0f, 1.0f}));
-    ASSERT_TRUE(
-        rhi::QueryInterfacePtr<backend::IBackendWindow>(window.Get()).Get()->RecordImGui(commands.Get(), target.Get()));
+    ASSERT_TRUE(RecordNativeImGui(window.Get(), commands.Get(), target.Get()));
     targets.push_back(target);
     recordings.push_back(commands);
   }
@@ -950,8 +949,7 @@ TEST_P(RhiImage, ImGuiUpdateChangesSceneBeforeRecordingAndConsumesLatestFrameOnc
     ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdClearImage(target.Get(), background));
-    ASSERT_TRUE(
-        rhi::QueryInterfacePtr<backend::IBackendWindow>(window.Get()).Get()->RecordImGui(commands.Get(), target.Get()));
+    ASSERT_TRUE(RecordNativeImGui(window.Get(), commands.Get(), target.Get()));
     EXPECT_EQ(updates, before);  // Recording must not run UI logic.
     ObjPtr<ISubmissionToken> done = commands->Submit();
     ASSERT_TRUE(done && done->WaitHost());

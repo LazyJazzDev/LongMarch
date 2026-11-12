@@ -39,9 +39,9 @@ class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
   void RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator, ComPtr<ID3D12GraphicsCommandList> list);
 
  private:
-  void InterruptCollector() override;
-  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const override;
-  void WaitForProgress(const std::vector<Event> &next) override;
+  void InterruptCollector();
+  bool WaitNativeEvents(const std::vector<Event> &events, bool wait_all) const;
+  void WaitForProgress(const std::vector<Event> &next);
   D3D12DeviceImpl(PhysicalDevice info, ICore *core, ComPtr<::ID3D12Device> device);
   D3D12TemporalBufferPool upload_pool_;
   D3D12TemporalBufferPool download_pool_;

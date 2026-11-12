@@ -9,14 +9,20 @@
 #include <GLFW/glfw3native.h>
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
+#include <list>
+#include <mutex>
+#include <thread>
 
-#include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image_presenter.h"
-#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
+#include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_queue.h"
 #define GLFW_INCLUDE_NONE
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -106,7 +112,7 @@ HRESULT D3D12WindowImpl::PresentFrame(uint64_t generation) {
                              mode_ == PRESENT_MODE_CONTINUOUS ? DXGI_PRESENT_ALLOW_TEARING : 0);
 }
 
-ObjectPtr<IBackendImage> D3D12WindowImpl::AcquireNativeFrame() {
+ObjectPtr<ID3D12Image> D3D12WindowImpl::AcquireNativeFrame() {
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
@@ -129,7 +135,7 @@ ObjectPtr<IBackendImage> D3D12WindowImpl::AcquireNativeFrame() {
   }
 #endif
   const UINT index = swapchain_->GetCurrentBackBufferIndex();
-  auto frame = ObjectPtr<IBackendImage>::Adopt(
+  auto frame = ObjectPtr<ID3D12Image>::Adopt(
       ID3D12SwapChainImage::Create(desc_, this, generation_, images_[index].Get(), attachments_[index]));
   acquired_ = true;
   return frame;
@@ -323,7 +329,7 @@ rhi::IImage *D3D12WindowImpl::GetNextImage() {
   return rhi::QueryInterfacePtr<IImage>(next_image_.Get()).Detach();
 }
 
-IBackendQueue *D3D12WindowImpl::OwnerQueue() const {
+ID3D12Queue *D3D12WindowImpl::OwnerQueue() const {
   return queue_;
 }
 

@@ -21,7 +21,7 @@ class MetalQueueImpl final : public Object<rhi::IQueue, IMetalQueue> {
  public:
   ~MetalQueueImpl() override = default;
 
-  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IBackendCommandContext> &commands,
+  ObjectPtr<IBackendSubmissionToken> Submit(const ObjectPtr<IMetalCommandContext> &commands,
                                             const SubmitInfo &info) override;
 
   // Called only by the device collector; returns whether this queue is drained.
@@ -44,7 +44,7 @@ class MetalQueueImpl final : public Object<rhi::IQueue, IMetalQueue> {
 
  private:
   struct Submission {
-    ObjectPtr<IBackendCommandContext> commands;
+    ObjectPtr<IMetalCommandContext> commands;
     ObjectPtr<IBackendSubmissionToken> completion;
   };
 

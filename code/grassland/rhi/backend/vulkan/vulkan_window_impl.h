@@ -8,7 +8,7 @@ class VulkanWindowImpl final : public Object<rhi::IWindow, IVulkanWindow> {
  public:
   ~VulkanWindowImpl() override;
   static rhi::IWindow *Create(IVulkanDevice *device, const WindowDesc &desc);
-  ObjectPtr<IBackendImage> AcquireNativeFrame() override;
+  ObjectPtr<IVulkanImage> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
@@ -61,7 +61,7 @@ class VulkanWindowImpl final : public Object<rhi::IWindow, IVulkanWindow> {
 
   rhi::IImage *GetNextImage() override;
 
-  IBackendQueue *OwnerQueue() const override;
+  IVulkanQueue *OwnerQueue() const override;
 
   bool UpdateNextImage() override;
 
@@ -141,6 +141,6 @@ class VulkanWindowImpl final : public Object<rhi::IWindow, IVulkanWindow> {
   ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
   GLFWwindow *window_{};
   std::mutex next_image_mutex_{};
-  ObjectPtr<IBackendImage> next_image_{};
+  ObjectPtr<IVulkanImage> next_image_{};
 };
 }  // namespace grassland::rhi::backend::vulkan
