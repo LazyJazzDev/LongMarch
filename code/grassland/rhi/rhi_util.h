@@ -409,13 +409,14 @@ std::string to_string(AccelerationStructureBuildMode value);
 }  // namespace grassland::rhi
 
 // Register in the owning interface header at global namespace scope.
-#define LONGMARCH_RHI_INTERFACE(Type, Parent, Text)                                                  \
-  template <>                                                                                        \
-  inline grassland::rhi::InterfaceID grassland::rhi::uuid<Type>() {                                  \
-    static_assert(grassland::rhi::ParseInterfaceID(Text).has_value(), "Invalid RHI interface UUID"); \
-    return *grassland::rhi::ParseInterfaceID(Text);                                                  \
-  }                                                                                                  \
-  template <>                                                                                        \
-  struct grassland::rhi::InterfaceTraits<Type> {                                                     \
-    using Base = Parent;                                                                             \
+#define LONGMARCH_RHI_INTERFACE(Type, Parent, Text)                  \
+  template <>                                                        \
+  inline grassland::rhi::InterfaceID grassland::rhi::uuid<Type>() {  \
+    constexpr auto parsed = grassland::rhi::ParseInterfaceID(Text);  \
+    static_assert(parsed.has_value(), "Invalid RHI interface UUID"); \
+    return *parsed;                                                  \
+  }                                                                  \
+  template <>                                                        \
+  struct grassland::rhi::InterfaceTraits<Type> {                     \
+    using Base = Parent;                                             \
   };

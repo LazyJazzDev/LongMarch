@@ -180,8 +180,9 @@ This timer includes allocations, synchronization and driver stalls; it does not
 isolate UUID lookup, reference counting, or CPU cycles. A subsequent
 [profiling and controlled experiment](rhi-draw-profile.md) identifies runtime
 UUID string parsing as the dominant regression; forcing constant evaluation
-removes 96.2%/92.1% of the excess over main on Vulkan/D3D12. That experimental
-change has not been applied to the production source. The draw workload deliberately makes many separate
+removes 96.2%/92.1% of the excess over main on Vulkan/D3D12. The registration
+macro now enforces compile-time parsing with a local constexpr result and retains
+its validity static_assert. The draw workload deliberately makes many separate
 RHI calls rather than using instancing, so these ratios are not universal costs
 for production scenes. No Linux or Metal performance claim is made.
 

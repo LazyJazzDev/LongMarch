@@ -135,6 +135,19 @@ change this benchmark's purpose and would not repair the framework regression.
 The macro-only experiment leaves a smaller residual difference versus main;
 it does not prove that reference counting alone accounts for that remainder.
 
-Only diagnosis and results are committed here. The temporary instrumentation and
-constant-evaluation change are reverted; the retained experimental executable
-and Nsight reports are under `out/query-interface/profile/` for local inspection.
+The profiling experiment originally reverted both instrumentation and its macro
+change. The subsequent fix now uses a local constexpr parsed result in the
+production registration macro, validates it with static_assert, and returns the
+contained ID. Temporary instrumentation remains absent. Nine existing interface
+and ownership tests pass. The retained experimental executable and Nsight
+reports are under `out/query-interface/profile/` for local inspection.
+
+
+Post-fix Release verification repeats two balanced old/fixed pairs per backend,
+800 measured frames and 120 warmup frames, with performance-core affinity:
+
+- vulkan: 5.525 -> 1.014 ms/frame.
+- d3d12: 9.515 -> 2.436 ms/frame.
+
+These are short fix-validation runs, separate from the four-round experiment
+above. Both backend captures remain byte-identical to the original PR.
