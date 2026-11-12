@@ -6,6 +6,11 @@ target_link_libraries(sparkium_fallback_test PRIVATE LongMarch GTest::gtest_main
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_fallback_test)
 add_test(NAME sparkium_fallback COMMAND sparkium_fallback_test)
 
+add_executable(sparkium_rhi_test rhi_binding_test.cpp)
+target_link_libraries(sparkium_rhi_test PRIVATE LongMarch GTest::gtest_main)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_rhi_test)
+add_test(NAME sparkium_rhi COMMAND sparkium_rhi_test)
+
 # Optional diagnostic only: no Wayland protocol/header dependency for normal
 # builds, including Linux/X11, Windows and macOS.
 option(LONGMARCH_ENABLE_WAYLAND_COLOR_PROBE "Build the native Wayland reference-white diagnostic" OFF)
