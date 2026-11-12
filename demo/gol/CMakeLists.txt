@@ -9,6 +9,5 @@ endif()
 PACK_SHADER_CODE(${DEMO_NAME})
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(${DEMO_NAME})
 
-target_sources(${DEMO_NAME} PRIVATE ../demo_window.cpp)
 
 target_include_directories(${DEMO_NAME} PRIVATE ${STB_INC_DIR})

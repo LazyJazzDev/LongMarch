@@ -348,12 +348,11 @@ void GameOfLife::DrawCellGrid() {
 }
 
 glm::vec2 GameOfLife::CursorPosition() const {
-  return FramePosition(GetWindow()->GetCursorPosition());
+  return FramePosition(GetCursorPosition());
 }
 
 glm::vec2 GameOfLife::FramePosition(glm::dvec2 position) const {
-  return glm::vec2(position) * glm::vec2(FramebufferSize()) /
-         glm::vec2(glm::max(GetWindow()->GetSize(), glm::ivec2{1}));
+  return glm::vec2(position) * glm::vec2(FramebufferSize()) / glm::vec2(glm::max(GetWindowSize(), glm::ivec2{1}));
 }
 
 bool GameOfLife::CursorInGrid() const {
@@ -377,7 +376,7 @@ void GameOfLife::ScrollGrid(double x, double y) {
   }
   if ((down(GLFW_KEY_LEFT_SHIFT) || down(GLFW_KEY_RIGHT_SHIFT)) && x == 0.0)
     std::swap(x, y);
-  const glm::vec2 scale = glm::vec2(FramebufferSize()) / glm::vec2(glm::max(GetWindow()->GetSize(), glm::ivec2{1}));
+  const glm::vec2 scale = glm::vec2(FramebufferSize()) / glm::vec2(glm::max(GetWindowSize(), glm::ivec2{1}));
   grid_view_.pan += glm::vec2{float(x), float(y)} * scale * 10.0f;
   LayoutCells();
 }
@@ -466,7 +465,7 @@ void GameOfLife::ProcessFileAction() {
   simulation_clock_ = {};
   open_button_->OnCursorEnter(0);
   save_button_->OnCursorEnter(0);
-  GetWindow()->Focus();
+  glfwFocusWindow(GetWindow()->GLFWWindow());
 }
 
 void GameOfLife::RandomizeCells(float density, uint32_t seed) {

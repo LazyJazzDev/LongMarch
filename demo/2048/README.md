@@ -89,13 +89,10 @@ image through an RHI download token.
 
 The demos link `grassland_rhi` and utility dependencies directly, without the
 legacy `grassland_graphics` renderer. Window input uses RHI events and GLFW
-conveniences in `demo/demo_window.*`.
+queries. The application owns an RHI `IWindow` directly.
 
-For reproducible validation, `LONGMARCH_DEMO_SEED=1` fixes 2048's spawn seed;
-normal launches still use a time-based seed. `LONGMARCH_DEMO_BENCHMARK=1` reports
-frame-loop timings after 120 warmup frames. `LONGMARCH_DEMO_OFFSCREEN=1` skips
-presentation while retaining all scene/resolve rendering. These environment
-variables are intended for validation, not normal gameplay.
+`LONGMARCH_DEMO_SEED=1` fixes 2048's spawn seed; normal launches use a time-based seed.
+Temporary benchmark instrumentation and the offscreen environment switch have been removed.
 
 See [migration validation](../../docs/demo-rhi-migration.md) for baseline setup,
 image comparisons, replay coverage and performance measurements.

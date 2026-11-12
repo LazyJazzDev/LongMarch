@@ -4,8 +4,6 @@
 #include <cstring>
 #include <map>
 
-#include "../../frame_benchmark.h"
-
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "listener.h"
 #include "model.h"
@@ -58,11 +56,7 @@ bool Application::Run(int max_frames) {
     return false;
   }
   int frames = 0;
-  demo::FrameBenchmark benchmark;
   while (!failed_ && !window_->ShouldClose() && (max_frames <= 0 || frames < max_frames)) {
-    if (frames == 120 && !WaitFrames())
-      break;
-    const bool measured = benchmark.BeginFrame(frames);
     // Bound CPU/GPU overlap without making every upload a synchronous transfer.
     auto &previous = submissions_[submission_index_];
     if (previous && !Check(previous->WaitHost(), "Wait for frame slot"))
@@ -73,11 +67,9 @@ bool Application::Run(int max_frames) {
     OnUpdate();
     if (failed_ || !OnRender())
       break;
-    benchmark.EndFrame(measured);
     frames++;
   }
   WaitFrames();
-  benchmark.Finish();
   if (!failed_ && !screenshot_path_.empty())
     SaveScreenshot();
   OnClose();
@@ -144,7 +136,7 @@ bool Application::OnInit() {
                                             rhi::PRESENT_MODE_CONTINUOUS});
   if (!Check(window != nullptr, "Create RHI window"))
     return false;
-  window_ = std::make_unique<demo::Window>(window);
+  window_ = window;
   LogInfo("Backend API: {}", rhi::BackendAPIName(api_));
   LogInfo("Device Name: {}", device_->Name());
   mouse_move_callback_ = window_->MouseMoveEvent().RegisterCallback(
@@ -218,7 +210,7 @@ bool Application::OnInit() {
 }
 
 void Application::OnUpdate() {
-  const auto size = window_->GetFramebufferSize();
+  const auto size = GetFramebufferSize();
   const int width = size.x, height = size.y;
   if (width > 0 && height > 0 && glm::ivec2{width, height} != framebuffer_size_) {
     if (!BuildScreenFrameObjects())
@@ -238,10 +230,10 @@ void Application::OnUpdate() {
 }
 
 bool Application::OnRender() {
-  const auto size = window_->GetFramebufferSize();
+  const auto size = GetFramebufferSize();
   if (size.x <= 0 || size.y <= 0)
     return true;
-  auto *window = window_->Get();
+  auto *window = window_.Get();
   if (window->IsSwapChainInvalid()) {
     // No swapchain images are held by the demo; drain before rebuilding.
     if (!WaitFrames() || !Check(window->RebuildSwapChain(), "Rebuild swapchain"))
@@ -286,8 +278,7 @@ bool Application::OnRender() {
                  context->CmdSetViewport({0, 0, float(framebuffer_size_.x), float(framebuffer_size_.y), 0, 1}) &&
                  context->CmdSetScissor({0, 0, uint32_t(framebuffer_size_.x), uint32_t(framebuffer_size_.y)}) &&
                  context->CmdDraw(3) && context->CmdEndRendering() &&
-                 (!demo::FrameBenchmark::PresentFrames() ||
-                  context->CmdPresentImage(window, present_image_.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR)),
+                 context->CmdPresentImage(window, present_image_.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR),
              "Record resolve and presentation"))
     return false;
   submissions_[submission_index_] = context->Submit();
@@ -403,7 +394,7 @@ void Application::OnClose() {
 bool Application::BuildScreenFrameObjects() {
   if (!WaitFrames())
     return false;
-  const auto size = window_->GetFramebufferSize();
+  const auto size = GetFramebufferSize();
   framebuffer_size_ = glm::max(size, glm::ivec2{1});
   supersample_scale_ = ChooseSupersampleScale(framebuffer_size_);
   const auto sample_size = framebuffer_size_ * supersample_scale_;
@@ -498,4 +489,22 @@ bool Application::UploadBuffer(rhi::ObjPtr<rhi::IBuffer> &buffer, const void *da
   if (!upload_context_)
     upload_context_ = queue_->CreateCommandContext();
   return Check(upload_context_ && upload_context_->CmdUploadBuffer(buffer.Get(), 0, data, size), "Upload buffer");
+}
+
+glm::ivec2 Application::GetWindowSize() const {
+  glm::ivec2 size{};
+  glfwGetWindowSize(window_->GLFWWindow(), &size.x, &size.y);
+  return size;
+}
+
+glm::ivec2 Application::GetFramebufferSize() const {
+  glm::ivec2 size{};
+  glfwGetFramebufferSize(window_->GLFWWindow(), &size.x, &size.y);
+  return size;
+}
+
+glm::dvec2 Application::GetCursorPosition() const {
+  glm::dvec2 position{};
+  glfwGetCursorPos(window_->GLFWWindow(), &position.x, &position.y);
+  return position;
 }

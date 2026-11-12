@@ -570,7 +570,7 @@ void TwentyFourEight::OnUpdate(float t) {
           [](const NumberBlock &left, const NumberBlock &right) { return left.number < right.number; });
       if (reached != number_blocks_.end() && reached->number >= ai_stop_tile_) {
         LogInfo("2048 autoplay reached {}, closing for the screenshot", reached->number);
-        GetWindow()->RequestClose();
+        glfwSetWindowShouldClose(GetWindow()->GLFWWindow(), GLFW_TRUE);
       }
     }
 

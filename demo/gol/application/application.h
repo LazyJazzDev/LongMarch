@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "../../demo_window.h"
+#include "grassland/rhi/rhi.h"
 #include "grassland/util/util.h"
 
 using namespace grassland;
@@ -44,9 +44,13 @@ class Application {
   rhi::ObjPtr<rhi::IBuffer> CreateBuffer(uint64_t size);
   bool UploadBuffer(rhi::ObjPtr<rhi::IBuffer> &buffer, const void *data, uint64_t size);
 
-  [[nodiscard]] demo::Window *GetWindow() const {
-    return window_.get();
+  [[nodiscard]] rhi::IWindow *GetWindow() const {
+    return window_.Get();
   }
+
+  glm::ivec2 GetWindowSize() const;
+  glm::ivec2 GetFramebufferSize() const;
+  glm::dvec2 GetCursorPosition() const;
 
   [[nodiscard]] std::string Name() const {
     return name_;
@@ -134,7 +138,7 @@ class Application {
   rhi::ObjPtr<rhi::ICore> core_;
   rhi::ObjPtr<rhi::IDevice> device_;
   rhi::ObjPtr<rhi::IQueue> queue_;
-  std::unique_ptr<demo::Window> window_;
+  rhi::ObjPtr<rhi::IWindow> window_;
   rhi::ObjPtr<rhi::ICommandContext> upload_context_;
   std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> submissions_;
   size_t submission_index_{};

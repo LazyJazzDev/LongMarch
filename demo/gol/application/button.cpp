@@ -26,7 +26,7 @@ void Button::OnCursorEnter(int enter) {
 }
 
 void Button::OnMouseButton(int mouse_button, int state, int mods) {
-  const auto local_pos = app_->GetWindow()->GetCursorPosition();
+  const auto local_pos = app_->GetCursorPosition();
   bool inside = IsInsideListenerBounds(local_pos.x, local_pos.y);
   if (mouse_button == GLFW_MOUSE_BUTTON_LEFT) {
     if (state == GLFW_RELEASE) {
@@ -106,10 +106,10 @@ void Button::Deactivate() {
 
 void Button::CalculateListenerBounds() {
   // Get frame size
-  const auto framebuffer = app_->GetWindow()->GetFramebufferSize();
+  const auto framebuffer = app_->GetFramebufferSize();
 
   // Get window size
-  const auto window = app_->GetWindow()->GetSize();
+  const auto window = app_->GetWindowSize();
 
   // Scale from frame to window
   float scale_x = float(window.x) / float(std::max(framebuffer.x, 1));
