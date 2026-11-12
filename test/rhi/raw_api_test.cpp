@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-// This translation unit deliberately needs neither rhix nor backend headers.
+// This translation unit deliberately uses only public RHI headers.
 #include "grassland/rhi/rhi.h"
 
 namespace grassland::rhi {

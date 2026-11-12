@@ -6,7 +6,7 @@
 #include <thread>
 
 #include "format_support.h"
-#include "grassland/rhi/rhix/rhix_download_token.h"
+#include "grassland/rhi/rhi.h"
 
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
@@ -236,10 +236,10 @@ TEST_P(RhiDownload, WaitHostSurvivesSubmissionHandleReleaseAndSupportsMultipleWa
   EXPECT_TRUE(first);
   EXPECT_TRUE(second);
   EXPECT_TRUE(other->WaitHost());
-  grassland::rhix::DownloadToken wrapped(token.Detach());
-  EXPECT_TRUE(wrapped.WaitHost());
+  grassland::rhi::ObjPtr<IDownloadToken> wrapped(token.Detach());
+  EXPECT_TRUE(wrapped->WaitHost());
   std::array<uint32_t, 16> output{};
-  ASSERT_TRUE(wrapped.CopyTo(output.data(), sizeof(output)));
+  ASSERT_TRUE(wrapped->CopyTo(output.data(), sizeof(output)));
   EXPECT_EQ(output, source);
 }
 

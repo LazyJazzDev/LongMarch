@@ -15,8 +15,7 @@ if (!buffer)
 `QueryInterfacePtr<T>(source)` combines a nullable source, the query, and `ObjPtr`
 ownership. Internal code may use its temporary `.Get()` within an expression.
 When retaining the resulting raw pointer afterward, the original object must
-remain alive, just as with the previous borrowed casts. RHIX containers forward
-queries to the underlying RHI object; their ordinary `Get()` remains borrowed.
+remain alive, just as with the previous borrowed casts. `ObjPtr<T>::Get()` returns a borrowed pointer.
 
 ## Identification and implementation
 
@@ -143,7 +142,7 @@ magnify support.
 ## Regression coverage
 
 Keep tests of actual production behavior: UUID parsing and recursive queries,
-canonical identity and reference ownership, typed RHIX wrappers, descriptor
+canonical identity and reference ownership, typed interface owners, descriptor
 versioning, resource lifetimes, GPU timeline/collector progress, swapchain texture
 rejection, and gesture callback lifetime/isolation. Metal regressions additionally
 cover frontend/native retention and active-render-pass validation.
@@ -163,7 +162,7 @@ The synthetic stress demo and its paired-measurement and summary scripts have
 been removed. Historical diagnosis, benchmark source and raw reports remain
 available through Git history and fixed-revision links in
 [Issue #115](https://github.com/LazyJazzDev/LongMarch/issues/115).
-The one-off RHIX offscreen comparison script is also removed from the source
+The one-off offscreen comparison script is also removed from the source
 tree. Future diagnostic runners and raw reports belong in ignored temporary
 directories such as `out/`.
 The runtime UUID parsing regression described there has been fixed by forcing

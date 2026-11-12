@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <thread>
 #include "grassland/rhi/rhi.h"
-#include "grassland/rhi/rhix/rhix.h"
 #define GLFW_EXPOSE_NATIVE_COCOA
 #import <Cocoa/Cocoa.h>
 #include <GLFW/glfw3native.h>
@@ -22,25 +21,25 @@ TEST(RhiCocoaHDR, AllBackendsQueryTheWindowScreen) {
 #endif
   for (auto backend : backends) {
     SCOPED_TRACE(int(backend));
-    auto core = grassland::rhix::CreateCore(backend);
+    ObjPtr<ICore> core = grassland::rhi::CreateCore(backend);
     ASSERT_TRUE(core);
-    auto device = core.CreateDeviceByAutoSelection();
+    ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
     ASSERT_TRUE(device);
-    auto window = device.CreateGLFWWindow({320, 240, "Shared Cocoa HDR query"});
+    ObjPtr<IWindow> window = device->CreateGLFWWindow({320, 240, "Shared Cocoa HDR query"});
     ASSERT_TRUE(window);
-    for (const auto &option : window.GetSupportedPresentationOptions()) {
-      ASSERT_TRUE(window.SetColorSpace(option.color_space));
-      auto screen = [glfwGetCocoaWindow(window.GLFWWindow()) screen];
+    for (const auto &option : window->GetSupportedPresentationOptions()) {
+      ASSERT_TRUE(window->SetColorSpace(option.color_space));
+      auto screen = [glfwGetCocoaWindow(window->GLFWWindow()) screen];
       ASSERT_NE(screen, nil);
       const float expected = screen.maximumExtendedDynamicRangeColorComponentValue;
-      EXPECT_FLOAT_EQ(window.GetHDRHeadroom(), expected);
-      EXPECT_FLOAT_EQ(window.GetHDRReferenceWhiteScale(), 1.0f);
+      EXPECT_FLOAT_EQ(window->GetHDRHeadroom(), expected);
+      EXPECT_FLOAT_EQ(window->GetHDRReferenceWhiteScale(), 1.0f);
       float nits = -1.0f;
-      EXPECT_FALSE(window.GetHDRReferenceWhiteNits(nits));
+      EXPECT_FALSE(window->GetHDRReferenceWhiteNits(nits));
       EXPECT_FLOAT_EQ(nits, -1.0f);
       std::cout << "HDR query: backend=" << int(backend) << " color_space=" << int(option.color_space)
-                << " headroom=" << window.GetHDRHeadroom() << " NSScreen=" << expected
-                << " white_scale=" << window.GetHDRReferenceWhiteScale() << " nits=unavailable\n";
+                << " headroom=" << window->GetHDRHeadroom() << " NSScreen=" << expected
+                << " white_scale=" << window->GetHDRReferenceWhiteScale() << " nits=unavailable\n";
     }
   }
 }

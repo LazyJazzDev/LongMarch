@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/rhi.h"
 #include "grassland/rhi/rhi_buffer.h"
-#include "grassland/rhi/rhix/rhix_buffer.h"
 
 namespace query_test {
 class ILeft : public grassland::rhi::IObject {};
@@ -53,21 +53,21 @@ class SideBuffer final : public Object<ILeft, IBuffer> {
   }
 };
 
-TEST(RhiQueryInterface, TypedWrapperPreservesNoncanonicalInterfaceThroughCopyMoveAndRelease) {
+TEST(RhiQueryInterface, TypedPointerPreservesNoncanonicalInterfaceThroughCopyMoveAndRelease) {
   auto object = ObjPtr<SideBuffer>(new SideBuffer);
   auto buffer = static_cast<IBuffer *>(object.Get());
   ObjPtr<IObject> identity = buffer->QueryInterface<IObject>();
   ASSERT_NE(identity.Get(), static_cast<IObject *>(buffer));
   buffer->AddRef();
-  grassland::rhix::Buffer wrapped(buffer);
+  grassland::rhi::ObjPtr<IBuffer> wrapped(buffer);
   auto copy = wrapped;
   auto moved = std::move(copy);
   EXPECT_EQ(copy.Get(), nullptr);
   wrapped.Release();
   EXPECT_EQ(wrapped.Get(), nullptr);
   EXPECT_EQ(moved.Get(), buffer);
-  EXPECT_EQ(moved.GetDesc().size, 4096);
-  ObjPtr<ILeft> side = moved.QueryInterface<ILeft>();
+  EXPECT_EQ(moved->GetDesc().size, 4096);
+  ObjPtr<ILeft> side = moved->QueryInterface<ILeft>();
   EXPECT_EQ(side.Get(), static_cast<ILeft *>(object.Get()));
   moved.Release();
   side.Release();

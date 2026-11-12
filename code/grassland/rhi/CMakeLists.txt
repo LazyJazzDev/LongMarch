@@ -20,5 +20,3 @@ if (LONGMARCH_CUDA_RUNTIME)
 endif ()
 
 add_subdirectory(backend)
-
-add_subdirectory(rhix)
