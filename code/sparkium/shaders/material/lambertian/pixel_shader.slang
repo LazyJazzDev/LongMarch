@@ -18,7 +18,7 @@ struct MaterialLambertian {
   float3 emission;
 };
 
-RHI_BYTE_ADDRESS_BUFFER(0, 2, material_data);
+RHI_BYTE_ADDRESS_BUFFER(1, 2, material_data);
 
 PSOutput PSMain(PSInput input) {
   PSOutput output;

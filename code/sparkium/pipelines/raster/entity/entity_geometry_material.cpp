@@ -22,18 +22,18 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
                                        rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT, rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
                                        rhi::IMAGE_FORMAT_R32_INT};
   render_program_desc.depth_stencil = {rhi::IMAGE_FORMAT_D32_SFLOAT, true, true};
-  render_program_desc.pipeline_layout.groups.resize(1);
+  render_program_desc.pipeline_layout.groups.resize(3);
   render_program_desc.vertex_shader = geometry_->VertexShader();
   render_program_desc.fragment_shader = material_->PixelShader();
   geometry_->SetupProgram(render_program_desc);
-  render_program_desc.pipeline_layout.groups[0].bindings.push_back({0, rhi::BINDING_UNIFORM_BUFFER, 1});  // Camera Data
-  render_program_desc.pipeline_layout.groups[0].bindings.push_back(
+  render_program_desc.pipeline_layout.groups[2].bindings.push_back({0, rhi::BINDING_UNIFORM_BUFFER, 1});  // Camera Data
+  render_program_desc.pipeline_layout.groups[1].bindings.push_back(
       {1, rhi::BINDING_UNIFORM_BUFFER, 1});  // Instance Data
-  render_program_desc.pipeline_layout.groups[0].bindings.push_back(
+  render_program_desc.pipeline_layout.groups[1].bindings.push_back(
       {2, rhi::BINDING_BYTE_ADDRESS_BUFFER, 1});  // Material Data
   material_->SetupProgram(render_program_desc);
   render_program_ = core_->GetDevice()->CreateProgram(render_program_desc);
-  render_group_ = core_->GetDevice()->CreateBindingGroup(render_program_desc.pipeline_layout.groups[0]);
+  render_group_ = core_->GetDevice()->CreateBindingGroup(render_program_desc.pipeline_layout.groups[1]);
 
   point_light_buffer_ = core_->GetDevice()->CreateBuffer({(sizeof(PointLightData) + 255) & ~uint64_t(255)});
   auto shaders_vfs = core_->GetShadersVFS();
@@ -43,7 +43,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
                                                      &shaders_vfs, {"."}, {});
   rhi::ProgramDesc point_light_program_desc;
   point_light_program_desc.color_formats = {rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT};
-  point_light_program_desc.pipeline_layout.groups.resize(1);
+  point_light_program_desc.pipeline_layout.groups.resize(3);
   point_light_program_desc.vertex_shader = point_light_vs_.Get();
   point_light_program_desc.fragment_shader = point_light_ps_.Get();
   point_light_program_desc.blend_states = {rhi::BlendState{rhi::BLEND_FACTOR_ONE, rhi::BLEND_FACTOR_ONE,
@@ -55,12 +55,12 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
       {1, rhi::BINDING_TEXTURE2D, 1});  // PositionSpecular
   point_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
       {2, rhi::BINDING_TEXTURE2D, 1});  // NormalMetallic
-  point_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
-      {3, rhi::BINDING_UNIFORM_BUFFER, 1});  // Camera Data
-  point_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
+  point_light_program_desc.pipeline_layout.groups[2].bindings.push_back(
+      {0, rhi::BINDING_UNIFORM_BUFFER, 1});  // Camera Data
+  point_light_program_desc.pipeline_layout.groups[1].bindings.push_back(
       {4, rhi::BINDING_BYTE_ADDRESS_BUFFER, 1});  // PointLightData
   point_light_program_ = core_->GetDevice()->CreateProgram(point_light_program_desc);
-  point_light_group_ = core_->GetDevice()->CreateBindingGroup(point_light_program_desc.pipeline_layout.groups[0]);
+  point_light_group_ = core_->GetDevice()->CreateBindingGroup(point_light_program_desc.pipeline_layout.groups[1]);
 }
 
 void EntityGeometryMaterial::Update(Scene *scene) {
@@ -73,12 +73,12 @@ void EntityGeometryMaterial::Update(Scene *scene) {
   core_->QueueUpload(instance_buffer_.Get(), &instance_data, sizeof(InstanceData));
   material_->Sync();
 
-  scene->RegisterRenderCallback([this](rhi::ICommandContext *cmd_ctx, rhi::IBuffer *camera_buffer) {
+  scene->RegisterRenderCallback([this](rhi::ICommandContext *cmd_ctx, rhi::IBindingGroup *camera_bindings) {
     cmd_ctx->CmdBindProgram(render_program_.Get());
-    render_group_->BindResource(0, camera_buffer);
+    cmd_ctx->CmdBindGroup(2, camera_bindings);
     render_group_->BindResource(1, instance_buffer_.Get());
     material_->BindMaterialResources(render_group_.Get());
-    cmd_ctx->CmdBindGroup(0, render_group_.Get());
+    cmd_ctx->CmdBindGroup(1, render_group_.Get());
     geometry_->DispatchDrawCalls(cmd_ctx);
   });
 
@@ -91,12 +91,11 @@ void EntityGeometryMaterial::Update(Scene *scene) {
       core_->QueueUpload(point_light_buffer_.Get(), &point_light_data, sizeof(PointLightData));
       scene->RegisterLightingCallback([this](rhi::ICommandContext *cmd_ctx, Camera *camera, Film *film) {
         cmd_ctx->CmdBindProgram(point_light_program_.Get());
-        point_light_group_->BindResource(0, film->GetAlbedoRoughnessBuffer());
-        point_light_group_->BindResource(1, film->GetPositionSpecularBuffer());
-        point_light_group_->BindResource(2, film->GetNormalMetallicBuffer());
-        point_light_group_->BindResource(3, camera->NearFieldBuffer());
+
+        cmd_ctx->CmdBindGroup(2, camera->NearFieldBindings());
         point_light_group_->BindResource(4, point_light_buffer_.Get());
-        cmd_ctx->CmdBindGroup(0, point_light_group_.Get());
+        cmd_ctx->CmdBindGroup(0, film->LightingBindings());
+        cmd_ctx->CmdBindGroup(1, point_light_group_.Get());
         cmd_ctx->CmdDraw(6, 1, 0, 0);
       });
     }

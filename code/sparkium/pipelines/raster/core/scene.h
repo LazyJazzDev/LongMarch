@@ -19,7 +19,7 @@ class Scene : public Object {
 
   std::map<Entity *, EntityStatus> entities_;
 
-  void RegisterRenderCallback(const std::function<void(rhi::ICommandContext *, rhi::IBuffer *)> &callback);
+  void RegisterRenderCallback(const std::function<void(rhi::ICommandContext *, rhi::IBindingGroup *)> &callback);
   void RegisterShadowMapCallback(const std::function<void(rhi::ICommandContext *)> &callback);
   void RegisterLightingCallback(
       const std::function<void(rhi::ICommandContext *, Camera *camera, Film *film)> &callback);
@@ -28,7 +28,7 @@ class Scene : public Object {
   sparkium::Scene &scene_;
   Core *core_;
 
-  std::vector<std::function<void(rhi::ICommandContext *, rhi::IBuffer *)>> render_callbacks_;
+  std::vector<std::function<void(rhi::ICommandContext *, rhi::IBindingGroup *)>> render_callbacks_;
   std::vector<std::function<void(rhi::ICommandContext *)>> shadow_map_callbacks_;
   std::vector<std::function<void(rhi::ICommandContext *, Camera *camera, Film *film)>> lighting_callbacks_;
 

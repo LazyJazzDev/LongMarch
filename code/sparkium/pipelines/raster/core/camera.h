@@ -15,8 +15,8 @@ struct CameraData {
 class Camera : public Object {
  public:
   explicit Camera(sparkium::Camera &camera);
-  rhi::IBuffer *NearFieldBuffer() const;
-  rhi::IBuffer *FarFieldBuffer() const;
+  rhi::IBindingGroup *NearFieldBindings() const;
+  rhi::IBindingGroup *FarFieldBindings() const;
   void Update();
 
  private:
@@ -24,6 +24,8 @@ class Camera : public Object {
   Core *core_{};
   rhi::ObjPtr<rhi::IBuffer> near_field_buffer_;
   rhi::ObjPtr<rhi::IBuffer> far_field_buffer_;
+  rhi::ObjPtr<rhi::IBindingGroup> near_field_bindings_;
+  rhi::ObjPtr<rhi::IBindingGroup> far_field_bindings_;
   CameraData data_{};
 };
 

@@ -36,8 +36,8 @@ struct GeometryData {
   float4x4 normal_matrix;
 };
 
-RHI_UNIFORM(0, 0, CameraData, camera_data);
-RHI_UNIFORM(0, 1, GeometryData, geometry_data);
+RHI_UNIFORM(2, 0, CameraData, camera_data);
+RHI_UNIFORM(1, 1, GeometryData, geometry_data);
 
 VSOutput VSMain(VSInput input) {
   VSOutput output;

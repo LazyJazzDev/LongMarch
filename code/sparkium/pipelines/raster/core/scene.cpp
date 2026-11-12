@@ -17,7 +17,7 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), core_(DedicatedCast(scene.
                                                        rhi::SHADER_STAGE_FRAGMENT, &shaders_vfs, {"."}, {});
   rhi::ProgramDesc ambient_light_program_desc;
   ambient_light_program_desc.color_formats = {rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT};
-  ambient_light_program_desc.pipeline_layout.groups.resize(1);
+  ambient_light_program_desc.pipeline_layout.groups.resize(3);
   ambient_light_program_desc.vertex_shader = ambient_light_vs_.Get();
   ambient_light_program_desc.fragment_shader = ambient_light_ps_.Get();
   ambient_light_program_desc.blend_states = {rhi::BlendState{rhi::BLEND_FACTOR_ONE, rhi::BLEND_FACTOR_ONE,
@@ -29,12 +29,12 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), core_(DedicatedCast(scene.
       {1, rhi::BINDING_TEXTURE2D, 1});  // PositionSpecular
   ambient_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
       {2, rhi::BINDING_TEXTURE2D, 1});  // NormalMetallic
-  ambient_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
-      {3, rhi::BINDING_UNIFORM_BUFFER, 1});  // Camera Data
-  ambient_light_program_desc.pipeline_layout.groups[0].bindings.push_back(
+  ambient_light_program_desc.pipeline_layout.groups[2].bindings.push_back(
+      {0, rhi::BINDING_UNIFORM_BUFFER, 1});  // Camera Data
+  ambient_light_program_desc.pipeline_layout.groups[1].bindings.push_back(
       {4, rhi::BINDING_UNIFORM_BUFFER, 1});  // Ambient Light Data
   ambient_light_program_ = core_->GetDevice()->CreateProgram(ambient_light_program_desc);
-  ambient_light_group_ = core_->GetDevice()->CreateBindingGroup(ambient_light_program_desc.pipeline_layout.groups[0]);
+  ambient_light_group_ = core_->GetDevice()->CreateBindingGroup(ambient_light_program_desc.pipeline_layout.groups[1]);
 
   ambient_light_buffer_ = core_->GetDevice()->CreateBuffer({(sizeof(glm::vec3) + 255) & ~uint64_t(255)});
 }
@@ -112,7 +112,7 @@ bool Scene::RecordRender(rhi::ICommandContext *commands, ResourceUpdates::Cursor
   commands->CmdSetScissor(scissor);
   commands->CmdSetViewport(viewport);
   for (auto &callback : render_callbacks_) {
-    callback(commands, camera->FarFieldBuffer());
+    callback(commands, camera->FarFieldBindings());
   }
   commands->CmdEndRendering();
   commands->CmdClearImage(
@@ -122,7 +122,7 @@ bool Scene::RecordRender(rhi::ICommandContext *commands, ResourceUpdates::Cursor
   commands->CmdSetScissor(scissor);
   commands->CmdSetViewport(viewport);
   for (auto &callback : render_callbacks_) {
-    callback(commands, camera->NearFieldBuffer());
+    callback(commands, camera->NearFieldBindings());
   }
   commands->CmdEndRendering();
 
@@ -133,12 +133,11 @@ bool Scene::RecordRender(rhi::ICommandContext *commands, ResourceUpdates::Cursor
   commands->CmdSetScissor(scissor);
   commands->CmdSetViewport(viewport);
   commands->CmdBindProgram(ambient_light_program_.Get());
-  ambient_light_group_->BindResource(0, film->GetAlbedoRoughnessBuffer());
-  ambient_light_group_->BindResource(1, film->GetPositionSpecularBuffer());
-  ambient_light_group_->BindResource(2, film->GetNormalMetallicBuffer());
-  ambient_light_group_->BindResource(3, camera->NearFieldBuffer());
+
+  commands->CmdBindGroup(2, camera->NearFieldBindings());
   ambient_light_group_->BindResource(4, ambient_light_buffer_.Get());
-  commands->CmdBindGroup(0, ambient_light_group_.Get());
+  commands->CmdBindGroup(0, film->LightingBindings());
+  commands->CmdBindGroup(1, ambient_light_group_.Get());
   commands->CmdDraw(6, 1, 0, 0);
 
   for (auto &callback : lighting_callbacks_) {
@@ -150,7 +149,7 @@ bool Scene::RecordRender(rhi::ICommandContext *commands, ResourceUpdates::Cursor
   return core_->IsValid();
 }
 
-void Scene::RegisterRenderCallback(const std::function<void(rhi::ICommandContext *, rhi::IBuffer *)> &callback) {
+void Scene::RegisterRenderCallback(const std::function<void(rhi::ICommandContext *, rhi::IBindingGroup *)> &callback) {
   render_callbacks_.push_back(callback);
 }
 

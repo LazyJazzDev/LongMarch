@@ -51,8 +51,8 @@ glm::vec3 MaterialPrincipled::Emission() const {
 }
 
 void MaterialPrincipled::SetupProgram(rhi::ProgramDesc &program) {
-  program.pipeline_layout.groups[0].bindings.push_back({3, rhi::BINDING_TEXTURE2D, 6});  // Material textures
-  program.pipeline_layout.groups[0].bindings.push_back({4, rhi::BINDING_SAMPLER, 1});    // Material Data
+  program.pipeline_layout.groups[1].bindings.push_back({3, rhi::BINDING_TEXTURE2D, 6});  // Material textures
+  program.pipeline_layout.groups[1].bindings.push_back({4, rhi::BINDING_SAMPLER, 1});    // Material Data
 }
 
 void MaterialPrincipled::BindMaterialResources(rhi::IBindingGroup *group) {

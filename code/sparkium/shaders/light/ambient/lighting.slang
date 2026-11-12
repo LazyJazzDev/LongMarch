@@ -15,8 +15,8 @@ struct CameraInfo {
 RHI_TEXTURE2D(0, 0, float4, albedo_roughness);
 RHI_TEXTURE2D(0, 1, float4, position_specular);
 RHI_TEXTURE2D(0, 2, float4, normal_metallic);
-RHI_UNIFORM(0, 3, CameraInfo, camera_data);
-RHI_UNIFORM(0, 4, SceneSettings, scene_settings);
+RHI_UNIFORM(2, 0, CameraInfo, camera_data);
+RHI_UNIFORM(1, 4, SceneSettings, scene_settings);
 
 struct VSOutput {
   float4 position : SV_POSITION;
