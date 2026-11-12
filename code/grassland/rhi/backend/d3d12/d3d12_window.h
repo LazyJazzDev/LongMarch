@@ -22,9 +22,6 @@ class ID3D12Window : public IBackendWindow {
   virtual bool RecordPresentImage(ICommandContext *commands, IImage *image, ColorSpace color_space) = 0;
   virtual const void *DeviceIdentity() const = 0;
   virtual bool UpdateNextImage() = 0;
-  virtual void ReleaseNextImage() = 0;
-  virtual ObjectPtr<ID3D12Image> AcquireNativeFrame() = 0;
-  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
   static rhi::IWindow *Create(ID3D12Device *device, const WindowDesc &desc);
 
   virtual bool IsFrameValid(uint64_t generation) const = 0;
@@ -38,14 +35,16 @@ class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
  public:
   ~D3D12WindowImpl() override;
   static rhi::IWindow *Create(ID3D12Device *device, const WindowDesc &desc);
-  ObjectPtr<ID3D12Image> AcquireNativeFrame() override;
-  bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;
   HRESULT PresentFrame(uint64_t generation);
 
  private:
+  ObjectPtr<ID3D12Image> AcquireNativeFrame();
+  bool RebuildNativeSwapChain(PresentMode mode);
+  void ReleaseNextImage();
+
   D3D12WindowImpl(ID3D12Device *device);
   ID3D12Device *device_;
   ComPtr<IDXGISwapChain3> swapchain_;
@@ -80,8 +79,6 @@ class D3D12WindowImpl final : public Object<rhi::IWindow, ID3D12Window> {
   ID3D12Queue *OwnerQueue() const override;
 
   bool UpdateNextImage() override;
-
-  void ReleaseNextImage() override;
 
   bool IsSwapChainInvalid() const override;
 

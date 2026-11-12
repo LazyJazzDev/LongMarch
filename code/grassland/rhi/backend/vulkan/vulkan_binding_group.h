@@ -12,7 +12,6 @@ class IVulkanBindingVersion : public IObject {
   virtual bool IsUniquelyOwned() const noexcept = 0;
   virtual const BindingLayoutDesc &GetLayout() const = 0;
   virtual const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const = 0;
-  virtual bool IsInitialized(size_t binding_index, uint32_t element) const = 0;
   virtual bool IsComplete() const = 0;
   virtual ObjectPtr<IVulkanBindingVersion> Clone() const = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) = 0;
@@ -50,11 +49,12 @@ class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
  public:
   static VulkanBindingVersionImpl *Create(IVulkanDevice *device, const BindingLayoutDesc &layout);
   ObjectPtr<IVulkanBindingVersion> Clone() const override;
-  bool IsInitialized(size_t binding_index, uint32_t element) const override;
   ~VulkanBindingVersionImpl() override;
   VkDescriptorSet Set() const;
 
  private:
+  bool IsInitialized(size_t binding_index, uint32_t element) const;
+
   IVulkanDevice *device_;
   bool WriteDescriptors(size_t binding_index,
                         uint32_t first_element,

@@ -20,7 +20,6 @@ class ID3D12AccelerationStructure : public IObject {
   virtual D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS NativeInputs() const = 0;
   virtual uint64_t Address() const = 0;
   virtual uint64_t ScratchSize(AccelerationStructureBuildMode mode) const = 0;
-  virtual uint64_t ReadCompactedSize() const = 0;
   virtual bool AllowsUpdate() const = 0;
   virtual bool AllowsCompaction() const = 0;
   virtual bool IsCompactStorage() const = 0;
@@ -72,8 +71,6 @@ class D3D12BottomLevelAccelerationStructureImpl final
 
   uint64_t ScratchSize(AccelerationStructureBuildMode mode) const override;
 
-  uint64_t ReadCompactedSize() const override;
-
   bool AllowsUpdate() const override;
 
   bool AllowsCompaction() const override;
@@ -81,6 +78,8 @@ class D3D12BottomLevelAccelerationStructureImpl final
   bool IsCompactStorage() const override;
 
  private:
+  uint64_t ReadCompactedSize() const;
+
   D3D12BottomLevelAccelerationStructureImpl(ID3D12Device *device, const BottomLevelAccelerationStructureDesc &desc);
 
   BottomLevelAccelerationStructureDesc desc_;
@@ -135,8 +134,6 @@ class D3D12TopLevelAccelerationStructureImpl final
 
   uint64_t ScratchSize(AccelerationStructureBuildMode mode) const override;
 
-  uint64_t ReadCompactedSize() const override;
-
   bool AllowsUpdate() const override;
 
   bool AllowsCompaction() const override;
@@ -144,6 +141,8 @@ class D3D12TopLevelAccelerationStructureImpl final
   bool IsCompactStorage() const override;
 
  private:
+  uint64_t ReadCompactedSize() const;
+
   D3D12TopLevelAccelerationStructureImpl(ID3D12Device *device, const TopLevelAccelerationStructureDesc &desc);
 
   TopLevelAccelerationStructureDesc desc_;

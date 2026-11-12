@@ -12,7 +12,6 @@ class ID3D12Sampler : public IObject {
  public:
   virtual const void *DeviceIdentity() const = 0;
   static rhi::ISampler *Create(ID3D12Device *device, const SamplerDesc &desc);
-  virtual const D3D12_SAMPLER_DESC &NativeDesc() const = 0;
   virtual D3D12_CPU_DESCRIPTOR_HANDLE Descriptor() const = 0;
 };
 
@@ -22,10 +21,6 @@ namespace grassland::rhi::backend::d3d12 {
 class D3D12SamplerImpl final : public Object<rhi::ISampler, ID3D12Sampler> {
  public:
   static rhi::ISampler *Create(ID3D12Device *device, const SamplerDesc &desc);
-
-  const D3D12_SAMPLER_DESC &NativeDesc() const {
-    return native_desc_;
-  }
 
   D3D12_CPU_DESCRIPTOR_HANDLE Descriptor() const {
     return descriptor_->CPU();

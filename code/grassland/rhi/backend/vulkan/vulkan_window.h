@@ -22,8 +22,6 @@ class IVulkanWindow : public IBackendWindow {
   virtual const void *DeviceIdentity() const = 0;
   virtual bool UpdateNextImage() = 0;
   virtual void ReleaseNextImage() = 0;
-  virtual ObjectPtr<IVulkanImage> AcquireNativeFrame() = 0;
-  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
   static rhi::IWindow *Create(IVulkanDevice *device, const WindowDesc &desc);
 
   virtual VkSemaphore RenderSemaphore() const = 0;
@@ -37,14 +35,15 @@ class VulkanWindowImpl final : public Object<rhi::IWindow, IVulkanWindow> {
  public:
   ~VulkanWindowImpl() override;
   static rhi::IWindow *Create(IVulkanDevice *device, const WindowDesc &desc);
-  ObjectPtr<IVulkanImage> AcquireNativeFrame() override;
-  bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   VkSemaphore RenderSemaphore() const;
   VkResult PresentFrame();
 
  private:
+  ObjectPtr<IVulkanImage> AcquireNativeFrame();
+  bool RebuildNativeSwapChain(PresentMode mode);
+
   VulkanWindowImpl(IVulkanDevice *device);
   void DestroySwapchain();
   IVulkanDevice *device_;

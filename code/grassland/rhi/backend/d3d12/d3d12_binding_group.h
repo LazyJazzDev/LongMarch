@@ -9,7 +9,6 @@ class ID3D12BindingVersion : public IObject {
   virtual bool IsUniquelyOwned() const noexcept = 0;
   virtual const BindingLayoutDesc &GetLayout() const = 0;
   virtual const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const = 0;
-  virtual bool IsInitialized(size_t binding_index, uint32_t element) const = 0;
   virtual bool IsComplete() const = 0;
   virtual ObjectPtr<ID3D12BindingVersion> Clone() const = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) = 0;
@@ -49,12 +48,13 @@ class D3D12BindingVersionImpl final : public Object<ID3D12BindingVersion> {
  public:
   static D3D12BindingVersionImpl *Create(ID3D12Device *device, const BindingLayoutDesc &layout);
   ObjectPtr<ID3D12BindingVersion> Clone() const override;
-  bool IsInitialized(size_t binding_index, uint32_t element) const override;
   uint32_t ResourceCount() const;
   D3D12DescriptorPool::Lease *ResourceDescriptors() const;
   D3D12DescriptorPool::Lease *SamplerDescriptors() const;
 
  private:
+  bool IsInitialized(size_t binding_index, uint32_t element) const;
+
   ID3D12Device *device_;
   bool WriteDescriptors(size_t binding_index,
                         uint32_t first_element,

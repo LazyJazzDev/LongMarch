@@ -23,8 +23,6 @@ class IVulkanCommandContext : public IObject {
   virtual void BindDownloads(rhi::ISubmissionToken *submission) = 0;
   virtual void ReleaseDownloads() = 0;
   virtual bool Seal() = 0;
-  virtual const void *DeviceIdentity() const = 0;
-  virtual IVulkanQueue *OwnerQueue() const = 0;
   virtual void MarkSubmitted() = 0;
   virtual bool WasSubmitted() const = 0;
   virtual void UpdatePresentedImages() = 0;
@@ -95,6 +93,9 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
+  const void *DeviceIdentity() const;
+  IVulkanQueue *OwnerQueue() const;
+
   // Inputs and ranges have been validated by the recording entry point.
   bool CopyBuffer(IVulkanBuffer *source,
                   uint64_t source_offset,
@@ -172,10 +173,6 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
 
  public:
   bool Seal() override;
-
-  IVulkanQueue *OwnerQueue() const override;
-
-  const void *DeviceIdentity() const override;
 
   void MarkSubmitted() override;
 

@@ -565,7 +565,7 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
     ASSERT_TRUE(
         group->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{SAMPLER_FILTER_NEAREST})).Get()));
     EXPECT_EQ(native->CurrentVersion(), next);
-    EXPECT_TRUE(captured->IsInitialized(2, 0));
+    EXPECT_TRUE(bool(captured->GetReferences()[2][0]));
     ASSERT_EQ(captured->GetReferences()[2].size(), 1u);
     EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[2][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
     // Capture of the unchanged version shares all descriptors and resources.
@@ -622,14 +622,14 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
         group->BindResource(9, CreateSamplers(device.Get(), {{SAMPLER_FILTER_LINEAR}, {SAMPLER_FILTER_NEAREST}}), 1));
     auto next = native->CurrentVersion();
     EXPECT_NE(next, sparse.Get());
-    EXPECT_FALSE(next->IsInitialized(0, 0));
+    EXPECT_FALSE(bool(next->GetReferences()[0][0]));
     EXPECT_EQ(next->GetReferences()[0][1].Get(), buffer.Get());
-    EXPECT_FALSE(next->IsInitialized(0, 2));
+    EXPECT_FALSE(bool(next->GetReferences()[0][2]));
     EXPECT_EQ(next->GetReferences()[1][2].Get(), first.Get());
-    EXPECT_TRUE(sparse->IsInitialized(2, 1));
-    EXPECT_TRUE(next->IsInitialized(2, 1));
-    EXPECT_FALSE(sparse->IsInitialized(2, 2));
-    EXPECT_TRUE(next->IsInitialized(2, 2));
+    EXPECT_TRUE(bool(sparse->GetReferences()[2][1]));
+    EXPECT_TRUE(bool(next->GetReferences()[2][1]));
+    EXPECT_FALSE(bool(sparse->GetReferences()[2][2]));
+    EXPECT_TRUE(bool(next->GetReferences()[2][2]));
     ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 0, 256}, {buffer.Get(), 256, 256}}, 0));
     ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 0, 256}}, 2));
     ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{first.Get(), second.Get()}, 0));

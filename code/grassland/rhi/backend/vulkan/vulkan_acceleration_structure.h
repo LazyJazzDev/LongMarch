@@ -19,7 +19,6 @@ class IVulkanAccelerationStructure : public IObject {
   virtual VkBuildAccelerationStructureFlagsKHR BuildFlags() const = 0;
   virtual uint64_t Address() const = 0;
   virtual uint64_t ScratchSize(AccelerationStructureBuildMode mode) const = 0;
-  virtual uint64_t ReadCompactedSize() const = 0;
   virtual bool AllowsUpdate() const = 0;
   virtual bool AllowsCompaction() const = 0;
   virtual bool IsCompactStorage() const = 0;
@@ -69,8 +68,6 @@ class VulkanBottomLevelAccelerationStructureImpl final
 
   uint64_t ScratchSize(AccelerationStructureBuildMode mode) const override;
 
-  uint64_t ReadCompactedSize() const override;
-
   bool AllowsUpdate() const override;
 
   bool AllowsCompaction() const override;
@@ -78,6 +75,8 @@ class VulkanBottomLevelAccelerationStructureImpl final
   bool IsCompactStorage() const override;
 
  private:
+  uint64_t ReadCompactedSize() const;
+
   VulkanBottomLevelAccelerationStructureImpl(IVulkanDevice *device, const BottomLevelAccelerationStructureDesc &desc);
 
   BottomLevelAccelerationStructureDesc desc_;
@@ -138,8 +137,6 @@ class VulkanTopLevelAccelerationStructureImpl final
 
   uint64_t ScratchSize(AccelerationStructureBuildMode mode) const override;
 
-  uint64_t ReadCompactedSize() const override;
-
   bool AllowsUpdate() const override;
 
   bool AllowsCompaction() const override;
@@ -147,6 +144,8 @@ class VulkanTopLevelAccelerationStructureImpl final
   bool IsCompactStorage() const override;
 
  private:
+  uint64_t ReadCompactedSize() const;
+
   VulkanTopLevelAccelerationStructureImpl(IVulkanDevice *device, const TopLevelAccelerationStructureDesc &desc);
 
   TopLevelAccelerationStructureDesc desc_;

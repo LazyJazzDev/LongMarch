@@ -24,8 +24,6 @@ class ID3D12CommandContext : public IObject {
   virtual void BindDownloads(rhi::ISubmissionToken *submission) = 0;
   virtual void ReleaseDownloads() = 0;
   virtual bool Seal() = 0;
-  virtual const void *DeviceIdentity() const = 0;
-  virtual ID3D12Queue *OwnerQueue() const = 0;
   virtual void MarkSubmitted() = 0;
   virtual bool WasSubmitted() const = 0;
   virtual void UpdatePresentedImages() = 0;
@@ -96,6 +94,9 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
+  const void *DeviceIdentity() const;
+  ID3D12Queue *OwnerQueue() const;
+
   // Inputs and ranges have been validated by the recording entry point.
   bool CopyBuffer(ID3D12Buffer *source,
                   uint64_t source_offset,
@@ -179,10 +180,6 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
 
  public:
   bool Seal() override;
-
-  ID3D12Queue *OwnerQueue() const override;
-
-  const void *DeviceIdentity() const override;
 
   void MarkSubmitted() override;
 
