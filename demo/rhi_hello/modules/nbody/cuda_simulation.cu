@@ -14,11 +14,12 @@ __global__ void NBodyStep(const float3 *positions,
   const unsigned id = blockIdx.x * blockDim.x + threadIdx.x;
   const float3 position = id < count ? positions[id] : make_float3(0, 0, 0);
   float3 acceleration = make_float3(0, 0, 0);
-  __shared__ float3 tile[block_size];
+  __shared__ __align__(16) float3 tile[block_size];
   for (unsigned base = 0; base < count; base += block_size) {
     tile[threadIdx.x] = base + threadIdx.x < count ? positions[base + threadIdx.x] : make_float3(0, 0, 0);
     __syncthreads();
     const unsigned remaining = count - base < block_size ? count - base : block_size;
+#pragma unroll 128
     for (unsigned i = 0; i < remaining; ++i) {
       const float3 difference = make_float3(position.x - tile[i].x, position.y - tile[i].y, position.z - tile[i].z);
       float inverse = rsqrtf(difference.x * difference.x + difference.y * difference.y + difference.z * difference.z +
