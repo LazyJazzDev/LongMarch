@@ -1,6 +1,7 @@
 ﻿#include "2048.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace {
 
@@ -26,8 +27,15 @@ constexpr int kScoreBoardClicksToStartAi = 5;
 
 }  // namespace
 
-TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api)
+TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height, rhi::BackendAPI api)
     : Application(title, width, height, api) {
+}
+
+void TwentyFourEight::OnFramebufferResize() {
+  OnWindowSize();
+}
+
+void TwentyFourEight::CustomOnInit() {
   GetWindow()->KeyEvent().RegisterCallback([this](int key, int scancode, int action, int mods) {
     if (action != GLFW_PRESS) {
       return;
@@ -54,13 +62,7 @@ TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height
         break;
     }
   });
-}
 
-void TwentyFourEight::OnFramebufferResize() {
-  OnWindowSize();
-}
-
-void TwentyFourEight::CustomOnInit() {
   Application::CustomOnInit();
   clear_color_ = {250.0f / 255.0f, 248.0f / 255.0f, 240.0f / 255.0f, 1.0f};
   float arc_size = 1.0f / 16.0f;
@@ -341,7 +343,10 @@ void TwentyFourEight::ResetGame() {
   // A new game always returns control to the player and cancels pending AI work.
   SetAiEnabled(false);
   number_blocks_.clear();
-  random_device_ = std::mt19937(int(std::time(nullptr)));
+  // Reproducible screenshots/replays without changing normal game randomness.
+  const char *validation_seed = std::getenv("LONGMARCH_DEMO_SEED");
+  random_device_ = std::mt19937(validation_seed ? uint32_t(std::strtoul(validation_seed, nullptr, 10))
+                                                : uint32_t(std::time(nullptr)));
   GenRandomBlock();
   GenRandomBlock();
   score_ = 0;

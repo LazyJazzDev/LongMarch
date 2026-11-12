@@ -4,6 +4,8 @@
 #include <set>
 #include <stdexcept>
 
+#include "grassland/util/log.h"
+
 #include FT_OUTLINE_H
 
 namespace {

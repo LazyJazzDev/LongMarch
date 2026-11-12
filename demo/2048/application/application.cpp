@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <map>
 
+#include "../../frame_benchmark.h"
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "listener.h"
 #include "model.h"
@@ -31,54 +33,54 @@ int ChooseSupersampleScale(glm::ivec2 size) {
 
 }  // namespace
 
-Application::Application(const std::string &name, int width, int height, graphics::BackendAPI api) : name_(name) {
-  if (!graphics::SupportBackendAPI(api) || graphics::CreateCore(api, graphics::Core::Settings{}, &core_) != 0 ||
-      !core_) {
-    throw std::runtime_error("Requested graphics backend is unavailable");
-  }
-  if (core_->InitializeLogicalDeviceAutoSelect(false) != 0) {
-    throw std::runtime_error("No compatible graphics device found");
-  }
-  LogInfo("Backend API: {}", graphics::BackendAPIString(core_->API()));
-  LogInfo("Device Name: {}", core_->DeviceName());
-
-  core_->CreateWindowObject(width, height,
-                            fmt::format("[{}] {} FPS: 0.0", graphics::BackendAPIString(core_->API()), name_), false,
-                            true, &window_);
-
-  mouse_move_callback_ = window_->MouseMoveEvent().RegisterCallback(
-      [this](double xpos, double ypos) { NotifyListeners(&Listener::OnCursorPos, xpos, ypos); });
-  mouse_button_callback_ =
-      window_->MouseButtonEvent().RegisterCallback([this](int button, int action, int mods, double, double) {
-        NotifyListeners(&Listener::OnMouseButton, button, action, mods);
-      });
-
-  cursor_enter_callback_ = window_->CursorEnterEvent().RegisterCallback(
-      [this](bool entered) { NotifyListeners(&Listener::OnCursorEnter, int(entered)); });
-  focus_callback_ =
-      window_->FocusEvent().RegisterCallback([this](bool focused) { NotifyListeners(&Listener::OnFocus, focused); });
+Application::Application(const std::string &name, int width, int height, rhi::BackendAPI api)
+    : name_(name),
+      api_(api),
+      initial_width_(width),
+      initial_height_(height) {
 }
 
 Application::~Application() {
+  upload_context_.Release();
+  WaitFrames();
+  if (!window_)
+    return;
   window_->CursorEnterEvent().UnregisterCallback(cursor_enter_callback_);
   window_->FocusEvent().UnregisterCallback(focus_callback_);
   window_->MouseMoveEvent().UnregisterCallback(mouse_move_callback_);
   window_->MouseButtonEvent().UnregisterCallback(mouse_button_callback_);
 }
 
-void Application::Run(int max_frames) {
-  OnInit();
+bool Application::Run(int max_frames) {
+  if (!OnInit()) {
+    OnClose();
+    return false;
+  }
   int frames = 0;
-  while (!window_->ShouldClose() && (max_frames <= 0 || frames < max_frames)) {
-    grassland::graphics::Window::PollEvents();
+  demo::FrameBenchmark benchmark;
+  while (!failed_ && !window_->ShouldClose() && (max_frames <= 0 || frames < max_frames)) {
+    if (frames == 120 && !WaitFrames())
+      break;
+    const bool measured = benchmark.BeginFrame(frames);
+    // Bound CPU/GPU overlap without making every upload a synchronous transfer.
+    auto &previous = submissions_[submission_index_];
+    if (previous && !Check(previous->WaitHost(), "Wait for frame slot"))
+      break;
+    previous.Release();
+    if (!Check(rhi::PollEvents(), "Poll window events"))
+      break;
     OnUpdate();
-    OnRender();
+    if (failed_ || !OnRender())
+      break;
+    benchmark.EndFrame(measured);
     frames++;
   }
-  if (!screenshot_path_.empty()) {
+  WaitFrames();
+  benchmark.Finish();
+  if (!failed_ && !screenshot_path_.empty())
     SaveScreenshot();
-  }
   OnClose();
+  return !failed_;
 }
 
 void Application::DrawModel(DeviceModel *device_model, const InstanceInfo &instance_info) {
@@ -111,55 +113,100 @@ void Application::CustomOnInit() {
 void Application::OnFramebufferResize() {
 }
 
-void Application::OnInit() {
-  const auto shader_code = GetShaderCode("shaders/super.slang");
-  core_->CreateShader(shader_code, "VSMain", "vs_6_0", &vertex_shader_);
-  core_->CreateShader(shader_code, "PSMain", "ps_6_0", &pixel_shader_);
-  core_->CreateProgram({graphics::IMAGE_FORMAT_R8G8B8A8_UNORM}, graphics::IMAGE_FORMAT_D32_SFLOAT, &program_);
-  program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-  program_->BindShader(pixel_shader_.get(), graphics::SHADER_TYPE_PIXEL);
-  program_->AddInputBinding(sizeof(Vertex));
-  program_->AddInputBinding(sizeof(uint32_t), true);
-  program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT2, offsetof(Vertex, position));
-  program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT4, offsetof(Vertex, color));
-  program_->AddInputAttribute(1, graphics::INPUT_TYPE_UINT, 0);
-  program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-  program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  program_->SetCullMode(graphics::CULL_MODE_NONE);
-  program_->Finalize();
+bool Application::OnInit() {
+  core_ = rhi::CreateCore(api_);
+  if (!Check(bool(core_), "Create RHI core"))
+    return false;
+  device_ = core_->CreateDeviceByAutoSelection();
+  if (!Check(bool(device_), "Select RHI device"))
+    return false;
+  queue_ = device_->GetQueue(rhi::QUEUE_TYPE_MAIN);
+  if (!Check(bool(queue_), "Get main queue"))
+    return false;
+  auto *window = device_->CreateGLFWWindow({initial_width_, initial_height_,
+                                            fmt::format("[{}] {} FPS: 0.0", rhi::BackendAPIName(api_), name_),
+                                            rhi::PRESENT_MODE_CONTINUOUS});
+  if (!Check(window != nullptr, "Create RHI window"))
+    return false;
+  window_ = std::make_unique<demo::Window>(window);
+  LogInfo("Backend API: {}", rhi::BackendAPIName(api_));
+  LogInfo("Device Name: {}", device_->Name());
+  mouse_move_callback_ = window_->MouseMoveEvent().RegisterCallback(
+      [this](double x, double y) { NotifyListeners(&Listener::OnCursorPos, x, y); });
+  mouse_button_callback_ =
+      window_->MouseButtonEvent().RegisterCallback([this](int button, int action, int mods, double, double) {
+        NotifyListeners(&Listener::OnMouseButton, button, action, mods);
+      });
+  cursor_enter_callback_ = window_->CursorEnterEvent().RegisterCallback(
+      [this](bool entered) { NotifyListeners(&Listener::OnCursorEnter, int(entered)); });
+  focus_callback_ =
+      window_->FocusEvent().RegisterCallback([this](bool focused) { NotifyListeners(&Listener::OnFocus, focused); });
 
-  const auto resolve_code = GetShaderCode("shaders/resolve.slang");
-  core_->CreateShader(resolve_code, "VSMain", "vs_6_0", &resolve_vertex_shader_);
-  core_->CreateShader(resolve_code, "PSMain", "ps_6_0", &resolve_pixel_shader_);
-  core_->CreateProgram({graphics::IMAGE_FORMAT_R8G8B8A8_UNORM}, graphics::IMAGE_FORMAT_UNDEFINED, &resolve_program_);
-  resolve_program_->BindShader(resolve_vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-  resolve_program_->BindShader(resolve_pixel_shader_.get(), graphics::SHADER_TYPE_PIXEL);
-  resolve_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  resolve_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  resolve_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  resolve_program_->SetCullMode(graphics::CULL_MODE_NONE);
-  resolve_program_->Finalize();
+  vertex_shader_ =
+      device_->CreateShaderFromSource(GetShaderCode("shaders/super.slang"), "VSMain", rhi::SHADER_STAGE_VERTEX);
+  pixel_shader_ =
+      device_->CreateShaderFromSource(GetShaderCode("shaders/super.slang"), "PSMain", rhi::SHADER_STAGE_FRAGMENT);
+  resolve_vertex_shader_ =
+      device_->CreateShaderFromSource(GetShaderCode("shaders/resolve.slang"), "VSMain", rhi::SHADER_STAGE_VERTEX);
+  resolve_pixel_shader_ =
+      device_->CreateShaderFromSource(GetShaderCode("shaders/resolve.slang"), "PSMain", rhi::SHADER_STAGE_FRAGMENT);
+  if (!Check(vertex_shader_ && pixel_shader_ && resolve_vertex_shader_ && resolve_pixel_shader_,
+             "Compile demo shaders"))
+    return false;
 
-  core_->CreateBuffer(sizeof(glm::mat4), graphics::BUFFER_TYPE_DYNAMIC, &global_uniform_buffer_);
-  core_->CreateBuffer(sizeof(ResolveParams), graphics::BUFFER_TYPE_DYNAMIC, &resolve_uniform_buffer_);
-  const uint32_t first_instance_index = 0;
-  core_->CreateBuffer(sizeof(uint32_t), graphics::BUFFER_TYPE_DYNAMIC, &instance_index_buffer_);
-  instance_index_buffer_->UploadData(&first_instance_index, sizeof(uint32_t));
+  const rhi::BindingLayoutDesc instances{{{0, rhi::BINDING_BYTE_ADDRESS_BUFFER}}};
+  const rhi::BindingLayoutDesc uniform{{{0, rhi::BINDING_UNIFORM_BUFFER}}};
+  const rhi::BindingLayoutDesc image{{{0, rhi::BINDING_TEXTURE2D}}};
+  rhi::ProgramDesc desc;
+  desc.vertex_shader = vertex_shader_.Get();
+  desc.fragment_shader = pixel_shader_.Get();
+  desc.vertex_bindings = {{sizeof(Vertex)}, {sizeof(uint32_t), true}};
+  desc.vertex_attributes = {{0, 0, rhi::INPUT_TYPE_FLOAT2, offsetof(Vertex, position)},
+                            {1, 0, rhi::INPUT_TYPE_FLOAT4, offsetof(Vertex, color)},
+                            {2, 1, rhi::INPUT_TYPE_UINT, 0}};
+  desc.depth_stencil = {rhi::IMAGE_FORMAT_D32_SFLOAT, true, true};
+  desc.rasterizer.cull_mode = rhi::CULL_MODE_NONE;
+  desc.pipeline_layout.groups = {instances, uniform};
+  program_ = device_->CreateProgram(desc);
+  rhi::ProgramDesc resolve;
+  resolve.vertex_shader = resolve_vertex_shader_.Get();
+  resolve.fragment_shader = resolve_pixel_shader_.Get();
+  resolve.rasterizer.cull_mode = rhi::CULL_MODE_NONE;
+  resolve.pipeline_layout.groups = {uniform, image, image};
+  resolve_program_ = device_->CreateProgram(resolve);
+  instance_group_ = device_->CreateBindingGroup(instances);
+  global_group_ = device_->CreateBindingGroup(uniform);
+  resolve_group_ = device_->CreateBindingGroup(uniform);
+  main_image_group_ = device_->CreateBindingGroup(image);
+  second_image_group_ = device_->CreateBindingGroup(image);
+  if (!Check(program_ && resolve_program_ && instance_group_ && global_group_ && resolve_group_ && main_image_group_ &&
+                 second_image_group_,
+             "Create render pipelines and bindings"))
+    return false;
+
+  // D3D12 constant-buffer views require a 256-byte backing allocation.
+  global_uniform_buffer_ = CreateBuffer(256);
+  resolve_uniform_buffer_ = CreateBuffer(256);
+  main_frame_.instance_buffer = CreateBuffer(sizeof(InstanceInfo));
+  second_frame_.instance_buffer = CreateBuffer(sizeof(InstanceInfo));
+  const uint32_t first_index = 0;
+  if (failed_ || !UploadBuffer(instance_index_buffer_, &first_index, sizeof(first_index)))
+    return false;
   instance_index_count_ = 1;
-  core_->CreateBuffer(sizeof(InstanceInfo), graphics::BUFFER_TYPE_DYNAMIC, &main_frame_.instance_buffer);
-  core_->CreateBuffer(sizeof(InstanceInfo), graphics::BUFFER_TYPE_DYNAMIC, &second_frame_.instance_buffer);
-
-  BuildScreenFrameObjects();
-
+  if (!BuildScreenFrameObjects())
+    return false;
   title_time_ = grassland::GetTimeSeconds();
+  custom_initialized_ = true;
   CustomOnInit();
+  return !failed_;
 }
 
 void Application::OnUpdate() {
   const auto size = window_->GetFramebufferSize();
   const int width = size.x, height = size.y;
   if (width > 0 && height > 0 && glm::ivec2{width, height} != framebuffer_size_) {
-    BuildScreenFrameObjects();
+    if (!BuildScreenFrameObjects())
+      return;
     OnFramebufferResize();
   }
 
@@ -171,59 +218,68 @@ void Application::OnUpdate() {
   UpdateTitle();
 }
 
-void Application::OnRender() {
+bool Application::OnRender() {
   const auto size = window_->GetFramebufferSize();
-  const int width = size.x, height = size.y;
-  if (width <= 0 || height <= 0) {
-    // Minimized windows have no framebuffer to present.
-    return;
+  if (size.x <= 0 || size.y <= 0)
+    return true;
+  auto *window = window_->Get();
+  if (window->IsSwapChainInvalid()) {
+    // No swapchain images are held by the demo; drain before rebuilding.
+    if (!WaitFrames() || !Check(window->RebuildSwapChain(), "Rebuild swapchain"))
+      return false;
+    if (window->IsSwapChainInvalid())
+      return true;
   }
 
-  // Instance indices are fed through a per-instance vertex stream so that the
-  // first instance offset works identically on every backend.
   const size_t max_instances = std::max(main_frame_.instances.size(), second_frame_.instances.size());
-  // Track which indices have been initialized independently of buffer capacity.
   if (max_instances > instance_index_count_) {
     std::vector<uint32_t> indices(std::max(max_instances, instance_index_count_ * 2));
-    for (size_t i = 0; i < indices.size(); i++) {
+    for (size_t i = 0; i < indices.size(); i++)
       indices[i] = static_cast<uint32_t>(i);
-    }
-    if (indices.size() * sizeof(uint32_t) > instance_index_buffer_->Size()) {
-      instance_index_buffer_->Resize(indices.size() * sizeof(uint32_t));
-    }
-    instance_index_buffer_->UploadData(indices.data(), indices.size() * sizeof(uint32_t));
+    if (!UploadBuffer(instance_index_buffer_, indices.data(), indices.size() * sizeof(uint32_t)))
+      return false;
     instance_index_count_ = indices.size();
   }
-
-  std::unique_ptr<graphics::CommandContext> context;
-  core_->CreateCommandContext(&context);
-
+  if (!upload_context_)
+    upload_context_ = queue_->CreateCommandContext();
+  if (!Check(bool(upload_context_), "Create frame commands"))
+    return false;
+  auto *context = upload_context_.Get();
   const bool use_second_frame = second_frame_alpha_ > 0.0f;
-  if (use_second_frame) {
-    RenderFrameTarget(context.get(), second_frame_);
-  }
-  RenderFrameTarget(context.get(), main_frame_);
-
+  if (use_second_frame && !RenderFrameTarget(context, second_frame_))
+    return false;
+  if (!RenderFrameTarget(context, main_frame_))
+    return false;
   ResolveParams params{use_second_frame ? second_frame_alpha_ : 0.0f, static_cast<uint32_t>(supersample_scale_)};
-  resolve_uniform_buffer_->UploadData(&params, sizeof(params));
-
-  auto *second_image = use_second_frame ? second_frame_.color_image.get() : main_frame_.color_image.get();
-  context->CmdBeginRendering({present_image_.get()}, nullptr);
-  context->CmdBindProgram(resolve_program_.get());
-  context->CmdBindResources(0, {resolve_uniform_buffer_.get()});
-  context->CmdBindResources(1, {main_frame_.color_image.get()});
-  context->CmdBindResources(2, {second_image});
-  context->CmdSetViewport({0.0f, 0.0f, float(framebuffer_size_.x), float(framebuffer_size_.y), 0.0f, 1.0f});
-  context->CmdSetScissor({{0, 0}, {uint32_t(framebuffer_size_.x), uint32_t(framebuffer_size_.y)}});
-  context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  context->CmdDraw(3, 1, 0, 0);
-  context->CmdEndRendering();
-
-  context->CmdPresent(window_.get(), present_image_.get());
-  core_->SubmitCommandContext(context.get());
+  if (!UploadBuffer(resolve_uniform_buffer_, &params, sizeof(params)))
+    return false;
+  auto *second_image = use_second_frame ? second_frame_.color_image.Get() : main_frame_.color_image.Get();
+  if (!Check(resolve_group_->BindResource(0, resolve_uniform_buffer_.Get()) &&
+                 main_image_group_->BindResource(0, main_frame_.color_image.Get()) &&
+                 second_image_group_->BindResource(0, second_image),
+             "Bind resolve resources"))
+    return false;
+  rhi::RenderingInfo rendering;
+  rendering.color_attachments = {{present_image_.Get(), rhi::ATTACHMENT_LOAD_OP_DISCARD}};
+  if (!Check(context->CmdBeginRendering(rendering) && context->CmdBindProgram(resolve_program_.Get()) &&
+                 context->CmdBindGroup(0, resolve_group_.Get()) && context->CmdBindGroup(1, main_image_group_.Get()) &&
+                 context->CmdBindGroup(2, second_image_group_.Get()) &&
+                 context->CmdSetViewport({0, 0, float(framebuffer_size_.x), float(framebuffer_size_.y), 0, 1}) &&
+                 context->CmdSetScissor({0, 0, uint32_t(framebuffer_size_.x), uint32_t(framebuffer_size_.y)}) &&
+                 context->CmdDraw(3) && context->CmdEndRendering() &&
+                 (!demo::FrameBenchmark::PresentFrames() ||
+                  context->CmdPresentImage(window, present_image_.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR)),
+             "Record resolve and presentation"))
+    return false;
+  submissions_[submission_index_] = context->Submit();
+  upload_context_.Release();
+  if (!Check(bool(submissions_[submission_index_]), "Submit frame"))
+    return false;
+  submission_index_ = (submission_index_ + 1) % submissions_.size();
+  return true;
 }
 
-void Application::RenderFrameTarget(graphics::CommandContext *context, FrameTarget &target) {
+bool Application::RenderFrameTarget(rhi::ICommandContext *context, FrameTarget &target) {
   auto &instances = target.instances;
   // Group instances of the same model into a single draw call. The stable sort
   // keeps submission order within a model; the depth buffer resolves layering.
@@ -236,23 +292,29 @@ void Application::RenderFrameTarget(graphics::CommandContext *context, FrameTarg
       instance_infos.push_back(instance.second);
     }
     const size_t data_size = instance_infos.size() * sizeof(InstanceInfo);
-    if (data_size > target.instance_buffer->Size()) {
-      target.instance_buffer->Resize(data_size);
-    }
-    target.instance_buffer->UploadData(instance_infos.data(), data_size);
+    if (!UploadBuffer(target.instance_buffer, instance_infos.data(), data_size))
+      return false;
   }
 
-  const auto extent = target.color_image->Extent();
-  context->CmdClearImage(target.color_image.get(), {{clear_color_.r, clear_color_.g, clear_color_.b, clear_color_.a}});
-  context->CmdClearImage(depth_image_.get(), {{1.0f}});
-  context->CmdBeginRendering({target.color_image.get()}, depth_image_.get());
-  context->CmdBindProgram(program_.get());
-  context->CmdBindResources(0, {target.instance_buffer.get()});
-  context->CmdBindResources(1, {global_uniform_buffer_.get()});
-  context->CmdBindVertexBuffers(1, {instance_index_buffer_.get()}, {0});
-  context->CmdSetViewport({0.0f, 0.0f, float(extent.width), float(extent.height), 0.0f, 1.0f});
-  context->CmdSetScissor({{0, 0}, extent});
-  context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+  const auto extent = target.color_image->GetDesc();
+  if (!Check(instance_group_->BindResource(0, target.instance_buffer.Get()) &&
+                 global_group_->BindResource(0, global_uniform_buffer_.Get()),
+             "Bind scene resources"))
+    return false;
+  rhi::RenderingInfo rendering;
+  rendering.color_attachments = {{target.color_image.Get(),
+                                  rhi::ATTACHMENT_LOAD_OP_CLEAR,
+                                  rhi::ATTACHMENT_STORE_OP_STORE,
+                                  {clear_color_.r, clear_color_.g, clear_color_.b, clear_color_.a}}};
+  rendering.depth_stencil.image = depth_image_.Get();
+  rendering.depth_stencil.depth_load_op = rhi::ATTACHMENT_LOAD_OP_CLEAR;
+  if (!Check(context->CmdBeginRendering(rendering) && context->CmdBindProgram(program_.Get()) &&
+                 context->CmdBindGroup(0, instance_group_.Get()) && context->CmdBindGroup(1, global_group_.Get()) &&
+                 context->CmdBindVertexBuffer(1, instance_index_buffer_.Get()) &&
+                 context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}) &&
+                 context->CmdSetScissor({0, 0, extent.width, extent.height}),
+             "Begin scene rendering"))
+    return false;
 
   for (size_t head = 0, tail = 0; head < instances.size(); head = tail) {
     while (tail < instances.size() && instances[head].first == instances[tail].first) {
@@ -262,57 +324,65 @@ void Application::RenderFrameTarget(graphics::CommandContext *context, FrameTarg
     if (!device_model->IndexCount()) {
       continue;
     }
-    context->CmdBindVertexBuffers(0, {device_model->VertexBuffer()}, {0});
-    context->CmdBindIndexBuffer(device_model->IndexBuffer(), 0);
-    context->CmdDrawIndexed(device_model->IndexCount(), uint32_t(tail - head), 0, 0, uint32_t(head));
+    if (!Check(context->CmdBindVertexBuffer(0, device_model->VertexBuffer()) &&
+                   context->CmdBindIndexBuffer(device_model->IndexBuffer()) &&
+                   context->CmdDrawIndexed(device_model->IndexCount(), uint32_t(tail - head), 0, 0, uint32_t(head)),
+               "Draw model batch"))
+      return false;
   }
-  context->CmdEndRendering();
+  return Check(context->CmdEndRendering(), "End scene rendering");
 }
 
 void Application::OnClose() {
-  core_->WaitGPU();
-
-  CustomOnClose();
-
+  // Discard recordings before releasing resources, including on an error path.
+  upload_context_.Release();
+  WaitFrames();
+  if (custom_initialized_) {
+    CustomOnClose();
+    custom_initialized_ = false;
+  }
   main_frame_ = {};
   second_frame_ = {};
-  depth_image_.reset();
-  present_image_.reset();
-  instance_index_buffer_.reset();
-  resolve_uniform_buffer_.reset();
-  global_uniform_buffer_.reset();
-  resolve_program_.reset();
-  resolve_pixel_shader_.reset();
-  resolve_vertex_shader_.reset();
-  program_.reset();
-  pixel_shader_.reset();
-  vertex_shader_.reset();
+  instance_group_.Release();
+  global_group_.Release();
+  resolve_group_.Release();
+  main_image_group_.Release();
+  second_image_group_.Release();
+  depth_image_.Release();
+  present_image_.Release();
+  instance_index_buffer_.Release();
+  resolve_uniform_buffer_.Release();
+  global_uniform_buffer_.Release();
+  resolve_program_.Release();
+  resolve_pixel_shader_.Release();
+  resolve_vertex_shader_.Release();
+  program_.Release();
+  pixel_shader_.Release();
+  vertex_shader_.Release();
 }
 
-void Application::BuildScreenFrameObjects() {
+bool Application::BuildScreenFrameObjects() {
+  if (!WaitFrames())
+    return false;
   const auto size = window_->GetFramebufferSize();
-  const int width = size.x, height = size.y;
-  framebuffer_size_ = {std::max(width, 1), std::max(height, 1)};
+  framebuffer_size_ = glm::max(size, glm::ivec2{1});
   supersample_scale_ = ChooseSupersampleScale(framebuffer_size_);
   const auto sample_size = framebuffer_size_ * supersample_scale_;
-
-  core_->WaitGPU();
-  main_frame_.color_image.reset();
-  second_frame_.color_image.reset();
-  depth_image_.reset();
-  present_image_.reset();
-  core_->CreateImage(sample_size.x, sample_size.y, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &main_frame_.color_image);
-  core_->CreateImage(sample_size.x, sample_size.y, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &second_frame_.color_image);
-  core_->CreateImage(sample_size.x, sample_size.y, graphics::IMAGE_FORMAT_D32_SFLOAT, &depth_image_);
-  core_->CreateImage(framebuffer_size_.x, framebuffer_size_.y, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &present_image_);
-
-  // Maps framebuffer pixel coordinates (y pointing down) to normalized device coordinates.
+  const rhi::ImageDesc color{uint32_t(sample_size.x), uint32_t(sample_size.y), rhi::IMAGE_FORMAT_R8G8B8A8_UNORM};
+  main_frame_.color_image = device_->CreateImage(color);
+  second_frame_.color_image = device_->CreateImage(color);
+  depth_image_ = device_->CreateImage({color.width, color.height, rhi::IMAGE_FORMAT_D32_SFLOAT});
+  present_image_ = device_->CreateImage(
+      {uint32_t(framebuffer_size_.x), uint32_t(framebuffer_size_.y), rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  if (!Check(main_frame_.color_image && second_frame_.color_image && depth_image_ && present_image_,
+             "Create frame targets"))
+    return false;
   glm::mat4 view{1.0f};
   view[0][0] = 2.0f / float(framebuffer_size_.x);
   view[1][1] = -2.0f / float(framebuffer_size_.y);
   view[3][0] = -1.0f;
   view[3][1] = 1.0f;
-  global_uniform_buffer_->UploadData(&view, sizeof(view));
+  return UploadBuffer(global_uniform_buffer_, &view, sizeof(view));
 }
 
 void Application::UpdateTitle() {
@@ -321,21 +391,72 @@ void Application::UpdateTitle() {
   fps_counter_.TickFrame();
   const double now = grassland::GetTimeSeconds();
   if (now - title_time_ >= 0.25) {
-    window_->SetTitle(
-        fmt::format("[{}] {} FPS: {:.1f}", graphics::BackendAPIString(core_->API()), name_, fps_counter_.GetFPS()));
+    window_->SetTitle(fmt::format("[{}] {} FPS: {:.1f}", rhi::BackendAPIName(api_), name_, fps_counter_.GetFPS()));
     title_time_ = now;
   }
 }
 
-void Application::SaveScreenshot() {
-  core_->WaitGPU();
-  const auto extent = present_image_->Extent();
-  std::vector<uint8_t> pixels(size_t(extent.width) * extent.height * 4);
-  present_image_->DownloadData(pixels.data());
-  if (stbi_write_png(screenshot_path_.c_str(), int(extent.width), int(extent.height), 4, pixels.data(),
-                     int(extent.width) * 4)) {
-    LogInfo("Screenshot saved to {}", screenshot_path_);
-  } else {
-    LogError("Failed to save screenshot to {}", screenshot_path_);
+bool Application::SaveScreenshot() {
+  const auto desc = present_image_->GetDesc();
+  rhi::ObjPtr<rhi::ICommandContext> context = queue_->CreateCommandContext();
+  if (!Check(bool(context), "Create screenshot commands"))
+    return false;
+  rhi::ObjPtr<rhi::IDownloadToken> download = context->CmdDownloadImage(present_image_.Get());
+  if (!Check(bool(download), "Record screenshot download"))
+    return false;
+  rhi::ObjPtr<rhi::ISubmissionToken> submission = context->Submit();
+  if (!Check(submission && submission->WaitHost() && download->WaitHost(), "Download screenshot"))
+    return false;
+  std::vector<uint8_t> pixels(size_t(desc.width) * desc.height * 4);
+  if (!Check(download->CopyTo(pixels.data(), pixels.size()), "Copy screenshot pixels"))
+    return false;
+  if (!Check(stbi_write_png(screenshot_path_.c_str(), int(desc.width), int(desc.height), 4, pixels.data(),
+                            int(desc.width) * 4) != 0,
+             "Write screenshot PNG"))
+    return false;
+  LogInfo("Screenshot saved to {}", screenshot_path_);
+  return true;
+}
+
+bool Application::Check(bool success, const char *operation) {
+  if (!success) {
+    if (!failed_)
+      LogError("{} failed", operation);
+    failed_ = true;
   }
+  return success;
+}
+
+bool Application::WaitFrames() {
+  bool success = true;
+  for (auto &submission : submissions_) {
+    if (submission)
+      success = Check(submission->WaitHost(), "Wait for GPU work") && success;
+    submission.Release();
+  }
+  return success;
+}
+
+rhi::ObjPtr<rhi::IBuffer> Application::CreateBuffer(uint64_t size) {
+  if (failed_ || !device_)
+    return {};
+  rhi::ObjPtr<rhi::IBuffer> buffer = device_->CreateBuffer({std::max<uint64_t>(size, 4)});
+  Check(bool(buffer), "Allocate buffer");
+  return buffer;
+}
+
+bool Application::UploadBuffer(rhi::ObjPtr<rhi::IBuffer> &buffer, const void *data, uint64_t size) {
+  if (failed_)
+    return false;
+  if (!buffer || buffer->GetDesc().size < size) {
+    auto replacement = CreateBuffer(std::max(size, buffer ? buffer->GetDesc().size * 2 : uint64_t{4}));
+    if (!replacement)
+      return false;
+    buffer = std::move(replacement);
+  }
+  if (!size)
+    return true;
+  if (!upload_context_)
+    upload_context_ = queue_->CreateCommandContext();
+  return Check(upload_context_ && upload_context_->CmdUploadBuffer(buffer.Get(), 0, data, size), "Upload buffer");
 }

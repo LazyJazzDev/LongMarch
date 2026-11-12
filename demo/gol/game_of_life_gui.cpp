@@ -22,7 +22,7 @@ GameOfLife::GameOfLife(const char *title,
                        int height,
                        int cell_grid_width,
                        int cell_grid_height,
-                       graphics::BackendAPI api)
+                       rhi::BackendAPI api)
     : Application(title, width, height, api),
       cell_grid_width_(cell_grid_width),
       cell_grid_height_(cell_grid_height) {
@@ -92,8 +92,8 @@ void GameOfLife::CustomOnInit() {
   height_slider_ = std::make_unique<SizeSlider>(this, 'H', cell_grid_height_, &white_rect_model.value(),
                                                 [this](int value) { requested_height_ = value; });
   OnWindowSize();
-  magnify_callback_ = GetWindow()->MagnifyEvent().RegisterCallback([this](const graphics::MagnifyGesture &gesture) {
-    if (gesture.phase == graphics::MagnifyPhase::kCancel)
+  magnify_callback_ = GetWindow()->MagnifyEvent().RegisterCallback([this](const demo::MagnifyGesture &gesture) {
+    if (gesture.phase == demo::MagnifyPhase::kCancel)
       return;
     const glm::vec2 point = FramePosition({gesture.x, gesture.y});
     if (point.x < playground_left_ || point.x >= playground_right_ || point.y < playground_top_ ||

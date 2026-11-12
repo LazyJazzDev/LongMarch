@@ -1,12 +1,15 @@
 ﻿#pragma once
 
+#include <array>
+#include <glm/gtc/matrix_transform.hpp>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "long_march.h"
+#include "../../demo_window.h"
+#include "grassland/util/util.h"
 
 using namespace grassland;
 
@@ -21,28 +24,27 @@ struct InstanceInfo {
   glm::vec4 clip_rect{-1.0e9f, -1.0e9f, 1.0e9f, 1.0e9f};
 };
 
-// A small 2D instanced renderer on top of grassland::graphics. Models are drawn
+// A small 2D instanced renderer on top of grassland::rhi. Models are drawn
 // in framebuffer pixel coordinates (origin at the top-left corner) with depth
 // testing, then resolved from a supersampled target for anti-aliasing.
 class Application {
  public:
-  Application(const std::string &name, int width, int height, graphics::BackendAPI api);
+  Application(const std::string &name, int width, int height, rhi::BackendAPI api);
 
   virtual ~Application();
 
   // Runs until the window closes, or after max_frames frames when positive.
-  void Run(int max_frames = 0);
+  bool Run(int max_frames = 0);
 
   // Saves the last presented frame as a PNG file when the application exits.
   void SetScreenshotPath(const std::string &path) {
     screenshot_path_ = path;
   }
 
-  [[nodiscard]] graphics::Core *Core() const {
-    return core_.get();
-  }
+  rhi::ObjPtr<rhi::IBuffer> CreateBuffer(uint64_t size);
+  bool UploadBuffer(rhi::ObjPtr<rhi::IBuffer> &buffer, const void *data, uint64_t size);
 
-  [[nodiscard]] graphics::Window *GetWindow() const {
+  [[nodiscard]] demo::Window *GetWindow() const {
     return window_.get();
   }
 
@@ -83,8 +85,8 @@ class Application {
 
  private:
   struct FrameTarget {
-    std::unique_ptr<graphics::Image> color_image;
-    std::unique_ptr<graphics::Buffer> instance_buffer;
+    rhi::ObjPtr<rhi::IImage> color_image;
+    rhi::ObjPtr<rhi::IBuffer> instance_buffer;
     std::vector<std::pair<DeviceModel *, InstanceInfo>> instances;
     // Data words stored after the instance records, and the instances whose
     // extra.y holds an offset into them, relative to the end of the records.
@@ -93,19 +95,21 @@ class Application {
     std::vector<uint8_t> upload;
   };
 
-  void OnInit();
+  bool Check(bool success, const char *operation);
+  bool WaitFrames();
+  bool OnInit();
 
   void OnUpdate();
 
-  void OnRender();
+  bool OnRender();
 
   void OnClose();
 
-  void BuildScreenFrameObjects();
+  bool BuildScreenFrameObjects();
 
   void UpdateTitle();
 
-  void SaveScreenshot();
+  bool SaveScreenshot();
 
   template <class Func, class... Args>
   void NotifyListeners(Func func, Args... args) {
@@ -119,27 +123,38 @@ class Application {
     }
   }
 
-  void RenderFrameTarget(graphics::CommandContext *context, FrameTarget &target);
+  bool RenderFrameTarget(rhi::ICommandContext *context, FrameTarget &target);
 
   std::string name_;
   std::string screenshot_path_;
-  std::unique_ptr<graphics::Core> core_;
-  std::unique_ptr<graphics::Window> window_;
+  rhi::BackendAPI api_;
+  int initial_width_, initial_height_;
+  bool failed_{false};
+  bool custom_initialized_{false};
+  rhi::ObjPtr<rhi::ICore> core_;
+  rhi::ObjPtr<rhi::IDevice> device_;
+  rhi::ObjPtr<rhi::IQueue> queue_;
+  std::unique_ptr<demo::Window> window_;
+  rhi::ObjPtr<rhi::ICommandContext> upload_context_;
+  std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> submissions_;
+  size_t submission_index_{};
+  rhi::ObjPtr<rhi::IBindingGroup> instance_group_, global_group_;
+  rhi::ObjPtr<rhi::IBindingGroup> resolve_group_, main_image_group_, second_image_group_;
 
-  std::unique_ptr<graphics::Shader> vertex_shader_;
-  std::unique_ptr<graphics::Shader> pixel_shader_;
-  std::unique_ptr<graphics::Program> program_;
-  std::unique_ptr<graphics::Shader> resolve_vertex_shader_;
-  std::unique_ptr<graphics::Shader> resolve_pixel_shader_;
-  std::unique_ptr<graphics::Program> resolve_program_;
+  rhi::ObjPtr<rhi::IShader> vertex_shader_;
+  rhi::ObjPtr<rhi::IShader> pixel_shader_;
+  rhi::ObjPtr<rhi::IProgram> program_;
+  rhi::ObjPtr<rhi::IShader> resolve_vertex_shader_;
+  rhi::ObjPtr<rhi::IShader> resolve_pixel_shader_;
+  rhi::ObjPtr<rhi::IProgram> resolve_program_;
 
-  std::unique_ptr<graphics::Buffer> global_uniform_buffer_;
-  std::unique_ptr<graphics::Buffer> resolve_uniform_buffer_;
-  std::unique_ptr<graphics::Buffer> instance_index_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> global_uniform_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> resolve_uniform_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> instance_index_buffer_;
   size_t instance_index_count_{};
 
-  std::unique_ptr<graphics::Image> depth_image_;
-  std::unique_ptr<graphics::Image> present_image_;
+  rhi::ObjPtr<rhi::IImage> depth_image_;
+  rhi::ObjPtr<rhi::IImage> present_image_;
   FrameTarget main_frame_;
   FrameTarget second_frame_;
   float second_frame_alpha_{0.0f};
