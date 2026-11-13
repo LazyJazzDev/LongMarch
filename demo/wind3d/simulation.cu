@@ -68,7 +68,7 @@ struct TransportSampler {
       if (coordinate[d] - floorf(coordinate[d]) == 0.5f)
         ties |= 1 << d;
     if (!ties)
-      return DonorAtAnchor(field, axis, anchor, x, y, z);
+      return DonorAtAnchor(field, axis, p, anchor, x, y, z);
     // Exactly halfway between samples, neither adjacent anchor is preferred.
     // Average their reconstructions so reflecting the grid preserves sampling.
     float result = 0;
@@ -78,27 +78,39 @@ struct TransportSampler {
         continue;
       int adjacent[] = {anchor[0] - ((subset & 1) != 0), anchor[1] - ((subset & 2) != 0),
                         anchor[2] - ((subset & 4) != 0)};
-      result += DonorAtAnchor(field, axis, adjacent, x, y, z);
+      result += DonorAtAnchor(field, axis, p, adjacent, x, y, z);
       ++count;
     }
     return result / count;
   }
 
-  __device__ float DonorAtAnchor(const float *field, int axis, const int *anchor, int x, int y, int z) const {
+  __device__ float DonorAtAnchor(const float *field, int axis, Vec3 p, const int *anchor, int x, int y, int z) const {
     int q[] = {x, y, z};
     int dims[] = {g.nx, g.ny, g.nz}, mirror[] = {x, y, z};
     float fraction[] = {0, 0, 0};
     for (int d = 0; d < 3; ++d) {
       if (d == axis || q[d] == anchor[d])
         continue;
-      int face[] = {anchor[0], anchor[1], anchor[2]};
-      face[d] = max(q[d], anchor[d]);
-      for (int half = 0; half < 2; ++half) {
-        if (face[0] >= 0 && face[0] <= dims[0] && face[1] >= 0 && face[1] <= dims[1] && face[2] >= 0 &&
-            face[2] <= dims[2])
-          fraction[d] += 0.5f * (blocked[d][g.F(face[0], face[1], face[2])] != 0);
-        --face[axis];
-      }
+      // Interpolate wall coverage along its tangent plane. Nearest-anchor
+      // lookup would jump when a trace crosses a tangential half cell.
+      float coordinate[] = {p.x, p.y, p.z};
+      int t0 = (d + 1) % 3, t1 = (d + 2) % 3;
+      int base0 = int(floorf(coordinate[t0])), base1 = int(floorf(coordinate[t1]));
+      float f0 = coordinate[t0] - base0, f1 = coordinate[t1] - base1;
+      for (int j = 0; j < 2; ++j)
+        for (int i = 0; i < 2; ++i) {
+          int face[] = {0, 0, 0};
+          face[d] = max(q[d], anchor[d]);
+          face[t0] = base0 + i;
+          face[t1] = base1 + j;
+          float weight = (i ? f0 : 1 - f0) * (j ? f1 : 1 - f1);
+          for (int half = 0; half < 2; ++half) {
+            if (face[0] >= 0 && face[0] <= dims[0] && face[1] >= 0 && face[1] <= dims[1] && face[2] >= 0 &&
+                face[2] <= dims[2])
+              fraction[d] += 0.5f * weight * (blocked[d][g.F(face[0], face[1], face[2])] != 0);
+            --face[axis];
+          }
+        }
       mirror[d] = 2 * max(q[d], anchor[d]) - 1 - q[d];
     }
     if (fraction[0] == 0 && fraction[1] == 0 && fraction[2] == 0)

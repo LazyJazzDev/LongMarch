@@ -77,7 +77,9 @@ on staggered faces and pressure at cell centres. Each step performs:
    bounds reconstruct tangential samples using stationary-wall ghost values.
    Each adjacent pressure-face flag contributes half of the MAC dual-face
    reflection, retaining the open part of a partially blocked face. This is a
-   local Cartesian reconstruction, not a curved-wall cut-cell scheme.
+   local Cartesian reconstruction, not a curved-wall cut-cell scheme. Wall
+   coverage is interpolated in the tangent plane to avoid half-cell jumps
+   when a traced position moves along a wall edge.
    Tangential diffusion uses stationary no-slip
    ghost velocities across blocked faces, including thin walls with fluid cells
    on both sides. `--first-order` disables the transport correction.
