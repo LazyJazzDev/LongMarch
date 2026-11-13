@@ -5,5 +5,3 @@ target_compile_definitions(grassland_rhi PUBLIC LONGMARCH_METAL_ENABLED)
 target_link_libraries(grassland_rhi PRIVATE
         spirv-cross-msl spirv-cross-glsl spirv-cross-core
         "-framework Metal" "-framework Foundation" "-framework QuartzCore" "-framework Cocoa")
-
-target_link_libraries(grassland_rhi PRIVATE grassland_metal_cpp)
