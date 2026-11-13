@@ -19,9 +19,9 @@ struct VSInput {
 
 struct PSInput {
   float4 position : SV_POSITION;
-  RHI_VARYING(0, float2, local_position);
-  RHI_VARYING(1, float4, color);
-  RHI_VARYING(2, nointerpolation uint4, extra);
+  float2 local_position : TEXCOORD0;
+  float4 color : TEXCOORD1;
+  nointerpolation uint4 extra : TEXCOORD2;
 };
 
 PSInput VSMain(VSInput input) {

@@ -214,7 +214,7 @@ TEST_P(RhiFormats, FloatSignedAndUnsignedVertexInputsRenderEveryDimension) {
             "input.value" + (n == 1 ? std::string{} : "." + std::string(1, "xyzw"[j])) + " == " + std::to_string(value);
       }
       const std::string source = "struct Input { RHI_INPUT(0," + vector + ",value); };" + R"(
-        struct Output { float4 position:SV_Position; RHI_VARYING(0, float, ok); };
+        struct Output { float4 position:SV_Position; float ok : TEXCOORD0; };
         Output VSMain(Input input, uint id:SV_VertexID) {
           float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};
           Output o; o.position=float4(p[id],0,1); o.ok=()" +

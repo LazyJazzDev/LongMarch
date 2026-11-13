@@ -56,7 +56,7 @@ TEST_P(RhiProgram, FileShadersOwnPreprocessedIncludesAndDeferLayoutMacros) {
 #include "common.slang"
 #include "include/types.slang"
 struct Input { RHI_INPUT(0,float3,position); };
-struct Varying { float4 position : SV_Position; RHI_VARYING(5,float3,color); };
+struct Varying { float4 position : SV_Position; float3 color : TEXCOORD0; };
 Varying VSMain(Input input) { Varying o; o.position=float4(input.position,1); o.color=input.position; return o; }
 float4 PSMain(Varying input):SV_Target0 { return settings.color * float4(input.color,1); }
 )"),
@@ -71,7 +71,6 @@ float4 PSMain(Varying input):SV_Target0 { return settings.color * float4(input.c
     EXPECT_EQ(expanded.find("#include"), std::string::npos);
     EXPECT_NE(expanded.find("RHI_INPUT"), std::string::npos);
     EXPECT_NE(expanded.find("RHI_UNIFORM"), std::string::npos);
-    EXPECT_NE(expanded.find("RHI_VARYING"), std::string::npos);
   }  // Compilation below must not dereference the destroyed filesystem.
   ProgramDesc desc;
   desc.vertex_shader = vertex.Get();
@@ -239,7 +238,7 @@ TEST_P(RhiProgram, CreationCompilesAndOwnsSourcesUsingInputMacros) {
       "\xef\xbb\xbf"
       R"(
  struct Input { RHI_INPUT(0,float3,position); RHI_INPUT(1,float3,color); };
- struct Varying { float4 position : SV_Position; RHI_VARYING(0, float3, color); };
+ struct Varying { float4 position : SV_Position; float3 color : TEXCOORD0; };
  Varying VSMain(Input input) { Varying output; output.position=float4(input.position,1); output.color=input.color; return output; }
  float4 PSMain(Varying input) : SV_Target0 { return float4(input.color,1); }
  )";

@@ -20,7 +20,7 @@ RHI_UNIFORM(0, 0, DisplaySettings, display);
 
 struct Varying {
   float4 position : SV_Position;
-  RHI_VARYING(0, float2, uv);
+  float2 uv : TEXCOORD0;
 };
 
 Varying VSMain(uint id : SV_VertexID) {

@@ -1,48 +1,40 @@
 # RHI shader interfaces
 
-RHI supplies shader declaration macros when creating a program. Shader creation
-first resolves source includes and user defines; program creation then expands
-the RHI macros and compiles against the selected backend and pipeline layout.
-
 Use `RHI_INPUT(location, type, name)` for vertex-buffer inputs. Its location must
-exist in `ProgramDesc::vertex_attributes`.
+exist in `ProgramDesc::vertex_attributes`. Resource declarations likewise use
+the RHI binding macros to follow the C++ pipeline layout.
 
-Use `RHI_VARYING(location, type, name)` for values passed from a vertex shader to
-a fragment shader. These locations are independent of vertex-buffer inputs and
-need no C++ attribute declaration. Both stages use the same location and
-compatible types/interpolation. Field names can differ, but keep declaration
-order compatible (including system-value fields): D3D signatures share hardware
-registers and require matching register placement, not just matching semantic
-numbers. A shared interface struct is the preferred way to keep stages aligned.
-The macro unifies declarations; it does not reorder or repack stage signatures.
+For vertex-to-fragment values, use ordinary Slang semantics with matching types,
+interpolation modifiers and declaration order. Prefer a shared interface struct:
 
 ```slang
 struct Surface {
   float4 position : SV_Position;
-  RHI_VARYING(0, float2, uv);
-  RHI_VARYING(1, float4, color);
-  RHI_VARYING(2, nointerpolation uint, material_id);
-  RHI_VARYING(3, noperspective float2, screen_offset);
+  float2 uv : TEXCOORD0;
+  float4 color : TEXCOORD1;
+  nointerpolation uint material_id : TEXCOORD2;
+  noperspective float2 screen_offset : TEXCOORD3;
 };
 ```
 
-Ordinary floating-point fields retain perspective-correct interpolation. Put
-Slang interpolation modifiers in the type argument, as above; integer fields
-should use `nointerpolation`. Location arguments can be numeric macros. Sparse
-locations are allowed, subject to backend limits. Matrices/arrays can consume
-multiple consecutive locations: reserve the full range and avoid overlaps.
+Slang assigns Vulkan locations automatically. The numeric suffix of `TEXCOORDN`
+is a semantic index, not an explicit Vulkan location. Do not reorder fields or
+omit fields from the middle of the fragment interface while assuming that
+matching semantic names alone will preserve the Vulkan mapping. D3D also
+requires compatible signature register placement. Field names can differ.
 
-The macro generates the Vulkan location and D3D semantic from the same number;
-Metal consumes the SPIR-V interface through the existing SPIRV-Cross path.
-Shader authors do not repeat backend-specific location attributes and semantic
-indices. `SV_Position`, `SV_TargetN`, `SV_VertexID` and other system semantics
-remain explicit: they identify built-in roles, not user varying locations.
+A fragment interface can consume a matching prefix of the vertex output; this
+is how Sparkium's Lambertian, light and specular materials omit the trailing
+tangent fields used by the principled material. Keep that prefix in the same
+order with the same types and semantics. Conditional interfaces must preserve
+this agreement across both shader compilations.
 
-`RHI_VARYING` is separate from `RHI_INPUT`: reusing the latter for varyings would
-incorrectly require vertex-buffer attributes even for a procedural fullscreen
-triangle. Using only automatically assigned stage locations would also couple
-separately compiled interfaces to field order and shader permutations.
+Ordinary floating-point fields retain perspective-correct interpolation;
+`nointerpolation` and `noperspective` retain their normal Slang meanings. Metal
+uses the generated SPIR-V interface through the existing SPIRV-Cross path.
+System semantics such as `SV_Position`, `SV_TargetN` and `SV_VertexID` remain
+explicit. No separate stage-interface macro or handwritten Vulkan location
+annotation is needed for the repository's current interfaces.
 
-For interpolation and target mapping, see the [Slang Metal target documentation](https://docs.shader-slang.org/en/stable/external/slang/docs/user-guide/a2-02-metal-target-specific.html),
-[D3D shader signature rules](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-signatures)
-and [Vulkan location attribute](https://docs.shader-slang.org/en/stable/external/core-module-reference/attributes/vk_location.html).
+See [Slang's cross-stage matching rules](https://github.com/shader-slang/slang/blob/master/docs/user-guide/02-conventional-features.md)
+and [D3D shader signature rules](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-signatures).

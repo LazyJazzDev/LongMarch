@@ -25,12 +25,12 @@ struct VSInput {
 
 struct PSInput {
   float4 position : SV_POSITION;
-  RHI_VARYING(0, float2, local_position);
-  RHI_VARYING(1, float4, color);
-  RHI_VARYING(2, nointerpolation uint4, extra);
-  RHI_VARYING(3, float2, screen_position);
-  RHI_VARYING(4, nointerpolation float4, clip_rect);
-  RHI_VARYING(5, noperspective float2, projected_die_position);
+  float2 local_position : TEXCOORD0;
+  float4 color : TEXCOORD1;
+  nointerpolation uint4 extra : TEXCOORD2;
+  float2 screen_position : TEXCOORD3;
+  nointerpolation float4 clip_rect : TEXCOORD4;
+  noperspective float2 projected_die_position : TEXCOORD5;
 };
 
 PSInput VSMain(VSInput input) {

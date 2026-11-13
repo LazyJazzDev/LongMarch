@@ -6,7 +6,7 @@ struct GlobalUniformObject {
 
 struct PSInput {
   float4 position : SV_POSITION;
-  RHI_VARYING(0, float2, frag_v);
+  float2 frag_v : TEXCOORD0;
 };
 
 RHI_UNIFORM(0, 0, GlobalUniformObject, ubo);

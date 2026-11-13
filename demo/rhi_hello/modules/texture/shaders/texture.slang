@@ -8,7 +8,7 @@ struct Input {
 
 struct Varying {
   float4 position : SV_Position;
-  RHI_VARYING(0, float2, uv);
+  float2 uv : TEXCOORD0;
 };
 
 Varying VSMain(Input input) {

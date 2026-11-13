@@ -1,8 +1,8 @@
 struct PSInput {
   float4 position : SV_POSITION;
-  RHI_VARYING(0, float3, world_position);
-  RHI_VARYING(1, float3, world_normal);
-  RHI_VARYING(2, float2, tex_coord);
+  float3 world_position : TEXCOORD0;
+  float3 world_normal : TEXCOORD1;
+  float2 tex_coord : TEXCOORD2;
 };
 
 struct PSOutput {

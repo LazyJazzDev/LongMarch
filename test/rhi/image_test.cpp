@@ -1204,7 +1204,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ASSERT_TRUE(image);
   const std::string source = R"(
     struct Input { RHI_INPUT(3,float2,position); RHI_INPUT(5,float4,color); };
-    struct Varying { float4 position : SV_Position; RHI_VARYING(0, float4, color); };
+    struct Varying { float4 position : SV_Position; float4 color : TEXCOORD0; };
     Varying VSMain(Input input) { Varying result; result.position=float4(input.position,0,1); result.color=input.color; return result; }
     float4 PSMain(Varying input) : SV_Target0 { return input.color; }
   )";
@@ -1257,7 +1257,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 0, 0, 255}));
 }
 
-TEST_P(RhiImage, VaryingsLinkByLocationAndPreserveInterpolation) {
+TEST_P(RhiImage, StageSemanticsPreserveInterpolation) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -1265,16 +1265,15 @@ TEST_P(RhiImage, VaryingsLinkByLocationAndPreserveInterpolation) {
   Track(device.Get());
   ObjPtr<IImage> image = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(image);
-  // No vertex attributes: inter-stage locations must not depend on RHI_INPUT.
-  // Compile separate sources with renamed fields and sparse locations.
+  // No vertex attributes: stage semantics are independent of RHI_INPUT.
+  // Compile separate sources with renamed fields and matching semantic order.
   // D3D stage signatures still require compatible declaration order.
   const std::string vertex_source = R"(
-    #define SMOOTH_LOCATION 7
     struct Output {
       float4 position : SV_Position;
-      RHI_VARYING(SMOOTH_LOCATION, float, smoothValue);
-      RHI_VARYING(3, noperspective float, linearValue);
-      RHI_VARYING(11, nointerpolation uint, flatValue);
+      float smoothValue : TEXCOORD0;
+      noperspective float linearValue : TEXCOORD1;
+      nointerpolation uint flatValue : TEXCOORD2;
     };
     Output VSMain(uint id : SV_VertexID) {
       float2 p[3] = {float2(-1,-1), float2(3,-1), float2(-1,3)};
@@ -1289,9 +1288,9 @@ TEST_P(RhiImage, VaryingsLinkByLocationAndPreserveInterpolation) {
   const std::string fragment_source = R"(
     struct Input {
       float4 position : SV_Position;
-      RHI_VARYING(7, float, perspective);
-      RHI_VARYING(3, noperspective float, affine);
-      RHI_VARYING(11, nointerpolation uint, material);
+      float perspective : TEXCOORD0;
+      noperspective float affine : TEXCOORD1;
+      nointerpolation uint material : TEXCOORD2;
     };
     float4 PSMain(Input i) : SV_Target0 {
       return float4(i.perspective, i.affine, float(i.material - 16u) / 4.0, 1.0);
@@ -1352,7 +1351,7 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D32_SFLOAT});
   ASSERT_TRUE(first && second && depth);
   const std::string source = R"(
-    struct V { float4 position : SV_Position; RHI_VARYING(0, float, nearValue); };
+    struct V { float4 position : SV_Position; float nearValue : TEXCOORD0; };
     V VSMain(uint id : SV_VertexID) {
       float2 p[3] = {float2(0,.75), float2(-.75,-.75),float2(.75,-.75)};
       V v; v.nearValue = id < 3 ? 1 : 0; v.position=float4(p[id%3],id < 3 ? .2 : .8,1); return v;

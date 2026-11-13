@@ -9,7 +9,7 @@ struct Settings { float white_scale; float3 padding; };
 RHI_UNIFORM(0, 0, Settings, settings);
 RHI_TEXTURE2D(0, 1, float4, source);
 RHI_SAMPLER(0, 2, sourceSampler);
-struct Varying { float4 position : SV_Position; RHI_VARYING(0, float2, uv); };
+struct Varying { float4 position : SV_Position; float2 uv : TEXCOORD0; };
 Varying VSMain(uint id : SV_VertexID) {
   Varying o;
   o.uv = float2((id << 1) & 2, id & 2);
