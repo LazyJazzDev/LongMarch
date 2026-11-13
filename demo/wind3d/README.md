@@ -66,7 +66,12 @@ on staggered faces and pressure at cell centres. Each step performs:
 
 1. Rebuild the solid mask when the aircraft geometry changes. Also sample each
    pressure-cell connection at h/8 spacing to block velocity faces crossed by
-   thin surfaces whose neighbouring cell centres are both fluid.
+   surfaces whose neighbouring cell centres are both fluid. Connections still
+   marked open are checked against the complete deflected foil solids using
+   segment clipping and convex-section minimization, so a thin trailing edge
+   between sample points is not omitted. This uses the current convex NACA
+   profiles and a 1 micrometre grazing-contact tolerance; it does not remove
+   the stair-step error of representing a curved wall on Cartesian faces.
 2. Midpoint characteristic tracing, bounded MacCormack transport correction,
    and explicit viscous diffusion. Tangential diffusion uses stationary no-slip
    ghost velocities across blocked faces, including thin walls with fluid cells

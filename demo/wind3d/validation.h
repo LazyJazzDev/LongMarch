@@ -11,6 +11,20 @@ namespace wind3d {
 // Cross-check the actual explicit mesh against the independent occupancy path,
 // including combined extreme deflections. Glazing/paint has a 1.2 mm offset.
 inline bool ValidateGeometry() {
+  // This 496-grid connection crosses a deflected elevator while all seven
+  // internal samples and both endpoints lie outside. Keep the actual case,
+  // along with a clearly separated segment to guard against overblocking.
+  Controls thin_control;
+  thin_control.elevator = 15;
+  auto thin_part = AircraftPart(4, 1, thin_control);
+  float half_cell = 8.0f / 496;
+  Vec3 a = BodyPoint({2.33870983f, -0.096774355f - half_cell, 0.596774101f}, thin_control);
+  Vec3 b = BodyPoint({2.33870983f, -0.096774355f + half_cell, 0.596774101f}, thin_control);
+  if (!FoilLineHit(thin_part, a, b) || !FoilLineHit(thin_part, b, a) ||
+      FoilLineHit(thin_part, Add(a, {0, 0.5f, 0}), Add(b, {0, 0.5f, 0}))) {
+    std::cerr << "Thin elevator intersection regression\n";
+    return false;
+  }
   const Controls poses[] = {{12, 5, 0, 0, 0, 0}, {12, -20, 40, 25, -25, 25}, {12, 25, 0, -25, 25, -25}};
   float maximum = 0;
   for (const auto &controls : poses) {

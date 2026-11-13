@@ -98,6 +98,16 @@ __global__ void FaceMask(Grid g,
     Vec3 center = Add(g.Position(x, y, z), Scale(normal, -0.5f * g.h));
     for (int sample = -3; sample <= 3 && !blocked; ++sample)
       blocked = AircraftDistance(Add(center, Scale(normal, sample * g.h / 8)), controls) <= 0;
+    // A fixed set of samples can pass on either side of a thin trailing edge.
+    // Intersect the complete connection with the actual deflected foil solids.
+    if (!blocked) {
+      Vec3 a = BodyPoint(Add(center, Scale(normal, -0.5f * g.h)), controls);
+      Vec3 b = BodyPoint(Add(center, Scale(normal, 0.5f * g.h)), controls);
+      for (int side = -1; side <= 1 && !blocked; side += 2)
+        for (int part = 0; part < 7 && !blocked; ++part)
+          if (part != 5 || side == 1)
+            blocked = FoilLineHit(AircraftPart(part, side, controls), a, b);
+    }
     faces[axis][n] = blocked;
   }
 }
