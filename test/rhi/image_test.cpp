@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <array>
@@ -1204,7 +1204,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ASSERT_TRUE(image);
   const std::string source = R"(
     struct Input { RHI_INPUT(3,float2,position); RHI_INPUT(5,float4,color); };
-    struct Varying { float4 position : SV_Position; float4 color : COLOR0; };
+    struct Varying { float4 position : SV_Position; float4 color : TEXCOORD0; };
     Varying VSMain(Input input) { Varying result; result.position=float4(input.position,0,1); result.color=input.color; return result; }
     float4 PSMain(Varying input) : SV_Target0 { return input.color; }
   )";
@@ -1257,6 +1257,85 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 0, 0, 255}));
 }
 
+TEST_P(RhiImage, StageSemanticsPreserveInterpolation) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IImage> image = device->CreateImage({64, 64, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ASSERT_TRUE(image);
+  // No vertex attributes: stage semantics are independent of RHI_INPUT.
+  // Compile separate sources with renamed fields and matching semantic order.
+  // D3D stage signatures still require compatible declaration order.
+  const std::string vertex_source = R"(
+    struct Output {
+      float4 position : SV_Position;
+      float smoothValue : TEXCOORD0;
+      noperspective float linearValue : TEXCOORD1;
+      nointerpolation uint flatValue : TEXCOORD2;
+    };
+    Output VSMain(uint id : SV_VertexID) {
+      float2 p[3] = {float2(-1,-1), float2(3,-1), float2(-1,3)};
+      float w = id == 1 ? 2.0 : 1.0;
+      Output o;
+      o.position = float4(p[id] * w, 0.5 * w, w);
+      o.smoothValue = o.linearValue = id == 1 ? 1.0 : 0.0;
+      o.flatValue = 17u + id;
+      return o;
+    }
+  )";
+  const std::string fragment_source = R"(
+    struct Input {
+      float4 position : SV_Position;
+      float perspective : TEXCOORD0;
+      noperspective float affine : TEXCOORD1;
+      nointerpolation uint material : TEXCOORD2;
+    };
+    float4 PSMain(Input i) : SV_Target0 {
+      return float4(i.perspective, i.affine, float(i.material - 16u) / 4.0, 1.0);
+    }
+  )";
+  ObjPtr<IShader> vs = device->CreateShaderFromSource(vertex_source, "VSMain", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> ps = device->CreateShaderFromSource(fragment_source, "PSMain", SHADER_STAGE_FRAGMENT);
+  ASSERT_TRUE(vs && ps);
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.rasterizer.cull_mode = CULL_MODE_NONE;
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 0}}}}));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  ObjPtr<ISubmissionToken> done = commands->Submit();
+  ASSERT_TRUE(done);
+  ASSERT_TRUE(done->WaitHost());
+  int flat_channel = -1;
+  for (uint32_t x : {8u, 32u, 55u}) {
+    std::array<uint8_t, 4> pixel{};
+    ReadPixel(device.Get(), image.Get(), GetParam(), x, 32, pixel);
+    // The triangle covers the target; only vertex 1 has value 1 and w=2.
+    const float affine = (float(x) + 0.5f) / 128.0f;
+    const float perspective = affine / (2.0f - affine);
+    EXPECT_NEAR(pixel[0], perspective * 255.0f, 1.0f);
+    EXPECT_NEAR(pixel[1], affine * 255.0f, 1.0f);
+    if (flat_channel < 0) {
+      flat_channel = pixel[2];
+      EXPECT_TRUE(flat_channel == 64 || flat_channel == 128 || flat_channel == 191);
+    }
+    EXPECT_EQ(pixel[2], flat_channel);
+    EXPECT_EQ(pixel[3], 255);
+  }
+}
+
 TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
@@ -1272,7 +1351,7 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D32_SFLOAT});
   ASSERT_TRUE(first && second && depth);
   const std::string source = R"(
-    struct V { float4 position : SV_Position; float nearValue : COLOR0; };
+    struct V { float4 position : SV_Position; float nearValue : TEXCOORD0; };
     V VSMain(uint id : SV_VertexID) {
       float2 p[3] = {float2(0,.75), float2(-.75,-.75),float2(.75,-.75)};
       V v; v.nearValue = id < 3 ? 1 : 0; v.position=float4(p[id%3],id < 3 ? .2 : .8,1); return v;

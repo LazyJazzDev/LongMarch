@@ -50,7 +50,7 @@ struct Input {
 struct Varying {
   float4 position : SV_Position;
   float2 uv : TEXCOORD0;
-  float4 color : COLOR0;
+  float4 color : TEXCOORD1;
 };
 Varying VSMain(Input input) {
   Varying o;
