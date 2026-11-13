@@ -1,13 +1,54 @@
-#include <cuda_runtime.h>
+﻿#include <cuda_runtime.h>
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <vector>
 
 #include "simulation.h"
 #include "wing_profile.h"
 
 namespace wing_fluid {
+using namespace grassland::rhi;
+
+class CUDASimulation final : public Simulation {
+ public:
+  CUDASimulation();
+  ~CUDASimulation() override;
+  bool Initialize(IDevice *device, int width, int height);
+  bool Reset(const Parameters &) override;
+  bool Step(const Parameters &, float dt) override;
+  bool BeginFrame(Event previous) override;
+  bool Export() override;
+
+  Event ReadyEvent() const override {
+    return ready_;
+  }
+
+  IBuffer *Field() const override {
+    return field_.Get();
+  }
+
+  bool Measure(Diagnostics &) override;
+  bool MeasureLoads(LoadCoefficients &) override;
+  bool ValidateLoads(float &) override;
+  bool ValidatePressure(float &, float &) override;
+  int Levels() const override;
+  const std::string &Error() const override;
+
+  const char *Name() const override {
+    return "CUDA";
+  }
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+  ObjPtr<ICUDABuffer> field_;
+  ObjPtr<ICUDATimeline> timeline_;
+  Event ready_{};
+  uint64_t serial_{};
+};
+
 namespace {
 constexpr int block = 256;
 
@@ -502,7 +543,7 @@ __global__ void IntegrateLoads(Level l,
 }
 }  // namespace
 
-struct Simulation::Impl {
+struct CUDASimulation::Impl {
   int w{}, h{};
   cudaStream_t stream{};
   cudaGraphExec_t pressure_graph{};
@@ -612,19 +653,21 @@ struct Simulation::Impl {
   }
 };
 
-Simulation::Simulation() : impl_(std::make_unique<Impl>()) {
+CUDASimulation::CUDASimulation() : impl_(std::make_unique<Impl>()) {
 }
 
-Simulation::~Simulation() {
+CUDASimulation::~CUDASimulation() {
   if (!impl_->allocations.empty())
     cudaStreamSynchronize(impl_->stream);
   if (impl_->pressure_graph)
     cudaGraphExecDestroy(impl_->pressure_graph);
   for (void *p : impl_->allocations)
     cudaFree(p);
+  if (impl_->stream)
+    cudaStreamDestroy(impl_->stream);
 }
 
-bool Simulation::Initialize(int width, int height, cudaStream_t stream) {
+bool CUDASimulation::Initialize(IDevice *device, int width, int height) {
   auto &s = *impl_;
   if (width < 64 || height * 2 != width || (width & (width - 1)) || !s.allocations.empty()) {
     s.error = "Grid must be a power-of-two 2:1 rectangle, initialized once";
@@ -632,7 +675,15 @@ bool Simulation::Initialize(int width, int height, cudaStream_t stream) {
   }
   s.w = width;
   s.h = height;
-  s.stream = stream;
+  if (!s.Check(cudaSetDevice(device->GetCUDADeviceIndex())) ||
+      !s.Check(cudaStreamCreateWithFlags(&s.stream, cudaStreamNonBlocking)))
+    return false;
+  field_ = device->CreateCUDABuffer({uint64_t(width) * height * 16});
+  timeline_ = device->CreateCUDATimeline();
+  if (!field_ || !timeline_) {
+    s.error = "CUDA interop creation failed";
+    return false;
+  }
   int w = width, h = height;
   while (true) {
     Level l;
@@ -654,7 +705,7 @@ bool Simulation::Initialize(int width, int height, cudaStream_t stream) {
          s.Allocate(s.stats, 8) && s.Allocate(s.load_sums, 6);
 }
 
-bool Simulation::Reset(const Parameters &parameters) {
+bool CUDASimulation::Reset(const Parameters &parameters) {
   auto &s = *impl_;
   s.time = 0;
   s.parameters = parameters;
@@ -676,7 +727,7 @@ bool Simulation::Reset(const Parameters &parameters) {
   return s.Check(cudaGetLastError());
 }
 
-bool Simulation::Step(const Parameters &parameters, float dt) {
+bool CUDASimulation::Step(const Parameters &parameters, float dt) {
   auto &s = *impl_;
   s.parameters = parameters;
   s.loads_valid = true;
@@ -703,14 +754,17 @@ bool Simulation::Step(const Parameters &parameters, float dt) {
   return s.Check(cudaGetLastError());
 }
 
-bool Simulation::Export(void *buffer) {
+bool CUDASimulation::Export() {
   auto &s = *impl_;
-  Display<<<s.Blocks(s.w * s.h), block, 0, s.stream>>>(static_cast<float4 *>(buffer), s.u, s.v, s.levels[0], s.dye,
-                                                       s.mask);
-  return s.Check(cudaGetLastError());
+  Display<<<s.Blocks(s.w * s.h), block, 0, s.stream>>>(static_cast<float4 *>(field_->GetDevicePointer()), s.u, s.v,
+                                                       s.levels[0], s.dye, s.mask);
+  if (!s.Check(cudaGetLastError()))
+    return false;
+  ready_ = timeline_->Signal(s.stream, ++serial_);
+  return ready_.timeline != nullptr;
 }
 
-bool Simulation::Measure(Diagnostics &d) {
+bool CUDASimulation::Measure(Diagnostics &d) {
   auto &s = *impl_;
   if (!s.Check(cudaMemsetAsync(s.stats, 0, 8 * sizeof(float), s.stream)))
     return false;
@@ -730,7 +784,7 @@ bool Simulation::Measure(Diagnostics &d) {
   return true;
 }
 
-bool Simulation::MeasureLoads(LoadCoefficients &loads) {
+bool CUDASimulation::MeasureLoads(LoadCoefficients &loads) {
   auto &s = *impl_;
   loads = {};
   loads.angle = s.angle;
@@ -750,7 +804,7 @@ bool Simulation::MeasureLoads(LoadCoefficients &loads) {
   return loads.valid;
 }
 
-bool Simulation::ValidateLoads(float &relative_error) {
+bool CUDASimulation::ValidateLoads(float &relative_error) {
   auto &s = *impl_;
   std::vector<unsigned char> mask(s.w * s.h);
   if (!s.Check(cudaMemcpyAsync(mask.data(), s.mask, mask.size(), cudaMemcpyDeviceToHost, s.stream)) ||
@@ -789,7 +843,7 @@ bool Simulation::ValidateLoads(float &relative_error) {
   return true;
 }
 
-bool Simulation::ValidatePressure(float &residual, float &error) {
+bool CUDASimulation::ValidatePressure(float &residual, float &error) {
   auto &s = *impl_;
   Level l = s.levels[0];
   // Reuse the idle dye scratch as an exact solution; b is the discrete A applied to it.
@@ -822,11 +876,24 @@ bool Simulation::ValidatePressure(float &residual, float &error) {
   return true;
 }
 
-int Simulation::Levels() const {
+int CUDASimulation::Levels() const {
   return int(impl_->levels.size());
 }
 
-const std::string &Simulation::Error() const {
+const std::string &CUDASimulation::Error() const {
   return impl_->error;
+}
+
+bool CUDASimulation::BeginFrame(Event previous) {
+  return !previous.timeline || timeline_->Wait(impl_->stream, {previous});
+}
+
+std::unique_ptr<Simulation> CreateCUDASimulation(IDevice *device, int width, int height) {
+  auto result = std::make_unique<CUDASimulation>();
+  if (!result->Initialize(device, width, height)) {
+    std::cerr << result->Error() << '\n';
+    return {};
+  }
+  return result;
 }
 }  // namespace wing_fluid

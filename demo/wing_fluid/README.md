@@ -1,9 +1,10 @@
 # Wing Fluid
 
 Interactive two-dimensional incompressible Navier–Stokes flow around selectable
-wing sections (NACA 0012 by default). CUDA computes the flow; RHI displays a shared CUDA buffer through
-Vulkan or D3D12. An NVIDIA GPU with CUDA/RHI external-memory support is required.
-The demo is built only when `LONGMARCH_CUDA_ENABLED` is enabled.
+wing sections (NACA 0012 by default). The flow runs on either CUDA or portable RHI
+Compute Shaders. Compute mode uses ordinary GPU buffers and supports non-CUDA
+adapters; the demo also builds without CUDA Toolkit. RHI provides rendering and
+compute through Vulkan, D3D12 or Metal (subject to the platform/backend).
 
 ```sh
 cmake --build cmake-build-release --target demo_wing_fluid
@@ -11,7 +12,31 @@ cmake-build-release/demo/wing_fluid/demo_wing_fluid --backend vulkan
 ```
 
 On Windows append `.exe`; `--backend d3d12` selects D3D12. With no backend option,
-RHI's platform default is used. The first CUDA-capable RHI adapter is selected.
+RHI's platform default is used; `--backend metal` selects Metal on macOS.
+The first creatable RHI adapter is selected unless `--device INDEX` is specified.
+Use `--list-devices` to see adapter indices for the selected graphics backend.
+
+## Compute backend
+
+- `--solver auto` (default): CUDA when compiled in and supported by the selected
+  device; otherwise Compute Shader. CUDA initialization failure also falls back
+  to compute in auto mode.
+- `--solver compute`: force the RHI compute implementation, including on NVIDIA.
+- `--solver cuda`: require CUDA; report failure rather than silently changing solver.
+
+```sh
+demo_wing_fluid --backend d3d12 --list-devices
+demo_wing_fluid --backend d3d12 --device 1 --solver compute
+demo_wing_fluid --solver compute --validate --grid 256 --frames 20
+```
+
+The two solvers implement the same MAC discretization, multigrid V-cycles, boundary
+weights, dye advection, load integration and validation. CUDA uses a cached pressure
+CUDA Graph. Compute uses ordered RHI dispatches and a GPU buffer arena; diagnostics
+and loads use FP32 tree reductions followed by small CPU readbacks, without FP64
+or floating-point atomic requirements. Results need not be bit-identical. Compute
+submissions are batched and use the same queue as rendering. Integrated GPUs may
+benefit from `--grid 128` or `--grid 256`; solver selection is fixed at startup.
 
 ## Wing sections
 
@@ -115,11 +140,13 @@ du/dt + (u · ∇)u = −∇p + ν∇²u
 5. Passive dye uses bounded MacCormack correction and inlet stripes. It does not
    exert forces or introduce artificial vorticity into the velocity field.
 
-The shared output is an RHI `ICUDABuffer` containing cell velocity, pressure and
-dye. A CUDA timeline waits for the previous graphics event before export, then
-signals an event consumed by the next graphics submission. Queue submission
-handles Vulkan external ownership barriers. One graphics frame is kept in flight;
-shutdown drains both CUDA and graphics before releasing imported resources.
+The output buffer contains cell velocity, pressure and dye. CUDA uses an RHI
+`ICUDABuffer` and an external timeline to order CUDA writes and graphics reads;
+queue submission handles Vulkan external ownership barriers. Compute mode uses
+an ordinary `IBuffer` and RHI-managed dispatch dependencies. The application waits
+for the preceding graphics frame before advancing the simulation and waits for the
+solver's export event before drawing. Shutdown drains outstanding work before
+releasing GPU resources.
 
 This is an exploratory laminar 2D visualization, not an aerodynamic design tool:
 approximate cut-face geometry and wall drag, semi-Lagrangian numerical diffusion, finite channel
@@ -171,3 +198,7 @@ The symmetric thickness and cambered mean-line formulas follow
 [PDAS thickness](https://www.pdas.com/naca456thick4.html) and
 [PDAS mean lines](https://www.pdas.com/naca456mean2.html), with the closed trailing
 edge and vertical-offset approximations described above.
+
+A CUDA-free build can be verified by configuring the existing build directory
+with `-DCMAKE_DISABLE_FIND_PACKAGE_CUDAToolkit=ON`; this omits the CUDA solver
+and external-memory path while retaining the compute demo.

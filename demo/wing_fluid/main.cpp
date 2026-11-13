@@ -24,37 +24,22 @@ const char *profile_keys[] = {"naca0012",  "naca0006", "naca0024", "cambered2",
 static_assert(sizeof(profile_names) / sizeof(*profile_names) == WING_PROFILE_COUNT);
 static_assert(sizeof(profile_keys) / sizeof(*profile_keys) == WING_PROFILE_COUNT);
 
-bool CUDA(cudaError_t error) {
-  if (error == cudaSuccess)
-    return true;
-  std::cerr << "CUDA: " << cudaGetErrorString(error) << '\n';
-  return false;
-}
-
 struct Runtime {
-  cudaStream_t stream{};
   std::unique_ptr<wing_fluid::Simulation> simulation;
-  ObjPtr<ICUDABuffer> field;
-  ObjPtr<ICUDATimeline> timeline;
   ObjPtr<ISubmissionToken> last;
-  uint64_t serial{};
 
   ~Runtime() {
-    if (stream)
-      cudaStreamSynchronize(stream);
     if (last)
       last->WaitHost();
-    simulation.reset();
-    if (stream)
-      cudaStreamDestroy(stream);
   }
 };
 
 struct Options {
   BackendAPI backend{BACKEND_API_DEFAULT};
   int width{512}, frames{}, steps{4}, view{};
-  bool headless{}, validate{}, debug{};
-  std::string capture;
+  bool headless{}, validate{}, debug{}, list_devices{};
+  std::string capture, solver{"auto"};
+  int device_index{-1};
   wing_fluid::Parameters parameters;
 };
 
@@ -169,6 +154,8 @@ bool Parse(int argc, char **argv, Options &o) {
     std::string a = argv[i];
     if (a == "--headless")
       o.headless = true;
+    else if (a == "--list-devices")
+      o.list_devices = true;
     else if (a == "--validate") {
       o.validate = true;
       o.headless = true;
@@ -176,7 +163,17 @@ bool Parse(int argc, char **argv, Options &o) {
       o.debug = true;
     else if (i + 1 < argc) {
       std::string value = argv[++i];
-      if (a == "--profile") {
+      if (a == "--solver") {
+        if (value != "auto" && value != "cuda" && value != "compute")
+          return false;
+        o.solver = value;
+      } else if (a == "--device") {
+        char *end = nullptr;
+        long index = std::strtol(value.c_str(), &end, 10);
+        if (value.empty() || *end || index < 0 || index > 1000)
+          return false;
+        o.device_index = int(index);
+      } else if (a == "--profile") {
         int profile = 0;
         while (profile < WING_PROFILE_COUNT && value != profile_keys[profile])
           ++profile;
@@ -195,6 +192,8 @@ bool Parse(int argc, char **argv, Options &o) {
           o.backend = BACKEND_API_VULKAN;
         else if (value == "d3d12")
           o.backend = BACKEND_API_D3D12;
+        else if (value == "metal")
+          o.backend = BACKEND_API_METAL;
         else
           return false;
       } else if (a == "--grid")
@@ -244,7 +243,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
   LoadDisplay loads;
   bool show_loads = true;
   if (!options.headless) {
-    window = device->CreateGLFWWindow({1440, 860, "Wing Fluid | CUDA + RHI"});
+    window = device->CreateGLFWWindow({1440, 860, "Wing Fluid | RHI"});
     if (!window || !window->EnableImGui(true, LONGMARCH_ASSETS_DIR "fonts/simhei.ttf", 19))
       return false;
   }
@@ -252,7 +251,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
   BindingLayoutDesc layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
                             {1, BINDING_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}};
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
-  if (!group || !uniform || !group->BindResource(0, uniform.Get()) || !group->BindResource(1, runtime.field.Get()))
+  if (!group || !uniform || !group->BindResource(0, uniform.Get()) || !group->BindResource(1, sim.Field()))
     return false;
   std::string source = "#define WING_PROFILE_SHADER\n";
   source.append(reinterpret_cast<const char *>(wing_profile_h), wing_profile_h_len);
@@ -365,7 +364,8 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::Text("Before projection: %.3g", diagnostics.divergence_before);
             ImGui::Text("Max speed: %.3f m/s", diagnostics.max_speed);
             ImGui::Spacing();
-            ImGui::TextWrapped("CUDA solves advection, viscosity and pressure. RHI renders the shared device buffer.");
+            ImGui::Text("Solver: %s", sim.Name());
+            ImGui::TextWrapped("GPU advection, viscosity and pressure. RHI renders the device buffer.");
             ImGui::Spacing();
             ImGui::TextDisabled("Exploratory 2D laminar model");
             ImGui::TextWrapped(
@@ -382,7 +382,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
           }))
         return false;
     }
-    if (runtime.last && !runtime.timeline->Wait(runtime.stream, {runtime.last->GetEvent()}))
+    if (!sim.BeginFrame(runtime.last ? runtime.last->GetEvent() : Event{}))
       return false;
     if (reset) {
       if (!sim.Reset(parameters))
@@ -440,9 +440,9 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
           return false;
       }
     }
-    if (!sim.Export(runtime.field->GetDevicePointer()))
+    if (!sim.Export())
       return false;
-    Event ready = runtime.timeline->Signal(runtime.stream, ++runtime.serial);
+    Event ready = sim.ReadyEvent();
     if (!ready.timeline)
       return false;
     if (!canvas || canvas->GetDesc().width != sw || canvas->GetDesc().height != sh) {
@@ -494,7 +494,8 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
         return false;
     }
     SubmitInfo info;
-    info.waits = {ready};
+    if (ready.timeline)
+      info.waits = {ready};
     runtime.last = commands->Submit(info);
     if (!runtime.last)
       return false;
@@ -529,7 +530,7 @@ int main(int argc, char **argv) {
   Options options;
   if (!Parse(argc, argv, options)) {
     std::cerr
-        << "Usage: demo_wing_fluid [--backend vulkan|d3d12] [--grid 128|256|512|1024] [--speed 0.1..30] "
+        << "Usage: demo_wing_fluid [--backend vulkan|d3d12|metal] [--solver auto|cuda|compute] [--device INDEX] [--list-devices] [--grid 128|256|512|1024] [--speed 0.1..30] "
            "[--angle -25..25] [--viscosity 0.0005..0.01] [--view dye|speed|vorticity|pressure] "
            "[--profile NAME] [--boundary smooth|voxel] [--frames N] [--steps 1..16] [--headless] [--validate] [--debug] [--capture image.ppm]\n";
     return 1;
@@ -539,33 +540,44 @@ int main(int argc, char **argv) {
     return 1;
   ObjPtr<IDevice> device;
   auto physical = core->GetPhysicalDevices();
-  for (size_t i = 0; i < physical.size(); ++i)
-    if (physical[i].cuda_device >= 0) {
-      device = core->CreateDevice(int(i));
-      if (device)
-        break;
-    }
+  if (options.list_devices) {
+    for (size_t i = 0; i < physical.size(); ++i)
+      std::cout << i << ": " << physical[i].name << " | CUDA device " << physical[i].cuda_device << '\n';
+    return 0;
+  }
+  for (size_t i = 0; i < physical.size(); ++i) {
+    if (options.device_index >= 0 && int(i) != options.device_index)
+      continue;
+    if (options.solver == "cuda" && physical[i].cuda_device < 0)
+      continue;
+    device = core->CreateDevice(int(i));
+    if (device)
+      break;
+  }
   if (!device) {
-    std::cerr << "A CUDA-capable RHI device is required.\n";
+    std::cerr << "No compatible RHI device found.\n";
     return 1;
   }
-  if (!CUDA(cudaSetDevice(device->GetCUDADeviceIndex())))
-    return 1;
   Runtime runtime;
-  if (!CUDA(cudaStreamCreateWithFlags(&runtime.stream, cudaStreamNonBlocking)))
+#ifdef LONGMARCH_CUDA_ENABLED
+  if (options.solver != "compute" && device->GetCUDADeviceIndex() >= 0)
+    runtime.simulation = wing_fluid::CreateCUDASimulation(device.Get(), options.width, options.width / 2);
+#endif
+  if (!runtime.simulation && options.solver == "cuda") {
+    std::cerr << "CUDA solver unavailable in this build or on this device.\n";
     return 1;
-  runtime.simulation = std::make_unique<wing_fluid::Simulation>();
+  }
+  if (!runtime.simulation)
+    runtime.simulation = wing_fluid::CreateComputeSimulation(device.Get(), options.width, options.width / 2);
+  if (!runtime.simulation)
+    return 1;
   auto &sim = *runtime.simulation;
-  if (!sim.Initialize(options.width, options.width / 2, runtime.stream) || !sim.Reset(options.parameters)) {
+  if (!sim.Reset(options.parameters)) {
     std::cerr << sim.Error() << '\n';
     return 1;
   }
-  runtime.field = device->CreateCUDABuffer({uint64_t(options.width) * (options.width / 2) * 16});
-  runtime.timeline = device->CreateCUDATimeline();
-  if (!runtime.field || !runtime.timeline)
-    return 1;
   std::cout << device->Name() << " | " << options.width << 'x' << options.width / 2 << " | " << sim.Levels()
-            << " levels | " << profile_keys[options.parameters.profile] << "\n";
+            << " levels | " << sim.Name() << " | " << profile_keys[options.parameters.profile] << "\n";
   if (options.validate) {
     wing_fluid::Diagnostics initial;
     if (!sim.Measure(initial))

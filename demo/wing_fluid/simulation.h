@@ -1,8 +1,8 @@
 #pragma once
-#include <cuda_runtime_api.h>
-
 #include <memory>
 #include <string>
+
+#include "grassland/rhi/rhi.h"
 
 namespace wing_fluid {
 struct Parameters {
@@ -27,29 +27,30 @@ struct LoadCoefficients {
   bool valid{};
 };
 
-// CUDA owns the solver fields; the caller owns the stream and shared RHI display buffer.
-class Simulation final {
+// Both solvers own their GPU fields. The application owns the graphics submissions.
+class Simulation {
  public:
-  Simulation();
-  ~Simulation();
-  Simulation(const Simulation &) = delete;
-  Simulation &operator=(const Simulation &) = delete;
-  bool Initialize(int width, int height, cudaStream_t stream);
-  bool Reset(const Parameters &parameters);
-  bool Step(const Parameters &parameters, float dt);
-  bool Export(void *float4_buffer);
-  bool Measure(Diagnostics &diagnostics);
-  bool MeasureLoads(LoadCoefficients &loads);
-  bool ValidateLoads(float &relative_error);
-  bool ValidatePressure(float &relative_residual, float &relative_error);
-  int Levels() const;
-  const std::string &Error() const;
+  virtual ~Simulation() = default;
+  virtual bool Reset(const Parameters &) = 0;
+  virtual bool Step(const Parameters &, float dt) = 0;
+  virtual bool BeginFrame(grassland::rhi::Event previous) = 0;
+  virtual bool Export() = 0;
+  virtual grassland::rhi::Event ReadyEvent() const = 0;
+  virtual grassland::rhi::IBuffer *Field() const = 0;
+  virtual bool Measure(Diagnostics &) = 0;
+  virtual bool MeasureLoads(LoadCoefficients &) = 0;
+  virtual bool ValidateLoads(float &relative_error) = 0;
+  virtual bool ValidatePressure(float &relative_residual, float &relative_error) = 0;
+  virtual int Levels() const = 0;
+  virtual const std::string &Error() const = 0;
+  virtual const char *Name() const = 0;
   static constexpr float domain_width = 6.0f;
   static constexpr float domain_height = 3.0f;
   static constexpr float chord = 1.25f;
-
- private:
-  struct Impl;
-  std::unique_ptr<Impl> impl_;
 };
+
+std::unique_ptr<Simulation> CreateComputeSimulation(grassland::rhi::IDevice *device, int width, int height);
+#ifdef LONGMARCH_CUDA_ENABLED
+std::unique_ptr<Simulation> CreateCUDASimulation(grassland::rhi::IDevice *device, int width, int height);
+#endif
 }  // namespace wing_fluid
