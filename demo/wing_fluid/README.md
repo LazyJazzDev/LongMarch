@@ -18,7 +18,7 @@ RHI's platform default is used. The first CUDA-capable RHI adapter is selected.
 - **Flow speed:** 0.1–3 m/s inlet velocity.
 - **Angle of attack:** −25° to +25°; positive incidence raises the leading edge.
 - **Display:** advected dye streaks, speed, signed vorticity, or pressure.
-- **Pause / Reset flow:** freeze time or restart from uniform inflow and straight dye streaks.
+- **Pause / Reset flow:** freeze time or restart from projected uniform inflow and straight dye streaks.
 - **Simulation speed:** requested simulated seconds per wall-clock second.
 - **Solver settings:** kinematic viscosity, 0.0005–0.01 m²/s.
 
@@ -57,7 +57,8 @@ du/dt + (u · ∇)u = −∇p + ν∇²u
    prolongation. Boundary extensions preserve Neumann/Dirichlet conditions. The
    final eight-variable system is solved directly on the GPU. Repeated V-cycles
    are recorded in a CUDA Graph; the graph sees updated coefficient arrays when
-   the wing angle changes.
+   the wing angle changes. Reset uses 32 V-cycles to project its initial velocity
+   without advancing the simulation clock, so a paused reset is also incompressible.
 5. Passive dye uses bounded MacCormack correction and inlet stripes. It does not
    exert forces or introduce artificial vorticity into the velocity field.
 

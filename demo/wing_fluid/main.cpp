@@ -198,6 +198,12 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::Combo("##view", &mode, "Dye streaks\0Speed\0Vorticity\0Pressure\0");
             if (mode == 0)
               ImGui::SliderFloat("##contrast", &dye_strength, 0.5f, 4.0f, "Dye contrast %.1f");
+            else if (mode == 1)
+              ImGui::TextWrapped("Speed: dark = 0, orange = %.1f m/s", parameters.speed * 2);
+            else if (mode == 2)
+              ImGui::TextWrapped("Blue: clockwise / orange: counterclockwise");
+            else
+              ImGui::TextWrapped("Relative to outlet: blue negative, orange positive");
             ImGui::Checkbox("Pause", &paused);
             ImGui::SameLine();
             if (ImGui::Button("Reset flow"))
@@ -298,8 +304,11 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
                    !commands->CmdPresentImage(window.Get(), canvas.Get(), COLOR_SPACE_BT709_LINEAR)))
       return false;
     ObjPtr<IDownloadToken> download;
-    if (!options.capture.empty() && frame + 1 == limit)
+    if (!options.capture.empty() && frame + 1 == limit) {
       download = commands->CmdDownloadImage(canvas.Get());
+      if (!download)
+        return false;
+    }
     SubmitInfo info;
     info.waits = {ready};
     runtime.last = commands->Submit(info);
@@ -368,6 +377,13 @@ int main(int argc, char **argv) {
   std::cout << device->Name() << " | " << options.width << 'x' << options.width / 2 << " | " << sim.Levels()
             << " levels\n";
   if (options.validate) {
+    wing_fluid::Diagnostics initial;
+    if (!sim.Measure(initial))
+      return 2;
+    std::cout << "reset_projection before=" << initial.divergence_before << " after=" << initial.divergence_after
+              << '\n';
+    if (!initial.finite || initial.solid_speed != 0 || initial.divergence_after > 0.001f)
+      return 2;
     float residual, error;
     if (!sim.ValidatePressure(residual, error))
       return 1;

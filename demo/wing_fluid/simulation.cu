@@ -484,6 +484,13 @@ bool Simulation::Reset(const Parameters &parameters) {
     if (!s.Check(cudaMemsetAsync(l.p, 0, l.w * l.h * sizeof(float), s.stream)))
       return false;
   InitializeDye<<<s.Blocks(s.w * s.h), block, 0, s.stream>>>(s.dye, s.mask, s.w, s.h);
+  // A reset is also a valid incompressible state, including when the UI is paused.
+  // Unit dt projects the initial velocity without advancing simulation time.
+  s.last_dt = 1;
+  RHS<<<s.Blocks(s.w * s.h), block, 0, s.stream>>>(s.levels[0], s.u, s.v, s.mask, s.last_dt);
+  for (int i = 0; i < 32; ++i)
+    s.Cycle(0);
+  Project<<<s.Blocks(s.w * (s.h + 1)), block, 0, s.stream>>>(s.levels[0], s.u, s.v, s.last_dt);
   return s.Check(cudaGetLastError());
 }
 
