@@ -1,7 +1,7 @@
 # Wing Fluid
 
-Interactive two-dimensional incompressible Navier–Stokes flow around a NACA 0012
-wing section. CUDA computes the flow; RHI displays a shared CUDA buffer through
+Interactive two-dimensional incompressible Navier–Stokes flow around selectable
+wing sections (NACA 0012 by default). CUDA computes the flow; RHI displays a shared CUDA buffer through
 Vulkan or D3D12. An NVIDIA GPU with CUDA/RHI external-memory support is required.
 The demo is built only when `LONGMARCH_CUDA_ENABLED` is enabled.
 
@@ -12,6 +12,32 @@ cmake-build-release/demo/wing_fluid/demo_wing_fluid --backend vulkan
 
 On Windows append `.exe`; `--backend d3d12` selects D3D12. With no backend option,
 RHI's platform default is used. The first CUDA-capable RHI adapter is selected.
+
+## Wing sections
+
+Select **Wing section** in the main window, or use `--profile NAME`:
+
+| CLI name | Section | Shape |
+| --- | --- | --- |
+| `naca0012` | NACA 0012 (default) | Symmetric, 12% thickness |
+| `naca0006` | NACA 0006 | Thin symmetric, 6% thickness |
+| `naca0024` | NACA 0024 | Thick symmetric, 24% thickness |
+| `cambered2` | Cambered 2% | 12% thickness; 2% maximum camber at 40% chord |
+| `cambered4` | Cambered 4% | 12% thickness; 4% maximum camber at 40% chord |
+| `reflex` | Reflex | 12% thickness; S-shaped mean line |
+| `ellipse` | Ellipse | Symmetric ellipse, 12% thickness |
+| `double-wedge` | Double wedge | Diamond section, 12% thickness |
+
+All use the same chord, pivot and fluid parameters. Switching section resets the
+flow and load history, including while paused. Both boundary modes support all
+sections. The solver, surface-load integration, load-window outline and display
+shader share the same profile functions in `wing_profile.h`.
+
+These are **2D sections**, not 3D swept/delta wing planforms. The symmetric NACA
+profiles use a closed trailing edge. The two cambered sections apply the four-digit
+mean line with *vertical* thickness offsets, so they are not exact normal-offset
+NACA 2412/4412 profiles. The reflex mean line is `0.16 x (1-x) (1-2x)`.
+Coarse grids resolve the thin section poorly; 512×256 or higher is preferable.
 
 ## Controls
 
@@ -61,7 +87,7 @@ du/dt + (u · ∇)u = −∇p + ν∇²u
 ```
 
 1. A staggered MAC grid stores horizontal/vertical face velocities and cell-centered
-   pressure. The NACA 0012 closed-trailing-edge curve is rotated about mid-chord.
+   pressure. The selected section curve is rotated about mid-chord.
    Smooth mode computes each grid face's open fraction using eight subsegments
    and interpolated intersections with the analytic implicit curve. Fractions below
    0.01 are closed and above 0.99 are fully open to avoid vanishing apertures.
@@ -107,6 +133,7 @@ it does not model the velocity of a physically pitching wing.
 ```sh
 demo_wing_fluid --validate --backend vulkan --debug --frames 120
 demo_wing_fluid --validate --backend d3d12 --debug --frames 120
+demo_wing_fluid --validate --profile cambered4 --speed 30 --angle 25 --frames 120
 demo_wing_fluid --headless --frames 2000 --steps 16 --speed 30 --angle 25 --viscosity 0.0005
 demo_wing_fluid --headless --frames 1200 --view vorticity --capture wake.ppm
 ```
@@ -139,3 +166,8 @@ Smooth pressure boundaries follow the open-face-weighted approach described by
 This demo uses approximate face intersections and split viscosity, not their full
 rigid-body coupling method. The displayed smooth contour is independently antialiased;
 the solver itself also uses fractional apertures.
+
+The symmetric thickness and cambered mean-line formulas follow
+[PDAS thickness](https://www.pdas.com/naca456thick4.html) and
+[PDAS mean lines](https://www.pdas.com/naca456mean2.html), with the closed trailing
+edge and vertical-offset approximations described above.

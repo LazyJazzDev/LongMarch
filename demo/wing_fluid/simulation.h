@@ -11,6 +11,7 @@ struct Parameters {
   float viscosity{0.0015f};
   int cycles{5};
   bool smooth_boundary{true};
+  int profile{};
 };
 
 struct Diagnostics {
@@ -22,6 +23,7 @@ struct Diagnostics {
 // World axes: +x downstream, +y up; positive moment is counterclockwise about mid-chord.
 struct LoadCoefficients {
   float x{}, y{}, moment{}, angle{};
+  int profile{};
   bool valid{};
 };
 

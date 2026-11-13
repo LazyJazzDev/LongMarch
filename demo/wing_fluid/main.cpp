@@ -10,10 +10,19 @@
 #include "grassland/rhi/rhi.h"
 #include "imgui.h"
 #include "simulation.h"
+#include "wing_profile.h"
 
 namespace {
 using namespace grassland::rhi;
 #include "display.slang.h"
+#include "wing_profile.h.h"
+
+const char *profile_names[] = {"NACA 0012 / symmetric", "NACA 0006 / thin", "NACA 0024 / thick", "Cambered / 2%",
+                               "Cambered / 4%",         "Reflex",           "Ellipse / 12%",     "Double wedge / 12%"};
+const char *profile_keys[] = {"naca0012",  "naca0006", "naca0024", "cambered2",
+                              "cambered4", "reflex",   "ellipse",  "double-wedge"};
+static_assert(sizeof(profile_names) / sizeof(*profile_names) == WING_PROFILE_COUNT);
+static_assert(sizeof(profile_keys) / sizeof(*profile_keys) == WING_PROFILE_COUNT);
 
 bool CUDA(cudaError_t error) {
   if (error == cudaSuccess)
@@ -64,6 +73,7 @@ struct LoadDisplay {
     value.y += a * (load.y - value.y);
     value.moment += a * (load.moment - value.moment);
     value.angle = load.angle;
+    value.profile = load.profile;
     value.valid = true;
     sample_time += dt;
     if (sample_time < 0.05f && !x.empty())
@@ -82,6 +92,7 @@ struct LoadDisplay {
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     ImGui::Begin("Loads", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
     ImGui::TextUnformatted("FLUID LOAD / LIVE TRENDS");
+    ImGui::TextUnformatted(profile_names[value.profile]);
     ImGui::TextDisabled(paused ? "Paused" : "Smoothed over 0.2 simulation seconds");
     auto *draw = ImGui::GetWindowDrawList();
     auto origin = ImGui::GetCursorScreenPos();
@@ -106,10 +117,7 @@ struct LoadDisplay {
     ImVec2 outline[82];
     for (int i = 0; i < 82; ++i) {
       float t = (i <= 40 ? i : 81 - i) / 40.0f;
-      float h =
-          0.6f *
-          (0.2969f * std::sqrt(t) - 0.126f * t - 0.3516f * t * t + 0.2843f * t * t * t - 0.1036f * t * t * t * t) *
-          (i <= 40 ? 1 : -1);
+      float h = WingCamber(t, value.profile) + WingThickness(t, value.profile) * (i <= 40 ? 1 : -1);
       float x = (t - 0.5f) * 160, y = h * 160;
       outline[i] = point(x * std::cos(angle) + y * std::sin(angle), -x * std::sin(angle) + y * std::cos(angle));
     }
@@ -168,7 +176,14 @@ bool Parse(int argc, char **argv, Options &o) {
       o.debug = true;
     else if (i + 1 < argc) {
       std::string value = argv[++i];
-      if (a == "--boundary") {
+      if (a == "--profile") {
+        int profile = 0;
+        while (profile < WING_PROFILE_COUNT && value != profile_keys[profile])
+          ++profile;
+        if (profile == WING_PROFILE_COUNT)
+          return false;
+        o.parameters.profile = profile;
+      } else if (a == "--boundary") {
         if (value == "smooth")
           o.parameters.smooth_boundary = true;
         else if (value == "voxel")
@@ -239,7 +254,10 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   if (!group || !uniform || !group->BindResource(0, uniform.Get()) || !group->BindResource(1, runtime.field.Get()))
     return false;
-  std::string source(reinterpret_cast<const char *>(display_slang), display_slang_len);
+  std::string source = "#define WING_PROFILE_SHADER\n";
+  source.append(reinterpret_cast<const char *>(wing_profile_h), wing_profile_h_len);
+  source.append("\n");
+  source.append(reinterpret_cast<const char *>(display_slang), display_slang_len);
   ObjPtr<IShader> vs = device->CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
   ObjPtr<IShader> ps = device->CreateShaderFromSource(source, "PSMain", SHADER_STAGE_FRAGMENT);
   ProgramDesc desc;
@@ -300,7 +318,10 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::TextUnformatted("2D incompressible Navier-Stokes");
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextUnformatted("NACA 0012 / symmetric section");
+            ImGui::TextUnformatted("Wing section");
+            ImGui::SetNextItemWidth(-1);
+            if (ImGui::Combo("##profile", &parameters.profile, profile_names, WING_PROFILE_COUNT))
+              reset = true;
             ImGui::Text("Chord %.2f m | channel 6 x 3 m", Simulation::chord);
             ImGui::Spacing();
             ImGui::PushItemWidth(-1);
@@ -434,7 +455,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
       uint32_t width, height, mode;
       float speed, contrast, angle;
       uint32_t smooth_boundary;
-      float padding;
+      uint32_t profile;
     } settings{uint32_t(width),
                uint32_t(height),
                uint32_t(mode),
@@ -442,7 +463,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
                dye_strength,
                load.angle,
                uint32_t(parameters.smooth_boundary),
-               0};
+               uint32_t(load.profile)};
 
     ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     if (!commands || !commands->CmdUploadBuffer(uniform.Get(), 0, &settings, sizeof(settings)) ||
@@ -510,7 +531,7 @@ int main(int argc, char **argv) {
     std::cerr
         << "Usage: demo_wing_fluid [--backend vulkan|d3d12] [--grid 128|256|512|1024] [--speed 0.1..30] "
            "[--angle -25..25] [--viscosity 0.0005..0.01] [--view dye|speed|vorticity|pressure] "
-           "[--boundary smooth|voxel] [--frames N] [--steps 1..16] [--headless] [--validate] [--debug] [--capture image.ppm]\n";
+           "[--profile NAME] [--boundary smooth|voxel] [--frames N] [--steps 1..16] [--headless] [--validate] [--debug] [--capture image.ppm]\n";
     return 1;
   }
   ObjPtr<ICore> core = CreateCore(options.backend, {options.debug});
@@ -544,7 +565,7 @@ int main(int argc, char **argv) {
   if (!runtime.field || !runtime.timeline)
     return 1;
   std::cout << device->Name() << " | " << options.width << 'x' << options.width / 2 << " | " << sim.Levels()
-            << " levels\n";
+            << " levels | " << profile_keys[options.parameters.profile] << "\n";
   if (options.validate) {
     wing_fluid::Diagnostics initial;
     if (!sim.Measure(initial))

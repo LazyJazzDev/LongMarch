@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "simulation.h"
+#include "wing_profile.h"
 
 namespace wing_fluid {
 namespace {
@@ -19,28 +20,22 @@ __device__ bool Fluid(const unsigned char *mask, int x, int y, int w, int h) {
   return x >= 0 && x < w && y >= 0 && y < h && mask[y * w + x];
 }
 
-__host__ __device__ float Thickness(float q) {
-  return q > 0 && q < 1 ? 0.6f * (0.2969f * sqrtf(q) - 0.1260f * q - 0.3516f * q * q + 0.2843f * q * q * q -
-                                  0.1036f * q * q * q * q)
-                        : 0;
-}
-
-// An implicit function with the exact NACA zero contour (not a distance field).
-__device__ float WingImplicit(float x, float y, float angle) {
+// An implicit function with the selected profile zero contour (not a distance field).
+__device__ float WingImplicit(float x, float y, float angle, int profile) {
   float a = angle * 0.01745329252f;
   x -= 2;
   y -= 1.5f;
   float q = (cosf(a) * x - sinf(a) * y) / Simulation::chord + 0.5f;
   float t = (sinf(a) * x + cosf(a) * y) / Simulation::chord;
-  return fmaxf(fabsf(t) - Thickness(q), fmaxf(-q, q - 1)) * Simulation::chord;
+  return fmaxf(fabsf(t - WingCamber(q, profile)) - WingThickness(q, profile), fmaxf(-q, q - 1)) * Simulation::chord;
 }
 
-__device__ float OpenFraction(float x, float y, float sx, float sy, float angle) {
+__device__ float OpenFraction(float x, float y, float sx, float sy, float angle, int profile) {
   float fraction = 0;
-  float a = WingImplicit(x, y, angle);
+  float a = WingImplicit(x, y, angle, profile);
   // Subsegments also detect the thin leading/trailing edge when both face endpoints are outside.
   for (int k = 1; k <= 8; ++k) {
-    float b = WingImplicit(x + sx * (k / 8.0f), y + sy * (k / 8.0f), angle);
+    float b = WingImplicit(x + sx * (k / 8.0f), y + sy * (k / 8.0f), angle, profile);
     fraction += a >= 0 && b >= 0 ? 1 : a <= 0 && b <= 0 ? 0 : a > 0 ? a / (a - b) : b / (b - a);
     a = b;
   }
@@ -49,14 +44,14 @@ __device__ float OpenFraction(float x, float y, float sx, float sy, float angle)
   return fraction < 0.01f ? 0 : fraction > 0.99f ? 1 : fraction;
 }
 
-__global__ void SmoothGeometry(Level l, float angle) {
+__global__ void SmoothGeometry(Level l, float angle, int profile) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= l.w * l.h)
     return;
   float h = Simulation::domain_width / l.w;
   int x = i % l.w, y = i / l.w;
-  l.east[i] = x + 1 < l.w ? OpenFraction((x + 1) * h, y * h, 0, h, angle) : 0;
-  l.north[i] = y + 1 < l.h ? OpenFraction(x * h, (y + 1) * h, h, 0, angle) : 0;
+  l.east[i] = x + 1 < l.w ? OpenFraction((x + 1) * h, y * h, 0, h, angle, profile) : 0;
+  l.north[i] = y + 1 < l.h ? OpenFraction(x * h, (y + 1) * h, h, 0, angle, profile) : 0;
   l.boundary[i] = x == l.w - 1 ? 2 : 0;
 }
 
@@ -81,22 +76,12 @@ __device__ float Flux(Level l, const float *u, const float *v, int x, int y) {
          VWeight(l, x, y) * v[i];
 }
 
-__global__ void Geometry(unsigned char *mask, int w, int h, float angle) {
+__global__ void Geometry(unsigned char *mask, int w, int h, float angle, int profile) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= w * h)
     return;
   float dx = Simulation::domain_width / w;
-  float x = (i % w + 0.5f) * dx - 2.0f;
-  float y = (i / w + 0.5f) * dx - 1.5f;
-  // Positive incidence raises the leading edge (the chord points down and right).
-  float a = angle * 0.01745329252f;
-  float q = (cosf(a) * x - sinf(a) * y) / Simulation::chord + 0.5f;
-  float t = (sinf(a) * x + cosf(a) * y) / Simulation::chord;
-  float thickness =
-      q > 0 && q < 1
-          ? 0.6f * (0.2969f * sqrtf(q) - 0.1260f * q - 0.3516f * q * q + 0.2843f * q * q * q - 0.1036f * q * q * q * q)
-          : 0;
-  mask[i] = !(q > 0 && q < 1 && fabsf(t) < thickness);
+  mask[i] = WingImplicit((i % w + 0.5f) * dx, (i / w + 0.5f) * dx, angle, profile) >= 0;
 }
 
 __global__ void FineOperator(Level l, const unsigned char *mask) {
@@ -416,11 +401,12 @@ __global__ void Manufactured(Level l, float *exact, bool rhs) {
 constexpr int surface_segments = 512;
 
 // Counterclockwise closed polygon, cosine spacing resolves the rounded nose.
-__host__ __device__ float2 SurfacePoint(int index, float angle) {
+__host__ __device__ float2 SurfacePoint(int index, float angle, int profile) {
   int k = index <= surface_segments / 2 ? index : surface_segments - index;
   float q = 0.5f * (1 - cosf(k * (6.28318530718f / surface_segments)));
   float x = (q - 0.5f) * Simulation::chord;
-  float y = Thickness(q) * Simulation::chord * (index <= surface_segments / 2 ? -1 : 1);
+  float y = (WingCamber(q, profile) + WingThickness(q, profile) * (index <= surface_segments / 2 ? -1 : 1)) *
+            Simulation::chord;
   float a = angle * 0.01745329252f;
   return make_float2(x * cosf(a) + y * sinf(a), -x * sinf(a) + y * cosf(a));
 }
@@ -444,13 +430,14 @@ __global__ void IntegrateSmoothLoads(Level l,
                                      const float *v,
                                      const unsigned char *mask,
                                      float angle,
+                                     int profile,
                                      float viscosity,
                                      double *sums,
                                      int analytic) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= surface_segments)
     return;
-  float2 a = SurfacePoint(i, angle), b = SurfacePoint(i + 1, angle);
+  float2 a = SurfacePoint(i, angle, profile), b = SurfacePoint(i + 1, angle, profile);
   double rx = 0.5 * (a.x + b.x), ry = 0.5 * (a.y + b.y);
   double tx = b.x - a.x, ty = b.y - a.y, length = hypot(tx, ty);
   double nx = ty / length, ny = -tx / length;
@@ -529,6 +516,7 @@ struct Simulation::Impl {
   bool loads_valid{};
   float angle{1000}, time{}, last_dt{0.001f};
   bool smooth_boundary{};
+  int profile{};
   std::string error;
 
   bool Check(cudaError_t result) {
@@ -554,7 +542,7 @@ struct Simulation::Impl {
     if (!Check(cudaMemsetAsync(load_sums, 0, 6 * sizeof(double), stream)))
       return false;
     if (smooth_boundary)
-      IntegrateSmoothLoads<<<Blocks(surface_segments), block, 0, stream>>>(levels[0], u, v, mask, angle,
+      IntegrateSmoothLoads<<<Blocks(surface_segments), block, 0, stream>>>(levels[0], u, v, mask, angle, profile,
                                                                            parameters.viscosity, load_sums, analytic);
     else
       IntegrateLoads<<<Blocks(w * h), block, 0, stream>>>(levels[0], u, v, mask, parameters.viscosity, load_sums,
@@ -565,12 +553,13 @@ struct Simulation::Impl {
 
   void GeometryFor(const Parameters &p) {
     angle = p.angle;
+    profile = p.profile;
     smooth_boundary = p.smooth_boundary;
     if (smooth_boundary) {
-      SmoothGeometry<<<Blocks(w * h), block, 0, stream>>>(levels[0], angle);
+      SmoothGeometry<<<Blocks(w * h), block, 0, stream>>>(levels[0], angle, profile);
       ActiveCells<<<Blocks(w * h), block, 0, stream>>>(levels[0], mask);
     } else {
-      Geometry<<<Blocks(w * h), block, 0, stream>>>(mask, w, h, angle);
+      Geometry<<<Blocks(w * h), block, 0, stream>>>(mask, w, h, angle, profile);
       FineOperator<<<Blocks(w * h), block, 0, stream>>>(levels[0], mask);
     }
     for (size_t i = 1; i < levels.size(); ++i)
@@ -692,7 +681,7 @@ bool Simulation::Step(const Parameters &parameters, float dt) {
   s.parameters = parameters;
   s.loads_valid = true;
   s.last_dt = dt;
-  if (parameters.angle != s.angle || parameters.smooth_boundary != s.smooth_boundary)
+  if (parameters.angle != s.angle || parameters.smooth_boundary != s.smooth_boundary || parameters.profile != s.profile)
     s.GeometryFor(parameters);
   int faces = s.Blocks(s.w * (s.h + 1));
   Boundaries<<<faces, block, 0, s.stream>>>(s.u, s.v, s.levels[0], parameters.speed);
@@ -745,6 +734,7 @@ bool Simulation::MeasureLoads(LoadCoefficients &loads) {
   auto &s = *impl_;
   loads = {};
   loads.angle = s.angle;
+  loads.profile = s.profile;
   if (!s.loads_valid)
     return true;
   double values[6];
@@ -778,7 +768,7 @@ bool Simulation::ValidateLoads(float &relative_error) {
     area = mx = my = 0;
     // Polygon area and first moments, independent of the surface traction integral.
     for (int i = 0; i < surface_segments; ++i) {
-      auto a = SurfacePoint(i, s.angle), b = SurfacePoint(i + 1, s.angle);
+      auto a = SurfacePoint(i, s.angle, s.profile), b = SurfacePoint(i + 1, s.angle, s.profile);
       double cross = double(a.x) * b.y - double(b.x) * a.y;
       area += cross / 2;
       mx += (a.x + b.x) * cross / 6;

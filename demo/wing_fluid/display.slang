@@ -6,7 +6,7 @@ struct Settings {
   float dye_strength;
   float angle;
   uint smooth_boundary;
-  float padding;
+  uint profile;
 };
 
 RHI_UNIFORM(0, 0, Settings, settings);
@@ -67,10 +67,7 @@ float4 PSMain(Varying input) : SV_Target0 {
     float a = settings.angle * 0.01745329252;
     float q = (cos(a) * world.x - sin(a) * world.y) / 1.25 + 0.5;
     float t = (sin(a) * world.x + cos(a) * world.y) / 1.25;
-    float s = clamp(q, 0, 1);
-    float thickness =
-        0.6 * (0.2969 * sqrt(s) - 0.126 * s - 0.3516 * s * s + 0.2843 * s * s * s - 0.1036 * s * s * s * s);
-    float phi = max(abs(t) - thickness, max(-q, q - 1));
+    float phi = max(abs(t - WingCamber(q, settings.profile)) - WingThickness(q, settings.profile), max(-q, q - 1));
     float coverage = 1 - smoothstep(-fwidth(phi), fwidth(phi), phi);
     color = lerp(color, float3(0.82, 0.87, 0.88), coverage);
   }
