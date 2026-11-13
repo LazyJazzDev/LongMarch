@@ -21,6 +21,21 @@ RHI's platform default is used. The first CUDA-capable RHI adapter is selected.
 - **Pause / Reset flow:** freeze time or restart from projected uniform inflow and straight dye streaks.
 - **Simulation speed:** requested simulated seconds per wall-clock second.
 - **Solver settings:** kinematic viscosity, 0.0005–0.01 m²/s.
+- **Load trends window:** a separate window with a cyan resultant-force arrow,
+  an orange moment arc, and recent Fx/Fy/Mz curves. Closing it leaves the simulation
+  running; this checkbox opens it again. Pause freezes the curves; Reset clears them.
+
+Loads combine pressure and approximate tangential viscous shear integrated over
+fluid/solid voxel faces, per unit span. Force is normalized by `0.5 rho U² c` and
+moment by `0.5 rho U² c²`, using the current simulated inlet speed and chord.
+Positive x points downstream, positive y upward, and positive moment is
+counterclockwise about mid-chord. The body remains fixed; no mass or inertia is assumed.
+The display uses 0.2 simulated seconds of exponential smoothing. Arrow length and
+arc extent use fixed compressive scales (not per-frame auto-normalization); the
+three history plots auto-scale symmetrically around zero. These are qualitative
+load trends, not calibrated aerodynamic coefficients. Speed normalization removes
+the direct dynamic-pressure factor, so doubling inlet speed need not double an arrow.
+Reset's initialization projection is excluded until an actual timestep completes.
 
 The default grid is **512×256**, with **eight multigrid levels**, ending at 4×2.
 The domain is a 6×3 m channel. The 1.25 m chord is centered at (2, 1.5) m;
@@ -90,6 +105,8 @@ speed/incidence changes without resets between cases. It rejects nonfinite field
 nonzero solid velocity or insufficient divergence reduction. It subsequently runs
 the actual RHI offscreen rendering path. This verifies the implemented discrete
 solver and interop; it does not establish continuum/grid convergence.
+It also checks the surface-load integration against constant and linear pressure
+fields on the closed voxel body, including force and moment signs.
 
 `--headless` creates no window and defaults to 120 frames. `--steps` specifies
 deterministic substeps per headless frame (default four); it does not override

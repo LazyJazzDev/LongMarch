@@ -345,6 +345,50 @@ __global__ void Manufactured(Level l, float *exact, bool rhs) {
     l.p[i] = 0;
   }
 }
+
+__global__ void IntegrateLoads(Level l,
+                               const float *u,
+                               const float *v,
+                               const unsigned char *mask,
+                               float viscosity,
+                               double *sums,
+                               int analytic = 0) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= l.w * l.h || !mask[i])
+    return;
+  int x = i % l.w, y = i / l.w;
+  const int ox[4] = {1, -1, 0, 0}, oy[4] = {0, 0, 1, -1};
+  const double h = double(Simulation::domain_width) / l.w;
+  float2 velocity = Velocity(u, v, l.w, l.h, x + 0.5f, y + 0.5f);
+  double local[6]{};
+  bool boundary = false;
+  for (int k = 0; k < 4; ++k) {
+    int nx = x + ox[k], ny = y + oy[k];
+    if (nx < 0 || nx >= l.w || ny < 0 || ny >= l.h || mask[ny * l.w + nx])
+      continue;
+    boundary = true;
+    // d points from fluid to solid, opposite to the body's outward normal.
+    double rx = (x + 0.5 + 0.5 * ox[k]) * h - 2.0;
+    double ry = (y + 0.5 + 0.5 * oy[k]) * h - 1.5;
+    double p = analytic == 1 ? 7.0 : analytic == 2 ? 0.7 * rx - 0.4 * ry : l.p[i];
+    double fx = p * ox[k] * h, fy = p * oy[k] * h;
+    local[0] += fx;
+    local[1] += fy;
+    local[2] += rx * fy - ry * fx;
+    // Stationary no-slip wall: tangential shear from the adjacent cell center,
+    // half a cell from the wall. Normal viscous traction is zero for a smooth
+    // incompressible no-slip wall; stair-step corners remain an approximation.
+    double normal = velocity.x * ox[k] + velocity.y * oy[k];
+    double sx = analytic ? 0 : 2 * viscosity * (velocity.x - normal * ox[k]);
+    double sy = analytic ? 0 : 2 * viscosity * (velocity.y - normal * oy[k]);
+    local[3] += sx;
+    local[4] += sy;
+    local[5] += rx * sy - ry * sx;
+  }
+  if (boundary)
+    for (int k = 0; k < 6; ++k)
+      atomicAdd(sums + k, local[k]);
+}
 }  // namespace
 
 struct Simulation::Impl {
@@ -356,6 +400,9 @@ struct Simulation::Impl {
   std::vector<void *> allocations;
   unsigned char *mask{};
   float *u{}, *v{}, *next_u{}, *next_v{}, *dye{}, *next_dye{}, *corrected_dye{}, *stats{};
+  double *load_sums{};
+  Parameters parameters;
+  bool loads_valid{};
   float angle{1000}, time{}, last_dt{0.001f};
   std::string error;
 
@@ -376,6 +423,15 @@ struct Simulation::Impl {
 
   int Blocks(int n) const {
     return (n + block - 1) / block;
+  }
+
+  bool ReadLoads(double *values, int analytic = 0) {
+    if (!Check(cudaMemsetAsync(load_sums, 0, 6 * sizeof(double), stream)))
+      return false;
+    IntegrateLoads<<<Blocks(w * h), block, 0, stream>>>(levels[0], u, v, mask, parameters.viscosity, load_sums,
+                                                        analytic);
+    return Check(cudaMemcpyAsync(values, load_sums, 6 * sizeof(double), cudaMemcpyDeviceToHost, stream)) &&
+           Check(cudaStreamSynchronize(stream));
   }
 
   void GeometryFor(float value) {
@@ -471,12 +527,14 @@ bool Simulation::Initialize(int width, int height, cudaStream_t stream) {
          s.Allocate(s.next_u, (width + 1) * height) && s.Allocate(s.v, width * (height + 1)) &&
          s.Allocate(s.next_v, width * (height + 1)) && s.Allocate(s.dye, width * height) &&
          s.Allocate(s.next_dye, width * height) && s.Allocate(s.corrected_dye, width * height) &&
-         s.Allocate(s.stats, 8);
+         s.Allocate(s.stats, 8) && s.Allocate(s.load_sums, 6);
 }
 
 bool Simulation::Reset(const Parameters &parameters) {
   auto &s = *impl_;
   s.time = 0;
+  s.parameters = parameters;
+  s.loads_valid = false;
   s.GeometryFor(parameters.angle);
   InitializeVelocity<<<s.Blocks(s.w * (s.h + 1)), block, 0, s.stream>>>(s.u, s.v, s.w, s.h, parameters.speed);
   Boundaries<<<s.Blocks(s.w * (s.h + 1)), block, 0, s.stream>>>(s.u, s.v, s.mask, s.w, s.h, parameters.speed);
@@ -496,6 +554,8 @@ bool Simulation::Reset(const Parameters &parameters) {
 
 bool Simulation::Step(const Parameters &parameters, float dt) {
   auto &s = *impl_;
+  s.parameters = parameters;
+  s.loads_valid = true;
   s.last_dt = dt;
   if (parameters.angle != s.angle)
     s.GeometryFor(parameters.angle);
@@ -542,6 +602,53 @@ bool Simulation::Measure(Diagnostics &d) {
        values[4],
        values[5],
        values[6] == 0};
+  return true;
+}
+
+bool Simulation::MeasureLoads(LoadCoefficients &loads) {
+  auto &s = *impl_;
+  loads = {};
+  loads.angle = s.angle;
+  if (!s.loads_valid)
+    return true;
+  double values[6];
+  if (!s.ReadLoads(values))
+    return false;
+  double reference = 0.5 * s.parameters.speed * s.parameters.speed * chord;
+  loads.x = float((values[0] + values[3]) / reference);
+  loads.y = float((values[1] + values[4]) / reference);
+  loads.moment = float((values[2] + values[5]) / (reference * chord));
+  loads.valid = std::isfinite(loads.x) && std::isfinite(loads.y) && std::isfinite(loads.moment);
+  if (!loads.valid)
+    s.error = "Nonfinite surface load";
+  return loads.valid;
+}
+
+bool Simulation::ValidateLoads(float &relative_error) {
+  auto &s = *impl_;
+  std::vector<unsigned char> mask(s.w * s.h);
+  if (!s.Check(cudaMemcpyAsync(mask.data(), s.mask, mask.size(), cudaMemcpyDeviceToHost, s.stream)) ||
+      !s.Check(cudaStreamSynchronize(s.stream)))
+    return false;
+  double area = 0, mx = 0, my = 0, h = double(domain_width) / s.w;
+  for (int i = 0; i < s.w * s.h; ++i)
+    if (!mask[i]) {
+      area += h * h;
+      mx += h * h * ((i % s.w + 0.5) * h - 2);
+      my += h * h * ((i / s.w + 0.5) * h - 1.5);
+    }
+  double constant[6], linear[6];
+  if (!s.ReadLoads(constant, 1) || !s.ReadLoads(linear, 2))
+    return false;
+  // Divergence theorem on the closed voxel body, independent of its perimeter.
+  // Constant pressure gives zero force/torque; p = gx*x + gy*y gives -area*grad(p).
+  double expected[3] = {-0.7 * area, 0.4 * area, 0.4 * mx + 0.7 * my};
+  double error = 0;
+  for (int k = 0; k < 3; ++k) {
+    error = std::max(error, std::abs(constant[k]));
+    error = std::max(error, std::abs(linear[k] - expected[k]));
+  }
+  relative_error = float(error / std::max(area, 1e-20));
   return true;
 }
 

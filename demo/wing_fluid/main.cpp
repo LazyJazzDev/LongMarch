@@ -49,6 +49,113 @@ struct Options {
   wing_fluid::Parameters parameters;
 };
 
+struct LoadDisplay {
+  wing_fluid::LoadCoefficients value;
+  std::vector<float> x, y, moment;
+  float sample_time{};
+
+  void Update(const wing_fluid::LoadCoefficients &load, float dt) {
+    if (!load.valid) {
+      value = load;
+      return;
+    }
+    float a = value.valid ? 1 - std::exp(-dt / 0.2f) : 1;
+    value.x += a * (load.x - value.x);
+    value.y += a * (load.y - value.y);
+    value.moment += a * (load.moment - value.moment);
+    value.angle = load.angle;
+    value.valid = true;
+    sample_time += dt;
+    if (sample_time < 0.05f && !x.empty())
+      return;
+    sample_time = 0;
+    for (auto *v : {&x, &y, &moment})
+      if (v->size() == 240)
+        v->erase(v->begin());
+    x.push_back(value.x);
+    y.push_back(value.y);
+    moment.push_back(value.moment);
+  }
+
+  void Draw(bool paused) {
+    ImGui::SetNextWindowPos({0, 0});
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    ImGui::Begin("Loads", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
+    ImGui::TextUnformatted("FLUID LOAD / LIVE TRENDS");
+    ImGui::TextDisabled(paused ? "Paused" : "Smoothed over 0.2 simulation seconds");
+    auto *draw = ImGui::GetWindowDrawList();
+    auto origin = ImGui::GetCursorScreenPos();
+    float width = ImGui::GetContentRegionAvail().x;
+    ImVec2 center{origin.x + width * 0.5f, origin.y + 145};
+    auto point = [&](float x, float y) { return ImVec2{center.x + x, center.y - y}; };
+    auto arrow = [&](ImVec2 a, ImVec2 b, ImU32 color) {
+      float dx = b.x - a.x, dy = b.y - a.y, length = std::hypot(dx, dy);
+      if (length < 1)
+        return;
+      dx /= length;
+      dy /= length;
+      draw->AddLine(a, b, color, 3);
+      draw->AddTriangleFilled(b, {b.x - 10 * dx + 5 * dy, b.y - 10 * dy - 5 * dx},
+                              {b.x - 10 * dx - 5 * dy, b.y - 10 * dy + 5 * dx}, color);
+    };
+    draw->AddLine(point(-width * 0.4f, 0), point(width * 0.4f, 0), IM_COL32(85, 95, 110, 255));
+    draw->AddLine(point(0, -120), point(0, 120), IM_COL32(85, 95, 110, 255));
+    draw->AddText(point(width * 0.4f - 20, -8), IM_COL32_WHITE, "+x");
+    draw->AddText(point(5, 120), IM_COL32_WHITE, "+y");
+    float angle = value.angle * 0.01745329252f;
+    ImVec2 outline[82];
+    for (int i = 0; i < 82; ++i) {
+      float t = (i <= 40 ? i : 81 - i) / 40.0f;
+      float h =
+          0.6f *
+          (0.2969f * std::sqrt(t) - 0.126f * t - 0.3516f * t * t + 0.2843f * t * t * t - 0.1036f * t * t * t * t) *
+          (i <= 40 ? 1 : -1);
+      float x = (t - 0.5f) * 160, y = h * 160;
+      outline[i] = point(x * std::cos(angle) + y * std::sin(angle), -x * std::sin(angle) + y * std::cos(angle));
+    }
+    draw->AddPolyline(outline, 82, IM_COL32(190, 200, 215, 255), ImDrawFlags_Closed, 2);
+    const auto cyan = IM_COL32(65, 225, 200, 255), orange = IM_COL32(255, 170, 65, 255);
+    float magnitude = std::hypot(value.x, value.y);
+    // Fixed nonlinear scale preserves direction and relative changes without clipping transients.
+    float scale = 115 / (1 + magnitude);
+    arrow(center, point(value.x * scale, value.y * scale), cyan);
+    if (std::abs(value.moment) > 0.0001f) {
+      float arc = 5.5f * std::abs(value.moment) / (0.1f + std::abs(value.moment));
+      float sign = value.moment > 0 ? 1 : -1;
+      ImVec2 last = point(100, 0);
+      for (int i = 1; i <= 40; ++i) {
+        float a = sign * arc * i / 40;
+        auto next = point(100 * std::cos(a), 100 * std::sin(a));
+        if (i == 40)
+          arrow(last, next, orange);
+        else
+          draw->AddLine(last, next, orange, 3);
+        last = next;
+      }
+    }
+    ImGui::Dummy({width, 290});
+    ImGui::TextColored({0.25f, 0.9f, 0.8f, 1}, "Force: downstream / upward");
+    ImGui::TextColored({1, 0.67f, 0.25f, 1}, "Moment: %s",
+                       value.moment >= 0 ? "counterclockwise (+)" : "clockwise (-)");
+    if (!value.valid)
+      ImGui::TextUnformatted("Waiting for a simulation step...");
+    ImGui::TextDisabled("Fixed compressed arrow scale; zero at center");
+    ImGui::Separator();
+    auto plot = [&](const char *label, const std::vector<float> &samples) {
+      float range = 0.1f;
+      for (float v : samples)
+        range = std::max(range, std::abs(v) * 1.1f);
+      ImGui::PlotLines(label, samples.data(), int(samples.size()), 0, nullptr, -range, range, {width - 55, 65});
+    };
+    plot("Fx", x);
+    plot("Fy", y);
+    plot("Mz", moment);
+    ImGui::TextWrapped(
+        "Pressure + approximate wall shear. Moment about mid-chord. Curves auto-scale around zero; qualitative trends only.");
+    ImGui::End();
+  }
+};
+
 bool Parse(int argc, char **argv, Options &o) {
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
@@ -111,6 +218,9 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
   const int width = options.width, height = width / 2;
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IWindow> window;
+  ObjPtr<IWindow> load_window;
+  LoadDisplay loads;
+  bool show_loads = true;
   if (!options.headless) {
     window = device->CreateGLFWWindow({1440, 860, "Wing Fluid | CUDA + RHI"});
     if (!window || !window->EnableImGui(true, LONGMARCH_ASSETS_DIR "fonts/simhei.ttf", 19))
@@ -208,6 +318,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::SameLine();
             if (ImGui::Button("Reset flow"))
               reset = true;
+            ImGui::Checkbox("Load trends window", &show_loads);
             ImGui::SliderFloat("##time", &time_scale, 0.1f, 2, "Simulation speed %.1fx");
             if (ImGui::CollapsingHeader("Solver settings")) {
               ImGui::TextUnformatted("Kinematic viscosity");
@@ -248,6 +359,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
         return false;
       reset = false;
       elapsed = 0;
+      loads = {};
     }
     float dx = Simulation::domain_width / width;
     float dt = std::min(0.65f * dx / std::max({3 * parameters.speed, diagnostics.max_speed * 1.25f, 0.1f}),
@@ -267,6 +379,36 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
     if (frame % 20 == 0 || frame + 1 == limit) {
       if (!sim.Measure(diagnostics) || !diagnostics.finite)
         return false;
+    }
+    wing_fluid::LoadCoefficients load;
+    if (!sim.MeasureLoads(load))
+      return false;
+    if (!paused || !load.valid)
+      loads.Update(load, paused ? 0 : steps * dt);
+    ObjPtr<IImage> load_image;
+    if (window) {
+      if (load_window && load_window->ShouldClose())
+        show_loads = false;
+      if (!show_loads)
+        load_window.Release();
+      if (show_loads && !load_window) {
+        load_window = device->CreateGLFWWindow({560, 740, "Wing Fluid | Load trends"});
+        if (!load_window || !load_window->EnableImGui(true, LONGMARCH_ASSETS_DIR "fonts/simhei.ttf", 19))
+          return false;
+        int x, y, w, h, mx, my, mw, mh;
+        glfwGetWindowPos(window->GLFWWindow(), &x, &y);
+        glfwGetWindowSize(window->GLFWWindow(), &w, &h);
+        glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(), &mx, &my, &mw, &mh);
+        glfwSetWindowPos(load_window->GLFWWindow(), std::max(mx, std::min(x + w + 12, mx + mw - 560)),
+                         std::max(my + 30, std::min(y, my + mh - 740)));
+      }
+      if (load_window) {
+        if (load_window->IsSwapChainInvalid() && !load_window->RebuildSwapChain())
+          return false;
+        load_image = load_window->GetNextImage();
+        if (load_image && !load_window->UpdateImGui([&] { loads.Draw(paused); }))
+          return false;
+      }
     }
     if (!sim.Export(runtime.field->GetDevicePointer()))
       return false;
@@ -304,6 +446,9 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
                    !commands->CmdPresentImage(window.Get(), canvas.Get(), COLOR_SPACE_BT709_LINEAR)))
       return false;
     ObjPtr<IDownloadToken> download;
+    if (load_image && (!commands->CmdClearImage(load_image.Get(), {0.035f, 0.05f, 0.075f, 1.0f}) ||
+                       !commands->CmdPresent(load_window.Get())))
+      return false;
     if (!options.capture.empty() && frame + 1 == limit) {
       download = commands->CmdDownloadImage(canvas.Get());
       if (!download)
@@ -332,6 +477,11 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             << " wall_time=" << std::chrono::duration<double>(std::chrono::steady_clock::now() - beginning).count()
             << " div_before=" << diagnostics.divergence_before << " div_after=" << diagnostics.divergence_after
             << " max_speed=" << diagnostics.max_speed << " solid_speed=" << diagnostics.solid_speed << '\n';
+  wing_fluid::LoadCoefficients final_load;
+  if (!sim.MeasureLoads(final_load))
+    return false;
+  std::cout << "load_coefficients x=" << final_load.x << " y=" << final_load.y << " moment=" << final_load.moment
+            << '\n';
   return true;
 }
 }  // namespace
@@ -385,6 +535,11 @@ int main(int argc, char **argv) {
     if (!initial.finite || initial.solid_speed != 0 || initial.divergence_after > 0.001f)
       return 2;
     float residual, error;
+    if (!sim.ValidateLoads(error))
+      return 1;
+    std::cout << "surface_load relative_error=" << error << '\n';
+    if (!std::isfinite(error) || error > 0.00001f)
+      return 2;
     if (!sim.ValidatePressure(residual, error))
       return 1;
     std::cout << "manufactured_pressure relative_residual=" << residual << " relative_error=" << error << '\n';

@@ -17,6 +17,13 @@ struct Diagnostics {
   bool finite{true};
 };
 
+// Per-unit-span fluid load, normalized by q*c and q*c^2 (rho cancels).
+// World axes: +x downstream, +y up; positive moment is counterclockwise about mid-chord.
+struct LoadCoefficients {
+  float x{}, y{}, moment{}, angle{};
+  bool valid{};
+};
+
 // CUDA owns the solver fields; the caller owns the stream and shared RHI display buffer.
 class Simulation final {
  public:
@@ -29,6 +36,8 @@ class Simulation final {
   bool Step(const Parameters &parameters, float dt);
   bool Export(void *float4_buffer);
   bool Measure(Diagnostics &diagnostics);
+  bool MeasureLoads(LoadCoefficients &loads);
+  bool ValidateLoads(float &relative_error);
   bool ValidatePressure(float &relative_residual, float &relative_error);
   int Levels() const;
   const std::string &Error() const;
