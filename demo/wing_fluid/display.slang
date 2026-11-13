@@ -4,7 +4,9 @@ struct Settings {
   uint mode;
   float speed;
   float dye_strength;
-  float3 padding;
+  float angle;
+  uint smooth_boundary;
+  float padding;
 };
 
 RHI_UNIFORM(0, 0, Settings, settings);
@@ -39,7 +41,7 @@ float4 PSMain(Varying input) : SV_Target0 {
   int2 p = int2(floor(pos));
   float2 f = frac(pos);
   float4 nearest = Cell(int2(round(pos)));
-  if (nearest.w < 0)
+  if (!settings.smooth_boundary && nearest.w < 0)
     return float4(0.82, 0.87, 0.88, 1);
   float4 q = lerp(lerp(Cell(p), Cell(p + int2(1, 0)), f.x), lerp(Cell(p + int2(0, 1)), Cell(p + int2(1, 1)), f.x), f.y);
   float speed = max(settings.speed, 0.1);
@@ -59,6 +61,18 @@ float4 PSMain(Varying input) : SV_Target0 {
       color *= 0.22;
       color = lerp(color, float3(0.3, 0.92, 0.8), saturate(q.w * settings.dye_strength));
     }
+  }
+  if (settings.smooth_boundary) {
+    float2 world = float2(input.uv.x * 6 - 2, (1 - input.uv.y) * 3 - 1.5);
+    float a = settings.angle * 0.01745329252;
+    float q = (cos(a) * world.x - sin(a) * world.y) / 1.25 + 0.5;
+    float t = (sin(a) * world.x + cos(a) * world.y) / 1.25;
+    float s = clamp(q, 0, 1);
+    float thickness =
+        0.6 * (0.2969 * sqrt(s) - 0.126 * s - 0.3516 * s * s + 0.2843 * s * s * s - 0.1036 * s * s * s * s);
+    float phi = max(abs(t) - thickness, max(-q, q - 1));
+    float coverage = 1 - smoothstep(-fwidth(phi), fwidth(phi), phi);
+    color = lerp(color, float3(0.82, 0.87, 0.88), coverage);
   }
   return float4(color, 1);
 }

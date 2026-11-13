@@ -168,7 +168,14 @@ bool Parse(int argc, char **argv, Options &o) {
       o.debug = true;
     else if (i + 1 < argc) {
       std::string value = argv[++i];
-      if (a == "--backend") {
+      if (a == "--boundary") {
+        if (value == "smooth")
+          o.parameters.smooth_boundary = true;
+        else if (value == "voxel")
+          o.parameters.smooth_boundary = false;
+        else
+          return false;
+      } else if (a == "--backend") {
         if (value == "vulkan")
           o.backend = BACKEND_API_VULKAN;
         else if (value == "d3d12")
@@ -206,7 +213,7 @@ bool Parse(int argc, char **argv, Options &o) {
       return false;
   }
   return o.width >= 128 && o.width <= 1024 && !(o.width & (o.width - 1)) && o.steps >= 1 && o.steps <= 16 &&
-         o.frames >= 0 && o.parameters.speed >= 0.1f && o.parameters.speed <= 3 && o.parameters.angle >= -25 &&
+         o.frames >= 0 && o.parameters.speed >= 0.1f && o.parameters.speed <= 30 && o.parameters.angle >= -25 &&
          o.parameters.angle <= 25 && std::isfinite(o.parameters.angle) && o.parameters.viscosity >= 0.0005f &&
          o.parameters.viscosity <= 0.01f;
 }
@@ -298,7 +305,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::Spacing();
             ImGui::PushItemWidth(-1);
             ImGui::TextUnformatted("Flow speed");
-            ImGui::SliderFloat("##speed", &parameters.speed, 0.1f, 3.0f, "%.2f m/s");
+            ImGui::SliderFloat("##speed", &parameters.speed, 0.1f, 30.0f, "%.2f m/s", ImGuiSliderFlags_Logarithmic);
             ImGui::TextUnformatted("Angle of attack");
             ImGui::SliderFloat("##angle", &parameters.angle, -25, 25, "%.1f deg");
             ImGui::Text("Reynolds number: %.0f", parameters.speed * Simulation::chord / parameters.viscosity);
@@ -321,6 +328,8 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::Checkbox("Load trends window", &show_loads);
             ImGui::SliderFloat("##time", &time_scale, 0.1f, 2, "Simulation speed %.1fx");
             if (ImGui::CollapsingHeader("Solver settings")) {
+              if (ImGui::Checkbox("Smooth wing boundary", &parameters.smooth_boundary))
+                reset = true;
               ImGui::TextUnformatted("Kinematic viscosity");
               ImGui::SliderFloat("##viscosity", &parameters.viscosity, 0.0005f, 0.01f, "%.4f m2/s",
                                  ImGuiSliderFlags_Logarithmic);
@@ -339,7 +348,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::Spacing();
             ImGui::TextDisabled("Exploratory 2D laminar model");
             ImGui::TextWrapped(
-                "Stair-step stationary wing; no turbulence model or engineering lift/drag prediction. Changing angle revoxelizes the obstacle.");
+                "Stationary wing; no turbulence model or engineering lift/drag prediction. Changing angle rebuilds the obstacle.");
             ImGui::End();
             ImGui::SetNextWindowPos({24, 20});
             ImGui::Begin("Title", nullptr,
@@ -423,8 +432,17 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
 
     struct Settings {
       uint32_t width, height, mode;
-      float speed, contrast, padding[3];
-    } settings{uint32_t(width), uint32_t(height), uint32_t(mode), parameters.speed, dye_strength, {0, 0, 0}};
+      float speed, contrast, angle;
+      uint32_t smooth_boundary;
+      float padding;
+    } settings{uint32_t(width),
+               uint32_t(height),
+               uint32_t(mode),
+               parameters.speed,
+               dye_strength,
+               load.angle,
+               uint32_t(parameters.smooth_boundary),
+               0};
 
     ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     if (!commands || !commands->CmdUploadBuffer(uniform.Get(), 0, &settings, sizeof(settings)) ||
@@ -489,9 +507,10 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
 int main(int argc, char **argv) {
   Options options;
   if (!Parse(argc, argv, options)) {
-    std::cerr << "Usage: demo_wing_fluid [--backend vulkan|d3d12] [--grid 128|256|512|1024] [--speed 0.1..3] "
-                 "[--angle -25..25] [--viscosity 0.0005..0.01] [--view dye|speed|vorticity|pressure] "
-                 "[--frames N] [--steps 1..16] [--headless] [--validate] [--debug] [--capture image.ppm]\n";
+    std::cerr
+        << "Usage: demo_wing_fluid [--backend vulkan|d3d12] [--grid 128|256|512|1024] [--speed 0.1..30] "
+           "[--angle -25..25] [--viscosity 0.0005..0.01] [--view dye|speed|vorticity|pressure] "
+           "[--boundary smooth|voxel] [--frames N] [--steps 1..16] [--headless] [--validate] [--debug] [--capture image.ppm]\n";
     return 1;
   }
   ObjPtr<ICore> core = CreateCore(options.backend, {options.debug});
@@ -532,7 +551,7 @@ int main(int argc, char **argv) {
       return 2;
     std::cout << "reset_projection before=" << initial.divergence_before << " after=" << initial.divergence_after
               << '\n';
-    if (!initial.finite || initial.solid_speed != 0 || initial.divergence_after > 0.001f)
+    if (!initial.finite || initial.solid_speed != 0 || initial.divergence_after > 0.001f * options.parameters.speed)
       return 2;
     float residual, error;
     if (!sim.ValidateLoads(error))
@@ -548,12 +567,12 @@ int main(int argc, char **argv) {
     if (!sim.Reset(options.parameters))
       return 1;
     // Exercise sudden inlet/geometry changes without resetting the flow between cases.
-    for (auto values : {std::pair<float, float>{1, 0}, {3, 25}, {0.2f, -25}, {1, 8}}) {
+    for (auto values : {std::pair<float, float>{1, 0}, {30, 25}, {0.2f, -25}, {1, 8}}) {
       auto p = options.parameters;
       p.speed = values.first;
       p.angle = values.second;
       float dx = wing_fluid::Simulation::domain_width / options.width;
-      float dt = std::min(0.5f * dx / 10.0f, 0.2f * dx * dx / p.viscosity);
+      float dt = std::min(0.5f * dx / 100.0f, 0.2f * dx * dx / p.viscosity);
       for (int step = 0; step < 96; ++step)
         if (!sim.Step(p, dt))
           return 1;

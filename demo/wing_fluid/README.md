@@ -15,18 +15,21 @@ RHI's platform default is used. The first CUDA-capable RHI adapter is selected.
 
 ## Controls
 
-- **Flow speed:** 0.1–3 m/s inlet velocity.
+- **Flow speed:** 0.1–30 m/s (logarithmic slider) inlet velocity.
 - **Angle of attack:** −25° to +25°; positive incidence raises the leading edge.
 - **Display:** advected dye streaks, speed, signed vorticity, or pressure.
 - **Pause / Reset flow:** freeze time or restart from projected uniform inflow and straight dye streaks.
 - **Simulation speed:** requested simulated seconds per wall-clock second.
-- **Solver settings:** kinematic viscosity, 0.0005–0.01 m²/s.
+- **Solver settings:** smooth wing boundary (enabled by default) and kinematic viscosity, 0.0005–0.01 m²/s. Switching boundary modes resets the flow.
+  `--boundary smooth|voxel` selects the mode at startup.
 - **Load trends window:** a separate window with a cyan resultant-force arrow,
   an orange moment arc, and recent Fx/Fy/Mz curves. Closing it leaves the simulation
   running; this checkbox opens it again. Pause freezes the curves; Reset clears them.
 
 Loads combine pressure and approximate tangential viscous shear integrated over
-fluid/solid voxel faces, per unit span. Force is normalized by `0.5 rho U² c` and
+the curved wing contour (or fluid/solid faces in voxel mode), per unit span.
+The smooth-mode contour has 512 cosine-spaced segments; pressure and tangential
+velocity are sampled one grid spacing outside it. Wall shear remains approximate. Force is normalized by `0.5 rho U² c` and
 moment by `0.5 rho U² c²`, using the current simulated inlet speed and chord.
 Positive x points downstream, positive y upward, and positive moment is
 counterclockwise about mid-chord. The body remains fixed; no mass or inertia is assumed.
@@ -58,14 +61,23 @@ du/dt + (u · ∇)u = −∇p + ν∇²u
 ```
 
 1. A staggered MAC grid stores horizontal/vertical face velocities and cell-centered
-   pressure. The NACA 0012 closed-trailing-edge thickness formula defines a binary
-   cell mask, rotated about mid-chord.
+   pressure. The NACA 0012 closed-trailing-edge curve is rotated about mid-chord.
+   Smooth mode computes each grid face's open fraction using eight subsegments
+   and interpolated intersections with the analytic implicit curve. Fractions below
+   0.01 are closed and above 0.99 are fully open to avoid vanishing apertures.
+   Cells with any open face participate in the pressure solve. Voxel mode retains
+   the original binary cell mask and fully open/closed faces.
 2. Midpoint-backtraced semi-Lagrangian velocity advection is followed by a separate
    explicit viscous-diffusion pass. The diffusion bound is `ν dt / dx² <= 0.2`.
-3. Pressure projection uses matching masked divergence and gradient operators.
+   Partially blocked faces receive an additional implicit wall-drag approximation
+   proportional to their blocked fraction; this is not a resolved no-slip boundary layer.
+3. Pressure projection uses open-face-weighted flux divergence and the matching
+   variable-coefficient Poisson operator, with the ordinary pressure-gradient velocity
+   correction. The reported divergence is net open-face flux divided by full cell area,
+   not by the possibly tiny fluid portion of a cut cell.
    Inlet velocity is prescribed, the downstream pressure is zero, top/bottom walls
-   are free-slip, and all faces touching the stationary voxelized wing have zero
-   velocity. Pressure has homogeneous Neumann conditions at solid walls and inlet.
+   are free-slip, and fully blocked faces have zero velocity. Stationary solid surfaces
+   contribute zero normal flux. Voxel mode closes all faces adjacent to solid cells.
 4. The pressure Poisson equation uses five geometric multigrid V-cycles per substep:
    three red/black Gauss–Seidel sweeps before and after coarse correction, summed
    residual restriction, averaged coarse face conductances, and bilinear correction
@@ -84,10 +96,10 @@ handles Vulkan external ownership barriers. One graphics frame is kept in flight
 shutdown drains both CUDA and graphics before releasing imported resources.
 
 This is an exploratory laminar 2D visualization, not an aerodynamic design tool:
-binary/stair-step geometry, semi-Lagrangian numerical diffusion, finite channel
+approximate cut-face geometry and wall drag, semi-Lagrangian numerical diffusion, finite channel
 walls and a coarse near-wall mesh affect separation and wake behavior. There is
 no turbulence model, 3D sweep/span, compressibility or validated lift/drag output.
-Changing incidence revoxelizes a stationary obstacle and introduces a transient;
+Changing incidence rebuilds a stationary obstacle and introduces a transient;
 it does not model the velocity of a physically pitching wing.
 
 ## Reproducible validation
@@ -95,7 +107,7 @@ it does not model the velocity of a physically pitching wing.
 ```sh
 demo_wing_fluid --validate --backend vulkan --debug --frames 120
 demo_wing_fluid --validate --backend d3d12 --debug --frames 120
-demo_wing_fluid --headless --frames 2000 --steps 8 --speed 3 --angle 25 --viscosity 0.0005
+demo_wing_fluid --headless --frames 2000 --steps 16 --speed 30 --angle 25 --viscosity 0.0005
 demo_wing_fluid --headless --frames 1200 --view vorticity --capture wake.ppm
 ```
 
@@ -106,7 +118,8 @@ nonzero solid velocity or insufficient divergence reduction. It subsequently run
 the actual RHI offscreen rendering path. This verifies the implemented discrete
 solver and interop; it does not establish continuum/grid convergence.
 It also checks the surface-load integration against constant and linear pressure
-fields on the closed voxel body, including force and moment signs.
+fields on the selected closed surface, including force and moment signs.
+The speed/incidence transition checks include 30 m/s at 25 degrees.
 
 `--headless` creates no window and defaults to 120 frames. `--steps` specifies
 deterministic substeps per headless frame (default four); it does not override
@@ -120,3 +133,9 @@ for MAC projection and boundary conditions, and
 [NVIDIA GPU Gems, Fast Fluid Dynamics](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu)
 for semi-Lagrangian splitting. This implementation uses multigrid rather than the
 GPU Gems chapter's Jacobi-only pressure iteration.
+
+Smooth pressure boundaries follow the open-face-weighted approach described by
+[Batty, Bertails and Bridson (2007)](https://www.cs.ubc.ca/labs/imager/tr/2007/Batty_VariationalFluids/).
+This demo uses approximate face intersections and split viscosity, not their full
+rigid-body coupling method. The displayed smooth contour is independently antialiased;
+the solver itself also uses fractional apertures.

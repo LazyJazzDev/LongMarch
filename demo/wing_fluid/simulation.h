@@ -10,6 +10,7 @@ struct Parameters {
   float angle{8.0f};
   float viscosity{0.0015f};
   int cycles{5};
+  bool smooth_boundary{true};
 };
 
 struct Diagnostics {

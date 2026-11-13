@@ -19,6 +19,68 @@ __device__ bool Fluid(const unsigned char *mask, int x, int y, int w, int h) {
   return x >= 0 && x < w && y >= 0 && y < h && mask[y * w + x];
 }
 
+__host__ __device__ float Thickness(float q) {
+  return q > 0 && q < 1 ? 0.6f * (0.2969f * sqrtf(q) - 0.1260f * q - 0.3516f * q * q + 0.2843f * q * q * q -
+                                  0.1036f * q * q * q * q)
+                        : 0;
+}
+
+// An implicit function with the exact NACA zero contour (not a distance field).
+__device__ float WingImplicit(float x, float y, float angle) {
+  float a = angle * 0.01745329252f;
+  x -= 2;
+  y -= 1.5f;
+  float q = (cosf(a) * x - sinf(a) * y) / Simulation::chord + 0.5f;
+  float t = (sinf(a) * x + cosf(a) * y) / Simulation::chord;
+  return fmaxf(fabsf(t) - Thickness(q), fmaxf(-q, q - 1)) * Simulation::chord;
+}
+
+__device__ float OpenFraction(float x, float y, float sx, float sy, float angle) {
+  float fraction = 0;
+  float a = WingImplicit(x, y, angle);
+  // Subsegments also detect the thin leading/trailing edge when both face endpoints are outside.
+  for (int k = 1; k <= 8; ++k) {
+    float b = WingImplicit(x + sx * (k / 8.0f), y + sy * (k / 8.0f), angle);
+    fraction += a >= 0 && b >= 0 ? 1 : a <= 0 && b <= 0 ? 0 : a > 0 ? a / (a - b) : b / (b - a);
+    a = b;
+  }
+  fraction *= 0.125f;
+  // Remove vanishing apertures to keep the pressure system well conditioned.
+  return fraction < 0.01f ? 0 : fraction > 0.99f ? 1 : fraction;
+}
+
+__global__ void SmoothGeometry(Level l, float angle) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= l.w * l.h)
+    return;
+  float h = Simulation::domain_width / l.w;
+  int x = i % l.w, y = i / l.w;
+  l.east[i] = x + 1 < l.w ? OpenFraction((x + 1) * h, y * h, 0, h, angle) : 0;
+  l.north[i] = y + 1 < l.h ? OpenFraction(x * h, (y + 1) * h, h, 0, angle) : 0;
+  l.boundary[i] = x == l.w - 1 ? 2 : 0;
+}
+
+__global__ void ActiveCells(Level l, unsigned char *mask) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < l.w * l.h)
+    mask[i] =
+        l.east[i] + l.north[i] + l.boundary[i] + (i % l.w ? l.east[i - 1] : 1) + (i >= l.w ? l.north[i - l.w] : 0) > 0;
+}
+
+__device__ float UWeight(Level l, int x, int y) {
+  return x == 0 || x == l.w ? 1 : l.east[y * l.w + x - 1];
+}
+
+__device__ float VWeight(Level l, int x, int y) {
+  return y == 0 || y == l.h ? 0 : l.north[(y - 1) * l.w + x];
+}
+
+__device__ float Flux(Level l, const float *u, const float *v, int x, int y) {
+  int j = y * (l.w + 1) + x, i = y * l.w + x;
+  return UWeight(l, x + 1, y) * u[j + 1] - UWeight(l, x, y) * u[j] + VWeight(l, x, y + 1) * v[i + l.w] -
+         VWeight(l, x, y) * v[i];
+}
+
 __global__ void Geometry(unsigned char *mask, int w, int h, float angle) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= w * h)
@@ -176,18 +238,19 @@ __global__ void InitializeDye(float *dye, const unsigned char *mask, int w, int 
   dye[i] = mask[i] ? 0.75f * expf(-50 * stripe * stripe) : 0;
 }
 
-__global__ void Boundaries(float *u, float *v, const unsigned char *mask, int w, int h, float speed) {
+__global__ void Boundaries(float *u, float *v, Level l, float speed) {
+  int w = l.w, h = l.h;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < (w + 1) * h) {
     int x = i % (w + 1), y = i / (w + 1);
     if (x == 0)
       u[i] = speed;
-    else if (x < w && (!Fluid(mask, x - 1, y, w, h) || !Fluid(mask, x, y, w, h)))
+    else if (UWeight(l, x, y) == 0)
       u[i] = 0;
   }
   if (i < w * (h + 1)) {
     int x = i % w, y = i / w;
-    if (y == 0 || y == h || !Fluid(mask, x, y - 1, w, h) || !Fluid(mask, x, y, w, h))
+    if (VWeight(l, x, y) == 0)
       v[i] = 0;
   }
 }
@@ -209,7 +272,8 @@ __global__ void Advect(const float *u, const float *v, float *next_u, float *nex
   }
 }
 
-__global__ void Diffuse(const float *u, const float *v, float *next_u, float *next_v, int w, int h, float factor) {
+__global__ void Diffuse(const float *u, const float *v, float *next_u, float *next_v, Level l, float factor) {
+  int w = l.w, h = l.h;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   for (int component = 0; component < 2; ++component) {
     int fw = component ? w : w + 1, fh = component ? h + 1 : h;
@@ -219,7 +283,10 @@ __global__ void Diffuse(const float *u, const float *v, float *next_u, float *ne
     const float *f = component ? v : u;
     float lap = f[y * fw + max(x - 1, 0)] + f[y * fw + min(x + 1, fw - 1)] + f[max(y - 1, 0) * fw + x] +
                 f[min(y + 1, fh - 1) * fw + x] - 4 * f[i];
-    (component ? next_v : next_u)[i] = f[i] + factor * lap;
+    float aperture = component ? VWeight(l, x, y) : UWeight(l, x, y);
+    // Approximate no-slip drag on the blocked portion, implicit to avoid a tiny-aperture timestep.
+    float drag = 2 * factor * (1 - aperture) / fmaxf(aperture, 0.1f);
+    (component ? next_v : next_u)[i] = (f[i] + factor * lap) / (1 + drag);
   }
 }
 
@@ -228,7 +295,7 @@ __global__ void RHS(Level l, const float *u, const float *v, const unsigned char
   if (i >= l.w * l.h)
     return;
   int x = i % l.w, y = i / l.w;
-  float flux = u[y * (l.w + 1) + x + 1] - u[y * (l.w + 1) + x] + v[i + l.w] - v[i];
+  float flux = Flux(l, u, v, x, y);
   l.b[i] = mask[i] ? -flux * (Simulation::domain_width / l.w) / dt : 0;
   l.p[i] = 0;
 }
@@ -318,7 +385,7 @@ __global__ void MeasureFields(Level l,
     return;
   int x = i % l.w, y = i / l.w;
   float dx = Simulation::domain_width / l.w;
-  float div = (u[y * (l.w + 1) + x + 1] - u[y * (l.w + 1) + x] + v[i + l.w] - v[i]) / dx;
+  float div = Flux(l, u, v, x, y) / dx;
   float2 vel = Velocity(u, v, l.w, l.h, x + 0.5f, y + 0.5f);
   if (!isfinite(div) || !isfinite(l.p[i]) || !isfinite(vel.x) || !isfinite(vel.y))
     atomicAdd(stats + 6, 1.0f);
@@ -344,6 +411,63 @@ __global__ void Manufactured(Level l, float *exact, bool rhs) {
     l.b[i] = Diagonal(l, i) * exact[i] - Neighbors(l, exact, i);
     l.p[i] = 0;
   }
+}
+
+constexpr int surface_segments = 512;
+
+// Counterclockwise closed polygon, cosine spacing resolves the rounded nose.
+__host__ __device__ float2 SurfacePoint(int index, float angle) {
+  int k = index <= surface_segments / 2 ? index : surface_segments - index;
+  float q = 0.5f * (1 - cosf(k * (6.28318530718f / surface_segments)));
+  float x = (q - 0.5f) * Simulation::chord;
+  float y = Thickness(q) * Simulation::chord * (index <= surface_segments / 2 ? -1 : 1);
+  float a = angle * 0.01745329252f;
+  return make_float2(x * cosf(a) + y * sinf(a), -x * sinf(a) + y * cosf(a));
+}
+
+__device__ float SurfacePressure(Level l, const unsigned char *mask, float x, float y) {
+  int ix = int(floorf(x)), iy = int(floorf(y));
+  float a = x - ix, b = y - iy, sum = 0, weight = 0;
+  for (int dy = 0; dy < 2; ++dy)
+    for (int dx = 0; dx < 2; ++dx) {
+      if (!Fluid(mask, ix + dx, iy + dy, l.w, l.h))
+        continue;
+      float w = (dx ? a : 1 - a) * (dy ? b : 1 - b);
+      sum += w * l.p[(iy + dy) * l.w + ix + dx];
+      weight += w;
+    }
+  return weight > 0 ? sum / weight : 0;
+}
+
+__global__ void IntegrateSmoothLoads(Level l,
+                                     const float *u,
+                                     const float *v,
+                                     const unsigned char *mask,
+                                     float angle,
+                                     float viscosity,
+                                     double *sums,
+                                     int analytic) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= surface_segments)
+    return;
+  float2 a = SurfacePoint(i, angle), b = SurfacePoint(i + 1, angle);
+  double rx = 0.5 * (a.x + b.x), ry = 0.5 * (a.y + b.y);
+  double tx = b.x - a.x, ty = b.y - a.y, length = hypot(tx, ty);
+  double nx = ty / length, ny = -tx / length;
+  float h = Simulation::domain_width / l.w;
+  float px = float((rx + 2 + nx * h) / h), py = float((ry + 1.5 + ny * h) / h);
+  double p = analytic == 1 ? 7 : analytic == 2 ? 0.7 * rx - 0.4 * ry : SurfacePressure(l, mask, px - 0.5f, py - 0.5f);
+  double fx = -p * ty, fy = p * tx;
+  float2 vel = Velocity(u, v, l.w, l.h, px, py);
+  double normal = vel.x * nx + vel.y * ny;
+  double sx = analytic ? 0 : viscosity * (vel.x - normal * nx) * length / h;
+  double sy = analytic ? 0 : viscosity * (vel.y - normal * ny) * length / h;
+  atomicAdd(sums, fx);
+  atomicAdd(sums + 1, fy);
+  atomicAdd(sums + 2, rx * fy - ry * fx);
+  atomicAdd(sums + 3, sx);
+  atomicAdd(sums + 4, sy);
+  atomicAdd(sums + 5, rx * sy - ry * sx);
 }
 
 __global__ void IntegrateLoads(Level l,
@@ -404,6 +528,7 @@ struct Simulation::Impl {
   Parameters parameters;
   bool loads_valid{};
   float angle{1000}, time{}, last_dt{0.001f};
+  bool smooth_boundary{};
   std::string error;
 
   bool Check(cudaError_t result) {
@@ -428,16 +553,26 @@ struct Simulation::Impl {
   bool ReadLoads(double *values, int analytic = 0) {
     if (!Check(cudaMemsetAsync(load_sums, 0, 6 * sizeof(double), stream)))
       return false;
-    IntegrateLoads<<<Blocks(w * h), block, 0, stream>>>(levels[0], u, v, mask, parameters.viscosity, load_sums,
-                                                        analytic);
+    if (smooth_boundary)
+      IntegrateSmoothLoads<<<Blocks(surface_segments), block, 0, stream>>>(levels[0], u, v, mask, angle,
+                                                                           parameters.viscosity, load_sums, analytic);
+    else
+      IntegrateLoads<<<Blocks(w * h), block, 0, stream>>>(levels[0], u, v, mask, parameters.viscosity, load_sums,
+                                                          analytic);
     return Check(cudaMemcpyAsync(values, load_sums, 6 * sizeof(double), cudaMemcpyDeviceToHost, stream)) &&
            Check(cudaStreamSynchronize(stream));
   }
 
-  void GeometryFor(float value) {
-    angle = value;
-    Geometry<<<Blocks(w * h), block, 0, stream>>>(mask, w, h, angle);
-    FineOperator<<<Blocks(w * h), block, 0, stream>>>(levels[0], mask);
+  void GeometryFor(const Parameters &p) {
+    angle = p.angle;
+    smooth_boundary = p.smooth_boundary;
+    if (smooth_boundary) {
+      SmoothGeometry<<<Blocks(w * h), block, 0, stream>>>(levels[0], angle);
+      ActiveCells<<<Blocks(w * h), block, 0, stream>>>(levels[0], mask);
+    } else {
+      Geometry<<<Blocks(w * h), block, 0, stream>>>(mask, w, h, angle);
+      FineOperator<<<Blocks(w * h), block, 0, stream>>>(levels[0], mask);
+    }
     for (size_t i = 1; i < levels.size(); ++i)
       CoarsenOperator<<<Blocks(levels[i].w * levels[i].h), block, 0, stream>>>(levels[i - 1], levels[i]);
   }
@@ -535,9 +670,9 @@ bool Simulation::Reset(const Parameters &parameters) {
   s.time = 0;
   s.parameters = parameters;
   s.loads_valid = false;
-  s.GeometryFor(parameters.angle);
+  s.GeometryFor(parameters);
   InitializeVelocity<<<s.Blocks(s.w * (s.h + 1)), block, 0, s.stream>>>(s.u, s.v, s.w, s.h, parameters.speed);
-  Boundaries<<<s.Blocks(s.w * (s.h + 1)), block, 0, s.stream>>>(s.u, s.v, s.mask, s.w, s.h, parameters.speed);
+  Boundaries<<<s.Blocks(s.w * (s.h + 1)), block, 0, s.stream>>>(s.u, s.v, s.levels[0], parameters.speed);
   for (auto l : s.levels)
     if (!s.Check(cudaMemsetAsync(l.p, 0, l.w * l.h * sizeof(float), s.stream)))
       return false;
@@ -557,15 +692,16 @@ bool Simulation::Step(const Parameters &parameters, float dt) {
   s.parameters = parameters;
   s.loads_valid = true;
   s.last_dt = dt;
-  if (parameters.angle != s.angle)
-    s.GeometryFor(parameters.angle);
+  if (parameters.angle != s.angle || parameters.smooth_boundary != s.smooth_boundary)
+    s.GeometryFor(parameters);
   int faces = s.Blocks(s.w * (s.h + 1));
-  Boundaries<<<faces, block, 0, s.stream>>>(s.u, s.v, s.mask, s.w, s.h, parameters.speed);
+  Boundaries<<<faces, block, 0, s.stream>>>(s.u, s.v, s.levels[0], parameters.speed);
   Advect<<<faces, block, 0, s.stream>>>(s.u, s.v, s.next_u, s.next_v, s.w, s.h, dt);
-  Boundaries<<<faces, block, 0, s.stream>>>(s.next_u, s.next_v, s.mask, s.w, s.h, parameters.speed);
+  Boundaries<<<faces, block, 0, s.stream>>>(s.next_u, s.next_v, s.levels[0], parameters.speed);
   float dx = Simulation::domain_width / s.w;
-  Diffuse<<<faces, block, 0, s.stream>>>(s.next_u, s.next_v, s.u, s.v, s.w, s.h, parameters.viscosity * dt / (dx * dx));
-  Boundaries<<<faces, block, 0, s.stream>>>(s.u, s.v, s.mask, s.w, s.h, parameters.speed);
+  Diffuse<<<faces, block, 0, s.stream>>>(s.next_u, s.next_v, s.u, s.v, s.levels[0],
+                                         parameters.viscosity * dt / (dx * dx));
+  Boundaries<<<faces, block, 0, s.stream>>>(s.u, s.v, s.levels[0], parameters.speed);
   RHS<<<s.Blocks(s.w * s.h), block, 0, s.stream>>>(s.levels[0], s.u, s.v, s.mask, dt);
   if (!s.Solve(parameters.cycles))
     return false;
@@ -638,6 +774,17 @@ bool Simulation::ValidateLoads(float &relative_error) {
       my += h * h * ((i / s.w + 0.5) * h - 1.5);
     }
   double constant[6], linear[6];
+  if (s.smooth_boundary) {
+    area = mx = my = 0;
+    // Polygon area and first moments, independent of the surface traction integral.
+    for (int i = 0; i < surface_segments; ++i) {
+      auto a = SurfacePoint(i, s.angle), b = SurfacePoint(i + 1, s.angle);
+      double cross = double(a.x) * b.y - double(b.x) * a.y;
+      area += cross / 2;
+      mx += (a.x + b.x) * cross / 6;
+      my += (a.y + b.y) * cross / 6;
+    }
+  }
   if (!s.ReadLoads(constant, 1) || !s.ReadLoads(linear, 2))
     return false;
   // Divergence theorem on the closed voxel body, independent of its perimeter.
