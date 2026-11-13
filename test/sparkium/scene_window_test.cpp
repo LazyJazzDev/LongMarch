@@ -6,9 +6,27 @@
 #include <cstdlib>
 #include <cstring>
 #include <glm/gtc/packing.hpp>
+#include <stdexcept>
 
-#include "../../demo/sparkium_backend.h"
 #include "sparkium/sparkium.h"
+
+namespace {
+grassland::rhi::BackendAPI ParseBackend(const std::string &name) {
+  using namespace grassland::rhi;
+  BackendAPI api;
+  if (name == "auto")
+    api = BACKEND_API_DEFAULT;
+  else if (name == "metal")
+    api = BACKEND_API_METAL;
+  else if (name == "vulkan")
+    api = BACKEND_API_VULKAN;
+  else if (name == "d3d12")
+    api = BACKEND_API_D3D12;
+  else
+    throw std::invalid_argument("unknown RHI backend: " + name);
+  return api;
+}
+}  // namespace
 
 using namespace grassland;
 using namespace grassland::rhi;
@@ -19,7 +37,7 @@ TEST(SparkiumWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
   if (!std::getenv("LONGMARCH_TEST_HDR") && !std::getenv("LONGMARCH_TEST_HDR_WINDOWS"))
     GTEST_SKIP() << "Requires an interactive desktop session";
   const char *backend = std::getenv("SPARKIUM_TEST_BACKEND");
-  const auto api = backend ? ParseSparkiumBackend(backend) : BACKEND_API_DEFAULT;
+  const auto api = backend ? ParseBackend(backend) : BACKEND_API_DEFAULT;
   RecordProperty("backend", BackendAPIName(api));
   ObjPtr<ICore> native = CreateCore(api, {true});
   ASSERT_TRUE(native);

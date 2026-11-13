@@ -1,4 +1,6 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
+
+#include <stdexcept>
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "sparkium/core/render_layout.h"
@@ -23,7 +25,6 @@
 #include <random>
 #include <tuple>
 
-#include "../../demo/sparkium_backend.h"
 #include "sparkium/pipelines/raytracing/core/camera.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
@@ -32,6 +33,24 @@
 #include "sparkium/pipelines/raytracing/material/materials.h"
 
 using namespace grassland;
+
+namespace {
+grassland::rhi::BackendAPI ParseBackend(const std::string &name) {
+  using namespace grassland::rhi;
+  BackendAPI api;
+  if (name == "auto")
+    api = BACKEND_API_DEFAULT;
+  else if (name == "metal")
+    api = BACKEND_API_METAL;
+  else if (name == "vulkan")
+    api = BACKEND_API_VULKAN;
+  else if (name == "d3d12")
+    api = BACKEND_API_D3D12;
+  else
+    throw std::invalid_argument("unknown RHI backend: " + name);
+  return api;
+}
+}  // namespace
 
 namespace {
 bool BackendCompiled(rhi::BackendAPI api) {
@@ -73,7 +92,7 @@ class SoftwareBVHTest : public testing::Test {
   void SetUp() override {
     const char *backend = std::getenv("SPARKIUM_TEST_BACKEND");
     const bool debug = std::getenv("SPARKIUM_TEST_DEBUG") != nullptr;
-    api = backend ? ParseSparkiumBackend(backend) : rhi::BACKEND_API_DEFAULT;
+    api = backend ? ParseBackend(backend) : rhi::BACKEND_API_DEFAULT;
     native_core = rhi::CreateCore(api, {debug});
     ASSERT_TRUE(native_core);
     device = native_core->CreateDeviceByAutoSelection();

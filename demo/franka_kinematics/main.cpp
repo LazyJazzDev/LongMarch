@@ -4,13 +4,31 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 
-#include "../sparkium_backend.h"
 #include "franka_scene.h"
 #include "sparkium/core/render_worker.h"
 #include "sparkium/sparkium.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+
+namespace {
+grassland::rhi::BackendAPI ParseBackend(const std::string &name) {
+  using namespace grassland::rhi;
+  BackendAPI api;
+  if (name == "auto")
+    api = BACKEND_API_DEFAULT;
+  else if (name == "metal")
+    api = BACKEND_API_METAL;
+  else if (name == "vulkan")
+    api = BACKEND_API_VULKAN;
+  else if (name == "d3d12")
+    api = BACKEND_API_D3D12;
+  else
+    throw std::invalid_argument("unknown RHI backend: " + name);
+  return api;
+}
+}  // namespace
 
 using namespace grassland;
 
@@ -28,7 +46,7 @@ int main(int argc, char **argv) {
             << "Franka Kinematics\n--backend auto|metal|vulkan|d3d12 --frames N --headless --raster --output image.bmp\n";
         return 0;
       } else if (arg == "--backend" && i + 1 < argc)
-        backend = ParseSparkiumBackend(argv[++i]);
+        backend = ParseBackend(argv[++i]);
       else if (arg == "--frames" && i + 1 < argc) {
         frames = std::stoi(argv[++i]);
         if (frames <= 0) {

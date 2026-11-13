@@ -1,4 +1,5 @@
-﻿#include "../sparkium_backend.h"
+#include <stdexcept>
+
 #include "sparkium/sparkium.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -6,6 +7,24 @@
 #include <iostream>
 
 #include "stb_image_write.h"
+
+namespace {
+grassland::rhi::BackendAPI ParseBackend(const std::string &name) {
+  using namespace grassland::rhi;
+  BackendAPI api;
+  if (name == "auto")
+    api = BACKEND_API_DEFAULT;
+  else if (name == "metal")
+    api = BACKEND_API_METAL;
+  else if (name == "vulkan")
+    api = BACKEND_API_VULKAN;
+  else if (name == "d3d12")
+    api = BACKEND_API_D3D12;
+  else
+    throw std::invalid_argument("unknown RHI backend: " + name);
+  return api;
+}
+}  // namespace
 
 using namespace grassland;
 
@@ -59,7 +78,7 @@ int main(int argc, char **argv) {
       if (argument == "--require-hardware-rt")
         require_hardware_rt = true;
       else if (argument == "--backend" && i + 1 < argc)
-        backend = ParseSparkiumBackend(argv[++i]);
+        backend = ParseBackend(argv[++i]);
       else if (argument == "--debug")
         debug = true;
       else if ((argument == "-o" || argument == "--output") && i + 1 < argc)
