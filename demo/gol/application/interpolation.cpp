@@ -1,4 +1,6 @@
-﻿#include "interpolation.h"
+#include "interpolation.h"
+
+namespace life_demo {
 
 float PowerInterpolation(float x, float index) {
   if (x < 0.5f)
@@ -10,3 +12,5 @@ float PowerInterpolation(float x, float index) {
 float CosineInterpolation(float x) {
   return (std::cos(x * float(glm::pi<float>())) + 1.0f) * 0.5f;
 }
+
+}  // namespace life_demo

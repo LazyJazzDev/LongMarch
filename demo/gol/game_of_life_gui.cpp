@@ -1,6 +1,10 @@
-﻿#include "game_of_life_gui.h"
+#include "game_of_life_gui.h"
 
+#include <limits>
+
+#ifndef LONGMARCH_HOSTED_GAMES
 #include <tinyfiledialogs.h>
+#endif
 
 #include <random>
 #include <stdexcept>
@@ -12,6 +16,8 @@
 #include "game_of_life_lib.h"
 #include "glm/gtc/matrix_transform.hpp"
 
+namespace life_demo {
+
 namespace {
 // Playground background, also the color seen through the gaps between cells.
 constexpr float kPlaygroundBrightness = 0.08f;
@@ -22,8 +28,9 @@ GameOfLife::GameOfLife(const char *title,
                        int height,
                        int cell_grid_width,
                        int cell_grid_height,
-                       rhi::BackendAPI api)
-    : Application(title, width, height, api),
+                       rhi::BackendAPI api,
+                       bool hosted)
+    : Application(title, width, height, api, hosted),
       cell_grid_width_(cell_grid_width),
       cell_grid_height_(cell_grid_height) {
 }
@@ -63,10 +70,10 @@ void GameOfLife::CustomOnInit() {
 
     std::vector<Vertex> vertices = ComposeVertices(positions, glm::vec4{1.0f});
 
-    white_icon_model.emplace(this, Model(vertices, indices));
+    white_icon_model = std::make_optional<DeviceModel>(this, Model(vertices, indices));
   }
 
-  white_rect_model.emplace(
+  white_rect_model = std::make_optional<DeviceModel>(
       this, Model(ComposeVertices({{-1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}}, glm::vec4{1.0f}),
                   {0, 1, 2, 2, 1, 3}));
 
@@ -92,39 +99,56 @@ void GameOfLife::CustomOnInit() {
   height_slider_ = std::make_unique<SizeSlider>(this, 'H', cell_grid_height_, &white_rect_model.value(),
                                                 [this](int value) { requested_height_ = value; });
   OnWindowSize();
-  magnify_callback_ =
-      GetWindow()->MagnifyEvent().RegisterCallback([this](const grassland::rhi::MagnifyGesture &gesture) {
-        if (gesture.phase == grassland::rhi::MagnifyPhase::kCancel)
-          return;
-        const glm::vec2 point = FramePosition({gesture.x, gesture.y});
-        if (point.x < playground_left_ || point.x >= playground_right_ || point.y < playground_top_ ||
-            point.y >= playground_bottom_)
-          return;
-        const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f,
-                               (playground_top_ + playground_bottom_) * 0.5f};
-        grid_view_.Zoom(float(gesture.scale), point - center);
-        LayoutCells();
-      });
+  magnify_callback_ = GetWindow()->MagnifyEvent().RegisterCallback([this](const rhi::MagnifyGesture &gesture) {
+    if (gesture.phase == rhi::MagnifyPhase::kCancel)
+      return;
+    const glm::vec2 point = FramePosition({gesture.x, gesture.y});
+    if (point.x < playground_left_ || point.x >= playground_right_ || point.y < playground_top_ ||
+        point.y >= playground_bottom_)
+      return;
+    const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f,
+                           (playground_top_ + playground_bottom_) * 0.5f};
+    grid_view_.Zoom(float(gesture.scale), point - center);
+    LayoutCells();
+  });
   scroll_callback_ = GetWindow()->ScrollEvent().RegisterCallback([this](double x, double y) { ScrollGrid(x, y); });
   pan_button_callback_ =
       GetWindow()->MouseButtonEvent().RegisterCallback([this](int button, int action, int, double x, double y) {
-        if (button != GLFW_MOUSE_BUTTON_RIGHT)
-          return;
-        pan_cursor_ = FramePosition({x, y});
-        panning_ = action == GLFW_PRESS && pan_cursor_.x >= playground_left_ && pan_cursor_.x < playground_right_ &&
-                   pan_cursor_.y >= playground_top_ && pan_cursor_.y < playground_bottom_;
+        const auto cursor = FramePosition({x, y});
+        const bool in_grid = cursor.x >= playground_left_ && cursor.x < playground_right_ &&
+                             cursor.y >= playground_top_ && cursor.y < playground_bottom_;
+        if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+          pan_cursor_ = cursor;
+          panning_ = action == GLFW_PRESS && in_grid;
+        } else if (button == GLFW_MOUSE_BUTTON_LEFT) {
+          // A left drag (one finger on touch screens) pans an enlarged grid; a
+          // tap still toggles the cell. The drag becomes a pan once it moves.
+          drag_start_ = cursor;
+          drag_pending_ = action == GLFW_PRESS && in_grid && grid_view_.zoom > 1.0f;
+          if (action != GLFW_PRESS)
+            EndDragPan();
+        }
       });
   pan_move_callback_ = GetWindow()->MouseMoveEvent().RegisterCallback([this](double x, double y) {
+    const auto cursor = FramePosition({x, y});
+    const glm::vec2 scale = glm::vec2(FramebufferSize()) / glm::vec2(glm::max(GetWindowSize(), glm::ivec2{1}));
+    if (drag_pending_ && glm::length(cursor - drag_start_) > 8.0f * scale.x) {
+      drag_pending_ = false;
+      drag_panning_ = panning_ = true;
+      pan_cursor_ = drag_start_;
+      cell_input_->SetSuspended(true);
+    }
     if (!panning_)
       return;
-    const auto cursor = FramePosition({x, y});
     grid_view_.pan += cursor - pan_cursor_;
     pan_cursor_ = cursor;
     LayoutCells();
   });
   pan_focus_callback_ = GetWindow()->FocusEvent().RegisterCallback([this](bool focused) {
-    if (!focused)
+    if (!focused) {
       panning_ = false;
+      EndDragPan();
+    }
   });
   key_callback_ = GetWindow()->KeyEvent().RegisterCallback([this](int key, int, int action, int mods) {
     if (action != GLFW_PRESS && action != GLFW_REPEAT)
@@ -144,7 +168,7 @@ void GameOfLife::CustomOnInit() {
       ZoomGrid(1.0f / 1.2f);
     }
   });
-  last_frame_time_ = grassland::GetTimeSeconds();
+  last_frame_time_ = last_simulation_time_ = grassland::GetTimeSeconds();
 }
 
 void GameOfLife::CustomOnUpdate() {
@@ -158,18 +182,21 @@ void GameOfLife::CustomOnUpdate() {
 
   auto current_frame_time = grassland::GetTimeSeconds();
   auto delta_time = static_cast<float>(current_frame_time - last_frame_time_);
-  last_frame_time_ = current_frame_time;
+  const double simulation_elapsed = current_frame_time - last_simulation_time_;
+  last_frame_time_ = last_simulation_time_ = current_frame_time;
 
   if (file_action_ != FileAction::kNone) {
     file_action_delay_ -= delta_time;
     if (file_action_delay_ <= 0.0f) {
       ProcessFileAction();
       // Modal dialogs must not accumulate simulation time or skip UI feedback.
-      last_frame_time_ = grassland::GetTimeSeconds();
+      last_frame_time_ = last_simulation_time_ = grassland::GetTimeSeconds();
       delta_time = 0.0f;
     }
   }
 
+  icon_rotation_.Update(delta_time / 0.25f);
+  SetIconRotation(float(icon_rotation_));
   time_total += delta_time;
 
   // Update pause_play_button_
@@ -184,13 +211,14 @@ void GameOfLife::CustomOnUpdate() {
   save_button_->Update(delta_time);
 
   simulation_clock_.Advance(
-      delta_time, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
+      simulation_elapsed, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
       speed_toggle_button_->SpeedLevel(),
       [this] { update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data(), boundary_button_->Mode()); });
 
   // Synchronize after stepping so the new generation is visible in this frame.
-  // One pass over the cells animates them and collects the shader data.
-  cell_input_->Update(delta_time, !pause_play_button_->IsPlaying());
+  // One pass over the cells: animate, collect the shader data and remember
+  // whether another frame is needed, instead of revisiting 65536 objects.
+  cells_animating_ = cell_input_->Update(delta_time, !pause_play_button_->IsPlaying());
 
   // Draw pause_play_button_
   pause_play_button_->Draw();
@@ -248,17 +276,38 @@ void GameOfLife::CustomOnClose() {
   white_icon_model.reset();
 }
 
+void GameOfLife::EndDragPan() {
+  drag_pending_ = false;
+  if (!drag_panning_)
+    return;
+  drag_panning_ = panning_ = false;
+  cell_input_->SetSuspended(false);
+}
+
 void GameOfLife::OnWindowSize() {
   panning_ = false;
+  EndDragPan();
   auto window_width = float(FramebufferSize().x);
   auto window_height = float(FramebufferSize().y);
-  auto ui_unit = std::min(window_width, window_height) * 0.01f * ui_scale_;
+  auto extent = std::min(window_width, window_height);
+  if (control_extent_limit_ > 0.0f)
+    extent = std::min(extent, window_height * control_extent_limit_);
+  auto ui_unit = extent * 0.01f * ui_scale_;
+  if (control_pixel_size_ > 0.0f)
+    ui_unit = std::min(control_pixel_size_ * 0.1f, std::min(window_width, window_height) / 90.0f);
   const float margin = ui_unit * 5.0f;
+  // Native hosts reserve the home-gesture strip without shrinking the canvas.
+  const float bottom_margin = std::max(margin, window_height * bottom_control_inset_);
+  const float bottom_shift = bottom_margin - margin;
   const float icon_size = ui_unit * 10.0f;
   const float step = ui_unit * 13.0f;
   const float slider_gap = ui_unit * 1.5f;
   const float slider_thickness = (icon_size - slider_gap) * 0.5f;
   const float panel_size = ui_unit * 20.0f;
+  // Controls keep at least a margin from a host's safe-area boundary (a screen
+  // cutout); without host safe areas they use the fallback gap.
+  const bool cutouts = cutout_insets_.y >= 0.0f;
+  auto edge_offset = [&](float inset, float fallback) { return cutouts ? std::max(margin, inset) : fallback; };
 
   float playground_left = 0.0f;
   float playground_right = window_width;
@@ -269,39 +318,44 @@ void GameOfLife::OnWindowSize() {
   panel_top_ = 0;
   panel_bottom_ = window_height;
 
-  // The controls stay on the window's short edges whatever the grid's aspect, so
-  // changing the grid dimensions never moves them: sidebars in landscape
-  // windows, top and bottom panels in portrait ones.
+  // Sidebars follow the window's short edges, independent of the grid aspect.
   sidebar_ = window_width >= window_height;
   auto place = [icon_size](Button *button, float x, float y) { button->Resize(x, y, x + icon_size, y + icon_size); };
   if (sidebar_) {
-    playground_left = panel_size;
-    playground_right = window_width - panel_size;
-    panel_right_ = panel_size;
-    place(open_button_.get(), margin, margin);
-    place(save_button_.get(), margin, margin + step);
-    place(boundary_button_.get(), margin, window_height - margin - icon_size - step * 2.0f);
-    place(speed_toggle_button_.get(), margin, window_height - margin - icon_size - step);
-    place(pause_play_button_.get(), margin, window_height - margin - icon_size);
-    place(refresh_button_.get(), window_width - margin - icon_size, margin);
-    place(randomize_button_.get(), window_width - margin - icon_size, window_height - margin - icon_size);
+    const float left_x = edge_offset(window_width * cutout_insets_.x, margin);
+    const float right_x = window_width - edge_offset(window_width * cutout_insets_.z, margin) - icon_size;
+    playground_left = left_x + icon_size + margin;
+    playground_right = right_x - margin;
+    panel_right_ = playground_left;
+    place(open_button_.get(), left_x, margin);
+    place(save_button_.get(), left_x, margin + step);
+    place(boundary_button_.get(), left_x, window_height - bottom_margin - icon_size - step * 2.0f);
+    place(speed_toggle_button_.get(), left_x, window_height - bottom_margin - icon_size - step);
+    place(pause_play_button_.get(), left_x, window_height - bottom_margin - icon_size);
+    place(refresh_button_.get(), right_x, margin);
+    place(randomize_button_.get(), right_x, window_height - bottom_margin - icon_size);
     const float top = margin + step * 2.0f;
-    const float bottom = window_height - top - step;
-    width_slider_->Resize({margin, top, margin + slider_thickness, bottom}, true);
-    height_slider_->Resize({margin + slider_thickness + slider_gap, top, margin + icon_size, bottom}, true);
+    const float bottom = window_height - top - step - bottom_shift;
+    width_slider_->Resize({left_x, top, left_x + slider_thickness, bottom}, true);
+    height_slider_->Resize({left_x + slider_thickness + slider_gap, top, left_x + icon_size, bottom}, true);
   } else {
-    // The dense controls anchor the bottom edge; reset and randomize sit on top.
-    playground_top = panel_size;
-    playground_bottom = window_height - panel_size;
+    // The sparse top actions sit in the corners beside a top cutout, so they
+    // center on its safe-area boundary. Without host safe areas, give them
+    // more breathing room against rounded corners.
+    const float action_top_margin = edge_offset(window_height * cutout_insets_.y - icon_size * 0.5f, margin * 2.0f);
+    playground_top = panel_size + action_top_margin - margin;
+    playground_bottom = window_height - panel_size - bottom_shift;
     panel_top_ = playground_bottom;
-    const float top = window_height - margin - icon_size;
+    const float top = window_height - bottom_margin - icon_size;
     place(open_button_.get(), margin, top);
     place(save_button_.get(), margin + step, top);
     place(boundary_button_.get(), window_width - margin - icon_size - step * 2.0f, top);
     place(speed_toggle_button_.get(), window_width - margin - icon_size - step, top);
     place(pause_play_button_.get(), window_width - margin - icon_size, top);
-    place(refresh_button_.get(), margin, margin);
-    place(randomize_button_.get(), window_width - margin - icon_size, margin);
+    // Keep the sparse action rail at the top, leaving its center clear for
+    // phone camera cutouts. The dense controls occupy the opposite short edge.
+    place(refresh_button_.get(), margin, action_top_margin);
+    place(randomize_button_.get(), window_width - margin - icon_size, action_top_margin);
     const float left = margin + step * 2.0f;
     const float right = window_width - left - step;
     width_slider_->Resize({left, top, right, top + slider_thickness}, false);
@@ -404,6 +458,12 @@ void GameOfLife::RequestFileAction(FileAction action) {
 }
 
 void GameOfLife::ProcessFileAction() {
+#ifdef LONGMARCH_HOSTED_GAMES
+  hosted_file_action_ = file_action_ == FileAction::kSave ? 2 : 1;
+  file_action_ = FileAction::kNone;
+  hosted_was_playing_ = pause_play_button_->IsPlaying();
+  pause_play_button_->SetPlaying(false);
+#else
   const auto action = std::exchange(file_action_, FileAction::kNone);
   auto *button = action == FileAction::kSave ? save_button_.get() : open_button_.get();
   const bool was_playing = pause_play_button_->IsPlaying();
@@ -465,7 +525,43 @@ void GameOfLife::ProcessFileAction() {
   simulation_clock_ = {};
   open_button_->OnCursorEnter(0);
   save_button_->OnCursorEnter(0);
-  glfwFocusWindow(GetWindow()->GLFWWindow());
+  FocusWindow();
+#endif
+}
+
+std::string GameOfLife::CompleteHostedFile(const std::string &path) {
+  if (!hosted_file_action_)
+    return "No pending file operation";
+  auto *button = hosted_file_action_ == 2 ? save_button_.get() : open_button_.get();
+  bool loaded = false;
+  std::string error;
+  try {
+    if (!path.empty()) {
+      if (hosted_file_action_ == 2)
+        SaveCellsPattern(path, {cell_grid_width_, cell_grid_height_, cell_grid_});
+      else {
+        auto pattern = FitCellsPattern(LoadCellsPattern(path), cell_grid_width_, cell_grid_height_);
+        ResizeGrid(pattern.width, pattern.height);
+        std::copy(pattern.cells.begin(), pattern.cells.end(), cell_grid_.begin());
+        requested_width_ = pattern.width;
+        requested_height_ = pattern.height;
+        width_slider_->SetValue(pattern.width);
+        height_slider_->SetValue(pattern.height);
+        loaded = true;
+      }
+      button->Feedback(true);
+    }
+  } catch (const std::exception &e) {
+    error = e.what();
+    button->Feedback(false);
+  }
+  hosted_file_action_ = 0;
+  ResetFrameClock();
+  pause_play_button_->SetPlaying(loaded ? false : hosted_was_playing_);
+  simulation_clock_ = {};
+  open_button_->OnCursorEnter(0);
+  save_button_->OnCursorEnter(0);
+  return error;
 }
 
 void GameOfLife::RandomizeCells(float density, uint32_t seed) {
@@ -488,3 +584,75 @@ void GameOfLife::InitCells(int width, int height) {
   cell_input_ = std::make_unique<CellGrid>(this);
   cell_input_->Reset(cell_grid_.data(), cell_grid_width_, cell_grid_height_);
 }
+
+void GameOfLife::EnableNativeSizeControls() {
+  width_slider_->SetActivationHandler([this] { hosted_size_axis_ = 1; });
+  height_slider_->SetActivationHandler([this] { hosted_size_axis_ = 2; });
+}
+
+glm::ivec2 GameOfLife::TakeSizeControlRequest() {
+  const int axis = std::exchange(hosted_size_axis_, 0);
+  return {axis, axis == 1 ? width_slider_->Value() : height_slider_->Value()};
+}
+
+glm::vec4 GameOfLife::SizeControlBounds(int axis) const {
+  const glm::vec2 size = glm::max(glm::vec2(FramebufferSize()), glm::vec2{1.0f});
+  return (axis == 1 ? width_slider_ : height_slider_)->Bounds() / glm::vec4{size, size};
+}
+
+void GameOfLife::SetGridDimension(int axis, int value) {
+  if (axis == 1)
+    width_slider_->SetValue(value);
+  else if (axis == 2)
+    height_slider_->SetValue(value);
+}
+
+void GameOfLife::SetBottomControlInset(float height_fraction) {
+  const float inset = std::clamp(height_fraction, 0.0f, 0.25f);
+  if (bottom_control_inset_ != inset) {
+    bottom_control_inset_ = inset;
+    OnWindowSize();
+  }
+}
+
+void GameOfLife::SetCutoutInsets(float left, float top, float right) {
+  const glm::vec3 insets = glm::clamp(glm::vec3{left, top, right}, 0.0f, 0.25f);
+  if (cutout_insets_ != insets) {
+    cutout_insets_ = insets;
+    OnWindowSize();
+  }
+}
+
+void GameOfLife::SetControlExtentLimit(float height_fraction) {
+  const float limit = std::max(height_fraction, 0.0f);
+  if (control_extent_limit_ != limit) {
+    control_extent_limit_ = limit;
+    OnWindowSize();
+  }
+}
+
+void GameOfLife::SetControlPixelSize(float pixels) {
+  const float size = std::isfinite(pixels) ? std::max(pixels, 0.0f) : 0.0f;
+  if (control_pixel_size_ != size) {
+    control_pixel_size_ = size;
+    OnWindowSize();
+  }
+}
+
+void GameOfLife::SetIconOrientation(float radians) {
+  ResetAnimationClock();
+  const float current = float(icon_rotation_);
+  icon_rotation_.TryUpdateTarget(current + std::remainder(radians - current, glm::two_pi<float>()));
+}
+
+double GameOfLife::NextFrameDelay() const {
+  if (!icon_rotation_.IsFinished() || file_action_ != FileAction::kNone || pause_play_button_->IsAnimating() ||
+      speed_toggle_button_->IsAnimating() || boundary_button_->IsAnimating() || refresh_button_->IsAnimating() ||
+      randomize_button_->IsAnimating() || open_button_->IsAnimating() || save_button_->IsAnimating())
+    return 0;
+  if (cells_animating_)
+    return 0;
+  return pause_play_button_->IsPlaying() ? simulation_clock_.NextStepDelay(speed_toggle_button_->SpeedLevel())
+                                         : std::numeric_limits<double>::infinity();
+}
+}  // namespace life_demo

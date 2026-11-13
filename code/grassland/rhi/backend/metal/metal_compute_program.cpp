@@ -1,7 +1,6 @@
-﻿#include "grassland/rhi/backend/metal/metal_compute_program.h"
+#include "grassland/rhi/backend/metal/metal_compute_program.h"
 
 #include <cstring>
-#include <spirv_msl.hpp>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"

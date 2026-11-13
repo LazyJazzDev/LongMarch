@@ -1,10 +1,12 @@
-﻿#pragma once
+#pragma once
 
 #include "application/animation_var.h"
 #include "application/button.h"
 #include "application/model.h"
 #include "boundary_glider.h"
 #include "game_of_life_lib/game_of_life_lib.h"
+
+namespace life_demo {
 
 class BoundaryToggleButton : public Button {
  public:
@@ -19,6 +21,11 @@ class BoundaryToggleButton : public Button {
   void OnClick() override;
   void OnStateChange(int state) override;
 
+  bool IsAnimating() const {
+    return glider_.Playing() || !hover_.IsFinished() ||
+           std::abs(morph_ - (mode_ == BoundaryMode::kPeriodic ? 1.f : 0.f)) > .001f || std::abs(velocity_) > .01f;
+  }
+
  private:
   BoundaryMode mode_{BoundaryMode::kPeriodic};
   DeviceModel *background_;
@@ -31,3 +38,5 @@ class BoundaryToggleButton : public Button {
   float morph_{1.0f};
   float velocity_{};
 };
+
+}  // namespace life_demo

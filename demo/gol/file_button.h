@@ -1,10 +1,12 @@
-﻿#pragma once
+#pragma once
 
 #include <functional>
 
 #include "application/animation_var.h"
 #include "application/button.h"
 #include "application/model.h"
+
+namespace life_demo {
 
 class FileButton : public Button {
  public:
@@ -14,6 +16,11 @@ class FileButton : public Button {
   void Draw();
   void BeginAction();
   void Feedback(bool success);
+
+  bool IsAnimating() const {
+    return motion_ < 1 || feedback_ > 0 || !hover_.IsFinished() || !check_transition_.IsFinished() ||
+           !success_tint_.IsFinished() || !error_tint_.IsFinished();
+  }
 
  private:
   void OnClick() override;
@@ -35,3 +42,5 @@ class FileButton : public Button {
   float feedback_{0.0f};
   bool success_{false};
 };
+
+}  // namespace life_demo

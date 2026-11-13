@@ -1,10 +1,12 @@
-﻿#pragma once
+#pragma once
 
 #include <vector>
 
 #include "application/animation_var.h"
 #include "application/listener.h"
 #include "application/model.h"
+
+namespace life_demo {
 
 // Animated appearance of one cell, stored contiguously so the per-frame pass
 // streams through memory.
@@ -62,6 +64,11 @@ class CellGrid : public Listener {
     return unit_;
   }
 
+  // While suspended, pointer input neither hovers, presses nor toggles cells;
+  // suspending also drops the current hover and press, so dragging the grid
+  // does not toggle the cell it started on.
+  void SetSuspended(bool suspended);
+
   void OnCursorEnter(int enter) override;
   void OnCursorPos(double xpos, double ypos) override;
   void OnMouseButton(int mouse_button, int state, int mods) override;
@@ -81,4 +88,7 @@ class CellGrid : public Listener {
   // At most one cell is hovered or pressed: the one under the cursor.
   int active_{-1};
   int active_state_{0};
+  bool suspended_{false};
 };
+
+}  // namespace life_demo

@@ -1,9 +1,11 @@
-﻿#pragma once
+#pragma once
 #include <optional>
 
 #include "application.h"
 #include "glm/gtc/matrix_transform.hpp"
 #include "interpolation.h"
+
+namespace life_demo {
 
 struct Vertex {
   glm::vec2 position;
@@ -74,3 +76,4 @@ class DeviceModel {
 std::vector<Vertex> ComposeVertices(const std::vector<glm::vec2> &positions, const glm::vec4 &color);
 
 glm::mat4 GetModelMatrix(const glm::vec2 &position, const glm::vec2 &scale, float depth = 0.5f);
+}  // namespace life_demo

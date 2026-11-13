@@ -1,8 +1,10 @@
-﻿#pragma once
+#pragma once
 #include <glm/glm.hpp>
 #include <iostream>
 
 #include "segment.h"
+
+namespace life_demo {
 
 namespace geometry {
 struct Line {
@@ -15,3 +17,5 @@ struct Line {
 
 glm::vec2 Intersection(const Line &line0, const Line &line1);
 }  // namespace geometry
+
+}  // namespace life_demo

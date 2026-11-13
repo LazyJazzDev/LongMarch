@@ -330,7 +330,12 @@ rhi::IProgram *VulkanDeviceImpl::CreateProgram(const ProgramDesc &desc) {
 }
 
 rhi::IWindow *VulkanDeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
+#ifdef LONGMARCH_HEADLESS
+  ReportError(-1, "GLFW windows are unavailable in this build");
+  return nullptr;
+#else
   return IVulkanWindow::Create(this, desc);
+#endif
 }
 
 VulkanScratchPool &VulkanDeviceImpl::ScratchPool() {

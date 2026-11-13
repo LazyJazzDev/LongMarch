@@ -1,10 +1,12 @@
-﻿#include "pause_play_button.h"
+#include "pause_play_button.h"
 
 #include <algorithm>
 #include <cmath>
 
 #include "application/model.h"
 #include "button_palette.h"
+
+namespace life_demo {
 
 PausePlayButton::PausePlayButton(Application *app,
                                  float left,
@@ -90,9 +92,9 @@ void PausePlayButton::Draw() {
                           {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.6f),
                            background_color_.GetValue(float(background_animation_var_)), glm::uvec4{1, 0, 0, 0}});
 
-  application_->DrawModel(pause_play_device_model_.get(),
-                          {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f),
-                           glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
+  DrawIcon(pause_play_device_model_.get(),
+           {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f), glm::vec4{1.0f},
+            glm::uvec4{1, 0, 0, 0}});
 }
 
 void PausePlayButton::OnResize() {
@@ -113,3 +115,5 @@ bool PausePlayButton::IsPlaying() const {
 void PausePlayButton::SetPlaying(bool playing) {
   is_playing_ = playing;
 }
+
+}  // namespace life_demo

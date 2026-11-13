@@ -1,7 +1,9 @@
-﻿#include "speed_toggle_button.h"
+#include "speed_toggle_button.h"
 
 #include "button_palette.h"
 #include "simulation_clock.h"
+
+namespace life_demo {
 
 SpeedToggleButton::SpeedToggleButton(Application *app,
                                      float left,
@@ -83,9 +85,9 @@ SpeedToggleButton::SpeedToggleButton(Application *app,
 }
 
 void SpeedToggleButton::Update(float t) {
-  speed_toggle_animation_var_.Update(t * 5.0f);
-  speed_toggle_device_model_->UploadVertices(
-      speed_toggle_model_->GetModel(float(speed_toggle_animation_var_), MixStyle::kLinear).Vertices());
+  if (speed_toggle_animation_var_.Update(t * 5.0f))
+    speed_toggle_device_model_->UploadVertices(
+        speed_toggle_model_->GetModel(float(speed_toggle_animation_var_), MixStyle::kLinear).Vertices());
   background_animation_var_.Update(t * 10.0f);
 }
 
@@ -94,9 +96,9 @@ void SpeedToggleButton::Draw() {
                           {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.6f),
                            background_color_.GetValue(float(background_animation_var_)), glm::uvec4{1, 0, 0, 0}});
 
-  application_->DrawModel(speed_toggle_device_model_.get(),
-                          {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f),
-                           glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
+  DrawIcon(speed_toggle_device_model_.get(),
+           {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f), glm::vec4{1.0f},
+            glm::uvec4{1, 0, 0, 0}});
 }
 
 void SpeedToggleButton::OnResize() {
@@ -119,3 +121,5 @@ void SpeedToggleButton::ResizeModel() {
 int SpeedToggleButton::SpeedLevel() const {
   return click_cnt_;
 }
+
+}  // namespace life_demo

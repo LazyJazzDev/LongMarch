@@ -1,6 +1,8 @@
-﻿#include "segment.h"
+#include "segment.h"
 
 #include "util.h"
+
+namespace life_demo {
 
 namespace geometry {
 
@@ -38,3 +40,5 @@ bool Segment::IsPoint() const {
   return length(u - v) < eps;
 }
 }  // namespace geometry
+
+}  // namespace life_demo

@@ -1,9 +1,11 @@
-﻿#pragma once
+#pragma once
 
 #include <functional>
 
 #include "application/listener.h"
 #include "application/model.h"
+
+namespace life_demo {
 
 class SizeSlider : public Listener {
  public:
@@ -13,12 +15,21 @@ class SizeSlider : public Listener {
   void Draw();
   void SetValue(int value);
 
+  void SetActivationHandler(std::function<void()> handler) {
+    on_activate_ = std::move(handler);
+  }
+
   bool IsDragging() const {
     return dragging_;
   }
 
   int Value() const {
     return value_;
+  }
+
+  // Left, top, right and bottom in framebuffer pixels.
+  glm::vec4 Bounds() const {
+    return bounds_;
   }
 
   void OnMouseButton(int button, int action, int mods) override;
@@ -47,8 +58,13 @@ class SizeSlider : public Listener {
   glm::vec4 bounds_{0.0f};
   bool vertical_{false};
   float label_width_{};
+  std::function<void()> on_activate_;
+  bool activation_pressed_{};
+  glm::vec2 activation_origin_{};
   bool dragging_{false};
   bool hovered_{false};
   bool focused_{false};
   uint32_t key_callback_{};
 };
+
+}  // namespace life_demo

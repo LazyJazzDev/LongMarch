@@ -1,8 +1,10 @@
-﻿#include "triangle.h"
+#include "triangle.h"
 
 #include "line.h"
 #include "segment.h"
 #include "util.h"
+
+namespace life_demo {
 
 namespace geometry {
 using namespace glm;
@@ -51,3 +53,5 @@ bool Triangle::IsInside(glm::vec2 v) const {
          (std::abs(signal(line2(v2)) - signal(line2(v))) < 2) && (v != v0 && v != v1 && v != v2);
 }
 }  // namespace geometry
+
+}  // namespace life_demo

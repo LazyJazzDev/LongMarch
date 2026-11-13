@@ -1,4 +1,4 @@
-﻿#include "mesh.h"
+#include "mesh.h"
 
 #include <map>
 #include <queue>
@@ -7,6 +7,8 @@
 #include "segment.h"
 #include "util.h"
 #define LAND_PI 3.14159265358979323846
+
+namespace life_demo {
 
 namespace geometry {
 
@@ -284,3 +286,5 @@ Mesh &Mesh::operator+=(const Mesh &mesh) {
   return *this;
 }
 }  // namespace geometry
+
+}  // namespace life_demo

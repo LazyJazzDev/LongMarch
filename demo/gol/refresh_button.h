@@ -1,7 +1,9 @@
-﻿#pragma once
+#pragma once
 #include "application/animation_var.h"
 #include "application/button.h"
 #include "application/model.h"
+
+namespace life_demo {
 
 class RefreshButton : public Button {
  public:
@@ -14,6 +16,10 @@ class RefreshButton : public Button {
                 DeviceModel *device_model);
   void Update(float t);
   void Draw();
+
+  bool IsAnimating() const {
+    return !refresh_animation_var_.IsFinished() || !background_animation_var_.IsFinished();
+  }
 
  private:
   void OnResize() override;
@@ -30,3 +36,5 @@ class RefreshButton : public Button {
   int32_t program_transformation_uniform_location_;
   std::vector<uint8_t> *game_buffer_;
 };
+
+}  // namespace life_demo

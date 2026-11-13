@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <array>
 #include <glm/gtc/matrix_transform.hpp>
@@ -10,6 +10,9 @@
 
 #include "grassland/rhi/rhi.h"
 #include "grassland/util/util.h"
+#include "hosted_window.h"
+
+namespace life_demo {
 
 using namespace grassland;
 
@@ -29,12 +32,63 @@ struct InstanceInfo {
 // testing, then resolved from a supersampled target for anti-aliasing.
 class Application {
  public:
-  Application(const std::string &name, int width, int height, rhi::BackendAPI api);
+  Application(const std::string &name, int width, int height, rhi::BackendAPI api, bool hosted = false);
 
   virtual ~Application();
 
   // Runs until the window closes, or after max_frames frames when positive.
   bool Run(int max_frames = 0);
+
+  bool InitializeHosted() {
+    return OnInit();
+  }
+
+  virtual double NextFrameDelay() const {
+    return 0;
+  }
+
+  bool RenderHostedFrame() {
+    auto &slot = submissions_[submission_index_];
+    if (slot && !Check(slot->WaitHost(), "Wait hosted frame slot"))
+      return false;
+    slot.Release();
+    OnUpdate();
+    return !failed_ && OnRender();
+  }
+
+  void CloseHosted() {
+    OnClose();
+  }
+
+  rhi::IDevice *Device() const {
+    return device_.Get();
+  }
+
+  rhi::IQueue *Queue() const {
+    return queue_.Get();
+  }
+
+  rhi::IImage *PresentedImage() const {
+    return present_image_.Get();
+  }
+
+  HostedWindow *HostedInput() const {
+    return hosted_ ? static_cast<HostedWindow *>(window_.Get()) : nullptr;
+  }
+
+  bool WaitGPU() {
+    return WaitFrames();
+  }
+
+  void FocusWindow();
+
+  float IconRotation() const {
+    return icon_rotation_;
+  }
+
+  void SetIconRotation(float value) {
+    icon_rotation_ = value;
+  }
 
   // Saves the last presented frame as a PNG file when the application exits.
   void SetScreenshotPath(const std::string &path) {
@@ -133,6 +187,8 @@ class Application {
   std::string screenshot_path_;
   rhi::BackendAPI api_;
   int initial_width_, initial_height_;
+  bool hosted_{false};
+  float icon_rotation_{};
   bool failed_{false};
   bool custom_initialized_{false};
   rhi::ObjPtr<rhi::ICore> core_;
@@ -176,3 +232,4 @@ class Application {
   grassland::FPSCounter fps_counter_;
   double title_time_{0.0};
 };
+}  // namespace life_demo

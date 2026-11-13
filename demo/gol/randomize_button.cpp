@@ -1,9 +1,11 @@
-﻿#include "randomize_button.h"
+#include "randomize_button.h"
 
 #include <array>
 
 #include "button_palette.h"
 #include "glm/gtc/matrix_transform.hpp"
+
+namespace life_demo {
 
 namespace {
 const std::array<glm::vec3, 6> kNormals{{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}};
@@ -70,9 +72,9 @@ void RandomizeButton::Draw() {
     // A 0.38 half-width on faces spaced 0.43 from the center leaves open seams.
     auto transform =
         placement * orientation * FaceFrame(normal) * glm::scale(glm::mat4{1.0f}, glm::vec3{0.38f, 0.38f, 1});
-    application_->DrawModel(face_.get(), {transform, face_color,
-                                          glm::uvec4{3, kFaceValues[i], glm::floatBitsToUint(size.x * 0.5f),
-                                                     glm::floatBitsToUint(size.y * 0.5f)}});
+    DrawIcon(face_.get(),
+             {transform, face_color,
+              glm::uvec4{3, kFaceValues[i], glm::floatBitsToUint(size.x * 0.5f), glm::floatBitsToUint(size.y * 0.5f)}});
   }
 }
 
@@ -98,3 +100,5 @@ void RandomizeButton::OnClick() {
 void RandomizeButton::OnStateChange(int state) {
   background_animation_.UpdateTarget(float(state));
 }
+
+}  // namespace life_demo

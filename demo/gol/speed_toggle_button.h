@@ -1,7 +1,9 @@
-﻿#pragma once
+#pragma once
 #include "application/animation_var.h"
 #include "application/button.h"
 #include "application/model.h"
+
+namespace life_demo {
 
 class SpeedToggleButton : public Button {
  public:
@@ -9,6 +11,10 @@ class SpeedToggleButton : public Button {
   void Update(float t);
   void Draw();
   [[nodiscard]] int SpeedLevel() const;
+
+  bool IsAnimating() const {
+    return !speed_toggle_animation_var_.IsFinished() || !background_animation_var_.IsFinished();
+  }
 
  private:
   void OnResize() override;
@@ -25,3 +31,5 @@ class SpeedToggleButton : public Button {
   int32_t program_transformation_uniform_location_;
   int32_t click_cnt_{0};
 };
+
+}  // namespace life_demo

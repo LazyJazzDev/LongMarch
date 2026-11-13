@@ -1,5 +1,7 @@
-﻿#pragma once
+#pragma once
 #include <glm/glm.hpp>
+
+namespace life_demo {
 
 namespace geometry {
 
@@ -11,3 +13,5 @@ struct Segment {
 };
 
 }  // namespace geometry
+
+}  // namespace life_demo

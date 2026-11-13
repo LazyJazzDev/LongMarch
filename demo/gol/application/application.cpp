@@ -1,14 +1,17 @@
-﻿#include "application.h"
+#include "application.h"
 
 #include <algorithm>
 #include <cstring>
 #include <map>
 
+#ifndef LONGMARCH_HOSTED_GAMES
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#endif
 #include "listener.h"
 #include "model.h"
 #include "stb_image_write.h"
 
+namespace life_demo {
 namespace {
 
 #include "built_in_shaders.inl"
@@ -32,11 +35,12 @@ int ChooseSupersampleScale(glm::ivec2 size) {
 
 }  // namespace
 
-Application::Application(const std::string &name, int width, int height, rhi::BackendAPI api)
+Application::Application(const std::string &name, int width, int height, rhi::BackendAPI api, bool hosted)
     : name_(name),
       api_(api),
       initial_width_(width),
-      initial_height_(height) {
+      initial_height_(height),
+      hosted_(hosted) {
 }
 
 Application::~Application() {
@@ -131,12 +135,15 @@ bool Application::OnInit() {
   queue_ = device_->GetQueue(rhi::QUEUE_TYPE_MAIN);
   if (!Check(bool(queue_), "Get main queue"))
     return false;
-  auto *window = device_->CreateGLFWWindow({initial_width_, initial_height_,
-                                            fmt::format("[{}] {} FPS: 0.0", rhi::BackendAPIName(api_), name_),
-                                            rhi::PRESENT_MODE_CONTINUOUS});
-  if (!Check(window != nullptr, "Create RHI window"))
+  if (hosted_) {
+    auto *input = new HostedWindow();
+    input->UpdateHostedSize({initial_width_, initial_height_}, {initial_width_, initial_height_});
+    window_ = input;
+  } else {
+    window_ = device_->CreateGLFWWindow({initial_width_, initial_height_, name_, rhi::PRESENT_MODE_CONTINUOUS});
+  }
+  if (!Check(bool(window_), "Create window"))
     return false;
-  window_ = window;
   LogInfo("Backend API: {}", rhi::BackendAPIName(api_));
   LogInfo("Device Name: {}", device_->Name());
   mouse_move_callback_ = window_->MouseMoveEvent().RegisterCallback(
@@ -229,7 +236,7 @@ bool Application::OnRender() {
   if (size.x <= 0 || size.y <= 0)
     return true;
   auto *window = window_.Get();
-  if (window->IsSwapChainInvalid()) {
+  if (!hosted_ && window->IsSwapChainInvalid()) {
     // No swapchain images are held by the demo; drain before rebuilding.
     if (!WaitFrames() || !Check(window->RebuildSwapChain(), "Rebuild swapchain"))
       return false;
@@ -272,7 +279,7 @@ bool Application::OnRender() {
                  context->CmdSetViewport({0, 0, float(framebuffer_size_.x), float(framebuffer_size_.y), 0, 1}) &&
                  context->CmdSetScissor({0, 0, uint32_t(framebuffer_size_.x), uint32_t(framebuffer_size_.y)}) &&
                  context->CmdDraw(3) && context->CmdEndRendering() &&
-                 context->CmdPresentImage(window, present_image_.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR),
+                 (hosted_ || context->CmdPresentImage(window, present_image_.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR)),
              "Record resolve and presentation"))
     return false;
   submissions_[submission_index_] = context->Submit();
@@ -387,7 +394,7 @@ bool Application::BuildScreenFrameObjects() {
     return false;
   const auto size = GetFramebufferSize();
   framebuffer_size_ = glm::max(size, glm::ivec2{1});
-  supersample_scale_ = ChooseSupersampleScale(framebuffer_size_);
+  supersample_scale_ = hosted_ ? 1 : ChooseSupersampleScale(framebuffer_size_);
   const auto sample_size = framebuffer_size_ * supersample_scale_;
   const rhi::ImageDesc color{uint32_t(sample_size.x), uint32_t(sample_size.y), rhi::IMAGE_FORMAT_R8G8B8A8_UNORM};
   main_frame_.color_image = device_->CreateImage(color);
@@ -484,18 +491,41 @@ bool Application::UploadBuffer(rhi::ObjPtr<rhi::IBuffer> &buffer, const void *da
 
 glm::ivec2 Application::GetWindowSize() const {
   glm::ivec2 size{};
+  if (hosted_)
+    return HostedInput()->GetSize();
+#ifndef LONGMARCH_HEADLESS
   glfwGetWindowSize(window_->GLFWWindow(), &size.x, &size.y);
+#endif
   return size;
 }
 
 glm::ivec2 Application::GetFramebufferSize() const {
   glm::ivec2 size{};
+  if (hosted_)
+    return HostedInput()->GetFramebufferSize();
+#ifndef LONGMARCH_HEADLESS
   glfwGetFramebufferSize(window_->GLFWWindow(), &size.x, &size.y);
+#endif
   return size;
 }
 
 glm::dvec2 Application::GetCursorPosition() const {
   glm::dvec2 position{};
+  if (hosted_)
+    return HostedInput()->GetCursorPosition();
+#ifndef LONGMARCH_HEADLESS
   glfwGetCursorPos(window_->GLFWWindow(), &position.x, &position.y);
+#endif
   return position;
 }
+
+void Application::FocusWindow() {
+  if (hosted_) {
+    HostedInput()->SendFocus(true);
+    return;
+  }
+#ifndef LONGMARCH_HEADLESS
+  glfwFocusWindow(window_->GLFWWindow());
+#endif
+}
+}  // namespace life_demo

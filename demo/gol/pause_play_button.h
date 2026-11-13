@@ -1,8 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include "application/animation_var.h"
 #include "application/button.h"
 #include "application/model.h"
+
+namespace life_demo {
 
 class PausePlayButton : public Button {
  public:
@@ -15,6 +17,10 @@ class PausePlayButton : public Button {
   [[nodiscard]] bool IsPlaying() const;
 
   void SetPlaying(bool playing);
+
+  bool IsAnimating() const {
+    return !background_animation_var_.IsFinished() || morph_ != (is_playing_ ? 1.f : 0.f) || morph_velocity_ != 0;
+  }
 
  private:
   void OnResize() override;
@@ -34,3 +40,5 @@ class PausePlayButton : public Button {
   AnimationVar background_animation_var_;
   bool is_playing_{false};
 };
+
+}  // namespace life_demo

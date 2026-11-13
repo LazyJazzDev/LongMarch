@@ -1,4 +1,8 @@
-﻿#include "button.h"
+#include "button.h"
+
+#include <glm/gtc/matrix_transform.hpp>
+
+namespace life_demo {
 
 Button::Button(Application *app, float left, float top, float right, float bottom)
     : Listener(app),
@@ -15,6 +19,14 @@ Button::Button(Application *app, float left, float top, float right, float botto
 
 Button::~Button() {
   app_->UnregisterListener(this);
+}
+
+void Button::DrawIcon(DeviceModel *model, InstanceInfo instance) {
+  const glm::vec3 center{(left_ + right_) * 0.5f, (top_ + bottom_) * 0.5f, 0};
+  instance.model = glm::translate(glm::mat4{1}, center) *
+                   glm::rotate(glm::mat4{1}, app_->IconRotation(), glm::vec3{0, 0, 1}) *
+                   glm::translate(glm::mat4{1}, -center) * instance.model;
+  app_->DrawModel(model, instance);
 }
 
 void Button::OnCursorEnter(int enter) {
@@ -125,3 +137,5 @@ void Button::CalculateListenerBounds() {
 bool Button::IsInsideListenerBounds(float x, float y) const {
   return (listener_left_ <= x) && (x <= listener_right_) && (listener_top_ <= y) && (y <= listener_bottom_);
 }
+
+}  // namespace life_demo

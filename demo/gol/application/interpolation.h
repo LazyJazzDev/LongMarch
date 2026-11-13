@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <cmath>
 #include <cstdint>
@@ -6,6 +6,8 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/constants.hpp"
 #include "vector"
+
+namespace life_demo {
 
 template <class Ty>
 Ty Mix(const Ty &v0, const Ty &v1, float alpha) {
@@ -37,3 +39,5 @@ class MixValue {
  private:
   std::vector<Ty> values_;
 };
+
+}  // namespace life_demo

@@ -1,7 +1,9 @@
-﻿#include "refresh_button.h"
+#include "refresh_button.h"
 
 #include "button_palette.h"
 #include "geometry/mesh.h"
+
+namespace life_demo {
 
 RefreshButton::RefreshButton(Application *app,
                              float left,
@@ -85,9 +87,9 @@ RefreshButton::RefreshButton(Application *app,
 }
 
 void RefreshButton::Update(float t) {
-  refresh_animation_var_.Update(t * 2.0f);
-  refresh_device_model_->UploadVertices(
-      refresh_model_->GetModel(float(refresh_animation_var_), MixStyle::kAngularClockwise).Vertices());
+  if (refresh_animation_var_.Update(t * 2.0f))
+    refresh_device_model_->UploadVertices(
+        refresh_model_->GetModel(float(refresh_animation_var_), MixStyle::kAngularClockwise).Vertices());
   background_animation_var_.Update(t * 10.0f);
 }
 
@@ -96,9 +98,9 @@ void RefreshButton::Draw() {
                           {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.6f),
                            background_color_.GetValue(float(background_animation_var_)), glm::uvec4{1, 0, 0, 0}});
 
-  application_->DrawModel(refresh_device_model_.get(),
-                          {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f),
-                           glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
+  DrawIcon(refresh_device_model_.get(),
+           {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f), glm::vec4{1.0f},
+            glm::uvec4{1, 0, 0, 0}});
 }
 
 void RefreshButton::OnResize() {
@@ -116,3 +118,5 @@ void RefreshButton::OnStateChange(int state) {
 
 void RefreshButton::ResizeModel() {
 }
+
+}  // namespace life_demo

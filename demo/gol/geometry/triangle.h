@@ -1,6 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #include <glm/glm.hpp>
+
+namespace life_demo {
 
 namespace geometry {
 struct Triangle {
@@ -11,3 +13,5 @@ struct Triangle {
   [[nodiscard]] bool IsInside(glm::vec2 v) const;
 };
 }  // namespace geometry
+
+}  // namespace life_demo

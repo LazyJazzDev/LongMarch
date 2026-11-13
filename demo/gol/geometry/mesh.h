@@ -1,9 +1,11 @@
-﻿#pragma once
+#pragma once
 
 #include <glm/glm.hpp>
 #include <vector>
 
 #include "triangle.h"
+
+namespace life_demo {
 
 namespace geometry {
 class Mesh {
@@ -19,3 +21,5 @@ class Mesh {
   std::vector<Triangle> triangles;
 };
 }  // namespace geometry
+
+}  // namespace life_demo

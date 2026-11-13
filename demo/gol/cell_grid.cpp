@@ -1,7 +1,9 @@
-﻿#include "cell_grid.h"
+#include "cell_grid.h"
 
 #include <algorithm>
 #include <cmath>
+
+namespace life_demo {
 
 namespace {
 uint32_t Unorm10(float value) {
@@ -81,6 +83,7 @@ bool CellGrid::Update(float t, bool animate_state) {
 
 int CellGrid::CellAt(glm::dvec2 window_position) const {
   // Pointer events use window coordinates; the layout uses framebuffer pixels.
+  const auto window = application_->GetWindow();
   const glm::vec2 scale = glm::vec2(glm::max(application_->GetFramebufferSize(), glm::ivec2{1})) /
                           glm::vec2(glm::max(application_->GetWindowSize(), glm::ivec2{1}));
   const glm::vec2 position = glm::vec2(window_position) * scale;
@@ -104,6 +107,15 @@ void CellGrid::SetState(int index, int state) {
     active_state_ = state;
 }
 
+void CellGrid::SetSuspended(bool suspended) {
+  suspended_ = suspended;
+  if (suspended && active_ >= 0) {
+    SetState(active_, 0);
+    active_ = -1;
+    active_state_ = 0;
+  }
+}
+
 void CellGrid::OnCursorEnter(int enter) {
   if (!enter && active_ >= 0) {
     SetState(active_, 0);
@@ -112,6 +124,8 @@ void CellGrid::OnCursorEnter(int enter) {
 }
 
 void CellGrid::OnCursorPos(double xpos, double ypos) {
+  if (suspended_)
+    return;
   const int index = CellAt({xpos, ypos});
   if (index == active_)
     return;
@@ -122,7 +136,7 @@ void CellGrid::OnCursorPos(double xpos, double ypos) {
 }
 
 void CellGrid::OnMouseButton(int mouse_button, int state, int mods) {
-  if (mouse_button != GLFW_MOUSE_BUTTON_LEFT)
+  if (mouse_button != GLFW_MOUSE_BUTTON_LEFT || suspended_)
     return;
   const int index = CellAt(application_->GetCursorPosition());
   if (index != active_) {
@@ -140,3 +154,5 @@ void CellGrid::OnMouseButton(int mouse_button, int state, int mods) {
     SetState(index, 1);
   }
 }
+
+}  // namespace life_demo

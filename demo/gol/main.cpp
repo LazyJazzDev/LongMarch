@@ -1,10 +1,12 @@
-﻿#include <iostream>
+#include <iostream>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
 #include "cells_pattern.h"
 #include "game_of_life_gui.h"
+
+namespace rhi = grassland::rhi;
 
 namespace {
 
@@ -85,7 +87,7 @@ int main(int argc, char *argv[]) {
     // Report error if cell grid size is not in [2,256]*[2,256]
     if (cell_grid_width < 2 || cell_grid_width > grid_size::kMax || cell_grid_height < 2 ||
         cell_grid_height > grid_size::kMax) {
-      LogError("Cell grid size must be in [2,256]*[2,256]");
+      grassland::LogError("Cell grid size must be in [2,256]*[2,256]");
       return 1;
     }
     if (!pattern_path.empty() && random_requested)
@@ -95,7 +97,7 @@ int main(int argc, char *argv[]) {
     if (!pattern_path.empty())
       initial_cells = CenterCellsPattern(LoadCellsPattern(pattern_path), cell_grid_width, cell_grid_height);
 
-    GameOfLife app("Game of Life", 1280, 720, cell_grid_width, cell_grid_height, api);
+    life_demo::GameOfLife app("Game of Life", 1280, 720, cell_grid_width, cell_grid_height, api);
     app.SetInitialPlaying(play);
     if (!pattern_path.empty()) {
       app.SetInitialCells(std::move(initial_cells));

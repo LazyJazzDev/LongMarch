@@ -1,6 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #include "listener.h"
+
+namespace life_demo {
 
 class Button : public Listener {
  public:
@@ -21,6 +23,7 @@ class Button : public Listener {
   void Deactivate();
 
  protected:
+  void DrawIcon(DeviceModel *model, InstanceInfo instance);
   void SetState(int state);
 
   void CalculateListenerBounds();
@@ -41,3 +44,5 @@ class Button : public Listener {
   float listener_right_{0};
   float listener_bottom_{0};
 };
+
+}  // namespace life_demo

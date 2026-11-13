@@ -1,6 +1,8 @@
-﻿#include "animation_var.h"
+#include "animation_var.h"
 
 #include "interpolation.h"
+
+namespace life_demo {
 
 AnimationVar::AnimationVar(float val, AnimationStyle ani_style)
     : target_(val),
@@ -54,3 +56,5 @@ float AnimationVar::Value() const {
       return Mix(origin_, target_, alpha_);
   }
 }
+
+}  // namespace life_demo

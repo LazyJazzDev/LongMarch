@@ -1,9 +1,11 @@
-﻿#include "size_slider.h"
+#include "size_slider.h"
 
 #include <array>
 #include <string>
 
 #include "grid_size.h"
+
+namespace life_demo {
 
 SizeSlider::SizeSlider(Application *app,
                        char label,
@@ -58,19 +60,28 @@ void SizeSlider::OnMouseButton(int button, int action, int) {
   const auto p = FramePosition(cursor.x, cursor.y);
   if (action == GLFW_PRESS) {
     focused_ = Contains(p);
-    dragging_ = focused_;
+    activation_pressed_ = focused_ && bool(on_activate_);
+    activation_origin_ = p;
+    dragging_ = focused_ && !on_activate_;
     if (dragging_)
       DragTo(p);
   } else if (action == GLFW_RELEASE) {
     if (dragging_)
       DragTo(p);
     dragging_ = false;
+    const bool activate = activation_pressed_ && Contains(p);
+    activation_pressed_ = false;
+    if (activate)
+      on_activate_();
   }
 }
 
 void SizeSlider::OnCursorPos(double x, double y) {
   const auto p = FramePosition(x, y);
   hovered_ = Contains(p);
+  const auto extent = application_->FramebufferSize();
+  if (activation_pressed_ && glm::length(p - activation_origin_) > float(std::min(extent.x, extent.y)) * 0.03f)
+    activation_pressed_ = false;
   if (dragging_)
     DragTo(p);
 }
@@ -82,6 +93,7 @@ void SizeSlider::OnCursorEnter(int entered) {
 
 void SizeSlider::OnFocus(bool focused) {
   if (!focused) {
+    activation_pressed_ = false;
     dragging_ = false;
     hovered_ = false;
     focused_ = false;
@@ -223,3 +235,5 @@ void SizeSlider::Draw() {
                    glm::translate(glm::mat4{1.0f}, glm::vec3{-label_width_ * 0.5f, -3.0f, 0});
   application_->DrawModel(label_model_.get(), {transform, {0.55f, 0.60f, 0.67f, 1.0f}, glm::uvec4{0}, bounds_});
 }
+
+}  // namespace life_demo

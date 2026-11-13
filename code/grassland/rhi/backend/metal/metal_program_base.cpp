@@ -1,11 +1,13 @@
-﻿#include "grassland/rhi/backend/metal/metal_program_base.h"
+#include "grassland/rhi/backend/metal/metal_program_base.h"
 
 #include <cstring>
+#ifndef LONGMARCH_OFFLINE_SHADERS
 #include <spirv_msl.hpp>
-
+#endif
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
+#include "grassland/rhi/shader_cache.h"
 
 namespace grassland::rhi::backend::metal {
 // Both backends consume the same DX-layout SPIR-V. Argument IDs come from the
@@ -15,7 +17,28 @@ static bool CompileMetal(const IShader *shader,
                          const std::vector<InputAttributeDesc> &attributes,
                          std::string &source,
                          std::string &entry,
-                         std::array<uint32_t, 3> *threads) {
+                         std::array<uint32_t, 3> *threads,
+                         bool tier1) {
+  const std::string key =
+      "msl-" +
+      ShaderCacheKey({"rhi-msl-v2", shader->GetPreprocessedCode(), shader->GetEntry(),
+                      std::to_string(shader->GetStage()), ShaderMacroHeader(layout, BACKEND_API_VULKAN, attributes),
+                      GetShaderCacheSettings().ios ? "ios" : (tier1 ? "macos-tier1" : "macos")});
+  std::vector<uint8_t> cached;
+  if (ReadShaderCache(key, cached)) {
+    auto split = std::find(cached.begin(), cached.end(), uint8_t{0});
+    if (split != cached.end() && (!threads || ReadShaderThreadGroup(key, *threads))) {
+      entry.assign(cached.begin(), split);
+      source.assign(split + 1, cached.end());
+      return true;
+    }
+  }
+  if (!GetShaderCacheSettings().directory.empty() && GetShaderCacheSettings().read_only)
+    return false;
+#ifdef LONGMARCH_OFFLINE_SHADERS
+  ReportError(-1, "Offline Metal compilation requires a prepared bundle");
+  return false;
+#else
   std::vector<uint8_t> code;
   if (!CompileSlang(shader, ShaderMacroHeader(layout, BACKEND_API_VULKAN, attributes), BACKEND_API_VULKAN, code,
                     &layout, threads))
@@ -30,8 +53,12 @@ static bool CompileMetal(const IShader *shader,
     compiler.set_entry_point(shader->GetEntry(), stage);
     auto options = compiler.get_msl_options();
     options.set_msl_version(3, 0);
+    options.ios_support_base_vertex_instance = true;
+    if (GetShaderCacheSettings().ios)
+      options.platform = spirv_cross::CompilerMSL::Options::iOS;
     options.argument_buffers = true;
-    options.argument_buffers_tier = spirv_cross::CompilerMSL::Options::ArgumentBuffersTier::Tier2;
+    options.argument_buffers_tier = tier1 ? spirv_cross::CompilerMSL::Options::ArgumentBuffersTier::Tier1
+                                          : spirv_cross::CompilerMSL::Options::ArgumentBuffersTier::Tier2;
     options.pad_argument_buffer_resources = true;
     compiler.set_msl_options(options);
     for (uint32_t g = 0; g < layout.groups.size(); ++g) {
@@ -72,11 +99,15 @@ static bool CompileMetal(const IShader *shader,
     }
     source = compiler.compile();
     entry = compiler.get_cleansed_entry_point_name(shader->GetEntry(), stage);
-    return true;
+    cached.assign(entry.begin(), entry.end());
+    cached.push_back(0);
+    cached.insert(cached.end(), source.begin(), source.end());
+    return (!threads || WriteShaderThreadGroup(key, *threads)) && WriteShaderCache(key, cached);
   } catch (const spirv_cross::CompilerError &e) {
     ReportError(-1, e.what());
     return false;
   }
+#endif
 }
 
 NS::SharedPtr<MTL::Function> CompileMetalFunction(MTL::Device *device,
@@ -88,7 +119,8 @@ NS::SharedPtr<MTL::Function> CompileMetalFunction(MTL::Device *device,
     if (!ValidateMetalBindingLayout(device, group))
       return {};
   std::string code, entry;
-  if (!CompileMetal(shader, layout, attributes, code, entry, threads))
+  if (!CompileMetal(shader, layout, attributes, code, entry, threads,
+                    GetShaderCacheSettings().ios || device->argumentBuffersSupport() == MTL::ArgumentBuffersTier1))
     return {};
   NS::Error *error = nullptr;
   auto library =

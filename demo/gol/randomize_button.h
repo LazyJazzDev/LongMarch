@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <random>
 
 #include "application/animation_var.h"
@@ -6,11 +6,17 @@
 #include "application/model.h"
 #include "glm/gtc/quaternion.hpp"
 
+namespace life_demo {
+
 class RandomizeButton : public Button {
  public:
   RandomizeButton(Application *app, std::vector<uint8_t> *cells, DeviceModel *background);
   void Update(float delta_time);
   void Draw();
+
+  bool IsAnimating() const {
+    return rotation_progress_ < 1 || !background_animation_.IsFinished();
+  }
 
  private:
   void OnClick() override;
@@ -30,3 +36,5 @@ class RandomizeButton : public Button {
   MixValue<glm::vec4> background_color_;
   MixValue<glm::vec4> face_color_;
 };
+
+}  // namespace life_demo

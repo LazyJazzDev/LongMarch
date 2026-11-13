@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "application/animation_var.h"
 #include "application/application.h"
 #include "application/model.h"
@@ -14,11 +14,57 @@
 #include "size_slider.h"
 #include "speed_toggle_button.h"
 
+namespace life_demo {
+
 class GameOfLife : public Application {
  public:
-  GameOfLife(const char *title, int width, int height, int cell_grid_width, int cell_grid_height, rhi::BackendAPI api);
+  GameOfLife(const char *title,
+             int width,
+             int height,
+             int cell_grid_width,
+             int cell_grid_height,
+             rhi::BackendAPI api,
+             bool hosted = false);
 
   ~GameOfLife() override;
+
+  double NextFrameDelay() const override;
+  void SetIconOrientation(float radians);
+  void SetBottomControlInset(float height_fraction);
+  // The host's left, top and right safe areas (a notch, Dynamic Island or camera
+  // hole) as fractions of the window width, height and width. Until set, the
+  // controls keep a fixed corner gap.
+  void SetCutoutInsets(float left, float top, float right);
+  // Caps the short edge that sizes controls, so large screens keep finger-sized controls.
+  void SetControlExtentLimit(float height_fraction);
+  // Host-selected icon size in framebuffer pixels, independent of window extent.
+  // Zero restores proportional desktop sizing. Small windows may shrink to fit.
+  void SetControlPixelSize(float pixels);
+  void EnableNativeSizeControls();
+  glm::ivec2 TakeSizeControlRequest();
+  // A size slider's rectangle as fractions of the framebuffer, for anchoring a
+  // native picker on it (axis 1: width, 2: height).
+  glm::vec4 SizeControlBounds(int axis) const;
+  void SetGridDimension(int axis, int value);
+
+  void ResetFrameClock() {
+    last_frame_time_ = last_simulation_time_ = grassland::GetTimeSeconds();
+  }
+
+  void ResetAnimationClock() {
+    const auto now = grassland::GetTimeSeconds();
+    // A new interaction after a timed sleep starts its animation now. Do not
+    // reset on every drag event or starve animations with high-rate input.
+    if (now - last_frame_time_ > 1.0 / 30.0)
+      last_frame_time_ = now;
+  }
+
+  // File pickers are asynchronous in native hosts. Buttons and feedback stay shared.
+  int HostedFileRequest() const {
+    return hosted_file_action_;
+  }
+
+  std::string CompleteHostedFile(const std::string &path);
 
   // Fills the grid with random live cells, each alive with the given probability.
   void RandomizeCells(float density, uint32_t seed);
@@ -52,17 +98,27 @@ class GameOfLife : public Application {
   bool CursorInGrid() const;
   void ZoomGrid(float factor);
   void ScrollGrid(double x, double y);
+  // Ends a left-drag pan and resumes cell input.
+  void EndDragPan();
   enum class FileAction { kNone, kOpen, kSave };
   void RequestFileAction(FileAction action);
   void ProcessFileAction();
 
+  int hosted_file_action_{};
+  int hosted_size_axis_{};
+  bool hosted_was_playing_{};
   SimulationClock simulation_clock_;
+  AnimationVar icon_rotation_{0.0f, AnimationStyle::kPower2};
   GridView grid_view_;
   std::unique_ptr<SizeSlider> width_slider_;
   std::unique_ptr<SizeSlider> height_slider_;
   int requested_width_{};
   int requested_height_{};
   bool sidebar_{true};
+  float bottom_control_inset_{};
+  glm::vec3 cutout_insets_{-1.0f};
+  float control_extent_limit_{};
+  float control_pixel_size_{};
   bool sliders_were_dragging_{false};
   uint32_t magnify_callback_{};
   uint32_t scroll_callback_{};
@@ -72,6 +128,10 @@ class GameOfLife : public Application {
   uint32_t pan_focus_callback_{};
   bool panning_{false};
   glm::vec2 pan_cursor_{0.0f};
+  // A left press on an enlarged grid, which becomes a pan once it moves.
+  bool drag_pending_{false};
+  bool drag_panning_{false};
+  glm::vec2 drag_start_{0.0f};
 
   std::unique_ptr<PausePlayButton> pause_play_button_;
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;
@@ -90,8 +150,10 @@ class GameOfLife : public Application {
   std::vector<uint8_t> cell_grid_;
   std::vector<uint8_t> initial_cells_;
   std::unique_ptr<CellGrid> cell_input_;
+  bool cells_animating_{false};
   float time_total{0.0};
   double last_frame_time_{};
+  double last_simulation_time_{};
   float ui_scale_{1.0};
   float random_density_{0.0f};
   uint32_t random_seed_{0};
@@ -109,3 +171,5 @@ class GameOfLife : public Application {
   float playground_top_{};
   float playground_bottom_{};
 };
+
+}  // namespace life_demo
