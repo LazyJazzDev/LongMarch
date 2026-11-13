@@ -18,6 +18,7 @@ struct Vertex {
 };
 
 std::vector<Vertex> AircraftMesh(const Controls &controls);
+bool ValidateWallDiffusion(int cuda_device);
 
 struct SolverOptions {
   float pressure_tolerance{0.0001f};

@@ -133,6 +133,8 @@ int main(int argc, char **argv) {
     std::cerr << "A CUDA-capable graphics device is required\n";
     return 1;
   }
+  if (validate && !wind3d::ValidateWallDiffusion(device->GetCUDADeviceIndex()))
+    return 2;
   auto simulation = wind3d::Simulation::Create(device->GetCUDADeviceIndex(), grid, solver);
   if (!simulation) {
     std::cerr << "CUDA initialization failed\n";

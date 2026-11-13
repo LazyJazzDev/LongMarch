@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
+#include <iostream>
 #include <mutex>
 #include <thread>
 
@@ -161,6 +162,9 @@ __global__ void CorrectTransport(Grid g,
                                  const float *source,
                                  const float *reverse,
                                  float *forward,
+                                 const unsigned char *bu,
+                                 const unsigned char *bv,
+                                 const unsigned char *bw,
                                  int axis,
                                  float dt) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
@@ -181,9 +185,30 @@ __global__ void CorrectTransport(Grid g,
         }
     transported = fminf(fmaxf(transported + 0.5f * (source[n] - reverse[n]), low), high);
   }
-  float lap = Read(source, g, x - 1, y, z) + Read(source, g, x + 1, y, z) + Read(source, g, x, y - 1, z) +
-              Read(source, g, x, y + 1, z) + Read(source, g, x, y, z - 1) + Read(source, g, x, y, z + 1) -
-              6 * source[n];
+  float lap = 0;
+  const unsigned char *blocked[] = {bu, bv, bw};
+  for (int direction = 0; direction < 3; ++direction)
+    for (int sign = -1; sign <= 1; sign += 2) {
+      int neighbour[] = {x, y, z};
+      neighbour[direction] += sign;
+      float value = Read(source, g, neighbour[0], neighbour[1], neighbour[2]);
+      if (direction != axis) {
+        // A tangential MAC velocity straddles two pressure cells. Each half
+        // of its dual face uses that cell's wall flag. A stationary wall at
+        // the midpoint has ghost velocity -u, rather than the fluid velocity
+        // on the far side of a thin control surface.
+        int face[] = {x, y, z};
+        face[direction] += sign > 0;
+        float fraction = 0;
+        for (int half = 0; half < 2; ++half) {
+          if (face[0] >= 0 && face[0] <= g.nx && face[1] >= 0 && face[1] <= g.ny && face[2] >= 0 && face[2] <= g.nz)
+            fraction += 0.5f * blocked[direction][g.F(face[0], face[1], face[2])];
+          --face[axis];
+        }
+        value += fraction * (-source[n] - value);
+      }
+      lap += value - source[n];
+    }
   forward[n] = transported + viscosity * dt / (g.h * g.h) * lap;
 }
 
@@ -250,6 +275,9 @@ __global__ void Measure(Grid g,
                         const float *u,
                         const float *v,
                         const float *w,
+                        const float *old_u,
+                        const float *old_v,
+                        const float *old_w,
                         const float *p,
                         const float *before,
                         const float *after,
@@ -272,7 +300,8 @@ __global__ void Measure(Grid g,
           if (!blocked[axis][g.F(a, b, c)])
             continue;
           Vec3 outward{axis == 0 ? float(sign) : 0, axis == 1 ? float(sign) : 0, axis == 2 ? float(sign) : 0};
-          Vec3 tangent = velocity;
+          // The explicit viscous update uses the pre-step velocities.
+          Vec3 tangent = CenterVelocity(g, old_u, old_v, old_w, x, y, z);
           if (axis == 0)
             tangent.x = 0;
           if (axis == 1)
@@ -328,6 +357,63 @@ Export(Grid g, Grid output, const float *u, const float *v, const float *w, cons
   cells[n] = cell;
 }
 }  // namespace
+
+bool ValidateWallDiffusion(int cuda_device) {
+  // A zero-thickness stationary plate separates fluid cells on both sides.
+  // Check all six normal/tangent combinations against the analytical shear
+  // and against the actual fluid momentum loss from CorrectTransport.
+  const Grid g{8, 8, 8, 0.25f};
+  constexpr int nf = 9 * 9 * 9, nc = 8 * 8 * 8;
+  float *fields = nullptr;
+  unsigned char *masks = nullptr;
+  Statistics *statistics = nullptr;
+  bool passed = cudaSetDevice(cuda_device) == cudaSuccess &&
+                cudaMallocManaged(&fields, (4 * nf + nc) * sizeof(float)) == cudaSuccess &&
+                cudaMallocManaged(&masks, 3 * nf + nc) == cudaSuccess &&
+                cudaMallocManaged(&statistics, 2 * sizeof(Statistics)) == cudaSuccess;
+  float dt = 0.1f * g.h * g.h / viscosity;
+  for (int normal = 0; passed && normal < 3; ++normal)
+    for (int tangent = 0; passed && tangent < 3; ++tangent) {
+      if (normal == tangent)
+        continue;
+      std::fill(fields, fields + 4 * nf + nc, 0.0f);
+      std::fill(masks, masks + 3 * nf + nc, 0);
+      float *source = fields + tangent * nf, *output = fields + 3 * nf, *zero = fields + 4 * nf;
+      std::fill(source, source + nf, 3.0f);
+      std::fill(output, output + nf, 3.0f);
+      for (int a = 2; a < 6; ++a)
+        for (int b = 2; b < 6; ++b) {
+          int face[3];
+          face[normal] = 4;
+          face[(normal + 1) % 3] = a;
+          face[(normal + 2) % 3] = b;
+          masks[normal * nf + g.F(face[0], face[1], face[2])] = 1;
+        }
+      CorrectTransport<<<(nf + 255) / 256, 256>>>(g, fields, fields + nf, fields + 2 * nf, source, nullptr, output,
+                                                  masks, masks + nf, masks + 2 * nf, tangent, dt);
+      Measure<<<2, 256>>>(g, masks + 3 * nf, masks, masks + nf, masks + 2 * nf, fields, fields + nf, fields + 2 * nf,
+                          fields, fields + nf, fields + 2 * nf, zero, zero, zero, statistics);
+      passed = cudaGetLastError() == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
+      if (!passed)
+        break;
+      double momentum_loss = 0;
+      for (int i = 0; i < nf; ++i)
+        momentum_loss += source[i] - output[i];
+      momentum_loss *= density * g.h * g.h * g.h / dt;
+      Vec3 force = Add(statistics[0].force, statistics[1].force);
+      float measured = tangent == 0 ? force.x : tangent == 1 ? force.y : force.z;
+      float expected = 2 * 16 * 2 * density * viscosity * g.h * 3;
+      passed = std::abs(measured - expected) < 1e-5f && std::abs(momentum_loss - expected) < 1e-5;
+      if (!passed)
+        std::cerr << "Wall diffusion mismatch: normal=" << normal << " tangent=" << tangent
+                  << " fluid=" << momentum_loss << " wall=" << measured << " expected=" << expected << '\n';
+    }
+  cudaFree(statistics);
+  cudaFree(masks);
+  cudaFree(fields);
+  std::cout << "wall_diffusion_validation=" << (passed ? "PASS" : "FAIL") << '\n';
+  return passed;
+}
 
 struct Simulation::Impl {
   mutable std::mutex mutex;
@@ -419,7 +505,9 @@ struct Simulation::Impl {
           break;
       }
       applied_generation = current_generation;
-      float dt = std::min(0.5f * g.h / std::max(max_speed, controls.speed), 0.12f * g.h * g.h / viscosity);
+      // No-slip ghost values can increase the diffusion diagonal from six
+      // to ten at corners; retain a conservative explicit stability bound.
+      float dt = std::min(0.5f * g.h / std::max(max_speed, controls.speed), 0.08f * g.h * g.h / viscosity);
       bool geometry_changed = !mesh || controls.angle != mesh_controls.angle || controls.flap != mesh_controls.flap ||
                               controls.aileron != mesh_controls.aileron ||
                               controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder;
@@ -438,8 +526,9 @@ struct Simulation::Impl {
       for (int axis = 0; axis < 3; ++axis) {
         if (options.corrected_transport)
           Advect<<<fb, 256, 0, stream>>>(g, u, v, w, destinations[axis], reverse, axis, -dt);
-        CorrectTransport<<<fb, 256, 0, stream>>>(
-            g, u, v, w, sources[axis], options.corrected_transport ? reverse : nullptr, destinations[axis], axis, dt);
+        CorrectTransport<<<fb, 256, 0, stream>>>(g, u, v, w, sources[axis],
+                                                 options.corrected_transport ? reverse : nullptr, destinations[axis],
+                                                 bu, bv, bw, axis, dt);
       }
       std::swap(u, un);
       std::swap(v, vn);
@@ -453,7 +542,7 @@ struct Simulation::Impl {
         break;
       Project<<<fb, 256, 0, stream>>>(g, bu, bv, bw, pressure, u, v, w, dt);
       Divergence<<<cb, 256, 0, stream>>>(g, solid, u, v, w, after);
-      Measure<<<cb, 256, 0, stream>>>(g, solid, bu, bv, bw, u, v, w, pressure, div, after, statistics);
+      Measure<<<cb, 256, 0, stream>>>(g, solid, bu, bv, bw, u, v, w, un, vn, wn, pressure, div, after, statistics);
       Export<<<(display_count + 255) / 256, 256, 0, stream>>>(g, display_grid, u, v, w, pressure, cells);
       auto snapshot = std::make_shared<Snapshot>();
       snapshot->cells.resize(display_count);

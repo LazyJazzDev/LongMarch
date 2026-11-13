@@ -68,7 +68,9 @@ on staggered faces and pressure at cell centres. Each step performs:
    pressure-cell connection at h/8 spacing to block velocity faces crossed by
    thin surfaces whose neighbouring cell centres are both fluid.
 2. Midpoint characteristic tracing, bounded MacCormack transport correction,
-   and explicit viscous diffusion. `--first-order` disables the transport correction.
+   and explicit viscous diffusion. Tangential diffusion uses stationary no-slip
+   ghost velocities across blocked faces, including thin walls with fluid cells
+   on both sides. `--first-order` disables the transport correction.
 3. Enforce stationary no-penetration face velocities at solid boundaries.
 4. Solve the fine-grid pressure equation with multigrid-preconditioned conjugate
    gradients, warm-started from the previous pressure. The true `b - A p`
@@ -84,7 +86,8 @@ The inlet and lateral far-field faces impose the wind; the outlet has zero
 pressure. Pressure force is integrated over the same blocked velocity faces used by the
 pressure operator. For a thin wall with fluid on both sides, their pressure
 contributions form the pressure jump; no solid cell is required for that load. A first-order
-tangential wall-shear estimate is added using the same viscosity, and each
+tangential wall-shear estimate uses the same pre-step velocities and viscosity
+as the explicit diffusion update, and each
 surface force contributes `r × F` to the moment. GPU fields use single precision;
 GPU reductions use single precision and their block totals accumulate on the
 CPU in double precision, with no double atomicAdd.
@@ -134,7 +137,10 @@ demo_wind3d --backend d3d12 --frames 600 --debug
 ```
 
 `--validate` cross-checks explicit mesh vertices against the solid-boundary
-function under combined extreme controls, checks finite fluid state, requires
+function under combined extreme controls. It also exercises the actual CUDA
+diffusion and force kernels on a thin stationary plate for all six normal/tangent
+axis combinations, checking that fluid momentum loss matches analytical wall
+friction and the integrated force. It checks finite fluid state, requires
 true pressure residual below the requested tolerance, and checks the divergence
 after projection (twice the requested relative tolerance, with a 1e-5 s⁻¹
 roundoff floor). `--pressure-tolerance` and `--pressure-cycles` set the residual
