@@ -98,6 +98,22 @@ __global__ void Smooth(Level l, int parity) {
     l.x[n] += 1.3f * ((l.rhs[n] + NeighborSum(l, n, x, y, z)) / d - l.x[n]);
 }
 
+// The final level fits in one block. Block barriers replace 64 graph kernel
+// boundaries while preserving the forward/backward symmetric red-black sweep.
+__global__ void CoarseSmooth(Level l) {
+  int n = threadIdx.x;
+  int x = n % l.nx, y = n / l.nx % l.ny, z = n / (l.nx * l.ny);
+  for (int sweep = 0; sweep < 64; ++sweep) {
+    int parity = sweep < 32 ? sweep % 2 : 1 - sweep % 2;
+    if (n < l.Count() && (x + y + z) % 2 == parity) {
+      float d = Diagonal(l, n, x, y, z);
+      if (d > 0)
+        l.x[n] += 1.3f * ((l.rhs[n] + NeighborSum(l, n, x, y, z)) / d - l.x[n]);
+    }
+    __syncthreads();
+  }
+}
+
 __global__ void Residual(Level l) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= l.Count())
@@ -314,16 +330,14 @@ class Solver {
 
   void Cycle(size_t index) {
     Level l = levels_[index];
-    int smooth = index + 1 == levels_.size() ? 16 : 3;
+    if (index + 1 == levels_.size()) {
+      CoarseSmooth<<<1, 64, 0, stream_>>>(l);
+      return;
+    }
+    int smooth = 3;
     for (int i = 0; i < smooth; ++i)
       for (int parity = 0; parity < 2; ++parity)
         Smooth<<<Blocks(l), 256, 0, stream_>>>(l, parity);
-    if (index + 1 == levels_.size()) {
-      for (int i = 0; i < smooth; ++i)
-        for (int parity = 1; parity >= 0; --parity)
-          Smooth<<<Blocks(l), 256, 0, stream_>>>(l, parity);
-      return;
-    }
     Residual<<<Blocks(l), 256, 0, stream_>>>(l);
     Level coarse = levels_[index + 1];
     Restrict<<<Blocks(coarse), 256, 0, stream_>>>(l, coarse);
