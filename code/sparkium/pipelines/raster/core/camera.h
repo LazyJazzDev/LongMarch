@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "sparkium/pipelines/raster/core/core_util.h"
 
 namespace sparkium::raster {
@@ -15,15 +15,17 @@ struct CameraData {
 class Camera : public Object {
  public:
   explicit Camera(sparkium::Camera &camera);
-  graphics::Buffer *NearFieldBuffer() const;
-  graphics::Buffer *FarFieldBuffer() const;
+  rhi::IBindingGroup *NearFieldBindings() const;
+  rhi::IBindingGroup *FarFieldBindings() const;
   void Update();
 
  private:
   sparkium::Camera &camera_;
   Core *core_{};
-  std::unique_ptr<graphics::Buffer> near_field_buffer_;
-  std::unique_ptr<graphics::Buffer> far_field_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> near_field_buffer_;
+  rhi::ObjPtr<rhi::IBuffer> far_field_buffer_;
+  rhi::ObjPtr<rhi::IBindingGroup> near_field_bindings_;
+  rhi::ObjPtr<rhi::IBindingGroup> far_field_bindings_;
   CameraData data_{};
 };
 

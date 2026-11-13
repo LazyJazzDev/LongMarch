@@ -1,5 +1,7 @@
-﻿#pragma once
-#include "grassland/grassland.h"
+#pragma once
+#include "grassland/math/math.h"
+#include "grassland/rhi/rhi.h"
+#include "grassland/util/util.h"
 #include "sparkium/core/code_lines.h"
 
 namespace sparkium {
@@ -7,6 +9,7 @@ namespace sparkium {
 using namespace grassland;
 
 class Core;
+class Renderer;
 class Geometry;
 class Material;
 class Entity;

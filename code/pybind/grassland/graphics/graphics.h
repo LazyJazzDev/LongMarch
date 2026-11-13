@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "grassland/graphics/frame_profile.h"
+#include "grassland/graphics/core.h"
 #include "grassland/graphics/graphics.h"
 #include "grassland/graphics/shader.h"
 #include "pybind/pybind.h"

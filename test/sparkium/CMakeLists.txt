@@ -1,10 +1,30 @@
-add_executable(sparkium_fallback_test fallback_test.cpp code_lines_test.cpp metal_backend_test.cpp hdr_window_test.cpp)
+add_executable(sparkium_fallback_test fallback_test.cpp code_lines_test.cpp scene_window_test.cpp)
+add_executable(sparkium_graphics_test metal_backend_test.cpp hdr_window_test.cpp graphics_capability_test.cpp)
+target_link_libraries(sparkium_graphics_test PRIVATE LongMarch GTest::gtest_main)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_graphics_test)
+add_test(NAME sparkium_graphics COMMAND sparkium_graphics_test)
 if (LONGMARCH_METAL_ENABLED)
-    target_sources(sparkium_fallback_test PRIVATE metal_window_test.mm)
+    target_sources(sparkium_graphics_test PRIVATE metal_window_test.mm)
 endif ()
-target_link_libraries(sparkium_fallback_test PRIVATE LongMarch GTest::gtest_main)
+target_link_libraries(sparkium_fallback_test PRIVATE Sparkium grassland_rhi GTest::gtest_main)
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_fallback_test)
 add_test(NAME sparkium_fallback COMMAND sparkium_fallback_test)
+
+add_executable(sparkium_rhi_test rhi_binding_test.cpp)
+target_link_libraries(sparkium_rhi_test PRIVATE Sparkium grassland_rhi GTest::gtest_main)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_rhi_test)
+add_test(NAME sparkium_rhi COMMAND sparkium_rhi_test)
+
+add_executable(sparkium_browser_test browser_renderer_test.cpp ../../demo/sparkium_gui/browser_renderer.cpp)
+target_link_libraries(sparkium_browser_test PRIVATE Sparkium grassland_rhi GTest::gtest_main)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_browser_test)
+add_test(NAME sparkium_browser COMMAND sparkium_browser_test)
+
+add_executable(sparkium_worker_test render_worker_test.cpp ../../demo/thin_lens/thin_lens_scene.cpp
+    ../../demo/practium_hello/practium_scene.cpp)
+target_link_libraries(sparkium_worker_test PRIVATE Practium Sparkium grassland_rhi GTest::gtest_main)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_worker_test)
+add_test(NAME sparkium_worker COMMAND sparkium_worker_test)
 
 # Optional diagnostic only: no Wayland protocol/header dependency for normal
 # builds, including Linux/X11, Windows and macOS.

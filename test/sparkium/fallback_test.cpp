@@ -1,5 +1,16 @@
-﻿#include <gtest/gtest.h>
-#include <long_march.h>
+#include <gtest/gtest.h>
+
+#include <stdexcept>
+
+#include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "sparkium/core/render_layout.h"
+#include "sparkium/sparkium.h"
+#if defined(LONGMARCH_VULKAN_ENABLED)
+#include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#endif
+#if defined(LONGMARCH_D3D12_ENABLED)
+#include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#endif
 
 #include <algorithm>
 #include <array>
@@ -9,13 +20,11 @@
 #include <filesystem>
 #include <fstream>
 #include <glm/gtc/matrix_transform.hpp>
+#include <limits>
 #include <numeric>
 #include <random>
 #include <tuple>
 
-#include "../../demo/sparkium_backend.h"
-#include "grassland/graphics/backend/backend.h"
-#include "grassland/graphics/frame_profile.h"
 #include "sparkium/pipelines/raytracing/core/camera.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
@@ -24,9 +33,45 @@
 #include "sparkium/pipelines/raytracing/material/materials.h"
 
 using namespace grassland;
-namespace vulkan = grassland::graphics::backend::vulkan;
 
 namespace {
+grassland::rhi::BackendAPI ParseBackend(const std::string &name) {
+  using namespace grassland::rhi;
+  BackendAPI api;
+  if (name == "auto")
+    api = BACKEND_API_DEFAULT;
+  else if (name == "metal")
+    api = BACKEND_API_METAL;
+  else if (name == "vulkan")
+    api = BACKEND_API_VULKAN;
+  else if (name == "d3d12")
+    api = BACKEND_API_D3D12;
+  else
+    throw std::invalid_argument("unknown RHI backend: " + name);
+  return api;
+}
+}  // namespace
+
+namespace {
+bool BackendCompiled(rhi::BackendAPI api) {
+  switch (api) {
+#if defined(LONGMARCH_VULKAN_ENABLED)
+    case rhi::BACKEND_API_VULKAN:
+      return true;
+#endif
+#if defined(LONGMARCH_D3D12_ENABLED)
+    case rhi::BACKEND_API_D3D12:
+      return true;
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+    case rhi::BACKEND_API_METAL:
+      return true;
+#endif
+    default:
+      return false;
+  }
+}
+
 struct Ray {
   glm::vec3 origin;
   float t_min;
@@ -47,16 +92,214 @@ class SoftwareBVHTest : public testing::Test {
   void SetUp() override {
     const char *backend = std::getenv("SPARKIUM_TEST_BACKEND");
     const bool debug = std::getenv("SPARKIUM_TEST_DEBUG") != nullptr;
-    ASSERT_EQ(graphics::CreateCore(backend ? ParseSparkiumBackend(backend) : graphics::BACKEND_API_DEFAULT,
-                                   graphics::Core::Settings{2, debug}, &graphics),
-              0);
-    ASSERT_EQ(graphics->InitializeLogicalDeviceAutoSelect(false), 0);
-    core = std::make_unique<sparkium::Core>(graphics.get());
+    api = backend ? ParseBackend(backend) : rhi::BACKEND_API_DEFAULT;
+    native_core = rhi::CreateCore(api, {debug});
+    ASSERT_TRUE(native_core);
+    device = native_core->CreateDeviceByAutoSelection();
+    ASSERT_TRUE(device);
+    queue = device->GetQueue(rhi::QUEUE_TYPE_ASSIST);
+    ASSERT_TRUE(queue);
+    core = sparkium::Core::Create(device.Get());
+    ASSERT_TRUE(core);
+    renderer = std::make_unique<sparkium::Renderer>(core.get());
+    ASSERT_TRUE(renderer->IsValid());
   }
 
-  std::unique_ptr<graphics::Core> graphics;
+  void Render(sparkium::Scene *scene,
+              sparkium::Camera *camera,
+              sparkium::Film *film,
+              sparkium::RenderPipeline pipeline) {
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    auto submitted = renderer->Submit(scene, camera, film, pipeline, nullptr, false, dependencies);
+    last_submission = submitted;
+    ASSERT_TRUE(submitted);
+    ASSERT_TRUE(submitted->WaitHost());
+  }
+
+  template <class T>
+  void Download(rhi::IImage *image, std::vector<T> &pixels) {
+    rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadImage(image);
+    ASSERT_TRUE(readback);
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit(dependencies);
+    last_submission = submitted;
+    ASSERT_TRUE(submitted);
+    ASSERT_TRUE(submitted->WaitHost());
+    ASSERT_TRUE(readback->CopyTo(pixels.data(), pixels.size() * sizeof(T)));
+  }
+
+  template <class T>
+  void Upload(rhi::IImage *image, const std::vector<T> &pixels) {
+    rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ASSERT_TRUE(commands->CmdUploadImage(image, pixels.data(), image->GetDesc().width * sizeof(T)));
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit(dependencies);
+    last_submission = submitted;
+    ASSERT_TRUE(submitted);
+    ASSERT_TRUE(submitted->WaitHost());
+  }
+
+  void Develop(sparkium::Film &film, rhi::IImage *image, bool hdr = false) {
+    rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ASSERT_TRUE(commands->CmdClearImage(image, {}));
+    ASSERT_TRUE(film.RecordDevelop(commands.Get(), image, hdr));
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit(dependencies);
+    last_submission = submitted;
+    ASSERT_TRUE(submitted);
+    ASSERT_TRUE(submitted->WaitHost());
+  }
+
+  rhi::ObjPtr<rhi::ISubmissionToken> last_submission;
+  rhi::BackendAPI api{};
+  rhi::ObjPtr<rhi::ICore> native_core;
+  rhi::ObjPtr<rhi::IDevice> device;
+  rhi::ObjPtr<rhi::IQueue> queue;
   std::unique_ptr<sparkium::Core> core;
+  std::unique_ptr<sparkium::Renderer> renderer;
 };
+
+TEST_F(SoftwareBVHTest, ShadowTerminatorOffsetPreservesPlanesAndScalesWithGeometry) {
+  auto vfs = core->GetShadersVFS();
+  vfs.WriteFile("terminator_test.slang", R"(
+#include "shadow_terminator.slang"
+RHI_RW_STRUCTURED_BUFFER(0, 0, float4, output);
+[numthreads(1,1,1)] void Main(uint3 id : SV_DispatchThreadID) {
+  float3 V[3] = {float3(0,0,0), float3(1,0,0), float3(0,1,0)};
+  float3 N[3] = {float3(0,0,1), float3(0.6,0,0.8), float3(0,0.6,0.8)};
+  float3 bary = float3(1.0/3.0);
+  output[0] = float4(ShadowTerminatorSurfaceOffset(V, N, bary, false), ShadowTerminatorWeight(0.5, 0.2, 0.1));
+  output[1] = float4(ShadowTerminatorSurfaceOffset(V, N, bary, true), ShadowTerminatorWeight(0.2, 0.05, 0.1));
+  output[2] = float4(ShadowTerminatorSurfaceOffset(V, N, float3(1,0,0), false), ShadowTerminatorWeight(0.05, 0.05, 0.1));
+  for (int i = 0; i < 3; ++i) V[i] *= 2.0;
+  output[3] = float4(ShadowTerminatorSurfaceOffset(V, N, bary, false), ShadowTerminatorWeight(0, -0.1, 0));
+  for (int j = 0; j < 3; ++j) N[j] = float3(0,0,1);
+  output[4] = float4(ShadowTerminatorSurfaceOffset(V, N, bary, false), ShadowTerminatorWeight(0, -0.1, 0.1));
+})");
+  rhi::ObjPtr<rhi::IShader> shader =
+      device->CreateShader("terminator_test.slang", "Main", rhi::SHADER_STAGE_COMPUTE, &vfs, {"."});
+  ASSERT_TRUE(shader);
+  rhi::PipelineLayoutDesc layout;
+  layout.groups = {{{{0, rhi::BINDING_RW_STRUCTURED_BUFFER, 1, rhi::SHADER_VISIBILITY_ALL, sizeof(glm::vec4)}}}};
+  rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
+  rhi::ObjPtr<rhi::IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
+  std::array<glm::vec4, 5> values;
+  rhi::ObjPtr<rhi::IBuffer> output = device->CreateBuffer({sizeof(values)});
+  ASSERT_TRUE(program && group && output);
+  ASSERT_TRUE(group->BindResource(0, output.Get()));
+  rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdDispatch(1, 1, 1));
+  rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadBuffer(output.Get(), 0, sizeof(values));
+  ASSERT_TRUE(readback);
+  rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+  ASSERT_TRUE(submitted);
+  ASSERT_TRUE(submitted->WaitHost());
+  ASSERT_TRUE(readback->CopyTo(values.data(), sizeof(values)));
+  // Golden values from Cycles' parabolic height and local-envelope equations.
+  const std::array<glm::vec4, 5> expected{{{0.026666667f, 0.026666667f, 0.115555556f, 0},
+                                           {0, 0, 0, 0.5f},
+                                           {0, 0, 0, 1},
+                                           {0.053333333f, 0.053333333f, 0.231111111f, 0},
+                                           {0, 0, 0, 1}}};
+  for (size_t i = 0; i < values.size(); ++i) {
+    SCOPED_TRACE(i);
+    for (int axis = 0; axis < 4; ++axis)
+      EXPECT_NEAR(values[i][axis], expected[i][axis], 1e-6f);
+  }
+}
+
+TEST_F(SoftwareBVHTest, GeometryOffsetSettingValidatesAndUpdatesExistingBuffer) {
+  sparkium::GeometryMesh mesh(core.get(), Mesh<>::Sphere(8, 8));
+  auto *buffer = mesh.GetBuffer();
+  EXPECT_FLOAT_EQ(mesh.GetShadowTerminatorGeometryOffset(), 0.1f);
+  for (float value : {0.0f, 0.5f, 1.0f}) {
+    mesh.SetShadowTerminatorGeometryOffset(value);
+    EXPECT_EQ(mesh.GetBuffer(), buffer);
+    EXPECT_FLOAT_EQ(mesh.GetShadowTerminatorGeometryOffset(), value);
+    sparkium::GeometryMesh::Header header;
+    auto updates = core->BeginUpdates();
+    rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ASSERT_TRUE(core->RecordUpdates(commands.Get(), updates));
+    rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadBuffer(buffer, 0, sizeof(header));
+    ASSERT_TRUE(readback);
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+    ASSERT_TRUE(submitted);
+    ASSERT_TRUE(core->AcceptUpdates(updates));
+    ASSERT_TRUE(submitted->WaitHost());
+    ASSERT_TRUE(readback->CopyTo(&header, sizeof(header)));
+    EXPECT_FLOAT_EQ(header.shadow_terminator_geometry_offset, value);
+  }
+  EXPECT_THROW(mesh.SetShadowTerminatorGeometryOffset(-0.1f), std::invalid_argument);
+  EXPECT_THROW(mesh.SetShadowTerminatorGeometryOffset(1.1f), std::invalid_argument);
+  EXPECT_THROW(mesh.SetShadowTerminatorGeometryOffset(std::numeric_limits<float>::quiet_NaN()), std::invalid_argument);
+  EXPECT_THROW(mesh.SetShadowTerminatorGeometryOffset(std::numeric_limits<float>::infinity()), std::invalid_argument);
+  EXPECT_FLOAT_EQ(mesh.GetShadowTerminatorGeometryOffset(), 1.0f);
+}
+
+TEST_F(SoftwareBVHTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {
+  auto vfs = core->GetShadersVFS();
+  rhi::ObjPtr<rhi::IShader> shader = device->CreateShader("gather_light_power.slang", "GatherLightPowerKernel",
+                                                          rhi::SHADER_STAGE_COMPUTE, &vfs, {"."});
+  ASSERT_TRUE(shader);
+  rhi::PipelineLayoutDesc layout;
+  layout.groups = {{{{0, rhi::BINDING_BYTE_ADDRESS_BUFFER},
+                     {1, rhi::BINDING_RW_BYTE_ADDRESS_BUFFER},
+                     {2, rhi::BINDING_BYTE_ADDRESS_BUFFER, 1}}}};
+  rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
+  rhi::ObjPtr<rhi::IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
+  ASSERT_TRUE(program && group);
+  for (uint32_t count : {1u, 65u}) {
+    SCOPED_TRACE(count);
+    rhi::ObjPtr<rhi::IBuffer> metadata = device->CreateBuffer({count * 16});
+    rhi::ObjPtr<rhi::IBuffer> power = device->CreateBuffer({4});
+    rhi::ObjPtr<rhi::IBuffer> selector = device->CreateBuffer({(count + 65) * 4});
+    ASSERT_TRUE(metadata && power && selector);
+    std::vector<uint32_t> records(count * 4, 0), actual(count + 65, 0xdeadbeef);
+    float one = 1;
+    actual[0] = count;
+    rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ASSERT_TRUE(commands->CmdUploadBuffer(metadata.Get(), 0, records.data(), records.size() * 4));
+    ASSERT_TRUE(commands->CmdUploadBuffer(power.Get(), 0, &one, 4));
+    ASSERT_TRUE(commands->CmdUploadBuffer(selector.Get(), 0, actual.data(), actual.size() * 4));
+    ASSERT_TRUE(group->BindResource(0, metadata.Get()));
+    ASSERT_TRUE(group->BindResource(1, selector.Get()));
+    ASSERT_TRUE(group->BindResource(2, power.Get()));
+    ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+    ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+    ASSERT_TRUE(commands->CmdDispatch((count + 63) / 64, 1, 1));
+    rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadBuffer(selector.Get(), 0, actual.size() * 4);
+    ASSERT_TRUE(readback);
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+    ASSERT_TRUE(submitted);
+    ASSERT_TRUE(submitted->WaitHost());
+    ASSERT_TRUE(readback->CopyTo(actual.data(), actual.size() * 4));
+    EXPECT_EQ(actual[0], count);
+    for (uint32_t i = 0; i < count; ++i) {
+      float value;
+      std::memcpy(&value, &actual[i + 1], 4);
+      EXPECT_FLOAT_EQ(value, float(i % 64 + 1));
+    }
+    for (size_t i = count + 1; i < actual.size(); ++i)
+      EXPECT_EQ(actual[i], 0xdeadbeef);
+  }
+}
 
 TEST_F(SoftwareBVHTest, JsonCameraTypesPreserveLegacyScenes) {
   const auto path = std::filesystem::temp_directory_path() /
@@ -111,34 +354,50 @@ TEST_F(SoftwareBVHTest, CameraModelsGeneratePinholeAndFocusedRays) {
 #pragma once
 #include "common.slang"
 #include "buffer_helper.slang"
-ByteAddressBuffer camera_data : register(t0, space0);
+RHI_BYTE_ADDRESS_BUFFER(0, 0, camera_data);
 )");
     vfs.WriteFile("camera_test.slang", "#define SPARKIUM_SOFTWARE_RT\n#include \"" + adapter->ShaderFile() +
-                                           "\"\nRWByteAddressBuffer output : register(u0, space1);\n"
+                                           "\"\nRHI_RW_BYTE_ADDRESS_BUFFER(1, 0, output);\n"
                                            "[numthreads(1,1,1)] void Main(uint3 id : SV_DispatchThreadID) {\n"
                                            "RayGenPayload p; p.uv = float2(0.3f, -0.2f); "
                                            "p.lens_sample = float2(0.13f + 0.2f * id.x, 0.64f);\n" +
                                            adapter->EntryPoint() +
                                            "(p); output.Store4(id.x * 32, asuint(float4(p.origin, 1))); "
                                            "output.Store4(id.x * 32 + 16, asuint(float4(p.direction, 0))); }\n");
-    std::unique_ptr<graphics::Shader> shader;
-    EXPECT_EQ(graphics->CreateShader(vfs, "camera_test.slang", "Main", "cs_6_0", {"-I."}, &shader), 0);
-    std::unique_ptr<graphics::ComputeProgram> program;
-    graphics->CreateComputeProgram(shader.get(), &program);
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-    program->Finalize();
-    std::unique_ptr<graphics::Buffer> output;
-    graphics->CreateBuffer(128, graphics::BUFFER_TYPE_STATIC, &output);
-    std::unique_ptr<graphics::CommandContext> commands;
-    graphics->CreateCommandContext(&commands);
-    commands->CmdBindComputeProgram(program.get());
-    commands->CmdBindResources(0, {adapter->Buffer()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(1, {output.get()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdDispatch(4, 1, 1);
-    graphics->SubmitCommandContext(commands.get());
     std::array<glm::vec4, 8> result{};
-    output->DownloadData(result.data(), sizeof(result));
+    rhi::ObjPtr<rhi::IShader> shader =
+        device->CreateShader("camera_test.slang", "Main", rhi::SHADER_STAGE_COMPUTE, &vfs, {"."});
+    rhi::PipelineLayoutDesc layout;
+    layout.groups = {{{{0, rhi::BINDING_BYTE_ADDRESS_BUFFER}}}, {{{0, rhi::BINDING_RW_BYTE_ADDRESS_BUFFER}}}};
+    rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
+    rhi::ObjPtr<rhi::IBuffer> output = device->CreateBuffer({sizeof(result)});
+    rhi::ObjPtr<rhi::IBindingGroup> camera_group = device->CreateBindingGroup(layout.groups[0]);
+    rhi::ObjPtr<rhi::IBindingGroup> output_group = device->CreateBindingGroup(layout.groups[1]);
+    EXPECT_TRUE(shader && program && output && camera_group && output_group);
+    if (!shader || !program || !output || !camera_group || !output_group)
+      return result;
+    EXPECT_TRUE(camera_group->BindResource(0, adapter->Buffer()));
+    EXPECT_TRUE(output_group->BindResource(0, output.Get()));
+    auto updates = core->BeginUpdates();
+    rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+    EXPECT_TRUE(commands);
+    if (!commands)
+      return result;
+    EXPECT_TRUE(core->RecordUpdates(commands.Get(), updates));
+    EXPECT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+    EXPECT_TRUE(commands->CmdBindGroup(0, camera_group.Get()));
+    EXPECT_TRUE(commands->CmdBindGroup(1, output_group.Get()));
+    EXPECT_TRUE(commands->CmdDispatch(4, 1, 1));
+    rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadBuffer(output.Get(), 0, sizeof(result));
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+    EXPECT_TRUE(submitted);
+    if (!submitted)
+      return result;
+    EXPECT_TRUE(core->AcceptUpdates(updates));
+    EXPECT_TRUE(submitted->WaitHost());
+    EXPECT_TRUE(readback);
+    if (readback)
+      EXPECT_TRUE(readback->CopyTo(result.data(), sizeof(result)));
     return result;
   };
   const auto reference = sample(pinhole);
@@ -177,6 +436,57 @@ ByteAddressBuffer camera_data : register(t0, space0);
     EXPECT_NEAR(moved[0][c], float(c + 2), 1e-6f);
 }
 
+TEST_F(SoftwareBVHTest, FilmOutputLeasesPreserveCompletedImages) {
+  sparkium::Scene scene(core.get());
+  scene.settings.samples_per_dispatch = 1;
+  scene.settings.max_bounces = 1;
+  scene.settings.background_color = {0.1f, 0.2f, 0.3f};
+  sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 1.0f);
+  auto film = std::make_unique<sparkium::Film>(core.get(), 8, 8);
+  auto first = film->AcquireOutput();
+  auto second = film->AcquireOutput();
+  auto third = film->AcquireOutput();
+  auto fourth = film->AcquireOutput();
+  ASSERT_TRUE(first && second && third && fourth);
+  EXPECT_FALSE(film->AcquireOutput());
+  EXPECT_TRUE(core->IsValid());
+  auto submit = [&](const std::shared_ptr<const sparkium::Film::Output> &output, bool hdr) {
+    rhi::SubmitInfo dependencies;
+    if (last_submission)
+      dependencies.waits.push_back(last_submission->GetEvent());
+    auto token = renderer->Submit(&scene, &camera, film.get(), sparkium::RENDER_PIPELINE_RT_FALLBACK, output->Image(),
+                                  hdr, dependencies);
+    last_submission = token;
+    ASSERT_TRUE(token);
+    ASSERT_TRUE(token->WaitHost());
+  };
+  submit(first, false);
+  std::vector<uint8_t> original(8 * 8 * 4), retained(original.size());
+  Download(first->Image(), original);
+  EXPECT_TRUE(std::any_of(original.begin(), original.end(), [](uint8_t value) { return value != 0; }));
+  second.reset();
+  auto hdr = film->AcquireOutput(true);
+  ASSERT_TRUE(hdr);
+  EXPECT_EQ(hdr->Image()->GetDesc().format, rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT);
+  // Discarded development must not publish successful image initialization.
+  {
+    rhi::ObjPtr<rhi::ICommandContext> discarded = queue->CreateCommandContext();
+    ASSERT_TRUE(discarded);
+    ASSERT_TRUE(film->RecordDevelop(discarded.Get(), hdr->Image(), true));
+  }
+  scene.settings.background_color = {0.7f, 0.1f, 0.2f};
+  film->Reset();
+  submit(hdr, true);
+  std::vector<glm::vec4> pixels(64);
+  Download(hdr->Image(), pixels);
+  EXPECT_GT(pixels[0].x, pixels[0].y);
+  EXPECT_FLOAT_EQ(pixels[0].w, 1.0f);
+  // Output ownership survives a scene/Film replacement while the UI holds a lease.
+  film.reset();
+  Download(first->Image(), retained);
+  EXPECT_EQ(retained, original);
+}
+
 TEST_F(SoftwareBVHTest, CameraModelsSwitchWithoutStalePrograms) {
   std::vector<Vector3<float>> positions{{-1, -1, 0}, {1, -1, 0}, {0, 1, 0}};
   uint32_t indices[]{0, 1, 2};
@@ -194,15 +504,15 @@ TEST_F(SoftwareBVHTest, CameraModelsSwitchWithoutStalePrograms) {
   lens.focus_distance = 2.0f;
   auto render = [&](sparkium::Camera *camera, sparkium::RenderPipeline pipeline) {
     sparkium::Film film(core.get(), 16, 16);
-    core->Render(&scene, camera, &film, pipeline);
+    Render(&scene, camera, &film, pipeline);
     std::vector<glm::vec4> pixels(256);
-    film.GetRawImage()->DownloadData(pixels.data());
+    Download(film.GetRawImage(), pixels);
     return pixels;
   };
   std::vector<sparkium::RenderPipeline> pipelines{sparkium::RENDER_PIPELINE_RT_FALLBACK};
-  if (graphics->DeviceRayQuerySupport())
+  if (device->SupportRayQuery())
     pipelines.push_back(sparkium::RENDER_PIPELINE_RAY_QUERY);
-  if (graphics->DeviceRayTracingSupport())
+  if (device->SupportRayTracingPipeline())
     pipelines.push_back(sparkium::RENDER_PIPELINE_RAY_TRACING);
   for (auto pipeline : pipelines) {
     SCOPED_TRACE(int(pipeline));
@@ -212,11 +522,18 @@ TEST_F(SoftwareBVHTest, CameraModelsSwitchWithoutStalePrograms) {
     lens.aperture_radius = 0.5f;
     EXPECT_NE(render(&lens, pipeline), reference);
     EXPECT_EQ(render(&pinhole, pipeline), reference);
+    // A prepared scene must work with independent Renderer-owned program caches,
+    // including switching back to a renderer that already used this scene version.
+    auto previous_renderer = std::move(renderer);
+    renderer = std::make_unique<sparkium::Renderer>(core.get());
+    EXPECT_EQ(render(&pinhole, pipeline), reference);
+    renderer.swap(previous_renderer);
+    EXPECT_EQ(render(&pinhole, pipeline), reference);
   }
 }
 
 TEST_F(SoftwareBVHTest, LazyGraphHitShadersSurvivePipelineSwitches) {
-  if (!graphics->DeviceRayTracingSupport() || !graphics->DeviceRayQuerySupport())
+  if (!device->SupportRayTracingPipeline() || !device->SupportRayQuery())
     GTEST_SKIP() << "requires native RT and ray query";
   sparkium::CodeLines code(R"(
 GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, uint ray_type,
@@ -250,8 +567,8 @@ GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, ui
   for (auto pipeline : {sparkium::RENDER_PIPELINE_RAY_QUERY, sparkium::RENDER_PIPELINE_RAY_TRACING,
                         sparkium::RENDER_PIPELINE_RAY_QUERY, sparkium::RENDER_PIPELINE_RAY_TRACING}) {
     sparkium::Film film(core.get(), 16, 16);
-    core->Render(&scene, &camera, &film, pipeline);
-    film.GetRawImage()->DownloadData(pixels.data());
+    Render(&scene, &camera, &film, pipeline);
+    Download(film.GetRawImage(), pixels);
     if (first_frame) {
       first_frame = false;
       reference = pixels;
@@ -284,25 +601,29 @@ TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
   sparkium::Film film(core.get(), 9, 3);
   std::vector<glm::vec4> source(27, glm::vec4(4.0f, 0.25f, -1.0f, 1.0f));
   source.back() = glm::vec4(100000.0f, 1.0f, 0.0f, 1.0f);
-  film.GetRawImage()->UploadData(source.data());
+  Upload(film.GetRawImage(), source);
   film.info.accumulated_samples = 17;
   film.info.exposure = 1.0f;
   film.info.gamma = 1.0f;
   film.info.contrast = 1.0f;
   int resets = 0;
   film.RegisterResetCallback([&]() { ++resets; });
-  std::unique_ptr<graphics::Image> sdr, hdr;
-  graphics->CreateImage(9, 3, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &sdr);
-  graphics->CreateImage(9, 3, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &hdr);
-  EXPECT_THROW(film.Develop(sdr.get(), true), std::invalid_argument);
+  rhi::ObjPtr<rhi::IImage> sdr, hdr;
+  sdr = device->CreateImage({9, 3, rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ASSERT_TRUE(sdr);
+  hdr = device->CreateImage({9, 3, rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  ASSERT_TRUE(hdr);
+  rhi::ObjPtr<rhi::ICommandContext> invalid = queue->CreateCommandContext();
+  ASSERT_TRUE(invalid);
+  EXPECT_FALSE(film.RecordDevelop(invalid.Get(), sdr.Get(), true));
   for (int transform : {0, 1, 2}) {
     film.info.view_transform = transform;
-    film.Develop(sdr.get());
+    Develop(film, sdr.Get());
     std::vector<uint8_t> before(27 * 4), after(27 * 4);
-    sdr->DownloadData(before.data());
-    film.Develop(hdr.get(), true);
+    Download(sdr.Get(), before);
+    Develop(film, hdr.Get(), true);
     std::vector<glm::vec4> actual(27);
-    hdr->DownloadData(actual.data());
+    Download(hdr.Get(), actual);
     for (size_t i = 0; i + 1 < actual.size(); ++i) {
       if (transform == 2) {
         EXPECT_GT(actual[i].x, 1.0f);
@@ -315,14 +636,14 @@ TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
       EXPECT_EQ(actual[i].w, 1.0f);
     }
     EXPECT_NEAR(actual.back().x, 65504.0f, 0.01f);
-    film.Develop(sdr.get());
-    sdr->DownloadData(after.data());
+    Develop(film, sdr.Get());
+    Download(sdr.Get(), after);
     EXPECT_EQ(before, after);
     EXPECT_EQ(film.info.accumulated_samples, 17);
     EXPECT_EQ(film.info.view_transform, transform);
   }
   std::vector<glm::vec4> unchanged(27);
-  film.GetRawImage()->DownloadData(unchanged.data());
+  Download(film.GetRawImage(), unchanged);
   EXPECT_EQ(unchanged, source);
   EXPECT_EQ(resets, 0);
 }
@@ -333,23 +654,25 @@ TEST_F(SoftwareBVHTest, HDRArtisticGradeMatchesSDRMidtonesAndPreservesHighlights
                                       {0.999f, 0.999f, 0.999f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f},
                                       {1.001f, 1.001f, 1.001f, 1.0f}, {4.0f, 2.0f, 1.0f, 1.0f},
                                       {16.0f, 8.0f, 4.0f, 1.0f},      {100000.0f, 0.0f, -1.0f, 1.0f}};
-  film.GetRawImage()->UploadData(source.data());
-  std::unique_ptr<graphics::Image> sdr, hdr;
-  ASSERT_EQ(graphics->CreateImage(8, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &sdr), 0);
-  ASSERT_EQ(graphics->CreateImage(8, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &hdr), 0);
+  Upload(film.GetRawImage(), source);
+  rhi::ObjPtr<rhi::IImage> sdr, hdr;
+  sdr = device->CreateImage({8, 1, rhi::IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ASSERT_TRUE(sdr);
+  hdr = device->CreateImage({8, 1, rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT});
+  ASSERT_TRUE(hdr);
   auto encode = [](float x) { return x <= 0.0031308f ? 12.92f * x : 1.055f * std::pow(x, 1.0f / 2.4f) - 0.055f; };
   for (int transform : {0, 1, 2}) {
     film.info.view_transform = transform;
     film.info.gamma = 1.0f;
     film.info.contrast = 1.0f;
-    film.Develop(hdr.get(), true);
+    Develop(film, hdr.Get(), true);
     std::vector<glm::vec4> neutral(8), graded(8);
-    hdr->DownloadData(neutral.data());
+    Download(hdr.Get(), neutral);
     for (auto grade : {glm::vec2(1.15f, 1.0f), glm::vec2(1.0f, 1.2f), glm::vec2(1.15f, 1.2f), glm::vec2(0.1f, 4.0f)}) {
       film.info.gamma = grade.x;
       film.info.contrast = grade.y;
-      film.Develop(hdr.get(), true);
-      hdr->DownloadData(graded.data());
+      Develop(film, hdr.Get(), true);
+      Download(hdr.Get(), graded);
       EXPECT_NE(graded[1].y, neutral[1].y);
       EXPECT_GT(graded[5].x, 1.0f);
       EXPECT_GE(graded[6].x, graded[5].x);
@@ -364,9 +687,9 @@ TEST_F(SoftwareBVHTest, HDRArtisticGradeMatchesSDRMidtonesAndPreservesHighlights
         EXPECT_EQ(pixel.w, 1.0f);
       }
       if (transform == 2 && grade.x > 1.0f) {
-        film.Develop(sdr.get());
+        Develop(film, sdr.Get());
         std::vector<uint8_t> bytes(32);
-        sdr->DownloadData(bytes.data());
+        Download(sdr.Get(), bytes);
         for (int pixel = 0; pixel < 4; ++pixel)
           for (int channel = 0; channel < 3; ++channel)
             EXPECT_NEAR(encode(graded[pixel][channel]), bytes[pixel * 4 + channel] / 255.0f, 1.0f / 255.0f);
@@ -378,14 +701,13 @@ TEST_F(SoftwareBVHTest, HDRArtisticGradeMatchesSDRMidtonesAndPreservesHighlights
   }
 }
 
-TEST(GraphicsCoreCreation, UnsupportedAPIsDoNotFallBack) {
-  for (auto api : {graphics::BACKEND_API_METAL, graphics::BACKEND_API_D3D12, graphics::BACKEND_API_VULKAN,
-                   static_cast<graphics::BackendAPI>(99)}) {
-    if (graphics::SupportBackendAPI(api))
+TEST(RHICoreCreation, UnsupportedAPIsDoNotFallBack) {
+  for (auto api :
+       {rhi::BACKEND_API_METAL, rhi::BACKEND_API_D3D12, rhi::BACKEND_API_VULKAN, static_cast<rhi::BackendAPI>(99)}) {
+    if (BackendCompiled(api))
       continue;
-    std::unique_ptr<graphics::Core> core;
-    EXPECT_EQ(graphics::CreateCore(api, graphics::Core::Settings{}, &core), -1);
-    EXPECT_EQ(core, nullptr);
+    rhi::ObjPtr<rhi::ICore> unsupported = rhi::CreateCore(api);
+    EXPECT_FALSE(unsupported);
   }
 }
 
@@ -431,17 +753,17 @@ TEST_F(SoftwareBVHTest, LightSamplingIsIndependentOfEntityAddresses) {
                                  glm::radians(45.0f), 1.0f);
   for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY,
                         sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RASTERIZATION}) {
-    if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics->DeviceRayQuerySupport())
+    if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !device->SupportRayQuery())
       continue;
-    if (pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics->DeviceRayTracingSupport())
+    if (pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING && !device->SupportRayTracingPipeline())
       continue;
     SCOPED_TRACE(static_cast<int>(pipeline));
     sparkium::Film a(core.get(), 32, 32), b(core.get(), 32, 32);
-    core->Render(&first, &camera, &a, pipeline);
-    core->Render(&second, &camera, &b, pipeline);
+    Render(&first, &camera, &a, pipeline);
+    Render(&second, &camera, &b, pipeline);
     std::vector<glm::vec4> left(1024), right(1024);
-    a.GetRawImage()->DownloadData(left.data());
-    b.GetRawImage()->DownloadData(right.data());
+    Download(a.GetRawImage(), left);
+    Download(b.GetRawImage(), right);
     double radiance = 0;
     for (size_t i = 0; i < left.size(); ++i)
       for (int c = 0; c < 3; ++c) {
@@ -479,18 +801,18 @@ TEST_F(SoftwareBVHTest, NonblockingEmittersDoNotHideShadowOccluders) {
                                  glm::radians(20.0f), 1.0f);
   for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY,
                         sparkium::RENDER_PIPELINE_RAY_TRACING}) {
-    if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics->DeviceRayQuerySupport())
+    if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !device->SupportRayQuery())
       continue;
-    if (pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics->DeviceRayTracingSupport())
+    if (pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING && !device->SupportRayTracingPipeline())
       continue;
     for (int mode = 0; mode < 3; ++mode) {
       SCOPED_TRACE(testing::Message() << "pipeline=" << pipeline << ", mode=" << mode);
       scene.SetEntityActive(&occluder, mode == 0);
       invisible.block_ray = mode == 2;
       sparkium::Film film(core.get(), 32, 32);
-      core->Render(&scene, &camera, &film, pipeline);
+      Render(&scene, &camera, &film, pipeline);
       std::vector<glm::vec4> pixels(1024);
-      film.GetRawImage()->DownloadData(pixels.data());
+      Download(film.GetRawImage(), pixels);
       double radiance = 0;
       for (const auto &pixel : pixels)
         for (int c = 0; c < 3; ++c) {
@@ -507,36 +829,21 @@ TEST_F(SoftwareBVHTest, NonblockingEmittersDoNotHideShadowOccluders) {
 
 TEST_F(SoftwareBVHTest, RayQueryCapabilityMatchesDevice) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
-  if (auto *vk = dynamic_cast<graphics::backend::VulkanCore *>(graphics.get())) {
-    const auto physical = vk->PhysicalDevice();
-    EXPECT_EQ(graphics->DeviceRayQuerySupport(), vulkan::SupportRayQuery(physical));
-    if (vulkan::SupportRayQuery(physical)) {
-      vulkan::DeviceFeatureRequirement requirement{};
-      requirement.enable_rayquery_extension = true;
-      auto info = requirement.GenerateRecommendedDeviceCreateInfo(physical);
-      auto has_extension = [&](const char *name) {
-        return std::any_of(info.extensions.begin(), info.extensions.end(),
-                           [&](const char *extension) { return std::strcmp(extension, name) == 0; });
-      };
-      EXPECT_TRUE(has_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME));
-      EXPECT_TRUE(has_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
-      EXPECT_FALSE(has_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME));
-      EXPECT_NE(requirement.GetVmaAllocatorCreateFlags() & VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT, 0);
-      VkDevice query_device = VK_NULL_HANDLE;
-      auto create_info = info.CompileVkDeviceCreateInfo(false, physical);
-      ASSERT_EQ(vkCreateDevice(physical, &create_info, nullptr, &query_device), VK_SUCCESS);
-      EXPECT_NE(vkGetDeviceProcAddr(query_device, "vkCmdBuildAccelerationStructuresKHR"), nullptr);
-      EXPECT_EQ(vkGetDeviceProcAddr(query_device, "vkCmdTraceRaysKHR"), nullptr);
-      vkDestroyDevice(query_device, nullptr);
-    }
+  if (auto vk = rhi::QueryInterfacePtr<rhi::backend::vulkan::IVulkanDevice>(device.Get())) {
+    const auto physical = vk->NativePhysicalDevice();
+    VkPhysicalDeviceRayQueryFeaturesKHR query{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
+    VkPhysicalDeviceFeatures2 features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+    features.pNext = &query;
+    vkGetPhysicalDeviceFeatures2(physical, &features);
+    EXPECT_EQ(device->SupportRayQuery(), query.rayQuery == VK_TRUE);
   }
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
-  if (auto *dx = dynamic_cast<graphics::backend::D3D12Core *>(graphics.get())) {
+  if (auto dx = rhi::QueryInterfacePtr<rhi::backend::d3d12::ID3D12Device>(device.Get())) {
     D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
-    const auto result = dx->Device()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options));
-    EXPECT_EQ(graphics->DeviceRayQuerySupport(),
-              SUCCEEDED(result) && options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1);
+    const auto result =
+        dx->NativeDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options));
+    EXPECT_EQ(device->SupportRayQuery(), SUCCEEDED(result) && options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1);
   }
 #endif
 }
@@ -574,7 +881,7 @@ class SoftwareBVHSizeTest : public SoftwareBVHTest, public testing::WithParamInt
 
 TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionOracle) {
   auto [triangle_count, ray_query] = GetParam();
-  if (ray_query && !graphics->DeviceRayQuerySupport())
+  if (ray_query && !device->SupportRayQuery())
     GTEST_SKIP() << "native ray query unavailable";
   // Five triangles: a non-power-of-two tree, duplicate centroids and a degenerate leaf.
   std::vector<Vector3<float>> positions{{-1, -1, 0}, {1, -1, 0},  {0, 1, 0},  {-1, -1, -1}, {1, -1, -1},
@@ -597,7 +904,7 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
   sparkium::raytracing::GeometryMesh rt_geometry(geometry);
   sparkium::raytracing::MaterialLambertian rt_material(material);
   sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()), ray_query);
-  std::vector<graphics::Buffer *> buffers{rt_geometry.Buffer()};
+  std::vector<rhi::IBuffer *> buffers{rt_geometry.Buffer()};
 
   std::mt19937 random(7411);
   std::uniform_real_distribution<float> position(-5.0f, 5.0f);
@@ -611,25 +918,25 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
     rays.push_back({origin, 0.001f, glm::normalize(target - origin), 100.0f});
   }
 
-  std::unique_ptr<graphics::Buffer> ray_buffer, output;
-  graphics->CreateBuffer(16 + rays.size() * sizeof(Ray), graphics::BUFFER_TYPE_STATIC, &ray_buffer);
+  rhi::ObjPtr<rhi::IBuffer> ray_buffer = device->CreateBuffer({16 + rays.size() * sizeof(Ray)});
+  rhi::ObjPtr<rhi::IBuffer> output = device->CreateBuffer({rays.size() * sizeof(Hit)});
+  ASSERT_TRUE(ray_buffer && output);
   uint32_t count = rays.size();
-  ray_buffer->UploadData(&count, sizeof(count));
-  ray_buffer->UploadData(rays.data(), rays.size() * sizeof(Ray), 16);
-  graphics->CreateBuffer(rays.size() * sizeof(Hit), graphics::BUFFER_TYPE_STATIC, &output);
+  ASSERT_TRUE(core->QueueUpload(ray_buffer.Get(), &count, sizeof(count)));
+  ASSERT_TRUE(core->QueueUpload(ray_buffer.Get(), rays.data(), rays.size() * sizeof(Ray), 16));
 
   auto vfs = core->GetShadersVFS();
   vfs.WriteFile("bvh_test.slang", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
 #ifdef NATIVE_QUERY
-RaytracingAccelerationStructure query_scene : register(t0, space0);
+RHI_ACCELERATION_STRUCTURE(0, 0, query_scene);
 #else
-ByteAddressBuffer software_nodes : register(t0, space0);
+RHI_BYTE_ADDRESS_BUFFER(0, 0, software_nodes);
 #endif
-ByteAddressBuffer software_instances : register(t0, space1);
-ByteAddressBuffer data_buffers[] : register(t0, space2);
-ByteAddressBuffer rays : register(t0, space3);
-RWByteAddressBuffer results : register(u0, space4);
+RHI_BYTE_ADDRESS_BUFFER(1, 0, software_instances);
+RHI_BYTE_ADDRESS_BUFFER_ARRAY(2, 0, data_buffers);
+RHI_BYTE_ADDRESS_BUFFER(3, 0, rays);
+RHI_RW_BYTE_ADDRESS_BUFFER(4, 0, results);
 #ifdef NATIVE_QUERY
 #include "ray_query/traversal.slang"
 #else
@@ -647,52 +954,89 @@ RWByteAddressBuffer results : register(u0, space4);
   results.Store4(id.x * 32 + 16, uint4(asuint(hit.barycentric), 0, 0));
 }
 )");
-  std::unique_ptr<graphics::Shader> shader;
-  std::vector<std::string> args{"-I."};
+  std::vector<std::pair<std::string, std::string>> defines;
   if (ray_query)
-    args.push_back("-DNATIVE_QUERY");
-  ASSERT_EQ(graphics->CreateShader(vfs, "bvh_test.slang", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader), 0);
-  std::unique_ptr<graphics::ComputeProgram> program;
-  graphics->CreateComputeProgram(shader.get(), &program);
-  for (int i = 0; i < 4; ++i)
-    program->AddResourceBinding(
-        ray_query && i == 0 ? graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE : graphics::RESOURCE_TYPE_STORAGE_BUFFER,
-        1);
-  program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  program->Finalize();
+    defines.emplace_back("NATIVE_QUERY", "1");
+  rhi::ObjPtr<rhi::IShader> shader =
+      device->CreateShader("bvh_test.slang", "Main", rhi::SHADER_STAGE_COMPUTE, &vfs, {"."}, defines);
+  ASSERT_TRUE(shader);
+  rhi::PipelineLayoutDesc layout;
+  layout.groups.resize(5);
+  for (int i = 0; i < 5; ++i)
+    layout.groups[i].bindings = {
+        {0, i == 4 ? rhi::BINDING_RW_BYTE_ADDRESS_BUFFER
+                   : (i == 0 && ray_query ? rhi::BINDING_ACCELERATION_STRUCTURE : rhi::BINDING_BYTE_ADDRESS_BUFFER)}};
+  rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
+  ASSERT_TRUE(program);
+  std::array<rhi::ObjPtr<rhi::IBindingGroup>, 5> groups;
+  for (int i = 0; i < 5; ++i) {
+    groups[i] = device->CreateBindingGroup(layout.groups[i]);
+    ASSERT_TRUE(groups[i]);
+  }
 
   glm::mat4 mirrored =
       glm::translate(glm::mat4(1), glm::vec3(3, 0, -1)) * glm::scale(glm::mat4(1), glm::vec3(-0.7f, 1.8f, 0.4f));
   std::vector<glm::mat4x3> transforms{glm::mat4x3(1), glm::mat4x3(mirrored)};
-  for (int phase = 0; phase < 4; ++phase) {
-    // Refit instances, shrink the instance tree, then exercise a completely empty TLAS.
-    if (phase == 1)
-      transforms[0] = glm::mat4x3(glm::translate(glm::mat4(1), glm::vec3(-1, 0.5f, -2)));
+  for (int phase = 0; phase < 8; ++phase) {
+    // Static reuse, transform refit, geometry rebuild, static reuse again, then
+    // shrinking/empty/growing instance counts. Compare every phase to the CPU oracle.
     if (phase == 2)
+      transforms[0] = glm::mat4x3(glm::translate(glm::mat4(1), glm::vec3(-1, 0.5f, -2)));
+    if (phase == 3) {
+      for (auto &position : positions)
+        position.z() -= 0.7f;
+      const auto &header = geometry.GetHeader();
+      ASSERT_TRUE(core->QueueUpload(geometry.GetBuffer(), positions.data(), positions.size() * sizeof(Vector3<float>),
+                                    header.position_offset));
+      if (ray_query)
+        ASSERT_TRUE(core->QueueBuild(rt_geometry.BLAS(), {{{geometry.GetBuffer(), header.position_offset},
+                                                           {geometry.GetBuffer(), header.index_offset}}}));
+    }
+    if (phase == 5)
       transforms.resize(1);
-    if (phase == 3)
+    if (phase == 6)
       transforms.clear();
+    if (phase == 7)
+      transforms = {glm::mat4x3(1), glm::mat4x3(mirrored)};
     pipeline.ClearInstances();
     for (auto transform : transforms)
       pipeline.AddInstance(&rt_geometry, &rt_material, transform, 0);
-    std::unique_ptr<graphics::CommandContext> commands;
-    graphics->CreateCommandContext(&commands);
     sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 1.0f);
-    pipeline.Update(commands.get(), buffers, 1, 1, sparkium::raytracing::DedicatedCast(&camera));
-    commands->CmdBindComputeProgram(program.get());
+    if (phase == 0 || phase == 2 || phase == 3) {
+      // Discarded BUILD/UPDATE must not publish a usable cached tree. The next
+      // recording must reconstruct the requested state, including the first build.
+      auto canceled_updates = core->BeginUpdates();
+      rhi::ObjPtr<rhi::ICommandContext> canceled = queue->CreateCommandContext();
+      ASSERT_TRUE(canceled);
+      ASSERT_TRUE(pipeline.RecordPrepare(canceled.Get(), canceled_updates, buffers, 1, 1,
+                                         sparkium::raytracing::DedicatedCast(&camera)));
+    }
+    rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    auto updates = core->BeginUpdates();
+    ASSERT_TRUE(
+        pipeline.RecordPrepare(commands.Get(), updates, buffers, 1, 1, sparkium::raytracing::DedicatedCast(&camera)));
+    ASSERT_TRUE(core->RecordUpdates(commands.Get(), updates));
+    ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
     if (ray_query)
-      commands->CmdBindResources(0, pipeline.AccelerationStructure(), graphics::BIND_POINT_COMPUTE);
+      ASSERT_TRUE(groups[0]->BindResource(0, pipeline.AccelerationStructure()));
     else
-      commands->CmdBindResources(0, {pipeline.Nodes()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(1, {pipeline.Instances()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(2, buffers, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(3, {ray_buffer.get()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(4, {output.get()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdDispatch((rays.size() + 63) / 64, 1, 1);
-    graphics->SubmitCommandContext(commands.get());
-    graphics->WaitGPU();
+      ASSERT_TRUE(groups[0]->BindResource(0, pipeline.Nodes()));
+    ASSERT_TRUE(groups[1]->BindResource(0, pipeline.Instances()));
+    ASSERT_TRUE(groups[2]->BindResource(0, buffers[0]));
+    ASSERT_TRUE(groups[3]->BindResource(0, ray_buffer.Get()));
+    ASSERT_TRUE(groups[4]->BindResource(0, output.Get()));
+    for (uint32_t i = 0; i < groups.size(); ++i)
+      ASSERT_TRUE(commands->CmdBindGroup(i, groups[i].Get()));
+    ASSERT_TRUE(commands->CmdDispatch((rays.size() + 63) / 64, 1, 1));
+    rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadBuffer(output.Get(), 0, rays.size() * sizeof(Hit));
+    ASSERT_TRUE(readback);
+    rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+    ASSERT_TRUE(submitted);
+    ASSERT_TRUE(core->AcceptUpdates(updates));
+    ASSERT_TRUE(submitted->WaitHost());
     std::vector<Hit> actual(rays.size());
-    output->DownloadData(actual.data(), actual.size() * sizeof(Hit));
+    ASSERT_TRUE(readback->CopyTo(actual.data(), actual.size() * sizeof(Hit)));
     for (size_t i = 0; i < rays.size(); ++i) {
       SCOPED_TRACE(testing::Message() << "phase " << phase << ", ray " << i);
       const Hit expected = Oracle(rays[i], positions, transforms);
@@ -717,7 +1061,7 @@ INSTANTIATE_TEST_SUITE_P(TraversalModes, ComputeTraversalTest, testing::Bool());
 
 TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
   bool ray_query = GetParam();
-  if (ray_query && !graphics->DeviceRayQuerySupport())
+  if (ray_query && !device->SupportRayQuery())
     GTEST_SKIP() << "native ray query unavailable";
   sparkium::Scene scene(core.get());
   scene.settings.samples_per_dispatch = 3;
@@ -726,7 +1070,7 @@ TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
   sparkium::Film film(core.get(), 17, 13);
   auto check = [&](glm::vec3 expected) {
     std::vector<glm::vec4> pixels(17 * 13);
-    film.GetRawImage()->DownloadData(pixels.data());
+    Download(film.GetRawImage(), pixels);
     for (auto pixel : pixels)
       for (int c = 0; c < 3; ++c) {
         ASSERT_TRUE(std::isfinite(pixel[c]));
@@ -735,37 +1079,30 @@ TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
   };
 
   for (int frame = 1; frame <= 2; ++frame) {
-    core->Render(&scene, &camera, &film,
-                 ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
+    Render(&scene, &camera, &film,
+           ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
     EXPECT_EQ(film.info.accumulated_samples, frame * 3);
     check(scene.settings.background_color);
   }
   scene.settings.background_color = glm::vec3(0.1f, 0.3f, 0.9f);
   film.Reset();
   EXPECT_EQ(film.info.accumulated_samples, 0);
-  core->Render(&scene, &camera, &film,
-               ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
+  Render(&scene, &camera, &film,
+         ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
   EXPECT_EQ(film.info.accumulated_samples, 3);
   check(scene.settings.background_color);
-  if (ray_query && (!graphics->DeviceRayTracingSupport() || graphics->API() == graphics::BACKEND_API_D3D12 ||
-                    graphics->API() == graphics::BACKEND_API_VULKAN)) {
+  if (ray_query &&
+      (!device->SupportRayTracingPipeline() || api == rhi::BACKEND_API_D3D12 || api == rhi::BACKEND_API_VULKAN)) {
     EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO), sparkium::RENDER_PIPELINE_RAY_QUERY);
-    graphics::FrameProfile profile(graphics.get(), false);
-    profile.Begin();
-    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_AUTO);
-    profile.Finish();
-    EXPECT_EQ(profile.counters["native_ray_query"], 1u);
+    Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_AUTO);
     // Auto must reuse the selected native pipeline and preserve its accumulation.
     EXPECT_EQ(film.info.accumulated_samples, 6);
     check(scene.settings.background_color);
-    if (!graphics->DeviceRayTracingSupport()) {
+    if (!device->SupportRayTracingPipeline()) {
       // Legacy JSON requests must select the same native query pipeline as Auto.
       EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING),
                 sparkium::RENDER_PIPELINE_RAY_QUERY);
-      profile.Begin();
-      core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING);
-      profile.Finish();
-      EXPECT_EQ(profile.counters["native_ray_query"], 1u);
+      Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING);
       EXPECT_EQ(film.info.accumulated_samples, 9);
       check(scene.settings.background_color);
     } else {
@@ -773,11 +1110,11 @@ TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
                 sparkium::RENDER_PIPELINE_RAY_TRACING);
     }
   }
-  if (graphics->DeviceRayQuerySupport()) {
+  if (device->SupportRayQuery()) {
     // Switching traversal implementations must discard accumulation in both directions.
     for (bool query : {!ray_query, ray_query}) {
-      core->Render(&scene, &camera, &film,
-                   query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
+      Render(&scene, &camera, &film,
+             query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
       EXPECT_EQ(film.info.accumulated_samples, 3);
       check(scene.settings.background_color);
     }
@@ -786,7 +1123,7 @@ TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
 
 TEST_P(ComputeTraversalTest, TransparentShadowLayers) {
   bool ray_query = GetParam();
-  if (ray_query && !graphics->DeviceRayQuerySupport())
+  if (ray_query && !device->SupportRayQuery())
     GTEST_SKIP() << "native ray query unavailable";
   std::vector<Vector3<float>> positions{{-2, -2, 0}, {2, -2, 0}, {0, 2, 0}, {-2, -2, -1}, {2, -2, -1}, {0, 2, -1}};
   uint32_t indices[]{0, 1, 2, 3, 4, 5};
@@ -802,13 +1139,13 @@ TEST_P(ComputeTraversalTest, TransparentShadowLayers) {
 #define SOFTWARE_EXTERNAL_BINDINGS
 #include "common.slang"
 #ifdef NATIVE_QUERY
-RaytracingAccelerationStructure query_scene : register(t0, space0);
+RHI_ACCELERATION_STRUCTURE(0, 0, query_scene);
 #else
-ByteAddressBuffer software_nodes : register(t0, space0);
+RHI_BYTE_ADDRESS_BUFFER(0, 0, software_nodes);
 #endif
-ByteAddressBuffer software_instances : register(t0, space1);
-ByteAddressBuffer data_buffers[] : register(t0, space2);
-RWByteAddressBuffer results : register(u0, space3);
+RHI_BYTE_ADDRESS_BUFFER(1, 0, software_instances);
+RHI_BYTE_ADDRESS_BUFFER_ARRAY(2, 0, data_buffers);
+RHI_RW_BYTE_ADDRESS_BUFFER(3, 0, results);
 #ifdef NATIVE_QUERY
 #include "ray_query/traversal.slang"
 #else
@@ -823,39 +1160,53 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
                                   ShadowRay(o, d, 4.5f), ShadowRay(o, d, 3.0f))));
 }
 )");
-  std::unique_ptr<graphics::Shader> shader;
-  std::vector<std::string> args{"-I."};
+  std::vector<std::pair<std::string, std::string>> defines;
   if (ray_query)
-    args.push_back("-DNATIVE_QUERY");
-  ASSERT_EQ(graphics->CreateShader(vfs, "shadow_test.slang", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader),
-            0);
-  std::unique_ptr<graphics::ComputeProgram> program;
-  graphics->CreateComputeProgram(shader.get(), &program);
-  for (int i = 0; i < 3; ++i)
-    program->AddResourceBinding(
-        ray_query && i == 0 ? graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE : graphics::RESOURCE_TYPE_STORAGE_BUFFER,
-        1);
-  program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  program->Finalize();
-  std::unique_ptr<graphics::Buffer> output;
-  graphics->CreateBuffer(16, graphics::BUFFER_TYPE_STATIC, &output);
-  std::unique_ptr<graphics::CommandContext> commands;
-  graphics->CreateCommandContext(&commands);
+    defines.emplace_back("NATIVE_QUERY", "1");
+  rhi::ObjPtr<rhi::IShader> shader =
+      device->CreateShader("shadow_test.slang", "Main", rhi::SHADER_STAGE_COMPUTE, &vfs, {"."}, defines);
+  ASSERT_TRUE(shader);
+  rhi::PipelineLayoutDesc layout;
+  layout.groups.resize(4);
+  for (int i = 0; i < 4; ++i)
+    layout.groups[i].bindings = {
+        {0, i == 3 ? rhi::BINDING_RW_BYTE_ADDRESS_BUFFER
+                   : (i == 0 && ray_query ? rhi::BINDING_ACCELERATION_STRUCTURE : rhi::BINDING_BYTE_ADDRESS_BUFFER)}};
+  rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
+  ASSERT_TRUE(program);
+  std::array<rhi::ObjPtr<rhi::IBindingGroup>, 4> groups;
+  for (int i = 0; i < 4; ++i) {
+    groups[i] = device->CreateBindingGroup(layout.groups[i]);
+    ASSERT_TRUE(groups[i]);
+  }
+  rhi::ObjPtr<rhi::IBuffer> output = device->CreateBuffer({16});
+  ASSERT_TRUE(output);
+  rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  auto updates = core->BeginUpdates();
   sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 1.0f);
-  pipeline.Update(commands.get(), {rt_geometry.Buffer()}, 1, 1, sparkium::raytracing::DedicatedCast(&camera));
-  commands->CmdBindComputeProgram(program.get());
+  ASSERT_TRUE(pipeline.RecordPrepare(commands.Get(), updates, {rt_geometry.Buffer()}, 1, 1,
+                                     sparkium::raytracing::DedicatedCast(&camera)));
+  ASSERT_TRUE(core->RecordUpdates(commands.Get(), updates));
+  ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
   if (ray_query)
-    commands->CmdBindResources(0, pipeline.AccelerationStructure(), graphics::BIND_POINT_COMPUTE);
+    ASSERT_TRUE(groups[0]->BindResource(0, pipeline.AccelerationStructure()));
   else
-    commands->CmdBindResources(0, {pipeline.Nodes()}, graphics::BIND_POINT_COMPUTE);
-  commands->CmdBindResources(1, {pipeline.Instances()}, graphics::BIND_POINT_COMPUTE);
-  commands->CmdBindResources(2, {rt_geometry.Buffer()}, graphics::BIND_POINT_COMPUTE);
-  commands->CmdBindResources(3, {output.get()}, graphics::BIND_POINT_COMPUTE);
-  commands->CmdDispatch(1, 1, 1);
-  graphics->SubmitCommandContext(commands.get());
-  graphics->WaitGPU();
+    ASSERT_TRUE(groups[0]->BindResource(0, pipeline.Nodes()));
+  ASSERT_TRUE(groups[1]->BindResource(0, pipeline.Instances()));
+  ASSERT_TRUE(groups[2]->BindResource(0, rt_geometry.Buffer()));
+  ASSERT_TRUE(groups[3]->BindResource(0, output.Get()));
+  for (uint32_t i = 0; i < groups.size(); ++i)
+    ASSERT_TRUE(commands->CmdBindGroup(i, groups[i].Get()));
+  ASSERT_TRUE(commands->CmdDispatch(1, 1, 1));
+  rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadBuffer(output.Get(), 0, 16);
+  ASSERT_TRUE(readback);
+  rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+  ASSERT_TRUE(submitted);
+  ASSERT_TRUE(core->AcceptUpdates(updates));
+  ASSERT_TRUE(submitted->WaitHost());
   float actual[4];
-  output->DownloadData(actual, sizeof(actual));
+  ASSERT_TRUE(readback->CopyTo(actual, sizeof(actual)));
   EXPECT_FLOAT_EQ(actual[0], 0.25f);
   EXPECT_FLOAT_EQ(actual[1], 0.0f);
   EXPECT_FLOAT_EQ(actual[2], 0.5f);
@@ -866,14 +1217,46 @@ TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
   auto vfs = core->GetShadersVFS();
   for (bool spirv : {false, true}) {
     // DXIL's downstream compiler is a D3D12 dependency, not a Metal requirement.
-    if (!spirv && !graphics::SupportBackendAPI(graphics::BACKEND_API_D3D12))
+    if (!spirv && !BackendCompiled(rhi::BACKEND_API_D3D12))
       continue;
-    std::vector<std::string> args{"-I.", "-warnings-as-errors", "all"};
-    if (spirv)
-      args.insert(args.end(), {"-target", "spirv", "-profile", "spirv_1_5", "-fvk-use-dx-layout"});
+    const auto backend = spirv ? rhi::BACKEND_API_VULKAN : rhi::BACKEND_API_D3D12;
     auto compile = [&](const char *file, const char *entry, const char *target) {
+      using namespace rhi;
       SCOPED_TRACE(testing::Message() << file << " / " << entry << ", SPIR-V=" << spirv);
-      EXPECT_FALSE(graphics::CompileShader(vfs, file, entry, target, args).data.empty());
+      auto layout = sparkium::RayTracingLayout(false, 1, 1, 1);
+      ShaderStage stage = SHADER_STAGE_COMPUTE;
+      const std::string path(file), name(entry);
+      if (std::string(target) == "ps_6_0") {
+        stage = SHADER_STAGE_FRAGMENT;
+        layout.groups = {{},
+                         {{{1, BINDING_UNIFORM_BUFFER},
+                           {2, BINDING_BYTE_ADDRESS_BUFFER},
+                           {3, BINDING_TEXTURE2D, 6},
+                           {4, BINDING_SAMPLER}}},
+                         {{{0, BINDING_UNIFORM_BUFFER}}}};
+      } else if (std::string(target) == "lib_6_5") {
+        stage = path.find("camera/") == 0                    ? SHADER_STAGE_CALLABLE
+                : name == "Main"                             ? SHADER_STAGE_RAY_GENERATION
+                : name == "MissMain" || name == "ShadowMiss" ? SHADER_STAGE_MISS
+                : name == "ShadowAnyHit"                     ? SHADER_STAGE_ANY_HIT
+                                                             : SHADER_STAGE_CLOSEST_HIT;
+      } else if (path == "software/build.slang") {
+        layout.groups = {{{{0, BINDING_RW_BYTE_ADDRESS_BUFFER},
+                           {1, BINDING_BYTE_ADDRESS_BUFFER, 1},
+                           {2, BINDING_UNIFORM_BUFFER},
+                           {3, BINDING_RW_BYTE_ADDRESS_BUFFER},
+                           {4, BINDING_BYTE_ADDRESS_BUFFER}}}};
+      } else if (path == "blelloch_scan.slang") {
+        layout.groups = {{{{0, BINDING_RW_BYTE_ADDRESS_BUFFER}, {1, BINDING_UNIFORM_BUFFER}}}};
+      } else if (path == "film2img.slang") {
+        layout.groups = {{{{0, BINDING_TEXTURE2D}, {1, BINDING_TEXTURE2D}, {2, BINDING_RW_TEXTURE2D}}}};
+      }
+      ObjPtr<IShader> shader = device->CreateShader(file, entry, stage, &vfs, {"."});
+      ASSERT_TRUE(shader);
+      std::vector<uint8_t> code;
+      EXPECT_TRUE(rhi::backend::CompileSlang(shader.Get(), rhi::backend::ShaderMacroHeader(layout, backend), backend,
+                                             code, &layout));
+      EXPECT_FALSE(code.empty());
     };
     for (auto entry : {"Main", "MissMain", "ShadowMiss"})
       compile("raygen.slang", entry, "lib_6_5");
@@ -917,16 +1300,16 @@ TEST_F(SoftwareBVHTest, RasterPointLightsLeaveEmptyBackgroundUnchanged) {
   sparkium::CameraPinhole camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
                                  glm::radians(45.0f), 17.0f / 13.0f);
   sparkium::Film film(core.get(), 17, 13);
-  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION);
+  Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION);
   std::vector<glm::vec4> pixels(17 * 13);
-  film.GetRawImage()->DownloadData(pixels.data());
+  Download(film.GetRawImage(), pixels);
   for (const auto &pixel : pixels)
     for (int c = 0; c < 3; ++c)
       EXPECT_NEAR(pixel[c], 0.2f, 1e-6f);
 }
 
 TEST_F(SoftwareBVHTest, HardwareImageParity) {
-  if (!graphics->DeviceRayTracingSupport())
+  if (!device->SupportRayTracingPipeline())
     GTEST_SKIP() << "requires a hardware ray tracing device";
   std::vector<Vector3<float>> positions{{-1, -1, 0}, {1, -1, 0}, {0, 1, 0}};
   uint32_t indices[]{0, 1, 2};
@@ -942,11 +1325,11 @@ TEST_F(SoftwareBVHTest, HardwareImageParity) {
   sparkium::CameraPinhole camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
                                  glm::radians(45.0f), 1.0f);
   sparkium::Film software(core.get(), 32, 32), hardware(core.get(), 32, 32);
-  core->Render(&scene, &camera, &software, sparkium::RENDER_PIPELINE_RT_FALLBACK);
-  core->Render(&scene, &camera, &hardware, sparkium::RENDER_PIPELINE_RAY_TRACING);
+  Render(&scene, &camera, &software, sparkium::RENDER_PIPELINE_RT_FALLBACK);
+  Render(&scene, &camera, &hardware, sparkium::RENDER_PIPELINE_RAY_TRACING);
   std::vector<glm::vec4> a(1024), b(1024);
-  software.GetRawImage()->DownloadData(a.data());
-  hardware.GetRawImage()->DownloadData(b.data());
+  Download(software.GetRawImage(), a);
+  Download(hardware.GetRawImage(), b);
   double error = 0;
   for (size_t i = 0; i < a.size(); ++i)
     for (int c = 0; c < 3; ++c) {

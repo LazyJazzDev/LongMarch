@@ -1,6 +1,8 @@
-﻿#pragma once
+#pragma once
+#include <array>
 #include <list>
 #include <mutex>
+#include <vector>
 
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
@@ -14,6 +16,15 @@ LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::vulkan::IVulkanQueue,
                         "09666973-0b3a-4165-bb7f-0faf38e0f01a")
 
 namespace grassland::rhi::backend::vulkan {
+
+struct QueueSelection {
+  uint32_t graphics_family{UINT32_MAX};
+  uint32_t compute_family{UINT32_MAX};
+  uint32_t graphics_count{};
+  std::array<uint32_t, 3> indices{};
+};
+
+QueueSelection SelectQueues(const std::vector<VkQueueFamilyProperties> &families);
 
 class IVulkanQueue : public IObject {
  public:

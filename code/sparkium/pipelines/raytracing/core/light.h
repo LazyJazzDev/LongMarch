@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "sparkium/pipelines/raytracing/core/core_util.h"
 
 namespace sparkium::raytracing {
@@ -8,8 +8,9 @@ class Light : public Object {
   Light(Core *core);
   virtual ~Light() = default;
   virtual int SamplerShader(Scene *scene) = 0;
-  virtual graphics::Buffer *SamplerData() = 0;
-  virtual uint32_t SamplerPreprocess(graphics::CommandContext *cmd_ctx) = 0;
+  virtual rhi::IBuffer *SamplerData() = 0;
+  virtual uint32_t SamplerPowerOffset() const = 0;
+  virtual bool RecordPreprocess(rhi::ICommandContext *commands) = 0;
 
   operator bool() const {
     return core_ != nullptr;

@@ -94,6 +94,8 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
+  bool RequireGraphicsQueue();
+  bool compute_queue_{};
   const void *DeviceIdentity() const;
   ID3D12Queue *OwnerQueue() const;
 

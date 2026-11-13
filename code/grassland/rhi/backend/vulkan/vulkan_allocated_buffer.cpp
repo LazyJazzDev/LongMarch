@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
+#include "grassland/rhi/backend/vulkan/vulkan_allocated_buffer.h"
 
 #include <vk_mem_alloc.h>
 
@@ -51,6 +51,7 @@ IVulkanAllocatedBuffer *VulkanAllocatedBufferImpl::Create(IVulkanDevice *device,
     if (device->GetPhysicalDevice().ray_tracing_pipeline_feature)
       info.usage |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
   }
+  device->ConfigureSharing(info);
   VmaAllocationCreateInfo memory{};
   memory.usage = (upload || download) ? VMA_MEMORY_USAGE_AUTO_PREFER_HOST : VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
   if (upload)

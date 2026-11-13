@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
@@ -138,7 +138,7 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     ASSERT_EQ(vkBindBufferMemory(native, readback, memory, 0), VK_SUCCESS);
     VkCommandPool pool{};
     VkCommandBuffer commands{};
-    ASSERT_TRUE(owner->AcquireCommandResources(pool, commands));
+    ASSERT_TRUE(owner->AcquireCommandResources(QUEUE_TYPE_MAIN, pool, commands));
     VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
     barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -176,7 +176,7 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     ASSERT_EQ(vkMapMemory(native, memory, 0, sizeof(output), 0, &mapped), VK_SUCCESS);
     std::memcpy(output.data(), mapped, sizeof(output));
     vkUnmapMemory(native, memory);
-    owner->RecycleCommandResources(pool, commands);
+    owner->RecycleCommandResources(QUEUE_TYPE_MAIN, pool, commands);
     vkDestroyBuffer(native, readback, nullptr);
     vkFreeMemory(native, memory, nullptr);
   }
@@ -185,6 +185,8 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
 
 class RhiRayTracing : public testing::TestWithParam<BackendAPI> {
  protected:
+  void CheckBuildsAndQueries(QueueType queue_type);
+
   void CheckNativeErrors(IDevice *device) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
@@ -206,7 +208,7 @@ class RhiRayTracing : public testing::TestWithParam<BackendAPI> {
   }
 };
 
-TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
+void RhiRayTracing::CheckBuildsAndQueries(QueueType queue_type) {
   const auto api = GetParam();
   ObjPtr<ICore> core = CreateCore(api, {true});
   ASSERT_TRUE(core);
@@ -215,7 +217,7 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
   if (!device)
     GTEST_SKIP() << "Ray query unavailable";
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> queue = device->GetQueue(queue_type);
   ASSERT_TRUE(queue);
   BottomLevelAccelerationStructureDesc desc;
   desc.geometries = {{3}};
@@ -231,7 +233,7 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
   RayTracingInstance instance;
   instance.blas = blas.Get();
   instance.disable_triangle_culling = true;
-  ObjPtr<ICommandContext> build = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+  ObjPtr<ICommandContext> build = ObjPtr<IQueue>(device->GetQueue(queue_type))->CreateCommandContext();
   ASSERT_TRUE(build);
   ASSERT_TRUE(build->CmdUploadBuffer(vertices.Get(), 0, positions, sizeof(positions)));
   ASSERT_TRUE(build->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{vertices.Get()}, {}}}));
@@ -247,7 +249,7 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
   ASSERT_GT(desc.compacted_size, 0u);
   ObjPtr<IBottomLevelAccelerationStructure> compact = device->CreateBottomLevelAccelerationStructure(desc);
   ASSERT_TRUE(compact);
-  build = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+  build = ObjPtr<IQueue>(device->GetQueue(queue_type))->CreateCommandContext();
   ASSERT_TRUE(build);
   ASSERT_TRUE(build->CmdCompactAccelerationStructure(blas.Get(), compact.Get()));
   instance.blas = compact.Get();
@@ -263,7 +265,7 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
   ASSERT_GT(top_desc.compacted_size, 0u);
   ObjPtr<ITopLevelAccelerationStructure> compact_top = device->CreateTopLevelAccelerationStructure(top_desc);
   ASSERT_TRUE(compact_top);
-  build = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+  build = ObjPtr<IQueue>(device->GetQueue(queue_type))->CreateCommandContext();
   ASSERT_TRUE(build);
   ASSERT_TRUE(build->CmdCompactAccelerationStructure(tlas.Get(), compact_top.Get()));
   token = build->Submit();
@@ -279,7 +281,7 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
     ObjPtr<IBottomLevelAccelerationStructure> replacement =
         device->CreateBottomLevelAccelerationStructure(replacement_desc);
     ASSERT_TRUE(replacement);
-    ObjPtr<ICommandContext> abandoned = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+    ObjPtr<ICommandContext> abandoned = ObjPtr<IQueue>(device->GetQueue(queue_type))->CreateCommandContext();
     ASSERT_TRUE(abandoned);
     auto next_instance = instance;
     next_instance.blas = replacement.Get();
@@ -336,7 +338,7 @@ void CSMain() {
   ASSERT_TRUE(group->BindResource(0, tlas.Get()));
   ASSERT_TRUE(group->BindResource(1, output.Get()));
   for (int frame = 0; frame < 2; ++frame) {
-    build = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
+    build = ObjPtr<IQueue>(device->GetQueue(queue_type))->CreateCommandContext();
     ASSERT_TRUE(build);
     instance.transform[3] = frame ? 5.0f : 0.0f;
     ASSERT_TRUE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {instance}, ACCELERATION_STRUCTURE_UPDATE));
@@ -353,6 +355,14 @@ void CSMain() {
   }
   compact.Release();
   CheckNativeErrors(device.Get());
+}
+
+TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
+  CheckBuildsAndQueries(QUEUE_TYPE_MAIN);
+}
+
+TEST_P(RhiRayTracing, ComputeQueueBuildsUpdatesCompactsAndQueriesRetainedGeometry) {
+  CheckBuildsAndQueries(QUEUE_TYPE_COMPUTE);
 }
 
 TEST_P(RhiRayTracing, ProceduralQueriesUseArraysMasksAndCapturedBindings) {

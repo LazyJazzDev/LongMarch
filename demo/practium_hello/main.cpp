@@ -1,207 +1,254 @@
-﻿#include <long_march.h>
+#include <imgui.h>
 
-#include <random>
+#include <chrono>
+#include <filesystem>
+#include <iostream>
+#include <limits>
+#include <stdexcept>
 
-#include "glm/gtc/matrix_transform.hpp"
+#include "practium_scene.h"
+#include "sparkium/core/render_worker.h"
+#include "sparkium/sparkium.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
-using namespace long_march;
+namespace {
+grassland::rhi::BackendAPI ParseBackend(const std::string &name) {
+  using namespace grassland::rhi;
+  BackendAPI api;
+  if (name == "auto")
+    api = BACKEND_API_DEFAULT;
+  else if (name == "metal")
+    api = BACKEND_API_METAL;
+  else if (name == "vulkan")
+    api = BACKEND_API_VULKAN;
+  else if (name == "d3d12")
+    api = BACKEND_API_D3D12;
+  else
+    throw std::invalid_argument("unknown RHI backend: " + name);
+  return api;
+}
+}  // namespace
 
-class AreaLight {
-  const uint32_t indices[6] = {0, 2, 1, 0, 3, 2};
-  const Vector3<float> vertices[4] = {{-1.0f, -1.0f, 0.0f},
-                                      {1.0f, -1.0f, 0.0f},
-                                      {1.0f, 1.0f, 0.0f},
-                                      {-1.0f, 1.0f, 0.0f}};
+using namespace grassland;
 
- public:
-  AreaLight(sparkium::Core *core,
-            const glm::vec3 &emission = {1.0f, 1.0f, 1.0f},
-            float size = 1.0f,
-            const glm::vec3 &position = {0.0f, 0.0f, 0.0f},
-            const glm::vec3 &direction = {0.0f, 0.0f, 1.0f},
-            const glm::vec3 &up = {0.0f, 1.0f, 0.0f})
-      : light_(core, emission, false, false),
-        emission(light_.emission),
-        position(position),
-        size(size),
-        direction(direction),
-        up(up) {
-    mesh_ = std::make_unique<sparkium::GeometryMesh>(core, Mesh<>{4, 6, indices, vertices});
-    entity_geometry_material_ = std::make_unique<sparkium::EntityGeometryMaterial>(core, mesh_.get(), &light_);
-    Sync();
-  }
-
-  void Sync() {
-    entity_geometry_material_->SetTransformation(glm::inverse(glm::lookAt(position, position + direction, up)) *
-                                                 glm::scale(glm::mat4{1.0f}, glm::vec3{size}));
-  }
-
-  operator sparkium::Entity *() {
-    return entity_geometry_material_.get();
-  }
-
-  glm::vec3 &emission;
-  float size{1.0f};
-  glm::vec3 position{0.0f, 0.0f, 0.0f};
-  glm::vec3 direction{0.0f, -1.0f, 0.0f};
-  glm::vec3 up{0.0f, 1.0f, 0.0f};
-
-  std::unique_ptr<sparkium::EntityGeometryMaterial> entity_geometry_material_;
-
- private:
-  std::unique_ptr<sparkium::GeometryMesh> mesh_;
-  sparkium::MaterialLight light_;
-};
-
-int main() {
-  std::unique_ptr<graphics::Core> core_;
-
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
-
-  practium::Core practium_core(core_.get());
-
-  practium::Scene scene(&practium_core);
-
-  Mesh<> cube_mesh;
-  cube_mesh.LoadObjFile(FindAssetFile("meshes/cube.obj"));
-
-  Mesh<> sphere_mesh = Mesh<>::Sphere(30);
-  Mesh<> sphere_collision = Mesh<>::Sphere(10);
-
-  Matrix<float, 3, 4> transform;
-  transform << 100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100.0f, 0.0f;
-  sparkium::MaterialPrincipled ground_surface(practium_core.GetRenderCore(), {0.8f, 0.8f, 0.8f});
-  practium::ModelMesh ground_model(&practium_core, cube_mesh.Transformed(transform), &ground_surface);
-  practium::MaterialPBDRigid ground_material(&practium_core, 0.0f, 0.0f, true);
-  auto ground_entity = scene.AddEntity(&ground_model, &ground_material);
-  auto ground_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(ground_entity.get());
-  ground_pbd_entity->SetPosition({0.0f, -101.0f, 0.0f});
-
-  sparkium::MaterialPrincipled wall_surface0(practium_core.GetRenderCore(), {0.8f, 0.8f, 0.8f});
-  wall_surface0.roughness = 0.3f;
-  wall_surface0.specular = 1.0f;
-  ground_model.material_ = &wall_surface0;
-  auto wall_entity0 = scene.AddEntity(&ground_model, &ground_material);
-  auto wall_pbd_entity0 = dynamic_cast<practium::EntityPBDRigid *>(wall_entity0.get());
-  wall_pbd_entity0->SetPosition({102.0f, 0.0f, 0.0f});
-
-  sparkium::MaterialPrincipled wall_surface1(practium_core.GetRenderCore(), {0.8f, 0.8f, 0.8f});
-  wall_surface1.roughness = 0.3f;
-  wall_surface1.specular = 1.0f;
-  ground_model.material_ = &wall_surface1;
-  auto wall_entity1 = scene.AddEntity(&ground_model, &ground_material);
-  auto wall_pbd_entity1 = dynamic_cast<practium::EntityPBDRigid *>(wall_entity1.get());
-  wall_pbd_entity1->SetPosition({0.0f, 0.0f, -102.0f});
-
-  const int num_spheres = 32;
-  std::unique_ptr<practium::Entity> sphere_entities[num_spheres];
-  std::unique_ptr<sparkium::MaterialPrincipled> sphere_surfaces[num_spheres];
-
-  std::mt19937 rng{1234567};
-  for (int i = 0; i < num_spheres; i++) {
-    Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
-                            std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng)};
-    transform << 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f;
-
-    sphere_surfaces[i] = std::make_unique<sparkium::MaterialPrincipled>(
-        practium_core.GetRenderCore(), glm::vec3{std::uniform_real_distribution<float>(0.0f, 1.0f)(rng),
-                                                 std::uniform_real_distribution<float>(0.0f, 1.0f)(rng),
-                                                 std::uniform_real_distribution<float>(0.0f, 1.0f)(rng)} *
-                                               0.5f +
-                                           0.5f);
-    sphere_surfaces[i]->roughness = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
-    sphere_surfaces[i]->metallic = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
-    sphere_surfaces[i]->specular = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
-    if ((i & 3) == 3) {
-      sphere_surfaces[i]->emission_color = sphere_surfaces[i]->base_color;
-      sphere_surfaces[i]->emission_strength = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng) * 5.0f;
-    }
-
-    practium::ModelMesh sphere_model(&practium_core, sphere_mesh.Transformed(transform),
-                                     sphere_collision.Transformed(transform), sphere_surfaces[i].get());
-    practium::MaterialPBDRigid sphere_material(&practium_core);
-    auto &sphere_entity = sphere_entities[i];
-    sphere_entity = scene.AddEntity(&sphere_model, &sphere_material);
-    // dynamic cast to EntityPBDRigid
-    auto sphere_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(sphere_entity.get());
-    sphere_pbd_entity->SetPosition(position);
-    sphere_pbd_entity->SetMass(0.03351f);
-    sphere_pbd_entity->SetInertia(0.000536f);
-    sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
-  }
-
-  graphics::Extent2D extent{640, 480};
-
-  sparkium::Film film(practium_core.GetRenderCore(), extent.width, extent.height);
-  scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 32;
-  sparkium::CameraPinhole camera(
-      practium_core.GetRenderCore(),
-      glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
-      glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
-
-  std::unique_ptr<graphics::Image> srgb_image;
-  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
-
-  std::unique_ptr<graphics::Window> window;
-  core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Practium Hello", &window);
-
-  AreaLight area_light(practium_core.GetRenderCore(), glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
-                       glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
-  area_light.emission = glm::vec3{1000.0f};
-  scene.GetRenderScene()->AddEntity(area_light);
-
-  bool ray_tracing = false;
-  bool pause = true;
-  bool day_light = true;
-  window->InitImGui(nullptr, 20.0f);
-
-  while (!window->ShouldClose()) {
-    if (!pause) {
-      scene.Step();
-      film.info.persistence = 0.98f;
-    } else {
-      film.info.persistence = 1.0f;
-    }
-
-    window->BeginImGuiFrame();
-    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
-    ImGui::SetNextWindowBgAlpha(0.3);
-    ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-    if (ImGui::Checkbox("Day Light", &day_light)) {
-      scene.GetRenderScene()->SetEntityActive(area_light, day_light);
-    }
-    ImGui::Checkbox("Pause", &pause);
-    ImGui::Checkbox("Ray Tracing", &ray_tracing);
-    if (ray_tracing && !core_->DeviceRayTracingSupport()) {
-      ImGui::Text("Ray Tracing not supported on this device!");
-    }
-    if (ImGui::Button("Reset")) {
-      for (int i = 0; i < num_spheres; i++) {
-        Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
-                                std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng)};
-        auto sphere_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(sphere_entities[i].get());
-        sphere_pbd_entity->SetPosition(position);
-        sphere_pbd_entity->SetVelocity({0.0f, 0.0f, 0.0f});
-        sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
+int main(int argc, char **argv) {
+  try {
+    auto backend = rhi::BACKEND_API_DEFAULT;
+    bool headless = false;
+    PractiumDemoScene::Settings settings;
+    int frames = 0;
+    std::filesystem::path output;
+    for (int i = 1; i < argc; ++i) {
+      const std::string arg = argv[i];
+      if (arg == "--help") {
+        std::cout
+            << "Practium Hello\n--backend auto|metal|vulkan|d3d12 --frames N --headless --ray-tracing --run --output image.png\n";
+        return 0;
+      } else if (arg == "--backend" && i + 1 < argc)
+        backend = ParseBackend(argv[++i]);
+      else if (arg == "--frames" && i + 1 < argc) {
+        frames = std::stoi(argv[++i]);
+        if (frames <= 0) {
+          std::cerr << "--frames must be positive\n";
+          return 2;
+        }
+      } else if (arg == "--headless")
+        headless = true;
+      else if (arg == "--ray-tracing")
+        settings.ray_tracing = true;
+      else if (arg == "--run")
+        settings.pause = false;
+      else if (arg == "--output" && i + 1 < argc)
+        output = argv[++i];
+      else {
+        std::cerr << "unknown or incomplete argument: " << arg << '\n';
+        return 2;
       }
     }
-    ImGui::End();
-    window->EndImGuiFrame();
+    if (frames > std::numeric_limits<int>::max() / 32) {
+      std::cerr << "--frames is too large\n";
+      return 2;
+    }
+    if (headless && frames == 0) {
+      std::cerr << "--headless requires --frames\n";
+      return 2;
+    }
 
-    scene.SyncRenderState();
-    practium_core.GetRenderCore()->Render(
-        scene.GetRenderScene(), &camera, &film,
-        ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
-    film.Develop(srgb_image.get());
-
-    std::unique_ptr<graphics::CommandContext> cmd_ctx;
-    core_->CreateCommandContext(&cmd_ctx);
-    cmd_ctx->CmdPresent(window.get(), srgb_image.get());
-    core_->SubmitCommandContext(cmd_ctx.get());
-
-    grassland::graphics::Window::PollEvents();
+    rhi::ObjPtr<rhi::ICore> rhi_core = rhi::CreateCore(backend);
+    if (!rhi_core)
+      return 1;
+    rhi::ObjPtr<rhi::IDevice> device = rhi_core->CreateDeviceByAutoSelection();
+    if (!device)
+      return 1;
+    constexpr int width = 640, height = 480;
+    int sample_limit = frames * (settings.ray_tracing ? 32 : 1);
+    rhi::ObjPtr<rhi::IQueue> queue = device->GetQueue(rhi::QUEUE_TYPE_MAIN);
+    if (!queue)
+      return 1;
+    int ui_redraw_frames = 2;
+    rhi::ObjPtr<rhi::IWindow> window;
+    if (!headless) {
+      window = device->CreateGLFWWindow({width, height, "Practium Hello", rhi::PRESENT_MODE_CONTINUOUS});
+      if (!window || !window->EnableImGui(true, nullptr, 20.0f))
+        return 1;
+      auto invalidate_ui = [&ui_redraw_frames](auto...) { ui_redraw_frames = 2; };
+      window->ResizeEvent().RegisterCallback(invalidate_ui);
+      window->FramebufferResizeEvent().RegisterCallback(invalidate_ui);
+      window->FocusEvent().RegisterCallback(invalidate_ui);
+      window->CursorEnterEvent().RegisterCallback(invalidate_ui);
+      window->MouseMoveEvent().RegisterCallback(invalidate_ui);
+      window->MouseButtonEvent().RegisterCallback(invalidate_ui);
+      window->ScrollEvent().RegisterCallback(invalidate_ui);
+      window->KeyEvent().RegisterCallback(invalidate_ui);
+      window->CharEvent().RegisterCallback(invalidate_ui);
+    }
+    using Worker = sparkium::RenderWorker<PractiumDemoScene>;
+    Worker worker([device = device.Get()] { return PractiumDemoScene::Create(device); }, settings, sample_limit, false,
+                  settings.ray_tracing ? 32 : 1,
+                  [interactive = !headless] {
+                    if (interactive)
+                      glfwPostEmptyEvent();
+                  });
+    uint64_t requested_revision = 1;
+    std::shared_ptr<const Worker::Frame> frame;
+    std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> ui_pending;
+    size_t ui_index{};
+    const auto *mode = window ? glfwGetVideoMode(glfwGetPrimaryMonitor()) : nullptr;
+    const int refresh_rate = mode && mode->refreshRate > 0 ? mode->refreshRate : 60;
+    const auto presentation_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+        std::chrono::duration<double>(1.0 / refresh_rate));
+    auto next_presentation = std::chrono::steady_clock::now();
+    if (headless) {
+      frame = worker.WaitForFrame(requested_revision, sample_limit);
+      if (!frame) {
+        std::cerr << worker.GetState().error << '\n';
+        return 1;
+      }
+    } else {
+      while (!window->ShouldClose() &&
+             (!sample_limit || !frame || frame->revision != requested_revision || frame->samples < sample_limit)) {
+        if (!rhi::PollEvents())
+          return 1;
+        const auto state = worker.GetState();
+        if (!state.error.empty()) {
+          std::cerr << state.error << '\n';
+          return 1;
+        }
+        const auto now = std::chrono::steady_clock::now();
+        if (now < next_presentation) {
+          glfwWaitEventsTimeout(std::min(0.01, std::chrono::duration<double>(next_presentation - now).count()));
+          continue;
+        }
+        auto &completion = ui_pending[ui_index % ui_pending.size()];
+        if (completion && completion->GetStatus() == rhi::SUBMISSION_STATUS_PENDING) {
+          glfwWaitEventsTimeout(0.001);
+          continue;
+        }
+        if (completion && completion->GetStatus() != rhi::SUBMISSION_STATUS_COMPLETED)
+          return 1;
+        if (!window->UpdateImGui([&] {
+              ImGui::GetIO().IniFilename = nullptr;
+              bool changed = false;
+              ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+              ImGui::SetNextWindowBgAlpha(0.3f);
+              ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+              changed |= ImGui::Checkbox("Day Light", &settings.day_light);
+              changed |= ImGui::Checkbox("Pause", &settings.pause);
+              changed |= ImGui::Checkbox("Ray Tracing", &settings.ray_tracing);
+              if (settings.ray_tracing && !device->SupportRayTracingPipeline() && !device->SupportRayQuery())
+                ImGui::Text("Ray Tracing not supported on this device!");
+              if (ImGui::Button("Reset")) {
+                ++settings.reset_sequence;
+                changed = true;
+              }
+              ImGui::End();
+              if (changed) {
+                sample_limit = frames * (settings.ray_tracing ? 32 : 1);
+                requested_revision = worker.Configure(settings, sample_limit, false, settings.ray_tracing ? 32 : 1);
+              }
+              if (changed || ImGui::IsAnyItemActive())
+                ui_redraw_frames = 2;
+            }))
+          return 1;
+        if (window->IsSwapChainInvalid()) {
+          ui_redraw_frames = 2;
+          if (!window->RebuildSwapChain())
+            return 1;
+        }
+        if (window->IsSwapChainInvalid()) {
+          glfwWaitEventsTimeout(0.01);
+          continue;
+        }
+        auto latest = worker.Latest();
+        // Input keeps the UI responsive while an unchanged completed image
+        // does not need another cross-queue presentation submission.
+        if (!ui_redraw_frames && latest == frame) {
+          // An idle poll must not postpone a newly completed image or input.
+          // Only an actual presentation advances the pacing deadline.
+          glfwWaitEventsTimeout(std::chrono::duration<double>(presentation_interval).count());
+          continue;
+        }
+        frame = std::move(latest);
+        rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+        if (!commands)
+          return 1;
+        rhi::SubmitInfo dependencies;
+        if (frame) {
+          dependencies.waits.push_back(frame->rendered->GetEvent());
+          if (!commands->CmdPresentImage(window.Get(), frame->Image(), rhi::COLOR_SPACE_SRGB_NONLINEAR))
+            return 1;
+        } else {
+          rhi::ObjPtr<rhi::IImage> background = window->GetNextImage();
+          if (!background || !commands->CmdClearImage(background.Get(), {0.0f, 0.0f, 0.0f, 1.0f}) ||
+              !commands->CmdPresent(window.Get()))
+            return 1;
+        }
+        completion = commands->Submit(dependencies);
+        if (!completion)
+          return 1;
+        if (frame)
+          worker.Presented(frame, completion);
+        if (ui_redraw_frames)
+          --ui_redraw_frames;
+        ++ui_index;
+        next_presentation = std::chrono::steady_clock::now() + presentation_interval;
+      }
+    }
+    if (window && window->ShouldClose())
+      glfwHideWindow(window->GLFWWindow());
+    worker.Stop();
+    if (const auto state = worker.GetState(); !state.error.empty()) {
+      std::cerr << state.error << '\n';
+      return 1;
+    }
+    frame = worker.Latest();
+    for (const auto &completion : ui_pending)
+      if (completion && !completion->WaitHost())
+        return 1;
+    if (!output.empty()) {
+      if (!frame)
+        return 1;
+      if (output.has_parent_path())
+        std::filesystem::create_directories(output.parent_path());
+      std::vector<uint8_t> pixels(width * height * 4);
+      rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
+      if (!commands)
+        return 1;
+      rhi::ObjPtr<rhi::IDownloadToken> readback = commands->CmdDownloadImage(frame->Image());
+      rhi::SubmitInfo dependencies;
+      dependencies.waits.push_back(frame->rendered->GetEvent());
+      rhi::ObjPtr<rhi::ISubmissionToken> downloaded = commands->Submit(dependencies);
+      if (!readback || !downloaded || !downloaded->WaitHost() || !readback->CopyTo(pixels.data(), pixels.size()))
+        return 1;
+      if (!stbi_write_png(output.string().c_str(), width, height, 4, pixels.data(), width * 4)) {
+        std::cerr << "cannot save output image\n";
+        return 1;
+      }
+    }
+    return 0;
+  } catch (const std::exception &error) {
+    std::cerr << "practium_hello: " << error.what() << '\n';
+    return 1;
   }
-
-  return 0;
 }

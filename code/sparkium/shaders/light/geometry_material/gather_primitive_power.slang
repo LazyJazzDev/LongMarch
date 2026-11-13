@@ -5,9 +5,9 @@
 #define GROUP_SIZE 64
 groupshared float group_element[GROUP_SIZE];
 
-ByteAddressBuffer geometry_data : register(t0, space0);
-ByteAddressBuffer material_data : register(t0, space1);
-RWByteAddressBuffer direct_lighting_sampler_data : register(u0, space2);
+RHI_BYTE_ADDRESS_BUFFER(0, 0, geometry_data);
+RHI_BYTE_ADDRESS_BUFFER(0, 1, material_data);
+RHI_RW_BYTE_ADDRESS_BUFFER(0, 2, direct_lighting_sampler_data);
 
 // clang-format off
 #include "geometry_sampler.slang"

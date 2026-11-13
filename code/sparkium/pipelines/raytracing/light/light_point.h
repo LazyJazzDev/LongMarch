@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "sparkium/pipelines/raytracing/core/light.h"
 
 namespace sparkium::raytracing {
@@ -14,8 +14,9 @@ class LightPoint : public Light {
              float &sampling_weight);
 
   int SamplerShader(Scene *scene) override;
-  graphics::Buffer *SamplerData() override;
-  uint32_t SamplerPreprocess(graphics::CommandContext *cmd_ctx) override;
+  rhi::IBuffer *SamplerData() override;
+  uint32_t SamplerPowerOffset() const override;
+  bool RecordPreprocess(rhi::ICommandContext *commands) override;
 
   glm::vec3 &position;
   glm::vec3 &color;
@@ -25,7 +26,7 @@ class LightPoint : public Light {
   float &sampling_weight;
 
  private:
-  std::unique_ptr<graphics::Buffer> direct_lighting_sampler_data_;
+  rhi::ObjPtr<rhi::IBuffer> direct_lighting_sampler_data_;
 };
 
 }  // namespace sparkium::raytracing

@@ -1,5 +1,10 @@
 # Sparkium fallback 性能分析（2026-09-16）
 
+> Historical report: built-in profiling and its CSV/script interfaces have been removed.
+> Commands and measurements below describe the earlier implementation at
+> [`b99233dc`](https://github.com/LazyJazzDev/LongMarch/tree/b99233dceffedba57c97770e37b2fd902da18c8b).
+> Use Nsight for new profiling; these timings are not current validation results.
+
 > 以下为分支拆分前、包含 Blender 扩展的实现所测历史数据，尚未针对独立后的 fallback 重新测量。
 
 主要耗时集中在 **路径追踪 compute kernel**。512×512、8 spp 时，该阶段占整帧约 90%–98%；128×128、1 spp 时，频繁的同步小 buffer 上传成为主要开销。

@@ -118,13 +118,14 @@ wall times include scene loading and shader compilation and are not benchmarks.
   software and native traversal. Monte Carlo path divergence prevents a general
   promise of bit-identical output.
 
-## Frame profiling
+## Profiling
 
-Use `--frames 24 --profile timings.csv` with the CLI for optional Vulkan GPU
-timestamps and host wall-time scopes. `scripts/profile_rt_fallback.py` runs the
-six basic scenes with warmup exclusion and produces CSV / JSON results.
-See [the M5 performance analysis](rt-fallback-profile.md) for measurements,
-profiling overhead checks, and the distinction between GPU work and host waits.
+Use NVIDIA Nsight for performance analysis. Built-in timing scopes, timestamp
+queries and profiling CSV options have been removed. Capture the complete frame,
+including CPU submission/waits, uploads, rendering, development and presentation.
+The CLI develops its final image once after `--frames N`; use the GUI to measure
+interactive frames with development and presentation on every frame.
+Historical measurements remain in [the M5 analysis](rt-fallback-profile.md).
 
 ## Native Apple Silicon backend
 

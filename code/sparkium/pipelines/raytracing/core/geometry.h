@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "sparkium/pipelines/raytracing/core/core_util.h"
 
 namespace sparkium::raytracing {
@@ -8,8 +8,8 @@ class Geometry : public Object {
   Geometry(Core *core);
   virtual ~Geometry() = default;
 
-  virtual graphics::Buffer *Buffer() = 0;
-  virtual graphics::AccelerationStructure *BLAS() = 0;
+  virtual rhi::IBuffer *Buffer() = 0;
+  virtual rhi::IBottomLevelAccelerationStructure *BLAS() = 0;
   virtual const CodeLines &ClosestHitShaderImpl() const = 0;
   virtual int PrimitiveCount() = 0;
   virtual const CodeLines &SamplerImpl() const = 0;

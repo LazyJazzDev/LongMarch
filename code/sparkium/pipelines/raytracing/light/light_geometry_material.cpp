@@ -1,4 +1,4 @@
-﻿#include "sparkium/pipelines/raytracing/light/light_geometry_material.h"
+#include "sparkium/pipelines/raytracing/light/light_geometry_material.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"
@@ -16,12 +16,15 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
       geometry_(geometry),
       material_(material),
       transform(transform) {
-  core_->GraphicsCore()->CreateBuffer(
-      sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float), graphics::BUFFER_TYPE_STATIC,
-      &direct_lighting_sampler_data_);
+  direct_lighting_sampler_data_ = core_->GetDevice()->CreateBuffer(
+      {sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float)});
 
   gather_primitive_power_program_ =
       core_->GetGeometryLightPowerProgram(geometry_->SamplerImpl(), material_->EvaluatorImpl());
+  if (!direct_lighting_sampler_data_ || !gather_primitive_power_program_) {
+    core_->ReportFailure("failed to create geometry light resources");
+    return;
+  }
   uint32_t primitive_count = geometry_->PrimitiveCount();
   uint32_t group_size = 64;
 
@@ -31,18 +34,29 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
     metadata = {metadata.offset + (group_size - 1) * metadata.stride, metadata.stride * group_size,
                 metadata.element_count / group_size};
   }
-  core_->GraphicsCore()->CreateBuffer(std::max<size_t>(1, metadatas_.size()) * sizeof(BlellochScanMetadata),
-                                      graphics::BUFFER_TYPE_STATIC, &metadata_buffer_);
+  metadata_buffer_ =
+      core_->GetDevice()->CreateBuffer({std::max<size_t>(1, metadatas_.size()) * sizeof(BlellochScanMetadata)});
   if (!metadatas_.empty())
-    metadata_buffer_->UploadData(metadatas_.data(), metadatas_.size() * sizeof(BlellochScanMetadata));
+    core_->QueueUpload(metadata_buffer_.Get(), metadatas_.data(), metadatas_.size() * sizeof(BlellochScanMetadata));
 
-  direct_lighting_sampler_data_->UploadData(&transform, sizeof(glm::mat4x3), 0);
-  direct_lighting_sampler_data_->UploadData(&primitive_count, sizeof(uint32_t), sizeof(glm::mat4x3));
+  core_->QueueUpload(direct_lighting_sampler_data_.Get(), &transform, sizeof(glm::mat4x3), 0);
+  core_->QueueUpload(direct_lighting_sampler_data_.Get(), &primitive_count, sizeof(uint32_t), sizeof(glm::mat4x3));
   blelloch_scan_up_program_ = core_->GetComputeProgram("blelloch_scan_up");
   blelloch_scan_down_program_ = core_->GetComputeProgram("blelloch_scan_down");
+  if (!metadata_buffer_ || !blelloch_scan_up_program_ || !blelloch_scan_down_program_) {
+    core_->ReportFailure("failed to create geometry light scan resources");
+    return;
+  }
+  gather_group_ =
+      core_->GetDevice()->CreateBindingGroup(gather_primitive_power_program_->GetDesc().pipeline_layout.groups[0]);
+  scan_group_ = core_->GetDevice()->CreateBindingGroup(blelloch_scan_up_program_->GetDesc().pipeline_layout.groups[0]);
+  if (!gather_group_ || !scan_group_)
+    core_->ReportFailure("failed to create geometry light bindings");
 }
 
 int LightGeometryMaterial::SamplerShader(Scene *scene) {
+  if (!core_->IsValid())
+    return -1;
   if (dynamic_cast<GeometryMesh *>(geometry_)) {
     if (dynamic_cast<MaterialLight *>(material_)) {
       return 0x1000001;
@@ -62,45 +76,72 @@ int LightGeometryMaterial::SamplerShader(Scene *scene) {
     auto vfs = core_->GetShadersVFS();
     vfs.WriteFile("geometry_sampler.slang", geometry_->SamplerImpl());
     vfs.WriteFile("material_evaluator.slang", material_->EvaluatorImpl());
-    if (core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.slang",
-                                            "SampleDirectLightingCallable", "lib_6_5", {"-I."},
-                                            &direct_lighting_sampler_) != 0)
-      throw std::runtime_error("failed to compile geometry light callable");
+    direct_lighting_sampler_ =
+        core_->GetDevice()->CreateShader("light/geometry_material/direct_lighting_sampler.slang",
+                                         "SampleDirectLightingCallable", rhi::SHADER_STAGE_CALLABLE, &vfs, {"."}, {});
+    if (!direct_lighting_sampler_) {
+      core_->ReportFailure("failed to compile geometry light callable");
+      return -1;
+    }
   }
-  return scene->RegisterCallableShader(direct_lighting_sampler_.get());
+  return scene->RegisterCallableShader(direct_lighting_sampler_.Get());
 }
 
-graphics::Buffer *LightGeometryMaterial::SamplerData() {
-  direct_lighting_sampler_data_->UploadData(&transform, sizeof(glm::mat4x3), 0);
-  return direct_lighting_sampler_data_.get();
+rhi::IBuffer *LightGeometryMaterial::SamplerData() {
+  core_->QueueUpload(direct_lighting_sampler_data_.Get(), &transform, sizeof(glm::mat4x3), 0);
+  return direct_lighting_sampler_data_.Get();
 }
 
-uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_context) {
+bool LightGeometryMaterial::RecordPreprocess(rhi::ICommandContext *cmd_context) {
+  if (!core_->IsValid() || !cmd_context || !gather_group_ || !scan_group_)
+    return false;
   uint32_t group_size = 64;
-  cmd_context->CmdBindComputeProgram(gather_primitive_power_program_);
-  cmd_context->CmdBindResources(0, {geometry_->Buffer()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(1, {material_->Buffer()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(2, {direct_lighting_sampler_data_.get()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdDispatch((geometry_->PrimitiveCount() + 63) / 64, 1, 1);
-  cmd_context->CmdBindComputeProgram(blelloch_scan_up_program_);
-  cmd_context->CmdBindResources(0, {direct_lighting_sampler_data_.get()}, graphics::BIND_POINT_COMPUTE);
+  if (!cmd_context->CmdBindComputeProgram(gather_primitive_power_program_))
+    return false;
+  if (!gather_group_->BindResource(0, geometry_->Buffer()))
+    return false;
+  if (!gather_group_->BindResource(1, material_->Buffer()))
+    return false;
+  if (!gather_group_->BindResource(2, direct_lighting_sampler_data_.Get()))
+    return false;
+  if (!cmd_context->CmdBindGroup(0, gather_group_.Get()))
+    return false;
+  if (!cmd_context->CmdDispatch((geometry_->PrimitiveCount() + 63) / 64, 1, 1))
+    return false;
+  if (!cmd_context->CmdBindComputeProgram(blelloch_scan_up_program_))
+    return false;
+  if (!scan_group_->BindResource(0, direct_lighting_sampler_data_.Get()))
+    return false;
 
   for (size_t i = 1; i < metadatas_.size(); i++) {
-    cmd_context->CmdBindResources(1, {metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},
-                                  graphics::BIND_POINT_COMPUTE);
-    cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1);
+    if (!scan_group_->BindResource(
+            1, rhi::BufferView{metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i, sizeof(BlellochScanMetadata)}))
+      return false;
+    if (!cmd_context->CmdBindGroup(0, scan_group_.Get()))
+      return false;
+    if (!cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1))
+      return false;
   }
 
-  cmd_context->CmdBindComputeProgram(blelloch_scan_down_program_);
+  if (!cmd_context->CmdBindComputeProgram(blelloch_scan_down_program_))
+    return false;
 
   for (size_t i = metadatas_.size() - 1; i < metadatas_.size(); i--) {
     if (metadatas_[i].element_count < group_size) {
       continue;
     }
-    cmd_context->CmdBindResources(1, {metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},
-                                  graphics::BIND_POINT_COMPUTE);
-    cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1);
+    if (!scan_group_->BindResource(
+            1, rhi::BufferView{metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i, sizeof(BlellochScanMetadata)}))
+      return false;
+    if (!cmd_context->CmdBindGroup(0, scan_group_.Get()))
+      return false;
+    if (!cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1))
+      return false;
   }
+  return true;
+}
+
+uint32_t LightGeometryMaterial::SamplerPowerOffset() const {
   return sizeof(glm::mat4x3) + sizeof(uint32_t) + (geometry_->PrimitiveCount() - 1) * sizeof(float);
 }
 }  // namespace sparkium::raytracing

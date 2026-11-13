@@ -5,6 +5,7 @@
 #include "sparkium/core/film.h"
 #include "sparkium/core/geometry.h"
 #include "sparkium/core/material.h"
+#include "sparkium/core/renderer.h"
 #include "sparkium/core/scene.h"
 #include "sparkium/entity/entities.h"
 #include "sparkium/geometry/geometries.h"

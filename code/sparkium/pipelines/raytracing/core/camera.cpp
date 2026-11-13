@@ -1,8 +1,7 @@
-﻿#include "sparkium/pipelines/raytracing/core/camera.h"
-
-#include <stdexcept>
+#include "sparkium/pipelines/raytracing/core/camera.h"
 
 #include "sparkium/camera/cameras.h"
+#include "sparkium/core/render_layout.h"
 #include "sparkium/pipelines/raytracing/camera/camera_pinhole.h"
 #include "sparkium/pipelines/raytracing/camera/camera_thin_lens.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
@@ -15,13 +14,25 @@ Camera::Camera(Core *core, const std::string &shader_file, const std::string &en
       entry_point_(entry_point) {
 }
 
-graphics::Shader *Camera::Shader() {
-  if (!camera_shader_ && core_->GraphicsCore()->DeviceRayTracingSupport()) {
-    if (core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), shader_file_, entry_point_, "lib_6_5",
-                                            &camera_shader_))
-      throw std::runtime_error("failed to compile camera shader");
+rhi::IShader *Camera::Shader() {
+  if (!core_->IsValid())
+    return nullptr;
+  if (!camera_shader_ && core_->GetDevice()->SupportRayTracingPipeline()) {
+    auto shaders_vfs = core_->GetShadersVFS();
+    camera_shader_ = core_->GetDevice()->CreateShader(shader_file_, entry_point_, rhi::SHADER_STAGE_CALLABLE,
+                                                      &shaders_vfs, {"."}, {});
+    if (!camera_shader_) {
+      core_->ReportFailure("failed to compile camera shader");
+      return nullptr;
+    }
   }
-  return camera_shader_.get();
+  return camera_shader_.Get();
+}
+
+rhi::IBindingGroup *Camera::Bindings() {
+  if (!bindings_)
+    bindings_ = core_->GetDevice()->CreateBindingGroup(RayTracingLayout(false, 1, 1, 1).groups[SPARKIUM_GROUP_CAMERA]);
+  return bindings_ && bindings_->BindResource(SPARKIUM_CAMERA_DATA, Buffer()) ? bindings_.Get() : nullptr;
 }
 
 const std::string &Camera::ShaderFile() const {
@@ -35,7 +46,9 @@ const std::string &Camera::EntryPoint() const {
 Camera *DedicatedCast(sparkium::Camera *camera) {
   DEDICATED_CAST(camera, sparkium::CameraPinhole, CameraPinhole);
   DEDICATED_CAST(camera, sparkium::CameraThinLens, CameraThinLens);
-  throw std::invalid_argument("unsupported ray tracing camera model");
+  if (camera)
+    camera->GetCore()->ReportFailure("unsupported ray tracing camera model");
+  return nullptr;
 }
 
 }  // namespace sparkium::raytracing

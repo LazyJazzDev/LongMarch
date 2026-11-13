@@ -125,6 +125,8 @@ class ICommandContext : public IObject {
                               int32_t vertex_offset = 0,
                               uint32_t first_instance = 0) = 0;
   // Clears color, or depth and stencil (if present), according to the image format.
+  // Compute queues reject depth/stencil clears; color clears may be unavailable
+  // for formats without native storage support. Main/Assist retain graphics clears.
   virtual bool CmdClearImage(IImage *image, const ClearValue &value) = 0;
   // Presents the target window's next image fixed at this call. Multiple windows
   // may be presented by one context; a preceding clear is not required.

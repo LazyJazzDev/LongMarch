@@ -60,17 +60,6 @@ void RegisterGraphics(py::module_ &m) {
   });
 #endif
 
-  py::classh<FrameProfile> c_frame_profile(m, "FrameProfile");
-  c_frame_profile.doc() = "Opt-in frame profiling; GPU timestamps currently require Vulkan. Read gpu_ms after wait_gpu";
-  c_frame_profile.def(py::init<Core *, bool>(), py::arg("core"), py::arg("gpu_timestamps") = true,
-                      py::keep_alive<1, 2>());
-  c_frame_profile.def("begin", &FrameProfile::Begin, py::arg("gpu_timestamps") = true);
-  c_frame_profile.def("begin_gpu", &FrameProfile::BeginGpu, py::arg("command_context"), py::arg("name"));
-  c_frame_profile.def("end_gpu", &FrameProfile::EndGpu, py::arg("command_context"), py::arg("index"));
-  c_frame_profile.def("finish", &FrameProfile::Finish);
-  c_frame_profile.def_readonly("gpu_ms", &FrameProfile::gpu_ms);
-  c_frame_profile.def_readonly("cpu_ms", &FrameProfile::cpu_ms);
-
   auto m_imgui = m.def_submodule("imgui", "Dear ImGui widgets for graphics windows");
   RegisterImGui(m_imgui);
 }

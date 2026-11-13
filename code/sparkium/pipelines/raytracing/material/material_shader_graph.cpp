@@ -1,6 +1,4 @@
-﻿#include "sparkium/pipelines/raytracing/material/material_shader_graph.h"
-
-#include <stdexcept>
+#include "sparkium/pipelines/raytracing/material/material_shader_graph.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/scene.h"
@@ -11,34 +9,38 @@ MaterialShaderGraph::MaterialShaderGraph(sparkium::MaterialShaderGraph &material
     : Material(DedicatedCast(material.GetCore())),
       material_(material) {
   const size_t size = std::max<size_t>(16, 12 + material_.textures.size() * sizeof(int));
-  core_->GraphicsCore()->CreateBuffer(size, graphics::BUFFER_TYPE_STATIC, &material_buffer_);
+  material_buffer_ = core_->GetDevice()->CreateBuffer({size});
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/shader_graph/sampler.slang");
   sampler_implementation_.InsertAfter(material_.graph_code, "// SHADER_GRAPH_IMPLEMENTATION");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/shader_graph/evaluator.slang");
-  material_buffer_->UploadData(&material_.emission_hint, sizeof(material_.emission_hint));
+  core_->QueueUpload(material_buffer_.Get(), &material_.emission_hint, sizeof(material_.emission_hint));
 }
 
 void MaterialShaderGraph::PrepareHitShaders() {
+  if (!core_->IsValid())
+    return;
   if (closest_hit_shader_ && shadow_closest_hit_shader_ && shadow_any_hit_shader_)
     return;
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("material_sampler.slang", sampler_implementation_);
-  if (core_->GraphicsCore()->DeviceRayTracingSupport() &&
-      (core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.slang", "RenderClosestHit", "lib_6_5", {"-I."},
-                                           &closest_hit_shader_) != 0 ||
-       core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.slang", "ShadowClosestHit", "lib_6_5", {"-I."},
-                                           &shadow_closest_hit_shader_) != 0 ||
-       core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.slang", "ShadowAnyHit", "lib_6_5", {"-I."},
-                                           &shadow_any_hit_shader_) != 0))
-    throw std::runtime_error("failed to compile shader graph material");
+  if (!core_->GetDevice()->SupportRayTracingPipeline())
+    return;
+  closest_hit_shader_ = core_->GetDevice()->CreateShader("geometry/mesh/hit_group.slang", "RenderClosestHit",
+                                                         rhi::SHADER_STAGE_CLOSEST_HIT, &vfs, {"."});
+  shadow_closest_hit_shader_ = core_->GetDevice()->CreateShader("geometry/mesh/hit_group.slang", "ShadowClosestHit",
+                                                                rhi::SHADER_STAGE_CLOSEST_HIT, &vfs, {"."});
+  shadow_any_hit_shader_ = core_->GetDevice()->CreateShader("geometry/mesh/hit_group.slang", "ShadowAnyHit",
+                                                            rhi::SHADER_STAGE_ANY_HIT, &vfs, {"."});
+  if (!closest_hit_shader_ || !shadow_closest_hit_shader_ || !shadow_any_hit_shader_)
+    core_->ReportFailure("failed to compile shader graph material");
 }
 
 const CodeLines *MaterialShaderGraph::GraphImpl() const {
   return &material_.graph_code;
 }
 
-graphics::Buffer *MaterialShaderGraph::Buffer() {
-  return material_buffer_.get();
+rhi::IBuffer *MaterialShaderGraph::Buffer() {
+  return material_buffer_.Get();
 }
 
 const CodeLines &MaterialShaderGraph::SamplerImpl() const {
@@ -55,7 +57,7 @@ void MaterialShaderGraph::Update(Scene *scene) {
   for (auto *texture : material_.textures)
     indices.push_back(scene->RegisterImage(texture));
   if (!indices.empty())
-    material_buffer_->UploadData(indices.data(), indices.size() * sizeof(int), 12);
+    core_->QueueUpload(material_buffer_.Get(), indices.data(), indices.size() * sizeof(int), 12);
 }
 
 }  // namespace sparkium::raytracing

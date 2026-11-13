@@ -1,45 +1,66 @@
-﻿#pragma once
+#pragma once
 #include "sparkium/core/core_util.h"
+#include "sparkium/core/resource_updates.h"
 
 namespace sparkium {
 class Core : public Object {
  public:
-  Core(graphics::Core *core);
+  // Borrowed device; destroy scenes, resources and this Core before the device.
+  static std::unique_ptr<Core> Create(rhi::IDevice *device);
 
-  graphics::Core *GraphicsCore() const;
+  bool IsValid() const;
+  bool ReportFailure(const char *message);
+  bool QueueUpload(rhi::IBuffer *buffer, const void *data, uint64_t size, uint64_t offset = 0);
+  bool QueueUpload(rhi::IImage *image, const void *data, uint64_t row_pitch = 0);
+  bool QueueBuild(rhi::IBottomLevelAccelerationStructure *structure,
+                  const std::vector<rhi::AccelerationStructureGeometryBuffers> &geometries);
+  ResourceUpdates::Cursor BeginUpdates() const;
+  bool RecordUpdates(rhi::ICommandContext *commands, ResourceUpdates::Cursor &cursor);
+  bool AcceptUpdates(const ResourceUpdates::Cursor &cursor);
+
+  rhi::IDevice *GetDevice() const;
 
   // Resolve automatic selection and supported fallbacks for rendering and UI display.
   RenderPipeline ResolveRenderPipeline(RenderPipeline render_pipeline) const;
 
-  void Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline = RENDER_PIPELINE_AUTO);
+  bool RecordRender(Renderer &renderer,
+                    rhi::ICommandContext *commands,
+                    ResourceUpdates::Cursor &updates,
+                    Scene *scene,
+                    Camera *camera,
+                    Film *film,
+                    RenderPipeline render_pipeline = RENDER_PIPELINE_AUTO);
 
   const VirtualFileSystem &GetShadersVFS() const;
 
-  graphics::Shader *GetShader(const std::string &name);
+  rhi::IShader *GetShader(const std::string &name);
 
-  graphics::ComputeProgram *GetComputeProgram(const std::string &name);
+  rhi::IComputeProgram *GetComputeProgram(const std::string &name);
 
-  graphics::Buffer *GetBuffer(const std::string &name);
+  rhi::IBuffer *GetBuffer(const std::string &name);
 
-  graphics::Image *GetImage(const std::string &name);
+  rhi::IImage *GetImage(const std::string &name);
 
-  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Shader> &&shader);
-  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::ComputeProgram> &&program);
-  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Buffer> &&buffer);
-  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Image> &&image);
+  bool SetPublicResource(const std::string &name, rhi::ObjPtr<rhi::IShader> &&shader);
+  bool SetPublicResource(const std::string &name, rhi::ObjPtr<rhi::IComputeProgram> &&program);
+  bool SetPublicResource(const std::string &name, rhi::ObjPtr<rhi::IBuffer> &&buffer);
+  bool SetPublicResource(const std::string &name, rhi::ObjPtr<rhi::IImage> &&image);
 
  private:
-  void LoadPublicShaders();
-  void LoadPublicBuffers();
-  void LoadPublicImages();
+  explicit Core(rhi::IDevice *device);
+  ResourceUpdates updates_;
+  bool valid_{true};
+  bool LoadPublicShaders();
+  bool LoadPublicBuffers();
+  bool LoadPublicImages();
 
-  graphics::Core *core_{nullptr};
+  rhi::IDevice *device_{nullptr};
 
   VirtualFileSystem shaders_vfs_;
 
-  std::map<std::string, std::unique_ptr<graphics::Shader>> shaders_;
-  std::map<std::string, std::unique_ptr<graphics::ComputeProgram>> compute_programs_;
-  std::map<std::string, std::unique_ptr<graphics::Buffer>> buffers_;
-  std::map<std::string, std::unique_ptr<graphics::Image>> images_;
+  std::map<std::string, rhi::ObjPtr<rhi::IShader>> shaders_;
+  std::map<std::string, rhi::ObjPtr<rhi::IComputeProgram>> compute_programs_;
+  std::map<std::string, rhi::ObjPtr<rhi::IBuffer>> buffers_;
+  std::map<std::string, rhi::ObjPtr<rhi::IImage>> images_;
 };
 }  // namespace sparkium

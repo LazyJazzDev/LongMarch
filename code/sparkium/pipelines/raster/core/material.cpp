@@ -1,11 +1,12 @@
-﻿#include "sparkium/pipelines/raster/core/material.h"
+#include "sparkium/pipelines/raster/core/material.h"
 
 namespace sparkium::raster {
 
-void Material::SetupProgram(graphics::Program *program) {
+void Material::SetupProgram(rhi::ProgramDesc &program) {
 }
 
-void Material::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
+bool Material::BindMaterialResources(rhi::IBindingGroup *group) {
+  return true;
 }
 
 glm::vec3 Material::Emission() const {

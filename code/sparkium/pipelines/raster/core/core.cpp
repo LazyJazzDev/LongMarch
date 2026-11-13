@@ -1,4 +1,4 @@
-﻿#include "sparkium/pipelines/raster/core/core.h"
+#include "sparkium/pipelines/raster/core/core.h"
 
 #include "sparkium/pipelines/raster/core/camera.h"
 #include "sparkium/pipelines/raster/core/film.h"
@@ -9,36 +9,43 @@ namespace sparkium::raster {
 Core::Core(sparkium::Core &core) : core_(core) {
 }
 
-graphics::Core *Core::GraphicsCore() const {
-  return core_.GraphicsCore();
+rhi::IDevice *Core::GetDevice() const {
+  return core_.GetDevice();
 }
 
 const VirtualFileSystem &Core::GetShadersVFS() const {
   return core_.GetShadersVFS();
 }
 
-graphics::Shader *Core::GetShader(const std::string &name) {
+rhi::IShader *Core::GetShader(const std::string &name) {
   return core_.GetShader(name);
 }
 
-graphics::ComputeProgram *Core::GetComputeProgram(const std::string &name) {
+rhi::IComputeProgram *Core::GetComputeProgram(const std::string &name) {
   return core_.GetComputeProgram(name);
 }
 
-graphics::Buffer *Core::GetBuffer(const std::string &name) {
+rhi::IBuffer *Core::GetBuffer(const std::string &name) {
   return core_.GetBuffer(name);
 }
 
-graphics::Image *Core::GetImage(const std::string &name) {
+rhi::IImage *Core::GetImage(const std::string &name) {
   return core_.GetImage(name);
 }
 
-void Render(sparkium::Core *core, sparkium::Scene *scene, sparkium::Camera *camera, sparkium::Film *film) {
+bool RecordRender(sparkium::Core *core,
+                  sparkium::Renderer &renderer,
+                  rhi::ICommandContext *commands,
+                  ResourceUpdates::Cursor &updates,
+                  sparkium::Scene *scene,
+                  sparkium::Camera *camera,
+                  sparkium::Film *film) {
   auto raster_core = DedicatedCast(core);
   auto raster_scene = DedicatedCast(scene);
   auto raster_camera = DedicatedCast(camera);
   auto raster_film = DedicatedCast(film);
-  raster_scene->Render(raster_camera, raster_film);
+  return raster_core && raster_scene && raster_camera && raster_film && raster_core->IsValid() &&
+         raster_scene->RecordRender(renderer, commands, updates, raster_camera, raster_film);
 }
 
 Core *DedicatedCast(sparkium::Core *core) {

@@ -1,12 +1,7 @@
 ﻿#include "nbody_cs.h"
 
 #include <fstream>
-#include <iomanip>
 #include <iostream>
-#include <numeric>
-#if defined(LONGMARCH_METAL_ENABLED)
-#include "grassland/graphics/backend/metal/metal_command_context.h"
-#endif
 
 namespace {
 #include "built_in_shaders.inl"
@@ -24,32 +19,12 @@ NBodyCS::NBodyCS(const NBodyOptions &options) : options_(options), n_particles_(
 void NBodyCS::Run() {
   OnInit();
   std::cout << "Backend: " << graphics::BackendAPIString(core_->API()) << ", device: " << core_->DeviceName() << '\n';
-  if (Benchmark() && options_.gpu_timing && core_->API() == graphics::BACKEND_API_VULKAN)
-    profiler_ = std::make_unique<graphics::FrameProfile>(core_.get());
-  std::ofstream csv;
-  if (!options_.csv.empty()) {
-    csv.open(options_.csv);
-    if (!csv)
-      throw std::runtime_error("cannot open timing CSV");
-    csv << "frame,wall_ms,gpu_ms,record_ms,submit_ms,wait_ms\n" << std::fixed << std::setprecision(6);
-  }
-
-  std::vector<double> wall_times, gpu_times;
   int frame = -options_.warmup;
   while ((!window_ || !window_->ShouldClose()) && (!Benchmark() || frame < options_.frames)) {
-    auto start = std::chrono::steady_clock::now();
     OnUpdate();
     OnRender();
     if (window_)
       grassland::graphics::Window::PollEvents();
-    double wall = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
-    if (Benchmark() && frame >= 0) {
-      wall_times.push_back(wall);
-      gpu_times.push_back(gpu_ms_);
-      if (csv)
-        csv << frame << ',' << wall << ',' << gpu_ms_ << ',' << record_ms_ << ',' << submit_ms_ << ',' << wait_ms_
-            << '\n';
-    }
     ++frame;
   }
   core_->WaitGPU();
@@ -62,15 +37,6 @@ void NBodyCS::Run() {
     output.write(reinterpret_cast<const char *>(velocities.data()), velocities.size() * sizeof(glm::vec3));
     if (!output)
       throw std::runtime_error("cannot write particle state");
-  }
-  if (!wall_times.empty()) {
-    auto mean = [](const std::vector<double> &v) { return std::accumulate(v.begin(), v.end(), 0.0) / v.size(); };
-    std::cout << std::fixed << std::setprecision(6) << "RESULT {\"backend\":\""
-              << graphics::BackendAPIString(core_->API()) << "\",\"mode\":\"" << options_.mode
-              << "\",\"particles\":" << n_particles_ << ",\"frames\":" << wall_times.size()
-              << ",\"warmup\":" << options_.warmup << ",\"seed\":" << options_.seed << ",\"width\":" << options_.width
-              << ",\"height\":" << options_.height << ",\"wall_ms\":" << mean(wall_times)
-              << ",\"gpu_ms\":" << mean(gpu_times) << ",\"fps_equivalent\":" << 1000.0 / mean(wall_times) << "}\n";
   }
   if (window_)
     window_->TerminateImGui();
@@ -103,13 +69,8 @@ void NBodyCS::OnUpdate() {
 }
 
 void NBodyCS::OnRender() {
-  using Clock = std::chrono::steady_clock;
-  auto start = Clock::now();
-  if (profiler_)
-    profiler_->Begin();
   std::unique_ptr<graphics::CommandContext> ctx;
   core_->CreateCommandContext(&ctx);
-  int gpu_scope = profiler_ ? profiler_->BeginGpu(ctx.get(), "frame") : -1;
   if (step_) {
     ctx->CmdBindComputeProgram(nbody_compute_program_.get());
     ctx->CmdBindResources(0, {particles_pos_.get()}, graphics::BIND_POINT_COMPUTE);
@@ -141,31 +102,9 @@ void NBodyCS::OnRender() {
   }
   if (window_)
     ctx->CmdPresent(window_.get(), frame_image_.get());
-  if (profiler_)
-    profiler_->EndGpu(ctx.get(), gpu_scope);
-  auto recorded = Clock::now();
   core_->SubmitCommandContext(ctx.get());
-  auto submitted = Clock::now();
-  if (Benchmark()) {
+  if (Benchmark())
     core_->WaitGPU();
-    auto completed = Clock::now();
-    record_ms_ = std::chrono::duration<double, std::milli>(recorded - start).count();
-    submit_ms_ = std::chrono::duration<double, std::milli>(submitted - recorded).count();
-    wait_ms_ = std::chrono::duration<double, std::milli>(completed - submitted).count();
-    gpu_ms_ = -1;
-    if (profiler_) {
-      profiler_->Finish();
-      gpu_ms_ = profiler_->gpu_ms.at("frame");
-    }
-#if defined(LONGMARCH_METAL_ENABLED)
-    if (options_.gpu_timing && core_->API() == graphics::BACKEND_API_METAL) {
-      auto native = dynamic_cast<graphics::backend::MetalCommandContext *>(ctx.get())->Handle();
-      gpu_ms_ = (native->GPUEndTime() - native->GPUStartTime()) * 1000.0;
-      if (gpu_ms_ <= 0)
-        throw std::runtime_error("Metal GPU timestamps unavailable");
-    }
-#endif
-  }
 }
 
 void NBodyCS::OnInit() {

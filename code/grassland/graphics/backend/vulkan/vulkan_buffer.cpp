@@ -1,7 +1,5 @@
 ﻿#include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 
-#include "grassland/graphics/frame_profile.h"
-
 namespace grassland::graphics::backend {
 
 VulkanBufferRange::VulkanBufferRange(const BufferRange &range)
@@ -66,11 +64,6 @@ void VulkanStaticBuffer::Resize(size_t new_size) {
 }
 
 void VulkanStaticBuffer::UploadData(const void *data, size_t size, size_t offset) {
-  CpuProfileScope upload_profile("static_upload");
-  if (FrameProfile::active) {
-    ++FrameProfile::active->counters["static_upload_calls"];
-    FrameProfile::active->counters["static_upload_bytes"] += size;
-  }
   core_->WaitGPU();
   auto staging_buffer = core_->RequestUploadStagingBuffer(size);
   void *mapped = nullptr;

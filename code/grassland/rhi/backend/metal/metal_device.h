@@ -115,7 +115,7 @@ class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
 
   void ShutdownQueues();
 
-  std::array<ObjectPtr<IMetalQueue>, 2> queues_{};
+  std::array<ObjectPtr<IMetalQueue>, 3> queues_{};
   std::atomic<bool> stopping_{};
   PhysicalDevice info_{};
   std::thread collector_{};

@@ -33,21 +33,17 @@ int main(int argc, char **argv) {
         options.width = std::stoi(value());
       else if (arg == "--height")
         options.height = std::stoi(value());
-      else if (arg == "--csv")
-        options.csv = value();
       else if (arg == "--state-output")
         options.state_output = value();
       else if (arg == "--debug")
         options.debug = true;
-      else if (arg == "--no-gpu-timing")
-        options.gpu_timing = false;
       else if (arg == "--mode")
         options.mode = value();
       else if (arg == "--help") {
         std::cout << "nbody_cs [--backend auto|metal|vulkan] [--mode interactive|compute|offscreen|window]\n"
                      "  [--particles N] [--frames N] [--warmup N] [--seed N] [--width W] [--height H]\n"
-                     "  [--csv path] [--state-output path] [--debug] [--no-gpu-timing]\n"
-                     "Benchmark modes wait for GPU completion each frame; initialization/warmup are excluded.\n";
+                     "  [--state-output path] [--debug]\n"
+                     "Benchmark modes wait for GPU completion each frame; use Nsight for profiling.\n";
         return 0;
       } else
         throw std::invalid_argument("unknown argument: " + arg);

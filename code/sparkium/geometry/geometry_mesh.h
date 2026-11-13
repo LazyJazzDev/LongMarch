@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "sparkium/core/geometry.h"
 
 namespace sparkium {
@@ -32,12 +32,15 @@ class GeometryMesh : public Geometry {
   float GetShadowTerminatorGeometryOffset() const;
 
   int PrimitiveCount() override;
-  graphics::Buffer *GetBuffer() const;
+  rhi::IBuffer *GetBuffer() const;
   const Header &GetHeader() const;
+  glm::vec4 CentricArea(const glm::mat4x3 &transform) const;
 
  private:
   Header header_{};
-  std::unique_ptr<graphics::Buffer> geometry_buffer_;
+  std::vector<glm::vec3> positions_;
+  std::vector<uint32_t> indices_;
+  rhi::ObjPtr<rhi::IBuffer> geometry_buffer_;
   int primitive_count_;
 };
 

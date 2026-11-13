@@ -89,6 +89,8 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IMetal
   SubmissionStatus PollCompletion(Event signal, uint64_t completed, bool timeline_valid) override;
 
  private:
+  bool RequireGraphicsQueue();
+  bool compute_queue_{};
   // Inputs and ranges have been validated by the recording entry point.
   bool CopyBuffer(IMetalBuffer *source,
                   uint64_t source_offset,

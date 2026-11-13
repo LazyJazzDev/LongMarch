@@ -1,11 +1,12 @@
-﻿#include "sparkium/pipelines/raster/core/geometry.h"
+#include "sparkium/pipelines/raster/core/geometry.h"
 
 namespace sparkium::raster {
 
-void Geometry::SetupProgram(graphics::Program *program) {
+void Geometry::SetupProgram(rhi::ProgramDesc &program) {
 }
 
-void Geometry::DispatchDrawCalls(graphics::CommandContext *cmd_ctx) {
+bool Geometry::DispatchDrawCalls(rhi::ICommandContext *cmd_ctx) {
+  return true;
 }
 
 }  // namespace sparkium::raster

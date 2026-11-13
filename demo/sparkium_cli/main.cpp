@@ -1,24 +1,38 @@
-﻿#include <long_march.h>
+#include <stdexcept>
 
-#include "../sparkium_backend.h"
+#include "sparkium/sparkium.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <filesystem>
-#include <fstream>
-#include <iomanip>
 #include <iostream>
 
-#include "grassland/graphics/frame_profile.h"
 #include "stb_image_write.h"
 
-using namespace long_march;
+namespace {
+grassland::rhi::BackendAPI ParseBackend(const std::string &name) {
+  using namespace grassland::rhi;
+  BackendAPI api;
+  if (name == "auto")
+    api = BACKEND_API_DEFAULT;
+  else if (name == "metal")
+    api = BACKEND_API_METAL;
+  else if (name == "vulkan")
+    api = BACKEND_API_VULKAN;
+  else if (name == "d3d12")
+    api = BACKEND_API_D3D12;
+  else
+    throw std::invalid_argument("unknown RHI backend: " + name);
+  return api;
+}
+}  // namespace
+
+using namespace grassland;
 
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--hdr-output image.hdr] [--frames N] "
             << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
-               "[--require-hardware-rt] [--debug] [--profile "
-               "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
+               "[--require-hardware-rt] [--debug]\n"
             << "       " << program << " --list [scene-directory]\n";
 }
 
@@ -54,10 +68,7 @@ int main(int argc, char **argv) {
     std::filesystem::path output = "output.png";
     std::filesystem::path hdr_output;
     int frames = 1;
-    auto backend = graphics::BACKEND_API_DEFAULT;
-    std::filesystem::path profile_path;
-    bool profile_cpu_only = false;
-    bool profile_alternate_gpu = false;
+    auto backend = rhi::BACKEND_API_DEFAULT;
     bool override_pipeline = false;
     bool require_hardware_rt = false;
     bool debug = false;
@@ -67,19 +78,13 @@ int main(int argc, char **argv) {
       if (argument == "--require-hardware-rt")
         require_hardware_rt = true;
       else if (argument == "--backend" && i + 1 < argc)
-        backend = ParseSparkiumBackend(argv[++i]);
+        backend = ParseBackend(argv[++i]);
       else if (argument == "--debug")
         debug = true;
       else if ((argument == "-o" || argument == "--output") && i + 1 < argc)
         output = argv[++i];
       else if (argument == "--hdr-output" && i + 1 < argc)
         hdr_output = argv[++i];
-      else if (argument == "--profile-alternate-gpu")
-        profile_alternate_gpu = true;
-      else if (argument == "--profile-cpu-only")
-        profile_cpu_only = true;
-      else if (argument == "--profile" && i + 1 < argc)
-        profile_path = argv[++i];
       else if (argument == "--frames" && i + 1 < argc)
         frames = std::stoi(argv[++i]);
       else if (argument == "--pipeline" && i + 1 < argc) {
@@ -89,10 +94,6 @@ int main(int argc, char **argv) {
         throw std::runtime_error("unknown or incomplete argument: " + argument);
       }
     }
-    if ((profile_cpu_only || profile_alternate_gpu) && profile_path.empty())
-      throw std::runtime_error("profiling mode requires --profile");
-    if (profile_cpu_only && profile_alternate_gpu)
-      throw std::runtime_error("choose one profiling mode");
     if (frames <= 0)
       throw std::runtime_error("--frames must be positive");
 
@@ -102,78 +103,76 @@ int main(int argc, char **argv) {
                                    std::filesystem::absolute(output).lexically_normal())
       throw std::runtime_error("SDR and HDR outputs must use different paths");
 
-    std::unique_ptr<graphics::Core> graphics_core;
-    if (graphics::CreateCore(backend, graphics::Core::Settings{2, debug}, &graphics_core) != 0)
-      throw std::runtime_error("failed to create graphics core");
-    if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
-      throw std::runtime_error("failed to initialize graphics device");
-    std::cout << "Backend: " << graphics::BackendAPIString(graphics_core->API())
-              << ", device: " << graphics_core->DeviceName() << '\n';
-    if (require_hardware_rt && !graphics_core->DeviceRayTracingSupport())
-      throw std::runtime_error("hardware ray tracing is unavailable on the selected device");
-    sparkium::Core core(graphics_core.get());
+    rhi::ObjPtr<rhi::ICore> rhi_core = rhi::CreateCore(backend, {debug});
+    if (!rhi_core) {
+      std::cerr << "failed to create RHI core\n";
+      return 1;
+    }
+    rhi::ObjPtr<rhi::IDevice> device = rhi_core->CreateDeviceByAutoSelection();
+    if (!device) {
+      std::cerr << "failed to initialize RHI device\n";
+      return 1;
+    }
+    std::cout << "Backend: " << rhi::BackendAPIName(backend) << ", device: " << device->Name() << '\n';
+    if (require_hardware_rt && !device->SupportRayTracingPipeline() && !device->SupportRayQuery()) {
+      std::cerr << "hardware ray tracing is unavailable on the selected device\n";
+      return 1;
+    }
+    auto core = sparkium::Core::Create(device.Get());
+    if (!core)
+      return 1;
     std::string error;
-    auto loaded = sparkium::JsonScene::Load(&core, scene_path, &error);
+    auto loaded = sparkium::JsonScene::Load(core.get(), scene_path, &error);
     if (!loaded)
       throw std::runtime_error(error);
     if (!override_pipeline)
       pipeline = loaded->GetRenderPipeline();
-    if (core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
+    if (core->ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
       std::cout << "Tracing: native ray query (compute, native AS)\n";
 
     auto *film = loaded->GetFilm();
-    std::unique_ptr<graphics::Image> image;
-    graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-    std::unique_ptr<graphics::FrameProfile> profiler;
-    std::ofstream profile_output;
-    if (!profile_path.empty()) {
-      profiler = std::make_unique<graphics::FrameProfile>(graphics_core.get(), !profile_cpu_only);
-      std::filesystem::create_directories(profile_path.has_parent_path() ? profile_path.parent_path() : ".");
-      profile_output.open(profile_path);
-      if (!profile_output)
-        throw std::runtime_error("cannot open profile output");
-      profile_output << "frame,domain,stage,value\n" << std::fixed << std::setprecision(6);
-      std::cout << "Profiling device: " << profiler->device_name << '\n';
-    }
+    sparkium::Renderer renderer(core.get());
+    // Bound queued work independently of the requested total sample count.
+    std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> pending;
     for (int frame = 0; frame < frames; ++frame) {
-      if (profiler)
-        profiler->Begin(!profile_alternate_gpu || frame % 4 == 0 || frame % 4 == 3);
-      {
-        graphics::CpuProfileScope frame_profile("frame_wall");
-        {
-          graphics::CpuProfileScope render_profile("render_wall");
-          core.Render(loaded->GetScene(), loaded->GetCamera(), film, pipeline);
-        }
-        // Profiling includes a developed display image for each frame, as in the GUI.
-        if (profiler)
-          film->Develop(image.get());
-      }
-      if (profiler) {
-        profiler->Finish();
-        for (const auto &[name, value] : profiler->cpu_ms)
-          profile_output << frame << ",cpu_ms," << name << ',' << value << '\n';
-        for (const auto &[name, value] : profiler->gpu_ms)
-          profile_output << frame << ",gpu_ms," << name << ',' << value << '\n';
-        for (const auto &[name, value] : profiler->counters)
-          profile_output << frame << ",count," << name << ',' << value << '\n';
-        profile_output.flush();
-      }
+      auto &slot = pending[frame % pending.size()];
+      if (slot && !slot->WaitHost())
+        return 1;
+      slot = renderer.Submit(loaded->GetScene(), loaded->GetCamera(), film, pipeline);
+      if (!slot)
+        return 1;
     }
-    if (!profiler)
-      film->Develop(image.get());
+    auto download = [&](bool hdr) -> rhi::ObjPtr<rhi::IDownloadToken> {
+      auto output_image = film->AcquireOutput(hdr);
+      rhi::ObjPtr<rhi::IQueue> queue = device->GetQueue(rhi::QUEUE_TYPE_ASSIST);
+      rhi::ObjPtr<rhi::ICommandContext> commands = queue ? queue->CreateCommandContext() : nullptr;
+      if (!output_image || !commands || !film->RecordDevelop(commands.Get(), output_image->Image(), hdr))
+        return {};
+      rhi::ObjPtr<rhi::IDownloadToken> result = commands->CmdDownloadImage(output_image->Image());
+      if (!result)
+        return {};
+      rhi::SubmitInfo dependencies;
+      for (const auto &rendered : pending)
+        if (rendered)
+          dependencies.waits.push_back(rendered->GetEvent());
+      rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit(dependencies);
+      if (!submitted || !submitted->WaitHost())
+        return {};
+      return result;
+    };
+    auto pixels_readback = download(false);
     std::vector<uint8_t> pixels(static_cast<size_t>(film->GetWidth()) * film->GetHeight() * 4);
-    image->DownloadData(pixels.data());
+    if (!pixels_readback || !pixels_readback->CopyTo(pixels.data(), pixels.size()))
+      return 1;
     std::filesystem::create_directories(output.has_parent_path() ? output.parent_path() : ".");
     if (!stbi_write_png(output.string().c_str(), film->GetWidth(), film->GetHeight(), 4, pixels.data(),
                         film->GetWidth() * 4))
       throw std::runtime_error("failed to write image: " + output.string());
     if (!hdr_output.empty()) {
-      std::unique_ptr<graphics::Image> hdr_image;
-      graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                                 &hdr_image);
-      film->Develop(hdr_image.get(), true);
+      auto hdr_readback = download(true);
       std::vector<float> hdr_pixels(static_cast<size_t>(film->GetWidth()) * film->GetHeight() * 4);
-      hdr_image->DownloadData(hdr_pixels.data());
+      if (!hdr_readback || !hdr_readback->CopyTo(hdr_pixels.data(), hdr_pixels.size() * sizeof(float)))
+        return 1;
       std::filesystem::create_directories(hdr_output.has_parent_path() ? hdr_output.parent_path() : ".");
       if (!stbi_write_hdr(hdr_output.string().c_str(), film->GetWidth(), film->GetHeight(), 4, hdr_pixels.data()))
         throw std::runtime_error("failed to write HDR image: " + hdr_output.string());

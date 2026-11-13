@@ -18,7 +18,7 @@ rhi::ICommandContext *D3D12QueueImpl::CreateCommandContext() {
 ID3D12Queue *D3D12QueueImpl::Create(ID3D12Device *device, QueueType type) {
   auto result = std::unique_ptr<D3D12QueueImpl>(new D3D12QueueImpl(device, type));
   D3D12_COMMAND_QUEUE_DESC desc{};
-  desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+  desc.Type = type == QUEUE_TYPE_COMPUTE ? D3D12_COMMAND_LIST_TYPE_COMPUTE : D3D12_COMMAND_LIST_TYPE_DIRECT;
   if (!Check(device->NativeDevice()->CreateCommandQueue(&desc, IID_PPV_ARGS(&result->queue_)), "Create command queue"))
     return nullptr;
   result->timeline_ = ID3D12Timeline::Create(device);

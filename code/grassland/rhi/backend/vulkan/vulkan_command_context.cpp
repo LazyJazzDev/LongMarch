@@ -53,6 +53,7 @@ VkClearValue NativeClearValue(ImageFormat format, const ClearValue &value) {
 }  // namespace
 
 VulkanCommandContextImpl::VulkanCommandContextImpl(IVulkanQueue *queue) : device_(queue->Owner()) {
+  compute_queue_ = rhi::QueryInterfacePtr<rhi::IQueue>(queue)->GetType() == QUEUE_TYPE_COMPUTE;
   InitializeCommandContext(queue);
 }
 
@@ -62,7 +63,7 @@ VulkanCommandContextImpl::~VulkanCommandContextImpl() {
     vkFreeCommandBuffers(device_->NativeDevice(), pool_, 1, &cuda_acquire_);
 #endif
   if (reusable_) {
-    device_->RecycleCommandResources(pool_, command_);
+    device_->RecycleCommandResources(compute_queue_ ? QUEUE_TYPE_COMPUTE : QUEUE_TYPE_MAIN, pool_, command_);
     return;
   }
   if (pool_)
@@ -71,7 +72,8 @@ VulkanCommandContextImpl::~VulkanCommandContextImpl() {
 
 ICommandContext *VulkanCommandContextImpl::Create(IVulkanQueue *queue) {
   auto object = std::unique_ptr<VulkanCommandContextImpl>(new VulkanCommandContextImpl(queue));
-  object->reusable_ = object->device_->AcquireCommandResources(object->pool_, object->command_);
+  object->reusable_ = object->device_->AcquireCommandResources(
+      object->compute_queue_ ? QUEUE_TYPE_COMPUTE : QUEUE_TYPE_MAIN, object->pool_, object->command_);
   if (!object->reusable_)
     return nullptr;
   return object.release();
@@ -110,6 +112,14 @@ bool VulkanCommandContextImpl::TransitionImage(IVulkanImage *image,
   return true;
 }
 
+bool VulkanCommandContextImpl::RequireGraphicsQueue() {
+  if (!compute_queue_)
+    return true;
+  recording_failed_ = true;
+  ReportError(-1, "Graphics commands and depth clears are unavailable on a Compute queue.");
+  return false;
+}
+
 bool VulkanCommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValue &value) {
   const auto native = rhi::QueryInterfacePtr<IVulkanImage>(image).Get();
 #if !defined(NDEBUG)
@@ -130,6 +140,8 @@ bool VulkanCommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValu
                        VK_ACCESS_TRANSFER_WRITE_BIT))
     return false;
   const auto format = image->GetDesc().format;
+  if (IsDepthFormat(format) && !RequireGraphicsQueue())
+    return false;
   const auto clear = NativeClearValue(format, value);
   VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
   if (IsDepthFormat(format)) {
@@ -145,6 +157,8 @@ bool VulkanCommandContextImpl::CmdClearImage(rhi::IImage *image, const ClearValu
 }
 
 bool VulkanCommandContextImpl::CmdPresent(rhi::IWindow *window) {
+  if (!RequireGraphicsQueue())
+    return false;
   const auto target = rhi::QueryInterfacePtr<IVulkanWindow>(window).Get();
 #if !defined(NDEBUG)
   if (render_target_) {
@@ -205,7 +219,7 @@ bool VulkanCommandContextImpl::EndRecording() {
       continue;
     VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
     barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-    barrier.srcQueueFamilyIndex = device_->QueueFamily();
+    barrier.srcQueueFamilyIndex = device_->QueueFamily(compute_queue_ ? QUEUE_TYPE_COMPUTE : QUEUE_TYPE_MAIN);
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
     barrier.buffer = entry.first->NativeBuffer();
     barrier.size = VK_WHOLE_SIZE;
@@ -467,6 +481,8 @@ bool VulkanCommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 }
 
 bool VulkanCommandContextImpl::CmdBindProgram(IProgram *program) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IVulkanProgram>(program).Get();
 #if !defined(NDEBUG)
   if (!native || native->Owner() != device_ || sealed_) {
@@ -489,6 +505,8 @@ bool VulkanCommandContextImpl::CmdBindProgram(IProgram *program) {
 }
 
 bool VulkanCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
+  if (!RequireGraphicsQueue())
+    return false;
   if (sealed_ || render_target_ || !PrepareRendering(info)) {
     recording_failed_ = true;
     return false;
@@ -589,6 +607,8 @@ bool VulkanCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
 }
 
 bool VulkanCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
 #if !defined(NDEBUG)
   assert(!native || native->Owner() == device_);
@@ -613,6 +633,8 @@ bool VulkanCommandContextImpl::CmdBindVertexBuffer(uint32_t binding, IBuffer *bu
 }
 
 bool VulkanCommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IVulkanBuffer>(buffer).Get();
 #if !defined(NDEBUG)
   assert(!native || native->Owner() == device_);
@@ -641,6 +663,8 @@ bool VulkanCommandContextImpl::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat f
 }
 
 bool VulkanCommandContextImpl::CmdSetViewport(const Viewport &viewport) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || viewport.width <= 0 || viewport.height <= 0) {
     recording_failed_ = true;
@@ -657,6 +681,8 @@ bool VulkanCommandContextImpl::CmdSetViewport(const Viewport &viewport) {
 }
 
 bool VulkanCommandContextImpl::CmdSetScissor(const Scissor &scissor) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || !scissor.width || !scissor.height) {
     recording_failed_ = true;
@@ -675,6 +701,8 @@ bool VulkanCommandContextImpl::CmdDraw(uint32_t vertex_count,
                                        uint32_t instance_count,
                                        uint32_t first_vertex,
                                        uint32_t first_instance) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_) {
     recording_failed_ = true;
@@ -699,6 +727,8 @@ bool VulkanCommandContextImpl::CmdDrawIndexed(uint32_t index_count,
                                               uint32_t first_index,
                                               int32_t vertex_offset,
                                               uint32_t first_instance) {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_ || !index_bound_) {
     recording_failed_ = true;
@@ -719,6 +749,8 @@ bool VulkanCommandContextImpl::CmdDrawIndexed(uint32_t index_count,
 }
 
 bool VulkanCommandContextImpl::CmdEndRendering() {
+  if (!RequireGraphicsQueue())
+    return false;
 #if !defined(NDEBUG)
   if (sealed_ || !render_target_) {
     recording_failed_ = true;
@@ -815,7 +847,7 @@ bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, u
   region.imageExtent = {desc.width, desc.height, 1};
   vkCmdCopyBufferToImage(command_, upload->NativeBuffer(), native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          1, &region);
-  return TransitionImage(native, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+  return TransitionImage(native, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                          VK_ACCESS_SHADER_READ_BIT);
 }
 
@@ -1066,6 +1098,8 @@ ICommandContext *CreateVulkanCommandContext(IVulkanQueue *queue) {
 }
 
 bool VulkanCommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IVulkanWindow>(window).Get();
   auto image = rhi::QueryInterfacePtr<IVulkanImage>(target).Get();
 #if !defined(NDEBUG)
@@ -1094,6 +1128,8 @@ bool VulkanCommandContextImpl::CmdDrawImGui(IWindow *window, IImage *target) {
 }
 
 bool VulkanCommandContextImpl::CmdPresentImage(IWindow *window, IImage *frame_img, ColorSpace frame_color_space) {
+  if (!RequireGraphicsQueue())
+    return false;
   auto native = rhi::QueryInterfacePtr<IVulkanWindow>(window).Get();
   auto image = rhi::QueryInterfacePtr<IVulkanImage>(frame_img).Get();
 #if !defined(NDEBUG)

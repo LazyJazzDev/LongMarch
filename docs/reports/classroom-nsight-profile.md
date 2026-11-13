@@ -1,5 +1,10 @@
 # Classroom Nsight profiling
 
+> Historical report: built-in profiling and its CSV/script interfaces have been removed.
+> Commands and measurements below describe the earlier implementation at
+> [`b99233dc`](https://github.com/LazyJazzDev/LongMarch/tree/b99233dceffedba57c97770e37b2fd902da18c8b).
+> Use Nsight for new profiling; these timings are not current validation results.
+
 Profiled on 2026-09-26 at LongMarch `72f475c`, Windows x64, Ninja Release,
 RTX 3090 Ti / driver 596.49, Nsight Systems 2025.5.1 and Nsight Graphics 2025.5.0.
 Classroom uses native hardware ray query, 1920 x 1080, 8 samples/dispatch,
