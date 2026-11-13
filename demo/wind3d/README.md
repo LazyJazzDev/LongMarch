@@ -19,15 +19,26 @@ Changes take effect at a solver-step boundary. The displayed model, flow and
 loads always belong to the same completed snapshot, so a slow backend can lag
 behind the requested panel values.
 
-The model has a streamlined fuselage, swept tapered main wings with dihedral,
-inboard flaps, outboard ailerons, a horizontal tail/elevator and a vertical
-tail/rudder. It has no engines. Its length is 6 m and its span is 9 m; this is a
-scaled demonstration geometry, not a particular full-size aircraft. Orange
-marks flaps, blue marks ailerons, green marks elevator surfaces and purple marks
-the rudder. Rendering directly tessellates the fuselage and airfoil surfaces, with closed
-wing tips and hinge faces. It does not reconstruct a sampled implicit surface.
-The fluid occupancy function shares the airfoil thickness law, dimensions and
-hinge transforms; its voxel resolution is independent of the display mesh.
+The model is a generic scaled narrow-body airliner, 6 m long with a 6.04 m
+span. It has a constant-section cabin, rounded forebody, upswept tailcone,
+continuous belly/wing-root fairing, cockpit glazing, passenger windows and doors.
+The low-mounted main wing has sweep, dihedral, camber and raked tips. Two
+stationary nacelles and pylons are part of both the visible geometry and solid
+boundary. They are unpowered solid nacelles with a dark fan-face representation;
+this is not an engine mass-flow or thrust model.
+
+Inboard Fowler-type flaps extend rearward as they deflect. Outboard differential
+ailerons, the horizontal stabilizer's elevators and the vertical stabilizer's
+rudder rotate about their actual swept three-dimensional hinge lines. Control
+surfaces have closed hinge, root and tip faces. Muted tan, blue and green surfaces
+identify flaps, ailerons and elevators; the fin has a blue livery. The explicit
+mesh and occupancy test share the complete geometry specification and hinge
+transforms in `aircraft.h`. Rendering does not reconstruct an implicit surface.
+The fluid still voxelizes the solid at its own grid resolution.
+
+Use `--model-only` to inspect the aircraft without flow/load vectors. Camera
+arguments `--yaw`, `--pitch` (radians) and `--distance` (metres) support repeatable
+inspection views; normal mouse orbit and zoom remain available.
 
 ## Coordinates and visualization
 
@@ -53,43 +64,53 @@ The default MAC grid is 128 × 64 × 96. `--grid` sets the x resolution (64–25
 multiple of 16); the other dimensions retain this aspect ratio. Velocity lives
 on staggered faces and pressure at cell centres. Each step performs:
 
-1. Rebuild the solid mask from the current aircraft geometry.
-2. Semi-Lagrangian velocity advection and explicit viscous diffusion.
+1. Rebuild the solid mask when the aircraft geometry changes. Also sample each
+   pressure-cell connection at h/8 spacing to block velocity faces crossed by
+   thin surfaces whose neighbouring cell centres are both fluid.
+2. Midpoint characteristic tracing, bounded MacCormack transport correction,
+   and explicit viscous diffusion. `--first-order` disables the transport correction.
 3. Enforce stationary no-penetration face velocities at solid boundaries.
-4. Solve the pressure Poisson equation using 400 red-black SOR iterations.
+4. Solve the fine-grid pressure equation with multigrid-preconditioned conjugate
+   gradients, warm-started from the previous pressure. The true `b - A p`
+   residual is recomputed every iteration; default relative tolerance is `1e-4`.
 5. Subtract the pressure gradient and measure the remaining divergence.
-6. Export the completed velocity/pressure field and integrate loads.
+6. Integrate force, torque and diagnostics on the full solver grid using GPU
+   block reductions. Publish a display field capped at 192 ? 96 ? 144;
+   downsampling the display field does not downsample the load integration.
 
 The air density is 1.225 kg/m³; the effective kinematic viscosity is 0.005 m²/s.
 The time step is bounded by advective CFL 0.5 and an explicit diffusion bound.
 The inlet and lateral far-field faces impose the wind; the outlet has zero
-pressure. Pressure force is integrated over exposed voxel faces. A first-order
+pressure. Pressure force is integrated over the same blocked velocity faces used by the
+pressure operator. For a thin wall with fluid on both sides, their pressure
+contributions form the pressure jump; no solid cell is required for that load. A first-order
 tangential wall-shear estimate is added using the same viscosity, and each
 surface force contributes `r × F` to the moment. GPU fields use single precision;
-CPU diagnostic norms accumulate in double precision, with no double atomicAdd.
+GPU reductions use single precision and their block totals accumulate on the
+CPU in double precision, with no double atomicAdd.
 
 This is a qualitative laminar demonstration. It has no turbulence model,
 compressibility, ground effect or moving-wall actuator dynamics. Controls are
 quasi-static boundary changes, not a simulation of the transient swept volume
-of a moving flap. Semi-Lagrangian transport is dissipative, the pressure solve
+of a moving flap. Transport limiting remains dissipative, the pressure solve
 has finite residual, and voxel boundaries underresolve thin trailing edges and
-small deflections, especially at coarse grids. The 256 grid improves geometric
+small deflections, especially at coarse grids. The 384 and 512 grids improve geometric
 resolution at substantially higher step cost. Mesh smoothness does not imply
 equally fine fluid resolution. Do not interpret the loads as calibrated
 aircraft performance data.
 
 The absence of a turbulence model does not itself forbid unsteady vortices.
 However, the effective viscosity here is over 300 times that of room-temperature
-air (about 1.5e-5 m²/s), the default cell width is about 8.3 cm, and linear
-semi-Lagrangian interpolation further damps small structures. This setup does
+air (about 1.5e-5 m²/s), the default cell width is about 8.3 cm, and the
+limited transport scheme still damps unresolved structures. This setup does
 not resolve a realistic turbulent aircraft wake. Instantaneous streamlines can
 show resolved recirculation, but do not convey particle histories or temporal
 fluctuations as directly as pathlines or vorticity visualization would.
 
 ## Asynchronous ownership
 
-A single worker owns the CUDA stream and all fluid allocations. It copies a
-completed field to a host snapshot, calculates diagnostics/loads, and publishes
+A single worker owns the CUDA stream and all fluid allocations. It reduces full-resolution
+loads/diagnostics on the GPU, copies a completed display field to a host snapshot, and publishes
 an immutable `shared_ptr` under a short mutex. The frontend acquires that pointer
 without waiting for a CUDA step. Only the latest snapshot is retained by the
 publisher; intermediate snapshots can be dropped. Aircraft meshes are reused
@@ -112,10 +133,25 @@ demo_wind3d --headless --frames 300 --capture out/wind3d/flow.ppm
 demo_wind3d --backend d3d12 --frames 600 --debug
 ```
 
-`--validate` checks finite fluid state and requires pressure projection to reduce
-RMS divergence below 10% of its input (or 0.002 s⁻¹ for nearly divergence-free
-inputs). It prints force, moment, physical time and solver wall time per observed
-snapshot. It then checks pause acknowledgement, reset while paused, applying all controls, resume, and retained snapshot immutability; a failed check returns exit code 2. Use `--help` for parameter bounds.
+`--validate` cross-checks explicit mesh vertices against the solid-boundary
+function under combined extreme controls, checks finite fluid state, requires
+true pressure residual below the requested tolerance, and checks the divergence
+after projection (twice the requested relative tolerance, with a 1e-5 s??
+roundoff floor). `--pressure-tolerance` and `--pressure-cycles` set the residual
+target and maximum PCG iterations. Exhausting the iteration limit is visible in
+the panel and fails validation; it is not silently treated as convergence.
+
+`--validate-time SECONDS` runs to a specified physical time instead of a step
+count, for comparable grid studies. For example:
+
+```powershell
+demo_wind3d --validate-time 1 --grid 384 --pressure-tolerance 0.0001 --flap 20
+demo_wind3d --validate-time 1 --grid 512 --pressure-tolerance 0.0001 --flap 20
+```
+
+Validation also checks pause acknowledgement, reset while paused, applying all
+controls, resume, and retained snapshot immutability. A failed check returns
+exit code 2. Use `--help` for parameter bounds.
 Startup has an impulsive loading transient; compare evolved states at equivalent
 physical times, not just equal step counts. `--headless` renders offscreen and
 adds an 8 ms pacing delay, so its reported FPS is not a window benchmark.

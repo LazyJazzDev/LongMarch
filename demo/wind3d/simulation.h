@@ -19,8 +19,16 @@ struct Vertex {
 
 std::vector<Vertex> AircraftMesh(const Controls &controls);
 
+struct SolverOptions {
+  float pressure_tolerance{0.0001f};
+  int pressure_cycles{64};
+  bool corrected_transport{true};
+};
+
 struct Snapshot {
-  int nx{}, ny{}, nz{};
+  int nx{}, ny{}, nz{}, pressure_cycles{}, solver_nx{};
+  float pressure_residual{};
+  bool pressure_converged{};
   uint64_t step{}, generation{};
   float time{}, dt{}, divergence_before{}, divergence_after{}, step_seconds{};
   Vec3 force{}, moment{};
@@ -33,7 +41,7 @@ struct Snapshot {
 // renderer never waits for a solver step or observes half-written velocity data.
 class Simulation {
  public:
-  static std::unique_ptr<Simulation> Create(int cuda_device, int nx);
+  static std::unique_ptr<Simulation> Create(int cuda_device, int nx, const SolverOptions &options = {});
   ~Simulation();
   Simulation(const Simulation &) = delete;
   Simulation &operator=(const Simulation &) = delete;

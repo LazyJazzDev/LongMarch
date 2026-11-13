@@ -65,8 +65,8 @@ std::vector<Vertex> FlowLines(const Snapshot &snapshot, bool streamlines, bool l
   Arrow(lines, {-4, -1.8f, -4.7f}, {0, 0, 1}, {0.2f, 0.5f, 1});
   if (streamlines) {
     for (int iz = -10; iz <= 10; ++iz)
-      for (int iy = -2; iy <= 3; ++iy) {
-        Vec3 p{-4.5f, iy * 0.32f + 0.05f, iz * 0.44f};
+      for (int iy = -1; iy <= 2; ++iy) {
+        Vec3 p{-4.5f, iy * 0.32f + 0.05f, iz * 0.30f};
         for (int step = 0; step < 170; ++step) {
           Vec3 velocity = SampleVelocity(snapshot, p);
           float speed = Length(velocity);
@@ -100,7 +100,8 @@ bool Render(IDevice *device,
             Controls controls,
             int frames,
             bool headless,
-            const std::string &capture) {
+            const std::string &capture,
+            const ViewSettings &view) {
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<IWindow> window;
   if (!headless) {
@@ -149,8 +150,8 @@ bool Render(IDevice *device,
   std::shared_ptr<const Snapshot> state;
   std::shared_ptr<const std::vector<Vertex>> mesh;
   size_t line_count = 0;
-  bool paused = false, streamlines = true, show_loads = true, rebuild = true;
-  float yaw = -0.85f, pitch = 0.48f, distance = 14, fps = 0, logical_width = 1440;
+  bool paused = false, streamlines = view.flow, show_loads = view.loads, rebuild = true;
+  float yaw = view.yaw, pitch = view.pitch, distance = view.distance, fps = 0, logical_width = 1440;
   auto previous = std::chrono::steady_clock::now(), beginning = previous;
   int rendered = 0, updates = 0;
   simulation.Configure(controls, paused);
@@ -195,6 +196,10 @@ bool Render(IDevice *device,
               ImGui::Text("CUDA step %.1f ms | #%llu", state->step_seconds * 1000,
                           static_cast<unsigned long long>(state->step));
               ImGui::Text("Simulation %.3f s | dt %.4f", state->time, state->dt);
+              ImGui::Text("Grid %d | pressure %.2g (%d PCG)", state->solver_nx, state->pressure_residual,
+                          state->pressure_cycles);
+              if (!state->pressure_converged)
+                ImGui::TextColored({1, 0.5f, 0.2f, 1}, "Pressure tolerance not met");
               ImGui::Text("Divergence RMS %.4g -> %.4g", state->divergence_before, state->divergence_after);
             } else
               ImGui::TextUnformatted("Building first flow snapshot...");
@@ -215,7 +220,7 @@ bool Render(IDevice *device,
             rebuild |= ImGui::Checkbox("3D streamlines", &streamlines);
             rebuild |= ImGui::Checkbox("Force and moment vectors", &show_loads);
             ImGui::SliderFloat("Orbit", &yaw, -3.14f, 3.14f);
-            ImGui::SliderFloat("Elevation", &pitch, -1.3f, 1.3f);
+            ImGui::SliderFloat("Elevation", &pitch, -1.55f, 1.55f);
             ImGui::SliderFloat("Distance", &distance, 7, 25);
             ImGui::TextWrapped("Drag outside panel to orbit; wheel to zoom. Flow: blue = slow, yellow = fast.");
             ImGui::SeparatorText("Integrated aircraft loads");
@@ -234,7 +239,7 @@ bool Render(IDevice *device,
             if (!io.WantCaptureMouse) {
               if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
                 yaw -= io.MouseDelta.x * 0.006f;
-                pitch = std::clamp(pitch + io.MouseDelta.y * 0.006f, -1.3f, 1.3f);
+                pitch = std::clamp(pitch + io.MouseDelta.y * 0.006f, -1.55f, 1.55f);
               }
               distance = std::clamp(distance - io.MouseWheel, 7.0f, 25.0f);
             }

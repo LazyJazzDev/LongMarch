@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <thread>
@@ -7,11 +8,40 @@
 #include "simulation.h"
 
 namespace wind3d {
+// Cross-check the actual explicit mesh against the independent occupancy path,
+// including combined extreme deflections. Glazing/paint has a 1.2 mm offset.
+inline bool ValidateGeometry() {
+  const Controls poses[] = {{12, 5, 0, 0, 0, 0}, {12, -20, 40, 25, -25, 25}, {12, 25, 0, -25, 25, -25}};
+  float maximum = 0;
+  for (const auto &controls : poses) {
+    auto mesh = AircraftMesh(controls);
+    if (mesh.empty() || mesh.size() % 3)
+      return false;
+    for (size_t i = 0; i < mesh.size(); ++i) {
+      const auto &vertex = mesh[i];
+      if (!std::isfinite(Length(vertex.position) + Length(vertex.normal)) ||
+          std::abs(Length(vertex.normal) - 1) > 0.001f) {
+        std::cerr << "Invalid mesh vertex " << i << ", normal length=" << Length(vertex.normal) << '\n';
+        return false;
+      }
+      if (i % 31 == 0) {
+        maximum = std::max(maximum, AircraftDistance(vertex.position, controls));
+        if (maximum > 0.0025f) {
+          std::cerr << "Geometry / solid boundary mismatch: " << maximum << " m\n";
+          return false;
+        }
+      }
+    }
+  }
+  std::cout << "geometry_validation=PASS max_surface_offset=" << maximum << " m\n";
+  return true;
+}
+
 // Exercise ownership and step-boundary control changes on the actual worker,
 // including a reset while paused. No additional simulation/backend is mocked.
 inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
   auto wait_for = [&](auto predicate) {
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(3);
     while (std::chrono::steady_clock::now() < deadline) {
       if (!simulation.Error().empty())
         return false;
@@ -38,7 +68,7 @@ inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
   if (simulation.Latest() != old)
     return false;
   controls.speed = controls.speed > 15 ? 8 : 20;
-  controls.angle = -8;
+  controls.angle = controls.angle == -8 ? 8 : -8;
   controls.flap = 25;
   controls.aileron = 15;
   controls.elevator = -15;

@@ -6,6 +6,7 @@
 #include <mutex>
 #include <thread>
 
+#include "pressure.cuh"
 #include "simulation.h"
 
 namespace wind3d {
@@ -72,7 +73,43 @@ __device__ bool Blocked(Grid g, const unsigned char *solid, int x, int y, int z,
   return g.Inside(x, y, z) && solid[g.C(x, y, z)];
 }
 
-__global__ void Boundary(Grid g, const unsigned char *solid, float *u, float *v, float *w, float speed, bool reset) {
+// Subcell sampling of the pressure-cell connection captures thin walls even
+// when both adjacent cell centres are fluid. These faces also define A and loads.
+__global__ void FaceMask(Grid g,
+                         const unsigned char *solid,
+                         unsigned char *bu,
+                         unsigned char *bv,
+                         unsigned char *bw,
+                         Controls controls) {
+  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
+    return;
+  int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
+  bu[n] = bv[n] = bw[n] = 0;
+  Vec3 body = BodyPoint(g.Position(x, y, z), controls);
+  if (body.x < -3.1f - g.h || body.x > 3.4f + g.h || fabsf(body.z) > 3.4f + g.h || body.y < -0.85f - g.h ||
+      body.y > 1.4f + g.h)
+    return;
+  unsigned char *faces[] = {bu, bv, bw};
+  for (int axis = 0; axis < 3; ++axis) {
+    bool blocked = Blocked(g, solid, x, y, z, axis);
+    Vec3 normal{axis == 0 ? 1.0f : 0, axis == 1 ? 1.0f : 0, axis == 2 ? 1.0f : 0};
+    Vec3 center = Add(g.Position(x, y, z), Scale(normal, -0.5f * g.h));
+    for (int sample = -3; sample <= 3 && !blocked; ++sample)
+      blocked = AircraftDistance(Add(center, Scale(normal, sample * g.h / 8)), controls) <= 0;
+    faces[axis][n] = blocked;
+  }
+}
+
+__global__ void Boundary(Grid g,
+                         const unsigned char *bu,
+                         const unsigned char *bv,
+                         const unsigned char *bw,
+                         float *u,
+                         float *v,
+                         float *w,
+                         float speed,
+                         bool reset) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
@@ -82,12 +119,24 @@ __global__ void Boundary(Grid g, const unsigned char *solid, float *u, float *v,
     v[n] = 0;
     w[n] = 0;
   }
-  if (Blocked(g, solid, x, y, z, 0))
+  if (bu[n])
     u[n] = 0;
-  if (Blocked(g, solid, x, y, z, 1))
+  if (bv[n])
     v[n] = 0;
-  if (Blocked(g, solid, x, y, z, 2))
+  if (bw[n])
     w[n] = 0;
+}
+
+__device__ Vec3
+Departure(Grid g, const float *u, const float *v, const float *w, int x, int y, int z, int axis, float dt) {
+  Vec3 offset{axis == 0 ? 0.0f : 0.5f, axis == 1 ? 0.0f : 0.5f, axis == 2 ? 0.0f : 0.5f};
+  Vec3 p{x + offset.x, y + offset.y, z + offset.z};
+  Vec3 velocity{Sample(u, g, Add(p, {0, -0.5f, -0.5f})), Sample(v, g, Add(p, {-0.5f, 0, -0.5f})),
+                Sample(w, g, Add(p, {-0.5f, -0.5f, 0}))};
+  Vec3 midpoint = Add(p, Scale(velocity, -0.5f * dt / g.h));
+  velocity = {Sample(u, g, Add(midpoint, {0, -0.5f, -0.5f})), Sample(v, g, Add(midpoint, {-0.5f, 0, -0.5f})),
+              Sample(w, g, Add(midpoint, {-0.5f, -0.5f, 0}))};
+  return Add(Add(p, Scale(velocity, -dt / g.h)), Scale(offset, -1));
 }
 
 __global__ void Advect(Grid g,
@@ -102,15 +151,40 @@ __global__ void Advect(Grid g,
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
-  Vec3 offset{axis == 0 ? 0.0f : 0.5f, axis == 1 ? 0.0f : 0.5f, axis == 2 ? 0.0f : 0.5f};
-  Vec3 p{x + offset.x, y + offset.y, z + offset.z};
-  Vec3 velocity{Sample(u, g, Add(p, {0, -0.5f, -0.5f})), Sample(v, g, Add(p, {-0.5f, 0, -0.5f})),
-                Sample(w, g, Add(p, {-0.5f, -0.5f, 0}))};
-  Vec3 back = Add(Add(p, Scale(velocity, -dt / g.h)), Scale(offset, -1));
+  destination[n] = Sample(source, g, Departure(g, u, v, w, x, y, z, axis, dt));
+}
+
+__global__ void CorrectTransport(Grid g,
+                                 const float *u,
+                                 const float *v,
+                                 const float *w,
+                                 const float *source,
+                                 const float *reverse,
+                                 float *forward,
+                                 int axis,
+                                 float dt) {
+  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
+    return;
+  int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
+  float transported = forward[n];
+  if (reverse) {
+    Vec3 back = Departure(g, u, v, w, x, y, z, axis, dt);
+    int ix = int(floorf(back.x)), iy = int(floorf(back.y)), iz = int(floorf(back.z));
+    float low = 1e30f, high = -1e30f;
+    for (int k = 0; k < 2; ++k)
+      for (int j = 0; j < 2; ++j)
+        for (int i = 0; i < 2; ++i) {
+          float value = Read(source, g, ix + i, iy + j, iz + k);
+          low = fminf(low, value);
+          high = fmaxf(high, value);
+        }
+    transported = fminf(fmaxf(transported + 0.5f * (source[n] - reverse[n]), low), high);
+  }
   float lap = Read(source, g, x - 1, y, z) + Read(source, g, x + 1, y, z) + Read(source, g, x, y - 1, z) +
               Read(source, g, x, y + 1, z) + Read(source, g, x, y, z - 1) + Read(source, g, x, y, z + 1) -
               6 * source[n];
-  destination[n] = Sample(source, g, back) + viscosity * dt / (g.h * g.h) * lap;
+  forward[n] = transported + viscosity * dt / (g.h * g.h) * lap;
 }
 
 __global__ void Divergence(Grid g,
@@ -129,44 +203,24 @@ __global__ void Divergence(Grid g,
                           g.h;
 }
 
-__global__ void Pressure(Grid g, const unsigned char *solid, const float *div, float *p, float dt, int parity) {
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
-  if (n >= g.nx * g.ny * g.nz || solid[n])
-    return;
-  int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
-  if ((x + y + z) % 2 != parity)
-    return;
-  float sum = 0, diagonal = 0;
-  for (int axis = 0; axis < 3; ++axis) {
-    for (int sign = -1; sign <= 1; sign += 2) {
-      int a = x + (axis == 0 ? sign : 0), b = y + (axis == 1 ? sign : 0), c = z + (axis == 2 ? sign : 0);
-      if (g.Inside(a, b, c)) {
-        int neighbor = g.C(a, b, c);
-        if (!solid[neighbor]) {
-          sum += p[neighbor];
-          diagonal += 1;
-        }
-      } else if (a == g.nx) {
-        // Outlet pressure is zero at the boundary, half a cell away.
-        diagonal += 2;
-      }
-    }
-  }
-  if (diagonal > 0) {
-    float candidate = (sum - div[n] * density * g.h * g.h / dt) / diagonal;
-    p[n] += 1.7f * (candidate - p[n]);
-  }
-}
-
-__global__ void Project(Grid g, const unsigned char *solid, const float *p, float *u, float *v, float *w, float dt) {
+__global__ void Project(Grid g,
+                        const unsigned char *bu,
+                        const unsigned char *bv,
+                        const unsigned char *bw,
+                        const float *p,
+                        float *u,
+                        float *v,
+                        float *w,
+                        float dt) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
   float *fields[] = {u, v, w};
+  const unsigned char *blocked[] = {bu, bv, bw};
   for (int axis = 0; axis < 3; ++axis) {
     int a = x - (axis == 0), b = y - (axis == 1), c = z - (axis == 2);
-    if (Blocked(g, solid, x, y, z, axis)) {
+    if (blocked[axis][n]) {
       fields[axis][n] = 0;
       continue;
     }
@@ -177,19 +231,101 @@ __global__ void Project(Grid g, const unsigned char *solid, const float *p, floa
   }
 }
 
-__global__ void Export(Grid g,
-                       const unsigned char *solid,
-                       const float *u,
-                       const float *v,
-                       const float *w,
-                       const float *p,
-                       Cell *cells) {
+struct Statistics {
+  float before{}, after{}, max_speed{};
+  Vec3 force{}, moment{};
+  int invalid{};
+};
+
+__device__ Vec3 CenterVelocity(Grid g, const float *u, const float *v, const float *w, int x, int y, int z) {
+  return {0.5f * (u[g.F(x, y, z)] + u[g.F(x + 1, y, z)]), 0.5f * (v[g.F(x, y, z)] + v[g.F(x, y + 1, z)]),
+          0.5f * (w[g.F(x, y, z)] + w[g.F(x, y, z + 1)])};
+}
+
+__global__ void Measure(Grid g,
+                        const unsigned char *solid,
+                        const unsigned char *bu,
+                        const unsigned char *bv,
+                        const unsigned char *bw,
+                        const float *u,
+                        const float *v,
+                        const float *w,
+                        const float *p,
+                        const float *before,
+                        const float *after,
+                        Statistics *blocks) {
+  __shared__ Statistics values[256];
   int n = blockIdx.x * blockDim.x + threadIdx.x;
-  if (n >= g.nx * g.ny * g.nz)
+  Statistics value;
+  if (n < g.nx * g.ny * g.nz) {
+    int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
+    Vec3 velocity = CenterVelocity(g, u, v, w, x, y, z);
+    value.before = before[n] * before[n];
+    value.after = after[n] * after[n];
+    value.max_speed = Length(velocity);
+    value.invalid = !isfinite(velocity.x + velocity.y + velocity.z + p[n] + before[n] + after[n]);
+    if (!solid[n]) {
+      const unsigned char *blocked[] = {bu, bv, bw};
+      for (int axis = 0; axis < 3; ++axis)
+        for (int sign = -1; sign <= 1; sign += 2) {
+          int a = x + (axis == 0 && sign > 0), b = y + (axis == 1 && sign > 0), c = z + (axis == 2 && sign > 0);
+          if (!blocked[axis][g.F(a, b, c)])
+            continue;
+          Vec3 outward{axis == 0 ? float(sign) : 0, axis == 1 ? float(sign) : 0, axis == 2 ? float(sign) : 0};
+          Vec3 tangent = velocity;
+          if (axis == 0)
+            tangent.x = 0;
+          if (axis == 1)
+            tangent.y = 0;
+          if (axis == 2)
+            tangent.z = 0;
+          Vec3 force = Add(Scale(outward, p[n] * g.h * g.h), Scale(tangent, 2 * density * viscosity * g.h));
+          Vec3 point = Add(g.Position(x, y, z), Scale(outward, g.h * 0.5f));
+          value.force = Add(value.force, force);
+          value.moment = Add(value.moment, Cross(point, force));
+        }
+    }
+  }
+
+  values[threadIdx.x] = value;
+  __syncthreads();
+  for (int offset = 128; offset; offset >>= 1) {
+    if (threadIdx.x < offset) {
+      auto &a = values[threadIdx.x];
+      auto b = values[threadIdx.x + offset];
+      a.before += b.before;
+      a.after += b.after;
+      a.max_speed = fmaxf(a.max_speed, b.max_speed);
+      a.force = Add(a.force, b.force);
+      a.moment = Add(a.moment, b.moment);
+      a.invalid |= b.invalid;
+    }
+    __syncthreads();
+  }
+  if (!threadIdx.x)
+    blocks[blockIdx.x] = values[0];
+}
+
+__global__ void
+Export(Grid g, Grid output, const float *u, const float *v, const float *w, const float *p, Cell *cells) {
+  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  if (n >= output.nx * output.ny * output.nz)
     return;
-  int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
-  cells[n] = {0.5f * (u[g.F(x, y, z)] + u[g.F(x + 1, y, z)]), 0.5f * (v[g.F(x, y, z)] + v[g.F(x, y + 1, z)]),
-              0.5f * (w[g.F(x, y, z)] + w[g.F(x, y, z + 1)]), solid[n] ? 0 : p[n]};
+  int x = n % output.nx, y = n / output.nx % output.ny, z = n / (output.nx * output.ny);
+  float ratio = float(g.nx) / output.nx;
+  Vec3 position{(x + 0.5f) * ratio, (y + 0.5f) * ratio, (z + 0.5f) * ratio};
+  Cell cell{Sample(u, g, Add(position, {0, -0.5f, -0.5f})), Sample(v, g, Add(position, {-0.5f, 0, -0.5f})),
+            Sample(w, g, Add(position, {-0.5f, -0.5f, 0})), 0};
+  position = Add(position, {-0.5f, -0.5f, -0.5f});
+  int ix = int(floorf(position.x)), iy = int(floorf(position.y)), iz = int(floorf(position.z));
+  for (int k = 0; k < 2; ++k)
+    for (int j = 0; j < 2; ++j)
+      for (int i = 0; i < 2; ++i) {
+        int a = max(0, min(g.nx - 1, ix + i)), b = max(0, min(g.ny - 1, iy + j)), c = max(0, min(g.nz - 1, iz + k));
+        cell.pressure += p[g.C(a, b, c)] * (i ? position.x - ix : 1 - position.x + ix) *
+                         (j ? position.y - iy : 1 - position.y + iy) * (k ? position.z - iz : 1 - position.z + iz);
+      }
+  cells[n] = cell;
 }
 }  // namespace
 
@@ -203,11 +339,15 @@ struct Simulation::Impl {
   std::shared_ptr<const Snapshot> latest;
   std::string error;
   Grid grid{};
+  pressure::Solver pressure_solver;
+  SolverOptions options;
   int device{};
   cudaStream_t stream{};
-  float *u{}, *v{}, *w{}, *un{}, *vn{}, *wn{}, *pressure{}, *div{}, *after{};
-  unsigned char *solid{};
+  float *u{}, *v{}, *w{}, *un{}, *vn{}, *wn{}, *reverse{}, *pressure{}, *div{}, *after{};
+  unsigned char *solid{}, *bu{}, *bv{}, *bw{};
   Cell *cells{};
+  Statistics *statistics{};
+  Grid display_grid{};
   std::vector<void *> allocations;
 
   bool Check(cudaError_t result) {
@@ -235,9 +375,14 @@ struct Simulation::Impl {
       return false;
     size_t nf = size_t(grid.nx + 1) * (grid.ny + 1) * (grid.nz + 1);
     size_t nc = size_t(grid.nx) * grid.ny * grid.nz;
+    int display_nx = std::min(grid.nx, 192);
+    display_grid = {display_nx, display_nx / 2, display_nx * 3 / 4, 16.0f / display_nx};
+    size_t display_cells = size_t(display_grid.nx) * display_grid.ny * display_grid.nz;
     return Allocate(u, nf) && Allocate(v, nf) && Allocate(w, nf) && Allocate(un, nf) && Allocate(vn, nf) &&
-           Allocate(wn, nf) && Allocate(pressure, nc) && Allocate(div, nc) && Allocate(after, nc) &&
-           Allocate(solid, nc) && Allocate(cells, nc) && Check(cudaStreamSynchronize(stream));
+           Allocate(wn, nf) && Allocate(reverse, nf) && Allocate(pressure, nc) && Allocate(div, nc) &&
+           Allocate(after, nc) && Allocate(solid, nc) && Allocate(bu, nf) && Allocate(bv, nf) && Allocate(bw, nf) &&
+           Allocate(cells, display_cells) && Allocate(statistics, (nc + 255) / 256) &&
+           Check(pressure_solver.Initialize(grid.nx, grid.ny, grid.nz, stream)) && Check(cudaStreamSynchronize(stream));
   }
 
   void Run() {
@@ -246,8 +391,8 @@ struct Simulation::Impl {
     const auto g = grid;
     int nc = g.nx * g.ny * g.nz, nf = (g.nx + 1) * (g.ny + 1) * (g.nz + 1);
     int cb = (nc + 255) / 256, fb = (nf + 255) / 256;
-    std::vector<float> before_cpu(nc), after_cpu(nc);
-    std::vector<unsigned char> mask(nc);
+    std::vector<Statistics> measurements(cb);
+    size_t display_count = size_t(display_grid.nx) * display_grid.ny * display_grid.nz;
     uint64_t applied_generation = ~uint64_t(0), step = 0;
     float time = 0, max_speed = 12;
     Controls mesh_controls;
@@ -270,78 +415,82 @@ struct Simulation::Impl {
         step = 0;
         time = 0;
         max_speed = controls.speed;
+        if (!Check(cudaMemsetAsync(pressure, 0, size_t(nc) * sizeof(float), stream)))
+          break;
       }
       applied_generation = current_generation;
       float dt = std::min(0.5f * g.h / std::max(max_speed, controls.speed), 0.12f * g.h * g.h / viscosity);
-      Mask<<<cb, 256, 0, stream>>>(g, solid, controls);
-      Boundary<<<fb, 256, 0, stream>>>(g, solid, u, v, w, controls.speed, reset);
+      bool geometry_changed = !mesh || controls.angle != mesh_controls.angle || controls.flap != mesh_controls.flap ||
+                              controls.aileron != mesh_controls.aileron ||
+                              controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder;
+      if (geometry_changed) {
+        Mask<<<cb, 256, 0, stream>>>(g, solid, controls);
+        FaceMask<<<fb, 256, 0, stream>>>(g, solid, bu, bv, bw, controls);
+        if (!Check(pressure_solver.Build(solid, bu, bv, bw)))
+          break;
+      }
+      Boundary<<<fb, 256, 0, stream>>>(g, bu, bv, bw, u, v, w, controls.speed, reset);
       Advect<<<fb, 256, 0, stream>>>(g, u, v, w, u, un, 0, dt);
       Advect<<<fb, 256, 0, stream>>>(g, u, v, w, v, vn, 1, dt);
       Advect<<<fb, 256, 0, stream>>>(g, u, v, w, w, wn, 2, dt);
+      Boundary<<<fb, 256, 0, stream>>>(g, bu, bv, bw, un, vn, wn, controls.speed, false);
+      float *sources[] = {u, v, w}, *destinations[] = {un, vn, wn};
+      for (int axis = 0; axis < 3; ++axis) {
+        if (options.corrected_transport)
+          Advect<<<fb, 256, 0, stream>>>(g, u, v, w, destinations[axis], reverse, axis, -dt);
+        CorrectTransport<<<fb, 256, 0, stream>>>(
+            g, u, v, w, sources[axis], options.corrected_transport ? reverse : nullptr, destinations[axis], axis, dt);
+      }
       std::swap(u, un);
       std::swap(v, vn);
       std::swap(w, wn);
-      Boundary<<<fb, 256, 0, stream>>>(g, solid, u, v, w, controls.speed, false);
+      Boundary<<<fb, 256, 0, stream>>>(g, bu, bv, bw, u, v, w, controls.speed, false);
       Divergence<<<cb, 256, 0, stream>>>(g, solid, u, v, w, div);
-      if (!Check(cudaMemsetAsync(pressure, 0, size_t(nc) * sizeof(float), stream)))
+      int pressure_cycles = 0;
+      float pressure_residual = 0;
+      if (!Check(pressure_solver.Solve(div, pressure, density * g.h * g.h / dt, options.pressure_tolerance,
+                                       options.pressure_cycles, pressure_cycles, pressure_residual)))
         break;
-      // Red-black SOR solves the variable solid-boundary Poisson system. Each
-      // launch is short so the graphics queue can progress between launches.
-      for (int iteration = 0; iteration < 400; ++iteration) {
-        Pressure<<<cb, 256, 0, stream>>>(g, solid, div, pressure, dt, 0);
-        Pressure<<<cb, 256, 0, stream>>>(g, solid, div, pressure, dt, 1);
-      }
-      Project<<<fb, 256, 0, stream>>>(g, solid, pressure, u, v, w, dt);
+      Project<<<fb, 256, 0, stream>>>(g, bu, bv, bw, pressure, u, v, w, dt);
       Divergence<<<cb, 256, 0, stream>>>(g, solid, u, v, w, after);
-      Export<<<cb, 256, 0, stream>>>(g, solid, u, v, w, pressure, cells);
+      Measure<<<cb, 256, 0, stream>>>(g, solid, bu, bv, bw, u, v, w, pressure, div, after, statistics);
+      Export<<<(display_count + 255) / 256, 256, 0, stream>>>(g, display_grid, u, v, w, pressure, cells);
       auto snapshot = std::make_shared<Snapshot>();
-      snapshot->cells.resize(nc);
+      snapshot->cells.resize(display_count);
       if (!Check(cudaGetLastError()) ||
-          !Check(cudaMemcpyAsync(snapshot->cells.data(), cells, size_t(nc) * sizeof(Cell), cudaMemcpyDeviceToHost,
+          !Check(cudaMemcpyAsync(snapshot->cells.data(), cells, display_count * sizeof(Cell), cudaMemcpyDeviceToHost,
                                  stream)) ||
-          !Check(cudaMemcpyAsync(before_cpu.data(), div, size_t(nc) * sizeof(float), cudaMemcpyDeviceToHost, stream)) ||
-          !Check(
-              cudaMemcpyAsync(after_cpu.data(), after, size_t(nc) * sizeof(float), cudaMemcpyDeviceToHost, stream)) ||
-          !Check(cudaMemcpyAsync(mask.data(), solid, size_t(nc), cudaMemcpyDeviceToHost, stream)) ||
+          !Check(cudaMemcpyAsync(measurements.data(), statistics, measurements.size() * sizeof(Statistics),
+                                 cudaMemcpyDeviceToHost, stream)) ||
           !Check(cudaStreamSynchronize(stream)))
         break;
-      double before_sum = 0, after_sum = 0;
+      double before_sum = 0, after_sum = 0, force[3]{}, moment[3]{};
       max_speed = controls.speed;
-      for (int n = 0; n < nc; ++n) {
-        before_sum += double(before_cpu[n]) * before_cpu[n];
-        after_sum += double(after_cpu[n]) * after_cpu[n];
-        const auto &c = snapshot->cells[n];
-        max_speed = std::max(max_speed, Length({c.u, c.v, c.w}));
-        if (!std::isfinite(c.u + c.v + c.w + c.pressure + after_cpu[n])) {
+      for (auto value : measurements) {
+        before_sum += value.before;
+        after_sum += value.after;
+        max_speed = std::max(max_speed, value.max_speed);
+        if (value.invalid) {
           std::lock_guard<std::mutex> guard(mutex);
           error = "Non-finite fluid state";
           return;
         }
-        if (!mask[n])
-          continue;
-        int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
-        for (int axis = 0; axis < 3; ++axis)
-          for (int sign : {-1, 1}) {
-            int a = x + (axis == 0 ? sign : 0), b = y + (axis == 1 ? sign : 0), d = z + (axis == 2 ? sign : 0);
-            if (a < 0 || a >= g.nx || b < 0 || b >= g.ny || d < 0 || d >= g.nz)
-              continue;
-            int neighbor = g.C(a, b, d);
-            if (mask[neighbor])
-              continue;
-            const auto &fluid = snapshot->cells[neighbor];
-            Vec3 normal{axis == 0 ? float(sign) : 0, axis == 1 ? float(sign) : 0, axis == 2 ? float(sign) : 0};
-            Vec3 tangential{axis == 0 ? 0 : fluid.u, axis == 1 ? 0 : fluid.v, axis == 2 ? 0 : fluid.w};
-            Vec3 force =
-                Add(Scale(normal, -fluid.pressure * g.h * g.h), Scale(tangential, 2 * density * viscosity * g.h));
-            Vec3 point{(x + 0.5f) * g.h - 6 + normal.x * g.h * 0.5f, (y + 0.5f) * g.h - 4 + normal.y * g.h * 0.5f,
-                       (z + 0.5f) * g.h - 6 + normal.z * g.h * 0.5f};
-            snapshot->force = Add(snapshot->force, force);
-            snapshot->moment = Add(snapshot->moment, Cross(point, force));
-          }
+        force[0] += value.force.x;
+        force[1] += value.force.y;
+        force[2] += value.force.z;
+        moment[0] += value.moment.x;
+        moment[1] += value.moment.y;
+        moment[2] += value.moment.z;
       }
-      snapshot->nx = g.nx;
-      snapshot->ny = g.ny;
-      snapshot->nz = g.nz;
+      snapshot->force = {float(force[0]), float(force[1]), float(force[2])};
+      snapshot->moment = {float(moment[0]), float(moment[1]), float(moment[2])};
+      snapshot->solver_nx = g.nx;
+      snapshot->pressure_converged = pressure_residual <= options.pressure_tolerance;
+      snapshot->pressure_cycles = pressure_cycles;
+      snapshot->pressure_residual = pressure_residual;
+      snapshot->nx = display_grid.nx;
+      snapshot->ny = display_grid.ny;
+      snapshot->nz = display_grid.nz;
       snapshot->step = ++step;
       snapshot->generation = current_generation;
       snapshot->time = time += dt;
@@ -377,6 +526,7 @@ struct Simulation::Impl {
     cudaSetDevice(device);
     if (stream)
       cudaStreamSynchronize(stream);
+    pressure_solver.Release();
     for (auto allocation : allocations)
       cudaFree(allocation);
     if (stream)
@@ -389,11 +539,13 @@ Simulation::Simulation() : impl_(std::make_unique<Impl>()) {
 
 Simulation::~Simulation() = default;
 
-std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx) {
-  if (cuda_device < 0 || nx < 64 || nx > 256 || nx % 16)
+std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const SolverOptions &options) {
+  if (cuda_device < 0 || nx < 64 || nx > 512 || nx % 16 || options.pressure_tolerance < 1e-6f ||
+      options.pressure_tolerance > 0.1f || options.pressure_cycles < 1 || options.pressure_cycles > 256)
     return {};
   auto result = std::unique_ptr<Simulation>(new Simulation);
   result->impl_->device = cuda_device;
+  result->impl_->options = options;
   result->impl_->grid = {nx, nx / 2, nx * 3 / 4, 16.0f / nx};
   if (!result->impl_->Initialize())
     return {};

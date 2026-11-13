@@ -21,13 +21,18 @@ class MeshBuilder {
   std::vector<Vertex> Build() {
     Fuselage();
     for (int side : {-1, 1}) {
-      Foil(0, 2.7f, side, 4.5f, 1.8f, 0.55f, -1.05f, 0.38f, 0.045f, 0, controls_.flap, false, {0.95f, 0.53f, 0.13f});
-      Foil(2.7f, 4.5f, side, 4.5f, 1.8f, 0.55f, -1.05f, 0.38f, 0.045f, 0, side * controls_.aileron, false,
-           {0.17f, 0.65f, 0.95f});
-      Foil(0, 1.65f, side, 1.65f, 0.95f, 0.4f, 1.65f, 0.32f, 0.05f, 0.18f, controls_.elevator, false,
-           {0.26f, 0.78f, 0.54f});
+      for (int part = 0; part < 7; ++part) {
+        if (part == 5 && side == -1)
+          continue;
+        Vec3 color = part == 1   ? Vec3{0.72f, 0.66f, 0.52f}
+                     : part == 2 ? Vec3{0.45f, 0.61f, 0.72f}
+                     : part == 4 ? Vec3{0.48f, 0.65f, 0.59f}
+                                 : Vec3{0.35f, 0.49f, 0.69f};
+        Foil(AircraftPart(part, side, controls_), color, part == 5 ? Vec3{0.035f, 0.15f, 0.32f} : skin);
+      }
+      Nacelle(side);
+      CabinDetails(side);
     }
-    Foil(0, 1.55f, 1, 1.55f, 1.25f, 0.45f, 1.35f, 0.45f, 0, 0.1f, controls_.rudder, true, {0.77f, 0.38f, 0.85f});
     return std::move(vertices_);
   }
 
@@ -51,54 +56,111 @@ class MeshBuilder {
     Triangle(a, c, d);
   }
 
-  void Fuselage() {
-    auto point = [&](int ring, int segment) {
-      float t = pi * ring / 96, phi = 2 * pi * segment / 64;
-      Vec3 p{-3 * cosf(t), 0.38f * sinf(t) * cosf(phi), 0.38f * sinf(t) * sinf(phi)};
-      if (ring == 0 || ring == 96)
-        p = {ring == 0 ? -3.0f : 3.0f, 0, 0};
-      return MakeVertex(p, {p.x / 9, p.y / (0.38f * 0.38f), p.z / (0.38f * 0.38f)}, skin);
-    };
-    for (int ring = 0; ring < 96; ++ring)
-      for (int segment = 0; segment < 64; ++segment)
-        Quad(point(ring, segment), point(ring + 1, segment), point(ring + 1, (segment + 1) % 64),
-             point(ring, (segment + 1) % 64));
+  Vertex BodyVertex(float x, float phi, Vec3 color, float offset = 0) const {
+    Vec3 p = FuselagePoint(x, phi);
+    Vec3 dx =
+        Add(FuselagePoint(std::min(3.0f, x + 0.001f), phi), Scale(FuselagePoint(std::max(-3.0f, x - 0.001f), phi), -1));
+    Vec3 dp = Add(FuselagePoint(x, phi + 0.001f), Scale(FuselagePoint(x, phi - 0.001f), -1));
+    Vec3 n = Unit(Cross(dp, dx));
+    if (std::abs(x) >= 3)
+      n = {x < 0 ? -1.0f : 1.0f, 0, 0};
+    return MakeVertex(Add(p, Scale(n, offset)), n, color);
   }
 
-  void Foil(float start,
-            float end,
-            int side,
-            float span,
-            float root,
-            float tip,
-            float leading,
-            float sweep,
-            float dihedral,
-            float offset,
-            float deflection,
-            bool vertical,
-            Vec3 control_color) {
+  void Fuselage() {
+    constexpr int rings = 160, slices = 96;
+    auto point = [&](int ring, int segment) {
+      float x = -3 + 6.0f * ring / rings, phi = 2 * pi * segment / slices;
+      Vec3 color = cosf(phi) < -0.65f ? Vec3{0.045f, 0.13f, 0.24f} : Vec3{0.86f, 0.88f, 0.90f};
+      return BodyVertex(x, phi, color);
+    };
+    for (int i = 0; i < rings; ++i)
+      for (int j = 0; j < slices; ++j)
+        Quad(point(i, j), point(i + 1, j), point(i + 1, (j + 1) % slices), point(i, (j + 1) % slices));
+  }
+
+  void CabinDetails(int side) {
+    // Paint/flush glazing lies on the explicit fuselage; it adds no fake solid
+    // obstacles to the aerodynamic boundary. Small offsets avoid depth fighting.
+    const Vec3 glass{0.015f, 0.045f, 0.075f}, trim{0.20f, 0.26f, 0.31f};
+    auto patch = [&](float x, float phi, float rx, float rp) {
+      auto center = BodyVertex(x, side * phi, glass, 0.001f);
+      for (int i = 0; i < 24; ++i) {
+        float a = 2 * pi * i / 24, b = 2 * pi * (i + 1) / 24;
+        Triangle(center, BodyVertex(x + rx * cosf(a), side * (phi + rp * sinf(a)), glass, 0.001f),
+                 BodyVertex(x + rx * cosf(b), side * (phi + rp * sinf(b)), glass, 0.001f));
+      }
+    };
+    for (int i = 0; i < 23; ++i)
+      patch(-1.75f + i * 0.14f, 1.17f, 0.029f, 0.11f);
+    // Tessellated trapezoidal cockpit panes follow the nose skin. A single
+    // planar quad would sink into the convex fuselage and disappear.
+    auto pane = [&](Vec3 a, Vec3 b, Vec3 c, Vec3 d) {
+      auto point = [&](int i, int j) {
+        float u = i / 8.0f, v = j / 8.0f;
+        Vec3 q = Add(Scale(Add(Scale(a, 1 - u), Scale(b, u)), 1 - v), Scale(Add(Scale(d, 1 - u), Scale(c, u)), v));
+        return BodyVertex(q.x, side * q.y, glass, 0.001f);
+      };
+      for (int i = 0; i < 8; ++i)
+        for (int j = 0; j < 8; ++j)
+          Quad(point(i, j), point(i + 1, j), point(i + 1, j + 1), point(i, j + 1));
+    };
+    pane({-2.70f, 0.28f, 0}, {-2.52f, 0.34f, 0}, {-2.50f, 0.72f, 0}, {-2.69f, 0.68f, 0});
+    pane({-2.65f, 0.76f, 0}, {-2.48f, 0.80f, 0}, {-2.39f, 1.12f, 0}, {-2.58f, 1.10f, 0});
+    pane({-2.54f, 1.14f, 0}, {-2.37f, 1.16f, 0}, {-2.24f, 1.37f, 0}, {-2.43f, 1.40f, 0});
+    for (float x : {-1.96f, 1.63f}) {
+      for (int i = 0; i < 32; ++i) {
+        float a = 2 * pi * i / 32, b = 2 * pi * (i + 1) / 32;
+        auto outline = [&](float t, float scale) {
+          return BodyVertex(x + 0.055f * scale * std::copysign(std::pow(std::abs(cosf(t)), 0.35f), cosf(t)),
+                            side * (1.6f + 0.58f * scale * std::copysign(std::pow(std::abs(sinf(t)), 0.35f), sinf(t))),
+                            trim, 0.0012f);
+        };
+        Quad(outline(a, 1), outline(b, 1), outline(b, 0.94f), outline(a, 0.94f));
+      }
+    }
+  }
+
+  void Nacelle(int side) {
+    constexpr int rings = 32, slices = 64;
+    auto point = [&](float t, float phi) {
+      Vec3 p = NacellePoint(t, phi, side);
+      float derivative = (NacelleRadius(t + 0.0001f) - NacelleRadius(t - 0.0001f)) / 0.00018f;
+      Vec3 color = t < 0.08f ? Vec3{0.48f, 0.51f, 0.55f} : skin;
+      return MakeVertex(p, {-derivative, cosf(phi), sinf(phi)}, color);
+    };
+    for (int i = 0; i < rings; ++i)
+      for (int j = 0; j < slices; ++j)
+        Quad(point(float(i) / rings, 2 * pi * j / slices), point(float(i + 1) / rings, 2 * pi * j / slices),
+             point(float(i + 1) / rings, 2 * pi * (j + 1) / slices),
+             point(float(i) / rings, 2 * pi * (j + 1) / slices));
+    for (int end : {0, 1}) {
+      Vec3 center{-1.3f + 0.9f * end, -0.54f, side * 0.92f}, normal{end ? 1.0f : -1.0f, 0, 0};
+      for (int j = 0; j < slices; ++j) {
+        Vec3 color = !end && j % 4 == 0 ? Vec3{0.10f, 0.12f, 0.14f} : Vec3{0.016f, 0.020f, 0.025f};
+        Triangle(MakeVertex(center, normal, color),
+                 MakeVertex(NacellePoint(float(end), 2 * pi * j / slices, side), normal, color),
+                 MakeVertex(NacellePoint(float(end), 2 * pi * (j + 1) / slices, side), normal, color));
+      }
+    }
+  }
+
+  void Foil(const FoilPart &part, Vec3 control_color, Vec3 fixed_color) {
+    float start = part.begin, end = part.end;
     // Separate closed fixed and hinged solids retain their thin trailing edges
     // at every deflection. Spanwise caps close tips and flap/aileron boundaries.
     constexpr int chord_segments = 48, span_segments = 16;
-    for (int piece = 0; piece < 2; ++piece) {
-      float first = piece ? 0.72f : 0, last = piece ? 1 : 0.72f;
-      Vec3 color = piece ? control_color : skin;
-      auto transform = [&](Vec3 p) { return vertical ? Vec3{p.x, p.z + offset, p.y} : Vec3{p.x, p.y + offset, p.z}; };
-      auto position = [&](float u, float s, int surface) {
-        float chord = root + (tip - root) * s / span;
-        Vec3 local{(u - 0.72f) * chord, surface * FoilThickness(u, chord), 0};
-        if (piece)
-          local = RotateZ(local, -deflection);
-        return transform({leading + sweep * s + 0.72f * chord + local.x, dihedral * s + local.y, side * s});
-      };
+    for (int piece = 0; piece < (part.hinged ? 2 : 1); ++piece) {
+      float first = piece ? 0.72f : 0, last = piece || !part.hinged ? 1 : 0.72f;
+      Vec3 color = piece ? control_color : fixed_color;
+      auto position = [&](float u, float s, int surface) { return FoilPoint(part, u, s, surface, piece != 0); };
       auto fraction = [&](int i) { return first + (last - first) * (1 - cosf(pi * i / chord_segments)) * 0.5f; };
       auto vertex = [&](float u, float s, int surface) {
         constexpr float e = 0.0001f;
         Vec3 du =
             Add(position(std::min(last, u + e), s, surface), Scale(position(std::max(first, u - e), s, surface), -1));
         Vec3 ds = Add(position(u, s + e, surface), Scale(position(u, s - e, surface), -1));
-        Vec3 n = Scale(Cross(ds, du), float(side * surface * (vertical ? -1 : 1)));
+        Vec3 n = Scale(Cross(ds, du), surface * Dot(Cross(part.spec.x_axis, part.spec.y_axis), part.spec.z_axis));
         return MakeVertex(position(u, s, surface), n, color);
       };
       for (int surface : {-1, 1}) {
@@ -111,9 +173,13 @@ class MeshBuilder {
         }
       }
       auto cap = [&](Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 outward) {
-        Vec3 n = Cross(Add(b, Scale(a, -1)), Add(d, Scale(a, -1)));
-        if (vertical)
-          outward = {outward.x, outward.z, outward.y};
+        Vec3 n =
+            Add(Cross(Add(b, Scale(a, -1)), Add(c, Scale(a, -1))), Cross(Add(c, Scale(a, -1)), Add(d, Scale(a, -1))));
+        if (piece) {
+          Vec3 origin = ControlTransform(part, {}, false);
+          outward = Add(ControlTransform(part, outward, false), Scale(origin, -1));
+        }
+        outward = FoilVector(part.spec, outward);
         if (n.x * outward.x + n.y * outward.y + n.z * outward.z < 0)
           n = Scale(n, -1);
         Quad(MakeVertex(a, n, color), MakeVertex(b, n, color), MakeVertex(c, n, color), MakeVertex(d, n, color));
@@ -121,12 +187,12 @@ class MeshBuilder {
       for (float s : {start, end})
         for (int i = 0; i < chord_segments; ++i)
           cap(position(fraction(i), s, -1), position(fraction(i + 1), s, -1), position(fraction(i + 1), s, 1),
-              position(fraction(i), s, 1), {0, 0, float(side * (s == start ? -1 : 1))});
+              position(fraction(i), s, 1), {0, 0, s == start ? -1.0f : 1.0f});
       // Exposed hinge faces, rather than an open gap when the control rotates.
       for (float u : {first, last})
         for (int j = 0; j < span_segments; ++j) {
           float a = start + (end - start) * j / span_segments, b = start + (end - start) * (j + 1) / span_segments;
-          Vec3 outward = RotateZ({u == first ? -1.0f : 1.0f, 0, 0}, piece ? -deflection : 0);
+          Vec3 outward{u == first ? -1.0f : 1.0f, 0, 0};
           cap(position(u, a, -1), position(u, b, -1), position(u, b, 1), position(u, a, 1), outward);
         }
     }
