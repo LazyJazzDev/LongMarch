@@ -18,6 +18,8 @@ class CUDASimulation final : public Simulation {
   bool Initialize(IDevice *device, int width, int height);
   bool Reset(const Parameters &) override;
   bool Step(const Parameters &, float dt) override;
+  bool SaveState(SimulationState &) override;
+  bool RestoreState(const SimulationState &) override;
   bool BeginFrame(Event previous) override;
   bool Export() override;
 
@@ -752,6 +754,58 @@ bool CUDASimulation::Step(const Parameters &parameters, float dt) {
                                                           s.h, dt, s.time);
   std::swap(s.dye, s.corrected_dye);
   return s.Check(cudaGetLastError());
+}
+
+bool CUDASimulation::SaveState(SimulationState &state) {
+  auto &s = *impl_;
+  state = {};
+  state.width = s.w;
+  state.height = s.h;
+  state.parameters = s.parameters;
+  state.time = s.time;
+  state.last_dt = s.last_dt;
+  state.loads_valid = s.loads_valid;
+  state.u.resize((s.w + 1) * s.h);
+  state.v.resize(s.w * (s.h + 1));
+  state.pressure.resize(s.w * s.h);
+  state.rhs.resize(s.w * s.h);
+  state.residual.resize(s.w * s.h);
+  state.dye.resize(s.w * s.h);
+  auto l = s.levels[0];
+  for (auto pair : {std::make_pair(&state.u, s.u),
+                    {&state.v, s.v},
+                    {&state.pressure, l.p},
+                    {&state.rhs, l.b},
+                    {&state.residual, l.r},
+                    {&state.dye, s.dye}})
+    if (!s.Check(cudaMemcpyAsync(pair.first->data(), pair.second, pair.first->size() * sizeof(float),
+                                 cudaMemcpyDeviceToHost, s.stream)))
+      return false;
+  return s.Check(cudaStreamSynchronize(s.stream));
+}
+
+bool CUDASimulation::RestoreState(const SimulationState &state) {
+  auto &s = *impl_;
+  if (!state.Matches(s.w, s.h)) {
+    s.error = "Incompatible simulation state";
+    return false;
+  }
+  s.parameters = state.parameters;
+  s.time = state.time;
+  s.last_dt = state.last_dt;
+  s.loads_valid = state.loads_valid;
+  s.GeometryFor(state.parameters);
+  auto l = s.levels[0];
+  for (auto pair : {std::make_pair(&state.u, s.u),
+                    {&state.v, s.v},
+                    {&state.pressure, l.p},
+                    {&state.rhs, l.b},
+                    {&state.residual, l.r},
+                    {&state.dye, s.dye}})
+    if (!s.Check(cudaMemcpyAsync(pair.second, pair.first->data(), pair.first->size() * sizeof(float),
+                                 cudaMemcpyHostToDevice, s.stream)))
+      return false;
+  return s.Check(cudaStreamSynchronize(s.stream));
 }
 
 bool CUDASimulation::Export() {

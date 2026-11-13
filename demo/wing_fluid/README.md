@@ -36,7 +36,29 @@ CUDA Graph. Compute uses ordered RHI dispatches and a GPU buffer arena; diagnost
 and loads use FP32 tree reductions followed by small CPU readbacks, without FP64
 or floating-point atomic requirements. Results need not be bit-identical. Compute
 submissions are batched and use the same queue as rendering. Integrated GPUs may
-benefit from `--grid 128` or `--grid 256`; solver selection is fixed at startup.
+benefit from `--grid 128` or `--grid 256`.
+
+On a CUDA-capable device in a CUDA-enabled build, the main window offers
+**Switch to: Compute Shader / CUDA**. Switching preserves the staggered velocity
+fields, pressure, dye, simulation time, current parameters, pause state and load
+history. It does not reset the flow. The previous frame is drained, state is copied
+through host memory, and the output binding is replaced only after the destination
+solver is ready. The alternate solver is created on first use and then retained;
+the first switch may briefly pause for allocation and shader compilation. Subsequent
+switches still incur a state-copy pause. Failed initialization/transfer leaves the
+original solver selected and displays an error. The button is absent on non-CUDA
+devices and in CUDA-free builds; the startup `--solver` option remains available.
+
+For bounded switching regression, use `--switch-every N` (requires CUDA support).
+With `--validate`, each transfer also verifies exact equality of the copied fields:
+
+```sh
+demo_wing_fluid --solver cuda --validate --grid 128 --frames 24 --switch-every 3
+```
+
+In interactive mode, the switching frame does not advance simulation time. Headless
+switch tests keep deterministic stepping, so their final state can be compared with
+an otherwise identical run without switching.
 
 ## Wing sections
 

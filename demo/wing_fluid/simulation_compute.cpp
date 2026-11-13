@@ -65,6 +65,8 @@ class ComputeSimulation final : public Simulation {
   bool Initialize(IDevice *device, int width, int height);
   bool Reset(const Parameters &parameters) override;
   bool Step(const Parameters &parameters, float dt) override;
+  bool SaveState(SimulationState &) override;
+  bool RestoreState(const SimulationState &) override;
 
   bool BeginFrame(Event) override {
     return true;
@@ -301,6 +303,47 @@ bool ComputeSimulation::Step(const Parameters &p, float dt) {
   std::swap(dye_, corrected_dye_);
   settings_.fields1 = {mask_, dye_, next_dye_, corrected_dye_};
   return true;
+}
+
+bool ComputeSimulation::SaveState(SimulationState &state) {
+  auto l = levels_[0];
+  state = {};
+  state.width = l.w;
+  state.height = l.h;
+  state.parameters = parameters_;
+  state.time = time_;
+  state.last_dt = last_dt_;
+  state.loads_valid = loads_valid_;
+  state.u.resize((l.w + 1) * l.h);
+  state.v.resize(l.w * (l.h + 1));
+  state.pressure.resize(l.w * l.h);
+  state.rhs.resize(l.w * l.h);
+  state.residual.resize(l.w * l.h);
+  state.dye.resize(l.w * l.h);
+  return Read(u_, state.u) && Read(v_, state.v) && Read(l.p, state.pressure) && Read(l.b, state.rhs) &&
+         Read(l.r, state.residual) && Read(dye_, state.dye);
+}
+
+bool ComputeSimulation::RestoreState(const SimulationState &state) {
+  auto l = levels_[0];
+  if (!state.Matches(l.w, l.h))
+    return Fail("Incompatible simulation state");
+  parameters_ = state.parameters;
+  time_ = state.time;
+  last_dt_ = state.last_dt;
+  loads_valid_ = state.loads_valid;
+  Update(parameters_, last_dt_);
+  if (!GeometryFor(parameters_) || !Begin())
+    return false;
+  for (auto pair : {std::make_pair(&state.u, u_),
+                    {&state.v, v_},
+                    {&state.pressure, l.p},
+                    {&state.rhs, l.b},
+                    {&state.residual, l.r},
+                    {&state.dye, dye_}})
+    if (!commands_->CmdUploadBuffer(heap_.Get(), uint64_t(pair.second) * 4, pair.first->data(), pair.first->size() * 4))
+      return Fail("State upload failed");
+  return (Flush() && pending_->WaitHost()) || Fail("State transfer failed");
 }
 
 bool ComputeSimulation::Export() {

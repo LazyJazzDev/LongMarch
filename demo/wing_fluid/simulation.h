@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "grassland/rhi/rhi.h"
 
@@ -27,12 +28,30 @@ struct LoadCoefficients {
   bool valid{};
 };
 
+// Backend-neutral state used only when transferring an existing flow between solvers.
+// Coarse-grid corrections and advection scratch are rebuilt by the next step.
+struct SimulationState {
+  int width{}, height{};
+  Parameters parameters;
+  float time{}, last_dt{};
+  bool loads_valid{};
+  std::vector<float> u, v, pressure, rhs, residual, dye;
+
+  bool Matches(int w, int h) const {
+    return width == w && height == h && u.size() == size_t(w + 1) * h && v.size() == size_t(w) * (h + 1) &&
+           pressure.size() == size_t(w) * h && rhs.size() == pressure.size() && residual.size() == pressure.size() &&
+           dye.size() == pressure.size();
+  }
+};
+
 // Both solvers own their GPU fields. The application owns the graphics submissions.
 class Simulation {
  public:
   virtual ~Simulation() = default;
   virtual bool Reset(const Parameters &) = 0;
   virtual bool Step(const Parameters &, float dt) = 0;
+  virtual bool SaveState(SimulationState &) = 0;
+  virtual bool RestoreState(const SimulationState &) = 0;
   virtual bool BeginFrame(grassland::rhi::Event previous) = 0;
   virtual bool Export() = 0;
   virtual grassland::rhi::Event ReadyEvent() const = 0;

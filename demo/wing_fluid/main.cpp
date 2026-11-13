@@ -25,7 +25,7 @@ static_assert(sizeof(profile_names) / sizeof(*profile_names) == WING_PROFILE_COU
 static_assert(sizeof(profile_keys) / sizeof(*profile_keys) == WING_PROFILE_COUNT);
 
 struct Runtime {
-  std::unique_ptr<wing_fluid::Simulation> simulation;
+  std::unique_ptr<wing_fluid::Simulation> simulation, standby;
   ObjPtr<ISubmissionToken> last;
 
   ~Runtime() {
@@ -39,7 +39,7 @@ struct Options {
   int width{512}, frames{}, steps{4}, view{};
   bool headless{}, validate{}, debug{}, list_devices{};
   std::string capture, solver{"auto"};
-  int device_index{-1};
+  int device_index{-1}, switch_every{};
   wing_fluid::Parameters parameters;
 };
 
@@ -167,6 +167,12 @@ bool Parse(int argc, char **argv, Options &o) {
         if (value != "auto" && value != "cuda" && value != "compute")
           return false;
         o.solver = value;
+      } else if (a == "--switch-every") {
+        char *end = nullptr;
+        long interval = std::strtol(value.c_str(), &end, 10);
+        if (value.empty() || *end || interval <= 0 || interval > 1000000)
+          return false;
+        o.switch_every = int(interval);
       } else if (a == "--device") {
         char *end = nullptr;
         long index = std::strtol(value.c_str(), &end, 10);
@@ -234,7 +240,7 @@ bool Parse(int argc, char **argv, Options &o) {
 
 bool Render(IDevice *device, Runtime &runtime, Options options) {
   using wing_fluid::Simulation;
-  auto &sim = *runtime.simulation;
+  auto *sim = runtime.simulation.get();
   auto parameters = options.parameters;
   const int width = options.width, height = width / 2;
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
@@ -251,7 +257,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
   BindingLayoutDesc layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
                             {1, BINDING_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}};
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
-  if (!group || !uniform || !group->BindResource(0, uniform.Get()) || !group->BindResource(1, sim.Field()))
+  if (!group || !uniform || !group->BindResource(0, uniform.Get()) || !group->BindResource(1, sim->Field()))
     return false;
   std::string source = "#define WING_PROFILE_SHADER\n";
   source.append(reinterpret_cast<const char *>(wing_profile_h), wing_profile_h_len);
@@ -271,6 +277,15 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
   int mode = options.view;
   float dye_strength = 1.8f, elapsed = 0, fps = 0, time_scale = 1;
   bool paused = false, reset = false;
+  bool can_switch = false;
+#ifdef LONGMARCH_CUDA_ENABLED
+  can_switch = device->GetCUDADeviceIndex() >= 0;
+#endif
+  if (options.switch_every && !can_switch) {
+    std::cerr << "Runtime switching requires a CUDA-enabled build and CUDA device.\n";
+    return false;
+  }
+  std::string switch_error;
   wing_fluid::Diagnostics diagnostics;
   auto previous = std::chrono::steady_clock::now();
   auto beginning = previous;
@@ -281,6 +296,8 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
     // Bound CPU submissions; the GPU interop edges below establish memory/ownership ordering.
     if (runtime.last && !runtime.last->WaitHost())
       return false;
+    bool switch_requested = options.switch_every && frame > 0 && frame % options.switch_every == 0;
+    bool switched = false;
     auto now = std::chrono::steady_clock::now();
     float seconds = std::chrono::duration<float>(now - previous).count();
     previous = now;
@@ -347,6 +364,15 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
               reset = true;
             ImGui::Checkbox("Load trends window", &show_loads);
             ImGui::SliderFloat("##time", &time_scale, 0.1f, 2, "Simulation speed %.1fx");
+            if (can_switch) {
+              if (ImGui::Button(std::string(sim->Name()) == "CUDA" ? "Switch to: Compute Shader" : "Switch to: CUDA"))
+                switch_requested = true;
+              if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Preserves flow, simulation time and pause state. First switch creates the other solver.");
+              if (!switch_error.empty())
+                ImGui::TextWrapped("%s", switch_error.c_str());
+            }
             if (ImGui::CollapsingHeader("Solver settings")) {
               if (ImGui::Checkbox("Smooth wing boundary", &parameters.smooth_boundary))
                 reset = true;
@@ -359,12 +385,12 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::Separator();
             ImGui::Text("%.1f FPS | simulation %.2f s", fps, elapsed);
             ImGui::Text("MAC grid: %d x %d", width, height);
-            ImGui::Text("Multigrid: %d levels, %d V-cycles", sim.Levels(), parameters.cycles);
+            ImGui::Text("Multigrid: %d levels, %d V-cycles", sim->Levels(), parameters.cycles);
             ImGui::Text("Divergence RMS: %.3g", diagnostics.divergence_after);
             ImGui::Text("Before projection: %.3g", diagnostics.divergence_before);
             ImGui::Text("Max speed: %.3f m/s", diagnostics.max_speed);
             ImGui::Spacing();
-            ImGui::Text("Solver: %s", sim.Name());
+            ImGui::Text("Solver: %s", sim->Name());
             ImGui::TextWrapped("GPU advection, viscosity and pressure. RHI renders the device buffer.");
             ImGui::Spacing();
             ImGui::TextDisabled("Exploratory 2D laminar model");
@@ -382,10 +408,63 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
           }))
         return false;
     }
-    if (!sim.BeginFrame(runtime.last ? runtime.last->GetEvent() : Event{}))
+    if (switch_requested) {
+      switch_error.clear();
+      wing_fluid::SimulationState state;
+      bool success = sim->SaveState(state);
+      if (!success)
+        switch_error = "Cannot read the current simulation state: " + sim->Error();
+      if (success && !runtime.standby) {
+#ifdef LONGMARCH_CUDA_ENABLED
+        runtime.standby = std::string(sim->Name()) == "CUDA"
+                              ? wing_fluid::CreateComputeSimulation(device, width, height)
+                              : wing_fluid::CreateCUDASimulation(device, width, height);
+#endif
+        success = bool(runtime.standby);
+        if (!success)
+          switch_error = "Cannot initialize the other solver; current flow retained.";
+      }
+      if (success && !runtime.standby->RestoreState(state)) {
+        success = false;
+        switch_error = "Cannot transfer the flow: " + runtime.standby->Error();
+        runtime.standby.reset();
+      }
+      if (success && options.validate) {
+        wing_fluid::SimulationState check;
+        success = runtime.standby->SaveState(check) && check.time == state.time && check.last_dt == state.last_dt &&
+                  check.loads_valid == state.loads_valid && check.u == state.u && check.v == state.v &&
+                  check.pressure == state.pressure && check.rhs == state.rhs && check.residual == state.residual &&
+                  check.dye == state.dye;
+        if (!success)
+          switch_error = "Transferred state did not match the source.";
+      }
+      ObjPtr<IBindingGroup> replacement;
+      if (success) {
+        replacement = device->CreateBindingGroup(layout);
+        success = replacement && replacement->BindResource(0, uniform.Get()) &&
+                  replacement->BindResource(1, runtime.standby->Field());
+        if (!success)
+          switch_error = "Cannot bind the new solver output; current flow retained.";
+      }
+      if (success) {
+        group = std::move(replacement);
+        runtime.last.Release();  // Its graphics work was drained before state transfer.
+        std::swap(runtime.simulation, runtime.standby);
+        sim = runtime.simulation.get();
+        switched = true;
+        std::cout << "switched_solver=" << sim->Name() << " simulation_time=" << elapsed << '\n';
+      } else {
+        std::cerr << switch_error << '\n';
+        if (options.switch_every)
+          return false;
+      }
+      previous = std::chrono::steady_clock::now();
+      fps = 0;
+    }
+    if (!sim->BeginFrame(runtime.last ? runtime.last->GetEvent() : Event{}))
       return false;
     if (reset) {
-      if (!sim.Reset(parameters))
+      if (!sim->Reset(parameters))
         return false;
       reset = false;
       elapsed = 0;
@@ -400,21 +479,23 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
       steps = std::max(1, std::min(32, int(std::ceil(duration / dt))));
       dt = std::min(dt, duration / steps);
     }
-    if (!paused)
+    float advanced_time = 0;
+    if (!paused && !(switched && window))
       for (int step = 0; step < steps; ++step) {
-        if (!sim.Step(parameters, dt))
+        if (!sim->Step(parameters, dt))
           return false;
         elapsed += dt;
+        advanced_time += dt;
       }
     if (frame % 20 == 0 || frame + 1 == limit) {
-      if (!sim.Measure(diagnostics) || !diagnostics.finite)
+      if (!sim->Measure(diagnostics) || !diagnostics.finite)
         return false;
     }
     wing_fluid::LoadCoefficients load;
-    if (!sim.MeasureLoads(load))
+    if (!sim->MeasureLoads(load))
       return false;
     if (!paused || !load.valid)
-      loads.Update(load, paused ? 0 : steps * dt);
+      loads.Update(load, advanced_time);
     ObjPtr<IImage> load_image;
     if (window) {
       if (load_window && load_window->ShouldClose())
@@ -440,9 +521,9 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
           return false;
       }
     }
-    if (!sim.Export())
+    if (!sim->Export())
       return false;
-    Event ready = sim.ReadyEvent();
+    Event ready = sim->ReadyEvent();
     if (!ready.timeline)
       return false;
     if (!canvas || canvas->GetDesc().width != sw || canvas->GetDesc().height != sh) {
@@ -518,7 +599,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             << " div_before=" << diagnostics.divergence_before << " div_after=" << diagnostics.divergence_after
             << " max_speed=" << diagnostics.max_speed << " solid_speed=" << diagnostics.solid_speed << '\n';
   wing_fluid::LoadCoefficients final_load;
-  if (!sim.MeasureLoads(final_load))
+  if (!sim->MeasureLoads(final_load))
     return false;
   std::cout << "load_coefficients x=" << final_load.x << " y=" << final_load.y << " moment=" << final_load.moment
             << '\n';
@@ -530,7 +611,7 @@ int main(int argc, char **argv) {
   Options options;
   if (!Parse(argc, argv, options)) {
     std::cerr
-        << "Usage: demo_wing_fluid [--backend vulkan|d3d12|metal] [--solver auto|cuda|compute] [--device INDEX] [--list-devices] [--grid 128|256|512|1024] [--speed 0.1..30] "
+        << "Usage: demo_wing_fluid [--backend vulkan|d3d12|metal] [--solver auto|cuda|compute] [--device INDEX] [--list-devices] [--switch-every N] [--grid 128|256|512|1024] [--speed 0.1..30] "
            "[--angle -25..25] [--viscosity 0.0005..0.01] [--view dye|speed|vorticity|pressure] "
            "[--profile NAME] [--boundary smooth|voxel] [--frames N] [--steps 1..16] [--headless] [--validate] [--debug] [--capture image.ppm]\n";
     return 1;
@@ -621,7 +702,7 @@ int main(int argc, char **argv) {
       return 1;
   }
   if (!Render(device.Get(), runtime, options)) {
-    std::cerr << "Wing fluid failed: " << sim.Error() << '\n';
+    std::cerr << "Wing fluid failed: " << runtime.simulation->Error() << '\n';
     return 1;
   }
   return 0;
