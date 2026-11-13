@@ -1,4 +1,4 @@
-﻿#include <cuda_runtime.h>
+#include <cuda_runtime.h>
 
 #include <algorithm>
 #include <cmath>
@@ -8,7 +8,7 @@
 #include "simulation.h"
 #include "wing_profile.h"
 
-namespace wing_fluid {
+namespace wing2d {
 using namespace grassland::rhi;
 
 class CUDASimulation final : public Simulation {
@@ -950,4 +950,4 @@ std::unique_ptr<Simulation> CreateCUDASimulation(IDevice *device, int width, int
   }
   return result;
 }
-}  // namespace wing_fluid
+}  // namespace wing2d

@@ -1,4 +1,4 @@
-﻿#include <algorithm>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <iostream>
@@ -7,7 +7,7 @@
 #include "simulation.h"
 #include "wing_profile.h"
 
-namespace wing_fluid {
+namespace wing2d {
 namespace {
 using namespace grassland::rhi;
 #include "simulation.slang.h"
@@ -532,4 +532,4 @@ std::unique_ptr<Simulation> CreateComputeSimulation(grassland::rhi::IDevice *dev
   }
   return result;
 }
-}  // namespace wing_fluid
+}  // namespace wing2d
