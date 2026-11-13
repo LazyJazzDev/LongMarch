@@ -45,8 +45,6 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 
 ## 临时性能诊断
 
-- 性能分析统一使用 Nsight（Systems / Compute / Graphics，按目标 API 选择），覆盖整帧、CPU 提交与等待、GPU 执行及呈现；不再维护内置 FrameProfile、分段计时/统计 CSV，也不为 profiling 增加后端专用 timestamp query 接口。普通 FPS 显示可以保留。Nsight 不支持的平台/API 明确标注无法采集，不以其他平台数据代替。
-
 - 为单次排查或 PR 验证编写的性能对比、压测驱动、统计汇总脚本，以及原始数据和临时报告，默认保存在不纳入 Git 的 `out/` 等临时目录，不放入受版本管理的 `scripts/`、`demo/` 或 `docs/`。只有用户明确要求作为长期维护工具保留时才纳入仓库；正式功能测试不受此约定影响。
 
 ## 提交信息
