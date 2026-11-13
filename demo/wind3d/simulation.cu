@@ -639,7 +639,7 @@ Simulation::Simulation() : impl_(std::make_unique<Impl>()) {
 Simulation::~Simulation() = default;
 
 std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const SolverOptions &options) {
-  if (cuda_device < 0 || nx < 64 || nx > 512 || nx % 16 || options.pressure_tolerance < 1e-6f ||
+  if (cuda_device < 0 || nx < 64 || nx > 640 || nx % 16 || options.pressure_tolerance < 1e-6f ||
       options.pressure_tolerance > 0.1f || options.pressure_cycles < 1 || options.pressure_cycles > 256)
     return {};
   auto result = std::unique_ptr<Simulation>(new Simulation);

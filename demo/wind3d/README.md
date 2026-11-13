@@ -60,7 +60,7 @@ inspection views; normal mouse orbit and zoom remain available.
 ## Numerical method and limits
 
 The domain is 16 × 8 × 12 m, spanning x = [-6, 10], y = [-4, 4], z = [-6, 6].
-The default MAC grid is 192 × 96 × 144. `--grid` sets the x resolution (64–512,
+The default MAC grid is 192 × 96 × 144. `--grid` sets the x resolution (64–640,
 multiple of 16); the other dimensions retain this aspect ratio. Velocity lives
 on staggered faces and pressure at cell centres. Each step performs:
 
@@ -102,8 +102,10 @@ compressibility, ground effect or moving-wall actuator dynamics. Controls are
 quasi-static boundary changes, not a simulation of the transient swept volume
 of a moving flap. Transport limiting remains dissipative, the pressure solve
 has finite residual, and voxel boundaries underresolve thin trailing edges and
-small deflections, especially at coarse grids. The 384 and 512 grids improve geometric
-resolution at substantially higher step cost. Mesh smoothness does not imply
+small deflections, especially at coarse grids. Higher grids improve geometric
+resolution at substantially higher step cost. Grid 640 uses 640 × 320 × 480
+cells at 2.5 cm spacing and approximately 8.1 GiB of explicit solver/display
+allocations, before CUDA/runtime and graphics overhead. Mesh smoothness does not imply
 equally fine fluid resolution. Do not interpret the loads as calibrated
 aircraft performance data.
 

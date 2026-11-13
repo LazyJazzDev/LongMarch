@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
       debug = true;
     else if (key == "--help") {
       std::cout
-          << "demo_wind3d [--backend vulkan|d3d12] [--grid 64..512, multiple of 16] "
+          << "demo_wind3d [--backend vulkan|d3d12] [--grid 64..640, multiple of 16] "
              "[--speed 1..30] [--angle -20..25] [--flap 0..40] [--aileron -25..25] "
              "[--elevator -25..25] [--rudder -25..25] [--frames N] [--headless] "
              "[--first-order] [--validate-time SECONDS] [--pressure-tolerance 1e-6..0.1] [--pressure-cycles 1..256] [--model-only] [--yaw RADIANS] [--pitch RADIANS] [--distance METRES] [--capture image.ppm] [--validate --steps N] [--debug]\n";
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
       }
     }
   }
-  if (grid < 64 || grid > 512 || grid % 16 || steps < 1 || controls.speed < 1 || controls.speed > 30 ||
+  if (grid < 64 || grid > 640 || grid % 16 || steps < 1 || controls.speed < 1 || controls.speed > 30 ||
       controls.angle < -20 || controls.angle > 25 || controls.flap < 0 || controls.flap > 40 ||
       std::abs(view.pitch) > 1.55f || view.distance < 7 || view.distance > 25 || std::abs(controls.aileron) > 25 ||
       std::abs(controls.elevator) > 25 || std::abs(controls.rudder) > 25)
