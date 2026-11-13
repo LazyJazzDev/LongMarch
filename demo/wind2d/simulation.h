@@ -5,7 +5,7 @@
 
 #include "grassland/rhi/rhi.h"
 
-namespace wing2d {
+namespace wind2d {
 struct Parameters {
   float speed{1.0f};
   float angle{8.0f};
@@ -72,4 +72,4 @@ std::unique_ptr<Simulation> CreateComputeSimulation(grassland::rhi::IDevice *dev
 #ifdef LONGMARCH_CUDA_ENABLED
 std::unique_ptr<Simulation> CreateCUDASimulation(grassland::rhi::IDevice *device, int width, int height);
 #endif
-}  // namespace wing2d
+}  // namespace wind2d

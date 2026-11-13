@@ -8,7 +8,7 @@
 #include "simulation.h"
 #include "wing_profile.h"
 
-namespace wing2d {
+namespace wind2d {
 using namespace grassland::rhi;
 
 class CUDASimulation final : public Simulation {
@@ -950,4 +950,4 @@ std::unique_ptr<Simulation> CreateCUDASimulation(IDevice *device, int width, int
   }
   return result;
 }
-}  // namespace wing2d
+}  // namespace wind2d

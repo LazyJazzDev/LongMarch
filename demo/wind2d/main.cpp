@@ -25,7 +25,7 @@ static_assert(sizeof(profile_names) / sizeof(*profile_names) == WING_PROFILE_COU
 static_assert(sizeof(profile_keys) / sizeof(*profile_keys) == WING_PROFILE_COUNT);
 
 struct Runtime {
-  std::unique_ptr<wing2d::Simulation> simulation, standby;
+  std::unique_ptr<wind2d::Simulation> simulation, standby;
   ObjPtr<ISubmissionToken> last;
 
   ~Runtime() {
@@ -40,15 +40,15 @@ struct Options {
   bool headless{}, validate{}, debug{}, list_devices{};
   std::string capture, solver{"auto"};
   int device_index{-1}, switch_every{};
-  wing2d::Parameters parameters;
+  wind2d::Parameters parameters;
 };
 
 struct LoadDisplay {
-  wing2d::LoadCoefficients value;
+  wind2d::LoadCoefficients value;
   std::vector<float> x, y, moment;
   float sample_time{};
 
-  void Update(const wing2d::LoadCoefficients &load, float dt) {
+  void Update(const wind2d::LoadCoefficients &load, float dt) {
     if (!load.valid) {
       value = load;
       return;
@@ -239,7 +239,7 @@ bool Parse(int argc, char **argv, Options &o) {
 }
 
 bool Render(IDevice *device, Runtime &runtime, Options options) {
-  using wing2d::Simulation;
+  using wind2d::Simulation;
   auto *sim = runtime.simulation.get();
   auto parameters = options.parameters;
   const int width = options.width, height = width / 2;
@@ -249,7 +249,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
   LoadDisplay loads;
   bool show_loads = true;
   if (!options.headless) {
-    window = device->CreateGLFWWindow({1440, 860, "Wing2D | RHI"});
+    window = device->CreateGLFWWindow({1440, 860, "Wind2D | RHI"});
     if (!window || !window->EnableImGui(true, LONGMARCH_ASSETS_DIR "fonts/simhei.ttf", 19))
       return false;
   }
@@ -286,7 +286,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
     return false;
   }
   std::string switch_error;
-  wing2d::Diagnostics diagnostics;
+  wind2d::Diagnostics diagnostics;
   auto previous = std::chrono::steady_clock::now();
   auto beginning = previous;
   const int limit = options.frames ? options.frames : options.headless ? 120 : 0;
@@ -330,7 +330,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::SetNextWindowSize({360, size.y});
             ImGui::Begin("Controls", nullptr,
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
-            ImGui::TextColored({0.35f, 0.9f, 0.8f, 1}, "WING / 2D");
+            ImGui::TextColored({0.35f, 0.9f, 0.8f, 1}, "WIND / 2D");
             ImGui::TextUnformatted("2D incompressible Navier-Stokes");
             ImGui::Separator();
             ImGui::Spacing();
@@ -410,14 +410,14 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
     }
     if (switch_requested) {
       switch_error.clear();
-      wing2d::SimulationState state;
+      wind2d::SimulationState state;
       bool success = sim->SaveState(state);
       if (!success)
         switch_error = "Cannot read the current simulation state: " + sim->Error();
       if (success && !runtime.standby) {
 #ifdef LONGMARCH_CUDA_ENABLED
-        runtime.standby = std::string(sim->Name()) == "CUDA" ? wing2d::CreateComputeSimulation(device, width, height)
-                                                             : wing2d::CreateCUDASimulation(device, width, height);
+        runtime.standby = std::string(sim->Name()) == "CUDA" ? wind2d::CreateComputeSimulation(device, width, height)
+                                                             : wind2d::CreateCUDASimulation(device, width, height);
 #endif
         success = bool(runtime.standby);
         if (!success)
@@ -429,7 +429,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
         runtime.standby.reset();
       }
       if (success && options.validate) {
-        wing2d::SimulationState check;
+        wind2d::SimulationState check;
         success = runtime.standby->SaveState(check) && check.time == state.time && check.last_dt == state.last_dt &&
                   check.loads_valid == state.loads_valid && check.u == state.u && check.v == state.v &&
                   check.pressure == state.pressure && check.rhs == state.rhs && check.residual == state.residual &&
@@ -490,7 +490,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
       if (!sim->Measure(diagnostics) || !diagnostics.finite)
         return false;
     }
-    wing2d::LoadCoefficients load;
+    wind2d::LoadCoefficients load;
     if (!sim->MeasureLoads(load))
       return false;
     if (!paused || !load.valid)
@@ -502,7 +502,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
       if (!show_loads)
         load_window.Release();
       if (show_loads && !load_window) {
-        load_window = device->CreateGLFWWindow({560, 740, "Wing2D | Load trends"});
+        load_window = device->CreateGLFWWindow({560, 740, "Wind2D | Load trends"});
         if (!load_window || !load_window->EnableImGui(true, LONGMARCH_ASSETS_DIR "fonts/simhei.ttf", 19))
           return false;
         int x, y, w, h, mx, my, mw, mh;
@@ -597,7 +597,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             << " wall_time=" << std::chrono::duration<double>(std::chrono::steady_clock::now() - beginning).count()
             << " div_before=" << diagnostics.divergence_before << " div_after=" << diagnostics.divergence_after
             << " max_speed=" << diagnostics.max_speed << " solid_speed=" << diagnostics.solid_speed << '\n';
-  wing2d::LoadCoefficients final_load;
+  wind2d::LoadCoefficients final_load;
   if (!sim->MeasureLoads(final_load))
     return false;
   std::cout << "load_coefficients x=" << final_load.x << " y=" << final_load.y << " moment=" << final_load.moment
@@ -610,7 +610,7 @@ int main(int argc, char **argv) {
   Options options;
   if (!Parse(argc, argv, options)) {
     std::cerr
-        << "Usage: demo_wing2d [--backend vulkan|d3d12|metal] [--solver auto|cuda|compute] [--device INDEX] [--list-devices] [--switch-every N] [--grid 128|256|512|1024] [--speed 0.1..30] "
+        << "Usage: demo_wind2d [--backend vulkan|d3d12|metal] [--solver auto|cuda|compute] [--device INDEX] [--list-devices] [--switch-every N] [--grid 128|256|512|1024] [--speed 0.1..30] "
            "[--angle -25..90] [--viscosity 0.0005..0.01] [--view dye|speed|vorticity|pressure] "
            "[--profile NAME] [--boundary smooth|voxel] [--frames N] [--steps 1..16] [--headless] [--validate] [--debug] [--capture image.ppm]\n";
     return 1;
@@ -641,14 +641,14 @@ int main(int argc, char **argv) {
   Runtime runtime;
 #ifdef LONGMARCH_CUDA_ENABLED
   if (options.solver != "compute" && device->GetCUDADeviceIndex() >= 0)
-    runtime.simulation = wing2d::CreateCUDASimulation(device.Get(), options.width, options.width / 2);
+    runtime.simulation = wind2d::CreateCUDASimulation(device.Get(), options.width, options.width / 2);
 #endif
   if (!runtime.simulation && options.solver == "cuda") {
     std::cerr << "CUDA solver unavailable in this build or on this device.\n";
     return 1;
   }
   if (!runtime.simulation)
-    runtime.simulation = wing2d::CreateComputeSimulation(device.Get(), options.width, options.width / 2);
+    runtime.simulation = wind2d::CreateComputeSimulation(device.Get(), options.width, options.width / 2);
   if (!runtime.simulation)
     return 1;
   auto &sim = *runtime.simulation;
@@ -659,7 +659,7 @@ int main(int argc, char **argv) {
   std::cout << device->Name() << " | " << options.width << 'x' << options.width / 2 << " | " << sim.Levels()
             << " levels | " << sim.Name() << " | " << profile_keys[options.parameters.profile] << "\n";
   if (options.validate) {
-    wing2d::Diagnostics initial;
+    wind2d::Diagnostics initial;
     if (!sim.Measure(initial))
       return 2;
     std::cout << "reset_projection before=" << initial.divergence_before << " after=" << initial.divergence_after
@@ -684,12 +684,12 @@ int main(int argc, char **argv) {
       auto p = options.parameters;
       p.speed = values.first;
       p.angle = values.second;
-      float dx = wing2d::Simulation::domain_width / options.width;
+      float dx = wind2d::Simulation::domain_width / options.width;
       float dt = std::min(0.5f * dx / 100.0f, 0.2f * dx * dx / p.viscosity);
       for (int step = 0; step < 96; ++step)
         if (!sim.Step(p, dt))
           return 1;
-      wing2d::Diagnostics d;
+      wind2d::Diagnostics d;
       if (!sim.Measure(d))
         return 1;
       std::cout << "projection speed=" << p.speed << " angle=" << p.angle << " before=" << d.divergence_before

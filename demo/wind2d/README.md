@@ -1,4 +1,4 @@
-# Wing2D
+# Wind2D ? 2D Wind Tunnel
 
 Interactive two-dimensional incompressible Navier–Stokes flow around selectable
 wing sections (NACA 0012 by default). The flow runs on either CUDA or portable RHI
@@ -7,8 +7,8 @@ adapters; the demo also builds without CUDA Toolkit. RHI provides rendering and
 compute through Vulkan, D3D12 or Metal (subject to the platform/backend).
 
 ```sh
-cmake --build cmake-build-release --target demo_wing2d
-cmake-build-release/demo/wing2d/demo_wing2d --backend vulkan
+cmake --build cmake-build-release --target demo_wind2d
+cmake-build-release/demo/wind2d/demo_wind2d --backend vulkan
 ```
 
 On Windows append `.exe`; `--backend d3d12` selects D3D12. With no backend option,
@@ -25,9 +25,9 @@ Use `--list-devices` to see adapter indices for the selected graphics backend.
 - `--solver cuda`: require CUDA; report failure rather than silently changing solver.
 
 ```sh
-demo_wing2d --backend d3d12 --list-devices
-demo_wing2d --backend d3d12 --device 1 --solver compute
-demo_wing2d --solver compute --validate --grid 256 --frames 20
+demo_wind2d --backend d3d12 --list-devices
+demo_wind2d --backend d3d12 --device 1 --solver compute
+demo_wind2d --solver compute --validate --grid 256 --frames 20
 ```
 
 The two solvers implement the same MAC discretization, multigrid V-cycles, boundary
@@ -60,7 +60,7 @@ For bounded switching regression, use `--switch-every N` (requires CUDA support)
 With `--validate`, each transfer also verifies exact equality of the copied fields:
 
 ```sh
-demo_wing2d --solver cuda --validate --grid 128 --frames 24 --switch-every 3
+demo_wind2d --solver cuda --validate --grid 128 --frames 24 --switch-every 3
 ```
 
 In interactive mode, the switching frame does not advance simulation time. Headless
@@ -187,11 +187,11 @@ it does not model the velocity of a physically pitching wing.
 ## Reproducible validation
 
 ```sh
-demo_wing2d --validate --backend vulkan --debug --frames 120
-demo_wing2d --validate --backend d3d12 --debug --frames 120
-demo_wing2d --validate --profile cambered4 --speed 30 --angle 25 --frames 120
-demo_wing2d --headless --frames 2000 --steps 16 --speed 30 --angle 25 --viscosity 0.0005
-demo_wing2d --headless --frames 1200 --view vorticity --capture wake.ppm
+demo_wind2d --validate --backend vulkan --debug --frames 120
+demo_wind2d --validate --backend d3d12 --debug --frames 120
+demo_wind2d --validate --profile cambered4 --speed 30 --angle 25 --frames 120
+demo_wind2d --headless --frames 2000 --steps 16 --speed 30 --angle 25 --viscosity 0.0005
+demo_wind2d --headless --frames 1200 --view vorticity --capture wake.ppm
 ```
 
 `--validate` runs a manufactured **discrete** pressure solve (`b = A p_exact`),

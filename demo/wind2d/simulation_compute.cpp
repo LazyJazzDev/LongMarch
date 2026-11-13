@@ -7,7 +7,7 @@
 #include "simulation.h"
 #include "wing_profile.h"
 
-namespace wing2d {
+namespace wind2d {
 namespace {
 using namespace grassland::rhi;
 #include "simulation.slang.h"
@@ -532,4 +532,4 @@ std::unique_ptr<Simulation> CreateComputeSimulation(grassland::rhi::IDevice *dev
   }
   return result;
 }
-}  // namespace wing2d
+}  // namespace wind2d
