@@ -234,7 +234,7 @@ bool Parse(int argc, char **argv, Options &o) {
   }
   return o.width >= 128 && o.width <= 1024 && !(o.width & (o.width - 1)) && o.steps >= 1 && o.steps <= 16 &&
          o.frames >= 0 && o.parameters.speed >= 0.1f && o.parameters.speed <= 30 && o.parameters.angle >= -25 &&
-         o.parameters.angle <= 25 && std::isfinite(o.parameters.angle) && o.parameters.viscosity >= 0.0005f &&
+         o.parameters.angle <= 90 && std::isfinite(o.parameters.angle) && o.parameters.viscosity >= 0.0005f &&
          o.parameters.viscosity <= 0.01f;
 }
 
@@ -344,7 +344,7 @@ bool Render(IDevice *device, Runtime &runtime, Options options) {
             ImGui::TextUnformatted("Flow speed");
             ImGui::SliderFloat("##speed", &parameters.speed, 0.1f, 30.0f, "%.2f m/s", ImGuiSliderFlags_Logarithmic);
             ImGui::TextUnformatted("Angle of attack");
-            ImGui::SliderFloat("##angle", &parameters.angle, -25, 25, "%.1f deg");
+            ImGui::SliderFloat("##angle", &parameters.angle, -25, 90, "%.1f deg");
             ImGui::Text("Reynolds number: %.0f", parameters.speed * Simulation::chord / parameters.viscosity);
             ImGui::Spacing();
             ImGui::Separator();
@@ -612,7 +612,7 @@ int main(int argc, char **argv) {
   if (!Parse(argc, argv, options)) {
     std::cerr
         << "Usage: demo_wing_fluid [--backend vulkan|d3d12|metal] [--solver auto|cuda|compute] [--device INDEX] [--list-devices] [--switch-every N] [--grid 128|256|512|1024] [--speed 0.1..30] "
-           "[--angle -25..25] [--viscosity 0.0005..0.01] [--view dye|speed|vorticity|pressure] "
+           "[--angle -25..90] [--viscosity 0.0005..0.01] [--view dye|speed|vorticity|pressure] "
            "[--profile NAME] [--boundary smooth|voxel] [--frames N] [--steps 1..16] [--headless] [--validate] [--debug] [--capture image.ppm]\n";
     return 1;
   }

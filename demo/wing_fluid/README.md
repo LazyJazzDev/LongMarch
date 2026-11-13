@@ -96,7 +96,7 @@ Coarse grids resolve the thin section poorly; 512×256 or higher is preferable.
 ## Controls
 
 - **Flow speed:** 0.1–30 m/s (logarithmic slider) inlet velocity.
-- **Angle of attack:** −25° to +25°; positive incidence raises the leading edge.
+- **Angle of attack:** −25° to +90°; positive incidence raises the leading edge.
 - **Display:** advected dye streaks, speed, signed vorticity, or pressure.
 - **Pause / Reset flow:** freeze time or restart from projected uniform inflow and straight dye streaks.
 - **Simulation speed:** requested simulated seconds per wall-clock second.
