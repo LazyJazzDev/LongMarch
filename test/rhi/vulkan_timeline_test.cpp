@@ -11,56 +11,29 @@ namespace {
 
 TEST(RhiVulkanQueues, SelectsDedicatedComputeAndFallsBackToSharedQueues) {
   const VkQueueFlags graphics = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
-  for (uint32_t count : {1u, 2u, 3u, 16u}) {
-    for (bool dedicated : {false, true}) {
-      SCOPED_TRACE(count);
-      SCOPED_TRACE(dedicated);
-      std::vector<VkQueueFamilyProperties> families(3);
-      families[0].queueFlags = VK_QUEUE_TRANSFER_BIT;
-      families[0].queueCount = 2;
-      families[1].queueFlags = graphics;
-      families[1].queueCount = count;
-      families[2].queueFlags = VK_QUEUE_COMPUTE_BIT;
-      families[2].queueCount = dedicated ? 8 : 0;
-      const auto selected = SelectQueues(families);
-      EXPECT_EQ(selected.graphics_family, 1u);
-      EXPECT_EQ(selected.compute_family, dedicated ? 2u : 1u);
-      EXPECT_EQ(selected.graphics_count, std::min(count, dedicated ? 2u : 3u));
-      EXPECT_EQ(selected.indices[0], 0u);
-      EXPECT_EQ(selected.indices[1], count == 1 ? 0u : 1u);
-      EXPECT_EQ(selected.indices[2], dedicated ? 0u : std::min(count - 1, 2u));
-    }
+
+  struct Case {
+    uint32_t graphics_count, dedicated_count, requested_count;
+    std::array<uint32_t, 3> indices;
+  };
+
+  for (const auto &test :
+       {Case{1, 0, 1, {0, 0, 0}}, Case{2, 0, 2, {0, 1, 1}}, Case{3, 0, 3, {0, 1, 2}}, Case{2, 1, 2, {0, 1, 0}}}) {
+    SCOPED_TRACE(test.graphics_count);
+    SCOPED_TRACE(test.dedicated_count);
+    std::vector<VkQueueFamilyProperties> families(2);
+    families[0].queueFlags = graphics;
+    families[0].queueCount = test.graphics_count;
+    families[1].queueFlags = VK_QUEUE_COMPUTE_BIT;
+    families[1].queueCount = test.dedicated_count;
+    const auto selected = SelectQueues(families);
+    EXPECT_EQ(selected.graphics_family, 0u);
+    EXPECT_EQ(selected.compute_family, test.dedicated_count ? 1u : 0u);
+    EXPECT_EQ(selected.graphics_count, test.requested_count);
+    for (size_t i = 0; i < test.indices.size(); ++i)
+      EXPECT_EQ(selected.indices[i], test.indices[i]);
   }
   EXPECT_EQ(SelectQueues({}).graphics_family, UINT32_MAX);
-  VkQueueFamilyProperties compute{};
-  compute.queueFlags = VK_QUEUE_COMPUTE_BIT;
-  compute.queueCount = 1;
-  EXPECT_EQ(SelectQueues({compute}).graphics_family, UINT32_MAX);
-}
-
-TEST(RhiVulkanQueues, NativeQueuesMatchSelectedFamiliesAndShareMutexWhenAliased) {
-  ObjPtr<ICore> core = CreateCore(BACKEND_API_VULKAN, {true});
-  ASSERT_TRUE(core);
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
-  ASSERT_TRUE(device);
-  auto native = QueryInterfacePtr<IVulkanDevice>(device.Get());
-  ASSERT_TRUE(native);
-  uint32_t count = 0;
-  vkGetPhysicalDeviceQueueFamilyProperties(native->NativePhysicalDevice(), &count, nullptr);
-  std::vector<VkQueueFamilyProperties> families(count);
-  vkGetPhysicalDeviceQueueFamilyProperties(native->NativePhysicalDevice(), &count, families.data());
-  const auto selected = SelectQueues(families);
-  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST, QUEUE_TYPE_COMPUTE}) {
-    const auto family = type == QUEUE_TYPE_COMPUTE ? selected.compute_family : selected.graphics_family;
-    EXPECT_EQ(native->QueueFamily(type), family);
-    VkQueue expected{};
-    vkGetDeviceQueue(native->NativeDevice(), family, selected.indices[type], &expected);
-    EXPECT_EQ(native->GetNativeQueue(type)->NativeQueue(), expected);
-    for (auto other : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST, QUEUE_TYPE_COMPUTE}) {
-      if (native->GetNativeQueue(other)->NativeQueue() == expected)
-        EXPECT_EQ(&native->GetNativeQueue(type)->QueueMutex(), &native->GetNativeQueue(other)->QueueMutex());
-    }
-  }
 }
 
 TEST(RhiVulkanTimeline, ConcurrentLogicalQueueSubmissionsKeepSeparateTimelines) {

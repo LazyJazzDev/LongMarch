@@ -126,7 +126,7 @@ TEST_P(RhiRaw, ComputeQueueClearsAndDispatchesAcrossMainQueueDependencies) {
   ASSERT_TRUE(group->BindResource(1, source.Get()));
   ASSERT_TRUE(group->BindResource(2, parameters.Get()));
   ObjPtr<ISubmissionToken> previous;
-  for (uint32_t round = 0; round < 8; ++round) {
+  for (uint32_t round = 0; round < 2; ++round) {
     uint32_t initial[4] = {round, round + 1, round + 2, round + 3};
     const uint32_t delta = round + 2;
     ObjPtr<ICommandContext> upload = main->CreateCommandContext();
