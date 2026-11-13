@@ -26,6 +26,10 @@ simulation).
 - **Contradium (矛盾):** [Work in progress] The physics simulation library.
 - **Practium   (实践):**: An simulation engine for robotics and other applications.
 
+Rendering uses `grassland::rhi`. The legacy `grassland::graphics` library, its
+Python bindings and demos, and Snowberg's draw/gui/visualizer modules have been
+removed. See [RHI Hello](demo/rhi_hello/README.md) for rendering examples.
+
 Sparkium also has an experimental [compute ray tracing fallback](docs/rt-fallback.md)
 for GPUs without hardware ray tracing. It shares the path tracer's materials,
 lighting and JSON scenes and builds its acceleration structures with compute shaders.
