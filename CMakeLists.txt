@@ -216,25 +216,6 @@ set(LONGMARCH_IMGUI_DIR ${CMAKE_CURRENT_LIST_DIR}/external/imgui)
 message(STATUS "PROJECT_BINARY_DIR : ${PROJECT_BINARY_DIR}")
 
 
-if (NOT LONGMARCH_DISABLE_PYTHON)
-
-    find_package(Python3 COMPONENTS Interpreter Development)
-
-    if (Python3_FOUND)
-        message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
-        message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
-        message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
-        message(STATUS "Python3_RUNTIME_LIBRARY_DIRS: ${Python3_RUNTIME_LIBRARY_DIRS}")
-        message(STATUS "Python3_VERSION: ${Python3_VERSION}")
-        message(STATUS "Python3_SITEARCH: ${Python3_SITEARCH}")
-
-        # Only the long_march extension module (code/pybind) uses pybind11.
-        add_subdirectory(external/pybind11)
-
-        set(LONGMARCH_PYTHON_ENABLED ON)
-    endif ()
-endif ()
-
 add_subdirectory(scripts)
 include(scripts/pack_shaders.cmake)
 

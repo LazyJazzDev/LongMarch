@@ -19,13 +19,16 @@ simulation).
 
 **Components:**
 
-- **Grassland (草地):** Basic libraries for math, physics, and wrapping graphics APIs (Vulkan, D3D12 & Metal).
-- **Snowberg (雪山):** [NOT AVAILABLE: Still under planning] Planned to be a functional layer for supporting higher
-  applications.
+- **Grassland (草地):** Basic math and physics libraries, with RHI backends for Vulkan, D3D12 and Metal.
+- **Snowberg (雪山):** Solver utilities and terminal user interfaces (TUI).
 - **Sparkium   (星火):** The renderer library, a multi-pipeline renderer with common front-end interface. (Now supports
   rasterization and path tracing)
 - **Contradium (矛盾):** [Work in progress] The physics simulation library.
 - **Practium   (实践):**: An simulation engine for robotics and other applications.
+
+Rendering uses `grassland::rhi`. The legacy `grassland::graphics` library, its
+Python bindings and demos, and Snowberg's draw/gui/visualizer modules have been
+removed. See [RHI Hello](demo/rhi_hello/README.md) for rendering examples.
 
 Sparkium also has an experimental [compute ray tracing fallback](docs/rt-fallback.md)
 for GPUs without hardware ray tracing. It shares the path tracer's materials,
@@ -88,7 +91,6 @@ Git objects locally; fresh clones do not download the old asset repository.
   - Desktop development with C++
 
   Then everything should be installed automatically.
-- [[optional] Python3](https://python.org): We provide python package with pybind11. Such functionality requires Python3 installation. You may install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 - [[optional] Vulkan SDK](https://vulkan.lunarg.com/sdk/home): Vulkan is the latest cross-platform graphics API. Since D3D12 is available on Windows, this is optional. Install the SDK [Caution: not the Runtime (RT)] via the official **SDK installer**. You should be able to run `vulkaninfo` command in a new terminal after installation. **No optional components are needed for this project**.
 - [[optional] CUDA Toolkit](https://developer.nvidia.com/cuda-downloads): CUDA is optional, however, some functions such as most of the GPU-accelerated physics simulation features will require CUDA. Install the toolkit with the official **exe (local)** installer. You should be able to run `nvcc --version` command in a new terminal after installation.
 
@@ -113,7 +115,7 @@ Git objects locally; fresh clones do not download the old asset repository.
 In the cloned repo root directory, apply cmake configuration with the following command:
 
 ```bash
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=<VCPKG_ROOT>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DPYTHON3_EXECUTABLE=<PYTHON_EXECUTABLE_PATH>
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=<VCPKG_ROOT>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
 ```
 
 In this process, the CMake script will check whether you have installed Vulkan SDK and CUDA Toolkit, and configure the build options accordingly.
@@ -123,14 +125,14 @@ In this process, the CMake script will check whether you have installed Vulkan S
 Run the following command to build the `hello triangle` demo:
 
 ```bash
-cmake --build build --target demo_graphics_hello
+cmake --build build --target demo_rhi_hello
 ```
 
 Run with `--module triangle`, or omit `--module` to select one of eleven demos in the terminal menu.
-The code is under [demo/graphics_hello/modules/triangle](demo/graphics_hello/modules/triangle);
-see [launcher usage](demo/graphics_hello/README.md) for all modules and options.
+The code is under [demo/rhi_hello/modules/triangle](demo/rhi_hello/modules/triangle);
+see [launcher usage](demo/rhi_hello/README.md) for all modules and options.
 
-The compiled executable should be located at `build/demo/graphics_hello/<Debug|Release>/demo_graphics_hello.exe`.
+The compiled executable should be located at `build/demo/rhi_hello/<Debug|Release>/demo_rhi_hello.exe`.
 
 ### Linux
 
@@ -142,7 +144,6 @@ see [Linux HDR presentation](docs/linux-hdr.md).
 - [vcpkg](https://github.com/microsoft/vcpkg): The C++ package manager. Clone the vcpkg repo to anywhere you like, we will refer tha vcpkg path as
   `<VCPKG_ROOT>` in the following instructions (the path ends in `vcpkg`, not its parent directory).
 - [Vulkan SDK](https://vulkan.lunarg.com/sdk/home): Vulkan is the latest cross-platform graphics API. Install the lastest Vulkan SDK via Tarball file, follow [this guide](https://vulkan.lunarg.com/doc/sdk/latest/linux/getting_started.html). You should be able to run `vulkaninfo` command in a new terminal after installation.
-- [[optional] Python3](https://python.org): We provide python package with pybind11. Such functionality requires Python3 installation. You may install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 - [[optional] CUDA Toolkit](https://developer.nvidia.com/cuda-downloads): CUDA is optional, however, some functions such as most of the GPU-accelerated physics simulation features will require CUDA. Install the toolkit following the official instructions. You should be able to run `nvcc --version` command in a new terminal after installation.
 
 #### Step 1: Clone the repo
@@ -166,7 +167,7 @@ see [Linux HDR presentation](docs/linux-hdr.md).
 In the cloned repo root directory, apply cmake configuration with the following command:
 
 ```bash
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=<VCPKG_ROOT>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DPYTHON3_EXECUTABLE=<PYTHON_EXECUTABLE_PATH>
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=<VCPKG_ROOT>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
 ```
 
 In this process, the CMake script will check whether you have installed Vulkan SDK and CUDA Toolkit, and configure the build options accordingly.
@@ -176,14 +177,14 @@ In this process, the CMake script will check whether you have installed Vulkan S
 Run the following command to build the `hello triangle` demo:
 
 ```bash
-cmake --build build --target demo_graphics_hello
+cmake --build build --target demo_rhi_hello
 ```
 
 Run with `--module triangle`, or omit `--module` to select one of eleven demos in the terminal menu.
-The code is under [demo/graphics_hello/modules/triangle](demo/graphics_hello/modules/triangle);
-see [launcher usage](demo/graphics_hello/README.md) for all modules and options.
+The code is under [demo/rhi_hello/modules/triangle](demo/rhi_hello/modules/triangle);
+see [launcher usage](demo/rhi_hello/README.md) for all modules and options.
 
-The compiled executable should be located at `build/demo/graphics_hello/demo_graphics_hello`.
+The compiled executable should be located at `build/demo/rhi_hello/demo_rhi_hello`.
 
 
 ### macOS
@@ -197,7 +198,6 @@ API selection, and the compute ray tracing path.
 - [vcpkg](https://github.com/microsoft/vcpkg): The C++ package manager. Clone the vcpkg repo to anywhere you like, we will refer tha vcpkg path as
   `<VCPKG_ROOT>` in the following instructions (the path ends in `vcpkg`, not its parent directory).
 - [[optional] Vulkan SDK](https://vulkan.lunarg.com/sdk/home): Required only for the Vulkan backend. Native Metal builds use vcpkg-provided metal-cpp and SPIRV-Cross and do not require Vulkan SDK.
-- [[optional] Python3](https://python.org): We provide python package with pybind11. Such functionality requires Python3 installation. You may install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 
 CUDA is not available on macOS since Apple has deprecated NVIDIA GPU support.
 
@@ -222,7 +222,7 @@ CUDA is not available on macOS since Apple has deprecated NVIDIA GPU support.
 In the cloned repo root directory, apply cmake configuration with the following command:
 
 ```bash
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=<VCPKG_ROOT>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DPYTHON3_EXECUTABLE=<PYTHON_EXECUTABLE_PATH>
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=<VCPKG_ROOT>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
 ```
 
 In this process, the CMake script will check whether you have installed Vulkan SDK and CUDA Toolkit, and configure the build options accordingly.
@@ -232,11 +232,11 @@ In this process, the CMake script will check whether you have installed Vulkan S
 Run the following command to build the `hello triangle` demo:
 
 ```bash
-cmake --build build --target demo_graphics_hello
+cmake --build build --target demo_rhi_hello
 ```
 
 Run with `--module triangle`, or omit `--module` to select one of eleven demos in the terminal menu.
-The code is under [demo/graphics_hello/modules/triangle](demo/graphics_hello/modules/triangle);
-see [launcher usage](demo/graphics_hello/README.md) for all modules and options.
+The code is under [demo/rhi_hello/modules/triangle](demo/rhi_hello/modules/triangle);
+see [launcher usage](demo/rhi_hello/README.md) for all modules and options.
 
-The compiled executable should be located at `build/demo/graphics_hello/demo_graphics_hello`.
+The compiled executable should be located at `build/demo/rhi_hello/demo_rhi_hello`.

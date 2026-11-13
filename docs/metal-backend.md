@@ -1,5 +1,7 @@
 # Native Metal backend
 
+> Historical documentation for the removed graphics library. Source paths and commands below refer to revisions before its removal; current rendering uses `grassland_rhi`.
+
 On Apple Silicon, Sparkium can use a native Grassland Metal backend built with
 Apple's **metal-cpp**. It supports compute pipelines, indexed rasterization,
 multiple render targets, depth testing, blending, resource transfers, GLFW
