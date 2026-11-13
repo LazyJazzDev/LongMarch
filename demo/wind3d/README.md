@@ -24,8 +24,10 @@ inboard flaps, outboard ailerons, a horizontal tail/elevator and a vertical
 tail/rudder. It has no engines. Its length is 6 m and its span is 9 m; this is a
 scaled demonstration geometry, not a particular full-size aircraft. Orange
 marks flaps, blue marks ailerons, green marks elevator surfaces and purple marks
-the rudder. Rendering extracts a smooth surface from the same implicit geometry
-used by the fluid boundary.
+the rudder. Rendering directly tessellates the fuselage and airfoil surfaces, with closed
+wing tips and hinge faces. It does not reconstruct a sampled implicit surface.
+The fluid occupancy function shares the airfoil thickness law, dimensions and
+hinge transforms; its voxel resolution is independent of the display mesh.
 
 ## Coordinates and visualization
 
@@ -75,6 +77,14 @@ small deflections, especially at coarse grids. The 256 grid improves geometric
 resolution at substantially higher step cost. Mesh smoothness does not imply
 equally fine fluid resolution. Do not interpret the loads as calibrated
 aircraft performance data.
+
+The absence of a turbulence model does not itself forbid unsteady vortices.
+However, the effective viscosity here is over 300 times that of room-temperature
+air (about 1.5e-5 m²/s), the default cell width is about 8.3 cm, and linear
+semi-Lagrangian interpolation further damps small structures. This setup does
+not resolve a realistic turbulent aircraft wake. Instantaneous streamlines can
+show resolved recirculation, but do not convey particle histories or temporal
+fluctuations as directly as pathlines or vorticity visualization would.
 
 ## Asynchronous ownership
 

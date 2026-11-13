@@ -50,8 +50,13 @@ WIND3D_HD Vec3 BodyPoint(Vec3 world, const Controls &controls) {
   return RotateZ(world, controls.angle);
 }
 
+WIND3D_HD float FoilThickness(float u, float chord) {
+  return 0.75f * chord *
+         (0.2969f * sqrtf(u) - 0.126f * u - 0.3516f * u * u + 0.2843f * u * u * u - 0.1036f * u * u * u * u);
+}
+
 // Signed implicit distance to a swept, tapered symmetric NACA 0015 surface.
-// It is conservative enough for occupancy/surface extraction, not an exact SDF.
+// Used only for fluid occupancy, not display surface extraction; not an exact SDF.
 // Deflection is an inverse rotation about the 72%-chord hinge. Positive angles
 // move the trailing edge down; the separate leading/trailing pieces meet there.
 WIND3D_HD float
@@ -68,9 +73,7 @@ FoilDistance(Vec3 p, float span, float root, float tip, float leading, float swe
   for (int piece = 0; piece < 2; ++piece) {
     float px = piece ? tx : x, py = piece ? ty : y;
     float u = fminf(fmaxf(px / chord, 0.0f), 1.0f);
-    float thickness =
-        0.75f * chord *
-        (0.2969f * sqrtf(u) - 0.126f * u - 0.3516f * u * u + 0.2843f * u * u * u - 0.1036f * u * u * u * u);
+    float thickness = FoilThickness(u, chord);
     float d = fmaxf(fabsf(py) - thickness, fmaxf(-px, px - chord));
     d = fmaxf(d, piece ? hinge - px : px - hinge);
     best = fminf(best, d);
