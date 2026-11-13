@@ -1,5 +1,7 @@
 # Window input and state
 
+> Historical documentation for the removed graphics library. Source paths and commands below refer to revisions before its removal; current rendering uses `grassland_rhi`.
+
 `grassland::graphics::Window` owns the native window callbacks. Application code
 subscribes through its event managers instead of installing GLFW callbacks or
 using a global application pointer. Each window routes events to its own

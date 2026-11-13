@@ -25,7 +25,7 @@ if (LONGMARCH_VULKAN_ENABLED)
 endif ()
 
 if (LONGMARCH_METAL_ENABLED)
-    # Emit metal-cpp implementation symbols once for both graphics and RHI.
+    # Emit metal-cpp implementation symbols once for RHI.
     target_include_directories(${GRASSLAND_SUBLIB_NAME} PRIVATE ${LONGMARCH_METAL_CPP_DIR})
     target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PRIVATE LONGMARCH_METAL_ENABLED)
     target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE

@@ -1,7 +1,7 @@
 # Window callbacks and ImGui
 
-`IWindow` exposes the same callback registries as the basic
-input events in `graphics::Window`: `ResizeEvent`, `FramebufferResizeEvent`,
+`IWindow` exposes callback registries for
+input events: `ResizeEvent`, `FramebufferResizeEvent`,
 `CursorEnterEvent`, `FocusEvent`, `MouseMoveEvent`, `MouseButtonEvent`,
 `ScrollEvent`, `KeyEvent`, `CharEvent` and `DropEvent`. RegisterCallback returns
 an ID for UnregisterCallback; higher priorities execute first. Callbacks may
@@ -68,13 +68,13 @@ is added by this API. Source and destination may alias only when no conversion o
 
 The RHI nbody demo performs particle accumulation and scene highlight processing
 in RGBA32 float, composites ImGui into its linear `frame_image`, and presents through
-this conversion. The independent graphics nbody demos are unchanged.
+this conversion.
 
 Initialization accepts a font file and pixel size:
 `window->EnableImGui(true, "fonts/MyFont.ttf", 24.0f)`.
 The defaults are `nullptr` and 13 pixels. A null path selects the built-in font
-at the requested size; a file font uses the ChineseFull glyph range, matching
-graphics D3D12/Vulkan (the font must contain the desired glyphs). Font data is
+at the requested size; a file font uses the ChineseFull glyph range
+(the font must contain the desired glyphs). Font data is
 copied and the atlas is built/uploaded once during initialization. Repeated enable
 calls preserve the existing context and font; disable before reinitializing to
 change either option. An unreadable file or nonpositive/nonfinite size returns
@@ -170,7 +170,7 @@ depends on display calibration and system color management.
 
 ### N-body controls and HDR
 
-Both hello demos' `nbody` modules follow `nbody_cs`: particles accumulate linear radiance
+The RHI hello `nbody` module accumulates linear radiance
 in a reusable RGBA32F image. Dense highlights desaturate toward white in a second
 RGBA32F frame image, bounded by the window's reported headroom. CmdDrawImGui blends
 the UI into that linear frame, then CmdPresentImage converts the completed frame

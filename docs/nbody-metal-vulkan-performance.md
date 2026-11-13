@@ -1,5 +1,7 @@
 # nbody_cs：Metal 与 Vulkan 性能对比
 
+> Historical documentation for the removed graphics library. Source paths and commands below refer to revisions before its removal; current rendering uses `grassland_rhi`.
+
 > Historical report: built-in profiling and its CSV/script interfaces have been removed.
 > Commands and measurements below describe the earlier implementation at
 > [`b99233dc`](https://github.com/LazyJazzDev/LongMarch/tree/b99233dceffedba57c97770e37b2fd902da18c8b).
