@@ -300,8 +300,14 @@ __global__ void Measure(Grid g,
     Vec3 velocity = CenterVelocity(g, u, v, w, x, y, z);
     value.before = before[n] * before[n];
     value.after = after[n] * after[n];
-    value.max_speed = Length(velocity);
     value.invalid = !isfinite(velocity.x + velocity.y + velocity.z + p[n] + before[n] + after[n]);
+    // Bound every component used by MAC interpolation, including padded faces.
+    // Cell-centred averages can cancel even in a divergence-free velocity field.
+    int face_count = (g.nx + 1) * (g.ny + 1) * (g.nz + 1);
+    for (int face = n; face < face_count; face += g.nx * g.ny * g.nz) {
+      value.max_speed = fmaxf(value.max_speed, fmaxf(fabsf(u[face]), fmaxf(fabsf(v[face]), fabsf(w[face]))));
+      value.invalid |= !isfinite(u[face]) || !isfinite(v[face]) || !isfinite(w[face]);
+    }
     if (!solid[n]) {
       const unsigned char *blocked[] = {bu, bv, bw};
       for (int axis = 0; axis < 3; ++axis)
@@ -515,6 +521,7 @@ struct Simulation::Impl {
           break;
       }
       applied_generation = current_generation;
+      // The advective bound limits displacement to half a cell per component.
       // No-slip ghost values can increase the diffusion diagonal from six
       // to ten at corners; retain a conservative explicit stability bound.
       float dt = std::min(0.5f * g.h / std::max(max_speed, controls.speed), 0.08f * g.h * g.h / viscosity);

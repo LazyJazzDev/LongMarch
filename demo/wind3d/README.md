@@ -86,7 +86,10 @@ on staggered faces and pressure at cell centres. Each step performs:
    downsampling the display field does not downsample the load integration.
 
 The air density is 1.225 kg/m³; the effective kinematic viscosity is 0.005 m²/s.
-The time step is bounded by advective CFL 0.5 and an explicit diffusion bound.
+The time step is bounded by advective CFL 0.5 per coordinate and an explicit
+diffusion bound. The CFL maximum includes every MAC velocity component,
+including padded faces used by interpolation, rather than cell-centred averages
+that can cancel opposite face velocities.
 The inlet and lateral far-field faces impose the wind; the outlet has zero
 pressure. Pressure force is integrated over the same blocked velocity faces used by the
 pressure operator. For a thin wall with fluid on both sides, their pressure
