@@ -23,7 +23,6 @@
 #include "grassland/rhi/backend/vulkan/vulkan_cuda_timeline.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
-#include "grassland/rhi/backend/vulkan/vulkan_queue_selection.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"

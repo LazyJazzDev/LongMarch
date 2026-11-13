@@ -4,7 +4,6 @@
 #include <future>
 
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
-#include "grassland/rhi/backend/vulkan/vulkan_queue_selection.h"
 #include "grassland/rhi/rhi.h"
 
 namespace grassland::rhi::backend::vulkan {
