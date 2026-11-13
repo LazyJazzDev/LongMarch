@@ -24,6 +24,10 @@ struct SolverOptions {
   float pressure_tolerance{0.0001f};
   int pressure_cycles{64};
   bool corrected_transport{true};
+  int devices{1};
+  uint64_t stop_after{};
+  bool export_field{true};
+  bool export_final{false};
 };
 
 struct Snapshot {
@@ -32,6 +36,7 @@ struct Snapshot {
   bool pressure_converged{};
   uint64_t step{}, generation{};
   float time{}, dt{}, divergence_before{}, divergence_after{}, step_seconds{};
+  float transport_seconds{}, pressure_seconds{}, diagnostics_seconds{};
   Vec3 force{}, moment{};
   Controls controls;
   std::vector<Cell> cells;

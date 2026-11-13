@@ -1,5 +1,17 @@
 cmake_minimum_required(VERSION 3.25)
 
+option(LONGMARCH_WIND3D_STANDALONE "Build the CUDA-only Wind3D cluster task" OFF)
+if (LONGMARCH_WIND3D_STANDALONE)
+    project(Wind3DTask LANGUAGES CXX CUDA)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD 17)
+    find_package(CUDAToolkit REQUIRED)
+    find_package(Threads REQUIRED)
+    include(CTest)
+    add_subdirectory(demo/wind3d)
+    return()
+endif ()
+
 if (VCPKG_PATH)
     set(CMAKE_TOOLCHAIN_FILE "${VCPKG_PATH}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
 endif ()

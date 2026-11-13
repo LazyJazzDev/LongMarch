@@ -180,3 +180,85 @@ physical times, not just equal step counts. `--headless` renders offscreen and
 adds an 8 ms pacing delay, so its reported FPS is not a window benchmark.
 Use Nsight for GPU and full-frame profiling; this demo adds no timestamp query
 interface.
+
+## Single-node CUDA batch task
+
+`wind3d_task` runs the same solver without the renderer or graphics dependencies.
+It supports 1–8 consecutive visible CUDA devices (starting at device 0). The
+multi-GPU path partitions the global grid into contiguous index ranges, places
+managed-memory pages on their owning GPUs, and accesses neighbouring ranges
+through peer mappings. Every physical boundary remains a global-domain boundary;
+partition boundaries introduce no artificial walls. CUDA events join each
+producer stage before its consumers run on any GPU. This path targets a
+peer-connected NVLink node with concurrent managed-memory access.
+
+Transport, masks, boundary enforcement, projection and full-grid diagnostics run
+across the selected GPUs. The globally coupled pressure PCG/multigrid solve runs
+on GPU 0, with pressure stored there to avoid repeated remote accesses during
+iterations. This preserves the original pressure operator, tolerance, warm start
+and true-residual checks. It also limits strong scaling: eight GPUs do not imply
+an eightfold speedup. The coarsest multigrid sweeps use one synchronized CUDA
+block instead of 64 separate kernels, preserving the symmetric preconditioner.
+On even-width levels, red/black smoothing launches only the cells of the active
+colour, so half the CUDA lanes are no longer discarded by a parity branch.
+
+Build **on a compute node**, with CUDA, CMake and Ninja available:
+
+```sh
+cmake -S . -B cmake-build-release -G Ninja \
+  -DLONGMARCH_WIND3D_STANDALONE=ON -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CUDA_ARCHITECTURES=90
+cmake --build cmake-build-release --target wind3d_task -j 8
+cmake-build-release/demo/wind3d/wind3d_task \
+  --gpus 8 --grid 384 --steps 80 --warmup 10 --no-export --validate
+```
+
+On an allocated eight-GPU node, `ctest --test-dir cmake-build-release -R wind3d
+--output-on-failure` compares complete 80-grid snapshots from 1/2/4/8 GPUs bit
+for bit in both per-step and final-only export modes, and checks geometry,
+projection, wall friction and lifecycle behavior.
+
+The standalone configuration does not require vcpkg, Vulkan, a display server or
+assets. It is separate from the graphics configuration; reconfigure the build
+directory when switching between them. Architecture 90 targets H100/H200; use the
+architecture of the allocated node for other GPUs.
+
+On the envelope cluster, submit the provided single-node job:
+
+```sh
+meshy-envelope submit demo/wind3d/task.star
+```
+
+`task.star` requests one entire eight-GPU node and runs `task.sh` there. The shell
+script builds the executable and passes through its arguments. It also searches
+`$HOME/.local/bin` for shared-home CMake/Ninja installations. Set
+`WIND3D_CUDA_ARCHITECTURES` or `WIND3D_BUILD_JOBS` through the job environment to
+override native architecture detection or build parallelism. Job logs contain
+per-step diagnostics and a final machine-readable `RESULT` line. The process
+returns nonzero on CUDA errors, nonfinite state, pressure nonconvergence,
+excessive post-projection divergence, or an incomplete timing sample.
+
+`--steps` bounds the run exactly; `--warmup` excludes the first steps from the
+reported mean. Timing includes transport, pressure, load/diagnostic reductions,
+CPU synchronization and any requested display snapshot export, but excludes initialization,
+compilation and command-line printing. Stage times are CUDA-event measurements;
+the reported step time is CPU wall time. `--validate` additionally exercises
+geometry, analytical wall friction, pause/reset/resume, combined control changes
+and snapshot immutability. `--dump PATH` writes the final display field as three
+native int32 dimensions followed by `Cell` records (four float32 values: u, v, w,
+pressure); the field is the full cell-centred grid up to grid 192, and is
+spatially downsampled above that size.
+
+The supplied cluster job uses `--no-export`: all fluid updates and full-grid
+force/divergence/CFL diagnostics still run, but the visualization volume is not
+copied to the CPU every step. This avoids unused display work in a batch task.
+The GUI and task runs without this flag keep exporting every snapshot.
+`--dump` with `--no-export` exports the final field only, for numerical comparison;
+that final step includes the export cost, so omit `--dump` in timing runs.
+
+For a fair speedup measurement, run `--gpus 1` and `--gpus 8` on the **same
+reserved node**, with identical grid, step count, warmup, transport scheme and
+pressure tolerance and export mode. Repeat in alternating order. Compute speedup as single-GPU
+mean step time divided by eight-GPU mean step time. Do not compare different
+resolutions or weaken the pressure tolerance to improve this ratio. The original
+graphics demo remains single-GPU by default.

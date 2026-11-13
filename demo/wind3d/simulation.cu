@@ -14,10 +14,20 @@ namespace wind3d {
 namespace {
 constexpr float density = 1.225f;
 constexpr float viscosity = 0.005f;
+#if CUDART_VERSION >= 13000
+cudaMemLocation Location(int device) {
+  return {cudaMemLocationTypeDevice, device};
+}
+#else
+int Location(int device) {
+  return device;
+}
+#endif
 
 struct Grid {
   int nx, ny, nz;
   float h;
+  int begin{};
 
   __host__ __device__ int C(int x, int y, int z) const {
     return (z * ny + y) * nx + x;
@@ -149,7 +159,7 @@ struct TransportSampler {
 };
 
 __global__ void Mask(Grid g, unsigned char *solid, Controls controls) {
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= g.nx * g.ny * g.nz)
     return;
   int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
@@ -176,7 +186,7 @@ __global__ void FaceMask(Grid g,
                          unsigned char *bv,
                          unsigned char *bw,
                          Controls controls) {
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
@@ -215,7 +225,7 @@ __global__ void Boundary(Grid g,
                          float *w,
                          float speed,
                          bool reset) {
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
@@ -262,7 +272,7 @@ __global__ void Advect(Grid g,
                        TransportSampler sampler,
                        int axis,
                        float dt) {
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
@@ -281,7 +291,7 @@ __global__ void CorrectTransport(Grid g,
                                  const unsigned char *bw,
                                  int axis,
                                  float dt) {
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
@@ -333,7 +343,7 @@ __global__ void Divergence(Grid g,
                            const float *v,
                            const float *w,
                            float *div) {
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= g.nx * g.ny * g.nz)
     return;
   int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
@@ -352,7 +362,7 @@ __global__ void Project(Grid g,
                         float *v,
                         float *w,
                         float dt) {
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
@@ -398,7 +408,7 @@ __global__ void Measure(Grid g,
                         const float *after,
                         Statistics *blocks) {
   __shared__ Statistics values[256];
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   Statistics value;
   if (n < g.nx * g.ny * g.nz) {
     int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
@@ -453,12 +463,12 @@ __global__ void Measure(Grid g,
     __syncthreads();
   }
   if (!threadIdx.x)
-    blocks[blockIdx.x] = values[0];
+    blocks[g.begin / 256 + blockIdx.x] = values[0];
 }
 
 __global__ void
 Export(Grid g, Grid output, const float *u, const float *v, const float *w, const float *p, Cell *cells) {
-  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= output.nx * output.ny * output.nz)
     return;
   int x = n % output.nx, y = n / output.nx % output.ny, z = n / (output.nx * output.ny);
@@ -550,6 +560,9 @@ struct Simulation::Impl {
   SolverOptions options;
   int device{};
   cudaStream_t stream{};
+  std::vector<cudaStream_t> streams;
+  std::vector<cudaEvent_t> ready;
+  cudaEvent_t timing[4]{};
   float *u{}, *v{}, *w{}, *un{}, *vn{}, *wn{}, *reverse{}, *pressure{}, *div{}, *after{};
   unsigned char *solid{}, *bu{}, *bv{}, *bw{};
   Cell *cells{};
@@ -566,19 +579,87 @@ struct Simulation::Impl {
   }
 
   template <typename T>
-  bool Allocate(T *&p, size_t count) {
-    if (!Check(cudaMalloc(reinterpret_cast<void **>(&p), count * sizeof(T))))
+  bool Allocate(T *&p, size_t count, bool distributed = true) {
+    if (!Check(options.devices == 1 ? cudaMalloc(reinterpret_cast<void **>(&p), count * sizeof(T))
+                                    : cudaMallocManaged(reinterpret_cast<void **>(&p), count * sizeof(T))))
       return false;
     allocations.push_back(p);
-    return Check(cudaMemsetAsync(p, 0, count * sizeof(T), stream));
+    if (!Check(cudaMemsetAsync(p, 0, count * sizeof(T), stream)))
+      return false;
+    if (options.devices > 1) {
+      if (!Check(cudaStreamSynchronize(stream)))
+        return false;
+      // Keep pages on their owning GPU; neighbours access them directly over NVLink.
+      const size_t bytes = count * sizeof(T), page = 65536;
+      const size_t pages = (bytes + page - 1) / page;
+      int owners = distributed ? options.devices : 1;
+      for (int d = 0; d < owners; ++d) {
+        size_t begin = pages * d / owners * page;
+        size_t end = std::min(bytes, pages * (d + 1) / owners * page);
+        if (begin >= end)
+          continue;
+        auto address = reinterpret_cast<char *>(p) + begin;
+        if (!Check(cudaMemAdvise(address, end - begin, cudaMemAdviseSetPreferredLocation, Location(device + d))))
+          return false;
+        for (int peer = 0; peer < options.devices; ++peer)
+          if (!Check(cudaMemAdvise(address, end - begin, cudaMemAdviseSetAccessedBy, Location(device + peer))))
+            return false;
+#if CUDART_VERSION >= 13000
+        if (!Check(cudaMemPrefetchAsync(address, end - begin, Location(device + d), 0, stream)))
+          return false;
+#else
+        if (!Check(cudaMemPrefetchAsync(address, end - begin, device + d, stream)))
+          return false;
+#endif
+      }
+    }
+    return true;
   }
 
   bool Initialize() {
     if (!Check(cudaSetDevice(device)))
       return false;
+    if (options.devices > 1) {
+      for (int d = 0; d < options.devices; ++d) {
+        int concurrent = 0;
+        if (!Check(cudaDeviceGetAttribute(&concurrent, cudaDevAttrConcurrentManagedAccess, device + d)))
+          return false;
+        if (!concurrent)
+          return Check(cudaErrorNotSupported);
+        for (int peer = 0; peer < options.devices; ++peer) {
+          if (peer == d)
+            continue;
+          int accessible = 0;
+          if (!Check(cudaDeviceCanAccessPeer(&accessible, device + d, device + peer)))
+            return false;
+          if (!accessible)
+            return Check(cudaErrorPeerAccessUnsupported);
+        }
+      }
+    }
     int low = 0, high = 0;
     if (!Check(cudaDeviceGetStreamPriorityRange(&low, &high)) ||
         !Check(cudaStreamCreateWithPriority(&stream, cudaStreamNonBlocking, low)))
+      return false;
+    streams.push_back(stream);
+    for (auto &event : timing)
+      if (!Check(cudaEventCreate(&event)))
+        return false;
+    for (int d = 0; d < options.devices; ++d) {
+      if (!Check(cudaSetDevice(device + d)))
+        return false;
+      if (d) {
+        cudaStream_t extra{};
+        if (!Check(cudaStreamCreateWithFlags(&extra, cudaStreamNonBlocking)))
+          return false;
+        streams.push_back(extra);
+      }
+      cudaEvent_t event{};
+      if (!Check(cudaEventCreateWithFlags(&event, cudaEventDisableTiming)))
+        return false;
+      ready.push_back(event);
+    }
+    if (!Check(cudaSetDevice(device)))
       return false;
     size_t nf = size_t(grid.nx + 1) * (grid.ny + 1) * (grid.nz + 1);
     size_t nc = size_t(grid.nx) * grid.ny * grid.nz;
@@ -586,10 +667,44 @@ struct Simulation::Impl {
     display_grid = {display_nx, display_nx / 2, display_nx * 3 / 4, 16.0f / display_nx};
     size_t display_cells = size_t(display_grid.nx) * display_grid.ny * display_grid.nz;
     return Allocate(u, nf) && Allocate(v, nf) && Allocate(w, nf) && Allocate(un, nf) && Allocate(vn, nf) &&
-           Allocate(wn, nf) && Allocate(reverse, nf) && Allocate(pressure, nc) && Allocate(div, nc) &&
+           Allocate(wn, nf) && Allocate(reverse, nf) && Allocate(pressure, nc, false) && Allocate(div, nc) &&
            Allocate(after, nc) && Allocate(solid, nc) && Allocate(bu, nf) && Allocate(bv, nf) && Allocate(bw, nf) &&
-           Allocate(cells, display_cells) && Allocate(statistics, (nc + 255) / 256) &&
+           (!(options.export_field || options.export_final) || Allocate(cells, display_cells, false)) &&
+           Allocate(statistics, (nc + 255) / 256) &&
            Check(pressure_solver.Initialize(grid.nx, grid.ny, grid.nz, stream)) && Check(cudaStreamSynchronize(stream));
+  }
+
+  template <class Launch>
+  bool Parallel(int blocks, Launch launch) {
+    if (options.devices == 1) {
+      if (blocks)
+        launch(grid, blocks, stream);
+      return Check(cudaGetLastError());
+    }
+    for (int d = 0; d < options.devices; ++d) {
+      if (!Check(cudaSetDevice(device + d)))
+        return false;
+      Grid local = grid;
+      int begin = blocks * d / options.devices;
+      int end = blocks * (d + 1) / options.devices;
+      local.begin = begin * 256;
+      if (end > begin)
+        launch(local, end - begin, streams[d]);
+      if (!Check(cudaGetLastError()) || !Check(cudaEventRecord(ready[d], streams[d])))
+        return false;
+    }
+    if (!Check(cudaSetDevice(device)))
+      return false;
+    for (int d = 1; d < options.devices; ++d)
+      if (!Check(cudaStreamWaitEvent(stream, ready[d])))
+        return false;
+    if (!Check(cudaEventRecord(ready[0], stream)))
+      return false;
+    for (int d = 1; d < options.devices; ++d) {
+      if (!Check(cudaSetDevice(device + d)) || !Check(cudaStreamWaitEvent(streams[d], ready[0])))
+        return false;
+    }
+    return Check(cudaSetDevice(device));
   }
 
   void Run() {
@@ -634,47 +749,107 @@ struct Simulation::Impl {
                               controls.aileron != mesh_controls.aileron ||
                               controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder;
       if (geometry_changed) {
-        Mask<<<cb, 256, 0, stream>>>(g, solid, controls);
-        FaceMask<<<fb, 256, 0, stream>>>(g, solid, bu, bv, bw, controls);
+        if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
+              Mask<<<blocks, 256, 0, queue>>>(g, solid, controls);
+            }))
+          break;
+        if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+              FaceMask<<<blocks, 256, 0, queue>>>(g, solid, bu, bv, bw, controls);
+            }))
+          break;
         if (!Check(pressure_solver.Build(solid, bu, bv, bw)))
           break;
       }
-      Boundary<<<fb, 256, 0, stream>>>(g, bu, bv, bw, u, v, w, controls.speed, reset);
-      Advect<<<fb, 256, 0, stream>>>(g, u, v, w, u, un, {g, {bu, bv, bw}}, 0, dt);
-      Advect<<<fb, 256, 0, stream>>>(g, u, v, w, v, vn, {g, {bu, bv, bw}}, 1, dt);
-      Advect<<<fb, 256, 0, stream>>>(g, u, v, w, w, wn, {g, {bu, bv, bw}}, 2, dt);
-      Boundary<<<fb, 256, 0, stream>>>(g, bu, bv, bw, un, vn, wn, controls.speed, false);
+      if (!Check(cudaEventRecord(timing[0], stream)))
+        break;
+      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, u, v, w, controls.speed, reset);
+          }))
+        break;
+      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, u, un, {g, {bu, bv, bw}}, 0, dt);
+            Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, v, vn, {g, {bu, bv, bw}}, 1, dt);
+            Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, w, wn, {g, {bu, bv, bw}}, 2, dt);
+          }))
+        break;
+      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, un, vn, wn, controls.speed, false);
+          }))
+        break;
       float *sources[] = {u, v, w}, *destinations[] = {un, vn, wn};
       for (int axis = 0; axis < 3; ++axis) {
         if (options.corrected_transport)
-          Advect<<<fb, 256, 0, stream>>>(g, u, v, w, destinations[axis], reverse, {g, {bu, bv, bw}}, axis, -dt);
-        CorrectTransport<<<fb, 256, 0, stream>>>(g, u, v, w, sources[axis],
-                                                 options.corrected_transport ? reverse : nullptr, destinations[axis],
-                                                 bu, bv, bw, axis, dt);
+          if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+                Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, destinations[axis], reverse, {g, {bu, bv, bw}}, axis,
+                                                  -dt);
+              }))
+            break;
+        if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+              CorrectTransport<<<blocks, 256, 0, queue>>>(g, u, v, w, sources[axis],
+                                                          options.corrected_transport ? reverse : nullptr,
+                                                          destinations[axis], bu, bv, bw, axis, dt);
+            }))
+          break;
       }
+      if (!error.empty())
+        break;
       std::swap(u, un);
       std::swap(v, vn);
       std::swap(w, wn);
-      Boundary<<<fb, 256, 0, stream>>>(g, bu, bv, bw, u, v, w, controls.speed, false);
-      Divergence<<<cb, 256, 0, stream>>>(g, solid, u, v, w, div);
+      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, u, v, w, controls.speed, false);
+          }))
+        break;
+      if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Divergence<<<blocks, 256, 0, queue>>>(g, solid, u, v, w, div);
+          }))
+        break;
+      if (!Check(cudaEventRecord(timing[1], stream)))
+        break;
       int pressure_cycles = 0;
       float pressure_residual = 0;
       if (!Check(pressure_solver.Solve(div, pressure, density * g.h * g.h / dt, options.pressure_tolerance,
                                        options.pressure_cycles, pressure_cycles, pressure_residual)))
         break;
-      Project<<<fb, 256, 0, stream>>>(g, bu, bv, bw, pressure, u, v, w, dt);
-      Divergence<<<cb, 256, 0, stream>>>(g, solid, u, v, w, after);
-      Measure<<<cb, 256, 0, stream>>>(g, solid, bu, bv, bw, u, v, w, un, vn, wn, pressure, div, after, statistics);
-      Export<<<(display_count + 255) / 256, 256, 0, stream>>>(g, display_grid, u, v, w, pressure, cells);
+      if (!Check(cudaEventRecord(timing[2], stream)))
+        break;
+      if (!Parallel(0, [&](Grid, int, cudaStream_t) {}))
+        break;
+      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Project<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, pressure, u, v, w, dt);
+          }))
+        break;
+      if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Divergence<<<blocks, 256, 0, queue>>>(g, solid, u, v, w, after);
+          }))
+        break;
+      if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Measure<<<blocks, 256, 0, queue>>>(g, solid, bu, bv, bw, u, v, w, un, vn, wn, pressure, div, after,
+                                               statistics);
+          }))
+        break;
       auto snapshot = std::make_shared<Snapshot>();
-      snapshot->cells.resize(display_count);
+      bool export_field =
+          options.export_field || (options.export_final && options.stop_after && step + 1 == options.stop_after);
+      if (export_field) {
+        Export<<<(display_count + 255) / 256, 256, 0, stream>>>(g, display_grid, u, v, w, pressure, cells);
+        snapshot->cells.resize(display_count);
+        if (!Check(cudaMemcpyAsync(snapshot->cells.data(), cells, display_count * sizeof(Cell), cudaMemcpyDeviceToHost,
+                                   stream)))
+          break;
+      }
       if (!Check(cudaGetLastError()) ||
-          !Check(cudaMemcpyAsync(snapshot->cells.data(), cells, display_count * sizeof(Cell), cudaMemcpyDeviceToHost,
-                                 stream)) ||
           !Check(cudaMemcpyAsync(measurements.data(), statistics, measurements.size() * sizeof(Statistics),
                                  cudaMemcpyDeviceToHost, stream)) ||
-          !Check(cudaStreamSynchronize(stream)))
+          !Check(cudaEventRecord(timing[3], stream)) || !Check(cudaStreamSynchronize(stream)))
         break;
+      float milliseconds[3]{};
+      for (int i = 0; i < 3; ++i)
+        if (!Check(cudaEventElapsedTime(&milliseconds[i], timing[i], timing[i + 1])))
+          return;
+      snapshot->transport_seconds = milliseconds[0] * 0.001f;
+      snapshot->pressure_seconds = milliseconds[1] * 0.001f;
+      snapshot->diagnostics_seconds = milliseconds[2] * 0.001f;
       double before_sum = 0, after_sum = 0, force[3]{}, moment[3]{};
       max_speed = controls.speed;
       for (auto value : measurements) {
@@ -722,6 +897,8 @@ struct Simulation::Impl {
         if (generation == current_generation)
           latest = std::move(snapshot);
         working = false;
+        if (options.stop_after && step >= options.stop_after)
+          paused = true;
       }
     }
   }
@@ -735,13 +912,24 @@ struct Simulation::Impl {
     if (worker.joinable())
       worker.join();
     cudaSetDevice(device);
-    if (stream)
-      cudaStreamSynchronize(stream);
+    for (int d = 0; d < int(streams.size()); ++d) {
+      cudaSetDevice(device + d);
+      cudaStreamSynchronize(streams[d]);
+    }
+    cudaSetDevice(device);
+    for (auto event : timing)
+      if (event)
+        cudaEventDestroy(event);
     pressure_solver.Release();
     for (auto allocation : allocations)
       cudaFree(allocation);
-    if (stream)
-      cudaStreamDestroy(stream);
+    for (int d = 0; d < int(streams.size()); ++d) {
+      cudaSetDevice(device + d);
+      if (d < int(ready.size()))
+        cudaEventDestroy(ready[d]);
+      cudaStreamDestroy(streams[d]);
+    }
+    cudaSetDevice(device);
   }
 };
 
@@ -751,8 +939,13 @@ Simulation::Simulation() : impl_(std::make_unique<Impl>()) {
 Simulation::~Simulation() = default;
 
 std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const SolverOptions &options) {
-  if (cuda_device < 0 || nx < 64 || nx > 640 || nx % 16 || options.pressure_tolerance < 1e-6f ||
-      options.pressure_tolerance > 0.1f || options.pressure_cycles < 1 || options.pressure_cycles > 256)
+  int available = 0;
+  if (cudaGetDeviceCount(&available) != cudaSuccess || options.devices < 1 || options.devices > 8 ||
+      cuda_device + options.devices > available)
+    return {};
+  if (cuda_device < 0 || nx < 64 || nx > 640 || nx % 16 || !std::isfinite(options.pressure_tolerance) ||
+      options.pressure_tolerance < 1e-6f || options.pressure_tolerance > 0.1f || options.pressure_cycles < 1 ||
+      options.pressure_cycles > 256)
     return {};
   auto result = std::unique_ptr<Simulation>(new Simulation);
   result->impl_->device = cuda_device;

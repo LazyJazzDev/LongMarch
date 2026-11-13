@@ -88,11 +88,26 @@ __global__ void SetRhs(Level l, const float *divergence, float factor) {
 
 __global__ void Smooth(Level l, int parity) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
-  if (n >= l.Count())
-    return;
-  int x = n % l.nx, y = n / l.nx % l.ny, z = n / (l.nx * l.ny);
-  if ((x + y + z) % 2 != parity)
-    return;
+  int x, y, z;
+  if (l.nx % 2 == 0) {
+    // Every thread updates a cell of this colour; the original full-grid
+    // launch discarded half its lanes on the parity test.
+    if (n >= l.Count() / 2)
+      return;
+    int row = n / (l.nx / 2);
+    y = row % l.ny;
+    z = row / l.ny;
+    x = 2 * (n % (l.nx / 2)) + ((parity + y + z) & 1);
+    n = l.Index(x, y, z);
+  } else {
+    if (n >= l.Count())
+      return;
+    x = n % l.nx;
+    y = n / l.nx % l.ny;
+    z = n / (l.nx * l.ny);
+    if ((x + y + z) % 2 != parity)
+      return;
+  }
   float d = Diagonal(l, n, x, y, z);
   if (d > 0)
     l.x[n] += 1.3f * ((l.rhs[n] + NeighborSum(l, n, x, y, z)) / d - l.x[n]);
@@ -320,6 +335,11 @@ class Solver {
     return (l.Count() + 255) / 256;
   }
 
+  static int SmoothBlocks(Level l) {
+    int count = l.nx % 2 == 0 ? l.Count() / 2 : l.Count();
+    return (count + 255) / 256;
+  }
+
   template <class T>
   cudaError_t Allocate(T *&p, int count) {
     auto error = cudaMalloc(reinterpret_cast<void **>(&p), size_t(count) * sizeof(T));
@@ -337,7 +357,7 @@ class Solver {
     int smooth = 3;
     for (int i = 0; i < smooth; ++i)
       for (int parity = 0; parity < 2; ++parity)
-        Smooth<<<Blocks(l), 256, 0, stream_>>>(l, parity);
+        Smooth<<<SmoothBlocks(l), 256, 0, stream_>>>(l, parity);
     Residual<<<Blocks(l), 256, 0, stream_>>>(l);
     Level coarse = levels_[index + 1];
     Restrict<<<Blocks(coarse), 256, 0, stream_>>>(l, coarse);
@@ -345,7 +365,7 @@ class Solver {
     Prolong<<<Blocks(l), 256, 0, stream_>>>(coarse, l);
     for (int i = 0; i < smooth; ++i)
       for (int parity = 1; parity >= 0; --parity)
-        Smooth<<<Blocks(l), 256, 0, stream_>>>(l, parity);
+        Smooth<<<SmoothBlocks(l), 256, 0, stream_>>>(l, parity);
   }
 
   cudaError_t Dot(const float *a, const float *b, const float *c, const float *d, double &first, double &second) {
