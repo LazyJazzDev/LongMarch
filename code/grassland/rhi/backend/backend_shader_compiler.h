@@ -7,7 +7,8 @@
 namespace grassland::rhi::backend {
 bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &source);
 
-// The C++ input layout owns locations. Slang expands this prefix; no source parsing.
+// C++ owns RHI_INPUT locations and resource bindings; shaders own RHI_VARYING
+// locations. Slang expands this prefix; no source parsing or interface rewriting.
 std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                               BackendAPI api,
                               const std::vector<InputAttributeDesc> &attributes = {});

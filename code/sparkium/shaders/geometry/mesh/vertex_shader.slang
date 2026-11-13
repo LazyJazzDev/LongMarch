@@ -14,11 +14,11 @@ struct VSInput {
 
 struct VSOutput {
   float4 position : SV_POSITION;
-  [[vk::location(0)]] float3 world_position : TEXCOORD0;
-  [[vk::location(1)]] float3 world_normal : TEXCOORD1;
-  [[vk::location(2)]] float2 tex_coord : TEXCOORD2;
-  [[vk::location(3)]] float3 tangent : TEXCOORD3;
-  [[vk::location(4)]] float signal : TEXCOORD4;
+  RHI_VARYING(0, float3, world_position);
+  RHI_VARYING(1, float3, world_normal);
+  RHI_VARYING(2, float2, tex_coord);
+  RHI_VARYING(3, float3, tangent);
+  RHI_VARYING(4, float, signal);
 };
 
 struct CameraData {

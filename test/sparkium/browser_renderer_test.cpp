@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <fstream>
 #include <thread>
 
@@ -233,6 +234,49 @@ TEST_P(BrowserRendererTest, QueueSwitchingPreservesAccumulationWithoutHostWaits)
   const auto reference = render(graphics);
   ASSERT_FALSE(reference.empty());
   EXPECT_EQ(render(automatic), reference);
+}
+
+TEST_P(BrowserRendererTest, RasterMaterialStageInterfacesRender) {
+  auto core = sparkium::Core::Create(device_.Get());
+  ASSERT_TRUE(core);
+  for (const char *material : {"lambertian", "specular", "light", "principled"}) {
+    SCOPED_TRACE(material);
+    {
+      std::ofstream file(path_);
+      file << R"({"format":"sparkium-scene","version":1,
+        "renderer":{"background_color":[0.1,0.2,0.3]},
+        "film":{"width":32,"height":32},
+        "camera":{"eye":[0,0,4],"target":[0,0,0]},
+        "materials":{"surface":{"type":")"
+           << material << R"(","base_color":[0.7,0.3,0.2],"emission":[0.3,0.2,0.1]}},
+        "geometries":{"sphere":{"type":"sphere","longitude_segments":12}},
+        "entities":[{"type":"mesh","geometry":"sphere","material":"surface"}]})";
+      ASSERT_TRUE(file.good());
+    }
+    std::string error;
+    auto scene = sparkium::JsonScene::Load(core.get(), path_, &error);
+    ASSERT_TRUE(scene) << error;
+    sparkium::Renderer renderer(core.get());
+    auto rendered = renderer.Submit(scene->GetScene(), scene->GetCamera(), scene->GetFilm(),
+                                    sparkium::RENDER_PIPELINE_RASTERIZATION);
+    ASSERT_TRUE(rendered);
+    ASSERT_TRUE(rendered->WaitHost());
+    ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_MAIN);
+    ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+    ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(scene->GetFilm()->GetRawImage());
+    ASSERT_TRUE(download);
+    ObjPtr<ISubmissionToken> submitted = commands->Submit();
+    ASSERT_TRUE(submitted);
+    ASSERT_TRUE(submitted->WaitHost());
+    std::vector<float> pixels(download->GetSize() / sizeof(float));
+    ASSERT_TRUE(download->CopyTo(pixels.data(), download->GetSize()));
+    ASSERT_EQ(pixels.size(), 32u * 32u * 4u);
+    for (float value : pixels)
+      ASSERT_TRUE(std::isfinite(value));
+    // A material pass must affect the covered center, not just clear the film.
+    EXPECT_NE(std::vector<float>(pixels.begin(), pixels.begin() + 3),
+              std::vector<float>(pixels.begin() + (16 * 32 + 16) * 4, pixels.begin() + (16 * 32 + 16) * 4 + 3));
+  }
 }
 
 std::vector<BackendAPI> Backends() {

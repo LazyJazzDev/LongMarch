@@ -49,8 +49,8 @@ struct Input {
 };
 struct Varying {
   float4 position : SV_Position;
-  float2 uv : TEXCOORD0;
-  float4 color : COLOR0;
+  RHI_VARYING(0, float2, uv);
+  RHI_VARYING(1, float4, color);
 };
 Varying VSMain(Input input) {
   Varying o;

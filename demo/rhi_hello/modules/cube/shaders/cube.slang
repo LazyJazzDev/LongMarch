@@ -13,7 +13,7 @@ struct Input {
 
 struct Varying {
   float4 position : SV_Position;
-  float3 color : COLOR0;
+  RHI_VARYING(0, float3, color);
 };
 
 Varying VSMain(Input input) {

@@ -2,7 +2,7 @@ RHI_TEXTURE2D(0, 0, float4, input_image);
 
 struct Vertex {
   float4 position : SV_Position;
-  float2 uv : TEXCOORD0;
+  RHI_VARYING(0, float2, uv);
 };
 
 [shader("vertex")] Vertex VSMain(uint id

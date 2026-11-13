@@ -243,6 +243,12 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                               BackendAPI api,
                               const std::vector<InputAttributeDesc> &attributes) {
   std::string header = "#define RHI_INPUT_I(L,T,N) RHI_INPUT_##L(T,N)\n#define RHI_INPUT(L,T,N) RHI_INPUT_I(L,T,N)\n";
+  // Inter-stage locations are shader contracts, independent of vertex-buffer inputs.
+  // Expand L once before token pasting so a caller can use a symbolic location.
+  header += "#define RHI_VARYING(L,T,N) RHI_VARYING_I(L,T,N)\n#define RHI_VARYING_I(L,T,N) ";
+  if (api == BACKEND_API_VULKAN || api == BACKEND_API_METAL)
+    header += "[[vk::location(L)]] ";
+  header += "T N : TEXCOORD##L\n";
   for (const auto &attribute : attributes) {
     auto location = std::to_string(attribute.location);
     header += "#define RHI_INPUT_" + location + "(T,N) ";
