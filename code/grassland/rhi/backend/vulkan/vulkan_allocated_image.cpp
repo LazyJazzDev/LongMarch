@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 
 #include <vk_mem_alloc.h>
 
@@ -72,6 +72,7 @@ IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc 
   if (SupportsImageStorage(device->NativePhysicalDevice(), desc.format))
     info.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
   image->storage_ = (info.usage & VK_IMAGE_USAGE_STORAGE_BIT) != 0;
+  device->ConfigureSharing(info);
   VmaAllocationCreateInfo memory{};
   memory.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
   if (!Check(vmaCreateImage(device->Allocator(), &info, &memory, &image->image_, &image->allocation_, nullptr),

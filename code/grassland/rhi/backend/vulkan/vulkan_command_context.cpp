@@ -63,7 +63,7 @@ VulkanCommandContextImpl::~VulkanCommandContextImpl() {
     vkFreeCommandBuffers(device_->NativeDevice(), pool_, 1, &cuda_acquire_);
 #endif
   if (reusable_) {
-    device_->RecycleCommandResources(pool_, command_);
+    device_->RecycleCommandResources(compute_queue_ ? QUEUE_TYPE_COMPUTE : QUEUE_TYPE_MAIN, pool_, command_);
     return;
   }
   if (pool_)
@@ -72,7 +72,8 @@ VulkanCommandContextImpl::~VulkanCommandContextImpl() {
 
 ICommandContext *VulkanCommandContextImpl::Create(IVulkanQueue *queue) {
   auto object = std::unique_ptr<VulkanCommandContextImpl>(new VulkanCommandContextImpl(queue));
-  object->reusable_ = object->device_->AcquireCommandResources(object->pool_, object->command_);
+  object->reusable_ = object->device_->AcquireCommandResources(
+      object->compute_queue_ ? QUEUE_TYPE_COMPUTE : QUEUE_TYPE_MAIN, object->pool_, object->command_);
   if (!object->reusable_)
     return nullptr;
   return object.release();
@@ -218,7 +219,7 @@ bool VulkanCommandContextImpl::EndRecording() {
       continue;
     VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
     barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-    barrier.srcQueueFamilyIndex = device_->QueueFamily();
+    barrier.srcQueueFamilyIndex = device_->QueueFamily(compute_queue_ ? QUEUE_TYPE_COMPUTE : QUEUE_TYPE_MAIN);
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
     barrier.buffer = entry.first->NativeBuffer();
     barrier.size = VK_WHOLE_SIZE;
@@ -846,7 +847,7 @@ bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, u
   region.imageExtent = {desc.width, desc.height, 1};
   vkCmdCopyBufferToImage(command_, upload->NativeBuffer(), native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          1, &region);
-  return TransitionImage(native, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+  return TransitionImage(native, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                          VK_ACCESS_SHADER_READ_BIT);
 }
 

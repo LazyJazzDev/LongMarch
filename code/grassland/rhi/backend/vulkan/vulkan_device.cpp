@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 #include <vk_mem_alloc.h>
 
@@ -23,6 +23,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_cuda_timeline.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue_selection.h"
 #include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
@@ -74,12 +75,13 @@ void VulkanDeviceImpl::WaitForProgress(const std::vector<Event> &next) {
   shutdown_consumed_ = stopping_;
 }
 
-bool VulkanDeviceImpl::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command) {
+bool VulkanDeviceImpl::AcquireCommandResources(QueueType type, VkCommandPool &pool, VkCommandBuffer &command) {
+  auto &command_pool = command_pools_[type];
   {
     std::lock_guard<std::mutex> lock(resource_pool_mutex_);
-    if (!command_pool_.empty()) {
-      std::tie(pool, command) = command_pool_.back();
-      command_pool_.pop_back();
+    if (!command_pool.empty()) {
+      std::tie(pool, command) = command_pool.back();
+      command_pool.pop_back();
     }
   }
   if (pool) {
@@ -87,7 +89,7 @@ bool VulkanDeviceImpl::AcquireCommandResources(VkCommandPool &pool, VkCommandBuf
       return false;
   } else {
     VkCommandPoolCreateInfo create{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    create.queueFamilyIndex = queue_family_index_;
+    create.queueFamilyIndex = QueueFamily(type);
     create.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     if (!Check(vkCreateCommandPool(device_, &create, nullptr, &pool), "Create command pool"))
       return false;
@@ -103,10 +105,11 @@ bool VulkanDeviceImpl::AcquireCommandResources(VkCommandPool &pool, VkCommandBuf
   return Check(vkBeginCommandBuffer(command, &begin), "Begin command buffer");
 }
 
-void VulkanDeviceImpl::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command) {
+void VulkanDeviceImpl::RecycleCommandResources(QueueType type, VkCommandPool pool, VkCommandBuffer command) {
+  auto &command_pool = command_pools_[type];
   try {
     std::lock_guard<std::mutex> lock(resource_pool_mutex_);
-    command_pool_.emplace_back(pool, command);
+    command_pool.emplace_back(pool, command);
     return;
   } catch (const std::bad_alloc &) {
   }
@@ -127,9 +130,9 @@ VulkanDeviceImpl::~VulkanDeviceImpl() {
   scratch_pool_.Clear();
   render_targets_.reset();
   descriptor_pool_.reset();
-  for (const auto &entry : command_pool_) {
-    vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
-  }
+  for (const auto &pool : command_pools_)
+    for (const auto &entry : pool)
+      vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
   for (auto &queue : queues_)
     queue.Reset();
   if (collector_shutdown_)
@@ -162,31 +165,27 @@ rhi::IDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevic
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, nullptr);
   std::vector<VkQueueFamilyProperties> families(count);
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, families.data());
-  uint32_t queue_family = UINT32_MAX;
-  for (uint32_t i = 0; i < count; ++i) {
-    const auto required = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
-    if (!families[i].queueCount || (families[i].queueFlags & required) != required)
-      continue;
-    if (queue_family == UINT32_MAX || families[i].queueCount > families[queue_family].queueCount)
-      queue_family = i;
-    if (families[i].queueCount >= 3)
-      break;
-  }
-  if (queue_family == UINT32_MAX) {
+  const auto selection = SelectQueues(families);
+  if (selection.graphics_family == UINT32_MAX) {
     ReportError(-1, "No Vulkan graphics and compute queue is available.");
     return {};
   }
-  // All roles share a family, so ordinary resources need no ownership transfers.
-  // Do not create unused queues in unrelated families.
+  device->queue_families_ = {selection.graphics_family, selection.compute_family};
+  const bool dedicated_compute = selection.compute_family != selection.graphics_family;
   const float priorities[] = {1.0f, 1.0f, 1.0f};
-  VkDeviceQueueCreateInfo queue_create{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-  queue_create.queueFamilyIndex = queue_family;
-  queue_create.queueCount = std::min(3u, families[queue_family].queueCount);
-  queue_create.pQueuePriorities = priorities;
+  std::array<VkDeviceQueueCreateInfo, 2> queue_create{};
+  queue_create[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+  queue_create[0].queueFamilyIndex = selection.graphics_family;
+  queue_create[0].queueCount = selection.graphics_count;
+  queue_create[0].pQueuePriorities = priorities;
+  queue_create[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+  queue_create[1].queueFamilyIndex = selection.compute_family;
+  queue_create[1].queueCount = 1;
+  queue_create[1].pQueuePriorities = priorities;
   VkDeviceCreateInfo create{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
   create.pNext = &enabled.Features();
-  create.queueCreateInfoCount = 1;
-  create.pQueueCreateInfos = &queue_create;
+  create.queueCreateInfoCount = dedicated_compute ? 2 : 1;
+  create.pQueueCreateInfos = queue_create.data();
   create.enabledExtensionCount = static_cast<uint32_t>(enabled.Extensions().size());
   create.ppEnabledExtensionNames = enabled.Extensions().data();
   const VkResult result = vkCreateDevice(physical_device, &create, nullptr, &device->device_);
@@ -212,14 +211,16 @@ rhi::IDevice *VulkanDeviceImpl::CreateVulkanDevice(grassland::rhi::PhysicalDevic
   device->render_targets_ =
       std::make_unique<VulkanRenderTargetPool>(device->device_, device->procedures_.CmdBeginRendering != nullptr);
   device->physical_ = physical_device;
-  device->queue_family_index_ = queue_family;
   device->swapchain_enabled_ = swapchain;
   std::array<std::shared_ptr<std::mutex>, 3> native_mutexes;
   for (uint32_t index = 0; index < device->queues_.size(); ++index) {
-    const auto native_index = std::min(index, queue_create.queueCount - 1);
+    const auto type = static_cast<QueueType>(index);
     VkQueue queue;
-    vkGetDeviceQueue(device->device_, queue_family, native_index, &queue);
-    auto &mutex = native_mutexes[native_index];
+    vkGetDeviceQueue(device->device_, device->QueueFamily(type), selection.indices[index], &queue);
+    auto &mutex = native_mutexes[index];
+    for (uint32_t previous = 0; previous < index; ++previous)
+      if (device->queues_[previous]->NativeQueue() == queue)
+        mutex = native_mutexes[previous];
     if (!mutex)
       mutex = std::make_shared<std::mutex>();
     device->queues_[index] =
@@ -274,8 +275,24 @@ VkInstance VulkanDeviceImpl::Instance() const {
   return core_->Instance();
 }
 
-uint32_t VulkanDeviceImpl::QueueFamily() const {
-  return queue_family_index_;
+uint32_t VulkanDeviceImpl::QueueFamily(QueueType type) const {
+  return queue_families_[type == QUEUE_TYPE_COMPUTE ? 1 : 0];
+}
+
+void VulkanDeviceImpl::ConfigureSharing(VkBufferCreateInfo &info) const {
+  if (queue_families_[0] != queue_families_[1]) {
+    info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    info.queueFamilyIndexCount = static_cast<uint32_t>(queue_families_.size());
+    info.pQueueFamilyIndices = queue_families_.data();
+  }
+}
+
+void VulkanDeviceImpl::ConfigureSharing(VkImageCreateInfo &info) const {
+  if (queue_families_[0] != queue_families_[1]) {
+    info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    info.queueFamilyIndexCount = static_cast<uint32_t>(queue_families_.size());
+    info.pQueueFamilyIndices = queue_families_.data();
+  }
 }
 
 bool VulkanDeviceImpl::SupportsSwapchain() const {

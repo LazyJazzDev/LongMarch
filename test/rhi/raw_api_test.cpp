@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <type_traits>
 
@@ -141,7 +141,13 @@ TEST_P(RhiRaw, ComputeQueueClearsAndDispatchesAcrossMainQueueDependencies) {
     ObjPtr<ICommandContext> commands = compute->CreateCommandContext();
     ASSERT_TRUE(commands);
     const float color = float(round + 1);
-    ASSERT_TRUE(commands->CmdClearImage(source.Get(), {color, 0.0f, 0.0f, 1.0f}));
+    if (round % 2) {
+      const float pixels[]{color, 0.0f, 0.0f, 1.0f, color, 0.0f, 0.0f, 1.0f,
+                           color, 0.0f, 0.0f, 1.0f, color, 0.0f, 0.0f, 1.0f};
+      ASSERT_TRUE(commands->CmdUploadImage(source.Get(), pixels, 2 * 4 * sizeof(float)));
+    } else {
+      ASSERT_TRUE(commands->CmdClearImage(source.Get(), {color, 0.0f, 0.0f, 1.0f}));
+    }
     ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
     ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
     ASSERT_TRUE(commands->CmdDispatch(4, 1, 1));

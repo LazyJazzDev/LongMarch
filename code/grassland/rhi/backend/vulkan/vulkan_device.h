@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 #include <atomic>
 #include <mutex>
@@ -34,7 +34,11 @@ class IVulkanDevice : public IObject {
   virtual VmaAllocator Allocator() const = 0;
   virtual VkPhysicalDevice NativePhysicalDevice() const = 0;
   virtual VkInstance Instance() const = 0;
-  virtual uint32_t QueueFamily() const = 0;
+  virtual uint32_t QueueFamily(QueueType type = QUEUE_TYPE_MAIN) const = 0;
+  // Ordinary resources are shared across active families; dependencies still require Events.
+  // CUDA buffers remain exclusive and use explicit external ownership transfers.
+  virtual void ConfigureSharing(VkBufferCreateInfo &info) const = 0;
+  virtual void ConfigureSharing(VkImageCreateInfo &info) const = 0;
   virtual bool SupportsSwapchain() const = 0;
   virtual VulkanTemporalBufferPool &UploadPool() = 0;
   virtual VulkanTemporalBufferPool &DownloadPool() = 0;
@@ -42,8 +46,8 @@ class IVulkanDevice : public IObject {
   virtual  // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
       // The pool grows on demand, independently of swapchain image count.
       bool
-      AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command) = 0;
-  virtual void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command) = 0;
+      AcquireCommandResources(QueueType type, VkCommandPool &pool, VkCommandBuffer &command) = 0;
+  virtual void RecycleCommandResources(QueueType type, VkCommandPool pool, VkCommandBuffer command) = 0;
 };
 
 }  // namespace grassland::rhi::backend::vulkan
@@ -73,7 +77,9 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
   VmaAllocator Allocator() const;
   VkPhysicalDevice NativePhysicalDevice() const;
   VkInstance Instance() const;
-  uint32_t QueueFamily() const;
+  uint32_t QueueFamily(QueueType type = QUEUE_TYPE_MAIN) const;
+  void ConfigureSharing(VkBufferCreateInfo &info) const override;
+  void ConfigureSharing(VkImageCreateInfo &info) const override;
   bool SupportsSwapchain() const;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
@@ -91,8 +97,8 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
   // The pool grows on demand, independently of swapchain image count.
-  bool AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command);
-  void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command);
+  bool AcquireCommandResources(QueueType type, VkCommandPool &pool, VkCommandBuffer &command);
+  void RecycleCommandResources(QueueType type, VkCommandPool pool, VkCommandBuffer command);
 
  private:
   void InterruptCollector();
@@ -102,7 +108,7 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
   VulkanTemporalBufferPool download_pool_;
   VulkanScratchPool scratch_pool_;
   std::mutex resource_pool_mutex_;
-  std::vector<std::tuple<VkCommandPool, VkCommandBuffer>> command_pool_;
+  std::array<std::vector<std::tuple<VkCommandPool, VkCommandBuffer>>, 3> command_pools_;
   VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, IVulkanCore *core);
   std::unique_ptr<VulkanRenderTargetPool> render_targets_;
   std::unique_ptr<VulkanDescriptorPool> descriptor_pool_;
@@ -110,7 +116,7 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
   VkDevice device_{VK_NULL_HANDLE};
   DeviceProcedures procedures_;
   VkPhysicalDevice physical_{};
-  uint32_t queue_family_index_{};
+  std::array<uint32_t, 2> queue_families_{};
   bool swapchain_enabled_{};
   VkSemaphore collector_shutdown_{VK_NULL_HANDLE};
   bool shutdown_consumed_{};

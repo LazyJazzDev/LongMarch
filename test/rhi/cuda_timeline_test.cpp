@@ -42,7 +42,7 @@ struct Gate {
 
 class RhiCUDATimeline : public testing::TestWithParam<BackendAPI> {};
 
-TEST_P(RhiCUDATimeline, BothQueuesWaitForCUDAAndCUDAWaitsForQueueEvents) {
+TEST_P(RhiCUDATimeline, AllQueuesWaitForCUDAAndCUDAWaitsForQueueEvents) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -55,7 +55,7 @@ TEST_P(RhiCUDATimeline, BothQueuesWaitForCUDAAndCUDAWaitsForQueueEvents) {
   CUDAStream producer, consumer;
   ASSERT_EQ(cudaStreamCreateWithFlags(&producer.stream, cudaStreamNonBlocking), cudaSuccess);
   ASSERT_EQ(cudaStreamCreateWithFlags(&consumer.stream, cudaStreamNonBlocking), cudaSuccess);
-  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST}) {
+  for (auto type : {QUEUE_TYPE_MAIN, QUEUE_TYPE_ASSIST, QUEUE_TYPE_COMPUTE}) {
     ObjPtr<IQueue> queue = device->GetQueue(type);
     ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     ASSERT_TRUE(commands);
@@ -184,7 +184,7 @@ TEST_P(RhiCUDATimeline, GraphicsUploadCUDAKernelGraphicsReadback) {
   for (uint32_t round = 0; round < 8; ++round) {
     for (uint32_t i = 0; i < count; ++i)
       expected[i] = i + round * count;
-    ObjPtr<IQueue> queue = device->GetQueue(round % 2 ? QUEUE_TYPE_ASSIST : QUEUE_TYPE_MAIN);
+    ObjPtr<IQueue> queue = device->GetQueue(static_cast<QueueType>(round % 3));
     ObjPtr<ICommandContext> upload = queue->CreateCommandContext();
     SCOPED_TRACE(round);
     ASSERT_TRUE(upload->CmdUploadBuffer(buffer.Get(), 0, expected.data(), bytes));

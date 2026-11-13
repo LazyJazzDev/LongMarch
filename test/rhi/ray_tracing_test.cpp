@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
@@ -139,7 +139,7 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     ASSERT_EQ(vkBindBufferMemory(native, readback, memory, 0), VK_SUCCESS);
     VkCommandPool pool{};
     VkCommandBuffer commands{};
-    ASSERT_TRUE(owner->AcquireCommandResources(pool, commands));
+    ASSERT_TRUE(owner->AcquireCommandResources(QUEUE_TYPE_MAIN, pool, commands));
     VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
     barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -177,7 +177,7 @@ void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uin
     ASSERT_EQ(vkMapMemory(native, memory, 0, sizeof(output), 0, &mapped), VK_SUCCESS);
     std::memcpy(output.data(), mapped, sizeof(output));
     vkUnmapMemory(native, memory);
-    owner->RecycleCommandResources(pool, commands);
+    owner->RecycleCommandResources(QUEUE_TYPE_MAIN, pool, commands);
     vkDestroyBuffer(native, readback, nullptr);
     vkFreeMemory(native, memory, nullptr);
   }

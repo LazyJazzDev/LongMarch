@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
+#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 
 #include <vk_mem_alloc.h>
 
@@ -205,6 +205,7 @@ bool VulkanBottomLevelAccelerationStructureImpl::Allocate(const VkAccelerationSt
   VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   buffer.size = compacted_size ? compacted_size : sizes.accelerationStructureSize;
   buffer.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+  device_->ConfigureSharing(buffer);
   VmaAllocationCreateInfo memory{};
   memory.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
   if (!Check(vmaCreateBuffer(device_->Allocator(), &buffer, &memory, &buffer_, &allocation_, nullptr),
@@ -264,6 +265,7 @@ bool VulkanTopLevelAccelerationStructureImpl::Allocate(const VkAccelerationStruc
   VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   buffer.size = compacted_size ? compacted_size : sizes.accelerationStructureSize;
   buffer.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+  device_->ConfigureSharing(buffer);
   VmaAllocationCreateInfo memory{};
   memory.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
   if (!Check(vmaCreateBuffer(device_->Allocator(), &buffer, &memory, &buffer_, &allocation_, nullptr),
