@@ -60,7 +60,7 @@ inspection views; normal mouse orbit and zoom remain available.
 ## Numerical method and limits
 
 The domain is 16 × 8 × 12 m, spanning x = [-6, 10], y = [-4, 4], z = [-6, 6].
-The default MAC grid is 128 × 64 × 96. `--grid` sets the x resolution (64–256,
+The default MAC grid is 192 × 96 × 144. `--grid` sets the x resolution (64–512,
 multiple of 16); the other dimensions retain this aspect ratio. Velocity lives
 on staggered faces and pressure at cell centres. Each step performs:
 
@@ -75,7 +75,7 @@ on staggered faces and pressure at cell centres. Each step performs:
    residual is recomputed every iteration; default relative tolerance is `1e-4`.
 5. Subtract the pressure gradient and measure the remaining divergence.
 6. Integrate force, torque and diagnostics on the full solver grid using GPU
-   block reductions. Publish a display field capped at 192 ? 96 ? 144;
+   block reductions. Publish a display field capped at 192 × 96 × 144;
    downsampling the display field does not downsample the load integration.
 
 The air density is 1.225 kg/m³; the effective kinematic viscosity is 0.005 m²/s.
@@ -136,7 +136,7 @@ demo_wind3d --backend d3d12 --frames 600 --debug
 `--validate` cross-checks explicit mesh vertices against the solid-boundary
 function under combined extreme controls, checks finite fluid state, requires
 true pressure residual below the requested tolerance, and checks the divergence
-after projection (twice the requested relative tolerance, with a 1e-5 s??
+after projection (twice the requested relative tolerance, with a 1e-5 s⁻¹
 roundoff floor). `--pressure-tolerance` and `--pressure-cycles` set the residual
 target and maximum PCG iterations. Exhausting the iteration limit is visible in
 the panel and fails validation; it is not silently treated as convergence.
