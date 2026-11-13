@@ -61,8 +61,31 @@ struct TransportSampler {
   const unsigned char *blocked[3];
 
   __device__ float Donor(const float *field, int axis, Vec3 p, int x, int y, int z) const {
-    int q[] = {x, y, z};
+    float coordinate[] = {p.x, p.y, p.z};
     int anchor[] = {int(floorf(p.x + 0.5f)), int(floorf(p.y + 0.5f)), int(floorf(p.z + 0.5f))};
+    int ties = 0;
+    for (int d = 0; d < 3; ++d)
+      if (coordinate[d] - floorf(coordinate[d]) == 0.5f)
+        ties |= 1 << d;
+    if (!ties)
+      return DonorAtAnchor(field, axis, anchor, x, y, z);
+    // Exactly halfway between samples, neither adjacent anchor is preferred.
+    // Average their reconstructions so reflecting the grid preserves sampling.
+    float result = 0;
+    int count = 0;
+    for (int subset = 0; subset < 8; ++subset) {
+      if (subset & ~ties)
+        continue;
+      int adjacent[] = {anchor[0] - ((subset & 1) != 0), anchor[1] - ((subset & 2) != 0),
+                        anchor[2] - ((subset & 4) != 0)};
+      result += DonorAtAnchor(field, axis, adjacent, x, y, z);
+      ++count;
+    }
+    return result / count;
+  }
+
+  __device__ float DonorAtAnchor(const float *field, int axis, const int *anchor, int x, int y, int z) const {
+    int q[] = {x, y, z};
     int dims[] = {g.nx, g.ny, g.nz}, mirror[] = {x, y, z};
     float fraction[] = {0, 0, 0};
     for (int d = 0; d < 3; ++d) {
