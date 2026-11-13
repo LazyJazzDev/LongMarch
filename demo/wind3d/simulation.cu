@@ -54,6 +54,65 @@ __device__ float Sample(const float *f, Grid g, Vec3 p) {
   return result;
 }
 
+// Reconstruct stationary-wall ghost values on the MAC dual faces. The two
+// pressure-face flags contribute half each, as in the diffusion operator.
+struct TransportSampler {
+  Grid g;
+  const unsigned char *blocked[3];
+
+  __device__ float Donor(const float *field, int axis, Vec3 p, int x, int y, int z) const {
+    int q[] = {x, y, z};
+    int anchor[] = {int(floorf(p.x + 0.5f)), int(floorf(p.y + 0.5f)), int(floorf(p.z + 0.5f))};
+    int dims[] = {g.nx, g.ny, g.nz}, mirror[] = {x, y, z};
+    float fraction[] = {0, 0, 0};
+    for (int d = 0; d < 3; ++d) {
+      if (d == axis || q[d] == anchor[d])
+        continue;
+      int face[] = {anchor[0], anchor[1], anchor[2]};
+      face[d] = max(q[d], anchor[d]);
+      for (int half = 0; half < 2; ++half) {
+        if (face[0] >= 0 && face[0] <= dims[0] && face[1] >= 0 && face[1] <= dims[1] && face[2] >= 0 &&
+            face[2] <= dims[2])
+          fraction[d] += 0.5f * (blocked[d][g.F(face[0], face[1], face[2])] != 0);
+        --face[axis];
+      }
+      mirror[d] = 2 * max(q[d], anchor[d]) - 1 - q[d];
+    }
+    if (fraction[0] == 0 && fraction[1] == 0 && fraction[2] == 0)
+      return Read(field, g, x, y, z);
+    float result = 0;
+    for (int subset = 0; subset < 8; ++subset) {
+      int donor[] = {x, y, z};
+      float weight = 1;
+      for (int d = 0; d < 3; ++d) {
+        if (subset & (1 << d)) {
+          weight *= -fraction[d];
+          donor[d] = mirror[d];
+        } else {
+          weight *= 1 - fraction[d];
+        }
+      }
+      if (weight != 0)
+        result += weight * Read(field, g, donor[0], donor[1], donor[2]);
+    }
+    return result;
+  }
+
+  __device__ float Sample(const float *field, int axis, Vec3 p) const {
+    p.x = fminf(fmaxf(p.x, 0), float(g.nx));
+    p.y = fminf(fmaxf(p.y, 0), float(g.ny));
+    p.z = fminf(fmaxf(p.z, 0), float(g.nz));
+    int x = int(p.x), y = int(p.y), z = int(p.z);
+    float result = 0;
+    for (int k = 0; k < 2; ++k)
+      for (int j = 0; j < 2; ++j)
+        for (int i = 0; i < 2; ++i)
+          result += Donor(field, axis, p, x + i, y + j, z + k) * (i ? p.x - x : 1 - p.x + x) *
+                    (j ? p.y - y : 1 - p.y + y) * (k ? p.z - z : 1 - p.z + z);
+    return result;
+  }
+};
+
 __global__ void Mask(Grid g, unsigned char *solid, Controls controls) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= g.nx * g.ny * g.nz)
@@ -138,15 +197,24 @@ __global__ void Boundary(Grid g,
     w[n] = 0;
 }
 
-__device__ Vec3
-Departure(Grid g, const float *u, const float *v, const float *w, int x, int y, int z, int axis, float dt) {
+__device__ Vec3 Departure(Grid g,
+                          const float *u,
+                          const float *v,
+                          const float *w,
+                          TransportSampler sampler,
+                          int x,
+                          int y,
+                          int z,
+                          int axis,
+                          float dt) {
   Vec3 offset{axis == 0 ? 0.0f : 0.5f, axis == 1 ? 0.0f : 0.5f, axis == 2 ? 0.0f : 0.5f};
   Vec3 p{x + offset.x, y + offset.y, z + offset.z};
-  Vec3 velocity{Sample(u, g, Add(p, {0, -0.5f, -0.5f})), Sample(v, g, Add(p, {-0.5f, 0, -0.5f})),
-                Sample(w, g, Add(p, {-0.5f, -0.5f, 0}))};
+  Vec3 velocity{sampler.Sample(u, 0, Add(p, {0, -0.5f, -0.5f})), sampler.Sample(v, 1, Add(p, {-0.5f, 0, -0.5f})),
+                sampler.Sample(w, 2, Add(p, {-0.5f, -0.5f, 0}))};
   Vec3 midpoint = Add(p, Scale(velocity, -0.5f * dt / g.h));
-  velocity = {Sample(u, g, Add(midpoint, {0, -0.5f, -0.5f})), Sample(v, g, Add(midpoint, {-0.5f, 0, -0.5f})),
-              Sample(w, g, Add(midpoint, {-0.5f, -0.5f, 0}))};
+  velocity = {sampler.Sample(u, 0, Add(midpoint, {0, -0.5f, -0.5f})),
+              sampler.Sample(v, 1, Add(midpoint, {-0.5f, 0, -0.5f})),
+              sampler.Sample(w, 2, Add(midpoint, {-0.5f, -0.5f, 0}))};
   return Add(Add(p, Scale(velocity, -dt / g.h)), Scale(offset, -1));
 }
 
@@ -156,13 +224,14 @@ __global__ void Advect(Grid g,
                        const float *w,
                        const float *source,
                        float *destination,
+                       TransportSampler sampler,
                        int axis,
                        float dt) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
-  destination[n] = Sample(source, g, Departure(g, u, v, w, x, y, z, axis, dt));
+  destination[n] = sampler.Sample(source, axis, Departure(g, u, v, w, sampler, x, y, z, axis, dt));
 }
 
 __global__ void CorrectTransport(Grid g,
@@ -181,15 +250,16 @@ __global__ void CorrectTransport(Grid g,
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
+  TransportSampler sampler{g, {bu, bv, bw}};
   float transported = forward[n];
   if (reverse) {
-    Vec3 back = Departure(g, u, v, w, x, y, z, axis, dt);
+    Vec3 back = Departure(g, u, v, w, sampler, x, y, z, axis, dt);
     int ix = int(floorf(back.x)), iy = int(floorf(back.y)), iz = int(floorf(back.z));
     float low = 1e30f, high = -1e30f;
     for (int k = 0; k < 2; ++k)
       for (int j = 0; j < 2; ++j)
         for (int i = 0; i < 2; ++i) {
-          float value = Read(source, g, ix + i, iy + j, iz + k);
+          float value = sampler.Donor(source, axis, back, ix + i, iy + j, iz + k);
           low = fminf(low, value);
           high = fmaxf(high, value);
         }
@@ -535,14 +605,14 @@ struct Simulation::Impl {
           break;
       }
       Boundary<<<fb, 256, 0, stream>>>(g, bu, bv, bw, u, v, w, controls.speed, reset);
-      Advect<<<fb, 256, 0, stream>>>(g, u, v, w, u, un, 0, dt);
-      Advect<<<fb, 256, 0, stream>>>(g, u, v, w, v, vn, 1, dt);
-      Advect<<<fb, 256, 0, stream>>>(g, u, v, w, w, wn, 2, dt);
+      Advect<<<fb, 256, 0, stream>>>(g, u, v, w, u, un, {g, {bu, bv, bw}}, 0, dt);
+      Advect<<<fb, 256, 0, stream>>>(g, u, v, w, v, vn, {g, {bu, bv, bw}}, 1, dt);
+      Advect<<<fb, 256, 0, stream>>>(g, u, v, w, w, wn, {g, {bu, bv, bw}}, 2, dt);
       Boundary<<<fb, 256, 0, stream>>>(g, bu, bv, bw, un, vn, wn, controls.speed, false);
       float *sources[] = {u, v, w}, *destinations[] = {un, vn, wn};
       for (int axis = 0; axis < 3; ++axis) {
         if (options.corrected_transport)
-          Advect<<<fb, 256, 0, stream>>>(g, u, v, w, destinations[axis], reverse, axis, -dt);
+          Advect<<<fb, 256, 0, stream>>>(g, u, v, w, destinations[axis], reverse, {g, {bu, bv, bw}}, axis, -dt);
         CorrectTransport<<<fb, 256, 0, stream>>>(g, u, v, w, sources[axis],
                                                  options.corrected_transport ? reverse : nullptr, destinations[axis],
                                                  bu, bv, bw, axis, dt);

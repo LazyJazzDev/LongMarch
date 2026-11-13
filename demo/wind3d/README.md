@@ -73,7 +73,12 @@ on staggered faces and pressure at cell centres. Each step performs:
    profiles and a 1 micrometre grazing-contact tolerance; it does not remove
    the stair-step error of representing a curved wall on Cartesian faces.
 2. Midpoint characteristic tracing, bounded MacCormack transport correction,
-   and explicit viscous diffusion. Tangential diffusion uses stationary no-slip
+   and explicit viscous diffusion. Tracing, forward/reverse transport and limiter
+   bounds reconstruct tangential samples using stationary-wall ghost values.
+   Each adjacent pressure-face flag contributes half of the MAC dual-face
+   reflection, retaining the open part of a partially blocked face. This is a
+   local Cartesian reconstruction, not a curved-wall cut-cell scheme.
+   Tangential diffusion uses stationary no-slip
    ghost velocities across blocked faces, including thin walls with fluid cells
    on both sides. `--first-order` disables the transport correction.
 3. Enforce stationary no-penetration face velocities at solid boundaries.
