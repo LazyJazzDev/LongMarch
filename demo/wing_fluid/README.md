@@ -38,6 +38,13 @@ or floating-point atomic requirements. Results need not be bit-identical. Comput
 submissions are batched and use the same queue as rendering. Integrated GPUs may
 benefit from `--grid 128` or `--grid 256`.
 
+The compute path batches immutable dispatch parameters into aligned uniform-buffer
+slices, avoiding an upload between every pair of kernels. Red/black smoothing uses
+one lane per active cell in a dedicated pipeline. The final 16x8, 8x4 and 4x2 grids
+run the same V-cycle inside one thread group, with device-memory barriers between
+stages; larger grids retain separate dispatches for global synchronization. These
+optimizations do not reduce resolution, pressure cycles or smoothing sweeps.
+
 On a CUDA-capable device in a CUDA-enabled build, the main window offers
 **Switch to: Compute Shader / CUDA**. Switching preserves the staggered velocity
 fields, pressure, dye, simulation time, current parameters, pause state and load

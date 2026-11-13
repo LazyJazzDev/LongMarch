@@ -35,7 +35,7 @@ enum Kernel {
   CoarsenOperator,
   Smooth,
   Residual,
-  CoarseSolve,
+  CoarseCycle,
   Restrict,
   Prolong,
   InitializeVelocity,
@@ -107,6 +107,7 @@ class ComputeSimulation final : public Simulation {
   }
 
   bool Begin();
+  bool RecordDispatches();
   bool Flush();
   bool Run(Kernel kernel, int count, Level level, Level coarse = {}, int argument = 0, bool diagnostic = false);
   bool Cycle(size_t index);
@@ -131,8 +132,16 @@ class ComputeSimulation final : public Simulation {
 
   ObjPtr<IQueue> queue_;
   ObjPtr<IBuffer> heap_, field_, uniform_;
-  ObjPtr<IComputeProgram> program_;
-  ObjPtr<IBindingGroup> group_;
+  std::array<ObjPtr<IComputeProgram>, 3> programs_;
+  static constexpr int batch_size = 1024;
+
+  struct alignas(256) DispatchRecord {
+    DispatchSettings settings;
+  };
+
+  static_assert(sizeof(DispatchRecord) == 256);
+  std::array<ObjPtr<IBindingGroup>, batch_size> groups_;
+  std::vector<DispatchRecord> records_;
   ObjPtr<ICommandContext> commands_;
   ObjPtr<ISubmissionToken> pending_;
   std::vector<Level> levels_;
@@ -140,7 +149,6 @@ class ComputeSimulation final : public Simulation {
   Parameters parameters_{};
   uint32_t size_{}, u_{}, v_{}, next_u_{}, next_v_{}, mask_{}, dye_{}, next_dye_{}, corrected_dye_{}, stats_{},
       reduced_{};
-  int recorded_{};
   float time_{}, last_dt_{1};
   bool loads_valid_{};
   std::string error_;
@@ -152,16 +160,37 @@ bool ComputeSimulation::Begin() {
   if (commands_)
     return true;
   commands_ = queue_->CreateCommandContext();
-  return (commands_ && commands_->CmdBindComputeProgram(program_.Get()) && commands_->CmdBindGroup(0, group_.Get())) ||
-         Fail("Compute command recording failed");
+  return bool(commands_) || Fail("Compute command recording failed");
+}
+
+bool ComputeSimulation::RecordDispatches() {
+  if (!records_.empty()) {
+    // Upload immutable, aligned parameter slices once, before any dispatch reads them.
+    // The same queue orders reuse of this arena after the previous batch finishes.
+    if (!commands_->CmdUploadBuffer(uniform_.Get(), 0, records_.data(), records_.size() * sizeof(DispatchRecord)))
+      return Fail("Compute batch upload failed");
+    int bound = -1;
+    for (size_t i = 0; i < records_.size(); ++i) {
+      auto &control = records_[i].settings.controls;
+      int program = control[0] == Smooth ? 1 : control[0] == CoarseCycle ? 2 : 0;
+      if (program != bound && !commands_->CmdBindComputeProgram(programs_[program].Get()))
+        return Fail("Compute pipeline binding failed");
+      bound = program;
+      if (!commands_->CmdBindGroup(0, groups_[i].Get()) || !commands_->CmdDispatch((control[2] + 255) / 256))
+        return Fail("Compute dispatch failed");
+    }
+  }
+  records_.clear();
+  return true;
 }
 
 bool ComputeSimulation::Flush() {
   if (!commands_)
     return error_.empty();
+  if (!RecordDispatches())
+    return false;
   pending_ = commands_->Submit();
   commands_.Release();
-  recorded_ = 0;
   return bool(pending_) || Fail("Compute submission failed");
 }
 
@@ -170,12 +199,10 @@ bool ComputeSimulation::Run(Kernel kernel, int count, Level level, Level coarse,
     return false;
   settings_.level = level;
   settings_.coarse = coarse;
-  settings_.controls = {int(kernel), argument, count, int(diagnostic)};
+  settings_.controls = {int(kernel), argument, kernel == Smooth ? count / 2 : count, int(diagnostic)};
   settings_.scratch = {stats_, reduced_, 0, 0};
-  if (!commands_->CmdUploadBuffer(uniform_.Get(), 0, &settings_, sizeof(settings_)) ||
-      !commands_->CmdDispatch((count + 255) / 256))
-    return Fail("Compute dispatch failed");
-  return ++recorded_ < 1024 || Flush();
+  records_.push_back({settings_});
+  return records_.size() < batch_size || Flush();
 }
 
 bool ComputeSimulation::Initialize(IDevice *device, int width, int height) {
@@ -201,25 +228,39 @@ bool ComputeSimulation::Initialize(IDevice *device, int width, int height) {
   reduced_ = Allocate(((width * height + 255) / 256) * 7);
   heap_ = device->CreateBuffer({uint64_t(size_) * 4});
   field_ = device->CreateBuffer({uint64_t(width) * height * 16});
-  uniform_ = device->CreateBuffer({256});
+  uniform_ = device->CreateBuffer({sizeof(DispatchRecord) * batch_size});
+  records_.reserve(batch_size);
   std::string source = "#define WING_PROFILE_SHADER\n";
   source.append(reinterpret_cast<const char *>(wing_profile_h), wing_profile_h_len);
   source.append("\n");
   source.append(reinterpret_cast<const char *>(simulation_slang), simulation_slang_len);
-  ObjPtr<IShader> shader = device->CreateShaderFromSource(source, "CSMain", SHADER_STAGE_COMPUTE);
+
   BindingLayoutDesc layout{{{0, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
                             {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
                             {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}};
-  if (!queue_ || !heap_ || !field_ || !uniform_ || !shader)
+  if (!queue_ || !heap_ || !field_ || !uniform_)
     return Fail("Compute resource/shader creation failed");
-  ComputeProgramDesc desc;
-  desc.compute_shader = shader.Get();
-  desc.pipeline_layout.groups = {layout};
-  program_ = device->CreateComputeProgram(desc);
-  group_ = device->CreateBindingGroup(layout);
-  if (!program_ || !group_ || !group_->BindResource(0, heap_.Get()) || !group_->BindResource(1, field_.Get()) ||
-      !group_->BindResource(2, uniform_.Get()) || !Begin())
-    return Fail("Compute pipeline creation failed");
+  const char *entries[] = {"CSMain", "SmoothMain", "CoarseCycleMain"};
+  for (size_t i = 0; i < programs_.size(); ++i) {
+    ObjPtr<IShader> shader = device->CreateShaderFromSource(source, entries[i], SHADER_STAGE_COMPUTE);
+    if (!shader)
+      return Fail("Compute shader creation failed");
+    ComputeProgramDesc desc;
+    desc.compute_shader = shader.Get();
+    desc.pipeline_layout.groups = {layout};
+    programs_[i] = device->CreateComputeProgram(desc);
+    if (!programs_[i])
+      return Fail("Compute pipeline creation failed");
+  }
+  for (size_t i = 0; i < groups_.size(); ++i) {
+    auto &group = groups_[i];
+    group = device->CreateBindingGroup(layout);
+    if (!group || !group->BindResource(0, heap_.Get()) || !group->BindResource(1, field_.Get()) ||
+        !group->BindResource(2, BufferView{uniform_.Get(), i * sizeof(DispatchRecord), sizeof(DispatchRecord)}))
+      return Fail("Compute binding creation failed");
+  }
+  if (!Begin())
+    return false;
   std::vector<float> zero(size_);
   return commands_->CmdUploadBuffer(heap_.Get(), 0, zero.data(), uint64_t(size_) * 4) ||
          Fail("Compute initialization failed");
@@ -242,8 +283,8 @@ bool ComputeSimulation::GeometryFor(const Parameters &p) {
 bool ComputeSimulation::Cycle(size_t index) {
   auto l = levels_[index];
   int n = l.w * l.h;
-  if (index + 1 == levels_.size())
-    return Run(CoarseSolve, 1, l);
+  if (l.w == 16)
+    return Run(CoarseCycle, 1, l, levels_[index + 1]);
   for (int sweep = 0; sweep < 3; ++sweep)
     for (int color = 0; color < 2; ++color)
       if (!Run(Smooth, n, l, {}, color))
@@ -333,7 +374,7 @@ bool ComputeSimulation::RestoreState(const SimulationState &state) {
   last_dt_ = state.last_dt;
   loads_valid_ = state.loads_valid;
   Update(parameters_, last_dt_);
-  if (!GeometryFor(parameters_) || !Begin())
+  if (!GeometryFor(parameters_) || !RecordDispatches() || !Begin())
     return false;
   for (auto pair : {std::make_pair(&state.u, u_),
                     {&state.v, v_},
@@ -352,7 +393,7 @@ bool ComputeSimulation::Export() {
 }
 
 bool ComputeSimulation::Read(uint32_t offset, std::vector<float> &values) {
-  if (!Begin())
+  if (!RecordDispatches() || !Begin())
     return false;
   ObjPtr<IDownloadToken> download = commands_->CmdDownloadBuffer(heap_.Get(), uint64_t(offset) * 4, values.size() * 4);
   return (download && Flush() && download->WaitHost() && download->CopyTo(values.data(), values.size() * 4)) ||

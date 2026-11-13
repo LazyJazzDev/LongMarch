@@ -548,6 +548,7 @@ Level L(uint4 a, uint4 b) {
 }
 
 groupshared float reduction[1792];
+
 [numthreads(256, 1, 1)] void CSMain(uint3 id
                                     : SV_DispatchThreadID, uint3 group
                                     : SV_GroupID, uint lane
@@ -579,15 +580,8 @@ groupshared float reduction[1792];
     case 4:
       CoarsenOperator(i, l, c);
       break;
-    case 5:
-      Smooth(i, l, color);
-      break;
     case 6:
       Residual(i, l);
-      break;
-    case 7:
-      if (i == 0)
-        CoarseSolve(i, l);
       break;
     case 8:
       Restrict(i, l, c);
@@ -657,4 +651,54 @@ groupshared float reduction[1792];
           heap.Store<float>((settings.scratch.y + group.x * 7 + k) * 4, reduction[k * 256]);
       break;
   }
+}
+
+    // One lane per active red/black cell. This entry excludes the direct solver's
+    // private matrix and the diagnostic reduction's shared storage from the hot kernel.
+    [numthreads(256, 1, 1)] void SmoothMain(uint3 id
+                                            : SV_DispatchThreadID) {
+  Level l = L(settings.level0, settings.level1);
+  int row = int(id.x) / (l.w / 2);
+  int i = int(id.x) * 2 + ((row + settings.controls.y) & 1);
+  Smooth(i, l, settings.controls.y);
+}
+
+// The final three grids (16x8, 8x4, 4x2) fit entirely in one thread group.
+// Keep the same V-cycle arithmetic and ordering, replacing dispatch boundaries
+// with device-memory group barriers. No other group accesses these grids here.
+void GroupSmooth(uint lane, Level l) {
+  for (int sweep = 0; sweep < 3; ++sweep) {
+    Smooth(lane, l, 0);
+    DeviceMemoryBarrierWithGroupSync();
+    Smooth(lane, l, 1);
+    DeviceMemoryBarrierWithGroupSync();
+  }
+}
+
+[numthreads(128, 1, 1)] void CoarseCycleMain(uint lane
+                                             : SV_GroupIndex) {
+  Level fine = L(settings.level0, settings.level1);
+  Level middle = L(settings.coarse0, settings.coarse1);
+  // Each level allocates p,b,r,east,north,boundary consecutively.
+  uint base = middle.boundary.offset + 32;
+  Level last = L(uint4(4, 2, base, base + 8), uint4(base + 16, base + 24, base + 32, base + 40));
+  GroupSmooth(lane, fine);
+  Residual(lane, fine);
+  DeviceMemoryBarrierWithGroupSync();
+  Restrict(lane, fine, middle);
+  DeviceMemoryBarrierWithGroupSync();
+  GroupSmooth(lane, middle);
+  Residual(lane, middle);
+  DeviceMemoryBarrierWithGroupSync();
+  Restrict(lane, middle, last);
+  DeviceMemoryBarrierWithGroupSync();
+  if (lane == 0)
+    CoarseSolve(0, last);
+  DeviceMemoryBarrierWithGroupSync();
+  Prolong(lane, last, middle);
+  DeviceMemoryBarrierWithGroupSync();
+  GroupSmooth(lane, middle);
+  Prolong(lane, middle, fine);
+  DeviceMemoryBarrierWithGroupSync();
+  GroupSmooth(lane, fine);
 }
