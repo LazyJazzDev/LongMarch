@@ -1,0 +1,555 @@
+#include <cuda_runtime.h>
+
+#include <climits>
+#include <cmath>
+#include <cuda/std/array>
+#include <vector>
+
+#include "amr_gpu_transport.h"
+
+namespace wind3d::amr {
+namespace {
+template <class T, size_t N>
+using Array = cuda::std::array<T, N>;
+
+__device__ double Min(double a, double b) {
+  return a < b ? a : b;
+}
+
+__device__ double Max(double a, double b) {
+  return a > b ? a : b;
+}
+
+__device__ double Clamp(double a, double lo, double hi) {
+  return Min(Max(a, lo), hi);
+}
+
+struct Cell {
+  Array<double, 3> centre;
+  double width;
+};
+
+struct Face {
+  int low, high, axis;
+  Array<double, 3> centre;
+  double area, aperture;
+};
+
+__device__ double Cubic(double f0, double f1, double f2, double f3, double t) {
+  double delta = f2 - f1, d1 = .5 * (f2 - f0), d2 = .5 * (f3 - f1);
+  if (delta == 0 || d1 * delta <= 0)
+    d1 = 0;
+  if (delta == 0 || d2 * delta <= 0)
+    d2 = 0;
+  double t2 = t * t, t3 = t2 * t;
+  return Clamp((2 * t3 - 3 * t2 + 1) * f1 + (t3 - 2 * t2 + t) * d1 + (-2 * t3 + 3 * t2) * f2 + (t3 - t2) * d2,
+               Min(f1, f2), Max(f1, f2));
+}
+
+struct Field {
+  int n, max_level, nb, nc, nf;
+  Array<int, 3> roots;
+  Array<double, 3> origin_;
+  double root_width_;
+  const Block *leaves;
+  const Cell *cells;
+  const Face *faces;
+  const int *offsets, *incidence;
+  double *velocity_;
+  Array<double, 3> *centres_;
+  Array<double, 9> *slopes_;
+  Array<double, 6> *limits_;
+
+  __device__ int Find(int x, int y, int z) const {
+    for (int level = max_level; level >= 0; --level) {
+      int scale = 1 << (max_level - level), qx = x / scale, qy = y / scale, qz = z / scale;
+      int lo = 0, hi = nb;
+      while (lo < hi) {
+        int mid = (lo + hi) / 2;
+        Block b = leaves[mid];
+        bool less =
+            b.level < level || (b.level == level && (b.z < qz || (b.z == qz && (b.y < qy || (b.y == qy && b.x < qx)))));
+        if (less)
+          lo = mid + 1;
+        else
+          hi = mid;
+      }
+      if (lo < nb) {
+        Block b = leaves[lo];
+        if (b.level == level && b.x == qx && b.y == qy && b.z == qz)
+          return lo;
+      }
+    }
+    return -1;
+  }
+
+  __device__ int CellAt(Array<double, 3> point) const {
+    const int n = this->n;
+    int fine[3];
+    for (int a = 0; a < 3; ++a) {
+      double q = (point[a] - origin_[a]) / root_width_;
+      q = Clamp(q, 0.0, nextafter(double(roots[a]), 0.0));
+      fine[a] = int(q * n * (1 << max_level));
+    }
+    int block = Find(fine[0] / n, fine[1] / n, fine[2] / n);
+    if (block < 0)
+      return -1;
+    auto b = leaves[block];
+    int scale = 1 << (max_level - b.level);
+    int x = fine[0] / scale - b.x * n, y = fine[1] / scale - b.y * n, z = fine[2] / scale - b.z * n;
+    return block * n * n * n + (z * n + y) * n + x;
+  }
+
+  __device__ int NativeFace(Array<double, 3> point, int axis) const {
+    int cell = CellAt(point);
+    if (cell < 0)
+      return -1;
+    const auto &c = cells[cell];
+    for (int k = offsets[cell]; k < offsets[cell + 1]; ++k) {
+      int f = abs(incidence[k]) - 1;
+      const auto &face = faces[f];
+      if (face.axis != axis)
+        continue;
+      double error = 0;
+      for (int a = 0; a < 3; ++a)
+        error = Max(error, fabs(point[a] - face.centre[a]));
+      if (error < c.width * 1e-9)
+        return f;
+    }
+    return -1;
+  }
+
+  __device__ double VirtualFace(Array<double, 3> point, int axis) const {
+    int cell = CellAt(point);
+    if (cell < 0)
+      return 0;
+    int native = NativeFace(point, axis);
+    if (native >= 0)
+      return velocity_[native];
+    const auto &c = cells[cell];
+    double value = centres_[cell][axis];
+    for (int a = 0; a < 3; ++a)
+      value += slopes_[cell][3 * axis + a] * (point[a] - c.centre[a]);
+    return Clamp(value, limits_[cell][2 * axis], limits_[cell][2 * axis + 1]);
+  }
+
+  __device__ double Component(Array<double, 3> point, int axis, bool cubic) const {
+    for (int a = 0; a < 3; ++a) {
+      if (!isfinite(point[a]))
+        return nan("");
+      point[a] = Clamp(point[a], origin_[a], origin_[a] + roots[a] * root_width_);
+    }
+
+    int cell = CellAt(point);
+    if (cell < 0)
+      return 0;
+    double h = cells[cell].width, base[3], fraction[3];
+    for (int a = 0; a < 3; ++a) {
+      double q = (point[a] - origin_[a]) / h - (a == axis ? 0 : .5);
+      base[a] = floor(q);
+      fraction[a] = q - base[a];
+    }
+    auto corner_point = [&](int x, int y, int z) {
+      int corner[3]{x, y, z};
+      Array<double, 3> p{};
+      for (int a = 0; a < 3; ++a) {
+        p[a] = origin_[a] + (base[a] + corner[a] + (a == axis ? 0 : .5)) * h;
+        p[a] = Clamp(p[a], origin_[a] + (a == axis ? 0 : .5 * h),
+                     origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
+      }
+      return p;
+    };
+    if (cubic) {
+      for (int z = 0; z < 2; ++z)
+        for (int y = 0; y < 2; ++y)
+          for (int x = 0; x < 2; ++x) {
+            int f = NativeFace(corner_point(x, y, z), axis);
+            if (f < 0 || faces[f].aperture != 1)
+              cubic = false;
+          }
+      if (cubic) {
+        double planes[4];
+        for (int z = 0; z < 4; ++z) {
+          double rows[4];
+          for (int y = 0; y < 4; ++y) {
+            double values[4];
+            for (int x = 0; x < 4; ++x)
+              values[x] = VirtualFace(corner_point(x - 1, y - 1, z - 1), axis);
+            rows[y] = Cubic(values[0], values[1], values[2], values[3], fraction[0]);
+          }
+          planes[z] = Cubic(rows[0], rows[1], rows[2], rows[3], fraction[1]);
+        }
+        return Cubic(planes[0], planes[1], planes[2], planes[3], fraction[2]);
+      }
+    }
+    double result = 0, weighted = 0, total = 0;
+    for (int z = 0; z < 2; ++z)
+      for (int y = 0; y < 2; ++y)
+        for (int x = 0; x < 2; ++x) {
+          int corner[3]{x, y, z};
+          Array<double, 3> p{};
+          double weight = 1;
+          for (int a = 0; a < 3; ++a) {
+            p[a] = origin_[a] + (base[a] + corner[a] + (a == axis ? 0 : .5)) * h;
+            weight *= corner[a] ? fraction[a] : 1 - fraction[a];
+            double lower = origin_[a] + (a == axis ? 0 : .5 * h),
+                   upper = origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h);
+            p[a] = Clamp(p[a], lower, upper);
+          }
+          double value = VirtualFace(p, axis);
+          result += weight * value;
+          int f = NativeFace(p, axis);
+          double aperture = f < 0 ? 1 : faces[f].aperture;
+          weighted += aperture * weight * value;
+          total += aperture * weight;
+        }
+    return total > 1e-3 ? weighted / total : result;
+  }
+
+  __device__ Array<double, 3> Sample(Array<double, 3> p) const {
+    return {Component(p, 0, false), Component(p, 1, false), Component(p, 2, false)};
+  }
+
+  __device__ Array<double, 3> Departure(Array<double, 3> p, double dt) const {
+    auto u = Sample(p), mid = p;
+    for (int a = 0; a < 3; ++a)
+      mid[a] -= .5 * dt * u[a];
+    u = Sample(mid);
+    for (int a = 0; a < 3; ++a)
+      p[a] -= dt * u[a];
+    return p;
+  }
+};
+
+__global__ void Centres(Field f) {
+  int cell = blockIdx.x * blockDim.x + threadIdx.x;
+  if (cell >= f.nc)
+    return;
+  Array<double, 3> value{}, weight{};
+  for (int k = f.offsets[cell]; k < f.offsets[cell + 1]; ++k) {
+    int face = abs(f.incidence[k]) - 1;
+    auto g = f.faces[face];
+    double area = g.area * g.aperture;
+    weight[g.axis] += area;
+    value[g.axis] += area * f.velocity_[face];
+  }
+  for (int a = 0; a < 3; ++a)
+    if (weight[a] > 0)
+      value[a] /= weight[a];
+  f.centres_[cell] = value;
+}
+
+__global__ void Slopes(Field f) {
+  int cell = blockIdx.x * blockDim.x + threadIdx.x;
+  if (cell >= f.nc)
+    return;
+  auto centres = f.centres_;
+  auto slopes = f.slopes_;
+  auto limits = f.limits_;
+  slopes[cell] = {};
+  for (int a = 0; a < 3; ++a)
+    limits[cell][2 * a] = limits[cell][2 * a + 1] = centres[cell][a];
+  double matrix[3][6]{};
+  for (int k = f.offsets[cell]; k < f.offsets[cell + 1]; ++k) {
+    int face_id = abs(f.incidence[k]) - 1;
+    auto face = f.faces[face_id];
+    int other = face.low == int(cell) ? face.high : face.low;
+    if (other < 0 || face.aperture == 0)
+      continue;
+    double d[3], r2 = 0;
+    for (int a = 0; a < 3; ++a) {
+      d[a] = f.cells[other].centre[a] - f.cells[cell].centre[a];
+      r2 += d[a] * d[a];
+      limits[cell][2 * a] = Min(limits[cell][2 * a], centres[other][a]);
+      limits[cell][2 * a + 1] = Max(limits[cell][2 * a + 1], centres[other][a]);
+    }
+    for (int a = 0; a < 3; ++a)
+      for (int b = 0; b < 3; ++b) {
+        matrix[a][b] += d[a] * d[b] / r2;
+        matrix[a][3 + b] += d[a] * (centres[other][b] - centres[cell][b]) / r2;
+      }
+  }
+  bool nonsingular = true;
+  for (int a = 0; a < 3; ++a) {
+    int pivot = a;
+    for (int b = a + 1; b < 3; ++b)
+      if (fabs(matrix[b][a]) > fabs(matrix[pivot][a]))
+        pivot = b;
+    if (fabs(matrix[pivot][a]) < 1e-12) {
+      nonsingular = false;
+      break;
+    }
+    for (int k = 0; k < 6; ++k) {
+      double t = matrix[a][k];
+      matrix[a][k] = matrix[pivot][k];
+      matrix[pivot][k] = t;
+    }
+    double scale = matrix[a][a];
+    for (int k = 0; k < 6; ++k)
+      matrix[a][k] /= scale;
+    for (int b = 0; b < 3; ++b)
+      if (b != a) {
+        double factor = matrix[b][a];
+        for (int k = 0; k < 6; ++k)
+          matrix[b][k] -= factor * matrix[a][k];
+      }
+  }
+  if (nonsingular)
+    for (int a = 0; a < 3; ++a)
+      for (int b = 0; b < 3; ++b)
+        slopes[cell][3 * b + a] = matrix[a][3 + b];
+}
+
+// Classify solid ghost layers once for each uploaded geometry.
+__global__ void SlipNeighbors(Field f, int *neighbors, int *layer) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= f.nf)
+    return;
+  layer[i] = 0;
+  if (f.faces[i].aperture > 0)
+    return;
+  double h = sqrt(f.faces[i].area);
+  for (int k = 0; k < 6; ++k) {
+    auto p = f.faces[i].centre;
+    p[k / 2] += (k % 2 ? 1 : -1) * h;
+    int j = f.NativeFace(p, f.faces[i].axis);
+    neighbors[6 * i + k] = j;
+    if (j >= 0 && f.faces[j].aperture > 0)
+      layer[i] = 1;
+  }
+}
+
+__global__ void ClearSolid(Field f) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < f.nf && f.faces[i].aperture == 0)
+    f.velocity_[i] = 0;
+}
+
+__global__ void Extend(Field f, const int *neighbors, const int *layers, int pass) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= f.nf || f.faces[i].aperture > 0 || (pass == 1 ? layers[i] != 1 : layers[i] == 1))
+    return;
+  double sum = 0;
+  int count = 0;
+  for (int k = 0; k < 6; ++k) {
+    int j = neighbors[6 * i + k];
+    if (j >= 0 && (pass == 1 ? f.faces[j].aperture > 0 : f.faces[j].aperture == 0 && layers[j] == 1)) {
+      sum += f.velocity_[j];
+      ++count;
+    }
+  }
+  if (count)
+    f.velocity_[i] = sum / count;
+}
+
+__global__ void Forward(Field f, double dt, bool cubic, double *out) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= f.nf)
+    return;
+  auto face = f.faces[i];
+  out[i] = face.aperture == 0 ? 0 : f.Component(f.Departure(face.centre, dt), face.axis, cubic);
+}
+
+__global__ void Correct(Field original, Field forward, double dt, bool cubic, double *out) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= original.nf)
+    return;
+  auto face = original.faces[i];
+  if (face.aperture == 0) {
+    out[i] = 0;
+    return;
+  }
+  double value =
+      forward.velocity_[i] +
+      .5 * (original.velocity_[i] - forward.Component(original.Departure(face.centre, -dt), face.axis, cubic));
+  if (!isfinite(value)) {
+    out[i] = nan("");
+    return;
+  }
+  auto back = original.Departure(face.centre, dt);
+  for (int a = 0; a < 3; ++a)
+    back[a] = Clamp(back[a], original.origin_[a], original.origin_[a] + original.roots[a] * original.root_width_);
+  int cell = original.CellAt(back);
+  double h = original.cells[cell].width, base[3];
+  for (int a = 0; a < 3; ++a)
+    base[a] = floor((back[a] - original.origin_[a]) / h - (a == face.axis ? 0 : .5));
+  double lo = INFINITY, hi = -INFINITY;
+  for (int z = 0; z < 2; ++z)
+    for (int y = 0; y < 2; ++y)
+      for (int x = 0; x < 2; ++x) {
+        int corner[3]{x, y, z};
+        Array<double, 3> p;
+        for (int a = 0; a < 3; ++a)
+          p[a] = Clamp(original.origin_[a] + (base[a] + corner[a] + (a == face.axis ? 0 : .5)) * h,
+                       original.origin_[a] + (a == face.axis ? 0 : .5 * h),
+                       original.origin_[a] + original.roots[a] * original.root_width_ - (a == face.axis ? 0 : .5 * h));
+        double v = original.VirtualFace(p, face.axis);
+        lo = Min(lo, v);
+        hi = Max(hi, v);
+      }
+  out[i] = (value >= lo && value <= hi) ? value : forward.velocity_[i];
+}
+
+__global__ void Validate(const double *u, int n, int *bad) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n && !isfinite(u[i]))
+    atomicExch(bad, 1);
+}
+}  // namespace
+
+struct GpuTransport::Impl {
+  int device{};
+  Field fields[2]{};
+  int *neighbors{}, *layers{}, *bad{};
+  double *result{};
+  std::vector<void *> allocations;
+  std::string error;
+
+  ~Impl() {
+    cudaSetDevice(device);
+    for (void *p : allocations)
+      cudaFree(p);
+  }
+
+  bool Check(cudaError_t status) {
+    if (status == cudaSuccess)
+      return true;
+    error = cudaGetErrorString(status);
+    return false;
+  }
+
+  template <class T>
+  bool Allocate(T *&p, size_t n) {
+    if (!Check(cudaMalloc(&p, n * sizeof(T))))
+      return false;
+    allocations.push_back(p);
+    return true;
+  }
+
+  template <class T>
+  bool Upload(const T *&p, const std::vector<T> &v) {
+    T *q{};
+    if (!Allocate(q, v.size()) || !Check(cudaMemcpy(q, v.data(), v.size() * sizeof(T), cudaMemcpyHostToDevice)))
+      return false;
+    p = q;
+    return true;
+  }
+
+  bool Valid(const double *u) {
+    int host = 0;
+    if (!Check(cudaMemset(bad, 0, sizeof(int))))
+      return false;
+    Validate<<<(fields[0].nf + 255) / 256, 256>>>(u, fields[0].nf, bad);
+    if (!Check(cudaGetLastError()) || !Check(cudaMemcpy(&host, bad, sizeof(int), cudaMemcpyDeviceToHost)))
+      return false;
+    if (host) {
+      error = "Non-finite transport field";
+      return false;
+    }
+    return true;
+  }
+
+  bool Prepare(Field f) {
+    int fb = (f.nf + 255) / 256, cb = (f.nc + 255) / 256;
+    ClearSolid<<<fb, 256>>>(f);
+    Extend<<<fb, 256>>>(f, neighbors, layers, 1);
+    Extend<<<fb, 256>>>(f, neighbors, layers, 2);
+    Centres<<<cb, 256>>>(f);
+    Slopes<<<cb, 256>>>(f);
+    return Check(cudaGetLastError());
+  }
+};
+
+GpuTransport::GpuTransport() = default;
+GpuTransport::~GpuTransport() = default;
+
+std::string GpuTransport::Error() const {
+  return !build_error_.empty() ? build_error_ : (impl_ ? impl_->error : "GPU transport is not built");
+}
+
+bool GpuTransport::Build(int device,
+                         const Mesh &mesh,
+                         const Topology &tree,
+                         double width,
+                         std::array<double, 3> origin) {
+  auto next = std::make_unique<Impl>();
+  next->device = device;
+  auto fail = [&]() {
+    build_error_ = next->error.empty() ? "Invalid transport geometry" : next->error;
+    return false;
+  };
+  if (mesh.Cells().empty() || mesh.Cells().size() > size_t(INT_MAX) || mesh.Faces().size() > size_t(INT_MAX / 6) ||
+      !(width > 0) || !std::isfinite(width) || tree.Leaves().size() > size_t(INT_MAX))
+    return fail();
+  for (double p : origin)
+    if (!std::isfinite(p))
+      return fail();
+  auto &f = next->fields[0];
+  f.n = mesh.CellsPerBlock();
+  f.nc = int(mesh.Cells().size());
+  f.nf = int(mesh.Faces().size());
+  f.nb = int(tree.Leaves().size());
+  f.max_level = tree.MaxLevel();
+  f.root_width_ = width;
+  if (size_t(f.n) * f.n * f.n * size_t(f.nb) != mesh.Cells().size())
+    return fail();
+  for (int a = 0; a < 3; ++a) {
+    f.origin_[a] = origin[a];
+    f.roots[a] = tree.Roots()[a];
+  }
+  std::vector<Cell> cells;
+  std::vector<Face> faces;
+  for (auto c : mesh.Cells())
+    cells.push_back({{c.centre[0], c.centre[1], c.centre[2]}, c.width});
+  for (auto g : mesh.Faces())
+    faces.push_back({g.low, g.high, g.axis, {g.centre[0], g.centre[1], g.centre[2]}, g.area, g.aperture});
+  if (!next->Check(cudaSetDevice(device)) || !next->Upload(f.cells, cells) || !next->Upload(f.faces, faces) ||
+      !next->Upload(f.leaves, tree.Leaves()) || !next->Upload(f.offsets, mesh.Offsets()) ||
+      !next->Upload(f.incidence, mesh.Incidence()))
+    return fail();
+  next->fields[1] = f;
+  for (auto &field : next->fields)
+    if (!next->Allocate(field.velocity_, f.nf) || !next->Allocate(field.centres_, f.nc) ||
+        !next->Allocate(field.slopes_, f.nc) || !next->Allocate(field.limits_, f.nc))
+      return fail();
+  if (!next->Allocate(next->neighbors, size_t(f.nf) * 6) || !next->Allocate(next->layers, f.nf) ||
+      !next->Allocate(next->bad, 1) || !next->Allocate(next->result, f.nf))
+    return fail();
+  SlipNeighbors<<<(f.nf + 255) / 256, 256>>>(f, next->neighbors, next->layers);
+  if (!next->Check(cudaGetLastError()) || !next->Check(cudaDeviceSynchronize()))
+    return fail();
+  impl_ = std::move(next);
+  build_error_.clear();
+  return true;
+}
+
+bool GpuTransport::AdvectDevice(const double *velocity,
+                                double *destination,
+                                size_t faces,
+                                double dt,
+                                bool cubic,
+                                bool corrected) {
+  if (!impl_ || !velocity || !destination || faces != size_t(impl_->fields[0].nf) || !std::isfinite(dt))
+    return false;
+  auto &w = *impl_;
+  w.error.clear();
+  auto a = w.fields[0], b = w.fields[1];
+  int blocks = (a.nf + 255) / 256;
+  if (!w.Check(cudaSetDevice(w.device)) ||
+      !w.Check(cudaMemcpy(a.velocity_, velocity, faces * sizeof(double), cudaMemcpyDeviceToDevice)) ||
+      !w.Valid(a.velocity_) || !w.Prepare(a))
+    return false;
+  Forward<<<blocks, 256>>>(a, dt, cubic, b.velocity_);
+  if (!w.Check(cudaGetLastError()) || !w.Valid(b.velocity_))
+    return false;
+  const double *result = b.velocity_;
+  if (corrected) {
+    if (!w.Prepare(b))
+      return false;
+    Correct<<<blocks, 256>>>(a, b, dt, cubic, w.result);
+    result = w.result;
+  }
+  return w.Check(cudaGetLastError()) && w.Valid(result) &&
+         w.Check(cudaMemcpy(destination, result, faces * sizeof(double), cudaMemcpyDeviceToDevice));
+}
+}  // namespace wind3d::amr

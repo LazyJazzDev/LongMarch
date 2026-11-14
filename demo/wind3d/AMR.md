@@ -81,8 +81,8 @@ them as part of an experiment without a new reason/authorization.
   forces/moments. Three small steps around the actual aircraft on a two-level
   mesh pass a finite-state/projection smoke test. This CPU reference includes
   slip extension, bounded MacCormack correction, molecular diffusion and an
-  outlet sponge. GPU transport, dynamic regridding and long-time load
-  equivalence remain required.
+  outlet sponge. Full GPU time-step integration, dynamic regridding and
+  long-time load equivalence remain required.
 - Two-layer slip extension and load-only Spalding friction are now connected
   to the CPU reference advance. The wall law is factored into `wall_model.h`
   for both backends. Wall loads use unweighted pre-step MAC centre velocities
@@ -107,7 +107,18 @@ them as part of an experiment without a new reason/authorization.
   uses the same solver. Job 2000960 passed all 11 tests and CUDA memcheck
   (zero errors), including CPU agreement, numerical-failure rollback, invalid
   sizes and zero-divergence solid-face clearing. Scalar Krylov reductions
-  still synchronize with the host; transport is not yet GPU-resident.
+  still synchronize with the host.
+- `GpuTransport` implements sparse-MAC midpoint transport, optional monotone
+  cubic sampling, two-layer slip extension and bounded MacCormack correction
+  in persistent device buffers. Leaf lookup uses a level-wise binary search;
+  cell reconstruction and face transport run as separate parallel kernels.
+  Job 2000964 passed all 12 tests and both projection/transport CUDA memchecks
+  (zero errors). Constant, smooth and discontinuous fields on a two-level
+  hierarchy, with and without an embedded box, agree with CPU transport to
+  1.11e-16 across linear/cubic and corrected/uncorrected modes. Tests also
+  cover in-place buffers, invalid inputs and failed-build recovery. This does
+  not yet integrate GPU diffusion, boundary conditions, loads or regridding,
+  and no end-to-end speedup or steady-load accuracy is established.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
