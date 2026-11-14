@@ -123,6 +123,7 @@ async function getFrame(){
     }
     const lines=geometry(new Float32Array(buffer,4+length),6,false);
     if(meshGeometry){aircraft.geometry.dispose();aircraft.geometry=meshGeometry;meshID=meta.mesh;}
+    flow.material.opacity=.72/(meta.streamline_density??1);
     flow.geometry.dispose();flow.geometry=lines;flow.geometry.setDrawRange(0,$('flow').checked?Infinity:70);
     arrow(forceArrow,meta.force);arrow(momentArrow,meta.moment);loads.visible=$('loads').checked;
     packetMeta=meta;transferred+=Number(response.headers.get('Content-Length'))||buffer.byteLength;frameTag=response.headers.get('ETag');
