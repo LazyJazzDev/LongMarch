@@ -196,23 +196,40 @@ them as part of an experiment without a new reason/authorization.
   Jacobi-preconditioned adaptive projection takes roughly 170-230 iterations;
   profiling and a scalable preconditioner are the next priorities. Job 2000976
   also verified changed initial control parameters and complete CSV files.
+- Adaptive pressure projection now defaults to a fixed linear aggregation
+  V-cycle preconditioner. Coarse matrices are Galerkin sums of the current
+  operator; inactive cells are excluded from aggregation, two damped Jacobi
+  sweeps run before/after correction, and the small coarsest system uses a
+  pivoted dense inverse. Two CUDA Graphs replay the fixed preconditioning
+  operations inside BiCGStab. `GpuProjection::Build(..., false)` retains the
+  Jacobi baseline. True residual checks and numerical-failure rollback remain.
+  Job 2000978 passed pressure, aircraft advance and regrid lifecycle tests;
+  CUDA memcheck reported zero errors. Small composite cases dropped from
+  62/57 iterations to 9, with CPU/GPU field differences below 7.80e-9. Aircraft
+  cases dropped to roughly 15-19 iterations. Across the six-step diagnostic,
+  the largest load-component difference from the previous preconditioner was
+  6.39e-4; this does not replace steady-load acceptance.
+  Uniform-AMR ordinary steps improved from 46.6 to 18.7 ms; adaptive ordinary
+  steps improved to about 16 ms, while regrid overhead still dominates that
+  short run's overall mean. Stage timing (job 2000979) measured adaptive
+  transport 8.81 ms, pressure 7.20 ms and loads 0.049 ms. Native remains much
+  faster in this small-grid case. Transport neighborhood caching, further
+  pressure optimization and less expensive regridding are still required.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
 ## Remaining implementation
 
-1. Build coarse/fine face connectivity, block ownership and explicit halo
-   exchange suitable for CUDA kernels and single-node peer communication.
-   Keep conservative face flux restriction and consistent pressure gradient /
-   divergence pairs at refinement interfaces. A face-centre neighbor query alone
-   is not a complete coarse-to-fine face stencil.
-2. Add field transfer and regridding, preserving constant fields and fluxes;
-   project transferred velocities and validate divergence. Refine aircraft and
-   control surfaces to the reference spacing; use flow-error indicators with
-   a buffer and hysteresis for wakes and moving refinement boundaries.
-3. Implement composite-grid pressure projection and a parallel preconditioner;
-   validate symmetry, nonnegative energy, manufactured pressure solutions,
-   interface flux cancellation and residual criteria on the composite operator.
+1. Add multi-GPU block ownership and explicit halo exchange to the existing
+   coarse/fine face connectivity. Preserve shared conservative fluxes and the
+   gradient/divergence operator across peer-device partitions.
+2. Optimize the host-side refinement/transfer path and validate adaptation
+   frequency, wake buffers and hysteresis over the control envelope. Preserve
+   finest wall spacing, flux conservation and post-transfer divergence checks.
+3. Optimize and distribute the composite pressure preconditioner. The
+   reconstructed operator is nonsymmetric: validate manufactured solutions,
+   interface flux cancellation, true residuals and partition equivalence rather
+   than assuming an SPD operator.
 4. Integrate transport, boundary geometry, full wetted-surface loads, display
    sampling and diagnostics with the adaptive hierarchy. Keep the uniform
    reference implementation selectable for every comparison.

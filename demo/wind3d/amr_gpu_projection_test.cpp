@@ -48,6 +48,21 @@ int Run(bool embedded) {
     if (error > 1e-7 * std::max(1.0, scale))
       return 10;
   }
+  GpuProjection diagonal;
+  auto diagonal_u = before;
+  std::vector<double> diagonal_p;
+  if (!diagonal.Build(0, mesh, g, false))
+    return 27;
+  auto diagonal_result = diagonal.Project(diagonal_u, diagonal_p);
+  if (!diagonal_result.converged || solve.iterations >= diagonal_result.iterations)
+    return 28;
+  double preconditioner_difference = 0;
+  for (size_t i = 0; i < u.size(); ++i)
+    preconditioner_difference = std::max(preconditioner_difference, std::abs(u[i] - diagonal_u[i]));
+  if (preconditioner_difference > 1e-7)
+    return 29;
+  std::cout << "multilevel/Jacobi iterations=" << solve.iterations << '/' << diagonal_result.iterations
+            << " field difference=" << preconditioner_difference << '\n';
   std::cout << "projection iterations=" << solve.iterations << " true relative residual=" << solve.relative_residual
             << '\n';
   if (!solve.converged)

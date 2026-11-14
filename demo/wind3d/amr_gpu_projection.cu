@@ -1,6 +1,7 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
+#include <algorithm>
 #include <climits>
 #include <cmath>
 #include <limits>
@@ -70,6 +71,48 @@ __global__ void CloseFaces(int count, const int *indices, double *velocity) {
     velocity[indices[i]] = 0;
 }
 
+__global__ void Smooth(Matrix a, const double *diagonal, const double *rhs, const double *x, double *next) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= a.rows)
+    return;
+  double ax = 0;
+  for (int k = a.offsets[i]; k < a.offsets[i + 1]; ++k)
+    ax += a.weights[k] * x[a.columns[k]];
+  next[i] = x[i] + .65 * (rhs[i] - ax) / diagonal[i];
+}
+
+__global__ void Residual(Matrix a, const double *rhs, const double *x, double *residual) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= a.rows)
+    return;
+  double ax = 0;
+  for (int k = a.offsets[i]; k < a.offsets[i + 1]; ++k)
+    ax += a.weights[k] * x[a.columns[k]];
+  residual[i] = rhs[i] - ax;
+}
+
+__global__ void Prolong(int n, const int *parent, const double *coarse, double *fine) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n && parent[i] >= 0)
+    fine[i] += coarse[parent[i]];
+}
+
+__global__ void DenseSolve(int n, const double *inverse, const double *rhs, double *x) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n)
+    return;
+  double sum = 0;
+  for (int j = 0; j < n; ++j)
+    sum += inverse[i * n + j] * rhs[j];
+  x[i] = sum;
+}
+
+struct Level {
+  Matrix a, restriction;
+  int *parent{};
+  double *diagonal{}, *rhs{}, *x{}, *scratch{}, *residual{}, *inverse{};
+};
+
 using Rows = std::vector<std::map<int, double>>;
 }  // namespace
 
@@ -80,12 +123,20 @@ struct GpuProjection::Impl {
   cublasHandle_t blas{};
   std::vector<void *> allocations;
   Matrix a, g, d;
+  std::vector<Level> levels;
+  cudaStream_t capture_stream{};
+  cudaGraphExec_t preconditioner[2]{};
   std::vector<int> closed;
   int *closed_device{};
   double *diagonal{}, *u{}, *face{}, *rhs{}, *x{}, *r{}, *shadow{}, *p{}, *v{}, *s{}, *t{}, *phat{}, *shat{}, *ax{};
 
   ~Impl() {
     cudaSetDevice(device);
+    for (auto graph : preconditioner)
+      if (graph)
+        cudaGraphExecDestroy(graph);
+    if (capture_stream)
+      cudaStreamDestroy(capture_stream);
     if (blas)
       cublasDestroy(blas);
     for (void *ptr : allocations)
@@ -144,6 +195,190 @@ struct GpuProjection::Impl {
     Check(cudaGetLastError());
   }
 
+  bool BuildLevels(const Mesh &mesh, const Rows &fine) {
+    Rows current = fine;
+    std::vector<std::array<double, 3>> centres;
+    std::vector<double> volumes;
+    std::array<double, 3> origin{INFINITY, INFINITY, INFINITY};
+    double width = INFINITY;
+    for (const auto &c : mesh.Cells()) {
+      centres.push_back(c.centre);
+      volumes.push_back(c.active ? c.width * c.width * c.width : 0);
+      width = std::min(width, c.width);
+      for (int k = 0; k < 3; ++k)
+        origin[k] = std::min(origin[k], c.centre[k] - .5 * c.width);
+    }
+    for (int depth = 0; depth < 32; ++depth) {
+      Level level;
+      if (depth == 0) {
+        level.a = a;
+        level.diagonal = diagonal;
+      } else {
+        std::vector<double> diag(current.size());
+        for (size_t i = 0; i < current.size(); ++i) {
+          diag[i] = current[i][int(i)];
+          if (!(diag[i] > 0) || !std::isfinite(diag[i])) {
+            error = "Invalid coarse diagonal";
+            return false;
+          }
+        }
+        if (!UploadMatrix(level.a, current) || !Upload(level.diagonal, diag))
+          return false;
+      }
+      int count = int(current.size());
+      for (double **ptr : {&level.rhs, &level.x, &level.scratch, &level.residual})
+        if (!Allocate(*ptr, count))
+          return false;
+      if (count <= 64) {
+        std::vector<double> matrix(size_t(count) * count), inverse(matrix.size());
+        double scale = 0;
+        for (int i = 0; i < count; ++i) {
+          inverse[i * count + i] = 1;
+          for (auto [j, v] : current[i]) {
+            matrix[i * count + j] = v;
+            scale = std::max(scale, std::abs(v));
+          }
+        }
+        for (int k = 0; k < count; ++k) {
+          int pivot = k;
+          for (int i = k + 1; i < count; ++i)
+            if (std::abs(matrix[i * count + k]) > std::abs(matrix[pivot * count + k]))
+              pivot = i;
+          if (std::abs(matrix[pivot * count + k]) <= 1e-14 * scale) {
+            error = "Singular coarse pressure operator";
+            return false;
+          }
+          for (int j = 0; j < count; ++j) {
+            std::swap(matrix[k * count + j], matrix[pivot * count + j]);
+            std::swap(inverse[k * count + j], inverse[pivot * count + j]);
+          }
+          double d = matrix[k * count + k];
+          for (int j = 0; j < count; ++j) {
+            matrix[k * count + j] /= d;
+            inverse[k * count + j] /= d;
+          }
+          for (int i = 0; i < count; ++i)
+            if (i != k) {
+              double factor = matrix[i * count + k];
+              for (int j = 0; j < count; ++j) {
+                matrix[i * count + j] -= factor * matrix[k * count + j];
+                inverse[i * count + j] -= factor * inverse[k * count + j];
+              }
+            }
+        }
+        for (double v : inverse)
+          if (!std::isfinite(v)) {
+            error = "Non-finite coarse inverse";
+            return false;
+          }
+        if (!Upload(level.inverse, inverse))
+          return false;
+        levels.push_back(level);
+        return true;
+      }
+      width *= 2;
+      std::map<std::array<long long, 3>, int> groups;
+      std::vector<int> parent(count, -1);
+      std::vector<std::array<double, 3>> coarse_centres;
+      std::vector<double> coarse_volumes;
+      for (int i = 0; i < count; ++i)
+        if (volumes[i] > 0) {
+          std::array<long long, 3> key;
+          for (int k = 0; k < 3; ++k)
+            key[k] = static_cast<long long>(std::floor((centres[i][k] - origin[k]) / width + 1e-9));
+          auto [it, inserted] = groups.emplace(key, int(groups.size()));
+          int j = it->second;
+          parent[i] = j;
+          if (inserted) {
+            coarse_centres.push_back({});
+            coarse_volumes.push_back(0);
+          }
+          coarse_volumes[j] += volumes[i];
+          for (int k = 0; k < 3; ++k)
+            coarse_centres[j][k] += volumes[i] * centres[i][k];
+        }
+      if (groups.empty()) {
+        levels.clear();
+        return true;
+      }  // All-solid operator is identity.
+      Rows coarse(groups.size()), restriction(groups.size());
+      for (int i = 0; i < count; ++i)
+        if (parent[i] >= 0) {
+          int row = parent[i];
+          restriction[row][i] = 1;
+          for (auto [j, v] : current[i])
+            if (parent[j] >= 0)
+              coarse[row][parent[j]] += v;
+        }
+      for (size_t i = 0; i < coarse_centres.size(); ++i)
+        for (int k = 0; k < 3; ++k)
+          coarse_centres[i][k] /= coarse_volumes[i];
+      if (!Upload(level.parent, parent) || !UploadMatrix(level.restriction, restriction))
+        return false;
+      levels.push_back(level);
+      current = std::move(coarse);
+      centres = std::move(coarse_centres);
+      volumes = std::move(coarse_volumes);
+    }
+    error = "Pressure hierarchy exceeded its depth limit";
+    return false;
+  }
+
+  void Cycle(size_t index, cudaStream_t stream) {
+    auto &level = levels[index];
+    int count = level.a.rows, blocks = (count + 255) / 256;
+    if (level.inverse) {
+      DenseSolve<<<blocks, 256, 0, stream>>>(count, level.inverse, level.rhs, level.x);
+      return;
+    }
+    Check(cudaMemsetAsync(level.x, 0, count * sizeof(double), stream));
+    for (int sweep = 0; sweep < 2; ++sweep) {
+      Smooth<<<blocks, 256, 0, stream>>>(level.a, level.diagonal, level.rhs, level.x, level.scratch);
+      std::swap(level.x, level.scratch);
+    }
+    Residual<<<blocks, 256, 0, stream>>>(level.a, level.rhs, level.x, level.residual);
+    auto &coarse = levels[index + 1];
+    Multiply<<<(coarse.a.rows + 255) / 256, 256, 0, stream>>>(level.restriction, level.residual, coarse.rhs);
+    Cycle(index + 1, stream);
+    Prolong<<<blocks, 256, 0, stream>>>(count, level.parent, coarse.x, level.x);
+    for (int sweep = 0; sweep < 2; ++sweep) {
+      Smooth<<<blocks, 256, 0, stream>>>(level.a, level.diagonal, level.rhs, level.x, level.scratch);
+      std::swap(level.x, level.scratch);
+    }
+  }
+
+  bool Capture() {
+    if (levels.empty())
+      return true;
+    if (!Check(cudaStreamCreateWithFlags(&capture_stream, cudaStreamNonBlocking)))
+      return false;
+    for (int k = 0; k < 2; ++k) {
+      if (!Check(cudaStreamBeginCapture(capture_stream, cudaStreamCaptureModeThreadLocal)))
+        return false;
+      Check(cudaMemcpyAsync(levels[0].rhs, k ? s : p, n * sizeof(double), cudaMemcpyDeviceToDevice, capture_stream));
+      Cycle(0, capture_stream);
+      Check(
+          cudaMemcpyAsync(k ? shat : phat, levels[0].x, n * sizeof(double), cudaMemcpyDeviceToDevice, capture_stream));
+      cudaGraph_t graph{};
+      auto status = cudaStreamEndCapture(capture_stream, &graph);
+      if (!Check(status) || !ok) {
+        if (graph)
+          cudaGraphDestroy(graph);
+        return false;
+      }
+      bool success = Check(cudaGraphInstantiate(&preconditioner[k], graph, nullptr, nullptr, 0));
+      cudaGraphDestroy(graph);
+      if (!success)
+        return false;
+    }
+    return Check(cudaGetLastError());
+  }
+
+  void Precondition(int k) {
+    if (preconditioner[k])
+      Check(cudaGraphLaunch(preconditioner[k], nullptr));
+  }
+
   double Dot(const double *a, const double *b) {
     double result = 0;
     Blas(cublasDdot(blas, n, a, 1, b, 1, &result));
@@ -158,7 +393,7 @@ std::string GpuProjection::Error() const {
   return !build_error_.empty() ? build_error_ : (impl_ ? impl_->error : "GPU projection is not built");
 }
 
-bool GpuProjection::Build(int device, const Mesh &mesh, const FaceGradient &gradient) {
+bool GpuProjection::Build(int device, const Mesh &mesh, const FaceGradient &gradient, bool multilevel) {
   auto next = std::make_unique<Impl>();
   next->device = device;
   auto fail = [&](const char *reason) {
@@ -210,6 +445,8 @@ bool GpuProjection::Build(int device, const Mesh &mesh, const FaceGradient &grad
       return fail("Invalid adaptive operator or GPU allocation failure");
   if (!next->closed.empty() && !next->Upload(next->closed_device, next->closed))
     return fail("Closed-face upload failed");
+  if (multilevel && (!next->BuildLevels(mesh, a) || !next->Capture()))
+    return fail("Multilevel preconditioner construction failed");
   impl_ = std::move(next);
   build_error_.clear();
   return true;
@@ -290,6 +527,7 @@ ProjectionResult GpuProjection::Solve(double tolerance, int max_iterations) {
       break;
     double beta = (rho / rho_old) * (alpha / omega);
     Search<<<blocks, 256>>>(w.n, w.r, w.p, w.v, w.diagonal, w.phat, beta, omega);
+    w.Precondition(0);
     w.Apply(w.a, w.phat, w.v);
     double divisor = w.Dot(w.shadow, w.v);
     if (!std::isfinite(divisor) || std::abs(divisor) < 1e-300)
@@ -297,6 +535,7 @@ ProjectionResult GpuProjection::Solve(double tolerance, int max_iterations) {
     alpha = rho / divisor;
     Advance<<<blocks, 256>>>(w.n, w.r, w.v, w.diagonal, w.phat, w.s, w.shat, w.x, alpha);
     if (std::sqrt(w.Dot(w.s, w.s)) / norm > tolerance) {
+      w.Precondition(1);
       w.Apply(w.a, w.shat, w.t);
       double tt = w.Dot(w.t, w.t);
       if (!std::isfinite(tt) || tt < 1e-300)

@@ -11,7 +11,8 @@ class GpuProjection {
   ~GpuProjection();
   GpuProjection(const GpuProjection &) = delete;
   GpuProjection &operator=(const GpuProjection &) = delete;
-  bool Build(int device, const Mesh &mesh, const FaceGradient &gradient);
+  // Fixed linear aggregation V-cycle by default; false selects Jacobi for comparison.
+  bool Build(int device, const Mesh &mesh, const FaceGradient &gradient, bool multilevel = true);
   ProjectionResult Project(std::vector<double> &velocity,
                            std::vector<double> &potential,
                            double tolerance = 1e-9,

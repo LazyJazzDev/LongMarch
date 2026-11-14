@@ -131,9 +131,10 @@ int RunAdaptiveTask(int grid,
     }
     const auto &f = result.total_loads;
     std::printf(
-        "step=%d seconds=%.9g time=%.9g dt=%.9g cycles=%d residual=%.9g force=%.9g,%.9g,%.9g moment=%.9g,%.9g,%.9g cells=%zu generation=%llu max_speed=%.9g adapt=%.9g\n",
+        "step=%d seconds=%.9g time=%.9g dt=%.9g cycles=%d residual=%.9g force=%.9g,%.9g,%.9g moment=%.9g,%.9g,%.9g cells=%zu generation=%llu max_speed=%.9g adapt=%.9g transport=%.9g pressure=%.9g loads=%.9g\n",
         step, seconds, info.time, dt, result.projection.iterations, result.projection.relative_residual, f[0], f[1],
-        f[2], f[3], f[4], f[5], info.cells, (unsigned long long)info.generation, maximum, adapt_seconds);
+        f[2], f[3], f[4], f[5], info.cells, (unsigned long long)info.generation, maximum, adapt_seconds,
+        result.transport_seconds, result.pressure_seconds, result.loads_seconds);
     std::fflush(stdout);
     if (csv) {
       file << step << ',' << info.time << ',' << dt;

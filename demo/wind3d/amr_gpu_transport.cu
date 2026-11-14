@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <chrono>
 #include <climits>
 #include <cmath>
 #include <cuda/std/array>
@@ -749,6 +750,7 @@ AdvanceResult GpuTransport::AdvanceDevice(GpuProjection &projection,
       dt * viscosity / impl_->min_area > 1.0 / 6)
     return result;
   auto &w = *impl_;
+  auto transport_start = std::chrono::steady_clock::now();
   if (!AdvectDevice(velocity, w.result, faces, dt, cubic, true))
     return result;
   auto f = w.fields[0];
@@ -756,6 +758,8 @@ AdvanceResult GpuTransport::AdvanceDevice(GpuProjection &projection,
   DiffuseBoundary<<<fb, 256>>>(f, w.result, dt, viscosity, sponge_length, speed);
   if (!w.Check(cudaGetLastError()) || !w.Valid(w.result))
     return result;
+  auto pressure_start = std::chrono::steady_clock::now();
+  result.transport_seconds = std::chrono::duration<double>(pressure_start - transport_start).count();
   result.projection = projection.ProjectDevice(w.result, faces, w.pressure, cells, 1e-8);
   if (!result.projection.converged) {
     w.error = projection.Error();
@@ -764,6 +768,8 @@ AdvanceResult GpuTransport::AdvanceDevice(GpuProjection &projection,
   ScalePressure<<<cb, 256>>>(w.pressure, f.nc, density / dt);
   if (!w.Check(cudaGetLastError()) || !w.Valid(w.pressure, f.nc))
     return result;
+  auto loads_start = std::chrono::steady_clock::now();
+  result.pressure_seconds = std::chrono::duration<double>(loads_start - pressure_start).count();
   LoadPartials<<<cb, 256>>>(f, w.pressure, density, wall_viscosity, w.partial);
   ReduceLoads<<<12, 256>>>(w.partial, cb, w.loads);
   double loads[12];
@@ -782,6 +788,7 @@ AdvanceResult GpuTransport::AdvanceDevice(GpuProjection &projection,
   if (!w.Check(cudaMemcpy(velocity, w.result, faces * sizeof(double), cudaMemcpyDeviceToDevice)) ||
       !w.Check(cudaMemcpy(pressure, w.pressure, cells * sizeof(double), cudaMemcpyDeviceToDevice)))
     return result;
+  result.loads_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - loads_start).count();
   result.advanced = true;
   return result;
 }

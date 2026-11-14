@@ -7,6 +7,8 @@ namespace wind3d::amr {
 struct AdvanceResult {
   bool advanced{};
   ProjectionResult projection;
+  // GPU stage wall times, including host synchronization; zero in CPU reference.
+  double transport_seconds{}, pressure_seconds{}, loads_seconds{};
   std::array<double, 6> pressure_loads{}, friction_loads{}, total_loads{};
 };
 
