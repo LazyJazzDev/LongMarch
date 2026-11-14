@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
 const $ = id => document.getElementById(id);
-const specs = [ ['speed','来流速度',1,30,'m/s',12], ['angle','迎角',-20,25,'°',5],
+const specs = [ ['speed','来流速度',1,30,'m/s',30], ['angle','迎角',-20,25,'°',4],
   ['flap','襟翼',0,40,'°',0], ['aileron','副翼（差动）',-25,25,'°',0],
   ['elevator','升降舵',-25,25,'°',0], ['rudder','方向舵',-25,25,'°',0] ];
 let desired = null, packetMeta = null, commands = Promise.resolve(), pending = 0, debounce;
@@ -73,6 +73,7 @@ function updateNumbers(meta,bytes){
     $(key+'-norm').textContent=`${Math.hypot(...meta[key]).toFixed(2)} ${unit}`;
     $(key).textContent=meta[key].map((v,i)=>`${['X','Y','Z'][i]} ${v.toFixed(3)}`).join(' · ');
   }
+  $('mean-ld').textContent=meta.mean_ld == null ? '流场建立中…' : `${meta.mean_ld.toFixed(3)}（${meta.average_seconds.toFixed(3)} s 平均）`;
   const c=meta.controls;
   $('applied').textContent=`已生效：${c.speed.toFixed(1)} m/s · 迎角 ${c.angle.toFixed(1)}° · 襟翼 ${c.flap.toFixed(1)}° · 副翼 ${c.aileron.toFixed(1)}° · 升降 ${c.elevator.toFixed(1)}° · 方向 ${c.rudder.toFixed(1)}°`;
   $('payload').textContent=`显示帧 ${(bytes/1024).toFixed(0)} KB · 已接收 ${(transferred/1048576).toFixed(1)} MB`;

@@ -122,26 +122,33 @@ class MeshBuilder {
   }
 
   void Nacelle(int side) {
-    constexpr int rings = 32, slices = 64;
-    auto point = [&](float t, float phi) {
-      Vec3 p = NacellePoint(t, phi, side);
-      float derivative = (NacelleRadius(t + 0.0001f) - NacelleRadius(t - 0.0001f)) / 0.00018f;
-      Vec3 color = t < 0.08f ? Vec3{0.48f, 0.51f, 0.55f} : skin;
-      return MakeVertex(p, {-derivative, cosf(phi), sinf(phi)}, color);
+    // Outer skin and duct wall of the flow-through nacelle. The elliptical lip
+    // closes the inlet; an annular face closes the thin exit trailing edge.
+    constexpr int rings = 48, slices = 64;
+    auto station = [](int i) { return 0.5f * (1 - cosf(pi * i / rings)); };
+    auto point = [&](float t, float phi, int surface) {
+      Vec3 p = NacellePoint(t, phi, side, surface);
+      float a = std::max(0.0f, t - 0.0005f), b = std::min(1.0f, t + 0.0005f);
+      float slope = (NacelleRadius(b, surface) - NacelleRadius(a, surface)) / (0.9f * (b - a));
+      Vec3 radial{0, cosf(phi), sinf(phi)};
+      Vec3 n = Scale(Add(Scale(Vec3{1, 0, 0}, -slope), radial), float(surface));
+      if (t <= 0)
+        n = {-1, 0, 0};
+      Vec3 color = surface < 0 ? Vec3{0.05f, 0.06f, 0.07f} : t < 0.06f ? Vec3{0.48f, 0.51f, 0.55f} : skin;
+      return MakeVertex(p, n, color);
     };
-    for (int i = 0; i < rings; ++i)
-      for (int j = 0; j < slices; ++j)
-        Quad(point(float(i) / rings, 2 * pi * j / slices), point(float(i + 1) / rings, 2 * pi * j / slices),
-             point(float(i + 1) / rings, 2 * pi * (j + 1) / slices),
-             point(float(i) / rings, 2 * pi * (j + 1) / slices));
-    for (int end : {0, 1}) {
-      Vec3 center{-1.3f + 0.9f * end, -0.54f, side * 0.92f}, normal{end ? 1.0f : -1.0f, 0, 0};
-      for (int j = 0; j < slices; ++j) {
-        Vec3 color = !end && j % 4 == 0 ? Vec3{0.10f, 0.12f, 0.14f} : Vec3{0.016f, 0.020f, 0.025f};
-        Triangle(MakeVertex(center, normal, color),
-                 MakeVertex(NacellePoint(float(end), 2 * pi * j / slices, side), normal, color),
-                 MakeVertex(NacellePoint(float(end), 2 * pi * (j + 1) / slices, side), normal, color));
-      }
+    for (int surface : {-1, 1})
+      for (int i = 0; i < rings; ++i)
+        for (int j = 0; j < slices; ++j) {
+          float a = 2 * pi * j / slices, b = 2 * pi * (j + 1) / slices;
+          Quad(point(station(i), a, surface), point(station(i + 1), a, surface), point(station(i + 1), b, surface),
+               point(station(i), b, surface));
+        }
+    Vec3 back{1, 0, 0};
+    for (int j = 0; j < slices; ++j) {
+      float a = 2 * pi * j / slices, b = 2 * pi * (j + 1) / slices;
+      Quad(MakeVertex(NacellePoint(1, a, side, 1), back, skin), MakeVertex(NacellePoint(1, b, side, 1), back, skin),
+           MakeVertex(NacellePoint(1, b, side, -1), back, skin), MakeVertex(NacellePoint(1, a, side, -1), back, skin));
     }
   }
 

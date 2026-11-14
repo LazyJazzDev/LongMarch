@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 
 BOUNDS = {"speed": (1, 30), "angle": (-20, 25), "flap": (0, 40),
           "aileron": (-25, 25), "elevator": (-25, 25), "rudder": (-25, 25)}
-DEFAULT = dict(speed=12, angle=5, flap=0, aileron=0, elevator=0, rudder=0)
+DEFAULT = dict(speed=30, angle=4, flap=0, aileron=0, elevator=0, rudder=0)
 
 
 def atomic(path, data):

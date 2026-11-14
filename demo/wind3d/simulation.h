@@ -19,16 +19,61 @@ struct Vertex {
 
 std::vector<Vertex> AircraftMesh(const Controls &controls);
 bool ValidateWallDiffusion(int cuda_device);
+bool ValidateClosedSurface(int cuda_device, bool cut_cells);
 
 struct SolverOptions {
   float pressure_tolerance{0.0001f};
   int pressure_cycles{64};
   bool corrected_transport{true};
+  // Kinematic viscosity of the resolved flow, in m^2/s.
+  float viscosity{0.005f};
+  // Wall shear from the log law at the first fluid sample instead of laminar
+  // no-slip diffusion; wall_viscosity is the molecular viscosity it uses.
+  bool wall_model{false};
+  float wall_viscosity{1.5e-5f};
+  // With the wall model, whether the log-law shear also removes momentum from
+  // the first fluid cells. Without a turbulence model nothing mixes momentum
+  // back toward the wall, so an applied sink separates the flow prematurely.
+  // When false the flow has slip walls (Euler) and the shear is a load only:
+  // a viscous-inviscid split, as in panel methods with strip friction.
+  bool wall_momentum{true};
+  // Cut-cell boundary (requires wall_model without wall_momentum): faces carry
+  // their open area fraction in the pressure operator, divergence and loads,
+  // instead of the all-or-nothing voxel staircase.
+  bool cut_cells{false};
+  // Length in metres of a sponge zone ending at the outlet, in which velocity
+  // relaxes toward the free stream. It removes wake vortices before they cross
+  // the zero-pressure outlet, where backflow is unstable. 0 disables it.
+  float sponge{0};
+  // Advective Courant number. Semi-Lagrangian transport is unconditionally
+  // stable; its interpolation dissipation per unit time falls as dt grows.
+  float cfl{0.5f};
+  // Publish the downsampled display field; batch runs only need loads.
+  bool display{true};
   int devices{1};
   uint64_t stop_after{};
   bool export_field{true};
   bool export_final{false};
 };
+
+// Reproduce the optimized cruise sweep from ~/LongMarch, commit 13ea18de.
+inline SolverOptions OptimizedSolverOptions() {
+  SolverOptions options;
+  options.viscosity = 1.5e-5f;
+  options.wall_model = true;
+  options.wall_momentum = false;
+  options.cut_cells = true;
+  options.wall_viscosity = 9.2e-7f;
+  options.sponge = 2;
+  options.cfl = 0.125f;
+  return options;
+}
+
+// Largest supported x resolution: face counts stay within 32-bit indices.
+// Create also rejects grids beyond the free device memory.
+constexpr int max_grid = 1536;
+// Approximate device bytes per pressure cell for all solver allocations.
+size_t SolverBytes(int nx);
 
 struct Snapshot {
   int nx{}, ny{}, nz{}, pressure_cycles{}, solver_nx{};
@@ -38,6 +83,15 @@ struct Snapshot {
   float time{}, dt{}, divergence_before{}, divergence_after{}, step_seconds{};
   float transport_seconds{}, pressure_seconds{}, diagnostics_seconds{};
   Vec3 force{}, moment{};
+  // Largest cell-centre speed and the centre of that cell.
+  float max_speed{};
+  Vec3 fastest{};
+  // Time integrals of force and moment since the last reset (N s, N m s).
+  double impulse[3]{}, angular_impulse[3]{};
+  // Time integral of the wall-shear part of the force (N s).
+  double friction_impulse[3]{};
+  // Time integrals of the drag (x) and lift (y) force of each component.
+  double drag_impulse[kComponents]{}, lift_impulse[kComponents]{};
   Controls controls;
   std::vector<Cell> cells;
   std::shared_ptr<const std::vector<Vertex>> aircraft;

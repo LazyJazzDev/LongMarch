@@ -38,7 +38,7 @@ class RelayTest(unittest.TestCase):
             state = json.load(response)
         self.assertEqual(state["sequence"], 2)
         self.assertEqual(state["reset"], 1)
-        self.assertEqual((self.directory / "controls.txt").read_text().split(), ["2", "1", "1", "18", "5", "20", "0", "0", "0"])
+        self.assertEqual((self.directory / "controls.txt").read_text().split(), ["2", "1", "1", "18", "4", "20", "0", "0", "0"])
         self.assertEqual(Relay(self.directory).desired, state)
 
     def test_invalid_commands_do_not_mutate(self):

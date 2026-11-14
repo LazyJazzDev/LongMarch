@@ -276,11 +276,11 @@ On the login node, start the relay (Python 3 standard library only):
 
 ```sh
 python3 demo/wind3d/web/server.py \
-  --directory "$PWD/out/wind3d-web/live" --port 10510
+  --directory "$PWD/out/wind3d-web/live-optimized" --port 10510
 ```
 
 Then submit `meshy-envelope submit demo/wind3d/web.star`. It builds and starts
-the worker on one eight-GPU node at grid 384, with an eight-hour job limit.
+the worker on one eight-GPU node at grid 512, with an eight-hour job limit.
 The login service and GPU worker must use the same shared directory. The relay
 binds to `0.0.0.0` by default; use `--bind 127.0.0.1` when accessing it solely
 through an SSH tunnel. This is an interactive cluster service for users who can
@@ -316,3 +316,40 @@ invalid controls, same-origin enforcement, ETags and the restricted file surface
 The worker can also be run as `wind3d_web DIRECTORY GRID GPUS` on an allocated
 GPU node for an independent mailbox integration test. Runtime mailboxes, process
 logs and browser screenshots belong in ignored `out/`, not in the source tree.
+
+## Optimized aerodynamic model
+
+The task and web worker use the geometry and numerical model imported from
+`~/LongMarch` commit `13ea18de`: higher-aspect-ratio wings, flow-through nacelles,
+cut-face apertures, aperture-weighted interpolation, two-layer slip extrapolation,
+Spalding wall-friction loads and the low-CFL MacCormack fallback. The eight-GPU
+partitioning and fused coarse pressure smoother are retained. This is a
+viscous/inviscid load model, not a turbulence-resolved engineering prediction.
+
+`OptimizedSolverOptions()` selects resolved viscosity 1.5e-5 m²/s, wall viscosity
+9.2e-7 m²/s (the source flight-Reynolds-number sweep), friction-only wall model,
+cut cells, a 2 m outlet sponge and CFL 0.125. The native GUI retains its existing
+solver defaults. Web default controls are 30 m/s and 4° incidence. Displayed
+vectors are instantaneous; L/D uses differences of per-step integrated loads
+across at least 0.15 s, after at least 0.55 s at unchanged controls. Reset or a
+control change clears that average. Pressure convergence alone does not imply
+that the aerodynamic transient has settled.
+
+Build `wind3d_sweep` for time-averaged coefficient comparisons. It accepts the
+source sweep arguments plus `--gpus N`; for the source 512-grid alpha4 reference:
+
+```sh
+wind3d_sweep --grid 512 --gpus 8 --cases cases.txt --wall-viscosity 9.2e-7 \
+  --settle-time 0.4 --case-time 0.3 --average-time 0.15 \
+  --friction-only --cut-cells --cfl 0.125 --output results.csv
+```
+
+Here `cases.txt` contains `alpha4 4 0 0 0 0`. Compare the averaged 0.55–0.70 s
+window, not the first-frame force ratio. The original reference recorded
+CL 0.384566, CD 0.048739 and L/D 7.8903. Validation of this port additionally
+checks closed-surface pressure cancellation and bitwise 1/2/4/8-GPU fields.
+
+The port's eight-H200 replay reproduced that reference at CSV precision:
+Fx 107.986 N, Fy 852.039 N, CL 0.384566, CD 0.048739, L/D 7.8903
+over 0.55008–0.70007 s (7,910 steps). The 1/2/4/8-GPU regression also
+compares per-step loads as well as full/final-export fields.

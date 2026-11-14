@@ -32,11 +32,13 @@ __device__ float NeighborSum(Level l, int n, int x, int y, int z) {
          (y ? l.edges[n - l.nx].y * l.x[n - l.nx] : 0) + (z ? l.edges[n - l.nx * l.ny].z * l.x[n - l.nx * l.ny] : 0);
 }
 
+// Edge conductances are face apertures (0..255): 0/255 on a voxel boundary,
+// and the open area fraction on a cut-cell boundary.
 __global__ void FineOperator(Level l,
                              const unsigned char *solid,
-                             const unsigned char *bu,
-                             const unsigned char *bv,
-                             const unsigned char *bw) {
+                             const unsigned char *au,
+                             const unsigned char *av,
+                             const unsigned char *aw) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= l.Count())
     return;
@@ -44,10 +46,11 @@ __global__ void FineOperator(Level l,
   float4 e{};
   int face = (z * (l.ny + 1) + y) * (l.nx + 1) + x;
   if (!solid[n]) {
-    e.x = x + 1 < l.nx && !solid[n + 1] && !bu[face + 1] ? 1 : 0;
-    e.y = y + 1 < l.ny && !solid[n + l.nx] && !bv[face + l.nx + 1] ? 1 : 0;
-    e.z = z + 1 < l.nz && !solid[n + l.nx * l.ny] && !bw[face + (l.nx + 1) * (l.ny + 1)] ? 1 : 0;
-    e.w = x + 1 == l.nx ? 2 : 0;
+    constexpr float scale = 1.0f / 255;
+    e.x = x + 1 < l.nx && !solid[n + 1] ? au[face + 1] * scale : 0;
+    e.y = y + 1 < l.ny && !solid[n + l.nx] ? av[face + l.nx + 1] * scale : 0;
+    e.z = z + 1 < l.nz && !solid[n + l.nx * l.ny] ? aw[face + (l.nx + 1) * (l.ny + 1)] * scale : 0;
+    e.w = x + 1 == l.nx ? 2 * au[face + 1] * scale : 0;
   }
   l.edges[n] = e;
 }
@@ -179,6 +182,30 @@ __global__ void DotProducts(int count, const float *a, const float *b, const flo
     blocks[blockIdx.x] = values[0];
 }
 
+constexpr int dot_blocks = 256;
+
+// Second stage in double precision: each thread sums a strided subset of the
+// single-precision block partials, so only dot_blocks values reach the host.
+__global__ void ReduceDots(int count, const float2 *blocks, double2 *totals) {
+  __shared__ double2 values[256];
+  double2 v{};
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < count; i += gridDim.x * blockDim.x) {
+    v.x += blocks[i].x;
+    v.y += blocks[i].y;
+  }
+  values[threadIdx.x] = v;
+  __syncthreads();
+  for (int offset = 128; offset; offset >>= 1) {
+    if (threadIdx.x < offset) {
+      values[threadIdx.x].x += values[threadIdx.x + offset].x;
+      values[threadIdx.x].y += values[threadIdx.x + offset].y;
+    }
+    __syncthreads();
+  }
+  if (!threadIdx.x)
+    totals[blockIdx.x] = values[0];
+}
+
 __global__ void Direction(int count, const float *z, float beta, float *d) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < count)
@@ -225,13 +252,14 @@ class Solver {
       ny = (ny + 1) / 2;
       nz = (nz + 1) / 2;
     }
-    host_norm_.resize((levels_[0].Count() + 255) / 256);
+    host_norm_.resize(dot_blocks);
     cudaError_t error;
     int count = levels_[0].Count();
     if ((error = Allocate(residual_, count)) != cudaSuccess || (error = Allocate(direction_, count)) != cudaSuccess ||
         (error = Allocate(product_, count)) != cudaSuccess)
       return error;
-    if ((error = Allocate(norm_, int(host_norm_.size()))) != cudaSuccess)
+    if ((error = Allocate(norm_, Blocks(levels_[0]))) != cudaSuccess ||
+        (error = Allocate(totals_, dot_blocks)) != cudaSuccess)
       return error;
     if ((error = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeThreadLocal)) != cudaSuccess)
       return error;
@@ -249,11 +277,11 @@ class Solver {
   }
 
   cudaError_t Build(const unsigned char *solid,
-                    const unsigned char *bu,
-                    const unsigned char *bv,
-                    const unsigned char *bw) {
+                    const unsigned char *au,
+                    const unsigned char *av,
+                    const unsigned char *aw) {
     auto first = levels_.front();
-    FineOperator<<<Blocks(first), 256, 0, stream_>>>(first, solid, bu, bv, bw);
+    FineOperator<<<Blocks(first), 256, 0, stream_>>>(first, solid, au, av, aw);
     for (size_t i = 1; i < levels_.size(); ++i)
       CoarseOperator<<<Blocks(levels_[i]), 256, 0, stream_>>>(levels_[i - 1], levels_[i]);
     return cudaGetLastError();
@@ -370,8 +398,9 @@ class Solver {
 
   cudaError_t Dot(const float *a, const float *b, const float *c, const float *d, double &first, double &second) {
     DotProducts<<<Blocks(levels_[0]), 256, 0, stream_>>>(levels_[0].Count(), a, b, c, d, norm_);
-    auto error =
-        cudaMemcpyAsync(host_norm_.data(), norm_, host_norm_.size() * sizeof(float2), cudaMemcpyDeviceToHost, stream_);
+    ReduceDots<<<dot_blocks, 256, 0, stream_>>>(Blocks(levels_[0]), norm_, totals_);
+    auto error = cudaMemcpyAsync(host_norm_.data(), totals_, host_norm_.size() * sizeof(double2),
+                                 cudaMemcpyDeviceToHost, stream_);
     if (error != cudaSuccess)
       return error;
     if ((error = cudaStreamSynchronize(stream_)) != cudaSuccess)
@@ -390,6 +419,7 @@ class Solver {
   std::vector<Level> levels_;
   std::vector<void *> allocations_;
   float2 *norm_{};
-  std::vector<float2> host_norm_;
+  double2 *totals_{};
+  std::vector<double2> host_norm_;
 };
 }  // namespace wind3d::pressure

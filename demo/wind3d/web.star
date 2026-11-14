@@ -5,7 +5,7 @@ job(
     entry = Entry(unverified_binary_contact_infra_team_for_support = UnverifiedBinary(
         path = "/usr/bin/bash",
         args = ["${MESHY_ENVELOPE_GIT_CHECKOUT_DIR}/demo/wind3d/web.sh",
-                "${MESHY_ENVELOPE_GIT_CHECKOUT_DIR}/out/wind3d-web/live", "384", "8"],
+                "${MESHY_ENVELOPE_GIT_CHECKOUT_DIR}/out/wind3d-web/live-optimized", "512", "8"],
     )),
     schedule = Schedule(time_limit = Duration(hours = 8)),
 )

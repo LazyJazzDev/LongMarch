@@ -114,7 +114,7 @@ struct FoilPart {
 WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
   Vec3 ex{1, 0, 0}, ey{0, 1, 0}, ez{0, 0, float(side)};
   FoilSpec wing{
-      {0, -0.18f, 0}, RotateZ(ex, -1.5f), RotateZ(ey, -1.5f), ez, 2.7f, 1.35f, 0.45f, -1.1f, 0.55f, 0.09f, 0.015f,
+      {0, -0.18f, 0}, RotateZ(ex, -1.5f), RotateZ(ey, -1.5f), ez, 2.7f, 1.10f, 0.34f, -1.04f, 0.55f, 0.09f, 0.015f,
       0.13f};
   if (part == 0)
     return {wing, 0, 0.35f, 0, false, false};
@@ -146,9 +146,10 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
             controls.rudder,
             true,
             false};
-  return {{{0, -0.47f, side * 0.92f}, ex, {0, 0, 1}, {0, 1, 0}, 0.40f, 0.48f, 0.60f, -0.85f, 0.4f, 0, 0, 0.18f},
+  // The pylon root sits inside the nacelle's upper wall, clear of the duct.
+  return {{{0, -0.41f, side * 0.92f}, ex, {0, 0, 1}, {0, 1, 0}, 0.32f, 0.48f, 0.58f, -0.85f, 0.94f, 0, 0, 0.12f},
           0,
-          0.40f,
+          0.32f,
           0,
           false,
           false};
@@ -217,98 +218,67 @@ WIND3D_HD float PartDistance(Vec3 body, const FoilPart &part) {
   return best;
 }
 
-// Clip a segment by the affine inequality f(t) <= 0.
-WIND3D_HD bool ClipFoilLine(float a, float b, float &lo, float &hi) {
-  if (a > 0 && b > 0)
-    return false;
-  if (a <= 0 && b <= 0)
-    return true;
-  float t = a / (a - b);
-  if (a > 0)
-    lo = fmaxf(lo, t);
-  else
-    hi = fminf(hi, t);
-  return lo <= hi;
+// Flow-through nacelle, as in an unpowered wind-tunnel model: an annular
+// duct whose wall has an elliptical inlet lip and a thin trailing edge.
+// t runs from the inlet highlight (0) to the exit (1); x = -1.3 + 0.9 t.
+WIND3D_HD float NacelleMean(float t) {
+  return 0.155f + 0.010f * sinf(3.14159265359f * t) - 0.025f * t;
 }
 
-WIND3D_HD float FoilGap(const FoilSpec &s, Vec3 p) {
-  float chord = s.root + (s.tip - s.root) * p.z / s.span;
-  float u = fminf(1, fmaxf(0, (p.x - s.leading - s.sweep * p.z) / chord));
-  return fabsf(p.y - s.dihedral * p.z - FoilCamber(u, chord, s.camber)) - FoilThickness(u, chord, s.thickness);
+WIND3D_HD float NacelleHalfThickness(float t) {
+  float lip = fminf(fmaxf(t / 0.08f, 0), 1);
+  // The last fifth tapers the wall to a thin exit trailing edge.
+  float exit = 1 - 0.7f * Smooth((t - 0.8f) / 0.2f);
+  return 0.022f * sqrtf(lip * (2 - lip)) * (1 - 0.45f * t) * exit;
 }
 
-WIND3D_HD bool FoilLineHit(const FoilPart &part, Vec3 body_a, Vec3 body_b) {
-  const auto &s = part.spec;
-  Vec3 a = FoilLocal(s, body_a), b = FoilLocal(s, body_b);
-  for (int piece = 0; piece < (part.hinged ? 2 : 1); ++piece) {
-    Vec3 p = piece ? ControlTransform(part, a, true) : a;
-    Vec3 q = piece ? ControlTransform(part, b, true) : b;
-    float cp = s.root + (s.tip - s.root) * p.z / s.span;
-    float cq = s.root + (s.tip - s.root) * q.z / s.span;
-    float xp = p.x - s.leading - s.sweep * p.z;
-    float xq = q.x - s.leading - s.sweep * q.z;
-    float lower = piece ? .72f : 0, upper = part.hinged && !piece ? .72f : 1;
-    float lo = 0, hi = 1;
-    float bound = fabsf(s.camber) + .6f * s.thickness;
-    if (!ClipFoilLine(part.begin - p.z, part.begin - q.z, lo, hi) ||
-        !ClipFoilLine(p.z - part.end, q.z - part.end, lo, hi) ||
-        !ClipFoilLine(lower * cp - xp, lower * cq - xq, lo, hi) ||
-        !ClipFoilLine(xp - upper * cp, xq - upper * cq, lo, hi) ||
-        !ClipFoilLine(p.y - s.dihedral * p.z - bound * cp, q.y - s.dihedral * q.z - bound * cq, lo, hi) ||
-        !ClipFoilLine(-p.y + s.dihedral * p.z - bound * cp, -q.y + s.dihedral * q.z - bound * cq, lo, hi))
-      continue;
-    Vec3 delta = Add(q, Scale(p, -1));
-    if (FoilGap(s, Add(p, Scale(delta, lo))) <= 0 || FoilGap(s, Add(p, Scale(delta, hi))) <= 0)
-      return true;
-    // This minimization requires convex sections. All current specs have either
-    // zero camber, or camber=.015 and thickness=.13. On each side of u=.4,
-    // thickness curvature dominates camber curvature, so the upper skin is
-    // concave and the lower skin convex. Taper preserves this via perspective.
-    // Revisit this assumption when introducing other airfoil profiles.
-    for (int iteration = 0; iteration < 32; ++iteration) {
-      float l = lo + (hi - lo) / 3, r = hi - (hi - lo) / 3;
-      float fl = FoilGap(s, Add(p, Scale(delta, l))), fr = FoilGap(s, Add(p, Scale(delta, r)));
-      if (fl <= 0 || fr <= 0)
-        return true;
-      if (fl < fr)
-        hi = r;
-      else
-        lo = l;
-    }
-    // Only a one-micrometre allowance for grazing contacts / float roundoff.
-    if (FoilGap(s, Add(p, Scale(delta, (lo + hi) * .5f))) <= 1e-6f)
-      return true;
-  }
-  return false;
+// surface: +1 outer skin, -1 duct wall.
+WIND3D_HD float NacelleRadius(float t, int surface) {
+  return NacelleMean(t) + surface * NacelleHalfThickness(t);
 }
 
-WIND3D_HD float NacelleRadius(float t) {
-  return 0.175f + 0.018f * sinf(3.14159265359f * t) - 0.035f * t;
-}
-
-WIND3D_HD Vec3 NacellePoint(float t, float phi, int side) {
-  float r = NacelleRadius(t);
+WIND3D_HD Vec3 NacellePoint(float t, float phi, int side, int surface) {
+  float r = NacelleRadius(t, surface);
   return {-1.3f + 0.9f * t, -0.54f + r * cosf(phi), side * 0.92f + r * sinf(phi)};
 }
 
-WIND3D_HD float AircraftDistance(Vec3 world, const Controls &controls) {
+// Aircraft components for load breakdowns.
+enum Component { kFuselage, kWing, kHorizontalTail, kVerticalTail, kNacelle, kComponents };
+
+// Signed distance to the aircraft (negative inside) and the nearest component.
+WIND3D_HD float AircraftDistance(Vec3 world, const Controls &controls, int &component) {
   Vec3 p = BodyPoint(world, controls);
+  component = kFuselage;
   if (p.x < -3.1f || p.x > 3.4f || fabsf(p.z) > 3.4f || p.y < -0.85f || p.y > 1.4f)
     return 1;
   float dy = p.y - FuselageCenter(p.x), radial = sqrtf(dy * dy + p.z * p.z);
   float body = fmaxf(radial - FuselageRadius(p.x, dy / fmaxf(radial, 1e-12f)), fabsf(p.x) - 3);
+  auto keep = [&](float d, int c) {
+    if (d < body) {
+      body = d;
+      component = c;
+    }
+  };
   for (int side = -1; side <= 1; side += 2) {
     for (int part = 0; part < 7; ++part) {
       if (part == 5 && side == -1)
         continue;
-      body = fminf(body, PartDistance(p, AircraftPart(part, side, controls)));
+      keep(PartDistance(p, AircraftPart(part, side, controls)), part <= 3   ? kWing
+                                                                : part == 4 ? kHorizontalTail
+                                                                : part == 5 ? kVerticalTail
+                                                                            : kNacelle);
     }
     float t = fminf(fmaxf((p.x + 1.3f) / 0.9f, 0), 1);
     float y = p.y + 0.54f, z = p.z - side * 0.92f;
-    float nacelle = fmaxf(sqrtf(y * y + z * z) - NacelleRadius(t), fmaxf(-1.3f - p.x, p.x + 0.4f));
-    body = fminf(body, nacelle);
+    keep(fmaxf(fabsf(sqrtf(y * y + z * z) - NacelleMean(t)) - NacelleHalfThickness(t), fmaxf(-1.3f - p.x, p.x + 0.4f)),
+         kNacelle);
   }
   return body;
+}
+
+WIND3D_HD float AircraftDistance(Vec3 world, const Controls &controls) {
+  int component;
+  return AircraftDistance(world, controls, component);
 }
 
 }  // namespace wind3d

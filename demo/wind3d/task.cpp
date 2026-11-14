@@ -11,7 +11,7 @@
 
 int main(int argc, char **argv) {
   int grid = 192, steps = 80, warmup = 10;
-  wind3d::SolverOptions options;
+  auto options = wind3d::OptimizedSolverOptions();
   bool validate = false;
   const char *dump = nullptr;
   for (int i = 1; i < argc; ++i) {
@@ -73,7 +73,8 @@ int main(int argc, char **argv) {
     return 1;
   options.stop_after = steps;
   options.export_final = dump != nullptr;
-  if (validate && (!wind3d::ValidateGeometry() || !wind3d::ValidateWallDiffusion(0)))
+  if (validate &&
+      (!wind3d::ValidateGeometry() || !wind3d::ValidateWallDiffusion(0) || !wind3d::ValidateClosedSurface(0, true)))
     return 2;
   auto simulation = wind3d::Simulation::Create(0, grid, options);
   if (!simulation) {

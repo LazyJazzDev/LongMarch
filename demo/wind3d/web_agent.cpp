@@ -1,6 +1,8 @@
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -56,7 +58,7 @@ int main(int argc, char **argv) {
     return 1;
   std::signal(SIGTERM, Stop);
   std::signal(SIGINT, Stop);
-  wind3d::SolverOptions options;
+  auto options = wind3d::OptimizedSolverOptions();
   options.devices = std::atoi(argv[3]);
   auto simulation = wind3d::Simulation::Create(0, std::atoi(argv[2]), options);
   if (!simulation) {
@@ -71,6 +73,16 @@ int main(int argc, char **argv) {
   bool paused = false;
   wind3d::Controls requested;
   std::shared_ptr<const std::vector<wind3d::Vertex>> mesh;
+
+  struct Sample {
+    double time;
+    std::array<double, 3> impulse;
+  };
+
+  std::deque<Sample> history;
+  wind3d::Controls history_controls;
+  uint64_t history_generation = ~uint64_t(0);
+  double condition_start = 0;
   auto next = std::chrono::steady_clock::now();
   while (running) {
     std::ifstream input(directory / "controls.txt");
@@ -100,6 +112,7 @@ int main(int argc, char **argv) {
       Write(directory / "error.txt", failure);
       return 2;
     }
+    bool actual_paused = simulation->Paused();
     auto state = simulation->Latest();
     auto now = std::chrono::steady_clock::now();
     if (state && now >= next) {
@@ -123,9 +136,21 @@ int main(int argc, char **argv) {
             files.erase(files.begin());
           }
         }
+        if (history_generation != state->generation || !Same(history_controls, state->controls)) {
+          history.clear();
+          history_generation = state->generation;
+          history_controls = state->controls;
+          condition_start = state->time;
+        }
+        if (history.empty() || history.back().time < state->time)
+          history.push_back({state->time, {state->impulse[0], state->impulse[1], state->impulse[2]}});
+        while (history.size() > 2 && history[1].time <= state->time - 0.15)
+          history.pop_front();
+        double average_span = state->time - history.front().time;
+        bool average_ready = state->time - condition_start >= 0.55 && average_span >= 0.15;
         auto lines = wind3d::visualization::FlowLines(*state, true, false);
-        bool acknowledged = Same(state->controls, requested) && state->generation == expected_generation &&
-                            simulation->Paused() == paused;
+        bool acknowledged =
+            Same(state->controls, requested) && state->generation == expected_generation && actual_paused == paused;
         std::ostringstream json;
         json << std::setprecision(9) << "{\"version\":1,\"frame\":" << ++frame << ",\"step\":" << state->step
              << ",\"generation\":" << state->generation << ",\"mesh\":\"" << mesh_id << "\",\"time\":" << state->time
@@ -133,14 +158,20 @@ int main(int argc, char **argv) {
              << ",\"pressure_residual\":" << state->pressure_residual
              << ",\"pressure_converged\":" << (state->pressure_converged ? "true" : "false")
              << ",\"divergence\":" << state->divergence_after << ",\"grid\":" << state->solver_nx
-             << ",\"gpus\":" << options.devices << ",\"paused\":" << (simulation->Paused() ? "true" : "false")
+             << ",\"gpus\":" << options.devices << ",\"paused\":" << (actual_paused ? "true" : "false")
              << ",\"ack\":" << (acknowledged ? request : 0) << ",\"line_vertices\":" << lines.size()
              << ",\"mesh_vertices\":" << mesh->size() << ",\"controls\":";
         Controls(json, state->controls);
-        json << ",\"force\":";
+        json << ",\"solver_model\":\"optimized-13ea18de\",\"force\":";
         Vector(json, state->force);
         json << ",\"moment\":";
         Vector(json, state->moment);
+        json << ",\"average_seconds\":" << average_span << ",\"mean_ld\":";
+        double drag = state->impulse[0] - history.front().impulse[0];
+        if (average_ready && drag > 1e-9)
+          json << (state->impulse[1] - history.front().impulse[1]) / drag;
+        else
+          json << "null";
         json << '}';
         auto header = json.str();
         while (header.size() % 4)
