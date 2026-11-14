@@ -74,6 +74,7 @@ struct GpuProjection::Impl {
   cublasHandle_t blas{};
   std::vector<void *> allocations;
   Matrix a, g, d;
+  std::vector<int> closed;
   double *diagonal{}, *u{}, *face{}, *rhs{}, *x{}, *r{}, *shadow{}, *p{}, *v{}, *s{}, *t{}, *phat{}, *shat{}, *ax{};
 
   ~Impl() {
@@ -170,7 +171,10 @@ bool GpuProjection::Build(int device, const Mesh &mesh, const FaceGradient &grad
     for (int k = gradient.Offsets()[f]; k < gradient.Offsets()[f + 1]; ++k)
       g[f][gradient.Columns()[k]] += gradient.Weights()[k];
     auto face = mesh.Faces()[f];
-    if (face.axis == 0 && face.high < 0)
+    if (face.aperture == 0)
+      next->closed.push_back(f);
+    face.area *= face.aperture;
+    if (face.aperture > 0 && face.axis == 0 && face.high < 0)
       g[f][face.low] = -1 / face.distance;
     if (face.low >= 0)
       d[face.low][f] = -face.area;
@@ -181,6 +185,8 @@ bool GpuProjection::Build(int device, const Mesh &mesh, const FaceGradient &grad
     for (auto [f, area] : d[i])
       for (auto [col, w] : g[f])
         a[i][col] += area * w;
+    if (!mesh.Cells()[i].active)
+      a[i][i] = 1;
     diagonal[i] = a[i][i];
     if (!(diagonal[i] > 0) || !std::isfinite(diagonal[i]))
       return fail("Invalid adaptive operator or GPU allocation failure");
@@ -224,6 +230,8 @@ ProjectionResult GpuProjection::Project(std::vector<double> &velocity,
   if (!w.ok || !std::isfinite(norm))
     return result;
   if (norm == 0) {
+    for (int f : w.closed)
+      velocity[f] = 0;
     potential.assign(w.n, 0);
     result.converged = true;
     return result;
@@ -272,6 +280,8 @@ ProjectionResult GpuProjection::Project(std::vector<double> &velocity,
     if (w.Check(cudaGetLastError()) &&
         w.Check(cudaMemcpy(new_u.data(), w.u, w.nf * sizeof(double), cudaMemcpyDeviceToHost)) &&
         w.Check(cudaMemcpy(new_p.data(), w.x, w.n * sizeof(double), cudaMemcpyDeviceToHost))) {
+      for (int f : w.closed)
+        new_u[f] = 0;
       velocity = std::move(new_u);
       potential = std::move(new_p);
     } else

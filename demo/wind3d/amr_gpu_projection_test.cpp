@@ -3,7 +3,7 @@
 #include <cmath>
 #include <iostream>
 
-int main() {
+int Run(bool embedded) {
   using namespace wind3d::amr;
   Topology tree;
   if (!tree.Regrid({2, 2, 2}, 1, 100, [](Block b) { return b.x == 0 && b.y == 0; }))
@@ -11,6 +11,10 @@ int main() {
   Mesh mesh;
   if (!mesh.Build(tree, 4, 1, {-1, -1, -1}))
     return 2;
+  if (embedded && !mesh.Embed([](std::array<double, 3> p) {
+        return std::max({std::abs(p[0] + .5), std::abs(p[1] + .5), std::abs(p[2])}) - .21;
+      }))
+    return 16;
   FaceGradient g;
   if (!g.Build(mesh))
     return 3;
@@ -51,7 +55,7 @@ int main() {
     double a = 0, b = 0;
     for (int k = mesh.Offsets()[i]; k < mesh.Offsets()[i + 1]; ++k) {
       int id = mesh.Incidence()[k], f = std::abs(id) - 1;
-      double area = (id > 0 ? 1 : -1) * mesh.Faces()[f].area;
+      double area = (id > 0 ? 1 : -1) * mesh.Faces()[f].area * mesh.Faces()[f].aperture;
       a += area * before[f];
       b += area * u[f];
     }
@@ -89,4 +93,10 @@ int main() {
     return 15;
   std::cout
       << "PASS composite projection removes divergence, preserves fixed boundary flux and rolls back nonconvergence\n";
+  return 0;
+}
+
+int main() {
+  int status = Run(false);
+  return status ? status : Run(true);
 }

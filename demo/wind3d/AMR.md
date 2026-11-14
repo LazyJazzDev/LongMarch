@@ -59,13 +59,15 @@ them as part of an experiment without a new reason/authorization.
 - Embedded boundaries now use 6x6 open-area sampling, quantized 0..255
   apertures, the 1/8 sliver cutoff, and thin-wall centre-connection probes.
   A cell is active if any face is open, matching the uniform cut-cell rule.
-  The CPU operator weights fluxes by aperture and pins inactive rows;
+  CPU and GPU operators weight fluxes by aperture and pin inactive rows;
   closed faces are zeroed only after successful projection. Coarse/fine faces
   intersecting the body are rejected to enforce a fine body-surface region.
   CPU box tests cover partial apertures, solid cells, projection, and rollback;
   the actual aircraft with flap/elevator deflection passes constant-pressure
   force and moment cancellation. Surface friction and advancing an aircraft
-  flow are still not implemented in the adaptive path.
+  flow are still not implemented in the production adaptive path. Job 2000954
+  passed all six tests and CUDA memcheck, including embedded CPU/GPU velocity
+  agreement to 3.13e-9 and true relative residual 6.98e-10.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
