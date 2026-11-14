@@ -46,6 +46,16 @@ them as part of an experiment without a new reason/authorization.
   residual and checks independent divergence reduction, fixed boundary fluxes
   and no mutation on nonconvergence. This is not yet the GPU projection, a
   cut-cell aircraft solve, or an energy/long-time stability validation.
+- `amr_gpu_projection` assembles the same composite operator and runs sparse
+  products, BiCGStab vector updates and double-precision reductions on one CUDA
+  device, with persistent device matrices/workspace. Job 2000952 on H200 passed
+  all five AMR tests and CUDA memcheck (zero errors). Corrected CPU/GPU velocity
+  max difference was 2.34e-9; GPU true relative residual was 9.83e-10 in 62
+  iterations. Tests include workspace reuse, zero RHS, failed-build rollback
+  and iteration-limit rollback. This all-fluid prototype still copies input/
+  output at each call, uses Jacobi rather than a scalable multilevel
+  preconditioner, and is not yet connected to aircraft advancement or multi-GPU
+  halo exchange. No acceleration claim follows from these correctness tests.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
