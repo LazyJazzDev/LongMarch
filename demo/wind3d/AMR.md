@@ -27,6 +27,14 @@ them as part of an experiment without a new reason/authorization.
   deterministic ordering, and rollback on capacity exhaustion. The coverage
   test checks every finest-level voxel for exactly one owner. It is not yet
   connected to fluid advancement or the live display.
+- `amr_mesh` constructs unique coarse/fine face patches and flat signed CSR
+  cell incidence suitable for GPU gathers without flux atomics. CPU tests verify
+  exact per-cell face closure, div(x,y,z)=3, global random-flux cancellation,
+  and symmetry/positive energy of the two-point graph operator. These do not
+  prove pressure consistency: coarse/fine cell centres are not aligned in
+  tangential directions, so a two-point graph alone is not an acceptable
+  second-order composite pressure discretization. Transverse reconstruction
+  and manufactured pressure tests remain mandatory before solver integration.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

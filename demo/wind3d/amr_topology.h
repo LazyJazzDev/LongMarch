@@ -38,8 +38,10 @@ class Topology {
   // Returns -1 outside the domain. Fine-side queries cover coarse/fine faces.
   int Neighbor(size_t leaf, int axis, int direction) const;
 
- private:
+  // Point lookup in finest-level block coordinates, -1 outside the domain.
   int Find(int x, int y, int z) const;
+
+ private:
   std::array<int, 3> roots_{};
   int max_level_{};
   std::vector<Block> leaves_;
