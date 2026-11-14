@@ -7,7 +7,7 @@ foreach (mode full final)
     foreach (devices 1 2 4 8)
         set(snapshot "${CMAKE_CURRENT_BINARY_DIR}/wind3d-verify-${devices}.bin")
         execute_process(
-            COMMAND "${WIND3D_TASK}" --grid 80 --gpus ${devices}
+            COMMAND "${WIND3D_TASK}" ${TRANSPORT_OPTIONS} --grid 80 --gpus ${devices}
                     --steps 8 --warmup 2 --validate ${export_options} --dump "${snapshot}"
             RESULT_VARIABLE result
             OUTPUT_VARIABLE output ERROR_VARIABLE errors

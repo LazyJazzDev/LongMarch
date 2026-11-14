@@ -144,7 +144,7 @@ void Usage() {
                "  [--settle-time S] [--case-time S] [--average-time S] [--viscosity M2S]\n"
                "  [--wall-model | --laminar] [--wall-viscosity M2S] [--cfl C] [--friction-only]\n"
                "  [--sponge METRES (default 2, 0 disables)] [--cut-cells (with --friction-only)]\n"
-               "  [--first-order]\n"
+               "  [--cubic] [--first-order]\n"
                "  [--pressure-tolerance T] [--pressure-cycles N] [--dump-dir DIR]\n"
                "Cases file rows: name angle flap aileron elevator rudder ('#' starts a comment).\n";
 }
@@ -221,6 +221,8 @@ int main(int argc, char **argv) {
       solver.wall_model = true;
     else if (key == "--laminar")
       solver.wall_model = false;
+    else if (key == "--cubic")
+      solver.cubic = true;
     else if (key == "--cut-cells")
       solver.cut_cells = true;
     else if (key == "--sponge")
@@ -275,9 +277,9 @@ int main(int argc, char **argv) {
   const auto reference = WingReference();
   const float h = 16.0f / grid;
   std::cout << "device=" << properties.name << " grid=" << grid << 'x' << grid / 2 << 'x' << grid * 3 / 4 << " h=" << h
-            << " m solver_gb=" << wind3d::SolverBytes(grid) / 1e9 << " speed=" << base.speed << " cfl=" << solver.cfl
-            << " sponge=" << solver.sponge << " cut_cells=" << solver.cut_cells << " viscosity=" << solver.viscosity
-            << " wall_model="
+            << " m solver_gb=" << wind3d::SolverBytes(grid) / 1e9 << " speed=" << base.speed
+            << " cubic=" << solver.cubic << " cfl=" << solver.cfl << " sponge=" << solver.sponge
+            << " cut_cells=" << solver.cut_cells << " viscosity=" << solver.viscosity << " wall_model="
             << (solver.wall_model ? (solver.wall_momentum ? "log-law" : "log-law-loads-only") : "laminar")
             << " S=" << reference.area << " b=" << reference.span << " mac=" << reference.chord << std::endl;
   std::ofstream csv(output);

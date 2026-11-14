@@ -60,6 +60,7 @@ struct Grid {
   int nx, ny, nz;
   float h;
   int begin{};
+  bool cubic{};
   // Face apertures of u, v and w on a cut-cell boundary; null otherwise.
   const unsigned char *aperture[3]{};
 
@@ -109,6 +110,47 @@ __device__ float Sample(const float *f, Grid g, Vec3 p, int component = -1) {
         }
       }
   return aperture && total > 1e-3f ? weighted / total : result;
+}
+
+// Monotone cubic Hermite interpolation between f1 and f2 (Fedkiw, Stam and
+// Jensen 2001): slopes that disagree in sign with f2 - f1 are zeroed, so the
+// result stays within [f1, f2] and creates no new extrema.
+__device__ inline float MonotoneCubic(float f0, float f1, float f2, float f3, float t) {
+  float delta = f2 - f1, d1 = 0.5f * (f2 - f0), d2 = 0.5f * (f3 - f1);
+  if (delta == 0 || d1 * delta <= 0)
+    d1 = 0;
+  if (delta == 0 || d2 * delta <= 0)
+    d2 = 0;
+  float t2 = t * t, t3 = t2 * t;
+  float value = (2 * t3 - 3 * t2 + 1) * f1 + (t3 - 2 * t2 + t) * d1 + (-2 * t3 + 3 * t2) * f2 + (t3 - t2) * d2;
+  return fminf(fmaxf(value, fminf(f1, f2)), fmaxf(f1, f2));
+}
+
+// Transported value at p: monotone tricubic where the eight surrounding faces
+// are fully open, otherwise the (aperture-weighted) trilinear Sample.
+__device__ float SampleTransported(const float *f, Grid g, Vec3 p, int component) {
+  if (!g.cubic)
+    return Sample(f, g, p, component);
+  p.x = fminf(fmaxf(p.x, 0), float(g.nx));
+  p.y = fminf(fmaxf(p.y, 0), float(g.ny));
+  p.z = fminf(fmaxf(p.z, 0), float(g.nz));
+  int x = int(p.x), y = int(p.y), z = int(p.z);
+  const unsigned char *aperture = g.aperture[component];
+  if (aperture)
+    for (int k = 0; k < 2; ++k)
+      for (int j = 0; j < 2; ++j)
+        for (int i = 0; i < 2; ++i)
+          if (aperture[g.F(min(x + i, g.nx), min(y + j, g.ny), min(z + k, g.nz))] != 255)
+            return Sample(f, g, p, component);
+  float tx = p.x - x, ty = p.y - y, tz = p.z - z, planes[4];
+  for (int k = 0; k < 4; ++k) {
+    float rows[4];
+    for (int j = 0; j < 4; ++j)
+      rows[j] = MonotoneCubic(Read(f, g, x - 1, y + j - 1, z + k - 1), Read(f, g, x, y + j - 1, z + k - 1),
+                              Read(f, g, x + 1, y + j - 1, z + k - 1), Read(f, g, x + 2, y + j - 1, z + k - 1), tx);
+    planes[k] = MonotoneCubic(rows[0], rows[1], rows[2], rows[3], ty);
+  }
+  return MonotoneCubic(planes[0], planes[1], planes[2], planes[3], tz);
 }
 
 __global__ void Mask(Grid g, unsigned char *solid, Controls controls) {
@@ -306,7 +348,7 @@ __global__ void Advect(Grid g,
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
-  destination[n] = Sample(source, g, Departure(g, u, v, w, x, y, z, axis, dt), axis);
+  destination[n] = SampleTransported(source, g, Departure(g, u, v, w, x, y, z, axis, dt), axis);
 }
 
 __global__ void CorrectTransport(Grid g,
@@ -965,6 +1007,7 @@ struct Simulation::Impl {
     if (options.devices == 1) {
       if (blocks) {
         Grid local = grid;
+        local.cubic = options.cubic;
         if (options.cut_cells) {
           local.aperture[0] = au;
           local.aperture[1] = av;
@@ -978,6 +1021,7 @@ struct Simulation::Impl {
       if (!Check(cudaSetDevice(device + d)))
         return false;
       Grid local = grid;
+      local.cubic = options.cubic;
       if (options.cut_cells) {
         local.aperture[0] = au;
         local.aperture[1] = av;

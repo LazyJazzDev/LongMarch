@@ -24,6 +24,10 @@ int main(int argc, char **argv) {
       options.export_field = false;
       continue;
     }
+    if (!std::strcmp(arg, "--cubic")) {
+      options.cubic = true;
+      continue;
+    }
     if (!std::strcmp(arg, "--first-order")) {
       options.corrected_transport = false;
       continue;
@@ -32,7 +36,7 @@ int main(int argc, char **argv) {
       std::puts(
           "wind3d_task [--grid 192] [--gpus 1|2|4|8] [--steps 80] [--warmup 10]\n"
           "            [--pressure-tolerance 0.0001] [--pressure-cycles 64]\n"
-          "            [--first-order] [--validate] [--no-export] [--dump snapshot.bin]\n"
+          "            [--cubic] [--first-order] [--validate] [--no-export] [--dump snapshot.bin]\n"
           "Times include transport, pressure, diagnostics and optional snapshot export; startup steps are excluded.");
       return 0;
     }

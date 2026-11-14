@@ -41,6 +41,8 @@ struct SolverOptions {
   // their open area fraction in the pressure operator, divergence and loads,
   // instead of the all-or-nothing voxel staircase.
   bool cut_cells{false};
+  // Monotone tricubic transported values; aperture-weighted linear fallback near walls.
+  bool cubic{false};
   // Length in metres of a sponge zone ending at the outlet, in which velocity
   // relaxes toward the free stream. It removes wake vortices before they cross
   // the zero-pressure outlet, where backflow is unstable. 0 disables it.

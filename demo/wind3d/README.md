@@ -430,3 +430,12 @@ samples retain their timestamps and raw values but carry `invalid_indices`;
 all statistics exclude them. The browser draws a gap without bridging it,
 reports null on hover, and handles a completely masked window with empty axes.
 Repeated changes extend the gap; display-density changes do not trigger it.
+
+### Numerical import and adaptive-grid work
+
+The task and sweep drivers accept `--cubic`, ported from upstream b20f9123.
+It uses monotone Hermite transported values in open fluid and retains weighted
+trilinear interpolation around cut faces; departure tracing stays linear.
+The existing linear mode remains available as a reference. GPU parity is
+checked by CTest `wind3d_multigpu_cubic`. Adaptive-grid scope, the accepted
+accuracy gate, resource limit and remaining work are recorded in [AMR.md](AMR.md).
