@@ -5,6 +5,7 @@
 #include "boundary_toggle_button.h"
 #include "cell_grid.h"
 #include "file_button.h"
+#include "gpu/tiled_life.h"
 #include "grid_size.h"
 #include "grid_view.h"
 #include "pause_play_button.h"
@@ -27,6 +28,10 @@ class GameOfLife : public Application {
              bool hosted = false);
 
   ~GameOfLife() override;
+
+  void EnableTiledSimulation() {
+    tiled_enabled_ = true;
+  }
 
   double NextFrameDelay() const override;
   void SetIconOrientation(float radians);
@@ -82,6 +87,10 @@ class GameOfLife : public Application {
   }
 
  private:
+  bool PrepareScene(rhi::ICommandContext *commands) override;
+  void QueueCenteredPattern();
+  std::string SaveTiledState(const std::string &path);
+  int LoadTiledState(const std::string &path, std::string &error);
   void CustomOnInit() override;
   void CustomOnUpdate() override;
   void CustomOnClose() override;
@@ -147,6 +156,13 @@ class GameOfLife : public Application {
   std::optional<DeviceModel> white_icon_model;
   std::optional<DeviceModel> white_rect_model;
 
+  bool tiled_enabled_{false};
+  bool tiled_ready_{false};
+  TiledLife tiled_life_;
+  uint32_t pending_steps_{};
+  int pending_fill_{-1};
+  std::vector<glm::uvec2> pending_toggles_;
+  std::vector<uint32_t> pending_pattern_;
   std::vector<uint8_t> cell_grid_;
   std::vector<uint8_t> initial_cells_;
   std::unique_ptr<CellGrid> cell_input_;

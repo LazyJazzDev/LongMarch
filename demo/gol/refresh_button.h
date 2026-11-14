@@ -1,4 +1,6 @@
 #pragma once
+#include <functional>
+
 #include "application/animation_var.h"
 #include "application/button.h"
 #include "application/model.h"
@@ -14,6 +16,11 @@ class RefreshButton : public Button {
                 float bottom,
                 std::vector<uint8_t> *game_buffer,
                 DeviceModel *device_model);
+
+  void SetResetHandler(std::function<void()> handler) {
+    action_ = std::move(handler);
+  }
+
   void Update(float t);
   void Draw();
 
@@ -22,6 +29,7 @@ class RefreshButton : public Button {
   }
 
  private:
+  std::function<void()> action_;
   void OnResize() override;
   void OnClick() override;
   void OnStateChange(int state) override;

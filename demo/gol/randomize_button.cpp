@@ -80,8 +80,11 @@ void RandomizeButton::Draw() {
 
 void RandomizeButton::OnClick() {
   std::bernoulli_distribution alive(0.5);
-  for (auto &cell : *cells_)
-    cell = alive(random_engine_) ? 1 : 0;
+  if (action_)
+    action_();
+  else
+    for (auto &cell : *cells_)
+      cell = alive(random_engine_) ? 1 : 0;
   // Pick uniformly from the other five faces; use a separate random roll for variety.
   int next_face = std::uniform_int_distribution<int>(0, 4)(random_engine_);
   if (next_face >= selected_face_)

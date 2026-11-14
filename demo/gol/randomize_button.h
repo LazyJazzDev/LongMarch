@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <random>
 
 #include "application/animation_var.h"
@@ -11,6 +12,11 @@ namespace life_demo {
 class RandomizeButton : public Button {
  public:
   RandomizeButton(Application *app, std::vector<uint8_t> *cells, DeviceModel *background);
+
+  void SetRandomizeHandler(std::function<void()> handler) {
+    action_ = std::move(handler);
+  }
+
   void Update(float delta_time);
   void Draw();
 
@@ -19,6 +25,7 @@ class RandomizeButton : public Button {
   }
 
  private:
+  std::function<void()> action_;
   void OnClick() override;
   void OnStateChange(int state) override;
 

@@ -15,6 +15,7 @@
 #include "cells_pattern.h"
 #include "game_of_life_lib.h"
 #include "glm/gtc/matrix_transform.hpp"
+#include "gpu/tiled_life_storage.h"
 
 namespace life_demo {
 
@@ -87,6 +88,18 @@ void GameOfLife::CustomOnInit() {
       std::make_unique<RefreshButton>(this, 10.0f, 230.0f, 110.0f, 330.0f, &cell_grid_, &white_icon_model.value());
 
   randomize_button_ = std::make_unique<RandomizeButton>(this, &cell_grid_, &white_icon_model.value());
+  if (tiled_enabled_) {
+    refresh_button_->SetResetHandler([this] {
+      pending_fill_ = 0;
+      pending_pattern_.clear();
+      pending_toggles_.clear();
+    });
+    randomize_button_->SetRandomizeHandler([this] {
+      pending_fill_ = 1;
+      pending_pattern_.clear();
+      pending_toggles_.clear();
+    });
+  }
   open_button_ = std::make_unique<FileButton>(this, &white_icon_model.value(), FileButton::Kind::kOpen,
                                               [this] { RequestFileAction(FileAction::kOpen); });
   save_button_ = std::make_unique<FileButton>(this, &white_icon_model.value(), FileButton::Kind::kSave,
@@ -124,7 +137,7 @@ void GameOfLife::CustomOnInit() {
           // A left drag (one finger on touch screens) pans an enlarged grid; a
           // tap still toggles the cell. The drag becomes a pan once it moves.
           drag_start_ = cursor;
-          drag_pending_ = action == GLFW_PRESS && in_grid && grid_view_.zoom > 1.0f;
+          drag_pending_ = action == GLFW_PRESS && in_grid && (tiled_enabled_ || grid_view_.zoom > 1.0f);
           if (action != GLFW_PRESS)
             EndDragPan();
         }
@@ -210,10 +223,14 @@ void GameOfLife::CustomOnUpdate() {
   open_button_->Update(delta_time);
   save_button_->Update(delta_time);
 
-  simulation_clock_.Advance(
-      simulation_elapsed, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
-      speed_toggle_button_->SpeedLevel(),
-      [this] { update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data(), boundary_button_->Mode()); });
+  simulation_clock_.Advance(simulation_elapsed, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
+                            speed_toggle_button_->SpeedLevel(), [this] {
+                              if (tiled_enabled_)
+                                ++pending_steps_;
+                              else
+                                update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data(),
+                                            boundary_button_->Mode());
+                            });
 
   // Synchronize after stepping so the new generation is visible in this frame.
   // One pass over the cells: animate, collect the shader data and remember
@@ -373,11 +390,18 @@ void GameOfLife::OnWindowSize() {
 void GameOfLife::LayoutCells() {
   const glm::vec2 viewport{playground_right_ - playground_left_, playground_bottom_ - playground_top_};
   const float fitted_unit = std::min(viewport.y / cell_grid_height_, viewport.x / cell_grid_width_) * 0.95f;
-  grid_view_.Clamp(viewport, glm::vec2{cell_grid_width_, cell_grid_height_} * fitted_unit);
+  if (tiled_enabled_) {
+    const auto limit = glm::max(
+        (glm::vec2{TiledLife::kWorldSize} * fitted_unit * grid_view_.zoom - viewport * 0.9f) * 0.5f, glm::vec2{0});
+    grid_view_.pan = glm::clamp(grid_view_.pan, -limit, limit);
+  } else
+    grid_view_.Clamp(viewport, glm::vec2{cell_grid_width_, cell_grid_height_} * fitted_unit);
   const float cell_unit = fitted_unit * grid_view_.zoom;
   const glm::vec2 origin = glm::vec2{float(playground_left_ + playground_right_) * 0.5f,
                                      float(playground_bottom_ + playground_top_) * 0.5f} -
-                           glm::vec2{float(cell_grid_width_), float(cell_grid_height_)} * cell_unit * 0.5f +
+                           (tiled_enabled_ ? glm::vec2{TiledLife::kWorldSize}
+                                           : glm::vec2{float(cell_grid_width_), float(cell_grid_height_)}) *
+                               cell_unit * 0.5f +
                            grid_view_.pan;
   cell_input_->Layout(origin, cell_unit, {playground_left_, playground_top_, playground_right_, playground_bottom_});
 }
@@ -387,13 +411,23 @@ void GameOfLife::DrawCellGrid() {
   // cell under each fragment.
   const glm::vec2 grid_origin = cell_input_->Origin();
   const glm::vec2 grid_end =
-      grid_origin + glm::vec2{float(cell_grid_width_), float(cell_grid_height_)} * cell_input_->Unit();
+      grid_origin + (tiled_enabled_ ? glm::vec2{TiledLife::kWorldSize}
+                                    : glm::vec2{float(cell_grid_width_), float(cell_grid_height_)}) *
+                        cell_input_->Unit();
   const glm::vec2 low = glm::max(grid_origin, glm::vec2{playground_left_, playground_top_});
   const glm::vec2 high = glm::min(grid_end, glm::vec2{playground_right_, playground_bottom_});
   if (high.x <= low.x || high.y <= low.y)
     return;
   // color carries the grid origin, pitch and gap brightness (the playground
   // background below); extra.zw carries its dimensions.
+  if (tiled_enabled_) {
+    DrawModel(
+        &white_rect_model.value(),
+        {GetModelMatrix(low, high - low, 0.4f), glm::vec4{grid_origin, cell_input_->Unit(), kPlaygroundBrightness},
+         glm::uvec4{6u, 0u, TiledLife::kWorldSize, TiledLife::kWorldSize},
+         glm::vec4{playground_left_, playground_top_, playground_right_, playground_bottom_}});
+    return;
+  }
   DrawModelWithData(
       &white_rect_model.value(),
       {GetModelMatrix(low, high - low, 0.4f), glm::vec4{grid_origin, cell_input_->Unit(), kPlaygroundBrightness},
@@ -443,7 +477,8 @@ void GameOfLife::ResizeGrid(int width, int height) {
   cell_grid_width_ = width;
   cell_grid_height_ = height;
   // Rebind after vector reallocation.
-  cell_input_->Reset(cell_grid_.data(), cell_grid_width_, cell_grid_height_);
+  if (!tiled_enabled_)
+    cell_input_->Reset(cell_grid_.data(), cell_grid_width_, cell_grid_height_);
   grid_view_ = {};
   OnWindowSize();
 }
@@ -503,6 +538,8 @@ void GameOfLife::ProcessFileAction() {
         requested_height_ = height;
         width_slider_->SetValue(width);
         height_slider_->SetValue(height);
+        if (tiled_enabled_)
+          QueueCenteredPattern();
         loaded = true;
       }
       if (accepted) {
@@ -537,9 +574,15 @@ std::string GameOfLife::CompleteHostedFile(const std::string &path) {
   std::string error;
   try {
     if (!path.empty()) {
-      if (hosted_file_action_ == 2)
-        SaveCellsPattern(path, {cell_grid_width_, cell_grid_height_, cell_grid_});
-      else {
+      int tiled_load = 0;
+      if (tiled_enabled_ && hosted_file_action_ == 1)
+        tiled_load = LoadTiledState(path, error);
+      if (hosted_file_action_ == 2) {
+        if (tiled_enabled_)
+          error = SaveTiledState(path);
+        else
+          SaveCellsPattern(path, {cell_grid_width_, cell_grid_height_, cell_grid_});
+      } else if (tiled_load == 0) {
         auto pattern = FitCellsPattern(LoadCellsPattern(path), cell_grid_width_, cell_grid_height_);
         ResizeGrid(pattern.width, pattern.height);
         std::copy(pattern.cells.begin(), pattern.cells.end(), cell_grid_.begin());
@@ -547,9 +590,12 @@ std::string GameOfLife::CompleteHostedFile(const std::string &path) {
         requested_height_ = pattern.height;
         width_slider_->SetValue(pattern.width);
         height_slider_->SetValue(pattern.height);
+        if (tiled_enabled_)
+          QueueCenteredPattern();
         loaded = true;
-      }
-      button->Feedback(true);
+      } else
+        loaded = tiled_load == 1;
+      button->Feedback(error.empty());
     }
   } catch (const std::exception &e) {
     error = e.what();
@@ -582,7 +628,95 @@ void GameOfLife::InitCells(int width, int height) {
     RandomizeCells(random_density_, random_seed_);
   }
   cell_input_ = std::make_unique<CellGrid>(this);
-  cell_input_->Reset(cell_grid_.data(), cell_grid_width_, cell_grid_height_);
+  if (tiled_enabled_) {
+    tiled_ready_ = tiled_life_.Initialize(Device(), ShaderSource("shaders/tiled_life.slang"));
+    if (tiled_ready_)
+      SetCellStorage(tiled_life_.Cells());
+    cell_input_->ResetGPU(TiledLife::kWorldSize, TiledLife::kWorldSize,
+                          [this](int x, int y) { pending_toggles_.push_back({uint32_t(x), uint32_t(y)}); });
+    QueueCenteredPattern();
+  } else
+    cell_input_->Reset(cell_grid_.data(), cell_grid_width_, cell_grid_height_);
+}
+
+// The experimental full-world format is identified by a versioned magic header.
+// Ordinary text .cells patterns remain supported for importing small designs.
+std::string GameOfLife::SaveTiledState(const std::string &path) {
+  rhi::ObjPtr<rhi::ICommandContext> commands = Queue()->CreateCommandContext();
+  if (!commands || !PrepareScene(commands.Get()))
+    return "Could not prepare the grid for saving";
+  std::vector<uint32_t> packed(tiled_life_.WordCount());
+  rhi::ObjPtr<rhi::IDownloadToken> download = commands->CmdDownloadBuffer(tiled_life_.Cells(), 0, packed.size() * 4);
+  rhi::ObjPtr<rhi::ISubmissionToken> submitted = commands->Submit();
+  if (!download || !submitted || !submitted->WaitHost() || !download->CopyTo(packed.data(), packed.size() * 4))
+    return "Could not read the grid for saving";
+  std::ofstream output(std::filesystem::u8path(path), std::ios::binary | std::ios::trunc);
+  std::string error;
+  if (!WriteTiledState(output, packed, error))
+    return error;
+  output.close();
+  return output ? std::string{} : "Could not save the grid";
+}
+
+int GameOfLife::LoadTiledState(const std::string &path, std::string &error) {
+  std::ifstream input(std::filesystem::u8path(path), std::ios::binary);
+  std::array<char, 8> magic{};
+  input.read(magic.data(), magic.size());
+  if (std::string(magic.data(), magic.size()) != kTiledStateMagic)
+    return 0;
+  input.clear();
+  input.seekg(0);
+  std::vector<uint32_t> packed;
+  if (!ReadTiledState(input, packed, error))
+    return -1;
+  pending_pattern_ = std::move(packed);
+  pending_fill_ = -1;
+  pending_toggles_.clear();
+  pending_steps_ = 0;
+  grid_view_ = {};
+  LayoutCells();
+  return 1;
+}
+
+void GameOfLife::QueueCenteredPattern() {
+  pending_fill_ = -1;
+  pending_toggles_.clear();
+  pending_pattern_.assign(TiledLife::kWorldSize * TiledLife::kWorldSize / 32, 0);
+  const uint32_t ox = (TiledLife::kWorldSize - cell_grid_width_) / 2;
+  const uint32_t oy = (TiledLife::kWorldSize - cell_grid_height_) / 2;
+  for (uint32_t y = 0; y < uint32_t(cell_grid_height_); ++y) {
+    for (uint32_t x = 0; x < uint32_t(cell_grid_width_); ++x) {
+      const uint32_t wx = x + ox, wy = y + oy;
+      const uint32_t word = ((wy / 256) * 64 + wx / 256) * 2048 + (wy % 256) * 8 + (wx % 256) / 32;
+      pending_pattern_[word] |= uint32_t(cell_grid_[y * cell_grid_width_ + x] != 0) << (wx % 32);
+    }
+  }
+}
+
+bool GameOfLife::PrepareScene(rhi::ICommandContext *commands) {
+  if (!tiled_enabled_)
+    return true;
+  if (!tiled_ready_)
+    return false;
+  if (!pending_pattern_.empty()) {
+    if (!tiled_life_.Upload(commands, pending_pattern_))
+      return false;
+    pending_pattern_.clear();
+  }
+  if (pending_fill_ >= 0) {
+    if (!tiled_life_.Fill(commands, pending_fill_ != 0, uint32_t(std::random_device{}())))
+      return false;
+    pending_fill_ = -1;
+  }
+  for (auto cell : pending_toggles_)
+    if (!tiled_life_.Toggle(commands, cell.x, cell.y))
+      return false;
+  pending_toggles_.clear();
+  for (uint32_t i = 0; i < pending_steps_; ++i)
+    if (!tiled_life_.Step(commands, boundary_button_->Mode() == BoundaryMode::kPeriodic))
+      return false;
+  pending_steps_ = 0;
+  return true;
 }
 
 void GameOfLife::EnableNativeSizeControls() {

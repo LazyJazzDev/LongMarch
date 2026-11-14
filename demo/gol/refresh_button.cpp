@@ -109,7 +109,10 @@ void RefreshButton::OnResize() {
 
 void RefreshButton::OnClick() {
   refresh_animation_var_.AddTarget(2.0);
-  std::memset(game_buffer_->data(), 0, game_buffer_->size());
+  if (action_)
+    action_();
+  else
+    std::memset(game_buffer_->data(), 0, game_buffer_->size());
 }
 
 void RefreshButton::OnStateChange(int state) {

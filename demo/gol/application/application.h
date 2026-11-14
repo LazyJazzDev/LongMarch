@@ -130,6 +130,16 @@ class Application {
   void UnregisterListener(Listener *listener);
 
  protected:
+  // Record simulation on the same queue before any scene draws.
+  virtual bool PrepareScene(rhi::ICommandContext *context) {
+    return true;
+  }
+
+  void SetCellStorage(rhi::IBuffer *buffer) {
+    cell_storage_ = rhi::ObjPtr<rhi::IBuffer>::Retain(buffer);
+  }
+
+  std::string ShaderSource(const char *name) const;
   virtual void CustomOnUpdate();
 
   virtual void CustomOnClose();
@@ -195,6 +205,7 @@ class Application {
   rhi::ObjPtr<rhi::IDevice> device_;
   rhi::ObjPtr<rhi::IQueue> queue_;
   rhi::ObjPtr<rhi::IWindow> window_;
+  rhi::ObjPtr<rhi::IBuffer> cell_storage_;
   rhi::ObjPtr<rhi::ICommandContext> upload_context_;
   std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> submissions_;
   size_t submission_index_{};

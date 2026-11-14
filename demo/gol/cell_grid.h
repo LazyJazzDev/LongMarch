@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <vector>
 
 #include "application/animation_var.h"
@@ -44,6 +45,9 @@ class CellGrid : public Listener {
   // Binds the cell values and resets every visual to its value.
   void Reset(uint8_t *cells, int width, int height);
 
+  // Large GPU grids retain only hit-test state; clicks enqueue GPU edits.
+  void ResetGPU(int width, int height, std::function<void(int, int)> toggle);
+
   // Top-left corner of cell (0, 0), cell pitch and clip bounds, all in
   // framebuffer pixels. Clears the hover state, as re-laying out buttons did.
   void Layout(glm::vec2 origin, float unit, glm::vec4 clip);
@@ -78,6 +82,7 @@ class CellGrid : public Listener {
   [[nodiscard]] int CellAt(glm::dvec2 window_position) const;
   void SetState(int index, int state);
 
+  std::function<void(int, int)> toggle_;
   uint8_t *cells_{};
   int width_{}, height_{};
   glm::vec2 origin_{};

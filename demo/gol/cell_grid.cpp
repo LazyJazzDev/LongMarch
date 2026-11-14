@@ -55,6 +55,7 @@ CellGrid::~CellGrid() {
 }
 
 void CellGrid::Reset(uint8_t *cells, int width, int height) {
+  toggle_ = {};
   cells_ = cells;
   width_ = width;
   height_ = height;
@@ -62,6 +63,17 @@ void CellGrid::Reset(uint8_t *cells, int width, int height) {
   appearance_.assign(visuals_.size(), 0);
   for (size_t i = 0; i < visuals_.size(); ++i)
     visuals_[i].Reset(cells_[i]);
+  active_ = -1;
+  active_state_ = 0;
+}
+
+void CellGrid::ResetGPU(int width, int height, std::function<void(int, int)> toggle) {
+  cells_ = nullptr;
+  width_ = width;
+  height_ = height;
+  toggle_ = std::move(toggle);
+  visuals_.clear();
+  appearance_.clear();
   active_ = -1;
   active_state_ = 0;
 }
@@ -101,8 +113,10 @@ int CellGrid::CellAt(glm::dvec2 window_position) const {
 void CellGrid::SetState(int index, int state) {
   if (index < 0)
     return;
-  visuals_[index].background.UpdateTarget(float(state));
-  visuals_[index].dirty = true;
+  if (!toggle_) {
+    visuals_[index].background.UpdateTarget(float(state));
+    visuals_[index].dirty = true;
+  }
   if (index == active_)
     active_state_ = state;
 }
@@ -149,8 +163,12 @@ void CellGrid::OnMouseButton(int mouse_button, int state, int mods) {
   if (state == GLFW_PRESS) {
     SetState(index, 2);
   } else if (state == GLFW_RELEASE) {
-    if (active_state_ == 2)
-      cells_[index] = cells_[index] ? 0 : 1;
+    if (active_state_ == 2) {
+      if (toggle_)
+        toggle_(index % width_, index / width_);
+      else
+        cells_[index] = cells_[index] ? 0 : 1;
+    }
     SetState(index, 1);
   }
 }

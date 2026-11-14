@@ -8,6 +8,9 @@
 #endif
 struct Batch {
   uint first_tile;
+  uint x;
+  uint y;
+  uint value;
 };
 
 RHI_UNIFORM(0, 3, Batch, batch);
@@ -68,6 +71,9 @@ uint Halo(uint tile, uint index) {
 uint EdgeCell(uint2 tile, int x, int y) {
   int dx = x < 0 ? -1 : (x >= 256 ? 1 : 0);
   int dy = y < 0 ? -1 : (y >= 256 ? 1 : 0);
+  if (batch.value == 0 && (int(tile.x) + dx < 0 || int(tile.y) + dy < 0 || int(tile.x) + dx >= TILES_AXIS ||
+                           int(tile.y) + dy >= TILES_AXIS))
+    return 0;
   uint neighbor = Tile(tile.x + dx, tile.y + dy);
   if (dx == 0)
     return (Halo(neighbor, (dy < 0 ? 8 : 0) + (uint(x) >> 5)) >> (uint(x) & 31)) & 1;
@@ -118,5 +124,27 @@ uint CachedRow(uint2 tile, int x, int y) {
     }
     // One writer per packed word. Old interior values are in decoded, not cells.
     cells.Store((tile_index * 2048 + index) * 4, result);
+  }
+}
+
+    [numthreads(1, 1, 1)] void Toggle() {
+  uint tile = Tile(batch.x / 256, batch.y / 256);
+  uint address = (tile * 2048 + (batch.y & 255) * 8 + (batch.x & 255) / 32) * 4;
+  cells.Store(address, cells.Load(address) ^ (1u << (batch.x & 31)));
+}
+
+uint Hash(uint v) {
+  v ^= v >> 16;
+  v *= 0x7feb352d;
+  v ^= v >> 15;
+  v *= 0x846ca68b;
+  return v ^ (v >> 16);
+}
+[numthreads(256, 1, 1)] void Fill(uint3 group
+                                  : SV_GroupID, uint lane
+                                  : SV_GroupIndex) {
+  for (uint index = lane; index < 2048; index += 256) {
+    uint word = group.x * 2048 + index;
+    cells.Store(word * 4, batch.value == 0 ? 0 : Hash(word ^ batch.x));
   }
 }

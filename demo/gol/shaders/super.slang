@@ -15,6 +15,7 @@ static const float kDicePlateOffset = 0.43;
 static const float kDicePerspectiveDistance = 0.6;
 
 RHI_BYTE_ADDRESS_BUFFER(0, 0, instance_infos);
+RHI_BYTE_ADDRESS_BUFFER(0, 2, cell_bits);
 RHI_UNIFORM(0, 1, GlobalUniformObject, global_uniform);
 
 struct VSInput {
@@ -99,15 +100,29 @@ float4 CellGridTheme(PSInput input, float sample_size) {
   float samples_per_unit = 0.4 * input.color.z / max(sample_size, 1.0e-6);
   float coverage = saturate(0.5 - (pow(p.x + p.y, 0.125) - 1.0) * samples_per_unit);
   clip(coverage - 1.0 / 512.0);
-  uint packed = instance_infos.Load(input.extra.y + 4 * uint(cell.y * size.x + cell.x));
-  float3 appearance = float3(packed & 1023u, (packed >> 10) & 1023u, (packed >> 20) & 1023u) / 1023.0;
+  float3 appearance;
+  if (input.extra.x == 6) {
+    uint tile = (uint(cell.y) / 256) * 64 + uint(cell.x) / 256;
+    uint word = tile * 2048 + (uint(cell.y) & 255) * 8 + (uint(cell.x) & 255) / 32;
+    uint alive = (cell_bits.Load(word * 4) >> (uint(cell.x) & 31)) & 1;
+    appearance = float3(0.2, 0.48, float(alive));
+  } else {
+    uint packed = instance_infos.Load(input.extra.y + 4 * uint(cell.y * size.x + cell.x));
+    appearance = float3(packed & 1023u, (packed >> 10) & 1023u, (packed >> 20) & 1023u) / 1023.0;
+  }
 
   float scale = 1.0 + length(local_position - float2(-1.0, -1.0)) * 0.15;
   float3 background_color = scale * appearance.x;
   scale = 2.0 - length(local_position - float2(-1.0, -1.0)) * 0.3;
   float4 foreground_color = float4(float3(scale * appearance.y), 1.0) * appearance.z;
   float3 cell_color = background_color * (1.0 - foreground_color.a) + foreground_color.rgb * foreground_color.a;
-  return float4(lerp(float3(input.color.w), cell_color, coverage), 1.0);
+  float fade = 1.0;
+  if (input.extra.x == 6) {
+    float2 edge = min(input.screen_position - input.clip_rect.xy, input.clip_rect.zw - input.screen_position);
+    float width = max(1.0, min(input.clip_rect.z - input.clip_rect.x, input.clip_rect.w - input.clip_rect.y) * 0.06);
+    fade = smoothstep(0.0, width, min(edge.x, edge.y));
+  }
+  return float4(lerp(float3(input.color.w), cell_color, coverage * fade), 1.0);
 }
 
 // A rounded plate with real cutouts. Discard exposes the button background through
@@ -203,6 +218,7 @@ float4 PSMain(PSInput input) : SV_TARGET {
       color = SliderTheme(input);
       break;
     case 2:
+    case 6:
       color = CellGridTheme(input, sample_size);
       break;
     default:

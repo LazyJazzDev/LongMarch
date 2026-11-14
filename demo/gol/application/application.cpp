@@ -113,6 +113,10 @@ void Application::UnregisterListener(Listener *listener) {
     ++listener_revision_;
 }
 
+std::string Application::ShaderSource(const char *name) const {
+  return GetShaderCode(name);
+}
+
 void Application::CustomOnUpdate() {
 }
 
@@ -169,7 +173,8 @@ bool Application::OnInit() {
              "Compile demo shaders"))
     return false;
 
-  const rhi::BindingLayoutDesc draw_layout{{{0, rhi::BINDING_BYTE_ADDRESS_BUFFER}, {1, rhi::BINDING_UNIFORM_BUFFER}}};
+  const rhi::BindingLayoutDesc draw_layout{
+      {{0, rhi::BINDING_BYTE_ADDRESS_BUFFER}, {1, rhi::BINDING_UNIFORM_BUFFER}, {2, rhi::BINDING_BYTE_ADDRESS_BUFFER}}};
   const rhi::BindingLayoutDesc resolve_layout{
       {{0, rhi::BINDING_UNIFORM_BUFFER}, {1, rhi::BINDING_TEXTURE2D}, {2, rhi::BINDING_TEXTURE2D}}};
   rhi::ProgramDesc desc;
@@ -258,6 +263,8 @@ bool Application::OnRender() {
   if (!Check(bool(upload_context_), "Create frame commands"))
     return false;
   auto *context = upload_context_.Get();
+  if (!Check(PrepareScene(context), "Prepare GPU simulation"))
+    return false;
   const bool use_second_frame = second_frame_alpha_ > 0.0f;
   if (use_second_frame && !RenderFrameTarget(context, second_frame_))
     return false;
@@ -332,7 +339,8 @@ bool Application::RenderFrameTarget(rhi::ICommandContext *context, FrameTarget &
 
   const auto extent = target.color_image->GetDesc();
   if (!Check(draw_group_->BindResource(0, target.instance_buffer.Get()) &&
-                 draw_group_->BindResource(1, global_uniform_buffer_.Get()),
+                 draw_group_->BindResource(1, global_uniform_buffer_.Get()) &&
+                 draw_group_->BindResource(2, cell_storage_ ? cell_storage_.Get() : global_uniform_buffer_.Get()),
              "Bind scene resources"))
     return false;
   rhi::RenderingInfo rendering;
