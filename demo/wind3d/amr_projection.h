@@ -10,7 +10,7 @@ struct ProjectionResult {
 
 // CPU reference for the composite operator; used to validate the GPU port.
 // Unit dt/rho: pressure is the velocity-potential correction. Fixed flux on
-// inlet/lateral boundaries, zero potential at the +x outlet. All-fluid only.
+// inlet/lateral boundaries, zero potential at the +x outlet. Closed embedded faces carry no flux; inactive solid cells are pinned.
 ProjectionResult ProjectReference(const Mesh &mesh,
                                   const FaceGradient &gradient,
                                   std::vector<double> &velocity,

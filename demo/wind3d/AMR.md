@@ -56,6 +56,16 @@ them as part of an experiment without a new reason/authorization.
   output at each call, uses Jacobi rather than a scalable multilevel
   preconditioner, and is not yet connected to aircraft advancement or multi-GPU
   halo exchange. No acceleration claim follows from these correctness tests.
+- Embedded boundaries now use 6x6 open-area sampling, quantized 0..255
+  apertures, the 1/8 sliver cutoff, and thin-wall centre-connection probes.
+  A cell is active if any face is open, matching the uniform cut-cell rule.
+  The CPU operator weights fluxes by aperture and pins inactive rows;
+  closed faces are zeroed only after successful projection. Coarse/fine faces
+  intersecting the body are rejected to enforce a fine body-surface region.
+  CPU box tests cover partial apertures, solid cells, projection, and rollback;
+  the actual aircraft with flap/elevator deflection passes constant-pressure
+  force and moment cancellation. Surface friction and advancing an aircraft
+  flow are still not implemented in the adaptive path.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

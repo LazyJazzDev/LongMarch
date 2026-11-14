@@ -56,7 +56,7 @@ bool FaceGradient::Build(const Mesh &mesh) {
   const auto &cells = mesh.Cells();
   const auto &faces = mesh.Faces();
   for (const auto &face : faces) {
-    if (face.low >= 0 && face.high >= 0) {
+    if (face.aperture > 0 && face.low >= 0 && face.high >= 0) {
       if (cells[face.low].width == cells[face.high].width) {
         columns.push_back(face.low);
         weights.push_back(-1 / face.distance);
@@ -72,7 +72,7 @@ bool FaceGradient::Build(const Mesh &mesh) {
             for (int k = mesh.Offsets()[cell]; k < mesh.Offsets()[cell + 1]; ++k) {
               const auto &f = faces[std::abs(mesh.Incidence()[k]) - 1];
               int other = f.low == cell ? f.high : f.low;
-              if (other >= 0)
+              if (other >= 0 && f.aperture > 0)
                 expanded.push_back(other);
             }
           std::sort(expanded.begin(), expanded.end());

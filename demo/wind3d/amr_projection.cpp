@@ -29,7 +29,7 @@ ProjectionResult ProjectReference(const Mesh &mesh,
       double value = 0;
       for (int k = g.Offsets()[f]; k < g.Offsets()[f + 1]; ++k)
         value += g.Weights()[k] * p[g.Columns()[k]];
-      if (faces[f].axis == 0 && faces[f].high < 0)
+      if (faces[f].aperture > 0 && faces[f].axis == 0 && faces[f].high < 0)
         value = -p[faces[f].low] / faces[f].distance;
       face_gradient[f] = value;
     }
@@ -39,7 +39,7 @@ ProjectionResult ProjectReference(const Mesh &mesh,
       double sum = 0;
       for (int k = mesh.Offsets()[i]; k < mesh.Offsets()[i + 1]; ++k) {
         int signed_face = mesh.Incidence()[k], f = std::abs(signed_face) - 1;
-        sum += (signed_face > 0 ? 1 : -1) * faces[f].area * u[f];
+        sum += (signed_face > 0 ? 1 : -1) * faces[f].area * faces[f].aperture * u[f];
       }
       out[i] = -sum;
     }
@@ -47,18 +47,25 @@ ProjectionResult ProjectReference(const Mesh &mesh,
   auto apply = [&](const std::vector<double> &p, std::vector<double> &out) {
     gradient(p);
     negative_divergence(face_gradient, out);
+    for (size_t i = 0; i < n; ++i)
+      if (!mesh.Cells()[i].active)
+        out[i] = p[i];
   };
   negative_divergence(velocity, rhs);
   double norm = std::sqrt(Dot(rhs, rhs));
   if (!std::isfinite(norm))
     return result;
   if (norm == 0) {
+    for (size_t f = 0; f < faces.size(); ++f)
+      if (faces[f].aperture == 0)
+        velocity[f] = 0;
     potential = x;
     result.converged = true;
     return result;
   }
   for (size_t f = 0; f < faces.size(); ++f) {
     auto face = faces[f];
+    face.area *= face.aperture;
     for (int k = g.Offsets()[f]; k < g.Offsets()[f + 1]; ++k) {
       if (g.Columns()[k] == face.low)
         diagonal[face.low] -= face.area * g.Weights()[k];
@@ -68,6 +75,9 @@ ProjectionResult ProjectReference(const Mesh &mesh,
     if (face.axis == 0 && face.high < 0)
       diagonal[face.low] += face.area / face.distance;
   }
+  for (size_t i = 0; i < n; ++i)
+    if (!mesh.Cells()[i].active)
+      diagonal[i] = 1;
   for (double d : diagonal)
     if (!(d > 0) || !std::isfinite(d))
       return result;
@@ -120,7 +130,7 @@ ProjectionResult ProjectReference(const Mesh &mesh,
   if (result.converged) {
     gradient(x);
     for (size_t f = 0; f < faces.size(); ++f)
-      velocity[f] -= face_gradient[f];
+      velocity[f] = faces[f].aperture > 0 ? velocity[f] - face_gradient[f] : 0;
     potential = std::move(x);
   }
   return result;
