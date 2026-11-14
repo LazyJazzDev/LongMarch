@@ -1,6 +1,8 @@
 if (LONGMARCH_WIND3D_STANDALONE)
     add_executable(wind3d_task EXCLUDE_FROM_ALL task.cpp simulation.cu geometry.cpp)
     target_link_libraries(wind3d_task PRIVATE CUDA::cudart Threads::Threads)
+    add_executable(wind3d_web EXCLUDE_FROM_ALL web_agent.cpp simulation.cu geometry.cpp)
+    target_link_libraries(wind3d_web PRIVATE CUDA::cudart Threads::Threads)
     if (BUILD_TESTING)
         add_test(NAME wind3d_multigpu
             COMMAND ${CMAKE_COMMAND} -DWIND3D_TASK=$<TARGET_FILE:wind3d_task>

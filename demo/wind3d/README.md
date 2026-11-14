@@ -262,3 +262,57 @@ pressure tolerance and export mode. Repeat in alternating order. Compute speedup
 mean step time divided by eight-GPU mean step time. Do not compare different
 resolutions or weaken the pressure tolerance to improve this ratio. The original
 graphics demo remains single-GPU by default.
+
+## Live web console on the login node
+
+The CUDA-only `wind3d_web` worker supports the same wind speed, incidence,
+flap, differential aileron, elevator and rudder controls as the native demo,
+plus pause/resume and reset. The browser displays the actual aircraft mesh,
+instantaneous streamlines, full-grid force and moment, and solver diagnostics.
+Geometry and streamline construction are shared with the native renderer in
+`visualization.h`; the web console does not substitute a different aircraft.
+
+On the login node, start the relay (Python 3 standard library only):
+
+```sh
+python3 demo/wind3d/web/server.py \
+  --directory "$PWD/out/wind3d-web/live" --port 10510
+```
+
+Then submit `meshy-envelope submit demo/wind3d/web.star`. It builds and starts
+the worker on one eight-GPU node at grid 384, with an eight-hour job limit.
+The login service and GPU worker must use the same shared directory. The relay
+binds to `0.0.0.0` by default; use `--bind 127.0.0.1` when accessing it solely
+through an SSH tunnel. This is an interactive cluster service for users who can
+reach the chosen port, not a multi-tenant authenticated web application. POST
+controls require same-origin JSON and are range/finite-value checked on both
+sides. Assets, including Three.js r160 (MIT), are served locally without a CDN.
+
+Only display data crosses the node boundary:
+
+- The solver volume remains on the compute node. Its bounded display snapshot
+  is consumed there to trace the same 84 streamlines as the original renderer.
+  No velocity/pressure volume is written into the shared mailbox or served by HTTP.
+- At most twice per second, the worker atomically replaces `frame.bin`: a padded
+  JSON metadata header and float32 line positions/colors. Typical raw display
+  frames are about 650 KB. Old line frames are discarded, not queued.
+- The original aircraft mesh is published only when its geometry changes.
+  Immutable revision IDs pair each frame with the correct mesh; the latest 32
+  meshes are retained for clients finishing an in-flight fetch. HTTP gzip and a
+  bounded cache reduce browser transfer sizes; ETags skip unchanged frames.
+- Force, moment, time, step, pressure residual and the **applied** controls are
+  from that same completed simulation snapshot. Requested controls are separate;
+  acknowledgements require matching controls, reset generation and pause state.
+  Edits while paused take effect on resume or reset, as in the native demo.
+
+The browser preserves its last image on interruption and explicitly marks it
+stale after five seconds. A worker failure/stoppage is shown rather than being
+presented as live simulation. Starting a replacement worker in the same mailbox
+uses unique mesh revisions and applies the persisted requested controls. After
+the envelope time limit, resubmit `web.star` to begin a new flow history.
+
+Validation: `python3 demo/wind3d/web/test_server.py` checks API persistence,
+invalid controls, same-origin enforcement, ETags and the restricted file surface.
+The worker can also be run as `wind3d_web DIRECTORY GRID GPUS` on an allocated
+GPU node for an independent mailbox integration test. Runtime mailboxes, process
+logs and browser screenshots belong in ignored `out/`, not in the source tree.
