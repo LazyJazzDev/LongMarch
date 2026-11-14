@@ -50,6 +50,7 @@ struct SolverOptions {
   float cfl{0.5f};
   // Publish the downsampled display field; batch runs only need loads.
   bool display{true};
+  bool record_loads{false};
   int devices{1};
   uint64_t stop_after{};
   bool export_field{true};
@@ -97,6 +98,21 @@ struct Snapshot {
   std::shared_ptr<const std::vector<Vertex>> aircraft;
 };
 
+// One instantaneous sample per completed solver step; no display field is retained.
+struct LoadSample {
+  uint64_t step{};
+  double time{};
+  float dt{};
+  Vec3 force{}, moment{};
+  Controls controls;
+};
+
+struct LoadHistory {
+  uint64_t generation{};
+  bool capacity_limited{};
+  std::vector<LoadSample> samples;
+};
+
 // Single worker owns all CUDA state. Published snapshots are immutable: the
 // renderer never waits for a solver step or observes half-written velocity data.
 class Simulation {
@@ -111,6 +127,7 @@ class Simulation {
   bool Paused() const;
   std::shared_ptr<const Snapshot> Latest() const;
   std::string Error() const;
+  LoadHistory RecentLoads() const;
 
  private:
   Simulation();

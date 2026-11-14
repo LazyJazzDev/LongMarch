@@ -12,7 +12,9 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
+
+from loads import WINDOWS, window_packet
 
 BOUNDS = {"speed": (1, 30), "angle": (-20, 25), "flap": (0, 40),
           "aileron": (-25, 25), "elevator": (-25, 25), "rudder": (-25, 25)}
@@ -154,13 +156,48 @@ def make_handler(relay, static):
                 state["error"] = error.read_text() if error.exists() else None
                 self.respond(200, json.dumps(state).encode())
                 return
+            if route == "/api/loads":
+                try:
+                    seconds = float(parse_qs(urlsplit(self.path).query).get("seconds", ["0.25"])[0])
+                    if seconds not in WINDOWS:
+                        raise ValueError("Unsupported history window")
+                except ValueError as error:
+                    self.respond(400, json.dumps({"error": str(error)}).encode())
+                    return
+                try:
+                    path = relay.directory / "loads.bin"
+                    with path.open("rb") as file:
+                        stat = os.fstat(file.fileno())
+                        etag = f'"loads-{stat.st_mtime_ns}-{stat.st_size}-{seconds}"'
+                        if self.headers.get("If-None-Match") == etag:
+                            self.respond(304, b"", headers={"ETag": etag})
+                            return
+                        data = file.read()
+                    compressed = "gzip" in self.headers.get("Accept-Encoding", "")
+                    key = (str(path), etag, compressed)
+                    with relay.cache_lock:
+                        if key not in relay.compressed:
+                            packet = window_packet(data, seconds)
+                            relay.compressed[key] = gzip.compress(packet, compresslevel=1) if compressed else packet
+                            while len(relay.compressed) > 6:
+                                relay.compressed.popitem(last=False)
+                        packet = relay.compressed[key]
+                    headers = {"ETag": etag, "Vary": "Accept-Encoding"}
+                    if compressed:
+                        headers["Content-Encoding"] = "gzip"
+                    self.respond(200, packet, "application/octet-stream", headers)
+                except FileNotFoundError:
+                    self.respond(404, b'{"error":"Waiting for per-step load history"}')
+                except (ValueError, KeyError, struct.error) as error:
+                    self.respond(503, json.dumps({"error": str(error)}).encode())
+                return
             if route == "/api/frame":
                 path = relay.directory / "frame.bin"
             elif re.fullmatch(r"/api/mesh/[0-9]+", route):
                 path = relay.directory / ("mesh-" + route.rsplit("/", 1)[-1] + ".bin")
             else:
                 allowed = {"/": "index.html", "/index.html": "index.html", "/app.js": "app.js",
-                           "/style.css": "style.css", "/vendor/three.module.js": "vendor/three.module.js",
+                           "/style.css": "style.css", "/charts.js": "charts.js", "/vendor/three.module.js": "vendor/three.module.js",
                            "/vendor/OrbitControls.js": "vendor/OrbitControls.js"}
                 if route not in allowed:
                     self.respond(404, b'{"error":"Not found"}')

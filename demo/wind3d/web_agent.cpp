@@ -60,6 +60,7 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, Stop);
   auto options = wind3d::OptimizedSolverOptions();
   options.devices = std::atoi(argv[3]);
+  options.record_loads = true;
   auto simulation = wind3d::Simulation::Create(0, std::atoi(argv[2]), options);
   if (!simulation) {
     Write(directory / "error.txt", "CUDA solver initialization failed");
@@ -70,6 +71,9 @@ int main(int argc, char **argv) {
   uint64_t frame = 0;
   // Unique mesh IDs survive restarting the agent in the same mailbox.
   uint64_t mesh_id = std::chrono::system_clock::now().time_since_epoch().count();
+  const auto run_id = std::to_string(mesh_id);
+  uint64_t published_load_step = 0, published_load_generation = ~uint64_t(0);
+  auto next_loads = std::chrono::steady_clock::now();
   bool paused = false;
   int density = 2;
   wind3d::Controls requested;
@@ -119,6 +123,47 @@ int main(int argc, char **argv) {
     bool actual_paused = simulation->Paused();
     auto state = simulation->Latest();
     auto now = std::chrono::steady_clock::now();
+    if (now >= next_loads) {
+      const auto loads = simulation->RecentLoads();
+      if (!loads.samples.empty() &&
+          (loads.samples.back().step != published_load_step || loads.generation != published_load_generation)) {
+        std::ostringstream header;
+        header << std::setprecision(9) << "{\"version\":1,\"run\":\"" << run_id
+               << "\",\"generation\":" << loads.generation << ",\"count\":" << loads.samples.size()
+               << ",\"stride\":44,\"retention_seconds\":2,\"capacity_limited\":"
+               << (loads.capacity_limited ? "true" : "false") << ",\"controls_events\":[";
+        bool first = true;
+        wind3d::Controls previous;
+        for (const auto &sample : loads.samples) {
+          if (first || !Same(sample.controls, previous)) {
+            if (!first)
+              header << ',';
+            header << "{\"step\":" << sample.step << ",\"time\":" << sample.time << ",\"controls\":";
+            Controls(header, sample.controls);
+            header << '}';
+            previous = sample.controls;
+            first = false;
+          }
+        }
+        header << "]}";
+        auto json = header.str();
+        uint32_t length = uint32_t(json.size());
+        std::string packet(reinterpret_cast<const char *>(&length), sizeof(length));
+        packet += json;
+        for (const auto &sample : loads.samples) {
+          packet.append(reinterpret_cast<const char *>(&sample.step), sizeof(sample.step));
+          packet.append(reinterpret_cast<const char *>(&sample.time), sizeof(sample.time));
+          packet.append(reinterpret_cast<const char *>(&sample.dt), sizeof(sample.dt));
+          packet.append(reinterpret_cast<const char *>(&sample.force), sizeof(sample.force));
+          packet.append(reinterpret_cast<const char *>(&sample.moment), sizeof(sample.moment));
+        }
+        if (!Write(directory / "loads.bin", packet))
+          return 2;
+        published_load_step = loads.samples.back().step;
+        published_load_generation = loads.generation;
+      }
+      next_loads = now + std::chrono::seconds(1);
+    }
     if (state && now >= next) {
       bool changed = state->step != last_step || state->generation != last_generation;
       // Refresh paused metadata as well, so pause acknowledgements and liveness remain visible.

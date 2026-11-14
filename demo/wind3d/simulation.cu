@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
+#include <deque>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -834,6 +835,8 @@ struct Simulation::Impl {
   uint64_t generation{};
   Controls requested;
   std::shared_ptr<const Snapshot> latest;
+  std::deque<LoadSample> load_history;
+  bool load_capacity_limited{};
   std::string error;
   Grid grid{};
   pressure::Solver pressure_solver;
@@ -1263,8 +1266,18 @@ struct Simulation::Impl {
       snapshot->step_seconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
       {
         std::lock_guard<std::mutex> guard(mutex);
-        if (generation == current_generation)
+        if (generation == current_generation) {
+          if (options.record_loads) {
+            load_history.push_back(
+                {snapshot->step, snapshot->time, snapshot->dt, snapshot->force, snapshot->moment, snapshot->controls});
+            while (load_history.size() > 1 && load_history[1].time <= snapshot->time - 2.0)
+              load_history.pop_front();
+            load_capacity_limited = load_history.size() > 65536;
+            if (load_capacity_limited)
+              load_history.pop_front();
+          }
           latest = std::move(snapshot);
+        }
         working = false;
         if (options.stop_after && step >= options.stop_after)
           paused = true;
@@ -1349,6 +1362,8 @@ void Simulation::Reset() {
   {
     std::lock_guard<std::mutex> guard(impl_->mutex);
     ++impl_->generation;
+    impl_->load_history.clear();
+    impl_->load_capacity_limited = false;
   }
   impl_->wake.notify_one();
 }
@@ -1361,6 +1376,12 @@ bool Simulation::Paused() const {
 std::shared_ptr<const Snapshot> Simulation::Latest() const {
   std::lock_guard<std::mutex> guard(impl_->mutex);
   return impl_->latest;
+}
+
+LoadHistory Simulation::RecentLoads() const {
+  std::lock_guard<std::mutex> guard(impl_->mutex);
+  return {impl_->generation, impl_->load_capacity_limited,
+          std::vector<LoadSample>(impl_->load_history.begin(), impl_->load_history.end())};
 }
 
 std::string Simulation::Error() const {

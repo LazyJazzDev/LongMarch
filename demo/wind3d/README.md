@@ -381,3 +381,35 @@ body axes (undoing incidence), plus a metre scale bar that follows zoom and
 viewport size. The bar is calibrated at the orbit target depth; perspective
 means it is not a universal ruler for objects at other depths. The current
 model is 6.00 m long with 6.04 m span; the domain remains 16 × 8 × 12 m.
+
+### Per-step load history
+
+The web worker enables `SolverOptions::record_loads`. Every completed solver step
+records physical time, actual adaptive dt, force (N), moment about the fixed body
+origin (N·m), and applied controls, under the same publication lock as its
+snapshot. The scalar-only ring retains the most recent 2 physical seconds
+(with one boundary sample), capped at 65,536 samples; capacity truncation is
+reported explicitly. Pause creates no duplicate samples, reset clears the ring,
+and run/generation identifiers distinguish restarts. Native viewers do not
+record this history unless requested.
+
+The GPU worker atomically publishes `loads.bin` approximately once per wall-clock
+second, independently of display-frame sampling. Its version-1 binary format is
+a little-endian uint32 JSON header length, the JSON header, then packed 44-byte
+`<Qdf6f` rows (step, time, dt, Fx/Fy/Fz, Mx/My/Mz). No solver-step samples are
+thinned. The relay's `/api/loads?seconds=0.25` selects a complete window from
+0.05, 0.1, 0.25, 0.5, 1 or 2 physical seconds and calculates dt-weighted means,
+standard deviations, extrema and peak-to-peak amplitudes on the backend.
+ETags, gzip and a bounded response cache limit transfer/processing costs.
+
+The page's load-history section replaces both curves with each complete server
+window. It never assembles history from arriving visualization frames. Its
+2-second polling interval affects freshness, not physical sample spacing.
+Select vector magnitude or XYZ components, subtract the backend mean to inspect
+small fluctuations, and hover for individual step/time/dt/load values. Dashed
+lines mark control changes; the status reports actual sample count and dt range.
+Early runs and capacity limits can provide less history than the requested window.
+
+Validation: build `wind3d_load_history` and run CTest `wind3d_load_history` on a
+CUDA node; run `python3 demo/wind3d/web/test_loads.py` and `test_server.py` for
+variable-dt statistics, narrow spikes, window transport, gzip and ETags.

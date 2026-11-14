@@ -6,6 +6,10 @@ if (LONGMARCH_WIND3D_STANDALONE)
     add_executable(wind3d_sweep EXCLUDE_FROM_ALL sweep.cpp simulation.cu geometry.cpp)
     target_link_libraries(wind3d_sweep PRIVATE CUDA::cudart Threads::Threads)
     if (BUILD_TESTING)
+        add_executable(wind3d_load_history EXCLUDE_FROM_ALL load_history_test.cpp simulation.cu geometry.cpp)
+        target_link_libraries(wind3d_load_history PRIVATE CUDA::cudart Threads::Threads)
+        add_test(NAME wind3d_load_history COMMAND wind3d_load_history)
+        set_tests_properties(wind3d_load_history PROPERTIES TIMEOUT 300 RUN_SERIAL TRUE)
         add_test(NAME wind3d_multigpu
             COMMAND ${CMAKE_COMMAND} -DWIND3D_TASK=$<TARGET_FILE:wind3d_task>
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/verify_multigpu.cmake)

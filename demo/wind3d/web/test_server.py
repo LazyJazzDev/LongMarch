@@ -1,3 +1,4 @@
+import gzip
 import json
 import struct
 import tempfile
@@ -83,6 +84,32 @@ class RelayTest(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(request)
         self.assertEqual(error.exception.code, 304)
+
+    def test_load_window_transport(self):
+        from loads import ROW
+        header = json.dumps(dict(version=1, stride=44, count=1000)).encode()
+        body = b"".join(ROW.pack(i, i * .001, .001, i, 2, 3, 4, 5, 6) for i in range(1, 1001))
+        (self.directory / "loads.bin").write_bytes(struct.pack("<I", len(header)) + header + body)
+        request = urllib.request.Request(self.url + "/api/loads?seconds=0.05", headers={"Accept-Encoding": "gzip"})
+        with urllib.request.urlopen(request) as response:
+            self.assertEqual(response.headers["Content-Encoding"], "gzip")
+            etag = response.headers["ETag"]
+            data = gzip.decompress(response.read())
+        length = struct.unpack_from("<I", data)[0]
+        meta = json.loads(data[4:4 + length])
+        rows = list(ROW.iter_unpack(data[4 + length:]))
+        self.assertGreaterEqual(len(rows), 50)
+        self.assertTrue(meta["contiguous"])
+        self.assertEqual(rows[-1][0], 1000)
+        request = urllib.request.Request(self.url + "/api/loads?seconds=0.05", headers={"If-None-Match": etag})
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request)
+        self.assertEqual(error.exception.code, 304)
+        with urllib.request.urlopen(self.url + "/api/loads?seconds=1") as response:
+            self.assertNotEqual(response.headers["ETag"], etag)
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(self.url + "/api/loads?seconds=nan")
+        self.assertEqual(error.exception.code, 400)
 
     def test_only_display_data_is_exposed(self):
         (self.directory / "frame.bin").write_bytes(b"test-frame")
