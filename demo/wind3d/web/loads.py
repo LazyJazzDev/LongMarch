@@ -24,12 +24,21 @@ def window_packet(data, seconds, skip_steps=0):
         header = json.dumps(meta, separators=(',', ':'), allow_nan=False).encode()
         return struct.pack('<I', len(header)) + header
     selected = rows[first:]
+    # The first event describes the retained baseline, not a new input change.
+    events = meta.get('controls_events', [])
+    changes = [event['step'] for event in events[1:]]
+    invalid = set()
+    for step in changes:
+        invalid.update(row[0] for row in selected if step <= row[0] < step + 20)
+    valid = [row for row in selected if row[0] not in invalid]
+    meta.update(invalid_indices=[i for i, row in enumerate(selected) if row[0] in invalid],
+                valid_count=len(valid), change_skip_steps=20)
     # Weighted online variance remains accurate even for tiny fluctuations on a large mean.
     names = ('norm', 'x', 'y', 'z')
     stats = {kind: {name: dict(mean=0.0, min=math.inf, max=-math.inf, std=0.0)
                     for name in names} for kind in ('force', 'moment')}
     weight = 0.0
-    for row in selected:
+    for row in valid:
         dt = max(0.0, min(row[2], row[1] - cutoff))
         new_weight = weight + dt
         for kind, vector in (('force', row[3:6]), ('moment', row[6:9])):
@@ -46,6 +55,8 @@ def window_packet(data, seconds, skip_steps=0):
         for stat in group.values():
             stat['std'] = math.sqrt(max(0.0, stat['std'] / weight)) if weight else 0.0
             stat['peak_to_peak'] = stat['max'] - stat['min']
+            if not valid:
+                stat.update(mean=None, min=None, max=None, std=None, peak_to_peak=None)
     events = meta.get('controls_events', [])
     active = [event for event in events if event['step'] <= selected[0][0]]
     meta['controls_events'] = active[-1:] + [event for event in events if event['step'] > selected[0][0]]

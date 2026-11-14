@@ -423,3 +423,10 @@ supports 0/5/20/50/100; zero restores the complete raw history. The relay applie
 `skip_steps` before statistics and returns an explicit warm-up state if no
 eligible samples exist yet. This is a configurable startup exclusion, not an
 outlier detector: later spikes are retained. Raw worker history is unchanged.
+
+Input-control transitions also mask the first 20 steps using the backend's
+applied-control events (the first event is only the retained baseline). Masked
+samples retain their timestamps and raw values but carry `invalid_indices`;
+all statistics exclude them. The browser draws a gap without bridging it,
+reports null on hover, and handles a completely masked window with empty axes.
+Repeated changes extend the gap; display-density changes do not trigger it.

@@ -64,6 +64,24 @@ class HistoryWindowTest(unittest.TestCase):
         self.assertTrue(warm['warming_up'])
         self.assertEqual(warm['generation'], 4)
 
+    def test_control_changes_leave_twenty_step_gaps(self):
+        rows = [(i, i*.001, .001, 100000 if 30 <= i < 65 else 1, 0, 0, 0, 0, 0) for i in range(1, 81)]
+        events = [dict(step=i, time=i*.001, controls={'speed': j}) for j, i in enumerate((1, 30, 45))]
+        meta, samples = unpack(window_packet(packet(rows, events=events), .1, 20))
+        self.assertEqual([samples[i][0] for i in meta['invalid_indices']], list(range(30, 65)))
+        self.assertEqual(meta['valid_count'], 25)
+        self.assertEqual(meta['statistics']['force']['x']['max'], 1)
+        self.assertEqual(len(samples), 60)
+        # A change preceding the requested window still masks the remaining steps.
+        meta, samples = unpack(window_packet(packet(rows[:60], events=events), .01, 20))
+        self.assertEqual(meta['valid_count'], 0)
+        self.assertIsNone(meta['statistics']['force']['x']['min'])
+        self.assertEqual(len(meta['invalid_indices']), len(samples))
+        # A retained baseline at step 100 is not an input change.
+        rows = [(i, i*.001, .001, 1, 0, 0, 0, 0, 0) for i in range(100, 110)]
+        meta, _ = unpack(window_packet(packet(rows, events=[dict(step=100, time=.1)]), .1, 20))
+        self.assertEqual(meta['invalid_indices'], [])
+
     def test_invalid_packet_rejected(self):
         rows = [(1, .001, .001, 0, 0, 0, 0, 0, 0)]
         with self.assertRaises(ValueError):
