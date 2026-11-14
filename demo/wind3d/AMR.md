@@ -35,6 +35,17 @@ them as part of an experiment without a new reason/authorization.
   tangential directions, so a two-point graph alone is not an acceptable
   second-order composite pressure discretization. Transverse reconstruction
   and manufactured pressure tests remain mandatory before solver integration.
+- `amr_gradient` reconstructs normal pressure derivatives at coarse/fine face
+  centres from a scaled quadratic least-squares stencil over two cell rings.
+  Tests verify all ten polynomial basis fields through degree two, and cubic
+  max-error reduction of 0.137310 -> 0.034328 when cell width halves.
+- `amr_projection` is a CPU all-fluid reference with fixed boundary fluxes and
+  zero pressure correction at the outlet. Right-preconditioned BiCGStab handles
+  the nonsymmetric reconstruction; convergence checks use the actual residual.
+  The manufactured-velocity test converges in 59 iterations to 7.69e-10 relative
+  residual and checks independent divergence reduction, fixed boundary fluxes
+  and no mutation on nonconvergence. This is not yet the GPU projection, a
+  cut-cell aircraft solve, or an energy/long-time stability validation.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
