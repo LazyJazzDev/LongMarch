@@ -87,7 +87,33 @@ function geometry(array,stride,normal){
   result.computeBoundingSphere(); return result;
 }
 new ResizeObserver(()=>{const box=$('viewport');renderer.setSize(box.clientWidth,box.clientHeight,false);camera.aspect=box.clientWidth/box.clientHeight;camera.updateProjectionMatrix();}).observe($('viewport'));
-function render(){requestAnimationFrame(render);orbit.update();renderer.render(scene,camera);}render();
+let modelDimensions=null, previousScale='';
+function measureModel(mesh,angle){
+  // Undo incidence so pitch does not change the model's longitudinal length.
+  const positions=mesh.attributes.position,a=angle*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+  const minimum=[Infinity,Infinity,Infinity],maximum=[-Infinity,-Infinity,-Infinity];
+  for(let i=0;i<positions.count;i++){
+    const x=positions.getX(i),y=positions.getY(i),p=[c*x-s*y,s*x+c*y,positions.getZ(i)];
+    for(let k=0;k<3;k++){minimum[k]=Math.min(minimum[k],p[k]);maximum[k]=Math.max(maximum[k],p[k]);}
+  }
+  modelDimensions={length:maximum[0]-minimum[0],span:maximum[2]-minimum[2],height:maximum[1]-minimum[1]};
+  $('model-size').textContent=`模型长度 ${modelDimensions.length.toFixed(2)} m · 翼展 ${modelDimensions.span.toFixed(2)} m`;
+}
+function updateScale(){
+  const height=renderer.domElement.clientHeight;
+  if(!height)return;
+  const metersPerPixel=2*camera.position.distanceTo(orbit.target)*Math.tan(camera.fov*Math.PI/360)/height;
+  const target=120*metersPerPixel,base=10**Math.floor(Math.log10(target)),ratio=target/base;
+  const meters=(ratio>=5?5:ratio>=2?2:1)*base,pixels=meters/metersPerPixel;
+  const key=`${meters}-${pixels.toFixed(1)}`;
+  if(key!==previousScale){
+    $('scale-bar').style.width=`${pixels.toFixed(1)}px`;
+    $('scale-label').textContent=`${Number(meters.toPrecision(3))} m`;
+    $('scale-bar').dataset.meters=meters;$('scale-bar').dataset.metersPerPixel=metersPerPixel;
+    previousScale=key;
+  }
+}
+function render(){requestAnimationFrame(render);orbit.update();updateScale();renderer.render(scene,camera);}render();
 function updateNumbers(meta,bytes){
   $('hardware').textContent=`单节点 · ${meta.gpus} GPU`;
   $('step').textContent=meta.step.toLocaleString();$('time').textContent=`${meta.time.toFixed(3)} s`;
@@ -123,13 +149,13 @@ async function getFrame(){
       transferred+=Number(meshResponse.headers.get('Content-Length'))||meshBuffer.byteLength;meshGeometry=geometry(new Float32Array(meshBuffer),9,true);
     }
     const lines=geometry(new Float32Array(buffer,4+length),6,false);
-    if(meshGeometry){aircraft.geometry.dispose();aircraft.geometry=meshGeometry;meshID=meta.mesh;}
+    if(meshGeometry){aircraft.geometry.dispose();aircraft.geometry=meshGeometry;meshID=meta.mesh;measureModel(meshGeometry,meta.controls.angle);}
     flow.material.opacity=.72/(meta.streamline_density??1);
     flow.geometry.dispose();flow.geometry=lines;flow.geometry.setDrawRange(0,$('flow').checked?Infinity:70);
     arrow(forceArrow,meta.force);arrow(momentArrow,meta.moment);loads.visible=$('loads').checked;
     packetMeta=meta;transferred+=Number(response.headers.get('Content-Length'))||buffer.byteLength;frameTag=response.headers.get('ETag');
     updateNumbers(meta,buffer.byteLength);showError('');
-    window.wind3dState={meta,domainBounds:[meta.domain_min,meta.domain_max],meshVertices:aircraft.geometry.attributes.position.count,lineVertices:lines.attributes.position.count};
+    window.wind3dState={meta,modelDimensions,domainBounds:[meta.domain_min,meta.domain_max],meshVertices:aircraft.geometry.attributes.position.count,lineVertices:lines.attributes.position.count};
   } catch(error){showError(`显示数据请求失败，正在重试：${error.message}`);}
   finally {setTimeout(getFrame,2000);}
 }

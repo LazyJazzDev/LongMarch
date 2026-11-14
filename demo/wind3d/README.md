@@ -375,3 +375,9 @@ preserving streamline seeds and leaving simulation fields and loads unchanged.
 It caches the compressed representation separately from the original packet.
 Requests are serial and wait two seconds after each transfer to avoid filling
 a slow tunnel with display updates. Meshes are still transferred only on change.
+
+The viewport shows model length and span measured from the received mesh in
+body axes (undoing incidence), plus a metre scale bar that follows zoom and
+viewport size. The bar is calibrated at the orbit target depth; perspective
+means it is not a universal ruler for objects at other depths. The current
+model is 6.00 m long with 6.04 m span; the domain remains 16 × 8 × 12 m.
