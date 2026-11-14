@@ -68,6 +68,21 @@ them as part of an experiment without a new reason/authorization.
   flow are still not implemented in the production adaptive path. Job 2000954
   passed all six tests and CUDA memcheck, including embedded CPU/GPU velocity
   agreement to 3.13e-9 and true relative residual 6.98e-10.
+- `amr_transport` supplies a CPU sparse-MAC sampler and midpoint tracing.
+  Coincident native faces retain their values; cross-level virtual faces use
+  bounded linear reconstruction, with aperture-weighted trilinear sampling.
+  Monotone cubic transported values are optional; tracing stays trilinear.
+  Tests preserve constant flow and exactly translate analytic shear across
+  levels; smooth-wave squared transport error was 0.0182403 (linear) versus
+  0.000097015 (cubic) in the tested uniform region. These isolated tests do not
+  establish equivalence of near-wall transport to the uniform solver.
+- `AdvanceReference` now couples CPU transport, boundary conditions and
+  projection, recovers physical pressure using rho/dt, and integrates pressure
+  forces/moments. Three small steps around the actual aircraft on a two-level
+  mesh pass a finite-state/projection smoke test. This is an inviscid CPU
+  reference, not the final solver: slip extensions, MacCormack correction,
+  viscosity, wall friction, sponge, GPU transport, dynamic regridding and
+  long-time load equivalence remain required.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
