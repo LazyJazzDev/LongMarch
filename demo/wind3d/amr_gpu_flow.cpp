@@ -181,6 +181,28 @@ bool GpuFlow::Regrid(const Topology &tree) {
   return true;
 }
 
+bool GpuFlow::Adapt(const RefinementOptions &options, RefinementReport &report) {
+  if (!impl_) {
+    error_ = "GPU flow is not initialized";
+    return false;
+  }
+  std::vector<double> velocity;
+  if (!impl_->DownloadVelocity(velocity)) {
+    error_ = impl_->error;
+    return false;
+  }
+  Topology next;
+  RefinementReport pending;
+  if (!PlanRefinement(impl_->mesh, impl_->tree, velocity, impl_->width, impl_->origin, options, next, pending)) {
+    error_ = "Refinement planning failed: invalid data or capacity exhausted";
+    return false;
+  }
+  if (!Regrid(next))
+    return false;
+  report = pending;
+  return true;
+}
+
 AdvanceResult GpuFlow::Advance(double dt, double speed, const FlowParameters &parameters) {
   if (!impl_) {
     error_ = "GPU flow is not initialized";

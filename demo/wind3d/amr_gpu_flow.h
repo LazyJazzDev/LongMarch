@@ -5,6 +5,7 @@
 #include <string>
 
 #include "amr_advance.h"
+#include "amr_refinement.h"
 
 namespace wind3d::amr {
 struct FlowParameters {
@@ -47,6 +48,9 @@ class GpuFlow {
   // storage, then commits. Remap potential is discarded; pressure_valid remains
   // false until the next successful physical step. Time and step count persist.
   bool Regrid(const Topology &tree);
+  // Explicit adaptation interval: downloads velocity for the host policy, then
+  // uses the transactional regrid path. Report is committed only on success.
+  bool Adapt(const RefinementOptions &options, RefinementReport &report);
   AdvanceResult Advance(double dt, double speed, const FlowParameters &parameters = {});
   bool Readback(FlowSnapshot &snapshot) const;
   FlowInfo Info() const;

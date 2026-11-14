@@ -143,8 +143,8 @@ them as part of an experiment without a new reason/authorization.
   Refine/coarsen face roundtrip errors are 1.11e-16; post-transfer projection
   gives max divergence <=1.76e-9 in the tested fields. The transfer itself is
   not divergence-free: its caller must project, and that correction potential
-  must not be interpreted as physical pressure. Refinement indicators and
-  load equivalence through regrids remain pending.
+  must not be interpreted as physical pressure. Load equivalence through
+  regrids remains pending.
 - `GpuFlow` owns the resident flow and replaces it transactionally on regrid:
   temporary topology/geometry and GPU operators, conservative transfer,
   projection, then commit. It retains physical time and step count, increments
@@ -156,9 +156,22 @@ them as part of an experiment without a new reason/authorization.
   Job 2000973 passed transfer and runtime GPU lifecycle tests and CUDA memcheck
   (zero errors); the preceding full run passed the other 13 tests. Tested
   refinement/coarsening preserves freestream and gives maximum post-regrid
-  divergence 2.10e-11 around an embedded box. Automatic refinement policy,
-  production UI integration, multi-GPU ownership and steady-load/performance
-  validation remain outstanding.
+  divergence 2.10e-11 around an embedded box. Production UI integration,
+  multi-GPU ownership and steady-load/performance validation remain outstanding.
+- `ProtectedTopology` and `PlanRefinement` add body protection and flow-driven
+  hierarchy selection. Protected physical boxes stay at the finest spacing;
+  existing cut-cell blocks retain their level. A dimensionless cell-scale
+  velocity variation indicator requests one-level refinement, retains levels
+  between two thresholds, and permits one-level coarsening below the lower
+  threshold. Configurable neighboring-block padding and 2:1 balancing provide
+  spatial buffers. Capacity failures leave the plan and report unchanged.
+  `GpuFlow::Adapt` runs this policy at an explicit adaptation interval and uses
+  transactional regridding. It currently downloads velocity for the host policy;
+  thresholds are heuristic defaults, not a certified 2% load-error bound.
+  Job 2000974 passed policy, transfer and GPU lifecycle tests and CUDA memcheck
+  (zero errors); direct strict C++ and ASan/UBSan policy tests also passed.
+  Production scheduling, real-aircraft protected bounds, adaptive histories,
+  performance tuning and the uniform-reference acceptance matrix remain pending.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

@@ -85,6 +85,32 @@ int Run() {
       return 16;
     if (!flow.Advance(.01, 1).advanced || !flow.Readback(state) || !state.info.pressure_valid || state.info.steps != 3)
       return 17;
+    before = state;
+    RefinementOptions options;
+    options.max_level = 1;
+    options.capacity = 64;
+    options.buffer_blocks = 0;
+    if (body)
+      options.protected_regions.push_back({{-.8, -.3, -.3}, {-.2, .3, .3}});
+    RefinementReport report;
+    if (!flow.Adapt(options, report) || !flow.Readback(state)) {
+      std::cerr << flow.Error() << '\n';
+      return 18;
+    }
+    if (state.info.steps != before.info.steps || state.info.time != before.info.time ||
+        report.new_blocks != state.info.blocks || report.old_blocks != before.info.blocks ||
+        state.info.generation != before.info.generation + size_t(report.changed))
+      return 19;
+    if (report.changed && state.info.pressure_valid)
+      return 20;
+    before = state;
+    auto saved_report = report;
+    options.capacity = 1;
+    if (flow.Adapt(options, report) || !flow.Readback(state) || !Same(before, state) ||
+        report.new_blocks != saved_report.new_blocks)
+      return 21;
+    if (!flow.Advance(.01, 1).advanced)
+      return 22;
   }
   std::cout << "PASS transactional runtime GPU regrids, body preservation, clock continuity and pressure validity\n";
   return 0;
