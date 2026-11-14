@@ -14,6 +14,16 @@ struct Sum {
   double area{}, open{}, flux{};
 };
 
+// Flux equality alone can hide a changed wall distance and friction law.
+// Keep all fluid-adjacent cut faces at identical resolution during regrids.
+std::map<std::array<double, 5>, double> WallFaces(const Mesh &mesh) {
+  std::map<std::array<double, 5>, double> result;
+  for (const auto &f : mesh.Faces())
+    if (f.aperture < 1 && ((f.low >= 0 && mesh.Cells()[f.low].active) || (f.high >= 0 && mesh.Cells()[f.high].active)))
+      result[{double(f.axis), f.centre[0], f.centre[1], f.centre[2], f.area}] = f.aperture;
+  return result;
+}
+
 bool Near(double a, double b, double scale) {
   return std::abs(a - b) <= 1e-10 * scale;
 }
@@ -65,6 +75,8 @@ bool TransferVelocity(const Mesh &source,
   for (double u : velocity)
     if (!std::isfinite(u))
       return false;
+  if (WallFaces(source) != WallFaces(target))
+    return false;
   const int64_t max_scale = int64_t(1) << std::max(source_tree.MaxLevel(), target_tree.MaxLevel());
   double unit = width / (source.CellsPerBlock() * double(max_scale));
   std::map<Key, size_t> native;

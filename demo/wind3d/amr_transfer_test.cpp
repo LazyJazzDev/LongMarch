@@ -102,5 +102,13 @@ int main() {
   for (size_t i = 0; i < mapped.size(); ++i)
     if (fine.Faces()[i].aperture == 0 && mapped[i] != 0)
       return 20;
+  // Even equal aggregate apertures must not permit a changed wall spacing.
+  if (!coarse.Embed([](std::array<double, 3> p) {
+        return std::max({std::abs(p[0] + .5), std::abs(p[1]), std::abs(p[2])}) - .21;
+      }))
+    return 21;
+  saved = mapped;
+  if (TransferVelocity(mixed, mixed_tree, u, coarse, coarse_tree, 1, {-1, -1, -1}, mapped) || mapped != saved)
+    return 22;
   std::cout << "PASS conservative transfer, constant preservation, post-transfer projection and rollback\n";
 }

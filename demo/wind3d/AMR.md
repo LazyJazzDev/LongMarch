@@ -136,14 +136,29 @@ them as part of an experiment without a new reason/authorization.
 - `TransferVelocity` supplies a host-side conservative regrid path. It sums
   open-face flux on coarsening and uses bounded, flux-recentered reconstruction
   on refinement; newly introduced interior faces use the old sparse sampler.
-  Changed cut-face open areas are rejected transactionally. Direct strict C++
+  Changes to fluid-adjacent cut-face locations, areas or apertures are rejected
+  transactionally, preserving wall spacing even when aggregate fluxes match. Direct strict C++
   and ASan/UBSan tests pass: constant preservation, moved refinement, unchanged
   embedded surfaces, changed-body rejection, no new extrema and failure rollback.
   Refine/coarsen face roundtrip errors are 1.11e-16; post-transfer projection
   gives max divergence <=1.76e-9 in the tested fields. The transfer itself is
   not divergence-free: its caller must project, and that correction potential
-  must not be interpreted as physical pressure. Runtime GPU state replacement,
-  refinement indicators and load equivalence through regrids remain pending.
+  must not be interpreted as physical pressure. Refinement indicators and
+  load equivalence through regrids remain pending.
+- `GpuFlow` owns the resident flow and replaces it transactionally on regrid:
+  temporary topology/geometry and GPU operators, conservative transfer,
+  projection, then commit. It retains physical time and step count, increments
+  grid generation, and invalidates/zeros pressure until the next physical step.
+  Failed initialization or regrid preserves the old flow. Explicit snapshots
+  are copies; no mutable internal geometry/device buffers are exposed.
+  Lifecycle testing found that equal aggregate apertures could still permit a
+  coarser wall distance; transfer now rejects that case, with a regression test.
+  Job 2000973 passed transfer and runtime GPU lifecycle tests and CUDA memcheck
+  (zero errors); the preceding full run passed the other 13 tests. Tested
+  refinement/coarsening preserves freestream and gives maximum post-regrid
+  divergence 2.10e-11 around an embedded box. Automatic refinement policy,
+  production UI integration, multi-GPU ownership and steady-load/performance
+  validation remain outstanding.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
