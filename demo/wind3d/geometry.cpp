@@ -5,7 +5,7 @@
 namespace wind3d {
 namespace {
 constexpr float pi = 3.14159265359f;
-const Vec3 skin{0.72f, 0.79f, 0.87f};
+const Vec3 skin{0.78f, 0.78f, 0.78f};
 
 Vec3 Normalize(Vec3 v) {
   return Scale(v, 1 / std::max(Length(v), 1e-12f));
@@ -28,10 +28,9 @@ class MeshBuilder {
                      : part == 2 ? Vec3{0.45f, 0.61f, 0.72f}
                      : part == 4 ? Vec3{0.48f, 0.65f, 0.59f}
                                  : Vec3{0.35f, 0.49f, 0.69f};
-        Foil(AircraftPart(part, side, controls_), color, part == 5 ? Vec3{0.035f, 0.15f, 0.32f} : skin);
+        Foil(AircraftPart(part, side, controls_), color, skin);
       }
       Nacelle(side);
-      CabinDetails(side);
     }
     return std::move(vertices_);
   }
@@ -56,7 +55,7 @@ class MeshBuilder {
     Triangle(a, c, d);
   }
 
-  Vertex BodyVertex(float x, float phi, Vec3 color, float offset = 0) const {
+  Vertex BodyVertex(float x, float phi) const {
     Vec3 p = FuselagePoint(x, phi);
     Vec3 dx =
         Add(FuselagePoint(std::min(3.0f, x + 0.001f), phi), Scale(FuselagePoint(std::max(-3.0f, x - 0.001f), phi), -1));
@@ -64,61 +63,18 @@ class MeshBuilder {
     Vec3 n = Unit(Cross(dp, dx));
     if (std::abs(x) >= 3)
       n = {x < 0 ? -1.0f : 1.0f, 0, 0};
-    return MakeVertex(Add(p, Scale(n, offset)), n, color);
+    return MakeVertex(p, n, skin);
   }
 
   void Fuselage() {
     constexpr int rings = 160, slices = 96;
     auto point = [&](int ring, int segment) {
       float x = -3 + 6.0f * ring / rings, phi = 2 * pi * segment / slices;
-      Vec3 color = cosf(phi) < -0.65f ? Vec3{0.045f, 0.13f, 0.24f} : Vec3{0.86f, 0.88f, 0.90f};
-      return BodyVertex(x, phi, color);
+      return BodyVertex(x, phi);
     };
     for (int i = 0; i < rings; ++i)
       for (int j = 0; j < slices; ++j)
         Quad(point(i, j), point(i + 1, j), point(i + 1, (j + 1) % slices), point(i, (j + 1) % slices));
-  }
-
-  void CabinDetails(int side) {
-    // Paint/flush glazing lies on the explicit fuselage; it adds no fake solid
-    // obstacles to the aerodynamic boundary. Small offsets avoid depth fighting.
-    const Vec3 glass{0.015f, 0.045f, 0.075f}, trim{0.20f, 0.26f, 0.31f};
-    auto patch = [&](float x, float phi, float rx, float rp) {
-      auto center = BodyVertex(x, side * phi, glass, 0.001f);
-      for (int i = 0; i < 24; ++i) {
-        float a = 2 * pi * i / 24, b = 2 * pi * (i + 1) / 24;
-        Triangle(center, BodyVertex(x + rx * cosf(a), side * (phi + rp * sinf(a)), glass, 0.001f),
-                 BodyVertex(x + rx * cosf(b), side * (phi + rp * sinf(b)), glass, 0.001f));
-      }
-    };
-    for (int i = 0; i < 23; ++i)
-      patch(-1.75f + i * 0.14f, 1.17f, 0.029f, 0.11f);
-    // Tessellated trapezoidal cockpit panes follow the nose skin. A single
-    // planar quad would sink into the convex fuselage and disappear.
-    auto pane = [&](Vec3 a, Vec3 b, Vec3 c, Vec3 d) {
-      auto point = [&](int i, int j) {
-        float u = i / 8.0f, v = j / 8.0f;
-        Vec3 q = Add(Scale(Add(Scale(a, 1 - u), Scale(b, u)), 1 - v), Scale(Add(Scale(d, 1 - u), Scale(c, u)), v));
-        return BodyVertex(q.x, side * q.y, glass, 0.001f);
-      };
-      for (int i = 0; i < 8; ++i)
-        for (int j = 0; j < 8; ++j)
-          Quad(point(i, j), point(i + 1, j), point(i + 1, j + 1), point(i, j + 1));
-    };
-    pane({-2.70f, 0.28f, 0}, {-2.52f, 0.34f, 0}, {-2.50f, 0.72f, 0}, {-2.69f, 0.68f, 0});
-    pane({-2.65f, 0.76f, 0}, {-2.48f, 0.80f, 0}, {-2.39f, 1.12f, 0}, {-2.58f, 1.10f, 0});
-    pane({-2.54f, 1.14f, 0}, {-2.37f, 1.16f, 0}, {-2.24f, 1.37f, 0}, {-2.43f, 1.40f, 0});
-    for (float x : {-1.96f, 1.63f}) {
-      for (int i = 0; i < 32; ++i) {
-        float a = 2 * pi * i / 32, b = 2 * pi * (i + 1) / 32;
-        auto outline = [&](float t, float scale) {
-          return BodyVertex(x + 0.055f * scale * std::copysign(std::pow(std::abs(cosf(t)), 0.35f), cosf(t)),
-                            side * (1.6f + 0.58f * scale * std::copysign(std::pow(std::abs(sinf(t)), 0.35f), sinf(t))),
-                            trim, 0.0012f);
-        };
-        Quad(outline(a, 1), outline(b, 1), outline(b, 0.94f), outline(a, 0.94f));
-      }
-    }
   }
 
   void Nacelle(int side) {
@@ -129,13 +85,12 @@ class MeshBuilder {
     auto point = [&](float t, float phi, int surface) {
       Vec3 p = NacellePoint(t, phi, side, surface);
       float a = std::max(0.0f, t - 0.0005f), b = std::min(1.0f, t + 0.0005f);
-      float slope = (NacelleRadius(b, surface) - NacelleRadius(a, surface)) / (0.9f * (b - a));
+      float slope = (NacelleRadius(b, surface) - NacelleRadius(a, surface)) / (nacelle_length * (b - a));
       Vec3 radial{0, cosf(phi), sinf(phi)};
       Vec3 n = Scale(Add(Scale(Vec3{1, 0, 0}, -slope), radial), float(surface));
       if (t <= 0)
         n = {-1, 0, 0};
-      Vec3 color = surface < 0 ? Vec3{0.05f, 0.06f, 0.07f} : t < 0.06f ? Vec3{0.48f, 0.51f, 0.55f} : skin;
-      return MakeVertex(p, n, color);
+      return MakeVertex(p, n, skin);
     };
     for (int surface : {-1, 1})
       for (int i = 0; i < rings; ++i)

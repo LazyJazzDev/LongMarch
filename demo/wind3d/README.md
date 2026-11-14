@@ -353,3 +353,11 @@ The port's eight-H200 replay reproduced that reference at CSV precision:
 Fx 107.986 N, Fy 852.039 N, CL 0.384566, CD 0.048739, L/D 7.8903
 over 0.55008–0.70007 s (7,910 steps). The 1/2/4/8-GPU regression also
 compares per-step loads as well as full/final-export fields.
+
+The current `high-bypass-v2` geometry uses a neutral gray skin, with colors only
+on flap, aileron, elevator and rudder surfaces. Decorative glazing, door outlines,
+belly/tail paint and inlet/duct tinting are removed. The pylons are 0.18 m high
+(previously 0.32 m); the unpowered flow-through nacelles use a larger rounded
+inlet, a short 0.83 m fan cowl and a contracted aft body. Rendering and the solver
+share these profiles. The reference coefficients above describe the earlier
+imported geometry, not this revised engine installation.

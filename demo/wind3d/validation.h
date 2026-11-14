@@ -9,7 +9,7 @@
 
 namespace wind3d {
 // Cross-check the actual explicit mesh against the independent occupancy path,
-// including combined extreme deflections. Glazing/paint has a 1.2 mm offset.
+// including combined extreme deflections.
 inline bool ValidateGeometry() {
   const Controls poses[] = {{12, 5, 0, 0, 0, 0}, {12, -20, 40, 25, -25, 25}, {12, 25, 0, -25, 25, -25}};
   float maximum = 0;

@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
              << ",\"ack\":" << (acknowledged ? request : 0) << ",\"line_vertices\":" << lines.size()
              << ",\"mesh_vertices\":" << mesh->size() << ",\"controls\":";
         Controls(json, state->controls);
-        json << ",\"solver_model\":\"optimized-13ea18de\",\"force\":";
+        json << ",\"solver_model\":\"optimized-13ea18de\",\"geometry_model\":\"high-bypass-v2\",\"force\":";
         Vector(json, state->force);
         json << ",\"moment\":";
         Vector(json, state->moment);

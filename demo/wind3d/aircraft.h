@@ -147,9 +147,9 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
             true,
             false};
   // The pylon root sits inside the nacelle's upper wall, clear of the duct.
-  return {{{0, -0.41f, side * 0.92f}, ex, {0, 0, 1}, {0, 1, 0}, 0.32f, 0.48f, 0.58f, -0.85f, 0.94f, 0, 0, 0.12f},
+  return {{{0, -0.26f, side * 0.92f}, ex, {0, 0, 1}, {0, 1, 0}, 0.18f, 0.48f, 0.58f, -0.95f, 0.94f, 0, 0, 0.12f},
           0,
-          0.32f,
+          0.18f,
           0,
           false,
           false};
@@ -220,16 +220,19 @@ WIND3D_HD float PartDistance(Vec3 body, const FoilPart &part) {
 
 // Flow-through nacelle, as in an unpowered wind-tunnel model: an annular
 // duct whose wall has an elliptical inlet lip and a thin trailing edge.
-// t runs from the inlet highlight (0) to the exit (1); x = -1.3 + 0.9 t.
+// Short, large-diameter fan cowl with a rounded inlet and contracted aft body.
+// The open duct remains unpowered; no fan thrust is added to the flow model.
+constexpr float nacelle_inlet = -1.3f, nacelle_length = 0.83f, nacelle_y = -0.50f;
+
 WIND3D_HD float NacelleMean(float t) {
-  return 0.155f + 0.010f * sinf(3.14159265359f * t) - 0.025f * t;
+  return 0.235f + 0.018f * sinf(3.14159265359f * t) - 0.085f * Smooth((t - 0.35f) / 0.65f);
 }
 
 WIND3D_HD float NacelleHalfThickness(float t) {
   float lip = fminf(fmaxf(t / 0.08f, 0), 1);
   // The last fifth tapers the wall to a thin exit trailing edge.
   float exit = 1 - 0.7f * Smooth((t - 0.8f) / 0.2f);
-  return 0.022f * sqrtf(lip * (2 - lip)) * (1 - 0.45f * t) * exit;
+  return 0.032f * sqrtf(lip * (2 - lip)) * (1 - 0.45f * t) * exit;
 }
 
 // surface: +1 outer skin, -1 duct wall.
@@ -239,7 +242,7 @@ WIND3D_HD float NacelleRadius(float t, int surface) {
 
 WIND3D_HD Vec3 NacellePoint(float t, float phi, int side, int surface) {
   float r = NacelleRadius(t, surface);
-  return {-1.3f + 0.9f * t, -0.54f + r * cosf(phi), side * 0.92f + r * sinf(phi)};
+  return {nacelle_inlet + nacelle_length * t, nacelle_y + r * cosf(phi), side * 0.92f + r * sinf(phi)};
 }
 
 // Aircraft components for load breakdowns.
@@ -268,9 +271,10 @@ WIND3D_HD float AircraftDistance(Vec3 world, const Controls &controls, int &comp
                                                                 : part == 5 ? kVerticalTail
                                                                             : kNacelle);
     }
-    float t = fminf(fmaxf((p.x + 1.3f) / 0.9f, 0), 1);
-    float y = p.y + 0.54f, z = p.z - side * 0.92f;
-    keep(fmaxf(fabsf(sqrtf(y * y + z * z) - NacelleMean(t)) - NacelleHalfThickness(t), fmaxf(-1.3f - p.x, p.x + 0.4f)),
+    float t = fminf(fmaxf((p.x - nacelle_inlet) / nacelle_length, 0), 1);
+    float y = p.y - nacelle_y, z = p.z - side * 0.92f;
+    keep(fmaxf(fabsf(sqrtf(y * y + z * z) - NacelleMean(t)) - NacelleHalfThickness(t),
+               fmaxf(nacelle_inlet - p.x, p.x - nacelle_inlet - nacelle_length)),
          kNacelle);
   }
   return body;
