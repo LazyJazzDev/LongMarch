@@ -1,5 +1,7 @@
 #include "amr_gpu_projection.h"
 
+#include <cuda_runtime.h>
+
 #include <cmath>
 #include <iostream>
 
@@ -91,6 +93,57 @@ int Run(bool embedded) {
   u = before;
   if (!gpu.Project(u, p).converged)
     return 15;
+
+  // Exercise caller-owned resident buffers, including rejected/nonconverged calls.
+  struct Buffers {
+    double *u{}, *p{};
+
+    ~Buffers() {
+      cudaFree(u);
+      cudaFree(p);
+    }
+  } device;
+
+  const size_t ub = before.size() * sizeof(double), pb = mesh.Cells().size() * sizeof(double);
+  if (cudaMalloc(&device.u, ub) != cudaSuccess || cudaMalloc(&device.p, pb) != cudaSuccess)
+    return 17;
+  std::vector<double> sentinel(mesh.Cells().size(), 42), check_u(before.size()), check_p(sentinel.size());
+  auto upload = [&] {
+    return cudaMemcpy(device.u, before.data(), ub, cudaMemcpyHostToDevice) == cudaSuccess &&
+           cudaMemcpy(device.p, sentinel.data(), pb, cudaMemcpyHostToDevice) == cudaSuccess;
+  };
+  auto download = [&] {
+    return cudaMemcpy(check_u.data(), device.u, ub, cudaMemcpyDeviceToHost) == cudaSuccess &&
+           cudaMemcpy(check_p.data(), device.p, pb, cudaMemcpyDeviceToHost) == cudaSuccess;
+  };
+  if (!upload())
+    return 18;
+  if (gpu.ProjectDevice(device.u, before.size(), device.p, sentinel.size(), 1e-12, 1).converged || !download() ||
+      check_u != before || check_p != sentinel)
+    return 19;
+  if (gpu.ProjectDevice(device.u, before.size() - 1, device.p, sentinel.size()).converged || !download() ||
+      check_u != before || check_p != sentinel)
+    return 20;
+  if (!gpu.ProjectDevice(device.u, before.size(), device.p, sentinel.size()).converged || !download())
+    return 21;
+  for (size_t f = 0; f < check_u.size(); ++f)
+    if (std::abs(check_u[f] - reference_u[f]) > 1e-7)
+      return 22;
+  for (size_t c = 0; c < check_p.size(); ++c)
+    if (std::abs(check_p[c] - reference_p[c]) > 1e-7)
+      return 23;
+  // Zero divergence must still clear solid faces and return zero potential.
+  for (size_t f = 0; f < before.size(); ++f)
+    before[f] = mesh.Faces()[f].aperture == 0 ? 17 : 0;
+  if (!upload() || !gpu.ProjectDevice(device.u, before.size(), device.p, sentinel.size()).converged || !download())
+    return 24;
+  for (double v : check_u)
+    if (v != 0)
+      return 25;
+  for (double v : check_p)
+    if (v != 0)
+      return 26;
+  std::cout << "PASS resident GPU buffers, CPU agreement, failure rollback and closed-face clearing\n";
   std::cout
       << "PASS composite projection removes divergence, preserves fixed boundary flux and rolls back nonconvergence\n";
   return 0;

@@ -102,6 +102,12 @@ them as part of an experiment without a new reason/authorization.
   has projection residuals below 1e-8 for three steps. These tests do not
   establish conservative viscous fluxes across refinement interfaces, native
   far-field boundary equivalence, or the 2% steady-load acceptance criterion.
+- `GpuProjection::ProjectDevice` accepts caller-owned disjoint device buffers,
+  keeping full velocity and potential arrays on the GPU. The host-vector API
+  uses the same solver. Job 2000960 passed all 11 tests and CUDA memcheck
+  (zero errors), including CPU agreement, numerical-failure rollback, invalid
+  sizes and zero-divergence solid-face clearing. Scalar Krylov reductions
+  still synchronize with the host; transport is not yet GPU-resident.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

@@ -64,6 +64,12 @@ __global__ void Difference(int n, const double *a, const double *b, double *out)
     out[i] = a[i] - b[i];
 }
 
+__global__ void CloseFaces(int count, const int *indices, double *velocity) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < count)
+    velocity[indices[i]] = 0;
+}
+
 using Rows = std::vector<std::map<int, double>>;
 }  // namespace
 
@@ -75,6 +81,7 @@ struct GpuProjection::Impl {
   std::vector<void *> allocations;
   Matrix a, g, d;
   std::vector<int> closed;
+  int *closed_device{};
   double *diagonal{}, *u{}, *face{}, *rhs{}, *x{}, *r{}, *shadow{}, *p{}, *v{}, *s{}, *t{}, *phat{}, *shat{}, *ax{};
 
   ~Impl() {
@@ -201,6 +208,8 @@ bool GpuProjection::Build(int device, const Mesh &mesh, const FaceGradient &grad
                        &next->phat, &next->shat, &next->ax})
     if (!next->Allocate(*ptr, next->n))
       return fail("Invalid adaptive operator or GPU allocation failure");
+  if (!next->closed.empty() && !next->Upload(next->closed_device, next->closed))
+    return fail("Closed-face upload failed");
   impl_ = std::move(next);
   build_error_.clear();
   return true;
@@ -210,18 +219,52 @@ ProjectionResult GpuProjection::Project(std::vector<double> &velocity,
                                         std::vector<double> &potential,
                                         double tolerance,
                                         int max_iterations) {
-  ProjectionResult result;
   if (!impl_ || velocity.size() != size_t(impl_->nf) || !(tolerance > 0) || !std::isfinite(tolerance) ||
       max_iterations <= 0)
-    return result;
+    return {};
   auto &w = *impl_;
-  if (!w.Check(cudaSetDevice(w.device)) || !w.ok)
-    return result;
+  if (!w.Check(cudaSetDevice(w.device)) || !w.ok ||
+      !w.Check(cudaMemcpy(w.u, velocity.data(), w.nf * sizeof(double), cudaMemcpyHostToDevice)))
+    return {};
+  auto result = Solve(tolerance, max_iterations);
+  if (result.converged) {
+    std::vector<double> new_u(w.nf), new_p(w.n);
+    if (w.Check(cudaMemcpy(new_u.data(), w.u, w.nf * sizeof(double), cudaMemcpyDeviceToHost)) &&
+        w.Check(cudaMemcpy(new_p.data(), w.x, w.n * sizeof(double), cudaMemcpyDeviceToHost))) {
+      velocity = std::move(new_u);
+      potential = std::move(new_p);
+    } else
+      result.converged = false;
+  }
+  return result;
+}
+
+ProjectionResult GpuProjection::ProjectDevice(double *velocity,
+                                              size_t faces,
+                                              double *potential,
+                                              size_t cells,
+                                              double tolerance,
+                                              int max_iterations) {
+  if (!impl_ || !velocity || !potential || velocity == potential || faces != size_t(impl_->nf) ||
+      cells != size_t(impl_->n) || !(tolerance > 0) || !std::isfinite(tolerance) || max_iterations <= 0)
+    return {};
+  auto &w = *impl_;
+  if (!w.Check(cudaSetDevice(w.device)) || !w.ok ||
+      !w.Check(cudaMemcpy(w.u, velocity, faces * sizeof(double), cudaMemcpyDeviceToDevice)))
+    return {};
+  auto result = Solve(tolerance, max_iterations);
+  if (result.converged && (!w.Check(cudaMemcpy(velocity, w.u, faces * sizeof(double), cudaMemcpyDeviceToDevice)) ||
+                           !w.Check(cudaMemcpy(potential, w.x, cells * sizeof(double), cudaMemcpyDeviceToDevice))))
+    result.converged = false;
+  return result;
+}
+
+ProjectionResult GpuProjection::Solve(double tolerance, int max_iterations) {
+  ProjectionResult result;
+  auto &w = *impl_;
   auto copy = [&](double *dst, const double *src) {
     return w.Check(cudaMemcpy(dst, src, w.n * sizeof(double), cudaMemcpyDeviceToDevice));
   };
-  if (!w.Check(cudaMemcpy(w.u, velocity.data(), w.nf * sizeof(double), cudaMemcpyHostToDevice)))
-    return result;
   for (double *ptr : {w.x, w.p, w.v})
     if (!w.Check(cudaMemset(ptr, 0, w.n * sizeof(double))))
       return result;
@@ -230,10 +273,9 @@ ProjectionResult GpuProjection::Project(std::vector<double> &velocity,
   if (!w.ok || !std::isfinite(norm))
     return result;
   if (norm == 0) {
-    for (int f : w.closed)
-      velocity[f] = 0;
-    potential.assign(w.n, 0);
-    result.converged = true;
+    if (!w.closed.empty())
+      CloseFaces<<<(w.closed.size() + 255) / 256, 256>>>(int(w.closed.size()), w.closed_device, w.u);
+    result.converged = w.Check(cudaGetLastError());
     return result;
   }
   copy(w.r, w.rhs);
@@ -276,15 +318,9 @@ ProjectionResult GpuProjection::Project(std::vector<double> &velocity,
   if (result.converged) {
     w.Apply(w.g, w.x, w.face);
     Add<<<(w.nf + 255) / 256, 256>>>(w.nf, w.u, w.face, -1);
-    std::vector<double> new_u(w.nf), new_p(w.n);
-    if (w.Check(cudaGetLastError()) &&
-        w.Check(cudaMemcpy(new_u.data(), w.u, w.nf * sizeof(double), cudaMemcpyDeviceToHost)) &&
-        w.Check(cudaMemcpy(new_p.data(), w.x, w.n * sizeof(double), cudaMemcpyDeviceToHost))) {
-      for (int f : w.closed)
-        new_u[f] = 0;
-      velocity = std::move(new_u);
-      potential = std::move(new_p);
-    } else
+    if (!w.closed.empty())
+      CloseFaces<<<(w.closed.size() + 255) / 256, 256>>>(int(w.closed.size()), w.closed_device, w.u);
+    if (!w.Check(cudaGetLastError()))
       result.converged = false;
   }
   return result;

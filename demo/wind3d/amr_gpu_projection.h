@@ -16,9 +16,20 @@ class GpuProjection {
                            std::vector<double> &potential,
                            double tolerance = 1e-9,
                            int max_iterations = 2000);
+  // Caller-owned, disjoint buffers on the Build device, in mesh face/cell order.
+  // Uses the default stream; caller must finish writes on other streams first.
+  // Numerical nonconvergence leaves both buffers unchanged. Runtime/device
+  // errors are reported by Error(); output contents are then unspecified.
+  ProjectionResult ProjectDevice(double *velocity,
+                                 size_t faces,
+                                 double *potential,
+                                 size_t cells,
+                                 double tolerance = 1e-9,
+                                 int max_iterations = 2000);
   std::string Error() const;
 
  private:
+  ProjectionResult Solve(double tolerance, int max_iterations);
   struct Impl;
   std::unique_ptr<Impl> impl_;
   std::string build_error_;
