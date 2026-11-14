@@ -79,10 +79,10 @@ them as part of an experiment without a new reason/authorization.
 - `AdvanceReference` now couples CPU transport, boundary conditions and
   projection, recovers physical pressure using rho/dt, and integrates pressure
   forces/moments. Three small steps around the actual aircraft on a two-level
-  mesh pass a finite-state/projection smoke test. This is an inviscid CPU
-  reference, not the final solver: slip extensions, MacCormack correction,
-  viscosity, sponge, GPU transport, dynamic regridding and
-  long-time load equivalence remain required.
+  mesh pass a finite-state/projection smoke test. This CPU reference includes
+  slip extension, bounded MacCormack correction, molecular diffusion and an
+  outlet sponge. GPU transport, dynamic regridding and long-time load
+  equivalence remain required.
 - Two-layer slip extension and load-only Spalding friction are now connected
   to the CPU reference advance. The wall law is factored into `wall_model.h`
   for both backends. Wall loads use unweighted pre-step MAC centre velocities
@@ -94,6 +94,14 @@ them as part of an experiment without a new reason/authorization.
   the uniform CUDA field dump is bitwise unchanged and all eight sampled force
   vectors are identical after sharing the wall law. This is a refactor
   regression check, not a steady-load equivalence claim.
+- Corrected transport reduces the smooth-wave squared error from 0.0182403
+  to 0.000276643 with linear sampling; discontinuous transport stays bounded.
+  Diffusion matches the discrete sine decay, rejects unstable explicit steps
+  without changing state, and preserves constant tangential slip flow. The
+  outlet sponge is checked independently. The combined aircraft smoke test
+  has projection residuals below 1e-8 for three steps. These tests do not
+  establish conservative viscous fluxes across refinement interfaces, native
+  far-field boundary equivalence, or the 2% steady-load acceptance criterion.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

@@ -12,6 +12,14 @@ class FaceField {
   bool Update(const std::vector<double> &velocity);
   std::array<double, 3> Sample(std::array<double, 3> point) const;
   bool Advect(double dt, std::vector<double> &destination, bool cubic = false) const;
+  // Both transport passes trace with the original velocity, as in the uniform
+  // solver. Out-of-stencil corrections revert to the first-order result.
+  bool AdvectCorrected(double dt, std::vector<double> &destination, bool cubic = false) const;
+  bool DiffuseAndSponge(double dt,
+                        double viscosity,
+                        double sponge_length,
+                        double speed,
+                        std::vector<double> &destination) const;
 
  private:
   int CellAt(std::array<double, 3> point) const;

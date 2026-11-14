@@ -13,7 +13,10 @@ AdvanceResult AdvanceReference(const Mesh &mesh,
                                std::vector<double> &pressure,
                                bool cubic,
                                double density,
-                               double wall_viscosity) {
+                               double wall_viscosity,
+                               double viscosity,
+                               double sponge_length,
+                               bool corrected_transport) {
   AdvanceResult result;
   if (!(dt > 0) || !std::isfinite(dt) || !(density > 0) || !std::isfinite(density) || !std::isfinite(speed))
     return result;
@@ -22,7 +25,9 @@ AdvanceResult AdvanceReference(const Mesh &mesh,
   if (!field.ExtendSlip(extended) || !field.Update(extended))
     return result;
   std::vector<double> next, potential;
-  if (!field.Advect(dt, next, cubic))
+  if (!(corrected_transport ? field.AdvectCorrected(dt, next, cubic) : field.Advect(dt, next, cubic)))
+    return result;
+  if (!field.DiffuseAndSponge(dt, viscosity, sponge_length, speed, next))
     return result;
   for (size_t f = 0; f < mesh.Faces().size(); ++f) {
     auto face = mesh.Faces()[f];

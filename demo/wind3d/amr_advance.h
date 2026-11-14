@@ -10,8 +10,8 @@ struct AdvanceResult {
   std::array<double, 6> pressure_loads{}, friction_loads{}, total_loads{};
 };
 
-// CPU reference with slip transport and load-only wall friction. Viscous diffusion, sponge,
-// MacCormack correction and regridding are not supplied by this reference.
+// CPU reference with corrected transport, slip walls, molecular diffusion,
+// outlet sponge and load-only wall friction. Dynamic regridding is separate.
 // A failed transport/projection leaves the caller's complete state untouched.
 AdvanceResult AdvanceReference(const Mesh &mesh,
                                const Topology &tree,
@@ -23,5 +23,8 @@ AdvanceResult AdvanceReference(const Mesh &mesh,
                                std::vector<double> &pressure,
                                bool cubic = true,
                                double density = 1.225,
-                               double wall_viscosity = 9.2e-7);
+                               double wall_viscosity = 9.2e-7,
+                               double viscosity = 1.5e-5,
+                               double sponge_length = 2,
+                               bool corrected_transport = true);
 }  // namespace wind3d::amr
