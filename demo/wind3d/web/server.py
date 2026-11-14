@@ -34,17 +34,22 @@ class Relay:
         path = directory / "desired.json"
         self.desired = json.loads(path.read_text()) if path.exists() else dict(
             sequence=1, reset=0, paused=False, controls=DEFAULT.copy())
+        self.desired.setdefault("streamline_density", 2)
         self.save()
 
     def save(self):
         d = self.desired
         atomic(self.directory / "desired.json", json.dumps(d))
-        values = [d["sequence"], d["reset"], int(d["paused"])] + [d["controls"][k] for k in BOUNDS]
+        values = [d["sequence"], d["reset"], int(d["paused"])] + [d["controls"][k] for k in BOUNDS] + [d["streamline_density"]]
         atomic(self.directory / "controls.txt", " ".join(map(str, values)) + "\n")
 
     def update(self, data):
-        if not isinstance(data, dict) or set(data) - {"controls", "paused", "reset"}:
+        if not isinstance(data, dict) or set(data) - {"controls", "paused", "reset", "streamline_density"}:
             raise ValueError("Unknown control fields")
+        if "streamline_density" in data:
+            density = data["streamline_density"]
+            if type(density) is not int or not 1 <= density <= 4:
+                raise ValueError("Streamline density must be an integer from 1 to 4")
         controls = data.get("controls", {})
         if not isinstance(controls, dict) or set(controls) - BOUNDS.keys():
             raise ValueError("Unknown aircraft control")
@@ -57,6 +62,7 @@ class Relay:
             if key in data and not isinstance(data[key], bool):
                 raise ValueError(f"{key} must be boolean")
         with self.lock:
+            self.desired["streamline_density"] = data.get("streamline_density", self.desired["streamline_density"])
             self.desired["controls"].update(controls)
             self.desired["paused"] = data.get("paused", self.desired["paused"])
             self.desired["reset"] += int(data.get("reset", False))

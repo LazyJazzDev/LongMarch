@@ -39,7 +39,7 @@ inline void Arrow(std::vector<Vertex> &lines, Vec3 origin, Vec3 vector, Vec3 col
   Line(lines, end, Add(base, Scale(perpendicular, -1)), color);
 }
 
-inline std::vector<Vertex> FlowLines(const Snapshot &snapshot, bool streamlines, bool loads) {
+inline std::vector<Vertex> FlowLines(const Snapshot &snapshot, bool streamlines, bool loads, int density = 1) {
   std::vector<Vertex> lines;
   for (int x = -5; x <= 9; ++x)
     Line(lines, {float(x), -2, -5}, {float(x), -2, 5}, {0.055f, 0.08f, 0.12f});
@@ -49,9 +49,10 @@ inline std::vector<Vertex> FlowLines(const Snapshot &snapshot, bool streamlines,
   Arrow(lines, {-4, -1.8f, -4.7f}, {0, 1, 0}, {0.2f, 1, 0.3f});
   Arrow(lines, {-4, -1.8f, -4.7f}, {0, 0, 1}, {0.2f, 0.5f, 1});
   if (streamlines) {
-    for (int iz = -10; iz <= 10; ++iz)
-      for (int iy = -1; iy <= 2; ++iy) {
-        Vec3 p{-4.5f, iy * 0.32f + 0.05f, iz * 0.30f};
+    density = std::clamp(density, 1, 4);
+    for (int iz = -10 * density; iz <= 10 * density; ++iz)
+      for (int iy = -density; iy <= 2 * density; ++iy) {
+        Vec3 p{-4.5f, iy * (0.32f / density) + 0.05f, iz * (0.30f / density)};
         for (int step = 0; step < 170; ++step) {
           Vec3 velocity = SampleVelocity(snapshot, p);
           float speed = Length(velocity);

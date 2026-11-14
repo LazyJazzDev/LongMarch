@@ -38,12 +38,13 @@ class RelayTest(unittest.TestCase):
             state = json.load(response)
         self.assertEqual(state["sequence"], 2)
         self.assertEqual(state["reset"], 1)
-        self.assertEqual((self.directory / "controls.txt").read_text().split(), ["2", "1", "1", "18", "4", "20", "0", "0", "0"])
+        self.assertEqual((self.directory / "controls.txt").read_text().split(), ["2", "1", "1", "18", "4", "20", "0", "0", "0", "2"])
         self.assertEqual(Relay(self.directory).desired, state)
 
     def test_invalid_commands_do_not_mutate(self):
         for data in ({"controls": {"speed": 0}}, {"controls": {"angle": float("nan")}},
-                     {"controls": {"flap": 41}}, {"controls": {"bad": 2}}, {"paused": 1}, {"reset": "yes"}):
+                     {"controls": {"flap": 41}}, {"controls": {"bad": 2}}, {"paused": 1}, {"reset": "yes"}, {"streamline_density": 0},
+                     {"streamline_density": 5}, {"streamline_density": 1.5}, {"streamline_density": True}):
             with self.assertRaises(urllib.error.HTTPError) as error:
                 self.post(data)
             self.assertEqual(error.exception.code, 400)
@@ -51,6 +52,17 @@ class RelayTest(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as error:
             self.post({"reset": True}, "http://untrusted.invalid")
         self.assertEqual(error.exception.code, 403)
+
+    def test_density_preserves_simulation_controls(self):
+        before = self.relay.desired.copy()
+        with self.post({"streamline_density": 4}) as response:
+            state = json.load(response)
+        self.assertEqual(state["controls"], before["controls"])
+        self.assertEqual(state["reset"], before["reset"])
+        self.assertEqual(state["paused"], before["paused"])
+        self.assertEqual(state["streamline_density"], 4)
+        self.assertEqual(Relay(self.directory).desired, state)
+        self.assertEqual((self.directory / "controls.txt").read_text().split()[-1], "4")
 
     def test_only_display_data_is_exposed(self):
         (self.directory / "frame.bin").write_bytes(b"test-frame")

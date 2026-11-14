@@ -5,6 +5,10 @@ const specs = [ ['speed','来流速度',1,30,'m/s',30], ['angle','迎角',-20,25
   ['flap','襟翼',0,40,'°',0], ['aileron','副翼（差动）',-25,25,'°',0],
   ['elevator','升降舵',-25,25,'°',0], ['rudder','方向舵',-25,25,'°',0] ];
 let desired = null, packetMeta = null, commands = Promise.resolve(), pending = 0, debounce;
+let densityDebounce;
+const seedCount = d => (20*d+1)*(3*d+1);
+function setDensity(d){$('density').value=d;$('density-value').textContent=`${d} 级 · ${seedCount(d)} 条`;}
+$('density').oninput=()=>{const d=Number($('density').value);setDensity(d);clearTimeout(densityDebounce);densityDebounce=setTimeout(()=>send({streamline_density:d}),250);};
 let frameTag = '', meshID = '', lastStatus = null, transferred = 0;
 function showError(message) { $('error').textContent=message; $('error').hidden=!message; }
 for (const [key,name,min,max,unit,value] of specs) {
@@ -52,6 +56,27 @@ loads.add(forceArrow,momentArrow);
 loads.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),origin]),new THREE.LineBasicMaterial({color:0x566c80})));
 $('loads').onchange=()=>loads.visible=$('loads').checked;
 $('aircraft').onchange=()=>aircraft.visible=$('aircraft').checked;
+const domain=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x7fc6ff,transparent:true,opacity:.8}));scene.add(domain);domain.visible=false;
+let domainKey='';
+function updateDomain(meta){
+  if(!meta.domain_min||!meta.domain_max)return;
+  const key=JSON.stringify([meta.domain_min,meta.domain_max]);
+  if(key!==domainKey){
+    const a=new THREE.Vector3(...meta.domain_min),b=new THREE.Vector3(...meta.domain_max),size=b.clone().sub(a);
+    const box=new THREE.BoxGeometry(size.x,size.y,size.z);domain.geometry.dispose();domain.geometry=new THREE.EdgesGeometry(box);box.dispose();
+    domain.position.copy(a.add(b).multiplyScalar(.5));domainKey=key;
+  }
+  $('domain-size').textContent=`计算域 ${meta.domain_max.map((v,i)=>v-meta.domain_min[i]).join(' × ')} m · 网格间距 ${(16/meta.grid).toFixed(4)} m`;
+}
+$('domain').onchange=()=>{
+  domain.visible=$('domain').checked;
+  if(domain.visible&&domainKey){
+    domain.geometry.computeBoundingSphere();const radius=domain.geometry.boundingSphere.radius;
+    const halfFov=Math.min(camera.fov*Math.PI/360,Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
+    const distance=radius/Math.sin(halfFov)*1.05,direction=camera.position.clone().sub(orbit.target).normalize();
+    orbit.maxDistance=Math.max(40,distance*1.2);orbit.target.copy(domain.position);camera.position.copy(domain.position).addScaledVector(direction,distance);orbit.update();
+  }
+};
 $('flow').onchange=()=>flow.geometry.setDrawRange(0,$('flow').checked?Infinity:70);
 function arrow(object,values){const v=new THREE.Vector3(...values),length=v.length();object.visible=length>1e-6;if(object.visible){object.setDirection(v.normalize());const size=3*length/(100+length);object.setLength(size,Math.min(.28,size*.4),Math.min(.2,size*.3));}}
 function geometry(array,stride,normal){
@@ -74,6 +99,8 @@ function updateNumbers(meta,bytes){
     $(key).textContent=meta[key].map((v,i)=>`${['X','Y','Z'][i]} ${v.toFixed(3)}`).join(' · ');
   }
   $('mean-ld').textContent=meta.mean_ld == null ? '流场建立中…' : `${meta.mean_ld.toFixed(3)}（${meta.average_seconds.toFixed(3)} s 平均）`;
+  updateDomain(meta);
+  $('density-applied').textContent=`已显示：${meta.streamline_density??1} 级 · ${meta.streamline_seeds??84} 条种子流线（遇机体或低速区会截断）`;
   const c=meta.controls;
   $('applied').textContent=`已生效：${c.speed.toFixed(1)} m/s · 迎角 ${c.angle.toFixed(1)}° · 襟翼 ${c.flap.toFixed(1)}° · 副翼 ${c.aileron.toFixed(1)}° · 升降 ${c.elevator.toFixed(1)}° · 方向 ${c.rudder.toFixed(1)}°`;
   $('payload').textContent=`显示帧 ${(bytes/1024).toFixed(0)} KB · 已接收 ${(transferred/1048576).toFixed(1)} MB`;
@@ -100,7 +127,7 @@ async function getFrame(){
     arrow(forceArrow,meta.force);arrow(momentArrow,meta.moment);loads.visible=$('loads').checked;
     packetMeta=meta;transferred+=Number(response.headers.get('Content-Length'))||buffer.byteLength;frameTag=response.headers.get('ETag');
     updateNumbers(meta,buffer.byteLength);showError('');
-    window.wind3dState={meta,meshVertices:aircraft.geometry.attributes.position.count,lineVertices:lines.attributes.position.count};
+    window.wind3dState={meta,domainBounds:[meta.domain_min,meta.domain_max],meshVertices:aircraft.geometry.attributes.position.count,lineVertices:lines.attributes.position.count};
   } catch(error){showError(error.message);}
   finally {setTimeout(getFrame,350);}
 }
@@ -108,8 +135,8 @@ async function status(){
   try {
     const response=await fetch('/api/status');if(!response.ok)throw new Error('状态连接失败');
     const state=await response.json();lastStatus=state;
-    if(!desired){desired=state;setControls(state.controls);$('pause').textContent=state.paused?'继续':'暂停';}
-    else if(!pending&&state.sequence>desired.sequence){desired=state;setControls(state.controls);$('pause').textContent=state.paused?'继续':'暂停';}
+    if(!desired){desired=state;setControls(state.controls);setDensity(state.streamline_density??2);$('pause').textContent=state.paused?'继续':'暂停';}
+    else if(!pending&&state.sequence>desired.sequence){desired=state;setControls(state.controls);setDensity(state.streamline_density??2);$('pause').textContent=state.paused?'继续':'暂停';}
     const stale=state.age===null||state.age>5||!!state.error;
     $('connection').textContent=state.error?'GPU 节点异常':state.age===null?'等待 GPU 节点':stale?'显示数据已过期':packetMeta?.paused?'已暂停 · GPU 在线':'实时连接 · GPU 在线';
     $('connection').className='badge '+(stale?'stale':'live');

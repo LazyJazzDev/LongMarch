@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
   // Unique mesh IDs survive restarting the agent in the same mailbox.
   uint64_t mesh_id = std::chrono::system_clock::now().time_since_epoch().count();
   bool paused = false;
+  int density = 2;
   wind3d::Controls requested;
   std::shared_ptr<const std::vector<wind3d::Vertex>> mesh;
 
@@ -91,11 +92,14 @@ int main(int argc, char **argv) {
     wind3d::Controls controls;
     if (input >> sequence >> reset_request >> pause >> controls.speed >> controls.angle >> controls.flap >>
         controls.aileron >> controls.elevator >> controls.rudder) {
-      bool valid = (pause == 0 || pause == 1) && controls.speed >= 1 && controls.speed <= 30 && controls.angle >= -20 &&
-                   controls.angle <= 25 && controls.flap >= 0 && controls.flap <= 40 &&
-                   std::abs(controls.aileron) <= 25 && std::abs(controls.elevator) <= 25 &&
-                   std::abs(controls.rudder) <= 25;
+      int requested_density = 2;
+      input >> requested_density;
+      bool valid = requested_density >= 1 && requested_density <= 4 && (pause == 0 || pause == 1) &&
+                   controls.speed >= 1 && controls.speed <= 30 && controls.angle >= -20 && controls.angle <= 25 &&
+                   controls.flap >= 0 && controls.flap <= 40 && std::abs(controls.aileron) <= 25 &&
+                   std::abs(controls.elevator) <= 25 && std::abs(controls.rudder) <= 25;
       if (valid && sequence != request) {
+        density = requested_density;
         requested = controls;
         paused = pause != 0;
         request = sequence;
@@ -148,7 +152,7 @@ int main(int argc, char **argv) {
           history.pop_front();
         double average_span = state->time - history.front().time;
         bool average_ready = state->time - condition_start >= 0.55 && average_span >= 0.15;
-        auto lines = wind3d::visualization::FlowLines(*state, true, false);
+        auto lines = wind3d::visualization::FlowLines(*state, true, false, density);
         bool acknowledged =
             Same(state->controls, requested) && state->generation == expected_generation && actual_paused == paused;
         std::ostringstream json;
@@ -162,6 +166,9 @@ int main(int argc, char **argv) {
              << ",\"ack\":" << (acknowledged ? request : 0) << ",\"line_vertices\":" << lines.size()
              << ",\"mesh_vertices\":" << mesh->size() << ",\"controls\":";
         Controls(json, state->controls);
+        json << ",\"streamline_density\":" << density
+             << ",\"streamline_seeds\":" << (20 * density + 1) * (3 * density + 1)
+             << ",\"domain_min\":[-6,-4,-6],\"domain_max\":[10,4,6]";
         json << ",\"solver_model\":\"optimized-13ea18de\",\"geometry_model\":\"high-bypass-v2\",\"force\":";
         Vector(json, state->force);
         json << ",\"moment\":";

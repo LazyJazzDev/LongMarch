@@ -291,11 +291,10 @@ sides. Assets, including Three.js r160 (MIT), are served locally without a CDN.
 Only display data crosses the node boundary:
 
 - The solver volume remains on the compute node. Its bounded display snapshot
-  is consumed there to trace the same 84 streamlines as the original renderer.
+  is consumed there to trace the same tracing method as the original renderer.
   No velocity/pressure volume is written into the shared mailbox or served by HTTP.
 - At most twice per second, the worker atomically replaces `frame.bin`: a padded
-  JSON metadata header and float32 line positions/colors. Typical raw display
-  frames are about 650 KB. Old line frames are discarded, not queued.
+  JSON metadata header and float32 line positions/colors. Raw display frames grow with the selected streamline density. Old line frames are discarded, not queued.
 - The original aircraft mesh is published only when its geometry changes.
   Immutable revision IDs pair each frame with the correct mesh; the latest 32
   meshes are retained for clients finishing an in-flight fetch. HTTP gzip and a
@@ -361,3 +360,11 @@ belly/tail paint and inlet/duct tinting are removed. The pylons are 0.18 m high
 inlet, a short 0.83 m fan cowl and a contracted aft body. Rendering and the solver
 share these profiles. The reference coefficients above describe the earlier
 imported geometry, not this revised engine installation.
+
+The web console provides four streamline seed densities: 84, 287, 610 and
+1,053 (default 287). Density changes retrace the current display field on the
+compute node, including while paused; they do not change resolution, reset the
+flow or transfer the volume. Streams can terminate at the aircraft or low speed.
+The optional domain outline uses the solver's bounds: x [-6,10], y [-4,4],
+z [-6,6] metres. Enabling it frames the entire box; this shows the computational
+extent, not every individual grid cell.
