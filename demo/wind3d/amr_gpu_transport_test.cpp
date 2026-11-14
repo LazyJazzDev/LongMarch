@@ -21,7 +21,9 @@ int Run(bool embedded) {
         return std::max({std::abs(p[0] + .5), std::abs(p[1] + .5), std::abs(p[2])}) - .21;
       }))
     return 3;
-  GpuTransport gpu;
+  GpuTransport gpu, direct;
+  if (!direct.Build(0, mesh, tree, 1, {-1, -1, -1}, false))
+    return 14;
   if (!gpu.Build(0, mesh, tree, 1, {-1, -1, -1})) {
     std::cerr << gpu.Error() << '\n';
     return 4;
@@ -39,39 +41,49 @@ int Run(bool embedded) {
   if (cudaMalloc(&device.u, bytes) != cudaSuccess)
     return 5;
   FaceField cpu(mesh, tree, 1, {-1, -1, -1});
-  double max_error = 0;
+  double max_error = 0, cache_error = 0;
   for (int pattern = 0; pattern < 3; ++pattern)
     for (bool cubic : {false, true})
-      for (bool corrected : {false, true}) {
-        std::vector<double> input(nf), reference, actual(nf);
-        for (size_t i = 0; i < nf; ++i) {
-          auto f = mesh.Faces()[i];
-          input[i] = pattern == 0   ? .3
-                     : pattern == 1 ? .2 + .1 * std::sin(2 * f.centre[(f.axis + 1) % 3])
-                                    : (f.centre[(f.axis + 1) % 3] > 0 ? .3 : .1);
-          if (f.aperture == 0)
-            input[i] = 0;
+      for (bool corrected : {false, true})
+        for (double dt : {.07, 1.7, -.07}) {
+          std::vector<double> input(nf), reference, actual(nf);
+          for (size_t i = 0; i < nf; ++i) {
+            auto f = mesh.Faces()[i];
+            input[i] = pattern == 0   ? .3
+                       : pattern == 1 ? .2 + .1 * std::sin(2 * f.centre[(f.axis + 1) % 3])
+                                      : (f.centre[(f.axis + 1) % 3] > 0 ? .3 : .1);
+            if (f.aperture == 0)
+              input[i] = 0;
+          }
+          auto extended = input;
+          if (!cpu.ExtendSlip(extended) || !cpu.Update(extended) ||
+              !(corrected ? cpu.AdvectCorrected(dt, reference, cubic) : cpu.Advect(dt, reference, cubic)))
+            return 6;
+          if (cudaMemcpy(device.u, input.data(), bytes, cudaMemcpyHostToDevice) != cudaSuccess ||
+              !gpu.AdvectDevice(device.u, device.u, nf, dt, cubic, corrected) ||
+              cudaMemcpy(actual.data(), device.u, bytes, cudaMemcpyDeviceToHost) != cudaSuccess) {
+            std::cerr << gpu.Error() << '\n';
+            return 7;
+          }
+          std::vector<double> direct_result(nf);
+          if (cudaMemcpy(device.u, input.data(), bytes, cudaMemcpyHostToDevice) != cudaSuccess ||
+              !direct.AdvectDevice(device.u, device.u, nf, dt, cubic, corrected) ||
+              cudaMemcpy(direct_result.data(), device.u, bytes, cudaMemcpyDeviceToHost) != cudaSuccess)
+            return 15;
+          for (size_t i = 0; i < nf; ++i)
+            cache_error = std::max(cache_error, std::abs(actual[i] - direct_result[i]));
+          if (cache_error > 1e-12)
+            return 16;
+          double error = 0;
+          for (size_t i = 0; i < nf; ++i)
+            error = std::max(error, std::abs(actual[i] - reference[i]));
+          max_error = std::max(max_error, error);
+          if (error > 1e-9) {
+            std::cerr << "pattern=" << pattern << " cubic=" << cubic << " corrected=" << corrected << " error=" << error
+                      << '\n';
+            return 8;
+          }
         }
-        auto extended = input;
-        if (!cpu.ExtendSlip(extended) || !cpu.Update(extended) ||
-            !(corrected ? cpu.AdvectCorrected(.07, reference, cubic) : cpu.Advect(.07, reference, cubic)))
-          return 6;
-        if (cudaMemcpy(device.u, input.data(), bytes, cudaMemcpyHostToDevice) != cudaSuccess ||
-            !gpu.AdvectDevice(device.u, device.u, nf, .07, cubic, corrected) ||
-            cudaMemcpy(actual.data(), device.u, bytes, cudaMemcpyDeviceToHost) != cudaSuccess) {
-          std::cerr << gpu.Error() << '\n';
-          return 7;
-        }
-        double error = 0;
-        for (size_t i = 0; i < nf; ++i)
-          error = std::max(error, std::abs(actual[i] - reference[i]));
-        max_error = std::max(max_error, error);
-        if (error > 1e-9) {
-          std::cerr << "pattern=" << pattern << " cubic=" << cubic << " corrected=" << corrected << " error=" << error
-                    << '\n';
-          return 8;
-        }
-      }
   std::vector<double> saved(nf, .25), actual(nf);
   if (cudaMemcpy(device.u, saved.data(), bytes, cudaMemcpyHostToDevice) != cudaSuccess)
     return 9;
@@ -90,7 +102,7 @@ int Run(bool embedded) {
       cudaMemcpy(actual.data(), device.u, bytes, cudaMemcpyDeviceToHost) != cudaSuccess || actual != saved)
     return 13;
   std::cout << "PASS GPU sparse transport embedded=" << embedded << " max CPU difference=" << max_error
-            << " with aliasing and failure rollback\n";
+            << " cache/direct difference=" << cache_error << " with aliasing and failure rollback\n";
   return 0;
 }
 

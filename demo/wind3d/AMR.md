@@ -215,6 +215,24 @@ them as part of an experiment without a new reason/authorization.
   transport 8.81 ms, pressure 7.20 ms and loads 0.049 ms. Native remains much
   faster in this small-grid case. Transport neighborhood caching, further
   pressure optimization and less expensive regridding are still required.
+- GPU transport now precomputes each block's MAC sampling sites and refreshes
+  two value halos after slip extension and slope reconstruction. Interpolation,
+  aperture weighting, bounded coarse/fine reconstruction and correction limits
+  keep their existing rules. `GpuTransport::Build(..., false)` retains direct
+  sampling for comparison. The cache adds `72 * (block_cells + 5)^3` bytes per
+  leaf (site indices and two double value fields), about 34.1 MiB for 682 leaves
+  with four cells per block; geometry is rebuilt when the hierarchy changes.
+  Job 2000982 passed transport, full advance and regrid lifecycle tests, with
+  zero CUDA memcheck errors. Constant, smooth and discontinuous inputs include
+  large and negative tracing steps, cubic/linear sampling and corrected/plain
+  advection. Cached/direct GPU outputs agreed exactly in these cases; CPU
+  differences were at most 2.23e-16. Across the six-step aircraft diagnostic,
+  maximum load-component changes were below 1.41e-9 for uniform-AMR and 9.80e-11
+  for adaptive. Adaptive ordinary transport fell from 8.81 to 0.983 ms and
+  ordinary total steps from 16.1 to 8.15 ms; uniform-AMR total steps fell from
+  18.7 to 7.64 ms. Pressure now dominates (adaptive 7.09 ms). These small-grid
+  startup results exclude regrid steps from the ordinary-step averages and
+  still do not establish steady-load acceptance or speedup over native.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

@@ -51,6 +51,10 @@ __device__ double Cubic(double f0, double f1, double f2, double f3, double t) {
                Min(f1, f2), Max(f1, f2));
 }
 
+struct HaloSite {
+  int cell, native;
+};
+
 struct Field {
   int n, max_level, nb, nc, nf;
   Array<int, 3> roots;
@@ -64,6 +68,9 @@ struct Field {
   Array<double, 3> *centres_;
   Array<double, 9> *slopes_;
   Array<double, 6> *limits_;
+  HaloSite *sites{};
+  double *halo{};
+  int halo_count{};
 
   __device__ int Find(int x, int y, int z) const {
     for (int level = max_level; level >= 0; --level) {
@@ -138,7 +145,7 @@ struct Field {
     return Clamp(value, limits_[cell][2 * axis], limits_[cell][2 * axis + 1]);
   }
 
-  __device__ double Component(Array<double, 3> point, int axis, bool cubic) const {
+  __device__ double DirectComponent(Array<double, 3> point, int axis, bool cubic) const {
     for (int a = 0; a < 3; ++a) {
       if (!isfinite(point[a]))
         return nan("");
@@ -211,6 +218,105 @@ struct Field {
     return total > 1e-3 ? weighted / total : result;
   }
 
+  __device__ Array<double, 3> HaloPoint(int index, int &axis) const {
+    int side = n + 5, cube = side * side * side, block = index / (3 * cube), slot = index % cube;
+    axis = (index / cube) % 3;
+    auto b = leaves[block];
+    int lower[3]{b.x * n, b.y * n, b.z * n};
+    int corner[3]{slot % side - 2, slot / side % side - 2, slot / (side * side) - 2};
+    double h = cells[block * n * n * n].width;
+    Array<double, 3> p;
+    for (int a = 0; a < 3; ++a)
+      p[a] =
+          Clamp(origin_[a] + (lower[a] + corner[a] + (a == axis ? 0 : .5)) * h, origin_[a] + (a == axis ? 0 : .5 * h),
+                origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
+    return p;
+  }
+
+  __device__ int StencilIndex(int cell, const double *base, int x, int y, int z, int axis) const {
+    int side = n + 5, block = cell / (n * n * n);
+    auto b = leaves[block];
+    int i = int(base[0]) - b.x * n + x + 2, j = int(base[1]) - b.y * n + y + 2, k = int(base[2]) - b.z * n + z + 2;
+    if (i < 0 || i >= side || j < 0 || j >= side || k < 0 || k >= side)
+      return -1;
+    return (block * 3 + axis) * side * side * side + (k * side + j) * side + i;
+  }
+
+  __device__ double StencilValue(int cell, const double *base, int x, int y, int z, int axis) const {
+    if (halo) {
+      int index = StencilIndex(cell, base, x, y, z, axis);
+      if (index >= 0)
+        return halo[index];
+    }
+    int corner[3]{x, y, z};
+    double h = cells[cell].width;
+    Array<double, 3> p;
+    for (int a = 0; a < 3; ++a)
+      p[a] = Clamp(origin_[a] + (base[a] + corner[a] + (a == axis ? 0 : .5)) * h, origin_[a] + (a == axis ? 0 : .5 * h),
+                   origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
+    return VirtualFace(p, axis);
+  }
+
+  __device__ double Component(Array<double, 3> point, int axis, bool cubic) const {
+    if (!halo)
+      return DirectComponent(point, axis, cubic);
+    for (int a = 0; a < 3; ++a) {
+      if (!isfinite(point[a]))
+        return nan("");
+      point[a] = Clamp(point[a], origin_[a], origin_[a] + roots[a] * root_width_);
+    }
+    int cell = CellAt(point);
+    if (cell < 0)
+      return 0;
+    double h = cells[cell].width, base[3], fraction[3];
+    for (int a = 0; a < 3; ++a) {
+      double q = (point[a] - origin_[a]) / h - (a == axis ? 0 : .5);
+      base[a] = floor(q);
+      fraction[a] = q - base[a];
+    }
+    // Defensive fallback for coordinates that round outside the owning block's halo.
+    if (StencilIndex(cell, base, -1, -1, -1, axis) < 0 || StencilIndex(cell, base, 2, 2, 2, axis) < 0)
+      return DirectComponent(point, axis, cubic);
+    int side = n + 5, origin_index = StencilIndex(cell, base, 0, 0, 0, axis);
+    if (cubic) {
+      for (int z = 0; z < 2; ++z)
+        for (int y = 0; y < 2; ++y)
+          for (int x = 0; x < 2; ++x) {
+            int native = sites[origin_index + (z * side + y) * side + x].native;
+            if (native < 0 || faces[native].aperture != 1)
+              cubic = false;
+          }
+      if (cubic) {
+        double planes[4];
+        for (int z = 0; z < 4; ++z) {
+          double rows[4];
+          for (int y = 0; y < 4; ++y) {
+            double values[4];
+            for (int x = 0; x < 4; ++x)
+              values[x] = halo[origin_index + ((z - 1) * side + y - 1) * side + x - 1];
+            rows[y] = Cubic(values[0], values[1], values[2], values[3], fraction[0]);
+          }
+          planes[z] = Cubic(rows[0], rows[1], rows[2], rows[3], fraction[1]);
+        }
+        return Cubic(planes[0], planes[1], planes[2], planes[3], fraction[2]);
+      }
+    }
+    double result = 0, weighted = 0, total = 0;
+    for (int z = 0; z < 2; ++z)
+      for (int y = 0; y < 2; ++y)
+        for (int x = 0; x < 2; ++x) {
+          int corner[3]{x, y, z}, index = origin_index + (z * side + y) * side + x, native = sites[index].native;
+          double weight = 1;
+          for (int a = 0; a < 3; ++a)
+            weight *= corner[a] ? fraction[a] : 1 - fraction[a];
+          double value = halo[index], aperture = native < 0 ? 1 : faces[native].aperture;
+          result += weight * value;
+          weighted += aperture * weight * value;
+          total += aperture * weight;
+        }
+    return total > 1e-3 ? weighted / total : result;
+  }
+
   __device__ Array<double, 3> Sample(Array<double, 3> p) const {
     return {Component(p, 0, false), Component(p, 1, false), Component(p, 2, false)};
   }
@@ -225,6 +331,35 @@ struct Field {
     return p;
   }
 };
+
+__global__ void MapHalos(Field f) {
+  int index = blockIdx.x * blockDim.x + threadIdx.x;
+  if (index >= f.halo_count)
+    return;
+  int axis;
+  auto p = f.HaloPoint(index, axis);
+  f.sites[index] = {f.CellAt(p), f.NativeFace(p, axis)};
+}
+
+__global__ void FillHalos(Field f) {
+  int index = blockIdx.x * blockDim.x + threadIdx.x;
+  if (index >= f.halo_count)
+    return;
+  auto site = f.sites[index];
+  double value = 0;
+  if (site.native >= 0)
+    value = f.velocity_[site.native];
+  else if (site.cell >= 0) {
+    int axis;
+    auto p = f.HaloPoint(index, axis);
+    auto c = f.cells[site.cell];
+    value = f.centres_[site.cell][axis];
+    for (int a = 0; a < 3; ++a)
+      value += f.slopes_[site.cell][3 * axis + a] * (p[a] - c.centre[a]);
+    value = Clamp(value, f.limits_[site.cell][2 * axis], f.limits_[site.cell][2 * axis + 1]);
+  }
+  f.halo[index] = value;
+}
 
 __global__ void Centres(Field f) {
   int cell = blockIdx.x * blockDim.x + threadIdx.x;
@@ -382,13 +517,7 @@ __global__ void Correct(Field original, Field forward, double dt, bool cubic, do
   for (int z = 0; z < 2; ++z)
     for (int y = 0; y < 2; ++y)
       for (int x = 0; x < 2; ++x) {
-        int corner[3]{x, y, z};
-        Array<double, 3> p;
-        for (int a = 0; a < 3; ++a)
-          p[a] = Clamp(original.origin_[a] + (base[a] + corner[a] + (a == face.axis ? 0 : .5)) * h,
-                       original.origin_[a] + (a == face.axis ? 0 : .5 * h),
-                       original.origin_[a] + original.roots[a] * original.root_width_ - (a == face.axis ? 0 : .5 * h));
-        double v = original.VirtualFace(p, face.axis);
+        double v = original.StencilValue(cell, base, x, y, z, face.axis);
         lo = Min(lo, v);
         hi = Max(hi, v);
       }
@@ -629,6 +758,8 @@ struct GpuTransport::Impl {
     Extend<<<fb, 256>>>(f, neighbors, layers, 2);
     Centres<<<cb, 256>>>(f);
     Slopes<<<cb, 256>>>(f);
+    if (f.halo)
+      FillHalos<<<(f.halo_count + 255) / 256, 256>>>(f);
     return Check(cudaGetLastError());
   }
 };
@@ -644,7 +775,8 @@ bool GpuTransport::Build(int device,
                          const Mesh &mesh,
                          const Topology &tree,
                          double width,
-                         std::array<double, 3> origin) {
+                         std::array<double, 3> origin,
+                         bool cache_halos) {
   auto next = std::make_unique<Impl>();
   next->device = device;
   auto fail = [&]() {
@@ -682,10 +814,24 @@ bool GpuTransport::Build(int device,
       !next->Upload(f.leaves, tree.Leaves()) || !next->Upload(f.offsets, mesh.Offsets()) ||
       !next->Upload(f.incidence, mesh.Incidence()))
     return fail();
+  if (cache_halos) {
+    size_t side = size_t(f.n) + 5, count = size_t(f.nb) * 3 * side * side * side;
+    if (count > size_t(INT_MAX - 255)) {
+      next->error = "Transport halo index capacity exceeded";
+      return fail();
+    }
+    f.halo_count = int(count);
+    if (!next->Allocate(f.sites, count))
+      return fail();
+    MapHalos<<<(f.halo_count + 255) / 256, 256>>>(f);
+    if (!next->Check(cudaGetLastError()))
+      return fail();
+  }
   next->fields[1] = f;
   for (auto &field : next->fields)
     if (!next->Allocate(field.velocity_, f.nf) || !next->Allocate(field.centres_, f.nc) ||
-        !next->Allocate(field.slopes_, f.nc) || !next->Allocate(field.limits_, f.nc))
+        !next->Allocate(field.slopes_, f.nc) || !next->Allocate(field.limits_, f.nc) ||
+        (cache_halos && !next->Allocate(field.halo, f.halo_count)))
       return fail();
   if (!next->Allocate(next->neighbors, size_t(f.nf) * 6) || !next->Allocate(next->layers, f.nf) ||
       !next->Allocate(next->bad, 1) || !next->Allocate(next->result, f.nf) || !next->Allocate(next->pressure, f.nc) ||

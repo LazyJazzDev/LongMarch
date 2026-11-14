@@ -14,7 +14,13 @@ class GpuTransport {
   ~GpuTransport();
   GpuTransport(const GpuTransport &) = delete;
   GpuTransport &operator=(const GpuTransport &) = delete;
-  bool Build(int device, const Mesh &mesh, const Topology &tree, double root_width, std::array<double, 3> origin);
+  // Cache block sampling halos by default; false retains direct lookup for validation.
+  bool Build(int device,
+             const Mesh &mesh,
+             const Topology &tree,
+             double root_width,
+             std::array<double, 3> origin,
+             bool cache_halos = true);
   // Default-stream operation on caller-owned buffers on the Build device.
   // Applies two-layer slip extension before tracing. Input/output may alias.
   // Numerical failure leaves destination unchanged; CUDA error contents are unspecified.
