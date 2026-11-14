@@ -416,3 +416,10 @@ Early runs and capacity limits can provide less history than the requested windo
 Validation: build `wind3d_load_history` and run CTest `wind3d_load_history` on a
 CUDA node; run `python3 demo/wind3d/web/test_loads.py` and `test_server.py` for
 variable-dt statistics, narrow spikes, window transport, gzip and ETags.
+
+The chart defaults to excluding solver steps 1–20 after each reset from the
+selected window and all its statistics/axis bounds. The startup-step selector
+supports 0/5/20/50/100; zero restores the complete raw history. The relay applies
+`skip_steps` before statistics and returns an explicit warm-up state if no
+eligible samples exist yet. This is a configurable startup exclusion, not an
+outlier detector: later spikes are retained. Raw worker history is unchanged.

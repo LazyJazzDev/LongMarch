@@ -159,6 +159,9 @@ def make_handler(relay, static):
             if route == "/api/loads":
                 try:
                     seconds = float(parse_qs(urlsplit(self.path).query).get("seconds", ["0.25"])[0])
+                    skip_steps = int(parse_qs(urlsplit(self.path).query).get("skip_steps", ["0"])[0])
+                    if not 0 <= skip_steps <= 10000:
+                        raise ValueError("Startup steps must be between 0 and 10000")
                     if seconds not in WINDOWS:
                         raise ValueError("Unsupported history window")
                 except ValueError as error:
@@ -168,7 +171,7 @@ def make_handler(relay, static):
                     path = relay.directory / "loads.bin"
                     with path.open("rb") as file:
                         stat = os.fstat(file.fileno())
-                        etag = f'"loads-{stat.st_mtime_ns}-{stat.st_size}-{seconds}"'
+                        etag = f'"loads-{stat.st_mtime_ns}-{stat.st_size}-{seconds}-{skip_steps}"'
                         if self.headers.get("If-None-Match") == etag:
                             self.respond(304, b"", headers={"ETag": etag})
                             return
@@ -177,7 +180,7 @@ def make_handler(relay, static):
                     key = (str(path), etag, compressed)
                     with relay.cache_lock:
                         if key not in relay.compressed:
-                            packet = window_packet(data, seconds)
+                            packet = window_packet(data, seconds, skip_steps)
                             relay.compressed[key] = gzip.compress(packet, compresslevel=1) if compressed else packet
                             while len(relay.compressed) > 6:
                                 relay.compressed.popitem(last=False)

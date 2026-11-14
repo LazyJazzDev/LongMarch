@@ -47,6 +47,23 @@ class HistoryWindowTest(unittest.TestCase):
         self.assertFalse(meta['contiguous'])
         self.assertTrue(math.isfinite(meta['statistics']['force']['norm']['std']))
 
+    def test_startup_exclusion_preserves_later_spikes_and_raw_data(self):
+        rows = [(i, i*.001, .001, 100000 if i <= 20 else (99 if i == 40 else 1), 0, 0, 0, 0, 0) for i in range(1, 51)]
+        data = packet(rows, generation=3)
+        meta, selected = unpack(window_packet(data, .1, 20))
+        self.assertEqual(len(selected), 30)
+        self.assertEqual(meta['first_step'], 21)
+        self.assertEqual(meta['skipped_in_window'], 20)
+        self.assertEqual(meta['statistics']['force']['x']['max'], 99)
+        self.assertAlmostEqual(meta['statistics']['force']['x']['mean'], (29+99)/30, places=5)
+        raw, _ = unpack(window_packet(data, .1, 0))
+        self.assertEqual(raw['count'], 50)
+        self.assertEqual(raw['statistics']['force']['x']['max'], 100000)
+        warm, selected = unpack(window_packet(packet(rows[:5], generation=4), .1, 20))
+        self.assertEqual(selected, [])
+        self.assertTrue(warm['warming_up'])
+        self.assertEqual(warm['generation'], 4)
+
     def test_invalid_packet_rejected(self):
         rows = [(1, .001, .001, 0, 0, 0, 0, 0, 0)]
         with self.assertRaises(ValueError):

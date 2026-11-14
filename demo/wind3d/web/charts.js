@@ -65,12 +65,12 @@ for(const chart of charts){
   canvas.addEventListener('pointerleave',()=>{hover=null;$('history-cursor').textContent='指向曲线可查看每一个仿真步；虚线标记工况变化。';redraw();});
 }
 $('history-demean').onchange=redraw;
-$('history-window').onchange=()=>{etag='';clearTimeout(timer);controller?.abort();fetchHistory();};
+$('history-skip').onchange=$('history-window').onchange=()=>{etag='';clearTimeout(timer);controller?.abort();fetchHistory();};
 async function fetchHistory(){
   const request=new AbortController();controller=request;
   try{
     const seconds=$('history-window').value;
-    const response=await fetch(`/api/loads?seconds=${seconds}`,{signal:request.signal,headers:etag?{'If-None-Match':etag}:{}});
+    const response=await fetch(`/api/loads?seconds=${seconds}&skip_steps=${$('history-skip').value}`,{signal:request.signal,headers:etag?{'If-None-Match':etag}:{}});
     if(response.status===304)return;
     if(response.status===404){$('history-status').textContent='等待后端逐步采样，历史数据从新版后端启动时开始。';return;}
     if(!response.ok)throw new Error(`载荷历史 HTTP ${response.status}`);
@@ -79,7 +79,15 @@ async function fetchHistory(){
     const length=view.getUint32(0,true);
     if(length>16*1024*1024||length+4>buffer.byteLength)throw new Error('载荷历史头无效');
     const meta=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,4,length)));
-    if(meta.version!==1||meta.stride!==44||meta.count<1||meta.count>65536||buffer.byteLength!==4+length+44*meta.count)throw new Error('载荷历史格式无效');
+    if(meta.version!==1||meta.stride!==44||meta.count<0||meta.count>65536||buffer.byteLength!==4+length+44*meta.count)throw new Error('载荷历史格式无效');
+    if(meta.count===0){
+      if(!meta.warming_up)throw new Error('载荷历史为空');
+      history=null;hover=null;etag=response.headers.get('ETag');
+      window.wind3dLoadHistory={meta,receivedAt:Date.now()};
+      for(const kind of ['force','moment'])$(kind+'-history-stats').textContent='';
+      $('history-status').textContent=`启动阶段：第 ${meta.last_step} 步，等待超过 ${meta.skip_steps} 步后显示；设为 0 可查看完整数据。`;
+      $('history-cursor').textContent='等待启动阶段结束…';redraw();return;
+    }
     const times=new Float64Array(meta.count),steps=new Float64Array(meta.count),dt=new Float32Array(meta.count),values=new Float32Array(meta.count*6);
     for(let i=0;i<meta.count;i++){
       const at=4+length+44*i;steps[i]=view.getUint32(at,true)+view.getUint32(at+4,true)*4294967296;
@@ -88,7 +96,7 @@ async function fetchHistory(){
     }
     // Replace the entire server-owned window. Never append points from display packets.
     history={meta,times,steps,dt,values};hover=null;etag=response.headers.get('ETag');
-    $('history-status').textContent=`逐仿真步采样 · ${meta.count.toLocaleString()} 点 · t = ${meta.start.toFixed(6)}–${meta.end.toFixed(6)} s · Δt ${(meta.dt_min*1e6).toFixed(1)}–${(meta.dt_max*1e6).toFixed(1)} μs${meta.capacity_limited?' · 已达缓冲容量上限':''}${meta.contiguous?'':' · 警告：步号存在缺口'}`;
+    $('history-status').textContent=`逐仿真步采样 · 跳过重置后前 ${meta.skip_steps} 步（当前窗口排除 ${meta.skipped_in_window} 点） · ${meta.count.toLocaleString()} 点 · t = ${meta.start.toFixed(6)}–${meta.end.toFixed(6)} s · Δt ${(meta.dt_min*1e6).toFixed(1)}–${(meta.dt_max*1e6).toFixed(1)} μs${meta.capacity_limited?' · 已达缓冲容量上限':''}${meta.contiguous?'':' · 警告：步号存在缺口'}`;
     window.wind3dLoadHistory={meta,receivedAt:Date.now()};redraw();
   }catch(error){if(error.name!=='AbortError')$('history-status').textContent=`载荷历史请求失败，正在重试：${error.message}`;}
   finally{if(controller===request)timer=setTimeout(fetchHistory,2000);}

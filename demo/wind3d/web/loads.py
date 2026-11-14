@@ -7,7 +7,7 @@ ROW = struct.Struct('<Qdf6f')
 WINDOWS = (0.05, 0.1, 0.25, 0.5, 1.0, 2.0)
 
 
-def window_packet(data, seconds):
+def window_packet(data, seconds, skip_steps=0):
     length = struct.unpack_from('<I', data)[0]
     meta = json.loads(data[4:4 + length])
     body = memoryview(data)[4 + length:]
@@ -17,7 +17,12 @@ def window_packet(data, seconds):
     if not rows:
         raise ValueError('Empty load-history packet')
     cutoff = rows[-1][1] - seconds
-    first = next((i for i, row in enumerate(rows) if row[1] >= cutoff), len(rows) - 1)
+    first = next((i for i, row in enumerate(rows) if row[1] >= cutoff and row[0] > skip_steps), len(rows))
+    meta.update(skip_steps=skip_steps, skipped_in_window=sum(row[0] <= skip_steps and row[1] >= cutoff for row in rows))
+    if first == len(rows):
+        meta.update(count=0, warming_up=True, last_step=rows[-1][0], requested_seconds=seconds)
+        header = json.dumps(meta, separators=(',', ':'), allow_nan=False).encode()
+        return struct.pack('<I', len(header)) + header
     selected = rows[first:]
     # Weighted online variance remains accurate even for tiny fluctuations on a large mean.
     names = ('norm', 'x', 'y', 'z')
