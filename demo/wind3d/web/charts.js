@@ -1,20 +1,20 @@
 const $=id=>document.getElementById(id);
-const colors={x:'#f58b83',y:'#69dfbd',z:'#79b9ff'};
+const colors={x:'#ff5050',y:'#40df60',z:'#5080ff'};
 let history=null,etag='',timer,controller,hover=null;
 const keys=()=>['x','y','z'];
-const charts=['force','moment'].flatMap(kind=>keys().map(key=>({kind,key,canvas:$(kind+'-'+key+'-chart')})));
+const charts=['force','moment'].map(kind=>({kind,canvas:$(kind+'-chart')}));
 const value=(kind,key,i)=>{
   const offset=i*6+(kind==='force'?0:3),values=history.values;
   const raw=values[offset+keys().indexOf(key)];
   return raw-($('history-demean').checked?history.meta.statistics[kind][key].mean:0);
 };
 const number=v=>Number(v.toPrecision(5)).toString();
-function draw({kind,key,canvas}){
+function draw({kind,canvas}){
   const width=canvas.clientWidth,height=240,ratio=Math.min(devicePixelRatio,2);
   canvas.width=Math.round(width*ratio);canvas.height=height*ratio;
   const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);ctx.clearRect(0,0,width,height);
   if(!history){ctx.fillStyle='#8399ab';ctx.font='12px sans-serif';ctx.fillText('等待后端逐步载荷记录…',16,35);return;}
-  const {meta,times}=history,series=[key],right=width-18,top=18,bottom=202;
+  const {meta,times}=history,series=keys(),right=width-18,top=18,bottom=202;
   let low=Infinity,high=-Infinity;
   for(const key of series){const stat=meta.statistics[kind][key],offset=$('history-demean').checked?stat.mean:0;low=Math.min(low,stat.min-offset);high=Math.max(high,stat.max-offset);}
   const spread=high-low;
@@ -46,7 +46,7 @@ function draw({kind,key,canvas}){
   }
   if(hover!==null){ctx.strokeStyle='#d7e8f5';ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x(times[hover]),top);ctx.lineTo(x(times[hover]),bottom);ctx.stroke();}
   ctx.restore();
-  $(kind+'-'+key+'-history-stats').textContent=series.map(key=>{const s=meta.statistics[kind][key];return `${key==='norm'?'模长':key.toUpperCase()}：均值 ${number(s.mean)} · 峰峰值 ${number(s.peak_to_peak)} · σ ${number(s.std)}`;}).join('\n');
+  $(kind+'-history-stats').textContent=series.map(key=>{const s=meta.statistics[kind][key];return `${key==='norm'?'模长':key.toUpperCase()}：均值 ${number(s.mean)} · 峰峰值 ${number(s.peak_to_peak)} · σ ${number(s.std)}`;}).join('\n');
 }
 function redraw(){charts.forEach(draw);}
 for(const chart of charts){

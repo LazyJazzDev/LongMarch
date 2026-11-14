@@ -405,10 +405,10 @@ ETags, gzip and a bounded response cache limit transfer/processing costs.
 The page's load-history section replaces both curves with each complete server
 window. It never assembles history from arriving visualization frames. Its
 2-second polling interval affects freshness, not physical sample spacing.
-Six separate charts show Fx/Fy/Fz and Mx/My/Mz. Each vertical axis fits its own
-current-window extrema with 8% padding on every update, so small components are
-not flattened by larger components. Constant values receive a small nonzero
-range. Subtract the backend mean to inspect fluctuations, and hover for
+Two charts show force and moment, each overlaying its X/Y/Z scalar components
+in red/green/blue. Each vertical axis fits the combined current-window extrema
+of all three components with 8% padding on every update. Constant values receive
+a small nonzero range. Subtract the backend mean to inspect fluctuations, and hover for
 individual step/time/dt/load values. Dashed
 lines mark control changes; the status reports actual sample count and dt range.
 Early runs and capacity limits can provide less history than the requested window.
