@@ -519,6 +519,51 @@ __global__ void ReduceLoads(const double *partial, int count, double *loads) {
   if (threadIdx.x == 0)
     loads[blockIdx.x] = sum[0];
 }
+
+__global__ void SpeedPartials(Field f, const double *velocity, double *partial) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  double speed = 0;
+  if (i < f.nc && f.cells[i].active) {
+    Array<double, 3> u{}, area{};
+    for (int k = f.offsets[i]; k < f.offsets[i + 1]; ++k) {
+      int id = abs(f.incidence[k]) - 1;
+      auto g = f.faces[id];
+      u[g.axis] += g.area * velocity[id];
+      area[g.axis] += g.area;
+    }
+    for (int a = 0; a < 3; ++a)
+      u[a] /= area[a];
+    speed = sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]);
+    if (!isfinite(speed))
+      speed = INFINITY;
+  }
+  __shared__ double values[256];
+  values[threadIdx.x] = speed;
+  __syncthreads();
+  for (int stride = 128; stride; stride /= 2) {
+    if (threadIdx.x < stride)
+      values[threadIdx.x] = Max(values[threadIdx.x], values[threadIdx.x + stride]);
+    __syncthreads();
+  }
+  if (!threadIdx.x)
+    partial[blockIdx.x] = values[0];
+}
+
+__global__ void SpeedMaximum(const double *partial, int n, double *output) {
+  double value = 0;
+  for (int i = threadIdx.x; i < n; i += 256)
+    value = Max(value, partial[i]);
+  __shared__ double values[256];
+  values[threadIdx.x] = value;
+  __syncthreads();
+  for (int stride = 128; stride; stride /= 2) {
+    if (threadIdx.x < stride)
+      values[threadIdx.x] = Max(values[threadIdx.x], values[threadIdx.x + stride]);
+    __syncthreads();
+  }
+  if (!threadIdx.x)
+    *output = values[0];
+}
 }  // namespace
 
 struct GpuTransport::Impl {
@@ -739,5 +784,26 @@ AdvanceResult GpuTransport::AdvanceDevice(GpuProjection &projection,
     return result;
   result.advanced = true;
   return result;
+}
+
+bool GpuTransport::MaximumSpeedDevice(const double *velocity, size_t faces, double &speed) {
+  if (!impl_ || !velocity || faces != size_t(impl_->fields[0].nf))
+    return false;
+  auto &w = *impl_;
+  if (!w.Check(cudaSetDevice(w.device)))
+    return false;
+  auto f = w.fields[0];
+  int blocks = (f.nc + 255) / 256;
+  SpeedPartials<<<blocks, 256>>>(f, velocity, w.partial);
+  SpeedMaximum<<<1, 256>>>(w.partial, blocks, w.loads);
+  double value;
+  if (!w.Check(cudaGetLastError()) || !w.Check(cudaMemcpy(&value, w.loads, sizeof(double), cudaMemcpyDeviceToHost)))
+    return false;
+  if (!std::isfinite(value)) {
+    w.error = "Non-finite cell speed";
+    return false;
+  }
+  speed = value;
+  return true;
 }
 }  // namespace wind3d::amr

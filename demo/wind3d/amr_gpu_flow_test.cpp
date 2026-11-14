@@ -42,6 +42,9 @@ int Run() {
       };
     if (!flow.Initialize(0, body ? mixed : coarse, 4, 1, {-1, -1, -1}, distance, 1) || !flow.Readback(state))
       return 2;
+    double maximum;
+    if (!flow.MaximumSpeed(maximum) || std::abs(maximum - 1) > 1e-12)
+      return 23;
     if (state.info.pressure_valid || state.info.steps || state.info.time)
       return 3;
     if (!flow.Advance(.01, 1).advanced || !flow.Readback(before))

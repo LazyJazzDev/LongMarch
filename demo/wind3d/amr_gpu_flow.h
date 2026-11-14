@@ -52,6 +52,7 @@ class GpuFlow {
   // uses the transactional regrid path. Report is committed only on success.
   bool Adapt(const RefinementOptions &options, RefinementReport &report);
   AdvanceResult Advance(double dt, double speed, const FlowParameters &parameters = {});
+  bool MaximumSpeed(double &speed);
   bool Readback(FlowSnapshot &snapshot) const;
   FlowInfo Info() const;
   std::string Error() const;

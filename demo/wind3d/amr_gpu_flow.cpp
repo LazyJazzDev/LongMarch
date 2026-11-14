@@ -226,6 +226,19 @@ AdvanceResult GpuFlow::Advance(double dt, double speed, const FlowParameters &pa
   return result;
 }
 
+bool GpuFlow::MaximumSpeed(double &speed) {
+  if (!impl_) {
+    error_ = "GPU flow is not initialized";
+    return false;
+  }
+  if (!impl_->transport.MaximumSpeedDevice(impl_->u, impl_->info.faces, speed)) {
+    error_ = impl_->transport.Error();
+    return false;
+  }
+  error_.clear();
+  return true;
+}
+
 bool GpuFlow::Readback(FlowSnapshot &snapshot) const {
   if (!impl_) {
     error_ = "GPU flow is not initialized";

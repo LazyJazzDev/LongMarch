@@ -1080,6 +1080,8 @@ struct Simulation::Impl {
       float speed_bound = std::max(max_speed, controls.speed);
       float diffusion = std::max(physics.viscosity, WallViscosity(physics, 2 * speed_bound, 0.5f * g.h));
       float dt = std::min(options.cfl * g.h / speed_bound, 0.08f * g.h * g.h / diffusion);
+      if (options.max_dt > 0)
+        dt = std::min(dt, options.max_dt);
       bool geometry_changed = !mesh || controls.angle != mesh_controls.angle || controls.flap != mesh_controls.flap ||
                               controls.aileron != mesh_controls.aileron ||
                               controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder;
@@ -1354,6 +1356,11 @@ std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const So
       !(options.cfl >= 0.05f && options.cfl <= 8) || !(options.sponge >= 0 && options.sponge <= 6) ||
       (options.cut_cells && (!options.wall_model || options.wall_momentum)))
     return {};
+  if (options.max_dt < 0 || !std::isfinite(options.max_dt) || !(options.initial_controls.speed > 0) ||
+      !std::isfinite(options.initial_controls.speed) || !std::isfinite(options.initial_controls.angle) ||
+      !std::isfinite(options.initial_controls.flap) || !std::isfinite(options.initial_controls.aileron) ||
+      !std::isfinite(options.initial_controls.elevator) || !std::isfinite(options.initial_controls.rudder))
+    return {};
   size_t free_bytes = 0, total_bytes = 0;
   if (cudaSetDevice(cuda_device) != cudaSuccess || cudaMemGetInfo(&free_bytes, &total_bytes) != cudaSuccess ||
       SolverBytes(nx) > free_bytes) {
@@ -1364,6 +1371,7 @@ std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const So
   auto result = std::unique_ptr<Simulation>(new Simulation);
   result->impl_->device = cuda_device;
   result->impl_->options = options;
+  result->impl_->requested = options.initial_controls;
   result->impl_->grid = {nx, nx / 2, nx * 3 / 4, 16.0f / nx};
   if (!result->impl_->Initialize())
     return {};

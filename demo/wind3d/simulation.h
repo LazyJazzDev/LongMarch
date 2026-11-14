@@ -50,6 +50,9 @@ struct SolverOptions {
   // Advective Courant number. Semi-Lagrangian transport is unconditionally
   // stable; its interpolation dissipation per unit time falls as dt grows.
   float cfl{0.5f};
+  // Optional upper bound on the adaptive time step; 0 keeps the automatic rule.
+  float max_dt{};
+  Controls initial_controls;
   // Publish the downsampled display field; batch runs only need loads.
   bool display{true};
   bool record_loads{false};

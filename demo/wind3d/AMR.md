@@ -170,8 +170,32 @@ them as part of an experiment without a new reason/authorization.
   thresholds are heuristic defaults, not a certified 2% load-error bound.
   Job 2000974 passed policy, transfer and GPU lifecycle tests and CUDA memcheck
   (zero errors); direct strict C++ and ASan/UBSan policy tests also passed.
-  Production scheduling, real-aircraft protected bounds, adaptive histories,
+  The aircraft batch runner schedules this policy; production web integration,
   performance tuning and the uniform-reference acceptance matrix remain pending.
+- `wind3d_task --adaptive` now runs the actual aircraft with conservative
+  world-space bounds obtained from the geometry's rotated body-space broad
+  phase, plus two finest cells of padding. `--amr-uniform` runs the same new
+  operators on a uniformly fine hierarchy. Both retain native geometry and
+  optimized viscosity/wall parameters; a GPU cell-speed reduction drives CFL
+  time steps. All backends accept initial speed/angle/control deflections,
+  `--max-dt`, and step-complete six-component `--csv` load output. Adaptive
+  batch mode currently requires one GPU and `--no-export`; web/display and
+  adaptive dumps are not integrated. Native pressure CLI controls apply to
+  the native multigrid solver; adaptive projection currently uses 1e-8 and
+  at most 2000 BiCGStab iterations.
+  Job 2000975 passed transport/advance/lifecycle regressions and CUDA memcheck;
+  native default fields remained bitwise identical and all eight force vectors
+  unchanged. Three backends completed six steps at h=0.25 and dt=0.0002.
+  At step six, AMR-uniform differs from native by about 0.13% in Fx and 0.06%
+  in Fy. Adaptive uses 39,168 initial cells versus 98,304 uniform cells and
+  changes to 43,648 after refinement. These are startup samples, not load
+  acceptance. Current timings are unacceptable for the speedup goal: native
+  averaged 2.09 ms/step, AMR-uniform 46.6 ms, and ordinary adaptive steps about
+  37-42 ms; one regrid cost 0.451 s. Different projection tolerances and this
+  short startup sequence prevent a formal equal-accuracy performance claim.
+  Jacobi-preconditioned adaptive projection takes roughly 170-230 iterations;
+  profiling and a scalable preconditioner are the next priorities. Job 2000976
+  also verified changed initial control parameters and complete CSV files.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
@@ -207,3 +231,24 @@ them as part of an experiment without a new reason/authorization.
 The objective remains incomplete until the adaptive solver is integrated and
 passes the full load-preservation and performance comparison. Wing-camber
 changes are geometry changes, not part of the numerical-only import baseline.
+
+## Aircraft batch comparisons
+
+The original uniform backend remains the default. For a matched small-grid
+startup diagnostic (not a steady-load or speedup acceptance test):
+
+```sh
+cmake --build cmake-build-release --target wind3d_task -j 4
+cmake-build-release/demo/wind3d/wind3d_task --grid 64 --steps 100 --warmup 20 --cubic --no-export --max-dt 0.0002 --csv out/native.csv
+cmake-build-release/demo/wind3d/wind3d_task --amr-uniform --grid 64 --steps 100 --warmup 20 --cubic --no-export --max-dt 0.0002 --csv out/amr-uniform.csv
+cmake-build-release/demo/wind3d/wind3d_task --adaptive --grid 64 --steps 100 --warmup 20 --cubic --no-export --max-dt 0.0002 --adapt-every 25 --csv out/adaptive.csv
+```
+
+`--levels`, `--block-cells` and `--max-blocks` control the adaptive hierarchy.
+All three domain dimensions must be divisible by `block-cells * 2^levels`;
+no grid resolution is silently rounded. `--speed`, `--angle`, `--flap`,
+`--aileron`, `--elevator` and `--rudder` set the initial case before solving.
+CSV rows retain the physical step's grid generation even when a subsequent
+regrid at the same time invalidates pressure; remapping corrections are never
+reported as load samples. Adaptive timing includes speed diagnostics and any
+scheduled regrid, while initialization is reported separately.

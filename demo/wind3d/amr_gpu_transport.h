@@ -39,6 +39,7 @@ class GpuTransport {
                               double wall_viscosity = 9.2e-7,
                               double viscosity = 1.5e-5,
                               double sponge_length = 2);
+  bool MaximumSpeedDevice(const double *velocity, size_t faces, double &speed);
   std::string Error() const;
 
  private:

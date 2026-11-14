@@ -1,6 +1,6 @@
 if (LONGMARCH_WIND3D_STANDALONE)
-    add_executable(wind3d_task EXCLUDE_FROM_ALL task.cpp simulation.cu geometry.cpp)
-    target_link_libraries(wind3d_task PRIVATE CUDA::cudart Threads::Threads)
+    add_executable(wind3d_task EXCLUDE_FROM_ALL task.cpp simulation.cu geometry.cpp amr_task.cpp amr_gpu_flow.cpp amr_refinement.cpp amr_gpu_transport.cu amr_gpu_projection.cu amr_transfer.cpp amr_transport.cpp amr_boundary.cpp amr_gradient.cpp amr_mesh.cpp amr_topology.cpp)
+    target_link_libraries(wind3d_task PRIVATE CUDA::cudart CUDA::cublas Threads::Threads)
     add_executable(wind3d_web EXCLUDE_FROM_ALL web_agent.cpp simulation.cu geometry.cpp)
     target_link_libraries(wind3d_web PRIVATE CUDA::cudart Threads::Threads)
     add_executable(wind3d_sweep EXCLUDE_FROM_ALL sweep.cpp simulation.cu geometry.cpp)
