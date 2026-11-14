@@ -36,6 +36,11 @@ int main() {
               << " Fx=" << result.pressure_loads[0] << " Fy=" << result.pressure_loads[1] << '\n';
     if (!result.advanced)
       return 6;
+    if (!(result.friction_loads[0] > 0))
+      return 9;
+    for (int k = 0; k < 6; ++k)
+      if (result.total_loads[k] != result.pressure_loads[k] + result.friction_loads[k])
+        return 10;
     for (double value : u)
       if (!std::isfinite(value))
         return 7;
@@ -45,5 +50,5 @@ int main() {
   if (AdvanceReference(mesh, tree, 2, {-6, -4, -6}, -1, 1, u, p).advanced || u != before || p != old_pressure)
     return 8;
   std::cout
-      << "PASS uniform freestream preservation and coarse-aircraft inviscid time-step smoke test (not steady-load validation)\n";
+      << "PASS uniform freestream preservation and coarse-aircraft slip-wall time-step smoke test (not steady-load validation)\n";
 }

@@ -10,6 +10,7 @@
 
 #include "pressure.cuh"
 #include "simulation.h"
+#include "wall_model.h"
 
 namespace wind3d {
 namespace {
@@ -29,31 +30,8 @@ struct Physics {
   bool wall_model, wall_momentum, cut_cells;
 };
 
-// Spalding's single law of the wall, y+ as a function of u+.
-__host__ __device__ inline float SpaldingYPlus(float up, float &derivative) {
-  constexpr float kappa = 0.41f, offset = 0.1185f;  // exp(-kappa * 5.2)
-  float k = kappa * up, e = expf(k);
-  derivative = 1 + offset * kappa * (e - 1 - k - 0.5f * k * k);
-  return up + offset * (e - 1 - k - 0.5f * k * k - k * k * k / 6);
-}
-
-// Effective viscosity of the ghost-velocity wall flux: the laminar flux
-// rho * nu * U / y equals the wall shear rho * u_tau^2 when nu takes this value.
-// The log-law shear uses the tangential speed U at distance y from the wall.
 __host__ __device__ inline float WallViscosity(Physics physics, float speed, float distance) {
-  if (!physics.wall_model)
-    return physics.viscosity;
-  float reynolds = speed * distance / physics.wall_viscosity;
-  if (!(reynolds > 1))
-    return physics.wall_viscosity;
-  // Solve u+ * y+(u+) = U y / nu, which increases monotonically with u+.
-  float up = fminf(sqrtf(reynolds), 2.44f * logf(reynolds) + 5);
-  for (int i = 0; i < 24; ++i) {
-    float derivative, yp = SpaldingYPlus(up, derivative);
-    float next = up - (up * yp - reynolds) / (yp + up * derivative);
-    up = fminf(fmaxf(next, 0.5f * up), 2 * up);
-  }
-  return physics.wall_viscosity * reynolds / (up * up);
+  return physics.wall_model ? WallEffectiveViscosity(physics.wall_viscosity, speed, distance) : physics.viscosity;
 }
 
 struct Grid {

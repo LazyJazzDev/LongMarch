@@ -81,8 +81,19 @@ them as part of an experiment without a new reason/authorization.
   forces/moments. Three small steps around the actual aircraft on a two-level
   mesh pass a finite-state/projection smoke test. This is an inviscid CPU
   reference, not the final solver: slip extensions, MacCormack correction,
-  viscosity, wall friction, sponge, GPU transport, dynamic regridding and
+  viscosity, sponge, GPU transport, dynamic regridding and
   long-time load equivalence remain required.
+- Two-layer slip extension and load-only Spalding friction are now connected
+  to the CPU reference advance. The wall law is factored into `wall_model.h`
+  for both backends. Wall loads use unweighted pre-step MAC centre velocities
+  after extension, the cut-cell wetted-area vector, half-cell wall distance,
+  and centre-based shear moment arms, matching the uniform formulation.
+  The planar-wall test agrees with an independent double-precision bisection
+  solution (force 0.0256771 N, Mz -0.00320964 N m), checks zero normal-flow
+  friction, and passes ASan/UBSan. Job 2000957 passed all nine AMR tests;
+  the uniform CUDA field dump is bitwise unchanged and all eight sampled force
+  vectors are identical after sharing the wall law. This is a refactor
+  regression check, not a steady-load equivalence claim.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

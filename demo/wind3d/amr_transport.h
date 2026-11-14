@@ -8,6 +8,7 @@ namespace wind3d::amr {
 class FaceField {
  public:
   FaceField(const Mesh &mesh, const Topology &tree, double root_width, std::array<double, 3> origin);
+  bool ExtendSlip(std::vector<double> &velocity) const;
   bool Update(const std::vector<double> &velocity);
   std::array<double, 3> Sample(std::array<double, 3> point) const;
   bool Advect(double dt, std::vector<double> &destination, bool cubic = false) const;

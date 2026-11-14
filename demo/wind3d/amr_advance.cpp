@@ -12,12 +12,14 @@ AdvanceResult AdvanceReference(const Mesh &mesh,
                                std::vector<double> &velocity,
                                std::vector<double> &pressure,
                                bool cubic,
-                               double density) {
+                               double density,
+                               double wall_viscosity) {
   AdvanceResult result;
   if (!(dt > 0) || !std::isfinite(dt) || !(density > 0) || !std::isfinite(density) || !std::isfinite(speed))
     return result;
   FaceField field(mesh, tree, root_width, origin);
-  if (!field.Update(velocity))
+  auto extended = velocity;
+  if (!field.ExtendSlip(extended) || !field.Update(extended))
     return result;
   std::vector<double> next, potential;
   if (!field.Advect(dt, next, cubic))
@@ -45,6 +47,10 @@ AdvanceResult AdvanceReference(const Mesh &mesh,
   for (double load : result.pressure_loads)
     if (!std::isfinite(load))
       return result;
+  if (!WallLoads(mesh, extended, density, wall_viscosity, result.friction_loads))
+    return result;
+  for (int i = 0; i < 6; ++i)
+    result.total_loads[i] = result.pressure_loads[i] + result.friction_loads[i];
   velocity = std::move(next);
   pressure = std::move(potential);
   result.advanced = true;

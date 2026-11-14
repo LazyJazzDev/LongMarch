@@ -1,15 +1,16 @@
 #pragma once
 #include "amr_projection.h"
 #include "amr_transport.h"
+#include "amr_wall_loads.h"
 
 namespace wind3d::amr {
 struct AdvanceResult {
   bool advanced{};
   ProjectionResult projection;
-  std::array<double, 6> pressure_loads{};
+  std::array<double, 6> pressure_loads{}, friction_loads{}, total_loads{};
 };
 
-// CPU inviscid reference time step. Wall friction, viscous diffusion, sponge,
+// CPU reference with slip transport and load-only wall friction. Viscous diffusion, sponge,
 // MacCormack correction and regridding are not supplied by this reference.
 // A failed transport/projection leaves the caller's complete state untouched.
 AdvanceResult AdvanceReference(const Mesh &mesh,
@@ -21,5 +22,6 @@ AdvanceResult AdvanceReference(const Mesh &mesh,
                                std::vector<double> &velocity,
                                std::vector<double> &pressure,
                                bool cubic = true,
-                               double density = 1.225);
+                               double density = 1.225,
+                               double wall_viscosity = 9.2e-7);
 }  // namespace wind3d::amr

@@ -42,6 +42,49 @@ int FaceField::CellAt(std::array<double, 3> point) const {
   return block * n * n * n + (z * n + y) * n + x;
 }
 
+bool FaceField::ExtendSlip(std::vector<double> &velocity) const {
+  if (velocity.size() != mesh_.Faces().size() || mesh_.Cells().empty() || !(root_width_ > 0))
+    return false;
+  std::vector<std::array<int, 6>> neighbors(velocity.size());
+  std::vector<bool> first(velocity.size());
+  for (size_t f = 0; f < velocity.size(); ++f) {
+    if (!std::isfinite(velocity[f]))
+      return false;
+    auto face = mesh_.Faces()[f];
+    if (face.aperture > 0)
+      continue;
+    double h = std::sqrt(face.area);
+    for (int k = 0; k < 6; ++k) {
+      auto p = face.centre;
+      p[k / 2] += (k % 2 ? 1 : -1) * h;
+      int other = NativeFace(p, face.axis);
+      neighbors[f][k] = other;
+      first[f] = first[f] || (other >= 0 && mesh_.Faces()[other].aperture > 0);
+    }
+  }
+  auto extended = velocity;
+  for (size_t f = 0; f < extended.size(); ++f)
+    if (mesh_.Faces()[f].aperture == 0)
+      extended[f] = 0;
+  for (int layer = 1; layer <= 2; ++layer)
+    for (size_t f = 0; f < velocity.size(); ++f) {
+      if (mesh_.Faces()[f].aperture > 0 || (layer == 1 ? !first[f] : first[f]))
+        continue;
+      double sum = 0;
+      int used = 0;
+      for (int other : neighbors[f])
+        if (other >= 0 &&
+            (layer == 1 ? mesh_.Faces()[other].aperture > 0 : mesh_.Faces()[other].aperture == 0 && first[other])) {
+          sum += extended[other];
+          ++used;
+        }
+      if (used)
+        extended[f] = sum / used;
+    }
+  velocity = std::move(extended);
+  return true;
+}
+
 bool FaceField::Update(const std::vector<double> &velocity) {
   if (velocity.size() != mesh_.Faces().size() || mesh_.Cells().empty() || !(root_width_ > 0) ||
       !std::isfinite(root_width_))
@@ -153,7 +196,7 @@ double FaceField::VirtualFace(std::array<double, 3> point, int axis) const {
     return 0;
   int native = NativeFace(point, axis);
   if (native >= 0)
-    return mesh_.Faces()[native].aperture > 0 ? velocity_[native] : 0;
+    return velocity_[native];
   const auto &c = mesh_.Cells()[cell];
   double value = centres_[cell][axis];
   for (int a = 0; a < 3; ++a)
