@@ -81,7 +81,7 @@ them as part of an experiment without a new reason/authorization.
   forces/moments. Three small steps around the actual aircraft on a two-level
   mesh pass a finite-state/projection smoke test. This CPU reference includes
   slip extension, bounded MacCormack correction, molecular diffusion and an
-  outlet sponge. Full GPU time-step integration, dynamic regridding and
+  outlet sponge. Production solver integration, dynamic regridding and
   long-time load equivalence remain required.
 - Two-layer slip extension and load-only Spalding friction are now connected
   to the CPU reference advance. The wall law is factored into `wall_model.h`
@@ -116,9 +116,23 @@ them as part of an experiment without a new reason/authorization.
   (zero errors). Constant, smooth and discontinuous fields on a two-level
   hierarchy, with and without an embedded box, agree with CPU transport to
   1.11e-16 across linear/cubic and corrected/uncorrected modes. Tests also
-  cover in-place buffers, invalid inputs and failed-build recovery. This does
-  not yet integrate GPU diffusion, boundary conditions, loads or regridding,
-  and no end-to-end speedup or steady-load accuracy is established.
+  cover in-place buffers, invalid inputs and failed-build recovery.
+- `GpuTransport::AdvanceDevice` now combines transport, molecular diffusion,
+  outlet sponge, boundary prescription and projection on resident fields.
+  GPU pressure/friction load reductions return 12 scalars; full velocity and
+  physical pressure stay on the device. Numerical failure leaves caller state
+  unchanged. Job 2000967 passed all 13 tests and projection, transport and
+  full-timestep CUDA memchecks (zero errors). Tests cover freestream,
+  viscous shear with a shorter sponge, three aircraft steps and invalid steps.
+  Same-input CPU/GPU velocity differences are at most 2.20e-9 in these cases.
+  Independent aircraft trajectories differ by up to 8.07e-6 in velocity and
+  1.29e-4 in pressure after small input perturbations; same-input step checks
+  isolate this from operator parity (aircraft error <=1.84e-10). Independent
+  pressure/friction load component differences are <=2.43e-6. Tests bound both
+  local operator error and accumulated state differences separately. This is
+  startup validation only: nonlinear sensitivity still requires long-time
+  load statistics, and neither the 2% uniform-reference gate nor an end-to-end
+  speedup has been established.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

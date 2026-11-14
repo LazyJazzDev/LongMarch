@@ -2,10 +2,12 @@
 #include <memory>
 #include <string>
 
-#include "amr_mesh.h"
+#include "amr_advance.h"
 
 namespace wind3d::amr {
 // Persistent single-device sparse MAC transport. Topology changes require Build.
+class GpuProjection;
+
 class GpuTransport {
  public:
   GpuTransport();
@@ -22,6 +24,21 @@ class GpuTransport {
                     double dt,
                     bool cubic = true,
                     bool corrected = true);
+  // Projection must be built for the same device and mesh. Velocity and
+  // physical pressure are disjoint caller-owned buffers; only successful
+  // steps commit them. Default stream, as for AdvectDevice.
+  AdvanceResult AdvanceDevice(GpuProjection &projection,
+                              double *velocity,
+                              size_t faces,
+                              double *pressure,
+                              size_t cells,
+                              double dt,
+                              double speed,
+                              bool cubic = true,
+                              double density = 1.225,
+                              double wall_viscosity = 9.2e-7,
+                              double viscosity = 1.5e-5,
+                              double sponge_length = 2);
   std::string Error() const;
 
  private:
