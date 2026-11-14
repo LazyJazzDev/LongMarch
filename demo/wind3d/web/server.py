@@ -7,6 +7,7 @@ import math
 import mimetypes
 import os
 import re
+import struct
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,6 +23,56 @@ def atomic(path, data):
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(data, encoding="utf-8")
     os.replace(temporary, path)
+
+
+def simplify_frame(data):
+    """Simplify display polylines to 2 mm and 0.02 RGB; never touch solver data."""
+    size = struct.unpack_from("<I", data)[0]
+    meta = json.loads(data[4:4 + size])
+    output = bytearray()
+    chain = []
+
+    def flush():
+        if len(chain) < 2:
+            return
+        keep = {0, len(chain) - 1}
+        pending = [(0, len(chain) - 1)]
+        while pending:
+            lo, hi = pending.pop()
+            a, b = chain[lo], chain[hi]
+            delta = [b[k] - a[k] for k in range(3)]
+            length2 = sum(v * v for v in delta)
+            worst, split = 1.0, None
+            for i in range(lo + 1, hi):
+                point = chain[i]
+                t = max(0, min(1, sum((point[k] - a[k]) * delta[k] for k in range(3)) / max(length2, 1e-20)))
+                error = sum((point[k] - a[k] - t * delta[k]) ** 2 for k in range(3)) / 0.002 ** 2
+                color = max(abs(point[k] - a[k] - t * (b[k] - a[k])) for k in range(3, 6)) / 0.02
+                error = max(error, color * color)
+                if error > worst:
+                    worst, split = error, i
+            if split is not None:
+                keep.add(split)
+                pending.extend(((lo, split), (split, hi)))
+        indices = sorted(keep)
+        for lo, hi in zip(indices, indices[1:]):
+            output.extend(struct.pack("<12f", *chain[lo], *chain[hi]))
+
+    for segment in struct.iter_unpack("<12f", data[4 + size:]):
+        a, b = segment[:6], segment[6:]
+        if chain and (chain[-1][:3] != a[:3] or max(abs(chain[-1][k] - a[k]) for k in range(3, 6)) > 0.02):
+            flush()
+            chain = []
+        if not chain:
+            chain.append(a)
+        chain.append(b)
+    flush()
+    meta["original_line_vertices"] = meta["line_vertices"]
+    meta["line_vertices"] = len(output) // 24
+    meta["display_tolerance_m"] = 0.002
+    header = json.dumps(meta, separators=(",", ":")).encode()
+    header += b" " * (-len(header) % 4)
+    return struct.pack("<I", len(header)) + header + output
 
 
 class Relay:
@@ -93,6 +144,7 @@ def make_handler(relay, static):
 
         def do_GET(self):
             route = urlsplit(self.path).path
+            compact = route == "/api/frame" and urlsplit(self.path).query == "compact=1"
             if route == "/api/status":
                 with relay.lock:
                     state = json.loads(json.dumps(relay.desired))
@@ -119,6 +171,8 @@ def make_handler(relay, static):
                 with path.open("rb") as file:
                     stat = os.fstat(file.fileno())
                     etag = f'"{stat.st_mtime_ns}-{stat.st_size}"'
+                    if compact:
+                        etag = etag[:-1] + '-compact"'
                     if self.headers.get("If-None-Match") == etag:
                         self.respond(304, b"", headers={"ETag": etag})
                         return
@@ -129,11 +183,13 @@ def make_handler(relay, static):
                     key = (str(path), etag)
                     with relay.cache_lock:
                         if key not in relay.compressed:
-                            relay.compressed[key] = gzip.compress(data, compresslevel=1)
+                            relay.compressed[key] = gzip.compress(simplify_frame(data) if compact else data, compresslevel=1)
                             while len(relay.compressed) > 6:
                                 relay.compressed.popitem(last=False)
                         data = relay.compressed[key]
                     headers["Content-Encoding"] = "gzip"
+                elif compact:
+                    data = simplify_frame(data)
                 self.respond(200, data, kind or "application/octet-stream", headers)
             except FileNotFoundError:
                 self.respond(404, b'{"error":"Waiting for GPU worker"}')

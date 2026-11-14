@@ -368,3 +368,10 @@ flow or transfer the volume. Streams can terminate at the aircraft or low speed.
 The optional domain outline uses the solver's bounds: x [-6,10], y [-4,4],
 z [-6,6] metres. Enabling it frames the entire box; this shows the computational
 extent, not every individual grid cell.
+
+For SSH forwarding, the browser requests `/api/frame?compact=1`. The relay
+simplifies display polylines with a 2 mm positional and 0.02 RGB tolerance,
+preserving streamline seeds and leaving simulation fields and loads unchanged.
+It caches the compressed representation separately from the original packet.
+Requests are serial and wait two seconds after each transfer to avoid filling
+a slow tunnel with display updates. Meshes are still transferred only on change.

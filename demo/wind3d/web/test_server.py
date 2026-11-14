@@ -1,4 +1,5 @@
 import json
+import struct
 import tempfile
 import threading
 import unittest
@@ -7,7 +8,7 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from server import Relay, make_handler
+from server import Relay, make_handler, simplify_frame
 
 
 class RelayTest(unittest.TestCase):
@@ -64,6 +65,25 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(Relay(self.directory).desired, state)
         self.assertEqual((self.directory / "controls.txt").read_text().split()[-1], "4")
 
+    def test_compact_representation_has_distinct_etag(self):
+        header = json.dumps(dict(version=1, line_vertices=6)).encode()
+        header += b" " * (-len(header) % 4)
+        points = [(i, 0, 0, 0.2, 0.4, 0.6) for i in range(4)]
+        body = b"".join(struct.pack("<12f", *a, *b) for a, b in zip(points, points[1:]))
+        (self.directory / "frame.bin").write_bytes(struct.pack("<I", len(header)) + header + body)
+        with urllib.request.urlopen(self.url + "/api/frame") as response:
+            original_etag = response.headers["ETag"]
+        with urllib.request.urlopen(self.url + "/api/frame?compact=1") as response:
+            compact_etag = response.headers["ETag"]
+            data = response.read()
+        self.assertNotEqual(original_etag, compact_etag)
+        size = struct.unpack_from("<I", data)[0]
+        self.assertEqual(json.loads(data[4:4 + size])["line_vertices"], 2)
+        request = urllib.request.Request(self.url + "/api/frame?compact=1", headers={"If-None-Match": compact_etag})
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request)
+        self.assertEqual(error.exception.code, 304)
+
     def test_only_display_data_is_exposed(self):
         (self.directory / "frame.bin").write_bytes(b"test-frame")
         with urllib.request.urlopen(self.url + "/api/frame") as response:
@@ -77,6 +97,29 @@ class RelayTest(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as error:
                 urllib.request.urlopen(self.url + path)
             self.assertEqual(error.exception.code, 404)
+
+
+class CompactFrameTest(unittest.TestCase):
+    def test_curve_and_color_features_survive(self):
+        points = [(i / 100, 0.2 if i == 50 else 0, 0, 1.0 if i == 75 else 0.2, 0.4, 0.6) for i in range(101)]
+        body = b"".join(struct.pack("<12f", *a, *b) for a, b in zip(points, points[1:]))
+        header = json.dumps(dict(version=1, line_vertices=200)).encode()
+        header += b" " * (-len(header) % 4)
+        compact = simplify_frame(struct.pack("<I", len(header)) + header + body)
+        size = struct.unpack_from("<I", compact)[0]
+        meta = json.loads(compact[4:4 + size])
+        self.assertLess(meta["line_vertices"], 30)
+        self.assertEqual(meta["original_line_vertices"], 200)
+        vertices = list(struct.iter_unpack("<6f", compact[4 + size:]))
+        self.assertTrue(any(abs(v[1] - 0.2) < 1e-6 for v in vertices))
+        self.assertTrue(any(v[3] == 1 for v in vertices))
+        for point in points:
+            errors = []
+            for a, b in zip(vertices[::2], vertices[1::2]):
+                delta = [b[k] - a[k] for k in range(3)]
+                t = max(0, min(1, sum((point[k] - a[k]) * delta[k] for k in range(3)) / max(sum(v*v for v in delta), 1e-20)))
+                errors.append(sum((point[k] - a[k] - t*delta[k])**2 for k in range(3)))
+            self.assertLessEqual(min(errors), 0.002**2)
 
 
 if __name__ == "__main__":

@@ -107,7 +107,7 @@ function updateNumbers(meta,bytes){
 }
 async function getFrame(){
   try {
-    const response=await fetch('/api/frame',{headers:frameTag?{'If-None-Match':frameTag}:{}});
+    const response=await fetch('/api/frame?compact=1',{headers:frameTag?{'If-None-Match':frameTag}:{}});
     if(response.status===304||response.status===404)return;
     if(!response.ok)throw new Error(`显示帧 HTTP ${response.status}`);
     const buffer=await response.arrayBuffer(), view=new DataView(buffer);
@@ -117,6 +117,7 @@ async function getFrame(){
     if(meta.version!==1||buffer.byteLength!==4+length+meta.line_vertices*24)throw new Error('显示几何长度无效');
     let meshGeometry=null;
     if(meshID!==meta.mesh){
+      $('payload').textContent='正在加载飞机构型…';
       const meshResponse=await fetch('/api/mesh/'+meta.mesh);if(!meshResponse.ok)throw new Error('飞机构型暂未同步，正在重试');
       const meshBuffer=await meshResponse.arrayBuffer();if(meshBuffer.byteLength!==meta.mesh_vertices*36)throw new Error('飞机网格长度无效');
       transferred+=Number(meshResponse.headers.get('Content-Length'))||meshBuffer.byteLength;meshGeometry=geometry(new Float32Array(meshBuffer),9,true);
@@ -129,8 +130,8 @@ async function getFrame(){
     packetMeta=meta;transferred+=Number(response.headers.get('Content-Length'))||buffer.byteLength;frameTag=response.headers.get('ETag');
     updateNumbers(meta,buffer.byteLength);showError('');
     window.wind3dState={meta,domainBounds:[meta.domain_min,meta.domain_max],meshVertices:aircraft.geometry.attributes.position.count,lineVertices:lines.attributes.position.count};
-  } catch(error){showError(error.message);}
-  finally {setTimeout(getFrame,350);}
+  } catch(error){showError(`显示数据请求失败，正在重试：${error.message}`);}
+  finally {setTimeout(getFrame,2000);}
 }
 async function status(){
   try {
@@ -139,7 +140,7 @@ async function status(){
     if(!desired){desired=state;setControls(state.controls);setDensity(state.streamline_density??2);$('pause').textContent=state.paused?'继续':'暂停';}
     else if(!pending&&state.sequence>desired.sequence){desired=state;setControls(state.controls);setDensity(state.streamline_density??2);$('pause').textContent=state.paused?'继续':'暂停';}
     const stale=state.age===null||state.age>5||!!state.error;
-    $('connection').textContent=state.error?'GPU 节点异常':state.age===null?'等待 GPU 节点':stale?'显示数据已过期':packetMeta?.paused?'已暂停 · GPU 在线':'实时连接 · GPU 在线';
+    $('connection').textContent=state.error?'GPU 节点异常':state.age===null?'等待 GPU 节点':stale?'显示数据已过期':!packetMeta?'GPU 在线 · 加载画面…':packetMeta?.paused?'已暂停 · GPU 在线':'实时连接 · GPU 在线';
     $('connection').className='badge '+(stale?'stale':'live');
     $('freshness').textContent=state.age===null?'等待 GPU 节点发布首帧；不会显示模拟数据。':`显示数据更新于 ${state.age.toFixed(1)} 秒前；仅传输飞机网格、流线和诊断。`;
     if(!pending)$('ack').textContent=packetMeta?.ack===desired.sequence?'参数已生效':desired.paused?'待生效（可继续或重置）':'参数待生效';
