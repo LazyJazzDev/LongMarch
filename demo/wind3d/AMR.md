@@ -133,6 +133,17 @@ them as part of an experiment without a new reason/authorization.
   startup validation only: nonlinear sensitivity still requires long-time
   load statistics, and neither the 2% uniform-reference gate nor an end-to-end
   speedup has been established.
+- `TransferVelocity` supplies a host-side conservative regrid path. It sums
+  open-face flux on coarsening and uses bounded, flux-recentered reconstruction
+  on refinement; newly introduced interior faces use the old sparse sampler.
+  Changed cut-face open areas are rejected transactionally. Direct strict C++
+  and ASan/UBSan tests pass: constant preservation, moved refinement, unchanged
+  embedded surfaces, changed-body rejection, no new extrema and failure rollback.
+  Refine/coarsen face roundtrip errors are 1.11e-16; post-transfer projection
+  gives max divergence <=1.76e-9 in the tested fields. The transfer itself is
+  not divergence-free: its caller must project, and that correction potential
+  must not be interpreted as physical pressure. Runtime GPU state replacement,
+  refinement indicators and load equivalence through regrids remain pending.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
