@@ -116,7 +116,8 @@ float GridMipSample(uint level, float2 grid) {
 float GridFade(PSInput input) {
   float2 edge = min(input.screen_position - input.clip_rect.xy, input.clip_rect.zw - input.screen_position);
   float width = max(1.0, min(input.clip_rect.z - input.clip_rect.x, input.clip_rect.w - input.clip_rect.y) * 0.06);
-  return smoothstep(0.0, width, min(edge.x, edge.y));
+  float opacity = float(input.extra.y >> 18) / 16383.0;
+  return lerp(1.0, smoothstep(0.0, width, min(edge.x, edge.y)), opacity);
 }
 
 uint DetailSpan(uint level) {
@@ -124,9 +125,11 @@ uint DetailSpan(uint level) {
 }
 
 float3 CheckerColor(float3 color, float2 grid, uint packed) {
-  uint level = packed >> 16;
+  uint level = (packed >> 16) & 3u;
   float t = float(packed & 65535u) / 65535.0;
-  float parent_c = 0.02 * (1.0 - t), child_c = 0.02 * t;
+  if (level == 3)
+    return color;
+  float parent_c = 0.02 * (1.0 - t), child_c = level == 2 ? 0.0 : 0.02 * t;
   uint2 parent_cell = uint2(floor(grid / float(DetailSpan(level))));
   float parent_a = ((parent_cell.x + parent_cell.y) & 1u) == 0 ? 1.0 : 0.0;
   if (t > 0 && level < 3) {
@@ -147,15 +150,19 @@ float4 CellGridTheme(PSInput input, float sample_size, bool allow_discard = true
   int2 size = int2(input.extra.zw);
   clip(float2(cell));
   clip(float2(size - 1 - cell));
-  if (input.extra.x == 6 && input.color.z < 1.0) {
+  float3 filtered = 0.0;
+  if (input.extra.x == 6 && input.color.z < 8.0) {
     float lod = clamp(log2(1.0 / input.color.z), 0.0, 14.0);
     uint level = uint(floor(lod));
-    float density = lerp(GridMipSample(level, grid), GridMipSample(min(level + 1, 14u), grid), frac(lod));
+    float density = GridMipSample(level, grid);
+    if (lod > 0)
+      density = lerp(density, GridMipSample(min(level + 1, 14u), grid), frac(lod));
     // Area averages of the same rounded, shaded dead/live cell themes below,
     // including the inter-cell gaps. Blend levels in linear brightness.
     float brightness = lerp(0.183960325, 0.493834190, density);
-    return float4(lerp(float3(input.color.w), CheckerColor(float3(brightness), grid, input.extra.y), GridFade(input)),
-                  1.0);
+    filtered = float3(brightness);
+    if (input.color.z <= 2.0)
+      return float4(lerp(float3(input.color.w), CheckerColor(filtered, grid, input.extra.y), GridFade(input)), 1.0);
   }
   // Each cell fills the middle 80% of its pitch, mapped to [-1, 1] as before.
   float2 local_position = (grid - float2(cell) - 0.5) / 0.4;
@@ -168,7 +175,7 @@ float4 CellGridTheme(PSInput input, float sample_size, bool allow_discard = true
   p *= p;
   float samples_per_unit = 0.4 * input.color.z / max(sample_size, 1.0e-6);
   float coverage = saturate(0.5 - (pow(p.x + p.y, 0.125) - 1.0) * samples_per_unit);
-  if (allow_discard)
+  if (allow_discard && input.extra.x != 6)
     clip(coverage - 1.0 / 512.0);
   float3 appearance;
   if (input.extra.x == 6) {
@@ -186,15 +193,16 @@ float4 CellGridTheme(PSInput input, float sample_size, bool allow_discard = true
   scale = 2.0 - length(local_position - float2(-1.0, -1.0)) * 0.3;
   float4 foreground_color = float4(float3(scale * appearance.y), 1.0) * appearance.z;
   float3 cell_color = background_color * (1.0 - foreground_color.a) + foreground_color.rgb * foreground_color.a;
-  float fade = 1.0;
-  if (input.extra.x == 6) {
-    float2 edge = min(input.screen_position - input.clip_rect.xy, input.clip_rect.zw - input.screen_position);
-    float width = max(1.0, min(input.clip_rect.z - input.clip_rect.x, input.clip_rect.w - input.clip_rect.y) * 0.06);
-    fade = smoothstep(0.0, width, min(edge.x, edge.y));
-  }
+  float fade = input.extra.x == 6 ? GridFade(input) : 1.0;
   float3 shaded = lerp(float3(input.color.w), cell_color, coverage);
-  if (input.extra.x == 6)
+  if (input.extra.x == 6) {
+    // Rounded bevels and narrow gaps are high-frequency detail. Remove them
+    // continuously before they become subpixel; keep population filtering active
+    // through the transition rather than switching abruptly at one cell/pixel.
+    if (input.color.z < 8.0)
+      shaded = lerp(filtered, shaded, smoothstep(2.0, 8.0, input.color.z));
     shaded = CheckerColor(shaded, grid, input.extra.y);
+  }
   return float4(lerp(float3(input.color.w), shaded, fade), 1.0);
 }
 
@@ -217,7 +225,7 @@ float RulerLayer(PSInput input, uint span, float font, float prominence, bool ma
 }
 
 float4 GridRulerTheme(PSInput input, float sample_size) {
-  uint level = input.extra.y >> 16;
+  uint level = (input.extra.y >> 16) & 3u;
   float t = float(input.extra.y & 65535u) / 65535.0;
   float font = float(input.extra.z) / 64.0;
   // At t=1 the child has exactly the next major layer's dimensions. Shared
