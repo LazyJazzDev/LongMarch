@@ -7,8 +7,8 @@
 namespace life_demo {
 
 // Bit-packed main tiles are updated in place. Each workgroup decodes its old
-// tile into four-bit cells; a separate buffer holds old edges/corners.
-// The default 64x64 compute tile uses 2 KiB of shared memory. Storage pages
+// tile into state and horizontal-count bit planes; a separate buffer holds old edges/corners.
+// The default 64x64 compute tile uses 1.5 KiB of shared memory. Storage pages
 // remain 256x256 independently of compute tiling.
 class TiledLife {
  public:

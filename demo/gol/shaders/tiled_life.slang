@@ -12,7 +12,6 @@
 #define WORDS_PER_ROW (TILE_SIZE / 32)
 #define WORDS_PER_TILE (TILE_SIZE * TILE_SIZE / 32)
 #define HALO_WORDS (4 * WORDS_PER_ROW + 1)
-#define SHARED_WORDS (TILE_SIZE * TILE_SIZE / 8)
 #ifndef GROUP_THREADS
 #define GROUP_THREADS 256
 #endif
@@ -89,27 +88,31 @@ uint EdgeCell(uint2 tile, int x, int y) {
   return (Halo(neighbor, HALO_WORDS - 1) >> corner) & 1;
 }
 
-// Eight four-bit cells per uint; a 256x256 tile uses 32 KiB, a 128x128 tile 8 KiB.
-// Horizontal sums and the old state share each nibble. A barrier separates
-// decoding plus horizontal scanning from the vertical pass and main writes.
-groupshared uint local_cells[SHARED_WORDS];
+// Bit planes decode each tile into old states and two horizontal-count bits.
+// A uint holds the same bit for 32 cells, so the vertical scan updates all
+// 32 cells together without expanding and repacking eight-cell nibbles.
+// Three bits per cell use 24 KiB for 256x256 or 1.5 KiB for 64x64.
+groupshared uint old_states[WORDS_PER_TILE];
+groupshared uint horizontal_low[WORDS_PER_TILE];
+groupshared uint horizontal_high[WORDS_PER_TILE];
 
-uint Expand(uint bits) {
-  bits &= 255u;
-  bits = (bits | (bits << 12)) & 0x000f000fu;
-  bits = (bits | (bits << 6)) & 0x03030303u;
-  return (bits | (bits << 3)) & 0x11111111u;
+uint2 HorizontalBits(uint center, uint left, uint right) {
+  return uint2(center ^ left ^ right, (center & left) | (right & (center | left)));
 }
 
-uint Pack(uint cells8) {
-  cells8 = (cells8 | (cells8 >> 3)) & 0x03030303u;
-  cells8 = (cells8 | (cells8 >> 6)) & 0x000f000fu;
-  return (cells8 | (cells8 >> 12)) & 255u;
+uint2 HorizontalAt(uint index) {
+  return uint2(horizontal_low[index], horizontal_high[index]);
 }
 
-uint EqualNibble(uint a, uint b) {
-  uint different = a ^ b;
-  return ~(different | (different >> 1) | (different >> 2) | (different >> 3)) & 0x11111111u;
+uint NextWord(uint2 a, uint2 b, uint2 c, uint old) {
+  uint ones = a.x ^ b.x ^ c.x;
+  uint carry = (a.x & b.x) | (c.x & (a.x | b.x));
+  uint twos = a.y ^ b.y ^ c.y;
+  uint fours = ((a.y & b.y) | (c.y & (a.y | b.y))) ^ (twos & carry);
+  twos ^= carry;
+  // Inclusive sums 8 and 9 alias 0 and 1 in these three planes. All four
+  // totals imply death, so the unused eight's bit cannot affect the rule.
+  return (ones & twos & ~fours) | (~(ones | twos) & fours & old);
 }
 
 // Read a whole old top/bottom border word once, before expanding its cells.
@@ -134,25 +137,17 @@ uint HaloRowWord(uint2 tile, uint word, int y) {
     uint right = xword + 1 < WORDS_PER_ROW ? Load(tile_index, xword + 1, y) & 1 : EdgeCell(tile, TILE_SIZE, int(y));
     uint shiftedLeft = (bits << 1) | left;
     uint shiftedRight = (bits >> 1) | (right << 31);
-    for (uint j = 0; j < 4; ++j) {
-      uint old = Expand(bits >> (j * 8));
-      uint count = old + Expand(shiftedLeft >> (j * 8)) + Expand(shiftedRight >> (j * 8));
-      local_cells[i * 4 + j] = (count << 1) | old;
-    }
+    uint2 count = HorizontalBits(bits, shiftedLeft, shiftedRight);
+    old_states[i] = bits;
+    horizontal_low[i] = count.x;
+    horizontal_high[i] = count.y;
   }
   GroupMemoryBarrierWithGroupSync();
   // Interior rows have no halo branches. Reuse the center read for state
   // and count instead of routing every packet through the generic accessor.
   for (uint index = lane + WORDS_PER_ROW; index < WORDS_PER_TILE - WORDS_PER_ROW; index += GROUP_THREADS) {
-    uint result = 0;
-    for (uint i = 0; i < 4; ++i) {
-      uint center = local_cells[index * 4 + i];
-      uint above = local_cells[(index - WORDS_PER_ROW) * 4 + i];
-      uint below = local_cells[(index + WORDS_PER_ROW) * 4 + i];
-      uint count = ((above >> 1) & 0x77777777u) + ((center >> 1) & 0x77777777u) + ((below >> 1) & 0x77777777u);
-      uint alive = EqualNibble(count, 0x33333333u) | (EqualNibble(count, 0x44444444u) & center);
-      result |= Pack(alive) << (i * 8);
-    }
+    uint result = NextWord(HorizontalAt(index - WORDS_PER_ROW), HorizontalAt(index),
+                           HorizontalAt(index + WORDS_PER_ROW), old_states[index]);
     cells.Store(Address(tile_index, index % WORDS_PER_ROW, index / WORDS_PER_ROW), result);
   }
   // Only the two boundary rows consult old neighboring halos.
@@ -167,15 +162,8 @@ uint HaloRowWord(uint2 tile, uint word, int y) {
     uint right = word + 1 < WORDS_PER_ROW ? HaloRowWord(tile, word + 1, outerY) & 1 : EdgeCell(tile, TILE_SIZE, outerY);
     uint shiftedLeft = (bits << 1) | left;
     uint shiftedRight = (bits >> 1) | (right << 31);
-    uint result = 0;
-    for (uint i = 0; i < 4; ++i) {
-      uint center = local_cells[index * 4 + i];
-      uint inner = local_cells[(innerY * WORDS_PER_ROW + word) * 4 + i];
-      uint count = ((center >> 1) & 0x77777777u) + ((inner >> 1) & 0x77777777u) + Expand(bits >> (i * 8)) +
-                   Expand(shiftedLeft >> (i * 8)) + Expand(shiftedRight >> (i * 8));
-      uint alive = EqualNibble(count, 0x33333333u) | (EqualNibble(count, 0x44444444u) & center);
-      result |= Pack(alive) << (i * 8);
-    }
+    uint result = NextWord(HorizontalBits(bits, shiftedLeft, shiftedRight), HorizontalAt(index),
+                           HorizontalAt(innerY * WORDS_PER_ROW + word), old_states[index]);
     cells.Store(Address(tile_index, word, uint(y)), result);
   }
 }
