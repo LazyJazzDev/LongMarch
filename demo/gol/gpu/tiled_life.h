@@ -7,7 +7,9 @@
 namespace life_demo {
 
 // Bit-packed main tiles are updated in place. Each workgroup decodes its old
-// tile into 32 KiB of four-bit cells; a separate buffer holds old edges/corners.
+// tile into four-bit cells; a separate buffer holds old edges/corners.
+// The default 64x64 compute tile uses 2 KiB of shared memory. Storage pages
+// remain 256x256 independently of compute tiling.
 class TiledLife {
  public:
   static constexpr uint32_t kTileSize = 256;
@@ -18,7 +20,7 @@ class TiledLife {
   bool Initialize(grassland::rhi::IDevice *device,
                   const std::string &shader_source,
                   uint32_t tiles_per_axis = kTilesPerAxis,
-                  uint32_t compute_tile_size = 256);
+                  uint32_t compute_tile_size = 64);
   bool Upload(grassland::rhi::ICommandContext *commands, const std::vector<uint32_t> &packed);
   bool Step(grassland::rhi::ICommandContext *commands, bool periodic = true);
   bool Toggle(grassland::rhi::ICommandContext *commands, uint32_t x, uint32_t y);

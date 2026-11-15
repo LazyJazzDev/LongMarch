@@ -112,31 +112,12 @@ uint EqualNibble(uint a, uint b) {
   return ~(different | (different >> 1) | (different >> 2) | (different >> 3)) & 0x11111111u;
 }
 
-uint CachedRow(uint2 tile, int x, int y) {
-  if (y >= 0 && y < TILE_SIZE && x >= 0 && x < TILE_SIZE)
-    return local_cells[uint(y) * (TILE_SIZE / 8) + uint(x) / 8];
-  if (x < 0)
-    return EdgeCell(tile, -1, y) << 28;
-  if (x >= TILE_SIZE)
-    return EdgeCell(tile, TILE_SIZE, y);
+// Read a whole old top/bottom border word once, before expanding its cells.
+uint HaloRowWord(uint2 tile, uint word, int y) {
   if (batch.value == 0 && ((y < 0 && tile.y == 0) || (y >= TILE_SIZE && tile.y + 1 == TILES_AXIS)))
     return 0;
   uint neighbor = Tile(tile.x, tile.y + (y < 0 ? -1 : 1));
-  return Expand(Halo(neighbor, (y < 0 ? WORDS_PER_ROW : 0) + uint(x) / 32) >> (uint(x) & 31));
-}
-
-// Horizontal three-cell sums fit alongside the old state in each nibble.
-uint Horizontal(uint2 tile, int x, int y) {
-  uint center = CachedRow(tile, x, y);
-  return center + ((center << 4) | (CachedRow(tile, x - 8, y) >> 28)) +
-         ((center >> 4) | (CachedRow(tile, x + 8, y) << 28));
-}
-
-uint HorizontalCached(uint2 tile, int x, int y) {
-  if (y >= 0 && y < TILE_SIZE)
-    return (local_cells[uint(y) * (TILE_SIZE / 8) + uint(x) / 8] >> 1) & 0x77777777u;
-  // Outside rows still come exclusively from the previous generation's halo.
-  return Horizontal(tile, x, y);
+  return Halo(neighbor, (y < 0 ? WORDS_PER_ROW : 0) + word);
 }
 
 [numthreads(GROUP_THREADS, 1, 1)] void Step(uint3 group
@@ -181,12 +162,17 @@ uint HorizontalCached(uint2 tile, int x, int y) {
     int outerY = lane < WORDS_PER_ROW ? -1 : TILE_SIZE;
     uint innerY = lane < WORDS_PER_ROW ? 1 : TILE_SIZE - 2;
     uint index = uint(y) * WORDS_PER_ROW + word;
+    uint bits = HaloRowWord(tile, word, outerY);
+    uint left = word > 0 ? HaloRowWord(tile, word - 1, outerY) >> 31 : EdgeCell(tile, -1, outerY);
+    uint right = word + 1 < WORDS_PER_ROW ? HaloRowWord(tile, word + 1, outerY) & 1 : EdgeCell(tile, TILE_SIZE, outerY);
+    uint shiftedLeft = (bits << 1) | left;
+    uint shiftedRight = (bits >> 1) | (right << 31);
     uint result = 0;
     for (uint i = 0; i < 4; ++i) {
       uint center = local_cells[index * 4 + i];
       uint inner = local_cells[(innerY * WORDS_PER_ROW + word) * 4 + i];
-      uint count = ((center >> 1) & 0x77777777u) + ((inner >> 1) & 0x77777777u) +
-                   Horizontal(tile, int(word * 32 + i * 8), outerY);
+      uint count = ((center >> 1) & 0x77777777u) + ((inner >> 1) & 0x77777777u) + Expand(bits >> (i * 8)) +
+                   Expand(shiftedLeft >> (i * 8)) + Expand(shiftedRight >> (i * 8));
       uint alive = EqualNibble(count, 0x33333333u) | (EqualNibble(count, 0x44444444u) & center);
       result |= Pack(alive) << (i * 8);
     }
