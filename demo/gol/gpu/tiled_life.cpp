@@ -8,38 +8,40 @@ using namespace grassland::rhi;
 bool TiledLife::Initialize(IDevice *device,
                            const std::string &shader_source,
                            uint32_t tiles_per_axis,
-                           uint32_t cache_tiles) {
-  if (!device || !tiles_per_axis || tiles_per_axis > kTilesPerAxis || (tiles_per_axis & (tiles_per_axis - 1)) ||
-      !cache_tiles || cache_tiles > 256 || (cache_tiles & (cache_tiles - 1)))
+                           uint32_t compute_tile_size) {
+  if (!device || !tiles_per_axis || tiles_per_axis > kTilesPerAxis || (tiles_per_axis & (tiles_per_axis - 1)))
+    return false;
+  if (compute_tile_size < 32 || compute_tile_size > 256 || (compute_tile_size & (compute_tile_size - 1)))
     return false;
   tile_count_ = tiles_per_axis * tiles_per_axis;
-  cache_tiles_ = std::min(tile_count_, cache_tiles);
+  compute_axis_ = tiles_per_axis * 256 / compute_tile_size;
+  compute_count_ = compute_axis_ * compute_axis_;
   batch_ = device->CreateBuffer({256});
   cells_ = device->CreateBuffer({uint64_t(WordCount()) * 4});
-  decoded_ = device->CreateBuffer({uint64_t(cache_tiles_) * kTileSize * kTileSize});
-  halos_ = device->CreateBuffer({uint64_t(tile_count_) * 33 * 4});
+  halos_ = device->CreateBuffer({uint64_t(compute_count_) * (4 * (compute_tile_size / 32) + 1) * 4});
   PipelineLayoutDesc layout;
   layout.groups = {{{{0, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
                      {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
-                     {2, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
-                     {3, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}};
+                     {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}};
   bindings_ = device->CreateBindingGroup(layout.groups[0]);
-  if (!cells_ || !decoded_ || !halos_ || !batch_ || !bindings_) {
-    grassland::LogError("Allocate tiled resources failed: cells={} decoded={} halos={} batch={} bindings={}",
-                        bool(cells_), bool(decoded_), bool(halos_), bool(batch_), bool(bindings_));
+  if (!cells_ || !halos_ || !batch_ || !bindings_) {
+    grassland::LogError("Allocate tiled GPU resources failed");
     return false;
   }
-  IBuffer *buffers[] = {cells_.Get(), decoded_.Get(), halos_.Get(), batch_.Get()};
-  for (uint32_t i = 0; i < 4; ++i)
+  IBuffer *buffers[] = {cells_.Get(), halos_.Get(), batch_.Get()};
+  for (uint32_t i = 0; i < 3; ++i)
     if (!bindings_->BindResource(i, buffers[i])) {
-      grassland::LogError("Bind tiled resource {} size {} failed", i, buffers[i]->GetDesc().size);
+      grassland::LogError("Bind tiled resource {} failed", i);
       return false;
     }
-  const char *entries[] = {"Decode", "Step", "ExportHalo", "Toggle", "Fill"};
+  const char *entries[] = {"Step", "ExportHalo", "Toggle", "Fill"};
   for (uint32_t i = 0; i < programs_.size(); ++i) {
     ObjPtr<IShader> shader = device->CreateShaderFromSource(
         shader_source, entries[i], SHADER_STAGE_COMPUTE, {},
-        {{"TILES_AXIS", std::to_string(tiles_per_axis)}, {"CACHE_TILES", std::to_string(cache_tiles_)}});
+        {{"TILES_AXIS", std::to_string(compute_axis_)},
+         {"STORAGE_TILES_AXIS", std::to_string(tiles_per_axis)},
+         {"TILE_SIZE", std::to_string(compute_tile_size)},
+         {"GROUP_THREADS", std::to_string(std::min(256u, compute_tile_size * compute_tile_size / 32))}});
     if (!shader) {
       grassland::LogError("Create tiled shader {} failed", entries[i]);
       return false;
@@ -64,7 +66,8 @@ bool TiledLife::Dispatch(ICommandContext *commands, uint32_t phase, uint32_t cou
     grassland::LogError("Bind tiled resources {} failed", phase);
     return false;
   }
-  if (!commands->CmdDispatch(count, 1, 1)) {
+  if (!commands->CmdDispatch(count == compute_count_ ? compute_axis_ : count,
+                             count == compute_count_ ? compute_axis_ : 1, 1)) {
     grassland::LogError("Dispatch tiled phase {} failed", phase);
     return false;
   }
@@ -80,30 +83,26 @@ bool TiledLife::Upload(ICommandContext *commands, const std::vector<uint32_t> &p
     grassland::LogError("Upload tiled grid failed");
     return false;
   }
-  return Dispatch(commands, 2, tile_count_);
+  return Dispatch(commands, 1, compute_count_);
 }
 
 bool TiledLife::Step(ICommandContext *commands, bool periodic) {
-  // RHI inserts storage dependencies between dispatches. No CPU wait is needed.
-  // In particular, no tile exports new borders until ALL main tiles are updated.
-  for (uint32_t first = 0; first < tile_count_; first += cache_tiles_) {
-    const std::array<uint32_t, 4> batch{first, 0, 0, periodic ? 1u : 0u};
-    if (!commands || !commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) ||
-        !Dispatch(commands, 0, cache_tiles_) || !Dispatch(commands, 1, cache_tiles_))
-      return false;
-  }
-  return Dispatch(commands, 2, tile_count_);
+  const std::array<uint32_t, 4> batch{0, 0, 0, periodic ? 1u : 0u};
+  // The RHI storage dependency makes all main writes visible before exporting
+  // the new borders. No CPU wait or global interior scratch buffer is needed.
+  return commands && commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) &&
+         Dispatch(commands, 0, compute_count_) && Dispatch(commands, 1, compute_count_);
 }
 
 bool TiledLife::Toggle(ICommandContext *commands, uint32_t x, uint32_t y) {
   const std::array<uint32_t, 4> batch{0, x, y, 0};
   return commands && commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) &&
-         Dispatch(commands, 3, 1) && Dispatch(commands, 2, tile_count_);
+         Dispatch(commands, 2, 1) && Dispatch(commands, 1, compute_count_);
 }
 
 bool TiledLife::Fill(ICommandContext *commands, bool random, uint32_t seed) {
   const std::array<uint32_t, 4> batch{0, seed, 0, random ? 1u : 0u};
   return commands && commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) &&
-         Dispatch(commands, 4, tile_count_) && Dispatch(commands, 2, tile_count_);
+         Dispatch(commands, 3, compute_count_) && Dispatch(commands, 1, compute_count_);
 }
 }  // namespace life_demo
