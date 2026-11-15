@@ -402,6 +402,15 @@ bool VulkanDeviceImpl::SupportGeometryShader() const {
   return info_.geometry_shader_feature;
 }
 
+bool VulkanDeviceImpl::SupportComputeSubgroupVote() const {
+  VkPhysicalDeviceSubgroupProperties subgroup{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES};
+  VkPhysicalDeviceProperties2 properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+  properties.pNext = &subgroup;
+  vkGetPhysicalDeviceProperties2(physical_, &properties);
+  const auto needed = VK_SUBGROUP_FEATURE_BASIC_BIT | VK_SUBGROUP_FEATURE_VOTE_BIT;
+  return (subgroup.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) && (subgroup.supportedOperations & needed) == needed;
+}
+
 IVulkanQueue *VulkanDeviceImpl::GetNativeQueue(QueueType type) const {
   if (type != QUEUE_TYPE_MAIN && type != QUEUE_TYPE_ASSIST && type != QUEUE_TYPE_COMPUTE)
     return nullptr;

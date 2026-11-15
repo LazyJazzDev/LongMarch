@@ -11,7 +11,8 @@ namespace life_demo {
 // Each tile owns an input halo copied from neighboring main tiles after all
 // updates complete; it stays unchanged throughout the next update dispatch.
 // The default 64x64 compute tile uses 1.5 KiB of shared memory. Storage pages
-// remain 256x256 independently of compute tiling.
+// remain 256x256 independently of compute tiling. Unchanged tiles sleep once
+// their eight neighbors are unchanged too; edits wake affected neighborhoods.
 class TiledLife {
  public:
   enum class UpdateMethod { BitPlanes, Lookup2x2 };
@@ -25,7 +26,9 @@ class TiledLife {
                   const std::string &shader_source,
                   uint32_t tiles_per_axis = kTilesPerAxis,
                   uint32_t compute_tile_size = 64,
-                  UpdateMethod method = UpdateMethod::BitPlanes);
+                  UpdateMethod method = UpdateMethod::BitPlanes,
+                  bool sparse_updates = true,
+                  bool allow_subgroup_vote = true);
   bool Upload(grassland::rhi::ICommandContext *commands, const std::vector<uint32_t> &packed);
   bool Step(grassland::rhi::ICommandContext *commands, bool periodic = true);
   bool Toggle(grassland::rhi::ICommandContext *commands, uint32_t x, uint32_t y);
@@ -45,8 +48,11 @@ class TiledLife {
   uint32_t compute_axis_{};
   uint32_t compute_count_{};
   uint32_t halo_groups_{};
-  grassland::rhi::ObjPtr<grassland::rhi::IBuffer> cells_, halos_, batch_, lookup_;
+  grassland::rhi::ObjPtr<grassland::rhi::IBuffer> cells_, halos_, batch_, activity_, lookup_;
   bool lookup_uploaded_{};
+  bool last_periodic_{true};
+  uint32_t generation_{};
+  uint32_t NextGeneration();
   grassland::rhi::ObjPtr<grassland::rhi::IBindingGroup> bindings_;
   std::array<grassland::rhi::ObjPtr<grassland::rhi::IComputeProgram>, 4> programs_;
 };

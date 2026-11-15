@@ -137,6 +137,7 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
   bool SupportRayQuery() const override;
 
   bool SupportGeometryShader() const override;
+  bool SupportComputeSubgroupVote() const override;
 
   rhi::IQueue *GetQueue(QueueType type) override;
 
