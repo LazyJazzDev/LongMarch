@@ -395,13 +395,24 @@ void GameOfLife::OnWindowSize() {
   }
 
   if (tiled_enabled_) {
-    if (!sidebar_) {
+    // Keep related actions together and the primary action at the rail center.
+    // Landscape rotates the same grouping onto the left sidebar.
+    if (sidebar_) {
+      const float left = edge_offset(window_width * cutout_insets_.x, margin);
+      const float bottom = window_height - bottom_margin - icon_size;
+      place(open_button_.get(), left, margin);
+      place(save_button_.get(), left, margin + step);
+      place(pause_play_button_.get(), left, (window_height - icon_size) * 0.5f);
+      place(speed_toggle_button_.get(), left, bottom - step);
+      place(boundary_button_.get(), left, bottom);
+    } else {
       const float top = window_height - bottom_margin - icon_size;
-      const float spacing = (window_width - 2 * margin - icon_size) / 4;
-      Button *buttons[] = {open_button_.get(), save_button_.get(), boundary_button_.get(), speed_toggle_button_.get(),
-                           pause_play_button_.get()};
-      for (int i = 0; i < 5; ++i)
-        place(buttons[i], margin + i * spacing, top);
+      const float right = window_width - margin - icon_size;
+      place(open_button_.get(), margin, top);
+      place(save_button_.get(), margin + step, top);
+      place(pause_play_button_.get(), (window_width - icon_size) * 0.5f, top);
+      place(speed_toggle_button_.get(), right - step, top);
+      place(boundary_button_.get(), right, top);
     }
   }
   playground_left_ = playground_left;
