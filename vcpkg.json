@@ -15,6 +15,7 @@
     "eigen3",
     "fmt",
     "freetype",
+    "zlib",
     "glfw3",
     "glm",
     "gtest",

@@ -783,7 +783,8 @@ int GameOfLife::LoadTiledState(const std::string &path, std::string &error) {
   std::ifstream input(std::filesystem::u8path(path), std::ios::binary);
   std::array<char, 8> magic{};
   input.read(magic.data(), magic.size());
-  if (std::string(magic.data(), magic.size()) != kTiledStateMagic)
+  if (std::string(magic.data(), magic.size()) != kTiledStateMagic &&
+      std::string(magic.data(), magic.size()) != kLegacyTiledStateMagic)
     return 0;
   input.clear();
   input.seekg(0);
