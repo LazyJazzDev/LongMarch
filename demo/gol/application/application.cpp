@@ -270,25 +270,31 @@ bool Application::OnRender() {
     return false;
   if (!RenderFrameTarget(context, main_frame_))
     return false;
-  ResolveParams params{use_second_frame ? second_frame_alpha_ : 0.0f, static_cast<uint32_t>(supersample_scale_)};
-  if (!UploadBuffer(resolve_uniform_buffer_, &params, sizeof(params)))
-    return false;
-  auto *second_image = use_second_frame ? second_frame_.color_image.Get() : main_frame_.color_image.Get();
-  if (!Check(resolve_group_->BindResource(0, resolve_uniform_buffer_.Get()) &&
-                 resolve_group_->BindResource(1, main_frame_.color_image.Get()) &&
-                 resolve_group_->BindResource(2, second_image),
-             "Bind resolve resources"))
-    return false;
-  rhi::RenderingInfo rendering;
-  rendering.color_attachments = {{present_image_.Get(), rhi::ATTACHMENT_LOAD_OP_DISCARD}};
-  if (!Check(context->CmdBeginRendering(rendering) && context->CmdBindProgram(resolve_program_.Get()) &&
-                 context->CmdBindGroup(0, resolve_group_.Get()) &&
-                 context->CmdSetViewport({0, 0, float(framebuffer_size_.x), float(framebuffer_size_.y), 0, 1}) &&
-                 context->CmdSetScissor({0, 0, uint32_t(framebuffer_size_.x), uint32_t(framebuffer_size_.y)}) &&
-                 context->CmdDraw(3) && context->CmdEndRendering() &&
-                 (hosted_ || context->CmdPresentImage(window, present_image_.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR)),
-             "Record resolve and presentation"))
-    return false;
+  if (hosted_ && supersample_scale_ == 1 && !use_second_frame) {
+    // No filtering or blending is needed. Reuse the scene target directly
+    // rather than reading and writing every pixel in a second render pass.
+    std::swap(main_frame_.color_image, present_image_);
+  } else {
+    ResolveParams params{use_second_frame ? second_frame_alpha_ : 0.0f, static_cast<uint32_t>(supersample_scale_)};
+    if (!UploadBuffer(resolve_uniform_buffer_, &params, sizeof(params)))
+      return false;
+    auto *second_image = use_second_frame ? second_frame_.color_image.Get() : main_frame_.color_image.Get();
+    if (!Check(resolve_group_->BindResource(0, resolve_uniform_buffer_.Get()) &&
+                   resolve_group_->BindResource(1, main_frame_.color_image.Get()) &&
+                   resolve_group_->BindResource(2, second_image),
+               "Bind resolve resources"))
+      return false;
+    rhi::RenderingInfo rendering;
+    rendering.color_attachments = {{present_image_.Get(), rhi::ATTACHMENT_LOAD_OP_DISCARD}};
+    if (!Check(context->CmdBeginRendering(rendering) && context->CmdBindProgram(resolve_program_.Get()) &&
+                   context->CmdBindGroup(0, resolve_group_.Get()) &&
+                   context->CmdSetViewport({0, 0, float(framebuffer_size_.x), float(framebuffer_size_.y), 0, 1}) &&
+                   context->CmdSetScissor({0, 0, uint32_t(framebuffer_size_.x), uint32_t(framebuffer_size_.y)}) &&
+                   context->CmdDraw(3) && context->CmdEndRendering() &&
+                   (hosted_ || context->CmdPresentImage(window, present_image_.Get(), rhi::COLOR_SPACE_SRGB_NONLINEAR)),
+               "Record resolve and presentation"))
+      return false;
+  }
   submissions_[submission_index_] = context->Submit();
   upload_context_.Release();
   if (!Check(bool(submissions_[submission_index_]), "Submit frame"))

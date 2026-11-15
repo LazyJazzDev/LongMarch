@@ -226,6 +226,8 @@ float4 PSMain(PSInput input) : SV_TARGET {
       break;
   }
 
+  // Presentation is opaque, including the direct single-frame path.
+  color.a = 1.0;
   // Dither to hide banding in the gradients.
   return ShakeColor(rng_state, color, 1.0 / 255.0);
 }
