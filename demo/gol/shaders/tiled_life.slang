@@ -88,8 +88,8 @@ uint EdgeCell(uint2 tile, int x, int y) {
 }
 
 // Eight four-bit cells per uint; a 256x256 tile uses 32 KiB, a 128x128 tile 8 KiB.
-// During the stencil pass only the old state bit is shared; counters stay in
-// registers so no thread overwrites a neighbor's old state.
+// Horizontal sums and the old state share each nibble. Barriers separate
+// decoding, horizontal reads, horizontal writes, and the vertical pass.
 groupshared uint local_cells[SHARED_WORDS];
 
 uint Expand(uint bits) {
@@ -123,40 +123,53 @@ uint CachedRow(uint2 tile, int x, int y) {
   return Expand(Halo(neighbor, (y < 0 ? WORDS_PER_ROW : 0) + uint(x) / 32) >> (uint(x) & 31));
 }
 
+// Horizontal three-cell sums fit alongside the old state in each nibble.
+uint Horizontal(uint2 tile, int x, int y) {
+  uint center = CachedRow(tile, x, y);
+  return center + ((center << 4) | (CachedRow(tile, x - 8, y) >> 28)) +
+         ((center >> 4) | (CachedRow(tile, x + 8, y) << 28));
+}
+
+uint HorizontalCached(uint2 tile, int x, int y) {
+  if (y >= 0 && y < TILE_SIZE)
+    return (local_cells[uint(y) * (TILE_SIZE / 8) + uint(x) / 8] >> 1) & 0x77777777u;
+  // Outside rows still come exclusively from the previous generation's halo.
+  return Horizontal(tile, x, y);
+}
+
 [numthreads(GROUP_THREADS, 1, 1)] void Step(uint3 group
                                             : SV_GroupID, uint lane
                                             : SV_GroupIndex) {
   uint tile_index = group.y * TILES_AXIS + group.x;
-  uint2 tile = uint2(tile_index % TILES_AXIS, tile_index / TILES_AXIS);
-  // Decode the entire old main tile before writing any main bit in place.
+  uint2 tile = uint2(group.x, group.y);
   for (uint i = lane; i < WORDS_PER_TILE; i += GROUP_THREADS) {
     uint bits = Load(tile_index, i % WORDS_PER_ROW, i / WORDS_PER_ROW);
     for (uint j = 0; j < 4; ++j)
       local_cells[i * 4 + j] = Expand(bits >> (j * 8));
   }
   GroupMemoryBarrierWithGroupSync();
+  uint horizontal[SHARED_WORDS / GROUP_THREADS];
+  [unroll] for (uint k = 0; k < SHARED_WORDS / GROUP_THREADS; ++k) {
+    uint packet = lane + k * GROUP_THREADS;
+    int x = int(packet % (TILE_SIZE / 8)) * 8;
+    int y = int(packet / (TILE_SIZE / 8));
+    horizontal[k] = (Horizontal(tile, x, y) << 1) | local_cells[packet];
+  }
+  // All reads of old states finish before any thread replaces shared data.
+  GroupMemoryBarrierWithGroupSync();
+  [unroll] for (uint k = 0; k < SHARED_WORDS / GROUP_THREADS; ++k) local_cells[lane + k * GROUP_THREADS] =
+      horizontal[k];
+  GroupMemoryBarrierWithGroupSync();
   for (uint index = lane; index < WORDS_PER_TILE; index += GROUP_THREADS) {
     int startX = int(index % WORDS_PER_ROW) * 32, y = int(index / WORDS_PER_ROW);
     uint result = 0;
     for (uint i = 0; i < 4; ++i) {
       int x = startX + int(i) * 8;
-      uint a = CachedRow(tile, x, y - 1);
-      uint b = CachedRow(tile, x, y);
-      uint c = CachedRow(tile, x, y + 1);
-      // Sum <= 8 fits in four bits, so packed additions cannot carry into
-      // the next cell. Only afterwards truncate to the three-bit counter.
-      uint count = a + c;
-      count += (a << 4) | (CachedRow(tile, x - 8, y - 1) >> 28);
-      count += (a >> 4) | (CachedRow(tile, x + 8, y - 1) << 28);
-      count += (b << 4) | (CachedRow(tile, x - 8, y) >> 28);
-      count += (b >> 4) | (CachedRow(tile, x + 8, y) << 28);
-      count += (c << 4) | (CachedRow(tile, x - 8, y + 1) >> 28);
-      count += (c >> 4) | (CachedRow(tile, x + 8, y + 1) << 28);
-      // Per cell: bit 0 = old state, bits 1..3 = count modulo 8.
-      // Count 8 becomes 0; both imply death, so this preserves Life's rule.
-      uint encoded = ((count & 0x77777777u) << 1) | b;
-      uint counters = encoded & 0xeeeeeeeeu;
-      uint alive = EqualNibble(counters, 0x66666666u) | (EqualNibble(counters, 0x44444444u) & encoded);
+      uint old = local_cells[index * 4 + i] & 0x11111111u;
+      // Keep self in the nine-cell sum. Values up to nine fit each nibble
+      // without carrying into the next cell.
+      uint count = HorizontalCached(tile, x, y - 1) + HorizontalCached(tile, x, y) + HorizontalCached(tile, x, y + 1);
+      uint alive = EqualNibble(count, 0x33333333u) | (EqualNibble(count, 0x44444444u) & old);
       result |= Pack(alive) << (i * 8);
     }
     cells.Store(Address(tile_index, index % WORDS_PER_ROW, index / WORDS_PER_ROW), result);
