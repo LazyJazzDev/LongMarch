@@ -23,7 +23,7 @@ static bool CompileMetal(const IShader *shader,
       "msl-" +
       ShaderCacheKey({"rhi-msl-v2", shader->GetPreprocessedCode(), shader->GetEntry(),
                       std::to_string(shader->GetStage()), ShaderMacroHeader(layout, BACKEND_API_VULKAN, attributes),
-                      GetShaderCacheSettings().ios ? "ios" : (tier1 ? "macos-tier1" : "macos")});
+                      GetShaderCacheSettings().ios ? "ios-simdgroup" : (tier1 ? "macos-tier1" : "macos")});
   std::vector<uint8_t> cached;
   if (ReadShaderCache(key, cached)) {
     auto split = std::find(cached.begin(), cached.end(), uint8_t{0});
@@ -54,8 +54,10 @@ static bool CompileMetal(const IShader *shader,
     auto options = compiler.get_msl_options();
     options.set_msl_version(3, 0);
     options.ios_support_base_vertex_instance = true;
-    if (GetShaderCacheSettings().ios)
+    if (GetShaderCacheSettings().ios) {
       options.platform = spirv_cross::CompilerMSL::Options::iOS;
+      options.ios_use_simdgroup_functions = true;
+    }
     options.argument_buffers = true;
     options.argument_buffers_tier = tier1 ? spirv_cross::CompilerMSL::Options::ArgumentBuffersTier::Tier1
                                           : spirv_cross::CompilerMSL::Options::ArgumentBuffersTier::Tier2;
