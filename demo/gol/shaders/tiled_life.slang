@@ -158,19 +158,37 @@ uint HorizontalCached(uint2 tile, int x, int y) {
     }
   }
   GroupMemoryBarrierWithGroupSync();
-  for (uint index = lane; index < WORDS_PER_TILE; index += GROUP_THREADS) {
-    int startX = int(index % WORDS_PER_ROW) * 32, y = int(index / WORDS_PER_ROW);
+  // Interior rows have no halo branches. Reuse the center read for state
+  // and count instead of routing every packet through the generic accessor.
+  for (uint index = lane + WORDS_PER_ROW; index < WORDS_PER_TILE - WORDS_PER_ROW; index += GROUP_THREADS) {
     uint result = 0;
     for (uint i = 0; i < 4; ++i) {
-      int x = startX + int(i) * 8;
-      uint old = local_cells[index * 4 + i] & 0x11111111u;
-      // Keep self in the nine-cell sum. Values up to nine fit each nibble
-      // without carrying into the next cell.
-      uint count = HorizontalCached(tile, x, y - 1) + HorizontalCached(tile, x, y) + HorizontalCached(tile, x, y + 1);
-      uint alive = EqualNibble(count, 0x33333333u) | (EqualNibble(count, 0x44444444u) & old);
+      uint center = local_cells[index * 4 + i];
+      uint above = local_cells[(index - WORDS_PER_ROW) * 4 + i];
+      uint below = local_cells[(index + WORDS_PER_ROW) * 4 + i];
+      uint count = ((above >> 1) & 0x77777777u) + ((center >> 1) & 0x77777777u) + ((below >> 1) & 0x77777777u);
+      uint alive = EqualNibble(count, 0x33333333u) | (EqualNibble(count, 0x44444444u) & center);
       result |= Pack(alive) << (i * 8);
     }
     cells.Store(Address(tile_index, index % WORDS_PER_ROW, index / WORDS_PER_ROW), result);
+  }
+  // Only the two boundary rows consult old neighboring halos.
+  if (lane < 2 * WORDS_PER_ROW) {
+    uint word = lane % WORDS_PER_ROW;
+    int y = lane < WORDS_PER_ROW ? 0 : TILE_SIZE - 1;
+    int outerY = lane < WORDS_PER_ROW ? -1 : TILE_SIZE;
+    uint innerY = lane < WORDS_PER_ROW ? 1 : TILE_SIZE - 2;
+    uint index = uint(y) * WORDS_PER_ROW + word;
+    uint result = 0;
+    for (uint i = 0; i < 4; ++i) {
+      uint center = local_cells[index * 4 + i];
+      uint inner = local_cells[(innerY * WORDS_PER_ROW + word) * 4 + i];
+      uint count = ((center >> 1) & 0x77777777u) + ((inner >> 1) & 0x77777777u) +
+                   Horizontal(tile, int(word * 32 + i * 8), outerY);
+      uint alive = EqualNibble(count, 0x33333333u) | (EqualNibble(count, 0x44444444u) & center);
+      result |= Pack(alive) << (i * 8);
+    }
+    cells.Store(Address(tile_index, word, uint(y)), result);
   }
 }
 
