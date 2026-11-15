@@ -153,7 +153,7 @@ float4 CellGridTheme(PSInput input, float sample_size, bool allow_discard = true
     float density = lerp(GridMipSample(level, grid), GridMipSample(min(level + 1, 14u), grid), frac(lod));
     // Area averages of the same rounded, shaded dead/live cell themes below,
     // including the inter-cell gaps. Blend levels in linear brightness.
-    float brightness = input.color.z < 0.25 ? density : lerp(0.183960325, 0.493834190, density);
+    float brightness = lerp(0.183960325, 0.493834190, density);
     return float4(lerp(float3(input.color.w), CheckerColor(float3(brightness), grid, input.extra.y), GridFade(input)),
                   1.0);
   }
@@ -198,51 +198,6 @@ float4 CellGridTheme(PSInput input, float sample_size, bool allow_discard = true
   return float4(lerp(float3(input.color.w), shaded, fade), 1.0);
 }
 
-uint RulerGlyph(uint digit) {
-  switch (digit) {
-    case 0:
-      return 31599u;
-    case 1:
-      return 29850u;
-    case 2:
-      return 29671u;
-    case 3:
-      return 31207u;
-    case 4:
-      return 18925u;
-    case 5:
-      return 31183u;
-    case 6:
-      return 31695u;
-    case 7:
-      return 18727u;
-    case 8:
-      return 31727u;
-    case 9:
-      return 31215u;
-  }
-  return 0;
-}
-
-uint RulerDigits(uint value) {
-  return value >= 10000 ? 5 : value >= 1000 ? 4 : value >= 100 ? 3 : value >= 10 ? 2 : 1;
-}
-
-float RulerNumber(uint value, float2 position, float height) {
-  float unit = height / 5.0;
-  int2 cell = int2(floor(position / unit));
-  uint digits = RulerDigits(value);
-  if (cell.x < 0 || cell.y < 0 || cell.y >= 5 || cell.x >= int(digits * 4 - 1) || cell.x % 4 == 3)
-    return 0;
-  uint character = uint(cell.x) / 4;
-  uint power = digits - character - 1;
-  uint divisor = power == 4 ? 10000 : power == 3 ? 1000 : power == 2 ? 100 : power == 1 ? 10 : 1;
-  uint glyph = RulerGlyph((value / divisor) % 10);
-  if (((glyph >> (uint(cell.y) * 3 + uint(cell.x) % 4)) & 1) == 0)
-    return 0;
-  return 1.0;  // The presentation supersampling antialiases the glyph outline.
-}
-
 float RulerLayer(PSInput input, uint span, float font, float prominence, bool major) {
   float2 p = input.screen_position;
   float2 origin = input.color.xy;
@@ -258,23 +213,6 @@ float RulerLayer(PSInput input, uint span, float font, float prominence, bool ma
     result = max(result, saturate(width - tick.x));
   if (rounded.y >= 0 && rounded.y * span <= 16384 && edge.x < tick_length)
     result = max(result, saturate(width - tick.y));
-  int2 label_index = int2(floor((p - origin) / spacing));
-  if (label_index.x >= 0 && label_index.x * int(span) <= 16384 && (major || label_index.x % 8 != 0)) {
-    uint value = uint(label_index.x) * span;
-    float x = p.x - (origin.x + label_index.x * spacing) - pad;
-    float top = p.y - input.clip_rect.y - tick_length - pad;
-    float bottom = p.y - (input.clip_rect.w - tick_length - pad - font);
-    result = max(result, max(RulerNumber(value, float2(x, top), font), RulerNumber(value, float2(x, bottom), font)));
-  }
-  if (label_index.y >= 0 && label_index.y * int(span) <= 16384 && (major || label_index.y % 8 != 0) &&
-      edge.y > font * lerp(5.0, 2.5, prominence)) {
-    uint value = uint(label_index.y) * span;
-    float y = p.y - (origin.y + label_index.y * spacing) - pad;
-    float left = p.x - input.clip_rect.x - tick_length - pad;
-    float number_width = float(RulerDigits(value) * 4 - 1) * font / 5;
-    float right = p.x - (input.clip_rect.z - tick_length - pad - number_width);
-    result = max(result, max(RulerNumber(value, float2(left, y), font), RulerNumber(value, float2(right, y), font)));
-  }
   return result;
 }
 
@@ -290,6 +228,8 @@ float4 GridRulerTheme(PSInput input, float sample_size) {
     mask = max(mask, t * RulerLayer(input, DetailSpan(level + 1), font * lerp(0.5, 1.0, t), t, false));
   float2 edge = min(input.screen_position - input.clip_rect.xy, input.clip_rect.zw - input.screen_position);
   mask = max(mask, 0.3 * saturate(max(1.0, font / 18.0) - min(edge.x, edge.y)));
+  if (input.extra.x == 8)
+    mask = 1.0;
   clip(mask - 0.001);
   float3 background = float3(0.08);
   float2 grid = (input.screen_position - input.color.xy) / input.color.z;
@@ -394,6 +334,7 @@ float4 PSMain(PSInput input) : SV_TARGET {
     case 5:
       color = SliderTheme(input);
       break;
+    case 8:
     case 7:
       color = GridRulerTheme(input, sample_size);
       break;

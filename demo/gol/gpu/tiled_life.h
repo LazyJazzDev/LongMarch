@@ -36,7 +36,7 @@ class TiledLife {
 
   // Rebuild only tiles changed since the last mip update, then reduce their
   // population totals. Call lazily for subpixel views; all work stays on GPU.
-  bool UpdateMipmaps(grassland::rhi::ICommandContext *commands, bool heat = false);
+  bool UpdateMipmaps(grassland::rhi::ICommandContext *commands);
 
   grassland::rhi::IBuffer *Mipmaps() const {
     return mipmaps_.Get();
@@ -57,9 +57,8 @@ class TiledLife {
   uint32_t compute_count_{};
   uint32_t halo_groups_{};
   uint32_t tile_levels_{}, world_levels_{};
-  bool mips_invalid_{true}, mips_current_{false}, sparse_updates_{true}, mips_heat_{false};
-  uint32_t heat_generation_{};
-  grassland::rhi::ObjPtr<grassland::rhi::IBuffer> cells_, halos_, batch_, activity_, lookup_, mipmaps_, changes_;
+  bool mips_invalid_{true}, mips_current_{false}, sparse_updates_{true};
+  grassland::rhi::ObjPtr<grassland::rhi::IBuffer> cells_, halos_, batch_, activity_, lookup_, mipmaps_;
   bool lookup_uploaded_{};
   bool last_periodic_{true};
   uint32_t generation_{};

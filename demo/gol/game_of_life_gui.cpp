@@ -2,6 +2,8 @@
 
 #include <limits>
 
+#include "stroke_text.h"
+
 #ifndef LONGMARCH_HOSTED_GAMES
 #include <tinyfiledialogs.h>
 #endif
@@ -123,7 +125,7 @@ void GameOfLife::CustomOnInit() {
       return;
     const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f,
                            (playground_top_ + playground_bottom_) * 0.5f};
-    ruler_timing_.Zoom(grassland::GetTimeSeconds());
+    ruler_timing_.Activate(grassland::GetTimeSeconds());
     grid_view_.Zoom(float(gesture.scale), point - center, tiled_enabled_ ? 64.0f / TiledLife::kWorldSize : 1.0f);
     LayoutCells();
   });
@@ -156,6 +158,7 @@ void GameOfLife::CustomOnInit() {
     }
     if (!panning_)
       return;
+    ruler_timing_.Activate(grassland::GetTimeSeconds());
     grid_view_.pan += cursor - pan_cursor_;
     pan_cursor_ = cursor;
     LayoutCells();
@@ -296,6 +299,8 @@ void GameOfLife::CustomOnClose() {
   open_button_.reset();
   save_button_.reset();
   white_rect_model.reset();
+  for (auto &glyph : ruler_glyphs_)
+    glyph.reset();
   white_icon_model.reset();
 }
 
@@ -469,7 +474,7 @@ void GameOfLife::DrawGridRuler() {
   const glm::vec2 low{playground_left_, playground_top_};
   const glm::vec2 size{playground_right_ - playground_left_, playground_bottom_ - playground_top_};
   const float font =
-      std::max(12.0f, control_pixel_size_ > 0 ? control_pixel_size_ * 0.25f : std::min(size.x, size.y) * 0.022f);
+      std::max(9.0f, control_pixel_size_ > 0 ? control_pixel_size_ * 0.16f : std::min(size.x, size.y) * 0.014f);
   DrawModel(
       &white_rect_model.value(),
       {GetModelMatrix(low, size, 0.2f), glm::vec4{cell_input_->Origin(), cell_input_->Unit(), alpha},
@@ -477,6 +482,60 @@ void GameOfLife::DrawGridRuler() {
            7u, GridDetail::At(cell_input_->Unit(), float(std::min(FramebufferSize().x, FramebufferSize().y))).Packed(),
            uint32_t(font * 64), 0u},
        glm::vec4{low, low + size}});
+  const auto detail = GridDetail::At(cell_input_->Unit(), float(std::min(FramebufferSize().x, FramebufferSize().y)));
+  const auto origin = cell_input_->Origin();
+  const auto clip = glm::vec4{low, low + size};
+  std::array<std::vector<InstanceInfo>, 11> glyph_instances;
+  auto label = [&](int value, glm::vec2 position, float height, float opacity) {
+    const auto text = std::to_string(value);
+    const float scale = height / 7.9f;
+    for (size_t i = 0; i < text.size(); ++i) {
+      const unsigned glyph = text[i] == '-' ? 10 : unsigned(text[i] - '0');
+      auto transform = glm::translate(glm::mat4{1.0f},
+                                      glm::vec3{position + glm::vec2{0.95f + float(i) * 6.2f, 0.95f} * scale, 0.19f}) *
+                       glm::scale(glm::mat4{1.0f}, glm::vec3{scale, scale, 1.0f});
+      glyph_instances[glyph].push_back({transform, glm::vec4{origin, cell_input_->Unit(), alpha * opacity},
+                                        glm::uvec4{8u, detail.Packed(), 0u, 0u}, clip});
+    }
+  };
+  auto layer = [&](int level, float height, float prominence, float opacity, bool child) {
+    const int span = GridDetail::kSpans[level];
+    const float spacing = span * cell_input_->Unit();
+    const float tick = height * glm::mix(0.45f, 0.65f, prominence);
+    const float pad = std::max(2.0f, height * 0.15f);
+    for (int axis = 0; axis < 2; ++axis) {
+      const int first = std::max(0, int(std::floor((low[axis] - origin[axis]) / spacing)));
+      const int last = std::min(int(TiledLife::kWorldSize) / span,
+                                int(std::ceil((low[axis] + size[axis] - origin[axis]) / spacing)));
+      for (int index = first; index <= last; ++index) {
+        if (child && index % 8 == 0)
+          continue;
+        const int value = index * span - int(TiledLife::kWorldSize) / 2;
+        const float position = origin[axis] + index * spacing + pad;
+        if (axis == 0) {
+          label(value, {position, low.y + tick + pad}, height, opacity);
+          label(value, {position, low.y + size.y - tick - pad - height}, height, opacity);
+        } else if (position >= low.y + font * 2.5f && position + height <= low.y + size.y - font * 2.5f) {
+          const float width = (float(std::to_string(value).size() - 1) * 6.2f + 5.9f) * height / 7.9f;
+          label(value, {low.x + tick + pad, position}, height, opacity);
+          label(value, {low.x + size.x - tick - pad - width, position}, height, opacity);
+        }
+      }
+    }
+  };
+  layer(detail.major, font, 1.0f, 1.0f, false);
+  if (detail.transition > 0 && detail.major < 3)
+    layer(detail.major + 1, font * glm::mix(0.5f, 1.0f, detail.transition), detail.transition, detail.transition, true);
+  // Group by glyph so all labels need at most eleven instanced draws.
+  for (unsigned glyph = 0; glyph < ruler_glyphs_.size(); ++glyph) {
+    if (glyph_instances[glyph].empty())
+      continue;
+    if (!ruler_glyphs_[glyph])
+      ruler_glyphs_[glyph] =
+          std::make_unique<DeviceModel>(this, StrokeText(std::string(1, glyph == 10 ? '-' : char('0' + glyph))));
+    for (const auto &instance : glyph_instances[glyph])
+      DrawModel(ruler_glyphs_[glyph].get(), instance);
+  }
 }
 
 glm::vec2 GameOfLife::CursorPosition() const {
@@ -493,7 +552,7 @@ bool GameOfLife::CursorInGrid() const {
 }
 
 void GameOfLife::ZoomGrid(float factor) {
-  ruler_timing_.Zoom(grassland::GetTimeSeconds());
+  ruler_timing_.Activate(grassland::GetTimeSeconds());
   const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f, (playground_top_ + playground_bottom_) * 0.5f};
   grid_view_.Zoom(factor, CursorInGrid() ? CursorPosition() - center : glm::vec2{0.0f},
                   tiled_enabled_ ? 64.0f / TiledLife::kWorldSize : 1.0f);
@@ -511,6 +570,7 @@ void GameOfLife::ScrollGrid(double x, double y) {
   if ((down(GLFW_KEY_LEFT_SHIFT) || down(GLFW_KEY_RIGHT_SHIFT)) && x == 0.0)
     std::swap(x, y);
   const glm::vec2 scale = glm::vec2(FramebufferSize()) / glm::vec2(glm::max(GetWindowSize(), glm::ivec2{1}));
+  ruler_timing_.Activate(grassland::GetTimeSeconds());
   grid_view_.pan += glm::vec2{float(x), float(y)} * scale * 10.0f;
   LayoutCells();
 }
@@ -766,7 +826,7 @@ bool GameOfLife::PrepareScene(rhi::ICommandContext *commands) {
     if (!tiled_life_.Step(commands, boundary_button_->Mode() == BoundaryMode::kPeriodic))
       return false;
   pending_steps_ = 0;
-  return cell_input_->Unit() >= 1.0f || tiled_life_.UpdateMipmaps(commands, GridDetail::Heat(cell_input_->Unit()));
+  return cell_input_->Unit() >= 1.0f || tiled_life_.UpdateMipmaps(commands);
 }
 
 void GameOfLife::EnableNativeSizeControls() {

@@ -28,7 +28,6 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0, 0, cells);
 RHI_RW_BYTE_ADDRESS_BUFFER(0, 1, halos);
 RHI_RW_BYTE_ADDRESS_BUFFER(0, 3, activity);
 RHI_RW_BYTE_ADDRESS_BUFFER(0, 5, mipmaps);
-RHI_RW_BYTE_ADDRESS_BUFFER(0, 6, changes);
 #if USE_LOOKUP
 RHI_BYTE_ADDRESS_BUFFER(0, 4, lookup_table);
 #endif
@@ -258,7 +257,6 @@ uint HaloRowWord(uint2 tile, uint word, int y) {
     uint result = NextWord(HorizontalAt(index - WORDS_PER_ROW), HorizontalAt(index),
                            HorizontalAt(index + WORDS_PER_ROW), old_states[index]);
     changed |= result ^ old_states[index];
-    changes.Store(Address(tile_index, index % WORDS_PER_ROW, index / WORDS_PER_ROW), result ^ old_states[index]);
     cells.Store(Address(tile_index, index % WORDS_PER_ROW, index / WORDS_PER_ROW), result);
   }
   // Only the two boundary rows consult old neighboring halos.
@@ -276,7 +274,6 @@ uint HaloRowWord(uint2 tile, uint word, int y) {
     uint result = NextWord(HorizontalBits(bits, shiftedLeft, shiftedRight), HorizontalAt(index),
                            HorizontalAt(innerY * WORDS_PER_ROW + word), old_states[index]);
     changed |= result ^ old_states[index];
-    changes.Store(Address(tile_index, index % WORDS_PER_ROW, index / WORDS_PER_ROW), result ^ old_states[index]);
     cells.Store(Address(tile_index, word, uint(y)), result);
   }
   FinishTile(tile_index, lane, changed);
@@ -335,9 +332,6 @@ uint WindowNibble(uint row, uint left, uint right, uint pair) {
     }
     changed |= upper ^ old_states[uint(y) * WORDS_PER_ROW + uint(word)];
     changed |= lower ^ old_states[(uint(y) + 1) * WORDS_PER_ROW + uint(word)];
-    changes.Store(Address(tile_index, uint(word), uint(y)), upper ^ old_states[uint(y) * WORDS_PER_ROW + uint(word)]);
-    changes.Store(Address(tile_index, uint(word), uint(y + 1)),
-                  lower ^ old_states[(uint(y) + 1) * WORDS_PER_ROW + uint(word)]);
     cells.Store(Address(tile_index, uint(word), uint(y)), upper);
     cells.Store(Address(tile_index, uint(word), uint(y + 1)), lower);
   }
@@ -449,9 +443,8 @@ void BuildMipLevel(uint tile, uint lane, uint level) {
     uint x = (cell % side) * 2, y = (cell / side) * 2;
     uint packed;
     if (level == 1) {
-      uint upper = (batch.value == 0 ? Load(tile, x / 32, y) : changes.Load(Address(tile, x / 32, y))) >> (x & 31);
-      uint lower =
-          (batch.value == 0 ? Load(tile, x / 32, y + 1) : changes.Load(Address(tile, x / 32, y + 1))) >> (x & 31);
+      uint upper = Load(tile, x / 32, y) >> (x & 31);
+      uint lower = Load(tile, x / 32, y + 1) >> (x & 31);
       packed = PairNibbles(upper) + PairNibbles(lower);
     } else {
       uint previous_bits = MipBits(level - 1);
@@ -490,21 +483,8 @@ void BuildMipLevel(uint tile, uint lane, uint level) {
                                                 : SV_GroupIndex) {
   uint tile = group.y * TILES_AXIS + group.x;
   uint stamp = activity.Load(tile * 12);
-#if !USE_SPARSE
-  if (batch.value != 0)
-    stamp = batch.generation;
-#endif
-  if (batch.value != 0 && (batch.generation == 0 || stamp != batch.generation))
-    stamp = 0;
   if (batch.flags == 0 && activity.Load(tile * 12 + 8) == stamp)
     return;
-  if (batch.value != 0 && stamp == 0) {
-    for (uint word = lane; word < MIP_LOCAL_WORDS; word += GROUP_THREADS)
-      mipmaps.Store((tile * MIP_LOCAL_WORDS + word) * 4, 0);
-    if (lane == 0)
-      activity.Store(tile * 12 + 8, 0);
-    return;
-  }
 #if TILE_LEVELS >= 1
   BuildMipLevel(tile, lane, 1);
 #endif

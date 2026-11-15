@@ -158,6 +158,7 @@ class GameOfLife : public Application {
 
   std::optional<DeviceModel> white_icon_model;
   std::optional<DeviceModel> white_rect_model;
+  std::array<std::unique_ptr<DeviceModel>, 11> ruler_glyphs_;
 
   bool tiled_enabled_{false};
   bool tiled_ready_{false};

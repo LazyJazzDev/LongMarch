@@ -25,16 +25,12 @@ struct GridDetail {
   uint32_t Packed() const {
     return (uint32_t(major) << 16) | uint32_t(transition * 65535.0f + 0.5f);
   }
-
-  static bool Heat(float pitch) {
-    return pitch < 0.25f;
-  }
 };
 
 struct GridRulerTiming {
   double started{-10}, last{-10};
 
-  void Zoom(double now) {
+  void Activate(double now) {
     if (now >= last + 2.35)
       started = now;
     last = now;

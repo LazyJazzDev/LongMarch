@@ -46,8 +46,7 @@ bool TiledLife::Initialize(IDevice *device,
   lookup_.Release();
   lookup_uploaded_ = false;
   last_periodic_ = true;
-  generation_ = heat_generation_ = 0;
-  mips_heat_ = false;
+  generation_ = 0;
   sparse_updates_ = sparse_updates;
   if (method == UpdateMethod::Lookup2x2) {
     lookup_ = device->CreateBuffer({32768});
@@ -80,19 +79,17 @@ bool TiledLife::Initialize(IDevice *device,
   mips_current_ = false;
   batch_ = device->CreateBuffer({256});
   cells_ = device->CreateBuffer({uint64_t(WordCount()) * 4});
-  changes_ = device->CreateBuffer({uint64_t(WordCount()) * 4});
   halos_ = device->CreateBuffer({uint64_t(compute_count_) * (4 * (compute_tile_size / 32) + 1) * 4});
   PipelineLayoutDesc layout;
   layout.groups = {{{{0, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
                      {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
                      {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
                      {3, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
-                     {5, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
-                     {6, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}};
+                     {5, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}};
   if (lookup_)
     layout.groups[0].bindings.push_back({4, BINDING_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE});
   bindings_ = device->CreateBindingGroup(layout.groups[0]);
-  if (!cells_ || !halos_ || !batch_ || !activity_ || !mipmaps_ || !changes_ || !bindings_) {
+  if (!cells_ || !halos_ || !batch_ || !activity_ || !mipmaps_ || !bindings_) {
     grassland::LogError("Allocate tiled GPU resources failed");
     return false;
   }
@@ -102,7 +99,7 @@ bool TiledLife::Initialize(IDevice *device,
       grassland::LogError("Bind tiled resource {} failed", i);
       return false;
     }
-  if (!bindings_->BindResource(5, mipmaps_.Get()) || !bindings_->BindResource(6, changes_.Get()))
+  if (!bindings_->BindResource(5, mipmaps_.Get()))
     return false;
   const char *entries[] = {lookup_ ? "StepLookup" : "Step", "RefreshHalo", "Toggle", "Fill", "MipLocal", "MipGlobal"};
   for (uint32_t i = 0; i < programs_.size(); ++i) {
@@ -174,7 +171,6 @@ bool TiledLife::Upload(ICommandContext *commands, const std::vector<uint32_t> &p
     return false;
   }
   mips_invalid_ = true;
-  heat_generation_ = 0;
   const std::array<uint32_t, 5> batch{2, 0, 0, 0, NextGeneration()};
   return commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) &&
          Dispatch(commands, 1, compute_count_);
@@ -191,7 +187,6 @@ bool TiledLife::Step(ICommandContext *commands, bool periodic) {
   }
   const std::array<uint32_t, 5> batch{periodic != last_periodic_ ? 1u : 0u, 0, 0, periodic ? 1u : 0u, NextGeneration()};
   last_periodic_ = periodic;
-  heat_generation_ = generation_;
   // The RHI storage dependency makes all main writes visible before pulling
   // the new borders into each tile's input halo. No CPU wait or global interior scratch buffer is needed.
   return commands && commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) &&
@@ -206,20 +201,17 @@ bool TiledLife::Toggle(ICommandContext *commands, uint32_t x, uint32_t y) {
 
 bool TiledLife::Fill(ICommandContext *commands, bool random, uint32_t seed) {
   mips_invalid_ = true;
-  heat_generation_ = 0;
   const std::array<uint32_t, 5> batch{random ? 2u : 4u, seed, 0, random ? 1u : 0u, NextGeneration()};
   return commands && commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) &&
          Dispatch(commands, 3, compute_count_) && Dispatch(commands, 1, compute_count_);
 }
 
-bool TiledLife::UpdateMipmaps(ICommandContext *commands, bool heat) {
+bool TiledLife::UpdateMipmaps(ICommandContext *commands) {
   if (!commands)
     return false;
-  if (mips_current_ && heat == mips_heat_)
+  if (mips_current_)
     return true;
-  if (heat != mips_heat_)
-    mips_invalid_ = true;
-  std::array<uint32_t, 5> batch{mips_invalid_ || !sparse_updates_ ? 1u : 0u, 0, 0, heat ? 1u : 0u, heat_generation_};
+  std::array<uint32_t, 5> batch{mips_invalid_ || !sparse_updates_ ? 1u : 0u, 0, 0, 0, 0};
   if (!commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) ||
       !Dispatch(commands, 4, compute_count_))
     return false;
@@ -232,7 +224,6 @@ bool TiledLife::UpdateMipmaps(ICommandContext *commands, bool heat) {
   }
   mips_invalid_ = false;
   mips_current_ = true;
-  mips_heat_ = heat;
   return true;
 }
 
