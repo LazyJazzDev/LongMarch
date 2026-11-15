@@ -116,8 +116,10 @@ float GridMipSample(uint level, float2 grid) {
 float GridFade(PSInput input) {
   float2 edge = min(input.screen_position - input.clip_rect.xy, input.clip_rect.zw - input.screen_position);
   float width = max(1.0, min(input.clip_rect.z - input.clip_rect.x, input.clip_rect.w - input.clip_rect.y) * 0.06);
-  float opacity = float(input.extra.y >> 18) / 16383.0;
-  return lerp(1.0, smoothstep(0.0, width, min(edge.x, edge.y)), opacity);
+  // Only the two control-panel edges fade: left/right in landscape,
+  // top/bottom in portrait. Ruler visibility does not affect this shading.
+  float distance = (input.extra.y & (1u << 18)) != 0 ? edge.x : edge.y;
+  return smoothstep(0.0, width, distance);
 }
 
 uint DetailSpan(uint level) {

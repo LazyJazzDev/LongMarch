@@ -464,7 +464,7 @@ void GameOfLife::DrawCellGrid() {
         {GetModelMatrix(low, high - low, 0.4f), glm::vec4{grid_origin, cell_input_->Unit(), kPlaygroundBrightness},
          glm::uvec4{6u,
                     GridDetail::At(cell_input_->Unit(), float(std::min(FramebufferSize().x, FramebufferSize().y)))
-                        .Packed(ruler_timing_.Opacity(grassland::GetTimeSeconds())),
+                        .Packed(sidebar_),
                     TiledLife::kWorldSize, TiledLife::kWorldSize},
          glm::vec4{playground_left_, playground_top_, playground_right_, playground_bottom_}});
     return;
@@ -490,7 +490,7 @@ void GameOfLife::DrawGridRuler() {
             {GetModelMatrix(low, size, 0.2f), glm::vec4{cell_input_->Origin(), cell_input_->Unit(), alpha},
              glm::uvec4{7u,
                         GridDetail::At(cell_input_->Unit(), float(std::min(FramebufferSize().x, FramebufferSize().y)))
-                            .Packed(ruler_timing_.Opacity(grassland::GetTimeSeconds())),
+                            .Packed(sidebar_),
                         uint32_t(font * 64), 0u},
              glm::vec4{low, low + size}});
   const auto detail = GridDetail::At(cell_input_->Unit(), float(std::min(FramebufferSize().x, FramebufferSize().y)));
@@ -505,9 +505,8 @@ void GameOfLife::DrawGridRuler() {
       auto transform = glm::translate(glm::mat4{1.0f},
                                       glm::vec3{position + glm::vec2{0.95f + float(i) * 6.2f, 0.95f} * scale, 0.19f}) *
                        glm::scale(glm::mat4{1.0f}, glm::vec3{scale, scale, 1.0f});
-      glyph_instances[glyph].push_back(
-          {transform, glm::vec4{origin, cell_input_->Unit(), alpha * opacity},
-           glm::uvec4{8u, detail.Packed(ruler_timing_.Opacity(grassland::GetTimeSeconds())), 0u, 0u}, clip});
+      glyph_instances[glyph].push_back({transform, glm::vec4{origin, cell_input_->Unit(), alpha * opacity},
+                                        glm::uvec4{8u, detail.Packed(sidebar_), 0u, 0u}, clip});
     }
   };
   auto layer = [&](int level, float height, float prominence, float opacity, bool child) {

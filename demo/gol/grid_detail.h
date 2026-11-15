@@ -22,9 +22,8 @@ struct GridDetail {
     return result;
   }
 
-  uint32_t Packed(float ruler_opacity = 0.0f) const {
-    return (uint32_t(std::clamp(ruler_opacity, 0.0f, 1.0f) * 16383.0f + 0.5f) << 18) | (uint32_t(major) << 16) |
-           uint32_t(transition * 65535.0f + 0.5f);
+  uint32_t Packed(bool sidebar = false) const {
+    return (uint32_t(sidebar) << 18) | (uint32_t(major) << 16) | uint32_t(transition * 65535.0f + 0.5f);
   }
 };
 
