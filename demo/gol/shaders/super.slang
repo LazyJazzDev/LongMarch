@@ -16,6 +16,7 @@ static const float kDicePerspectiveDistance = 0.6;
 
 RHI_BYTE_ADDRESS_BUFFER(0, 0, instance_infos);
 RHI_BYTE_ADDRESS_BUFFER(0, 2, cell_bits);
+RHI_BYTE_ADDRESS_BUFFER(0, 3, cell_mipmaps);
 RHI_UNIFORM(0, 1, GlobalUniformObject, global_uniform);
 
 struct VSInput {
@@ -78,6 +79,46 @@ float4 IconTheme(PSInput input) {
   return float4(input.color.rgb * scale, 1.0);
 }
 
+// The mobile world uses 64x64 compute tiles. Each tile stores exact counts
+// for levels 1..6 in 219 words; coarser levels are global uint count arrays.
+uint GridMipCount(uint level, int2 coordinate) {
+  uint side = 16384 >> level;
+  uint2 p = uint2(clamp(coordinate, int2(0), int2(side - 1)));
+  if (level == 0) {
+    uint page = (p.y / 256) * 64 + p.x / 256;
+    return (cell_bits.Load((page * 2048 + (p.y & 255) * 8 + (p.x & 255) / 32) * 4) >> (p.x & 31)) & 1;
+  }
+  if (level <= 6) {
+    uint tile_shift = 6 - level;
+    uint local_mask = (1u << tile_shift) - 1;
+    uint tile = ((p.y >> tile_shift) << 8) + (p.x >> tile_shift);
+    uint offset = level == 1 ? 0 : level == 2 ? 128 : level == 3 ? 192 : level == 4 ? 208 : level == 5 ? 216 : 218;
+    uint bit_shift = level == 1 ? 2 : level <= 3 ? 3 : 4;
+    uint bits = 1u << bit_shift;
+    uint word_shift = 5 - bit_shift;
+    uint index = ((p.y & local_mask) << tile_shift) | (p.x & local_mask);
+    uint packed = cell_mipmaps.Load((tile * 219 + offset + (index >> word_shift)) * 4);
+    return (packed >> ((index & ((1u << word_shift) - 1)) << bit_shift)) & (0xffffffffu >> (32 - bits));
+  }
+  uint offset = 65536 * 219 + (65536 - (1u << (30 - 2 * level))) / 3;
+  return cell_mipmaps.Load((offset + (p.y << (14 - level)) + p.x) * 4);
+}
+
+float GridMipSample(uint level, float2 grid) {
+  float2 p = grid / float(1u << level) - 0.5;
+  int2 origin = int2(floor(p));
+  float2 f = frac(p);
+  float a = lerp(float(GridMipCount(level, origin)), float(GridMipCount(level, origin + int2(1, 0))), f.x);
+  float b = lerp(float(GridMipCount(level, origin + int2(0, 1))), float(GridMipCount(level, origin + 1)), f.x);
+  return lerp(a, b, f.y) / float(1u << (level * 2));
+}
+
+float GridFade(PSInput input) {
+  float2 edge = min(input.screen_position - input.clip_rect.xy, input.clip_rect.zw - input.screen_position);
+  float width = max(1.0, min(input.clip_rect.z - input.clip_rect.x, input.clip_rect.w - input.clip_rect.y) * 0.06);
+  return smoothstep(0.0, width, min(edge.x, edge.y));
+}
+
 // One quad covers the visible grid: color.xy is the top-left corner of cell (0, 0),
 // color.z the cell pitch in framebuffer pixels, color.w the brightness of the gaps,
 // extra.zw the grid dimensions and extra.y the byte offset of one packed
@@ -88,6 +129,15 @@ float4 CellGridTheme(PSInput input, float sample_size) {
   int2 size = int2(input.extra.zw);
   clip(float2(cell));
   clip(float2(size - 1 - cell));
+  if (input.extra.x == 6 && input.color.z < 1.0) {
+    float lod = clamp(log2(1.0 / input.color.z), 0.0, 14.0);
+    uint level = uint(floor(lod));
+    float density = lerp(GridMipSample(level, grid), GridMipSample(min(level + 1, 14u), grid), frac(lod));
+    // Area averages of the same rounded, shaded dead/live cell themes below,
+    // including the inter-cell gaps. Blend levels in linear brightness.
+    float brightness = lerp(0.183960325, 0.493834190, density);
+    return float4(float3(lerp(input.color.w, brightness, GridFade(input))), 1.0);
+  }
   // Each cell fills the middle 80% of its pitch, mapped to [-1, 1] as before.
   float2 local_position = (grid - float2(cell) - 0.5) / 0.4;
   // The original 120-triangle silhouette samples |x|^8 + |y|^8 = 1. The L8

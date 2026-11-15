@@ -47,6 +47,7 @@ bool TiledLife::Initialize(IDevice *device,
   lookup_uploaded_ = false;
   last_periodic_ = true;
   generation_ = 0;
+  sparse_updates_ = sparse_updates;
   if (method == UpdateMethod::Lookup2x2) {
     lookup_ = device->CreateBuffer({32768});
     if (!lookup_)
@@ -56,7 +57,26 @@ bool TiledLife::Initialize(IDevice *device,
   compute_axis_ = tiles_per_axis * 256 / compute_tile_size;
   compute_count_ = compute_axis_ * compute_axis_;
   halo_groups_ = (compute_count_ * (compute_tile_size / 8) + 127) / 128;
-  activity_ = device->CreateBuffer({uint64_t(compute_count_) * 8});
+  activity_ = device->CreateBuffer({uint64_t(compute_count_) * 12});
+  tile_levels_ = world_levels_ = 0;
+  for (uint32_t side = compute_tile_size; side > 1; side >>= 1)
+    ++tile_levels_;
+  for (uint32_t side = tiles_per_axis * 256; side > 1; side >>= 1)
+    ++world_levels_;
+  uint64_t local_words = 0;
+  for (uint32_t level = 1; level <= tile_levels_; ++level) {
+    const uint32_t side = compute_tile_size >> level;
+    const uint32_t bits = level == 1 ? 4 : level <= 3 ? 8 : level <= 7 ? 16 : 32;
+    local_words += (side * side * bits + 31) / 32;
+  }
+  uint64_t mip_words = local_words * compute_count_;
+  for (uint32_t level = tile_levels_ + 1; level <= world_levels_; ++level) {
+    const uint32_t side = (tiles_per_axis * 256) >> level;
+    mip_words += side * side;
+  }
+  mipmaps_ = device->CreateBuffer({mip_words * 4});
+  mips_invalid_ = true;
+  mips_current_ = false;
   batch_ = device->CreateBuffer({256});
   cells_ = device->CreateBuffer({uint64_t(WordCount()) * 4});
   halos_ = device->CreateBuffer({uint64_t(compute_count_) * (4 * (compute_tile_size / 32) + 1) * 4});
@@ -64,11 +84,12 @@ bool TiledLife::Initialize(IDevice *device,
   layout.groups = {{{{0, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
                      {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
                      {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
-                     {3, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}};
+                     {3, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
+                     {5, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}};
   if (lookup_)
     layout.groups[0].bindings.push_back({4, BINDING_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE});
   bindings_ = device->CreateBindingGroup(layout.groups[0]);
-  if (!cells_ || !halos_ || !batch_ || !activity_ || !bindings_) {
+  if (!cells_ || !halos_ || !batch_ || !activity_ || !mipmaps_ || !bindings_) {
     grassland::LogError("Allocate tiled GPU resources failed");
     return false;
   }
@@ -78,11 +99,16 @@ bool TiledLife::Initialize(IDevice *device,
       grassland::LogError("Bind tiled resource {} failed", i);
       return false;
     }
-  const char *entries[] = {lookup_ ? "StepLookup" : "Step", "RefreshHalo", "Toggle", "Fill"};
+  if (!bindings_->BindResource(5, mipmaps_.Get()))
+    return false;
+  const char *entries[] = {lookup_ ? "StepLookup" : "Step", "RefreshHalo", "Toggle", "Fill", "MipLocal", "MipGlobal"};
   for (uint32_t i = 0; i < programs_.size(); ++i) {
     ObjPtr<IShader> shader = device->CreateShaderFromSource(
         shader_source, entries[i], SHADER_STAGE_COMPUTE, {},
-        {{"USE_SUBGROUP_VOTE", allow_subgroup_vote && device->SupportComputeSubgroupVote() ? "1" : "0"},
+        {{"MIP_LOCAL_WORDS", std::to_string(local_words)},
+         {"TILE_LEVELS", std::to_string(tile_levels_)},
+         {"WORLD_LEVELS", std::to_string(world_levels_)},
+         {"USE_SUBGROUP_VOTE", allow_subgroup_vote && device->SupportComputeSubgroupVote() ? "1" : "0"},
          {"USE_SPARSE", sparse_updates ? "1" : "0"},
          {"USE_LOOKUP", lookup_ ? "1" : "0"},
          {"TILES_AXIS", std::to_string(compute_axis_)},
@@ -106,8 +132,11 @@ bool TiledLife::Initialize(IDevice *device,
 uint32_t TiledLife::NextGeneration() {
   // Zero is reserved for cleared/uploaded metadata. A stamp collision after
   // wrap only causes a conservative extra update; it cannot hide a change.
-  if (++generation_ == 0)
+  mips_current_ = false;
+  if (++generation_ == 0) {
     ++generation_;
+    mips_invalid_ = true;
+  }
   return generation_;
 }
 
@@ -122,9 +151,10 @@ bool TiledLife::Dispatch(ICommandContext *commands, uint32_t phase, uint32_t cou
     grassland::LogError("Bind tiled resources {} failed", phase);
     return false;
   }
-  if (!(phase == 1 ? commands->CmdDispatch(halo_groups_, 1, 1)
-                   : commands->CmdDispatch(count == compute_count_ ? compute_axis_ : count,
-                                           count == compute_count_ ? compute_axis_ : 1, 1))) {
+  if (!(phase == 5   ? commands->CmdDispatch(count, 1, 1)
+        : phase == 1 ? commands->CmdDispatch(halo_groups_, 1, 1)
+                     : commands->CmdDispatch(count == compute_count_ ? compute_axis_ : count,
+                                             count == compute_count_ ? compute_axis_ : 1, 1))) {
     grassland::LogError("Dispatch tiled phase {} failed", phase);
     return false;
   }
@@ -140,6 +170,7 @@ bool TiledLife::Upload(ICommandContext *commands, const std::vector<uint32_t> &p
     grassland::LogError("Upload tiled grid failed");
     return false;
   }
+  mips_invalid_ = true;
   const std::array<uint32_t, 5> batch{2, 0, 0, 0, NextGeneration()};
   return commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) &&
          Dispatch(commands, 1, compute_count_);
@@ -169,8 +200,31 @@ bool TiledLife::Toggle(ICommandContext *commands, uint32_t x, uint32_t y) {
 }
 
 bool TiledLife::Fill(ICommandContext *commands, bool random, uint32_t seed) {
+  mips_invalid_ = true;
   const std::array<uint32_t, 5> batch{random ? 2u : 4u, seed, 0, random ? 1u : 0u, NextGeneration()};
   return commands && commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) &&
          Dispatch(commands, 3, compute_count_) && Dispatch(commands, 1, compute_count_);
 }
+
+bool TiledLife::UpdateMipmaps(ICommandContext *commands) {
+  if (!commands)
+    return false;
+  if (mips_current_)
+    return true;
+  std::array<uint32_t, 5> batch{mips_invalid_ || !sparse_updates_ ? 1u : 0u, 0, 0, 0, 0};
+  if (!commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) ||
+      !Dispatch(commands, 4, compute_count_))
+    return false;
+  for (uint32_t level = tile_levels_ + 1; level <= world_levels_; ++level) {
+    batch[1] = level;
+    const uint32_t side = (1u << world_levels_) >> level;
+    if (!commands->CmdUploadBuffer(batch_.Get(), 0, batch.data(), sizeof(batch)) ||
+        !Dispatch(commands, 5, (side * side + 127) / 128))
+      return false;
+  }
+  mips_invalid_ = false;
+  mips_current_ = true;
+  return true;
+}
+
 }  // namespace life_demo

@@ -34,6 +34,14 @@ class TiledLife {
   bool Toggle(grassland::rhi::ICommandContext *commands, uint32_t x, uint32_t y);
   bool Fill(grassland::rhi::ICommandContext *commands, bool random, uint32_t seed = 0);
 
+  // Rebuild only tiles changed since the last mip update, then reduce their
+  // population totals. Call lazily for subpixel views; all work stays on GPU.
+  bool UpdateMipmaps(grassland::rhi::ICommandContext *commands);
+
+  grassland::rhi::IBuffer *Mipmaps() const {
+    return mipmaps_.Get();
+  }
+
   grassland::rhi::IBuffer *Cells() const {
     return cells_.Get();
   }
@@ -48,13 +56,15 @@ class TiledLife {
   uint32_t compute_axis_{};
   uint32_t compute_count_{};
   uint32_t halo_groups_{};
-  grassland::rhi::ObjPtr<grassland::rhi::IBuffer> cells_, halos_, batch_, activity_, lookup_;
+  uint32_t tile_levels_{}, world_levels_{};
+  bool mips_invalid_{true}, mips_current_{false}, sparse_updates_{true};
+  grassland::rhi::ObjPtr<grassland::rhi::IBuffer> cells_, halos_, batch_, activity_, lookup_, mipmaps_;
   bool lookup_uploaded_{};
   bool last_periodic_{true};
   uint32_t generation_{};
   uint32_t NextGeneration();
   grassland::rhi::ObjPtr<grassland::rhi::IBindingGroup> bindings_;
-  std::array<grassland::rhi::ObjPtr<grassland::rhi::IComputeProgram>, 4> programs_;
+  std::array<grassland::rhi::ObjPtr<grassland::rhi::IComputeProgram>, 6> programs_;
 };
 
 }  // namespace life_demo

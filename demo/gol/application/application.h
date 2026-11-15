@@ -135,7 +135,8 @@ class Application {
     return true;
   }
 
-  void SetCellStorage(rhi::IBuffer *buffer) {
+  void SetCellStorage(rhi::IBuffer *buffer, rhi::IBuffer *mipmaps) {
+    cell_mipmaps_ = rhi::ObjPtr<rhi::IBuffer>::Retain(mipmaps);
     cell_storage_ = rhi::ObjPtr<rhi::IBuffer>::Retain(buffer);
   }
 
@@ -205,7 +206,7 @@ class Application {
   rhi::ObjPtr<rhi::IDevice> device_;
   rhi::ObjPtr<rhi::IQueue> queue_;
   rhi::ObjPtr<rhi::IWindow> window_;
-  rhi::ObjPtr<rhi::IBuffer> cell_storage_;
+  rhi::ObjPtr<rhi::IBuffer> cell_storage_, cell_mipmaps_;
   rhi::ObjPtr<rhi::ICommandContext> upload_context_;
   std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> submissions_;
   size_t submission_index_{};

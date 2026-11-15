@@ -107,10 +107,12 @@ void GameOfLife::CustomOnInit() {
 
   requested_width_ = cell_grid_width_;
   requested_height_ = cell_grid_height_;
-  width_slider_ = std::make_unique<SizeSlider>(this, 'W', cell_grid_width_, &white_rect_model.value(),
-                                               [this](int value) { requested_width_ = value; });
-  height_slider_ = std::make_unique<SizeSlider>(this, 'H', cell_grid_height_, &white_rect_model.value(),
-                                                [this](int value) { requested_height_ = value; });
+  if (!tiled_enabled_) {
+    width_slider_ = std::make_unique<SizeSlider>(this, 'W', cell_grid_width_, &white_rect_model.value(),
+                                                 [this](int value) { requested_width_ = value; });
+    height_slider_ = std::make_unique<SizeSlider>(this, 'H', cell_grid_height_, &white_rect_model.value(),
+                                                  [this](int value) { requested_height_ = value; });
+  }
   OnWindowSize();
   magnify_callback_ = GetWindow()->MagnifyEvent().RegisterCallback([this](const rhi::MagnifyGesture &gesture) {
     if (gesture.phase == rhi::MagnifyPhase::kCancel)
@@ -121,7 +123,7 @@ void GameOfLife::CustomOnInit() {
       return;
     const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f,
                            (playground_top_ + playground_bottom_) * 0.5f};
-    grid_view_.Zoom(float(gesture.scale), point - center);
+    grid_view_.Zoom(float(gesture.scale), point - center, tiled_enabled_ ? 64.0f / TiledLife::kWorldSize : 1.0f);
     LayoutCells();
   });
   scroll_callback_ = GetWindow()->ScrollEvent().RegisterCallback([this](double x, double y) { ScrollGrid(x, y); });
@@ -186,7 +188,7 @@ void GameOfLife::CustomOnInit() {
 
 void GameOfLife::CustomOnUpdate() {
   // Apply at most one resize per frame, outside listener event dispatch.
-  const bool dragging = width_slider_->IsDragging() || height_slider_->IsDragging();
+  const bool dragging = width_slider_ && (width_slider_->IsDragging() || height_slider_->IsDragging());
   if (requested_width_ != cell_grid_width_ || requested_height_ != cell_grid_height_)
     ResizeGrid(requested_width_, requested_height_);
   else if (sliders_were_dragging_ && !dragging)
@@ -247,8 +249,10 @@ void GameOfLife::CustomOnUpdate() {
   randomize_button_->Draw();
   open_button_->Draw();
   save_button_->Draw();
-  width_slider_->Draw();
-  height_slider_->Draw();
+  if (!tiled_enabled_) {
+    width_slider_->Draw();
+    height_slider_->Draw();
+  }
 
   DrawCellGrid();
 
@@ -353,8 +357,10 @@ void GameOfLife::OnWindowSize() {
     place(randomize_button_.get(), right_x, window_height - bottom_margin - icon_size);
     const float top = margin + step * 2.0f;
     const float bottom = window_height - top - step - bottom_shift;
-    width_slider_->Resize({left_x, top, left_x + slider_thickness, bottom}, true);
-    height_slider_->Resize({left_x + slider_thickness + slider_gap, top, left_x + icon_size, bottom}, true);
+    if (width_slider_) {
+      width_slider_->Resize({left_x, top, left_x + slider_thickness, bottom}, true);
+      height_slider_->Resize({left_x + slider_thickness + slider_gap, top, left_x + icon_size, bottom}, true);
+    }
   } else {
     // The sparse top actions sit in the corners beside a top cutout, so they
     // center on its safe-area boundary. Without host safe areas, give them
@@ -375,10 +381,22 @@ void GameOfLife::OnWindowSize() {
     place(randomize_button_.get(), window_width - margin - icon_size, action_top_margin);
     const float left = margin + step * 2.0f;
     const float right = window_width - left - step;
-    width_slider_->Resize({left, top, right, top + slider_thickness}, false);
-    height_slider_->Resize({left, top + slider_thickness + slider_gap, right, top + icon_size}, false);
+    if (width_slider_) {
+      width_slider_->Resize({left, top, right, top + slider_thickness}, false);
+      height_slider_->Resize({left, top + slider_thickness + slider_gap, right, top + icon_size}, false);
+    }
   }
 
+  if (tiled_enabled_) {
+    if (!sidebar_) {
+      const float top = window_height - bottom_margin - icon_size;
+      const float spacing = (window_width - 2 * margin - icon_size) / 4;
+      Button *buttons[] = {open_button_.get(), save_button_.get(), boundary_button_.get(), speed_toggle_button_.get(),
+                           pause_play_button_.get()};
+      for (int i = 0; i < 5; ++i)
+        place(buttons[i], margin + i * spacing, top);
+    }
+  }
   playground_left_ = playground_left;
   playground_right_ = playground_right;
   playground_top_ = playground_top;
@@ -389,7 +407,9 @@ void GameOfLife::OnWindowSize() {
 
 void GameOfLife::LayoutCells() {
   const glm::vec2 viewport{playground_right_ - playground_left_, playground_bottom_ - playground_top_};
-  const float fitted_unit = std::min(viewport.y / cell_grid_height_, viewport.x / cell_grid_width_) * 0.95f;
+  const float fitted_unit = tiled_enabled_
+                                ? std::min(viewport.x, viewport.y) * (0.95f / 64.0f)
+                                : std::min(viewport.y / cell_grid_height_, viewport.x / cell_grid_width_) * 0.95f;
   if (tiled_enabled_) {
     const auto limit = glm::max(
         (glm::vec2{TiledLife::kWorldSize} * fitted_unit * grid_view_.zoom - viewport * 0.9f) * 0.5f, glm::vec2{0});
@@ -450,7 +470,8 @@ bool GameOfLife::CursorInGrid() const {
 
 void GameOfLife::ZoomGrid(float factor) {
   const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f, (playground_top_ + playground_bottom_) * 0.5f};
-  grid_view_.Zoom(factor, CursorInGrid() ? CursorPosition() - center : glm::vec2{0.0f});
+  grid_view_.Zoom(factor, CursorInGrid() ? CursorPosition() - center : glm::vec2{0.0f},
+                  tiled_enabled_ ? 64.0f / TiledLife::kWorldSize : 1.0f);
   LayoutCells();
 }
 
@@ -536,8 +557,10 @@ void GameOfLife::ProcessFileAction() {
         std::copy(cells.begin(), cells.end(), cell_grid_.begin());
         requested_width_ = width;
         requested_height_ = height;
-        width_slider_->SetValue(width);
-        height_slider_->SetValue(height);
+        if (width_slider_)
+          width_slider_->SetValue(width);
+        if (height_slider_)
+          height_slider_->SetValue(height);
         if (tiled_enabled_)
           QueueCenteredPattern();
         loaded = true;
@@ -588,8 +611,10 @@ std::string GameOfLife::CompleteHostedFile(const std::string &path) {
         std::copy(pattern.cells.begin(), pattern.cells.end(), cell_grid_.begin());
         requested_width_ = pattern.width;
         requested_height_ = pattern.height;
-        width_slider_->SetValue(pattern.width);
-        height_slider_->SetValue(pattern.height);
+        if (width_slider_)
+          width_slider_->SetValue(pattern.width);
+        if (height_slider_)
+          height_slider_->SetValue(pattern.height);
         if (tiled_enabled_)
           QueueCenteredPattern();
         loaded = true;
@@ -631,7 +656,7 @@ void GameOfLife::InitCells(int width, int height) {
   if (tiled_enabled_) {
     tiled_ready_ = tiled_life_.Initialize(Device(), ShaderSource("shaders/tiled_life.slang"));
     if (tiled_ready_)
-      SetCellStorage(tiled_life_.Cells());
+      SetCellStorage(tiled_life_.Cells(), tiled_life_.Mipmaps());
     cell_input_->ResetGPU(TiledLife::kWorldSize, TiledLife::kWorldSize,
                           [this](int x, int y) { pending_toggles_.push_back({uint32_t(x), uint32_t(y)}); });
     QueueCenteredPattern();
@@ -716,25 +741,33 @@ bool GameOfLife::PrepareScene(rhi::ICommandContext *commands) {
     if (!tiled_life_.Step(commands, boundary_button_->Mode() == BoundaryMode::kPeriodic))
       return false;
   pending_steps_ = 0;
-  return true;
+  return cell_input_->Unit() >= 1.0f || tiled_life_.UpdateMipmaps(commands);
 }
 
 void GameOfLife::EnableNativeSizeControls() {
+  if (tiled_enabled_)
+    return;
   width_slider_->SetActivationHandler([this] { hosted_size_axis_ = 1; });
   height_slider_->SetActivationHandler([this] { hosted_size_axis_ = 2; });
 }
 
 glm::ivec2 GameOfLife::TakeSizeControlRequest() {
+  if (tiled_enabled_)
+    return {0, 0};
   const int axis = std::exchange(hosted_size_axis_, 0);
   return {axis, axis == 1 ? width_slider_->Value() : height_slider_->Value()};
 }
 
 glm::vec4 GameOfLife::SizeControlBounds(int axis) const {
+  if (tiled_enabled_)
+    return glm::vec4{0};
   const glm::vec2 size = glm::max(glm::vec2(FramebufferSize()), glm::vec2{1.0f});
   return (axis == 1 ? width_slider_ : height_slider_)->Bounds() / glm::vec4{size, size};
 }
 
 void GameOfLife::SetGridDimension(int axis, int value) {
+  if (tiled_enabled_)
+    return;
   if (axis == 1)
     width_slider_->SetValue(value);
   else if (axis == 2)

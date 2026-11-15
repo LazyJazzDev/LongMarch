@@ -173,8 +173,10 @@ bool Application::OnInit() {
              "Compile demo shaders"))
     return false;
 
-  const rhi::BindingLayoutDesc draw_layout{
-      {{0, rhi::BINDING_BYTE_ADDRESS_BUFFER}, {1, rhi::BINDING_UNIFORM_BUFFER}, {2, rhi::BINDING_BYTE_ADDRESS_BUFFER}}};
+  const rhi::BindingLayoutDesc draw_layout{{{0, rhi::BINDING_BYTE_ADDRESS_BUFFER},
+                                            {1, rhi::BINDING_UNIFORM_BUFFER},
+                                            {2, rhi::BINDING_BYTE_ADDRESS_BUFFER},
+                                            {3, rhi::BINDING_BYTE_ADDRESS_BUFFER}}};
   const rhi::BindingLayoutDesc resolve_layout{
       {{0, rhi::BINDING_UNIFORM_BUFFER}, {1, rhi::BINDING_TEXTURE2D}, {2, rhi::BINDING_TEXTURE2D}}};
   rhi::ProgramDesc desc;
@@ -346,7 +348,8 @@ bool Application::RenderFrameTarget(rhi::ICommandContext *context, FrameTarget &
   const auto extent = target.color_image->GetDesc();
   if (!Check(draw_group_->BindResource(0, target.instance_buffer.Get()) &&
                  draw_group_->BindResource(1, global_uniform_buffer_.Get()) &&
-                 draw_group_->BindResource(2, cell_storage_ ? cell_storage_.Get() : global_uniform_buffer_.Get()),
+                 draw_group_->BindResource(2, cell_storage_ ? cell_storage_.Get() : global_uniform_buffer_.Get()) &&
+                 draw_group_->BindResource(3, cell_mipmaps_ ? cell_mipmaps_.Get() : global_uniform_buffer_.Get()),
              "Bind scene resources"))
     return false;
   rhi::RenderingInfo rendering;

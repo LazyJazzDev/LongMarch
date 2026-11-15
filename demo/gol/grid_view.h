@@ -18,8 +18,8 @@ struct GridView {
     pan = glm::clamp(pan, -limit, limit);
   }
 
-  void Zoom(float factor, glm::vec2 anchor_from_center) {
-    const float next = std::clamp(zoom * factor, 1.0f, 12.0f);
+  void Zoom(float factor, glm::vec2 anchor_from_center, float minimum_zoom = 1.0f) {
+    const float next = std::clamp(zoom * factor, minimum_zoom, 12.0f);
     pan = anchor_from_center - (anchor_from_center - pan) * (next / zoom);
     zoom = next;
   }

@@ -27,6 +27,7 @@ RHI_UNIFORM(0, 2, Batch, batch);
 RHI_RW_BYTE_ADDRESS_BUFFER(0, 0, cells);
 RHI_RW_BYTE_ADDRESS_BUFFER(0, 1, halos);
 RHI_RW_BYTE_ADDRESS_BUFFER(0, 3, activity);
+RHI_RW_BYTE_ADDRESS_BUFFER(0, 5, mipmaps);
 #if USE_LOOKUP
 RHI_BYTE_ADDRESS_BUFFER(0, 4, lookup_table);
 #endif
@@ -52,14 +53,14 @@ uint Load(uint tile, uint x, uint y) {
 uint Changed(uint tile) {
 #if USE_SPARSE
   if ((batch.flags & 2) == 0)
-    return activity.Load(tile * 8) == batch.generation;
+    return activity.Load(tile * 12) == batch.generation;
 #endif
   return 1;
 }
 
 bool StartTile(uint tile) {
 #if USE_SPARSE
-  if ((batch.flags & 1) == 0 && activity.Load(tile * 8 + 4) == 0) {
+  if ((batch.flags & 1) == 0 && activity.Load(tile * 12 + 4) == 0) {
     return false;
   }
 #endif
@@ -76,7 +77,7 @@ void FinishTile(uint tile, uint lane, uint changed) {
   // execute the vote with only that lane active after SPIR-V/MSL lowering.
   if (any_changed && WaveIsFirstLane()) {
     uint previous;
-    activity.InterlockedExchange(tile * 8, batch.generation, previous);
+    activity.InterlockedExchange(tile * 12, batch.generation, previous);
   }
 #else
   if (changed != 0)
@@ -87,7 +88,7 @@ void FinishTile(uint tile, uint lane, uint changed) {
     for (uint i = 0; i < ((GROUP_THREADS + 31) / 32); ++i)
       combined |= tile_changed[i];
     if (combined != 0)
-      activity.Store(tile * 8, batch.generation);
+      activity.Store(tile * 12, batch.generation);
   }
 #endif
 #endif
@@ -106,8 +107,8 @@ void FinishTile(uint tile, uint lane, uint changed) {
     halos.Store((tile * HALO_WORDS + lane) * 4, 0);
     if (lane == 0) {
       halos.Store((tile * HALO_WORDS + HALO_WORDS - 1) * 4, 0);
-      activity.Store(tile * 8, 0);
-      activity.Store(tile * 8 + 4, 0);
+      activity.Store(tile * 12, 0);
+      activity.Store(tile * 12 + 4, 0);
     }
     return;
   }
@@ -117,7 +118,7 @@ void FinishTile(uint tile, uint lane, uint changed) {
 #if USE_SPARSE
     uint active = 0;
     if ((batch.flags & 2) != 0) {
-      activity.Store(tile * 8, 0);
+      activity.Store(tile * 12, 0);
       active = 1;
     } else {
       for (int dy = -1; dy <= 1; ++dy)
@@ -125,8 +126,8 @@ void FinishTile(uint tile, uint lane, uint changed) {
           active |= Changed(Tile(owner.x + dx, owner.y + dy));
     }
     if ((batch.flags & 8) != 0)
-      active |= activity.Load(tile * 8 + 4);
-    activity.Store(tile * 8 + 4, active);
+      active |= activity.Load(tile * 12 + 4);
+    activity.Store(tile * 12 + 4, active);
 #endif
   }
   uint value = 0, neighbor;
@@ -343,7 +344,7 @@ uint WindowNibble(uint row, uint left, uint right, uint pair) {
   uint address = Address(tile, (batch.x % TILE_SIZE) / 32, batch.y % TILE_SIZE);
   cells.Store(address, cells.Load(address) ^ (1u << (batch.x & 31)));
 #if USE_SPARSE
-  activity.Store(tile * 8, batch.generation);
+  activity.Store(tile * 12, batch.generation);
 #endif
 }
 
@@ -354,6 +355,7 @@ uint Hash(uint v) {
   v *= 0x846ca68b;
   return v ^ (v >> 16);
 }
+
 [numthreads(GROUP_THREADS, 1, 1)] void Fill(uint3 group
                                             : SV_GroupID, uint lane
                                             : SV_GroupIndex) {
@@ -361,4 +363,164 @@ uint Hash(uint v) {
     uint word = (group.y * TILES_AXIS + group.x) * WORDS_PER_TILE + index;
     cells.Store(word * 4, batch.value == 0 ? 0 : Hash(word ^ batch.x));
   }
+}
+
+// Exact population mipmaps, packed per compute tile. Small levels use 4/8/16
+// bits per count; each tile owns whole words, including its one-cell top level.
+uint MipBits(uint level) {
+  return level == 1 ? 4 : level <= 3 ? 8 : level <= 7 ? 16 : 32;
+}
+
+uint MipLocalOffset(uint level) {
+  uint offset = 0;
+  if (level > 1)
+    offset += (((TILE_SIZE >> 1) * (TILE_SIZE >> 1) * 4) + 31) / 32;
+  if (level > 2)
+    offset += (((TILE_SIZE >> 2) * (TILE_SIZE >> 2) * 8) + 31) / 32;
+  if (level > 3)
+    offset += (((TILE_SIZE >> 3) * (TILE_SIZE >> 3) * 8) + 31) / 32;
+  if (level > 4)
+    offset += (((TILE_SIZE >> 4) * (TILE_SIZE >> 4) * 16) + 31) / 32;
+  if (level > 5)
+    offset += (((TILE_SIZE >> 5) * (TILE_SIZE >> 5) * 16) + 31) / 32;
+  if (level > 6)
+    offset += (((TILE_SIZE >> 6) * (TILE_SIZE >> 6) * 16) + 31) / 32;
+  if (level > 7)
+    offset += (((TILE_SIZE >> 7) * (TILE_SIZE >> 7) * 16) + 31) / 32;
+  if (level > 8)
+    offset += (((TILE_SIZE >> 8) * (TILE_SIZE >> 8) * 32) + 31) / 32;
+  return offset;
+}
+
+uint MipStride() {
+  return MIP_LOCAL_WORDS;
+}
+
+uint MipGlobalOffset(uint level) {
+  uint offset = TILES_AXIS * TILES_AXIS * MipStride();
+  for (uint l = TILE_LEVELS + 1; l < level; ++l) {
+    uint side = (TILES_AXIS * TILE_SIZE) >> l;
+    offset += side * side;
+  }
+  return offset;
+}
+
+uint MipLocalLoad(uint tile, uint level, uint2 cell) {
+  uint side = TILE_SIZE >> level;
+  uint bits = MipBits(level);
+  uint index = cell.y * side + cell.x;
+  uint value = mipmaps.Load((tile * MipStride() + MipLocalOffset(level) + index / (32 / bits)) * 4);
+  return (value >> ((index % (32 / bits)) * bits)) & (0xffffffffu >> (32 - bits));
+}
+
+uint MipLoad(uint level, uint2 cell) {
+  if (level <= TILE_LEVELS) {
+    uint side = TILE_SIZE >> level;
+    return MipLocalLoad((cell.y / side) * TILES_AXIS + cell.x / side, level, cell % side);
+  }
+  uint side = (TILES_AXIS * TILE_SIZE) >> level;
+  return mipmaps.Load((MipGlobalOffset(level) + cell.y * side + cell.x) * 4);
+}
+
+groupshared uint mip_scratch[MIP_LOCAL_WORDS];
+
+// Spread eight 2-bit pairs into eight 4-bit lanes, then count each pair.
+uint PairNibbles(uint value) {
+  value &= 0xffffu;
+  value = (value | (value << 8)) & 0x00ff00ffu;
+  value = (value | (value << 4)) & 0x0f0f0f0fu;
+  value = (value | (value << 2)) & 0x33333333u;
+  return (value & 0x11111111u) + ((value >> 1) & 0x11111111u);
+}
+
+void BuildMipLevel(uint tile, uint lane, uint level) {
+  uint side = TILE_SIZE >> level;
+  uint bits = MipBits(level);
+  uint per_word = 32 / bits;
+  uint words = (side * side + per_word - 1) / per_word;
+  for (uint word = lane; word < words; word += GROUP_THREADS) {
+    uint cell = word * per_word;
+    uint x = (cell % side) * 2, y = (cell / side) * 2;
+    uint packed;
+    if (level == 1) {
+      uint upper = Load(tile, x / 32, y) >> (x & 31);
+      uint lower = Load(tile, x / 32, y + 1) >> (x & 31);
+      packed = PairNibbles(upper) + PairNibbles(lower);
+    } else {
+      uint previous_bits = MipBits(level - 1);
+      uint previous_per_word = 32 / previous_bits;
+      uint row_words = (side * 2 + previous_per_word - 1) / previous_per_word;
+      uint base = MipLocalOffset(level - 1) + y * row_words + x / previous_per_word;
+      uint upper = mip_scratch[base], lower = mip_scratch[base + row_words];
+      if (bits == 2 * previous_bits) {
+        uint mask = previous_bits == 4 ? 0x0f0f0f0fu : previous_bits == 8 ? 0x00ff00ffu : 0x0000ffffu;
+        packed =
+            (upper & mask) + ((upper >> previous_bits) & mask) + (lower & mask) + ((lower >> previous_bits) & mask);
+      } else if (bits == 8) {
+        uint first =
+            (upper & 0x00ff00ffu) + ((upper >> 8) & 0x00ff00ffu) + (lower & 0x00ff00ffu) + ((lower >> 8) & 0x00ff00ffu);
+        upper = mip_scratch[base + 1];
+        lower = mip_scratch[base + row_words + 1];
+        uint second =
+            (upper & 0x00ff00ffu) + ((upper >> 8) & 0x00ff00ffu) + (lower & 0x00ff00ffu) + ((lower >> 8) & 0x00ff00ffu);
+        packed = (first & 255) | ((first >> 8) & 0xff00u) | ((second & 255) << 16) | ((second & 0xff0000u) << 8);
+      } else {
+        packed = (upper & 65535) + (upper >> 16) + (lower & 65535) + (lower >> 16);
+        if (side > 1) {
+          upper = mip_scratch[base + 1];
+          lower = mip_scratch[base + row_words + 1];
+          packed |= ((upper & 65535) + (upper >> 16) + (lower & 65535) + (lower >> 16)) << 16;
+        }
+      }
+    }
+    mip_scratch[MipLocalOffset(level) + word] = packed;
+  }
+  GroupMemoryBarrierWithGroupSync();
+}
+
+[numthreads(GROUP_THREADS, 1, 1)] void MipLocal(uint3 group
+                                                : SV_GroupID, uint lane
+                                                : SV_GroupIndex) {
+  uint tile = group.y * TILES_AXIS + group.x;
+  uint stamp = activity.Load(tile * 12);
+  if (batch.flags == 0 && activity.Load(tile * 12 + 8) == stamp)
+    return;
+#if TILE_LEVELS >= 1
+  BuildMipLevel(tile, lane, 1);
+#endif
+#if TILE_LEVELS >= 2
+  BuildMipLevel(tile, lane, 2);
+#endif
+#if TILE_LEVELS >= 3
+  BuildMipLevel(tile, lane, 3);
+#endif
+#if TILE_LEVELS >= 4
+  BuildMipLevel(tile, lane, 4);
+#endif
+#if TILE_LEVELS >= 5
+  BuildMipLevel(tile, lane, 5);
+#endif
+#if TILE_LEVELS >= 6
+  BuildMipLevel(tile, lane, 6);
+#endif
+#if TILE_LEVELS >= 7
+  BuildMipLevel(tile, lane, 7);
+#endif
+#if TILE_LEVELS >= 8
+  BuildMipLevel(tile, lane, 8);
+#endif
+  for (uint word = lane; word < MIP_LOCAL_WORDS; word += GROUP_THREADS)
+    mipmaps.Store((tile * MIP_LOCAL_WORDS + word) * 4, mip_scratch[word]);
+  if (lane == 0)
+    activity.Store(tile * 12 + 8, stamp);
+}[numthreads(128, 1, 1)] void MipGlobal(uint3 thread
+                                        : SV_DispatchThreadID) {
+  uint level = batch.x;
+  uint side = (TILES_AXIS * TILE_SIZE) >> level;
+  if (thread.x >= side * side)
+    return;
+  uint2 p = uint2(thread.x % side, thread.x / side) * 2;
+  uint count = MipLoad(level - 1, p) + MipLoad(level - 1, p + uint2(1, 0)) + MipLoad(level - 1, p + uint2(0, 1)) +
+               MipLoad(level - 1, p + 1);
+  mipmaps.Store((MipGlobalOffset(level) + thread.x) * 4, count);
 }
