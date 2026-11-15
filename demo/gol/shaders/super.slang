@@ -243,11 +243,11 @@ float RulerNumber(uint value, float2 position, float height) {
   return 1.0;  // The presentation supersampling antialiases the glyph outline.
 }
 
-float RulerLayer(PSInput input, uint span, float font, bool major) {
+float RulerLayer(PSInput input, uint span, float font, float prominence, bool major) {
   float2 p = input.screen_position;
   float2 origin = input.color.xy;
   float spacing = float(span) * input.color.z;
-  float tick_length = font * (major ? 0.65 : 0.45);
+  float tick_length = font * lerp(0.45, 0.65, prominence);
   float width = max(1.0, font / 14.0);
   float pad = max(2.0, font * 0.15);
   float2 edge = min(p - input.clip_rect.xy, input.clip_rect.zw - p);
@@ -267,7 +267,7 @@ float RulerLayer(PSInput input, uint span, float font, bool major) {
     result = max(result, max(RulerNumber(value, float2(x, top), font), RulerNumber(value, float2(x, bottom), font)));
   }
   if (label_index.y >= 0 && label_index.y * int(span) <= 16384 && (major || label_index.y % 8 != 0) &&
-      edge.y > font * (major ? 2.5 : 5.0)) {
+      edge.y > font * lerp(5.0, 2.5, prominence)) {
     uint value = uint(label_index.y) * span;
     float y = p.y - (origin.y + label_index.y * spacing) - pad;
     float left = p.x - input.clip_rect.x - tick_length - pad;
@@ -282,9 +282,12 @@ float4 GridRulerTheme(PSInput input, float sample_size) {
   uint level = input.extra.y >> 16;
   float t = float(input.extra.y & 65535u) / 65535.0;
   float font = float(input.extra.z) / 64.0;
-  float mask = RulerLayer(input, DetailSpan(level), font, true);
+  // At t=1 the child has exactly the next major layer's dimensions. Shared
+  // multiples retain the parent label, avoiding two overlapping glyphs; their
+  // size and position already match the child when it becomes the major layer.
+  float mask = RulerLayer(input, DetailSpan(level), font, 1.0, true);
   if (t > 0 && level < 3)
-    mask = max(mask, t * RulerLayer(input, DetailSpan(level + 1), font * 0.5, false));
+    mask = max(mask, t * RulerLayer(input, DetailSpan(level + 1), font * lerp(0.5, 1.0, t), t, false));
   float2 edge = min(input.screen_position - input.clip_rect.xy, input.clip_rect.zw - input.screen_position);
   mask = max(mask, 0.3 * saturate(max(1.0, font / 18.0) - min(edge.x, edge.y)));
   clip(mask - 0.001);
