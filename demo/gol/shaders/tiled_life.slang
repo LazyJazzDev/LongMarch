@@ -25,6 +25,9 @@ struct Batch {
 RHI_UNIFORM(0, 2, Batch, batch);
 RHI_RW_BYTE_ADDRESS_BUFFER(0, 0, cells);
 RHI_RW_BYTE_ADDRESS_BUFFER(0, 1, halos);
+#if USE_LOOKUP
+RHI_BYTE_ADDRESS_BUFFER(0, 3, lookup_table);
+#endif
 
 uint Tile(uint x, uint y) {
   return (y & (TILES_AXIS - 1)) * TILES_AXIS + (x & (TILES_AXIS - 1));
@@ -41,30 +44,41 @@ uint Load(uint tile, uint x, uint y) {
   return cells.Load(Address(tile, x, y));
 }
 
-// Pack multiple tiles' border words into each workgroup. Small compute tiles
-// no longer launch mostly idle groups for their few border words.
-[numthreads(128, 1, 1)] void ExportHalo(uint3 thread
-                                        : SV_DispatchThreadID) {
+// After the whole generation finishes, each tile pulls its own input halo
+// from neighboring main tiles. Update kernels read only their own halo record.
+[numthreads(128, 1, 1)] void RefreshHalo(uint3 thread
+                                         : SV_DispatchThreadID) {
   uint tile = thread.x / (4 * WORDS_PER_ROW);
   uint lane = thread.x % (4 * WORDS_PER_ROW);
   if (tile >= TILES_AXIS * TILES_AXIS)
     return;
+  uint2 owner = uint2(tile % TILES_AXIS, tile / TILES_AXIS);
   uint value = 0;
   if (lane < WORDS_PER_ROW)
-    value = Load(tile, lane, 0);
+    value = Load(Tile(owner.x, owner.y - 1), lane, TILE_SIZE - 1);
   else if (lane < 2 * WORDS_PER_ROW)
-    value = Load(tile, lane - WORDS_PER_ROW, TILE_SIZE - 1);
+    value = Load(Tile(owner.x, owner.y + 1), lane - WORDS_PER_ROW, 0);
   else {
-    uint side = lane >= 3 * WORDS_PER_ROW ? WORDS_PER_ROW - 1 : 0;
-    uint shift = lane >= 3 * WORDS_PER_ROW ? 31 : 0;
+    uint side = lane >= 3 * WORDS_PER_ROW ? 0 : WORDS_PER_ROW - 1;
+    uint shift = lane >= 3 * WORDS_PER_ROW ? 0 : 31;
+    uint neighbor = Tile(owner.x + (lane >= 3 * WORDS_PER_ROW ? 1 : -1), owner.y);
     for (uint i = 0; i < 32; ++i)
-      value |= ((Load(tile, side, (lane % WORDS_PER_ROW) * 32 + i) >> shift) & 1) << i;
+      value |= ((Load(neighbor, side, (lane % WORDS_PER_ROW) * 32 + i) >> shift) & 1) << i;
   }
   halos.Store((tile * HALO_WORDS + lane) * 4, value);
   if (lane == 0) {
-    uint corners = (Load(tile, 0, 0) & 1) | ((Load(tile, WORDS_PER_ROW - 1, 0) >> 31) << 1) |
-                   ((Load(tile, 0, TILE_SIZE - 1) & 1) << 2) |
-                   ((Load(tile, WORDS_PER_ROW - 1, TILE_SIZE - 1) >> 31) << 3);
+    // Keep corner addresses in world coordinates. The equivalent neighbor-tile
+    // addressing path misreads right corners on Maleoon 920 for 64x64 tiles.
+    uint corners = 0;
+    for (uint corner = 0; corner < 4; ++corner) {
+      uint right = corner & 1;
+      uint bottom = corner >> 1;
+      uint x = (owner.x * TILE_SIZE + (right != 0 ? TILE_SIZE : -1)) & (TILES_AXIS * TILE_SIZE - 1);
+      uint y = (owner.y * TILE_SIZE + (bottom != 0 ? TILE_SIZE : -1)) & (TILES_AXIS * TILE_SIZE - 1);
+      uint page = (y / 256) * STORAGE_TILES_AXIS + x / 256;
+      uint address = (page * 2048 + (y & 255) * 8 + (x & 255) / 32) * 4;
+      corners |= ((cells.Load(address) >> (x & 31)) & 1) << corner;
+    }
     halos.Store((tile * HALO_WORDS + HALO_WORDS - 1) * 4, corners);
   }
 }
@@ -79,13 +93,13 @@ uint EdgeCell(uint2 tile, int x, int y) {
   if (batch.value == 0 && (int(tile.x) + dx < 0 || int(tile.y) + dy < 0 || int(tile.x) + dx >= TILES_AXIS ||
                            int(tile.y) + dy >= TILES_AXIS))
     return 0;
-  uint neighbor = Tile(tile.x + dx, tile.y + dy);
+  uint owner = Tile(tile.x, tile.y);
   if (dx == 0)
-    return (Halo(neighbor, (dy < 0 ? WORDS_PER_ROW : 0) + (uint(x) >> 5)) >> (uint(x) & 31)) & 1;
+    return (Halo(owner, (dy < 0 ? 0 : WORDS_PER_ROW) + (uint(x) >> 5)) >> (uint(x) & 31)) & 1;
   if (dy == 0)
-    return (Halo(neighbor, (dx < 0 ? 3 * WORDS_PER_ROW : 2 * WORDS_PER_ROW) + (uint(y) >> 5)) >> (uint(y) & 31)) & 1;
-  uint corner = (dy < 0 ? 2 : 0) + (dx < 0 ? 1 : 0);
-  return (Halo(neighbor, HALO_WORDS - 1) >> corner) & 1;
+    return (Halo(owner, (dx < 0 ? 2 * WORDS_PER_ROW : 3 * WORDS_PER_ROW) + (uint(y) >> 5)) >> (uint(y) & 31)) & 1;
+  uint corner = (dy < 0 ? 0 : 2) + (dx < 0 ? 0 : 1);
+  return (Halo(owner, HALO_WORDS - 1) >> corner) & 1;
 }
 
 // Bit planes decode each tile into old states and two horizontal-count bits.
@@ -119,8 +133,7 @@ uint NextWord(uint2 a, uint2 b, uint2 c, uint old) {
 uint HaloRowWord(uint2 tile, uint word, int y) {
   if (batch.value == 0 && ((y < 0 && tile.y == 0) || (y >= TILE_SIZE && tile.y + 1 == TILES_AXIS)))
     return 0;
-  uint neighbor = Tile(tile.x, tile.y + (y < 0 ? -1 : 1));
-  return Halo(neighbor, (y < 0 ? WORDS_PER_ROW : 0) + word);
+  return Halo(Tile(tile.x, tile.y), (y < 0 ? 0 : WORDS_PER_ROW) + word);
 }
 
 [numthreads(GROUP_THREADS, 1, 1)] void Step(uint3 group
@@ -167,6 +180,56 @@ uint HaloRowWord(uint2 tile, uint word, int y) {
     cells.Store(Address(tile_index, word, uint(y)), result);
   }
 }
+#if USE_LOOKUP
+// Old words needed by the 4x4 window: cached interior or this tile's halo.
+uint LookupRowWord(uint2 tile, int word, int y) {
+  if (word < 0)
+    return EdgeCell(tile, -1, y) << 31;
+  if (word >= WORDS_PER_ROW)
+    return EdgeCell(tile, TILE_SIZE, y);
+  if (y < 0 || y >= TILE_SIZE)
+    return HaloRowWord(tile, uint(word), y);
+  return old_states[uint(y) * WORDS_PER_ROW + uint(word)];
+}
+
+uint WindowNibble(uint row, uint left, uint right, uint pair) {
+  if (pair == 0)
+    return ((row << 1) | (left >> 31)) & 15;
+  if (pair == 15)
+    return ((row >> 29) | (right << 3)) & 15;
+  return (row >> (pair * 2 - 1)) & 15;
+}
+
+[numthreads(GROUP_THREADS, 1, 1)] void StepLookup(uint3 group
+                                                  : SV_GroupID, uint lane
+                                                  : SV_GroupIndex) {
+  uint tile_index = group.y * TILES_AXIS + group.x;
+  uint2 tile = uint2(group.x, group.y);
+  for (uint i = lane; i < WORDS_PER_TILE; i += GROUP_THREADS)
+    old_states[i] = Load(tile_index, i % WORDS_PER_ROW, i / WORDS_PER_ROW);
+  GroupMemoryBarrierWithGroupSync();
+  for (uint index = lane; index < WORDS_PER_TILE / 2; index += GROUP_THREADS) {
+    int word = int(index % WORDS_PER_ROW), y = int(index / WORDS_PER_ROW) * 2;
+    uint4 rows = uint4(LookupRowWord(tile, word, y - 1), LookupRowWord(tile, word, y), LookupRowWord(tile, word, y + 1),
+                       LookupRowWord(tile, word, y + 2));
+    uint4 left = uint4(LookupRowWord(tile, word - 1, y - 1), LookupRowWord(tile, word - 1, y),
+                       LookupRowWord(tile, word - 1, y + 1), LookupRowWord(tile, word - 1, y + 2));
+    uint4 right = uint4(LookupRowWord(tile, word + 1, y - 1), LookupRowWord(tile, word + 1, y),
+                        LookupRowWord(tile, word + 1, y + 1), LookupRowWord(tile, word + 1, y + 2));
+    uint upper = 0, lower = 0;
+    for (uint pair = 0; pair < 16; ++pair) {
+      uint key = WindowNibble(rows.x, left.x, right.x, pair) | (WindowNibble(rows.y, left.y, right.y, pair) << 4) |
+                 (WindowNibble(rows.z, left.z, right.z, pair) << 8) |
+                 (WindowNibble(rows.w, left.w, right.w, pair) << 12);
+      uint value = (lookup_table.Load((key >> 3) * 4) >> ((key & 7) * 4)) & 15;
+      upper |= (value & 3) << (pair * 2);
+      lower |= (value >> 2) << (pair * 2);
+    }
+    cells.Store(Address(tile_index, uint(word), uint(y)), upper);
+    cells.Store(Address(tile_index, uint(word), uint(y + 1)), lower);
+  }
+}
+#endif
 
     [numthreads(1, 1, 1)] void Toggle() {
   uint tile = Tile(batch.x / TILE_SIZE, batch.y / TILE_SIZE);

@@ -7,11 +7,15 @@
 namespace life_demo {
 
 // Bit-packed main tiles are updated in place. Each workgroup decodes its old
-// tile into state and horizontal-count bit planes; a separate buffer holds old edges/corners.
+// tile into state and horizontal-count bit planes (or scans 2x2 via lookup).
+// Each tile owns an input halo copied from neighboring main tiles after all
+// updates complete; it stays unchanged throughout the next update dispatch.
 // The default 64x64 compute tile uses 1.5 KiB of shared memory. Storage pages
 // remain 256x256 independently of compute tiling.
 class TiledLife {
  public:
+  enum class UpdateMethod { BitPlanes, Lookup2x2 };
+
   static constexpr uint32_t kTileSize = 256;
   static constexpr uint32_t kTilesPerAxis = 64;
   static constexpr uint32_t kWorldSize = kTileSize * kTilesPerAxis;
@@ -20,7 +24,8 @@ class TiledLife {
   bool Initialize(grassland::rhi::IDevice *device,
                   const std::string &shader_source,
                   uint32_t tiles_per_axis = kTilesPerAxis,
-                  uint32_t compute_tile_size = 64);
+                  uint32_t compute_tile_size = 64,
+                  UpdateMethod method = UpdateMethod::BitPlanes);
   bool Upload(grassland::rhi::ICommandContext *commands, const std::vector<uint32_t> &packed);
   bool Step(grassland::rhi::ICommandContext *commands, bool periodic = true);
   bool Toggle(grassland::rhi::ICommandContext *commands, uint32_t x, uint32_t y);
@@ -40,7 +45,8 @@ class TiledLife {
   uint32_t compute_axis_{};
   uint32_t compute_count_{};
   uint32_t halo_groups_{};
-  grassland::rhi::ObjPtr<grassland::rhi::IBuffer> cells_, halos_, batch_;
+  grassland::rhi::ObjPtr<grassland::rhi::IBuffer> cells_, halos_, batch_, lookup_;
+  bool lookup_uploaded_{};
   grassland::rhi::ObjPtr<grassland::rhi::IBindingGroup> bindings_;
   std::array<grassland::rhi::ObjPtr<grassland::rhi::IComputeProgram>, 4> programs_;
 };
