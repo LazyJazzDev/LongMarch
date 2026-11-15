@@ -123,6 +123,7 @@ void GameOfLife::CustomOnInit() {
       return;
     const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f,
                            (playground_top_ + playground_bottom_) * 0.5f};
+    ruler_timing_.Zoom(grassland::GetTimeSeconds());
     grid_view_.Zoom(float(gesture.scale), point - center, tiled_enabled_ ? 64.0f / TiledLife::kWorldSize : 1.0f);
     LayoutCells();
   });
@@ -255,6 +256,7 @@ void GameOfLife::CustomOnUpdate() {
   }
 
   DrawCellGrid();
+  DrawGridRuler();
 
   DrawModel(&white_rect_model.value(),
             {GetModelMatrix(glm::vec2{panel_left_, panel_top_},
@@ -444,7 +446,10 @@ void GameOfLife::DrawCellGrid() {
     DrawModel(
         &white_rect_model.value(),
         {GetModelMatrix(low, high - low, 0.4f), glm::vec4{grid_origin, cell_input_->Unit(), kPlaygroundBrightness},
-         glm::uvec4{6u, 0u, TiledLife::kWorldSize, TiledLife::kWorldSize},
+         glm::uvec4{
+             6u,
+             GridDetail::At(cell_input_->Unit(), float(std::min(FramebufferSize().x, FramebufferSize().y))).Packed(),
+             TiledLife::kWorldSize, TiledLife::kWorldSize},
          glm::vec4{playground_left_, playground_top_, playground_right_, playground_bottom_}});
     return;
   }
@@ -453,6 +458,25 @@ void GameOfLife::DrawCellGrid() {
       {GetModelMatrix(low, high - low, 0.4f), glm::vec4{grid_origin, cell_input_->Unit(), kPlaygroundBrightness},
        glm::uvec4{2u, 0u, uint32_t(cell_grid_width_), uint32_t(cell_grid_height_)}},
       cell_input_->Appearance());
+}
+
+void GameOfLife::DrawGridRuler() {
+  if (!tiled_enabled_)
+    return;
+  const float alpha = ruler_timing_.Opacity(grassland::GetTimeSeconds());
+  if (alpha <= 0)
+    return;
+  const glm::vec2 low{playground_left_, playground_top_};
+  const glm::vec2 size{playground_right_ - playground_left_, playground_bottom_ - playground_top_};
+  const float font =
+      std::max(12.0f, control_pixel_size_ > 0 ? control_pixel_size_ * 0.25f : std::min(size.x, size.y) * 0.022f);
+  DrawModel(
+      &white_rect_model.value(),
+      {GetModelMatrix(low, size, 0.2f), glm::vec4{cell_input_->Origin(), cell_input_->Unit(), alpha},
+       glm::uvec4{
+           7u, GridDetail::At(cell_input_->Unit(), float(std::min(FramebufferSize().x, FramebufferSize().y))).Packed(),
+           uint32_t(font * 64), 0u},
+       glm::vec4{low, low + size}});
 }
 
 glm::vec2 GameOfLife::CursorPosition() const {
@@ -469,6 +493,7 @@ bool GameOfLife::CursorInGrid() const {
 }
 
 void GameOfLife::ZoomGrid(float factor) {
+  ruler_timing_.Zoom(grassland::GetTimeSeconds());
   const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f, (playground_top_ + playground_bottom_) * 0.5f};
   grid_view_.Zoom(factor, CursorInGrid() ? CursorPosition() - center : glm::vec2{0.0f},
                   tiled_enabled_ ? 64.0f / TiledLife::kWorldSize : 1.0f);
@@ -741,7 +766,7 @@ bool GameOfLife::PrepareScene(rhi::ICommandContext *commands) {
     if (!tiled_life_.Step(commands, boundary_button_->Mode() == BoundaryMode::kPeriodic))
       return false;
   pending_steps_ = 0;
-  return cell_input_->Unit() >= 1.0f || tiled_life_.UpdateMipmaps(commands);
+  return cell_input_->Unit() >= 1.0f || tiled_life_.UpdateMipmaps(commands, GridDetail::Heat(cell_input_->Unit()));
 }
 
 void GameOfLife::EnableNativeSizeControls() {
@@ -819,7 +844,9 @@ double GameOfLife::NextFrameDelay() const {
     return 0;
   if (cells_animating_)
     return 0;
-  return pause_play_button_->IsPlaying() ? simulation_clock_.NextStepDelay(speed_toggle_button_->SpeedLevel())
-                                         : std::numeric_limits<double>::infinity();
+  const double normal = pause_play_button_->IsPlaying()
+                            ? simulation_clock_.NextStepDelay(speed_toggle_button_->SpeedLevel())
+                            : std::numeric_limits<double>::infinity();
+  return tiled_enabled_ ? ruler_timing_.NextDelay(grassland::GetTimeSeconds(), normal) : normal;
 }
 }  // namespace life_demo

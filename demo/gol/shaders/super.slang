@@ -119,11 +119,29 @@ float GridFade(PSInput input) {
   return smoothstep(0.0, width, min(edge.x, edge.y));
 }
 
+uint DetailSpan(uint level) {
+  return 2048u >> (3 * level);
+}
+
+float3 CheckerColor(float3 color, float2 grid, uint packed) {
+  uint level = packed >> 16;
+  float t = float(packed & 65535u) / 65535.0;
+  float parent_c = 0.15 * (1.0 - t), child_c = 0.15 * t;
+  uint2 parent_cell = uint2(floor(grid / float(DetailSpan(level))));
+  float parent_a = ((parent_cell.x + parent_cell.y) & 1u) == 0 ? 1.0 : 0.0;
+  if (t > 0 && level < 3) {
+    uint2 child_cell = uint2(floor(grid / float(DetailSpan(level + 1))));
+    float child_a = ((child_cell.x + child_cell.y) & 1u) == 0 ? 1.0 : 0.0;
+    color = color * (1.0 - child_c) + child_a * child_c;
+  }
+  return color * (1.0 - parent_c) + parent_a * parent_c;
+}
+
 // One quad covers the visible grid: color.xy is the top-left corner of cell (0, 0),
 // color.z the cell pitch in framebuffer pixels, color.w the brightness of the gaps,
 // extra.zw the grid dimensions and extra.y the byte offset of one packed
 // appearance word per cell.
-float4 CellGridTheme(PSInput input, float sample_size) {
+float4 CellGridTheme(PSInput input, float sample_size, bool allow_discard = true) {
   float2 grid = (input.screen_position - input.color.xy) / input.color.z;
   int2 cell = int2(floor(grid));
   int2 size = int2(input.extra.zw);
@@ -135,8 +153,9 @@ float4 CellGridTheme(PSInput input, float sample_size) {
     float density = lerp(GridMipSample(level, grid), GridMipSample(min(level + 1, 14u), grid), frac(lod));
     // Area averages of the same rounded, shaded dead/live cell themes below,
     // including the inter-cell gaps. Blend levels in linear brightness.
-    float brightness = lerp(0.183960325, 0.493834190, density);
-    return float4(float3(lerp(input.color.w, brightness, GridFade(input))), 1.0);
+    float brightness = input.color.z < 0.25 ? density : lerp(0.183960325, 0.493834190, density);
+    return float4(lerp(float3(input.color.w), CheckerColor(float3(brightness), grid, input.extra.y), GridFade(input)),
+                  1.0);
   }
   // Each cell fills the middle 80% of its pitch, mapped to [-1, 1] as before.
   float2 local_position = (grid - float2(cell) - 0.5) / 0.4;
@@ -149,7 +168,8 @@ float4 CellGridTheme(PSInput input, float sample_size) {
   p *= p;
   float samples_per_unit = 0.4 * input.color.z / max(sample_size, 1.0e-6);
   float coverage = saturate(0.5 - (pow(p.x + p.y, 0.125) - 1.0) * samples_per_unit);
-  clip(coverage - 1.0 / 512.0);
+  if (allow_discard)
+    clip(coverage - 1.0 / 512.0);
   float3 appearance;
   if (input.extra.x == 6) {
     uint tile = (uint(cell.y) / 256) * 64 + uint(cell.x) / 256;
@@ -172,7 +192,111 @@ float4 CellGridTheme(PSInput input, float sample_size) {
     float width = max(1.0, min(input.clip_rect.z - input.clip_rect.x, input.clip_rect.w - input.clip_rect.y) * 0.06);
     fade = smoothstep(0.0, width, min(edge.x, edge.y));
   }
-  return float4(lerp(float3(input.color.w), cell_color, coverage * fade), 1.0);
+  float3 shaded = lerp(float3(input.color.w), cell_color, coverage);
+  if (input.extra.x == 6)
+    shaded = CheckerColor(shaded, grid, input.extra.y);
+  return float4(lerp(float3(input.color.w), shaded, fade), 1.0);
+}
+
+uint RulerGlyph(uint digit) {
+  switch (digit) {
+    case 0:
+      return 31599u;
+    case 1:
+      return 29850u;
+    case 2:
+      return 29671u;
+    case 3:
+      return 31207u;
+    case 4:
+      return 18925u;
+    case 5:
+      return 31183u;
+    case 6:
+      return 31695u;
+    case 7:
+      return 18727u;
+    case 8:
+      return 31727u;
+    case 9:
+      return 31215u;
+  }
+  return 0;
+}
+
+uint RulerDigits(uint value) {
+  return value >= 10000 ? 5 : value >= 1000 ? 4 : value >= 100 ? 3 : value >= 10 ? 2 : 1;
+}
+
+float RulerNumber(uint value, float2 position, float height) {
+  float unit = height / 5.0;
+  int2 cell = int2(floor(position / unit));
+  uint digits = RulerDigits(value);
+  if (cell.x < 0 || cell.y < 0 || cell.y >= 5 || cell.x >= int(digits * 4 - 1) || cell.x % 4 == 3)
+    return 0;
+  uint character = uint(cell.x) / 4;
+  uint power = digits - character - 1;
+  uint divisor = power == 4 ? 10000 : power == 3 ? 1000 : power == 2 ? 100 : power == 1 ? 10 : 1;
+  uint glyph = RulerGlyph((value / divisor) % 10);
+  if (((glyph >> (uint(cell.y) * 3 + uint(cell.x) % 4)) & 1) == 0)
+    return 0;
+  return 1.0;  // The presentation supersampling antialiases the glyph outline.
+}
+
+float RulerLayer(PSInput input, uint span, float font, bool major) {
+  float2 p = input.screen_position;
+  float2 origin = input.color.xy;
+  float spacing = float(span) * input.color.z;
+  float tick_length = font * (major ? 0.65 : 0.45);
+  float width = max(1.0, font / 14.0);
+  float pad = max(2.0, font * 0.15);
+  float2 edge = min(p - input.clip_rect.xy, input.clip_rect.zw - p);
+  float2 rounded = round((p - origin) / spacing);
+  float2 tick = abs(p - (origin + rounded * spacing));
+  float result = 0;
+  if (rounded.x >= 0 && rounded.x * span <= 16384 && edge.y < tick_length)
+    result = max(result, saturate(width - tick.x));
+  if (rounded.y >= 0 && rounded.y * span <= 16384 && edge.x < tick_length)
+    result = max(result, saturate(width - tick.y));
+  int2 label_index = int2(floor((p - origin) / spacing));
+  if (label_index.x >= 0 && label_index.x * int(span) <= 16384 && (major || label_index.x % 8 != 0)) {
+    uint value = uint(label_index.x) * span;
+    float x = p.x - (origin.x + label_index.x * spacing) - pad;
+    float top = p.y - input.clip_rect.y - tick_length - pad;
+    float bottom = p.y - (input.clip_rect.w - tick_length - pad - font);
+    result = max(result, max(RulerNumber(value, float2(x, top), font), RulerNumber(value, float2(x, bottom), font)));
+  }
+  if (label_index.y >= 0 && label_index.y * int(span) <= 16384 && (major || label_index.y % 8 != 0) &&
+      edge.y > font * (major ? 2.5 : 5.0)) {
+    uint value = uint(label_index.y) * span;
+    float y = p.y - (origin.y + label_index.y * spacing) - pad;
+    float left = p.x - input.clip_rect.x - tick_length - pad;
+    float number_width = float(RulerDigits(value) * 4 - 1) * font / 5;
+    float right = p.x - (input.clip_rect.z - tick_length - pad - number_width);
+    result = max(result, max(RulerNumber(value, float2(left, y), font), RulerNumber(value, float2(right, y), font)));
+  }
+  return result;
+}
+
+float4 GridRulerTheme(PSInput input, float sample_size) {
+  uint level = input.extra.y >> 16;
+  float t = float(input.extra.y & 65535u) / 65535.0;
+  float font = float(input.extra.z) / 64.0;
+  float mask = RulerLayer(input, DetailSpan(level), font, true);
+  if (t > 0 && level < 3)
+    mask = max(mask, t * RulerLayer(input, DetailSpan(level + 1), font * 0.5, false));
+  float2 edge = min(input.screen_position - input.clip_rect.xy, input.clip_rect.zw - input.screen_position);
+  mask = max(mask, 0.3 * saturate(max(1.0, font / 18.0) - min(edge.x, edge.y)));
+  clip(mask - 0.001);
+  float3 background = float3(0.08);
+  float2 grid = (input.screen_position - input.color.xy) / input.color.z;
+  if (all(grid >= 0) && all(grid < 16384)) {
+    PSInput under = input;
+    under.extra = uint4(6, input.extra.y, 16384, 16384);
+    under.color.w = 0.08;
+    background = CellGridTheme(under, sample_size, false).rgb;
+  }
+  return float4(lerp(background, float3(0.85), mask * input.color.w), 1);
 }
 
 // A rounded plate with real cutouts. Discard exposes the button background through
@@ -266,6 +390,9 @@ float4 PSMain(PSInput input) : SV_TARGET {
     case 4:
     case 5:
       color = SliderTheme(input);
+      break;
+    case 7:
+      color = GridRulerTheme(input, sample_size);
       break;
     case 2:
     case 6:

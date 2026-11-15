@@ -6,6 +6,7 @@
 #include "cell_grid.h"
 #include "file_button.h"
 #include "gpu/tiled_life.h"
+#include "grid_detail.h"
 #include "grid_size.h"
 #include "grid_view.h"
 #include "pause_play_button.h"
@@ -101,6 +102,7 @@ class GameOfLife : public Application {
   void InitCells(int width, int height);
   void LayoutCells();
   void DrawCellGrid();
+  void DrawGridRuler();
   void ResizeGrid(int width, int height);
   glm::vec2 CursorPosition() const;
   glm::vec2 FramePosition(glm::dvec2 position) const;
@@ -119,6 +121,7 @@ class GameOfLife : public Application {
   SimulationClock simulation_clock_;
   AnimationVar icon_rotation_{0.0f, AnimationStyle::kPower2};
   GridView grid_view_;
+  GridRulerTiming ruler_timing_;
   std::unique_ptr<SizeSlider> width_slider_;
   std::unique_ptr<SizeSlider> height_slider_;
   int requested_width_{};
