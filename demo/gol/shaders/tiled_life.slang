@@ -88,8 +88,8 @@ uint EdgeCell(uint2 tile, int x, int y) {
 }
 
 // Eight four-bit cells per uint; a 256x256 tile uses 32 KiB, a 128x128 tile 8 KiB.
-// Horizontal sums and the old state share each nibble. Barriers separate
-// decoding, horizontal reads, horizontal writes, and the vertical pass.
+// Horizontal sums and the old state share each nibble. A barrier separates
+// decoding plus horizontal scanning from the vertical pass and main writes.
 groupshared uint local_cells[SHARED_WORDS];
 
 uint Expand(uint bits) {
@@ -142,23 +142,21 @@ uint HorizontalCached(uint2 tile, int x, int y) {
                                             : SV_GroupIndex) {
   uint tile_index = group.y * TILES_AXIS + group.x;
   uint2 tile = uint2(group.x, group.y);
+  // Fuse decoding with the horizontal scan. All main reads complete at the
+  // barrier before any thread writes a new generation into this tile.
   for (uint i = lane; i < WORDS_PER_TILE; i += GROUP_THREADS) {
-    uint bits = Load(tile_index, i % WORDS_PER_ROW, i / WORDS_PER_ROW);
-    for (uint j = 0; j < 4; ++j)
-      local_cells[i * 4 + j] = Expand(bits >> (j * 8));
+    uint xword = i % WORDS_PER_ROW, y = i / WORDS_PER_ROW;
+    uint bits = Load(tile_index, xword, y);
+    uint left = xword > 0 ? Load(tile_index, xword - 1, y) >> 31 : EdgeCell(tile, -1, int(y));
+    uint right = xword + 1 < WORDS_PER_ROW ? Load(tile_index, xword + 1, y) & 1 : EdgeCell(tile, TILE_SIZE, int(y));
+    uint shiftedLeft = (bits << 1) | left;
+    uint shiftedRight = (bits >> 1) | (right << 31);
+    for (uint j = 0; j < 4; ++j) {
+      uint old = Expand(bits >> (j * 8));
+      uint count = old + Expand(shiftedLeft >> (j * 8)) + Expand(shiftedRight >> (j * 8));
+      local_cells[i * 4 + j] = (count << 1) | old;
+    }
   }
-  GroupMemoryBarrierWithGroupSync();
-  uint horizontal[SHARED_WORDS / GROUP_THREADS];
-  [unroll] for (uint k = 0; k < SHARED_WORDS / GROUP_THREADS; ++k) {
-    uint packet = lane + k * GROUP_THREADS;
-    int x = int(packet % (TILE_SIZE / 8)) * 8;
-    int y = int(packet / (TILE_SIZE / 8));
-    horizontal[k] = (Horizontal(tile, x, y) << 1) | local_cells[packet];
-  }
-  // All reads of old states finish before any thread replaces shared data.
-  GroupMemoryBarrierWithGroupSync();
-  [unroll] for (uint k = 0; k < SHARED_WORDS / GROUP_THREADS; ++k) local_cells[lane + k * GROUP_THREADS] =
-      horizontal[k];
   GroupMemoryBarrierWithGroupSync();
   for (uint index = lane; index < WORDS_PER_TILE; index += GROUP_THREADS) {
     int startX = int(index % WORDS_PER_ROW) * 32, y = int(index / WORDS_PER_ROW);
