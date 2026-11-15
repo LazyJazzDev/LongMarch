@@ -126,7 +126,7 @@ uint DetailSpan(uint level) {
 float3 CheckerColor(float3 color, float2 grid, uint packed) {
   uint level = packed >> 16;
   float t = float(packed & 65535u) / 65535.0;
-  float parent_c = 0.15 * (1.0 - t), child_c = 0.15 * t;
+  float parent_c = 0.05 * (1.0 - t), child_c = 0.05 * t;
   uint2 parent_cell = uint2(floor(grid / float(DetailSpan(level))));
   float parent_a = ((parent_cell.x + parent_cell.y) & 1u) == 0 ? 1.0 : 0.0;
   if (t > 0 && level < 3) {

@@ -7,7 +7,7 @@
 namespace life_demo {
 // Shared CPU policy for checker transitions and the coordinate ruler.
 struct GridDetail {
-  static constexpr float kContrast = 0.15f;
+  static constexpr float kContrast = 0.05f;
   static constexpr std::array<int, 4> kSpans{2048, 256, 32, 4};
   int major{};
   float transition{};
