@@ -476,8 +476,13 @@ void GameOfLife::OnWindowSize() {
 
 void GameOfLife::LayoutCells() {
   const glm::vec2 viewport{playground_right_ - playground_left_, playground_bottom_ - playground_top_};
+  // Mobile hosts supply a 40-point/vp control size in framebuffer pixels.
+  // Use a fixed logical reference width: unfolding reveals more cells rather
+  // than magnifying them. Desktop hosts retain their viewport-fitted overview.
+  const float reference_extent =
+      control_pixel_size_ > 0.0f ? control_pixel_size_ * 9.0f : std::min(viewport.x, viewport.y);
   const float fitted_unit = tiled_enabled_
-                                ? std::min(viewport.x, viewport.y) * (0.95f / 64.0f)
+                                ? reference_extent * (0.95f / 64.0f)
                                 : std::min(viewport.y / cell_grid_height_, viewport.x / cell_grid_width_) * 0.95f;
   if (tiled_enabled_) {
     const auto limit = glm::max(
@@ -949,6 +954,10 @@ void GameOfLife::SetControlExtentLimit(float height_fraction) {
 void GameOfLife::SetControlPixelSize(float pixels) {
   const float size = std::isfinite(pixels) ? std::max(pixels, 0.0f) : 0.0f;
   if (control_pixel_size_ != size) {
+    // Pan is measured in framebuffer pixels. Preserve the viewed cell when
+    // switching between displays with different densities.
+    if (tiled_enabled_ && control_pixel_size_ > 0.0f && size > 0.0f)
+      grid_view_.pan *= size / control_pixel_size_;
     control_pixel_size_ = size;
     OnWindowSize();
   }
