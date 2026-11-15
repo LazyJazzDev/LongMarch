@@ -42,11 +42,13 @@ uint Load(uint tile, uint x, uint y) {
   return cells.Load(Address(tile, x, y));
 }
 
-[numthreads(32, 1, 1)] void ExportHalo(uint3 group
-                                       : SV_GroupID, uint lane
-                                       : SV_GroupIndex) {
-  uint tile = group.y * TILES_AXIS + group.x;
-  if (lane >= 4 * WORDS_PER_ROW)
+// Pack multiple tiles' border words into each workgroup. Small compute tiles
+// no longer launch mostly idle groups for their few border words.
+[numthreads(128, 1, 1)] void ExportHalo(uint3 thread
+                                        : SV_DispatchThreadID) {
+  uint tile = thread.x / (4 * WORDS_PER_ROW);
+  uint lane = thread.x % (4 * WORDS_PER_ROW);
+  if (tile >= TILES_AXIS * TILES_AXIS)
     return;
   uint value = 0;
   if (lane < WORDS_PER_ROW)

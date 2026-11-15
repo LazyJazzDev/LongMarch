@@ -37,6 +37,7 @@ class TiledLife {
   uint32_t tile_count_{};
   uint32_t compute_axis_{};
   uint32_t compute_count_{};
+  uint32_t halo_groups_{};
   grassland::rhi::ObjPtr<grassland::rhi::IBuffer> cells_, halos_, batch_;
   grassland::rhi::ObjPtr<grassland::rhi::IBindingGroup> bindings_;
   std::array<grassland::rhi::ObjPtr<grassland::rhi::IComputeProgram>, 4> programs_;

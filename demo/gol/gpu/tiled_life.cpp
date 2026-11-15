@@ -16,6 +16,7 @@ bool TiledLife::Initialize(IDevice *device,
   tile_count_ = tiles_per_axis * tiles_per_axis;
   compute_axis_ = tiles_per_axis * 256 / compute_tile_size;
   compute_count_ = compute_axis_ * compute_axis_;
+  halo_groups_ = (compute_count_ * (compute_tile_size / 8) + 127) / 128;
   batch_ = device->CreateBuffer({256});
   cells_ = device->CreateBuffer({uint64_t(WordCount()) * 4});
   halos_ = device->CreateBuffer({uint64_t(compute_count_) * (4 * (compute_tile_size / 32) + 1) * 4});
@@ -66,8 +67,9 @@ bool TiledLife::Dispatch(ICommandContext *commands, uint32_t phase, uint32_t cou
     grassland::LogError("Bind tiled resources {} failed", phase);
     return false;
   }
-  if (!commands->CmdDispatch(count == compute_count_ ? compute_axis_ : count,
-                             count == compute_count_ ? compute_axis_ : 1, 1)) {
+  if (!(phase == 1 ? commands->CmdDispatch(halo_groups_, 1, 1)
+                   : commands->CmdDispatch(count == compute_count_ ? compute_axis_ : count,
+                                           count == compute_count_ ? compute_axis_ : 1, 1))) {
     grassland::LogError("Dispatch tiled phase {} failed", phase);
     return false;
   }
