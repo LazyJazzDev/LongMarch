@@ -46,6 +46,9 @@ class GameOfLife : public Application {
   // Host-selected icon size in framebuffer pixels, independent of window extent.
   // Zero restores proportional desktop sizing. Small windows may shrink to fit.
   void SetControlPixelSize(float pixels);
+  // Precise host occlusions (normalized x/y/width/height, including safety margins).
+  // An empty list still enables local avoidance instead of whole-edge safe areas.
+  void SetControlOcclusions(const std::vector<glm::vec4> &regions);
   void EnableNativeSizeControls();
   glm::ivec2 TakeSizeControlRequest();
   // A size slider's rectangle as fractions of the framebuffer, for anchoring a
@@ -129,6 +132,8 @@ class GameOfLife : public Application {
   bool sidebar_{true};
   float bottom_control_inset_{};
   glm::vec3 cutout_insets_{-1.0f};
+  bool precise_occlusions_{};
+  std::vector<glm::vec4> control_occlusions_;
   float control_extent_limit_{};
   float control_pixel_size_{};
   bool sliders_were_dragging_{false};

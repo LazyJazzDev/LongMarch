@@ -335,7 +335,9 @@ void GameOfLife::OnWindowSize() {
   // Controls keep at least a margin from a host's safe-area boundary (a screen
   // cutout); without host safe areas they use the fallback gap.
   const bool cutouts = cutout_insets_.y >= 0.0f;
-  auto edge_offset = [&](float inset, float fallback) { return cutouts ? std::max(margin, inset) : fallback; };
+  auto edge_offset = [&](float inset, float fallback) {
+    return precise_occlusions_ ? margin : (cutouts ? std::max(margin, inset) : fallback);
+  };
 
   float playground_left = 0.0f;
   float playground_right = window_width;
@@ -348,7 +350,16 @@ void GameOfLife::OnWindowSize() {
 
   // Sidebars follow the window's short edges, independent of the grid aspect.
   sidebar_ = window_width >= window_height;
-  auto place = [icon_size](Button *button, float x, float y) { button->Resize(x, y, x + icon_size, y + icon_size); };
+  std::vector<std::pair<Button *, glm::vec2>> placements;
+  auto place = [&](Button *button, float x, float y) {
+    button->Resize(x, y, x + icon_size, y + icon_size);
+    auto found =
+        std::find_if(placements.begin(), placements.end(), [button](const auto &p) { return p.first == button; });
+    if (found == placements.end())
+      placements.emplace_back(button, glm::vec2{x, y});
+    else
+      found->second = {x, y};
+  };
   if (sidebar_) {
     const float left_x = edge_offset(window_width * cutout_insets_.x, margin);
     const float right_x = window_width - edge_offset(window_width * cutout_insets_.z, margin) - icon_size;
@@ -372,7 +383,8 @@ void GameOfLife::OnWindowSize() {
     // The sparse top actions sit in the corners beside a top cutout, so they
     // center on its safe-area boundary. Without host safe areas, give them
     // more breathing room against rounded corners.
-    const float action_top_margin = edge_offset(window_height * cutout_insets_.y - icon_size * 0.5f, margin * 2.0f);
+    const float action_top_margin =
+        precise_occlusions_ ? margin : edge_offset(window_height * cutout_insets_.y - icon_size * 0.5f, margin * 2.0f);
     playground_top = panel_size + action_top_margin - margin;
     playground_bottom = window_height - panel_size - bottom_shift;
     panel_top_ = playground_bottom;
@@ -413,6 +425,45 @@ void GameOfLife::OnWindowSize() {
       place(pause_play_button_.get(), (window_width - icon_size) * 0.5f, top);
       place(speed_toggle_button_.get(), right - step, top);
       place(boundary_button_.get(), right, top);
+    }
+  }
+  if (precise_occlusions_) {
+    // Move only controls intersecting a camera/system reserved region, along
+    // their existing rail. The board and unrelated controls keep their margins.
+    std::vector<glm::vec4> blocked;
+    for (const auto &r : control_occlusions_)
+      blocked.emplace_back(r.x * window_width, r.y * window_height, (r.x + r.z) * window_width,
+                           (r.y + r.w) * window_height);
+    const int axis = sidebar_ ? 1 : 0;
+    const int cross = 1 - axis;
+    const float end = (sidebar_ ? window_height - bottom_margin : window_width - margin) - icon_size;
+    for (auto &[button, origin] : placements) {
+      std::vector<float> candidates{origin[axis], margin, end};
+      for (const auto &r : blocked) {
+        candidates.push_back(r[axis] - icon_size);
+        candidates.push_back(r[axis + 2]);
+      }
+      float best = origin[axis];
+      float distance = std::numeric_limits<float>::infinity();
+      for (float candidate : candidates) {
+        if (candidate < margin || candidate > end)
+          continue;
+        bool clear = true;
+        for (const auto &r : blocked)
+          if (origin[cross] < r[cross + 2] && origin[cross] + icon_size > r[cross] && candidate < r[axis + 2] &&
+              candidate + icon_size > r[axis]) {
+            clear = false;
+            break;
+          }
+        if (clear && std::abs(candidate - origin[axis]) < distance) {
+          best = candidate;
+          distance = std::abs(candidate - origin[axis]);
+        }
+      }
+      origin[axis] = best;
+      button->Resize(origin.x, origin.y, origin.x + icon_size, origin.y + icon_size);
+      const float gap = ui_unit * 3.0f;
+      blocked.emplace_back(origin.x - gap, origin.y - gap, origin.x + icon_size + gap, origin.y + icon_size + gap);
     }
   }
   playground_left_ = playground_left;
@@ -899,6 +950,14 @@ void GameOfLife::SetControlPixelSize(float pixels) {
   const float size = std::isfinite(pixels) ? std::max(pixels, 0.0f) : 0.0f;
   if (control_pixel_size_ != size) {
     control_pixel_size_ = size;
+    OnWindowSize();
+  }
+}
+
+void GameOfLife::SetControlOcclusions(const std::vector<glm::vec4> &regions) {
+  if (!precise_occlusions_ || control_occlusions_ != regions) {
+    precise_occlusions_ = true;
+    control_occlusions_ = regions;
     OnWindowSize();
   }
 }
