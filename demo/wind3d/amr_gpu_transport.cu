@@ -318,8 +318,8 @@ bool GpuTransport::Build(int device,
   }
   next->fields[1] = f;
   for (auto &field : next->fields)
-    if (!next->Allocate(field.velocity_, f.nf) || !next->Allocate(field.centres_, f.nc) ||
-        !next->Allocate(field.slopes_, f.nc) || !next->Allocate(field.limits_, f.nc) ||
+    if (!next->Allocate(field.velocity_.local, f.nf) || !next->Allocate(field.centres_.local, f.nc) ||
+        !next->Allocate(field.slopes_.local, f.nc) || !next->Allocate(field.limits_.local, f.nc) ||
         (cache_halos && !next->Allocate(field.halo, f.halo_count)))
       return fail();
   if (!next->Allocate(next->neighbors, size_t(f.nf) * 6) || !next->Allocate(next->layers, f.nf) ||
@@ -352,13 +352,13 @@ bool GpuTransport::AdvectDevice(const double *velocity,
   a.inlet_speed = b.inlet_speed = inlet_speed.value_or(0);
   int blocks = (a.nf + 255) / 256;
   if (!w.Check(cudaSetDevice(w.device)) ||
-      !w.Check(cudaMemcpy(a.velocity_, velocity, faces * sizeof(double), cudaMemcpyDeviceToDevice)) ||
-      !w.Valid(a.velocity_) || !w.Prepare(a))
+      !w.Check(cudaMemcpy(a.velocity_.local, velocity, faces * sizeof(double), cudaMemcpyDeviceToDevice)) ||
+      !w.Valid(a.velocity_.local) || !w.Prepare(a))
     return false;
-  Forward<<<blocks, 256>>>(a, dt, cubic, b.velocity_);
-  if (!w.Check(cudaGetLastError()) || !w.Valid(b.velocity_))
+  Forward<<<blocks, 256>>>(a, dt, cubic, b.velocity_.local);
+  if (!w.Check(cudaGetLastError()) || !w.Valid(b.velocity_.local))
     return false;
-  const double *result = b.velocity_;
+  const double *result = b.velocity_.local;
   if (corrected) {
     if (!w.Prepare(b))
       return false;

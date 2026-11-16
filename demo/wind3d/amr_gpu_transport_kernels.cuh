@@ -51,6 +51,19 @@ struct HaloSite {
   int cell, native;
 };
 
+// Global IDs resolve to owned storage. Null maps retain the contiguous
+// single-device path. Peer reads are valid only after the owning stage ends.
+template <class T>
+struct DistributedValues {
+  T *local{};
+  T *const *peers{};
+  const int *owners{}, *indices{};
+
+  __device__ T &operator[](int id) const {
+    return peers ? peers[owners[id]][indices[id]] : local[id];
+  }
+};
+
 struct Field {
   int n, max_level, nb, nc, nf;
   Array<int, 3> roots;
@@ -60,10 +73,21 @@ struct Field {
   const Cell *cells;
   const Face *faces;
   const int *offsets, *incidence;
-  double *velocity_;
-  Array<double, 3> *centres_;
-  Array<double, 9> *slopes_;
-  Array<double, 6> *limits_;
+  DistributedValues<double> velocity_;
+  DistributedValues<Array<double, 3>> centres_;
+  DistributedValues<Array<double, 9>> slopes_;
+  DistributedValues<Array<double, 6>> limits_;
+  const int *owned_faces{}, *owned_cells{};
+  int face_count{}, cell_count{};
+
+  __device__ int FaceWork(int i) const {
+    return owned_faces ? (i < face_count ? owned_faces[i] : -1) : (i < nf ? i : -1);
+  }
+
+  __device__ int CellWork(int i) const {
+    return owned_cells ? (i < cell_count ? owned_cells[i] : -1) : (i < nc ? i : -1);
+  }
+
   HaloSite *sites{};
   double *halo{};
   int halo_count{};
@@ -401,8 +425,8 @@ __global__ void FillHalos(Field f) {
 }
 
 __global__ void Centres(Field f) {
-  int cell = blockIdx.x * blockDim.x + threadIdx.x;
-  if (cell >= f.nc)
+  int cell = f.CellWork(blockIdx.x * blockDim.x + threadIdx.x);
+  if (cell < 0)
     return;
   Array<double, 3> value{}, weight{};
   for (int k = f.offsets[cell]; k < f.offsets[cell + 1]; ++k) {
@@ -419,8 +443,8 @@ __global__ void Centres(Field f) {
 }
 
 __global__ void Slopes(Field f) {
-  int cell = blockIdx.x * blockDim.x + threadIdx.x;
-  if (cell >= f.nc)
+  int cell = f.CellWork(blockIdx.x * blockDim.x + threadIdx.x);
+  if (cell < 0)
     return;
   auto centres = f.centres_;
   auto slopes = f.slopes_;
@@ -499,14 +523,14 @@ __global__ void SlipNeighbors(Field f, int *neighbors, int *layer) {
 }
 
 __global__ void ClearSolid(Field f) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < f.nf && f.faces[i].aperture == 0)
+  int i = f.FaceWork(blockIdx.x * blockDim.x + threadIdx.x);
+  if (i >= 0 && f.faces[i].aperture == 0)
     f.velocity_[i] = 0;
 }
 
 __global__ void Extend(Field f, const int *neighbors, const int *layers, int pass) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= f.nf || f.faces[i].aperture > 0 || (pass == 1 ? layers[i] != 1 : layers[i] == 1))
+  int i = f.FaceWork(blockIdx.x * blockDim.x + threadIdx.x);
+  if (i < 0 || f.faces[i].aperture > 0 || (pass == 1 ? layers[i] != 1 : layers[i] == 1))
     return;
   double sum = 0;
   int count = 0;
@@ -522,29 +546,31 @@ __global__ void Extend(Field f, const int *neighbors, const int *layers, int pas
 }
 
 __global__ void Forward(Field f, double dt, bool cubic, double *out) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= f.nf)
+  int local = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = f.FaceWork(local);
+  if (i < 0)
     return;
   auto face = f.faces[i];
-  out[i] = face.aperture == 0
-               ? 0
-               : f.Component(f.Departure(face.centre, dt), face.axis, cubic, sqrt(face.area), f.FaceCell(face));
+  out[local] = face.aperture == 0
+                   ? 0
+                   : f.Component(f.Departure(face.centre, dt), face.axis, cubic, sqrt(face.area), f.FaceCell(face));
 }
 
 __global__ void Correct(Field original, Field forward, double dt, bool cubic, double *out) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= original.nf)
+  int local = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = original.FaceWork(local);
+  if (i < 0)
     return;
   auto face = original.faces[i];
   if (face.aperture == 0) {
-    out[i] = 0;
+    out[local] = 0;
     return;
   }
   double value = forward.velocity_[i] +
                  .5 * (original.velocity_[i] - forward.Component(original.Departure(face.centre, -dt), face.axis, cubic,
                                                                  sqrt(face.area), forward.FaceCell(face)));
   if (!isfinite(value)) {
-    out[i] = nan("");
+    out[local] = nan("");
     return;
   }
   auto back = original.Departure(face.centre, dt);
@@ -562,7 +588,7 @@ __global__ void Correct(Field original, Field forward, double dt, bool cubic, do
         lo = Min(lo, v);
         hi = Max(hi, v);
       }
-  out[i] = (value >= lo && value <= hi) ? value : forward.velocity_[i];
+  out[local] = (value >= lo && value <= hi) ? value : forward.velocity_[i];
 }
 
 }  // namespace

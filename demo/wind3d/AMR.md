@@ -1628,3 +1628,48 @@ flow CTests (153.21/46.39/0.78 seconds). Transport compares CPU/GPU and cached/
 direct results across inlet modes, embedded geometry, linear/cubic and
 corrected/uncorrected paths, signed timesteps and long traces. This validates
 the extraction's existing single-device behavior, not distributed transport.
+
+### Owned-field distributed advection
+
+`GpuDistributedTransport` builds the same block/face ownership as
+`PressurePartition`. Each rank stores only its owned dynamic velocity,
+cell-centre, slope and limiter arrays for original/forward fields, plus its
+owned output buffer. Global face/cell IDs resolve through owner/local-index
+maps and device pointer tables. Geometry, incidence, lookup topology and slip
+classification are currently replicated; dynamic fields are neither replicated
+nor gathered onto the host. Required CUDA peer access remains enabled for the
+context lifetime, as in distributed pressure.
+
+The shared transport kernels map work indices to owned global IDs, while the
+single-device path retains contiguous indexing. Each preparation stage launches
+on every rank and completes before peer reads in the next stage. Forward and
+corrected advection reuse the shared formulas and retain original-velocity
+tracing in both directions. Direct sampling supports cross-partition long
+trajectories without truncating donors or introducing a new timestep limit.
+The distributed implementation currently omits the optional block sampling
+cache; this is a functional ownership/communication path, not yet a performance
+claim.
+
+Public inputs and outputs use each rank's owned face prefix, matching pressure
+layouts; trailing pressure imports are untouched. Input/output aliasing is
+supported because all inputs first copy into private storage. Finite-value
+validation completes on every rank before output commits; numerical failures
+leave every caller output unchanged. Invalid builds preserve the previous
+instance. CUDA failures may leave partially copied outputs, and all internal
+streams are drained before returning from failed operations.
+
+Distributed diffusion, sponge, loads, pressure coupling and adaptive runtime
+integration are still required before full-flow or 2% steady-load acceptance.
+
+Job 2001385 passed distributed transport plus the existing single-device
+transport/advance/flow CTests and distributed transport memcheck with zero
+unsuppressed errors (the exact expected-704 peer-status suppression applies).
+All 32 geometry/scale/device configurations, each with 16 transport cases,
+reported zero maximum difference from single-device direct sampling. Coverage
+includes one/two/four GPUs, reversed/permuted device order, uniform/mixed grids,
+embedded bodies, inlet modes, signed/zero/long timesteps, linear/cubic and
+corrected/uncorrected transport. It also checks ownership against the pressure
+partition, aliasing, untouched trailing ghosts, build rollback, current-device
+restoration and all-rank output rollback on a non-finite input. This establishes
+advection consistency only; it does not establish a full-flow speedup or the
+steady-load acceptance gate.
