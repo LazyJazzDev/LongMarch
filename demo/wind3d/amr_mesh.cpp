@@ -102,6 +102,7 @@ bool Mesh::Build(const Topology &tree, int n, double root_width, std::array<doub
     if (faces[i].high >= 0)
       incidence[cursor[faces[i].high]++] = -int(i) - 1;
   }
+  embedded_ = false;
   cells_per_block_ = n;
   cells_ = std::move(cells);
   faces_ = std::move(faces);

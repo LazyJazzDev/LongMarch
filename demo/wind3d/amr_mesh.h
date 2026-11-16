@@ -26,7 +26,9 @@ class Mesh {
   // Embed a stationary body using the uniform solver's 6x6 aperture samples,
   // 1/8 sliver threshold and centre-connection thin-wall test. Interfaces that
   // intersect the body are rejected: body surfaces require finest-level blocks.
-  bool Embed(const std::function<double(std::array<double, 3>)> &distance);
+  // previous may reuse identical face/neighbor geometry only when it was
+  // embedded with the same stationary distance function and body parameters.
+  bool Embed(const std::function<double(std::array<double, 3>)> &distance, const Mesh *previous = nullptr);
   // Fluid pressure force/moment about world origin, from closed face areas.
   bool PressureLoads(const std::vector<double> &pressure, std::array<double, 6> &loads) const;
 
@@ -54,6 +56,7 @@ class Mesh {
 
  private:
   int cells_per_block_{};
+  bool embedded_{};
   std::vector<MeshCell> cells_;
   std::vector<MeshFace> faces_;
   std::vector<int> offsets_, incidence_;

@@ -5,8 +5,64 @@
 #include "aircraft.h"
 #include "amr_projection.h"
 
+bool ValidateReuse() {
+  using namespace wind3d::amr;
+  for (double width : {1.0, 1.3}) {
+    Topology fine, mixed;
+    if (!fine.Regrid({2, 2, 2}, 1, 64, [](Block) { return true; }) ||
+        !mixed.Regrid({2, 2, 2}, 1, 64, [](Block b) { return b.x == 0; }))
+      return false;
+    Mesh previous;
+    size_t calls = 0;
+    auto distance = [&](std::array<double, 3> p) {
+      ++calls;
+      return std::max({std::abs(p[0] + .5 * width), std::abs(p[1]), std::abs(p[2])}) - .21 * width;
+    };
+    if (!previous.Build(fine, 4, width, {-width, -width, -width}) || !previous.Embed(distance))
+      return false;
+    // Coarsen and refine away from the fixed fine body region. Verify every
+    // aperture and active cell, including unchanged centres with changed neighbors.
+    for (const auto *tree : {&mixed, &fine}) {
+      Mesh fresh, reused;
+      if (!fresh.Build(*tree, 4, width, {-width, -width, -width}) ||
+          !reused.Build(*tree, 4, width, {-width, -width, -width}))
+        return false;
+      calls = 0;
+      if (!fresh.Embed(distance))
+        return false;
+      size_t full_calls = calls;
+      calls = 0;
+      if (!reused.Embed(distance, &previous) || calls >= full_calls)
+        return false;
+      for (size_t i = 0; i < fresh.Faces().size(); ++i)
+        if (fresh.Faces()[i].aperture != reused.Faces()[i].aperture)
+          return false;
+      for (size_t i = 0; i < fresh.Cells().size(); ++i)
+        if (fresh.Cells()[i].active != reused.Cells()[i].active)
+          return false;
+      std::cout << "embedding width=" << width << " SDF calls=" << calls << '/' << full_calls << '\n';
+      previous = std::move(reused);
+    }
+    // Rebuilding invalidates the cached embedding; an unembedded mesh's default
+    // open faces must never be accepted as sampled geometry.
+    if (!previous.Build(fine, 4, width, {-width, -width, -width}))
+      return false;
+    Mesh check;
+    if (!check.Build(fine, 4, width, {-width, -width, -width}) || !check.Embed(distance, &previous))
+      return false;
+    bool closed = false;
+    for (const auto &face : check.Faces())
+      closed |= face.aperture == 0;
+    if (!closed)
+      return false;
+  }
+  return true;
+}
+
 int main() {
   using namespace wind3d::amr;
+  if (!ValidateReuse())
+    return 17;
   Topology tree;
   if (!tree.Regrid({4, 4, 4}, 1, 1000,
                    [](Block b) { return b.x >= 1 && b.x <= 2 && b.y >= 1 && b.y <= 2 && b.z >= 1 && b.z <= 2; }))

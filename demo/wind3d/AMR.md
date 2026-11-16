@@ -422,3 +422,28 @@ identical printed force/moment components and 17.2 mean iterations; total time
 fell from 12.96--12.98 ms to 12.83--12.86 ms (about 1%). This removes one host
 synchronization per full iteration; it does not fuse the reduction kernels or
 change the pressure operator/tolerance.
+
+## Stationary embedded-face reuse
+
+Regridding can reuse sampled apertures when face centre, area, axis, distance
+and both neighboring cell geometries exactly match the previous embedded mesh.
+The caller must retain the same stationary body/distance function. Changed
+faces are sampled normally; rebuilding a mesh invalidates its embedding flag.
+Active cells are recomputed from the completed apertures. GpuFlow uses this
+only for regrids with its unchanged body callback, preserving transactional
+failure behavior.
+
+CPU refine/coarsen tests at root widths 1 and 1.3 compare every aperture and
+active cell with fresh sampling and reject reuse of an unembedded mesh. Strict
+compiler warnings and ASan/UBSan passed. A grid-128 aircraft CPU diagnostic
+reduced embedding time from about 0.53 to 0.20 seconds and distance calls from
+about 6 million to 321024 after a small off-body refinement. GPU job 2001240
+passed mesh, boundary, conservative-transfer and runtime-flow regressions. Its
+100-step performance comparison did not change the hierarchy, so it is not
+rebuild-performance evidence.
+
+Job 2001242 extended both variants to 1200 steps with actual regrids at steps
+600, 700 and 1100. Clock, hierarchy, residual, speed and printed six-component
+loads matched at every step. Total adaptation time fell from 7.00 to 5.76
+seconds; mean step time after step 100 fell from 18.99 to 17.90 ms. This is one
+matched startup comparison, not steady-load or full-solver speedup acceptance.

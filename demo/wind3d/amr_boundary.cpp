@@ -1,10 +1,36 @@
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 #include "amr_mesh.h"
 
 namespace wind3d::amr {
-bool Mesh::Embed(const std::function<double(std::array<double, 3>)> &distance) {
+namespace {
+struct FaceKey {
+  std::array<double, 3> centre;
+  double area;
+  int axis;
+
+  bool operator==(const FaceKey &other) const {
+    return centre == other.centre && area == other.area && axis == other.axis;
+  }
+};
+
+struct FaceHash {
+  size_t operator()(const FaceKey &key) const {
+    size_t hash = size_t(key.axis);
+    for (double value : {key.centre[0], key.centre[1], key.centre[2], key.area})
+      hash ^= std::hash<double>{}(value) + size_t(0x9e3779b9) + (hash << 6) + (hash >> 2);
+    return hash;
+  }
+};
+
+FaceKey Key(const MeshFace &face) {
+  return {face.centre, face.area, face.axis};
+}
+}  // namespace
+
+bool Mesh::Embed(const std::function<double(std::array<double, 3>)> &distance, const Mesh *previous) {
   if (!distance || cells_.empty())
     return false;
   std::vector<bool> solid(cells_.size());
@@ -14,8 +40,28 @@ bool Mesh::Embed(const std::function<double(std::array<double, 3>)> &distance) {
       return false;
     solid[i] = d <= 0;
   }
+  std::unordered_map<FaceKey, size_t, FaceHash> old_faces;
+  if (previous && previous->embedded_) {
+    old_faces.reserve(previous->faces_.size());
+    for (size_t i = 0; i < previous->faces_.size(); ++i)
+      old_faces.emplace(Key(previous->faces_[i]), i);
+  }
+  auto same_cell = [&](int current, int old) {
+    if (current < 0 || old < 0)
+      return current == old;
+    return cells_[current].centre == previous->cells_[old].centre &&
+           cells_[current].width == previous->cells_[old].width;
+  };
   auto faces = faces_;
   for (auto &face : faces) {
+    auto found = old_faces.find(Key(face));
+    if (found != old_faces.end()) {
+      const auto &old = previous->faces_[found->second];
+      if (face.distance == old.distance && same_cell(face.low, old.low) && same_cell(face.high, old.high)) {
+        face.aperture = old.aperture;
+        continue;
+      }
+    }
     bool centre_solid = (face.low >= 0 && solid[face.low]) || (face.high >= 0 && solid[face.high]);
     bool blocked = centre_solid;
     double h = std::sqrt(face.area);
@@ -66,6 +112,7 @@ bool Mesh::Embed(const std::function<double(std::array<double, 3>)> &distance) {
       if (f.high >= 0)
         active[f.high] = true;
     }
+  embedded_ = true;
   faces_ = std::move(faces);
   for (size_t i = 0; i < cells_.size(); ++i)
     cells_[i].active = active[i];

@@ -36,12 +36,12 @@ struct GpuFlow::Impl {
     return false;
   }
 
-  bool Build() {
+  bool Build(const Mesh *previous = nullptr) {
     if (!mesh.Build(tree, n, width, origin)) {
       error = "Invalid adaptive mesh";
       return false;
     }
-    if (distance && !mesh.Embed(distance)) {
+    if (distance && !mesh.Embed(distance, previous)) {
       error = "Body intersects a refinement interface";
       return false;
     }
@@ -146,7 +146,7 @@ bool GpuFlow::Regrid(const Topology &tree) {
   next->origin = impl_->origin;
   next->distance = impl_->distance;
   next->tree = tree;
-  if (!next->Build()) {
+  if (!next->Build(&impl_->mesh)) {
     error_ = next->error;
     return false;
   }
