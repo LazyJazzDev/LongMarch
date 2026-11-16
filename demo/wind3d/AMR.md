@@ -770,3 +770,31 @@ and 1e-11. The default run's printed physical CSV data matched the prior CG run
 exactly. Maximum true residual in the tighter run was 9.735e-12. A subsequent
 30000-step static CG run at 1e-11 is continuing in the same job; its long-term
 load conclusions remain pending.
+
+
+## Underresolved thin-body connectivity diagnostic
+
+Matched early-window (0.5--0.9 s, not steady-state) CG comparisons show a strong
+base-resolution effect. Mean Fx/Fy/Mz were 19.096/16.396/-12.578 (static 128),
+18.688/15.781/-15.886 (uniform 128), 22.558/100.014/-29.730 (static 192), and
+22.247/102.829/-31.581 (uniform 192). This cannot be attributed solely to the
+coarse/fine interface: the uniform grids show a similar lift change.
+
+A CPU-only manufactured slab diagnostic confirms a geometry connectivity defect
+shared by the current AMR and native cut-face logic. On a unit cube with h=0.25,
+an infinite horizontal slab of total thickness 0.05 centred at y=0.5 closes 16
+normal faces. Translating the same slab to y=0.625 (a cell centre) leaves **all
+normal faces fully open**. When a neighbouring cell centre is solid, the current
+code resamples the face-plane aperture; both faces outside a thin solid can be
+reopened, reconnecting the two fluid sides through one pressure cell. The script
+and executable are `out/wind3d-amr/thin-slab-diagnostic.*`.
+
+An isolated diagnostic variant keeps faces adjacent to solid centres closed.
+It restores the slab barrier (32 closed normal faces at the cell-centred phase),
+but changes the cut-cell geometry into a more stair-stepped representation.
+The existing embedded-box test then fails its partial-face-count assertion;
+this variant is therefore **not** a validated replacement for the cut-cell
+method and has not been applied to production sources. Job 2001270 runs its
+static grid-128 aircraft diagnostic using an isolated boundary object and
+frozen executable. Geometry accuracy, cut-cell connectivity and spatial
+convergence must be resolved before accepting a production correction.
