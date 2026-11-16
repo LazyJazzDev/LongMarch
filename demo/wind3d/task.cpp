@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
   auto options = wind3d::OptimizedSolverOptions();
   bool validate = false;
   const char *dump = nullptr, *csv = nullptr;
-  bool adaptive_mode = false;
+  bool adaptive_mode = false, specified_padding = false;
   wind3d::AdaptiveTaskOptions adaptive;
   for (int i = 1; i < argc; ++i) {
     const char *arg = argv[i];
@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
           "            [--speed 12] [--angle 5] [--flap 0] [--aileron 0] [--elevator 0] [--rudder 0]\n"
           "            [--max-dt 0] [--csv loads.csv]\n"
           "            [--adaptive | --amr-uniform] [--levels 1] [--block-cells 4]\n"
+          "            [--protect-padding-cells 2] (minimum 2 finest-cell widths)\n"
           "            (adaptive pressure tolerance defaults to 1e-8)\n"
           "            [--amr-compatible-pressure] (requires --adaptive or --amr-uniform)\n"
           "            [--adapt-every 100] [--max-blocks 100000] (adaptive requires --no-export)\n"
@@ -91,6 +92,11 @@ int main(int argc, char **argv) {
       *parameter = std::strtof(argv[i], &end);
       if (!std::isfinite(*parameter))
         return 1;
+    } else if (!std::strcmp(arg, "--protect-padding-cells")) {
+      adaptive.protect_padding_cells = std::strtod(argv[i], &end);
+      specified_padding = true;
+      if (!std::isfinite(adaptive.protect_padding_cells) || adaptive.protect_padding_cells < 2)
+        return 1;
     } else if (!std::strcmp(arg, "--pressure-tolerance")) {
       adaptive.pressure_tolerance = std::strtod(argv[i], &end);
       options.pressure_tolerance = float(adaptive.pressure_tolerance);
@@ -126,6 +132,10 @@ int main(int argc, char **argv) {
   }
   if ((validate && steps < 2) || steps <= warmup || !std::isfinite(options.pressure_tolerance))
     return 1;
+  if (specified_padding && (!adaptive_mode || adaptive.uniform)) {
+    std::fputs("--protect-padding-cells requires --adaptive.\n", stderr);
+    return 1;
+  }
   if (adaptive.compatible_pressure && !adaptive_mode) {
     std::fputs("--amr-compatible-pressure requires --adaptive or --amr-uniform.\n", stderr);
     return 1;

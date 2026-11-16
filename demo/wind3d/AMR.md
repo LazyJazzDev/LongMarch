@@ -1210,3 +1210,25 @@ using the magnitude of the reference component as denominator. Its roughly
 Fy mean also shifts by -10.0133 between the two halves of the window, so these
 are finite-window comparisons, not established steady-state estimates. Mesh
 coverage and statistical convergence remain required alongside solver speed.
+
+### Configurable body protection extent
+
+Adaptive batch tasks accept `--protect-padding-cells N`, the isotropic distance
+outside the rotated conservative aircraft bounding box in finest-cell widths.
+The default and minimum are 2, retaining the existing geometry/stencil guard.
+The value must be finite; explicit use requires `--adaptive` and is rejected for
+native or uniform mode. Setup reports the corresponding physical distance.
+This changes the protected region used by both initial and subsequent dynamic
+refinement, without changing refinement thresholds or solver parameters.
+
+GPU job 2001329 checked invalid values/modes and five 80-step trajectories.
+Default and explicit 2-cell padding matched the frozen production-inlet binary
+exactly in every physical CSV column (timings excluded). At grid 128, cell
+counts increased from 212,992 to 367,104 and 614,400 for padding 2, 8 and 16.
+These short runs validate configuration, not load accuracy.
+
+Jobs 2001330/2001331 run static adaptive grid 192 with padding 8/16 respectively,
+30,000 steps, dt capped at .0002, speed 12 and angle 5. They use the same physical
+model as the completed 192-resolution reference, and will be compared over the
+same 2--6 second window. Expanded protection must still demonstrate both load
+accuracy and useful cost reduction; no acceptance is inferred from cell counts.
