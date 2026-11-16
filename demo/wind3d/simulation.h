@@ -60,6 +60,11 @@ struct SolverOptions {
   bool retain_snapshots{false};
   int devices{1};
   uint64_t stop_after{};
+  float stop_time{};
+  // Optional lossless per-step diagnostic CSV (including startup transients).
+  std::string diagnostics_path;
+  // Restore before the first step; caller must supply the original grid and model.
+  std::string initial_checkpoint;
   bool export_field{true};
   bool export_final{false};
 };

@@ -1,6 +1,8 @@
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <string>
 #include <thread>
 
 #include "simulation.h"
@@ -60,7 +62,7 @@ int main() {
   if (!drain(3))
     return 6;
   auto resumed = simulation->Latest();
-  std::filesystem::remove(path);
+
   if (resumed->time != reference->time || resumed->dt != reference->dt || resumed->force.x != reference->force.x ||
       resumed->force.y != reference->force.y || resumed->force.z != reference->force.z ||
       resumed->moment.x != reference->moment.x || resumed->moment.y != reference->moment.y ||
@@ -69,5 +71,47 @@ int main() {
   for (int k = 0; k < 3; ++k)
     if (resumed->impulse[k] != reference->impulse[k] || resumed->angular_impulse[k] != reference->angular_impulse[k])
       return 8;
+  simulation.reset();
+  options.retain_snapshots = false;
+  options.initial_checkpoint = path.string();
+  simulation = Simulation::Create(0, 64, options);
+  if (!simulation || !wait([&] {
+        auto state = simulation->Latest();
+        return state && state->step == 8 && simulation->Paused();
+      }))
+    return 14;
+  auto fresh_resume = simulation->Latest();
+  if (fresh_resume->time != reference->time || fresh_resume->force.x != reference->force.x ||
+      fresh_resume->force.y != reference->force.y || fresh_resume->moment.z != reference->moment.z)
+    return 15;
+  simulation.reset();
+  std::filesystem::remove(path);
+  options.initial_checkpoint.clear();
+  options.stop_after = 0;
+  options.stop_time = .0011f;
+  options.diagnostics_path = path.string() + ".csv";
+  simulation = Simulation::Create(0, 64, options);
+  if (!simulation || !wait([&] {
+        auto state = simulation->Latest();
+        return state && state->time >= options.stop_time && simulation->Paused();
+      }))
+    return 9;
+  auto final = simulation->Latest();
+  if (final->time - final->dt >= options.stop_time)
+    return 10;
+  simulation.reset();  // Close the complete history before checking every row.
+  std::ifstream diagnostics(options.diagnostics_path);
+  std::string line;
+  if (!std::getline(diagnostics, line) || line.find("max_speed") == std::string::npos)
+    return 11;
+  uint64_t rows = 0;
+  while (std::getline(diagnostics, line)) {
+    ++rows;
+    if (line.substr(0, line.find(',')) != std::to_string(rows))
+      return 12;
+  }
+  std::filesystem::remove(options.diagnostics_path);
+  if (rows != final->step)
+    return 13;
   std::cout << "PASS uniform checkpoint resumes exact loads, integrals and clock with a bounded snapshot queue\n";
 }

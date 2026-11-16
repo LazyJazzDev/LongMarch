@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -1102,6 +1104,18 @@ struct Simulation::Impl {
   void Loop() {
     if (!Check(cudaSetDevice(device)))
       return;
+    std::ofstream diagnostics;
+    if (!options.diagnostics_path.empty()) {
+      diagnostics.open(options.diagnostics_path);
+      if (!diagnostics) {
+        std::lock_guard<std::mutex> guard(mutex);
+        error = "Cannot open diagnostic history";
+        return;
+      }
+      diagnostics
+          << "step,generation,time,dt,max_speed,divergence_before,divergence_after,pressure_residual,pressure_cycles,pressure_converged,fx,fy,fz,mx,my,mz,step_seconds,transport_seconds,pressure_seconds,diagnostics_seconds\n";
+      diagnostics << std::setprecision(17);
+    }
     auto g = grid;
     if (options.cut_cells) {
       g.aperture[0] = au;
@@ -1416,6 +1430,24 @@ struct Simulation::Impl {
       snapshot->divergence_before = float(std::sqrt(before_sum / nc));
       snapshot->divergence_after = float(std::sqrt(after_sum / nc));
       snapshot->step_seconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
+      if (diagnostics.is_open()) {
+        diagnostics << step << ',' << current_generation << ',' << time << ',' << dt << ',' << max_speed << ','
+                    << snapshot->divergence_before << ',' << snapshot->divergence_after << ',' << pressure_residual
+                    << ',' << pressure_cycles << ',' << snapshot->pressure_converged;
+        for (double component : force)
+          diagnostics << ',' << component;
+        for (double component : moment)
+          diagnostics << ',' << component;
+        diagnostics << ',' << snapshot->step_seconds << ',' << snapshot->transport_seconds << ','
+                    << snapshot->pressure_seconds << ',' << snapshot->diagnostics_seconds << '\n';
+        if (step % 32 == 0)
+          diagnostics.flush();
+        if (!diagnostics) {
+          std::lock_guard<std::mutex> guard(mutex);
+          error = "Cannot write diagnostic history";
+          return;
+        }
+      }
       {
         std::lock_guard<std::mutex> guard(mutex);
         if (generation == current_generation) {
@@ -1433,7 +1465,7 @@ struct Simulation::Impl {
           latest = std::move(snapshot);
         }
         working = false;
-        if (options.stop_after && step >= options.stop_after)
+        if ((options.stop_after && step >= options.stop_after) || (options.stop_time > 0 && time >= options.stop_time))
           paused = true;
       }
     }
@@ -1479,6 +1511,8 @@ std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const So
   if (cudaGetDeviceCount(&available) != cudaSuccess || options.devices < 1 || options.devices > 8 || cuda_device < 0 ||
       cuda_device >= available || options.devices > available - cuda_device)
     return {};
+  if (!(options.stop_time >= 0) || !std::isfinite(options.stop_time))
+    return {};
   if (cuda_device < 0 || nx < 64 || nx > max_grid || nx % 16 || options.pressure_tolerance < 1e-6f ||
       options.pressure_tolerance > 0.1f || options.pressure_cycles < 1 || options.pressure_cycles > 256 ||
       !(options.viscosity >= 1e-6f && options.viscosity <= 0.1f) ||
@@ -1501,6 +1535,7 @@ std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const So
   auto result = std::unique_ptr<Simulation>(new Simulation);
   result->impl_->device = cuda_device;
   result->impl_->options = options;
+  result->impl_->restore_path = options.initial_checkpoint;
   result->impl_->requested = options.initial_controls;
   result->impl_->grid = {nx, nx / 2, nx * 3 / 4, 16.0f / nx};
   if (!result->impl_->Initialize())

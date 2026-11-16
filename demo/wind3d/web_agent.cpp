@@ -47,8 +47,8 @@ bool Same(const wind3d::Controls &a, const wind3d::Controls &b) {
 }  // namespace
 
 int main(int argc, char **argv) {
-  if (argc != 4) {
-    std::cerr << "wind3d_web DIRECTORY GRID GPUS\n";
+  if (argc != 4 && argc != 6 && argc != 7) {
+    std::cerr << "wind3d_web DIRECTORY GRID GPUS [baseline|linear-cut|linear-slip|viscous STOP_TIME [CHECKPOINT]]\n";
     return 1;
   }
   std::filesystem::path directory(argv[1]);
@@ -61,6 +61,36 @@ int main(int argc, char **argv) {
   auto options = wind3d::OptimizedSolverOptions();
   options.devices = std::atoi(argv[3]);
   options.record_loads = true;
+  std::string profile = argc >= 6 ? argv[4] : "baseline";
+  if (profile != "baseline" && profile != "linear-cut" && profile != "linear-slip" && profile != "viscous")
+    return 1;
+  if (argc >= 6) {
+    if (options.devices != 1)
+      return 1;
+    options.stop_time = std::atof(argv[5]);
+    if (!(options.stop_time >= 0) || !std::isfinite(options.stop_time))
+      return 1;
+    options.initial_controls.speed = 30;
+    options.initial_controls.angle = 6;
+    options.diagnostics_path = (directory / "diagnostics.csv").string();
+    if (profile != "baseline") {
+      options.corrected_transport = false;
+      options.cubic = false;
+      options.cut_cells = profile == "linear-cut";
+      options.cfl = 0.5f;
+      options.pressure_cycles = 128;
+    }
+    if (profile == "viscous") {
+      options.wall_model = false;
+      options.wall_momentum = true;
+      options.viscosity = 0.005f;
+    }
+  }
+  if (argc == 7)
+    options.initial_checkpoint = argv[6];
+  const auto started = std::chrono::steady_clock::now();
+  auto next_checkpoint = started;
+  unsigned checkpoint_index = 0;
   auto simulation = wind3d::Simulation::Create(0, std::atoi(argv[2]), options);
   if (!simulation) {
     Write(directory / "error.txt", "CUDA solver initialization failed");
@@ -76,7 +106,7 @@ int main(int argc, char **argv) {
   auto next_loads = std::chrono::steady_clock::now();
   bool paused = false;
   int density = 2;
-  wind3d::Controls requested;
+  wind3d::Controls requested = options.initial_controls;
   std::shared_ptr<const std::vector<wind3d::Vertex>> mesh;
 
   struct Sample {
@@ -123,7 +153,17 @@ int main(int argc, char **argv) {
     bool actual_paused = simulation->Paused();
     auto state = simulation->Latest();
     auto now = std::chrono::steady_clock::now();
-    if (now >= next_loads) {
+    if (state && argc >= 6 &&
+        (!std::isfinite(state->max_speed) || state->max_speed > 600 || state->dt < 1e-7f ||
+         !std::isfinite(state->force.x + state->force.y + state->force.z + state->moment.x + state->moment.y +
+                        state->moment.z))) {
+      simulation->Configure(state->controls, true);
+      simulation->Checkpoint((directory / "anomaly.bin").string());
+      Write(directory / "error.txt", "Stability guard stopped the run; see raw diagnostics and checkpoints");
+      return 2;
+    }
+    bool finished = state && options.stop_time > 0 && state->time >= options.stop_time && actual_paused;
+    if (now >= next_loads || finished) {
       const auto loads = simulation->RecentLoads();
       if (!loads.samples.empty() &&
           (loads.samples.back().step != published_load_step || loads.generation != published_load_generation)) {
@@ -164,7 +204,7 @@ int main(int argc, char **argv) {
       }
       next_loads = now + std::chrono::seconds(1);
     }
-    if (state && now >= next) {
+    if (state && (now >= next || finished)) {
       bool changed = state->step != last_step || state->generation != last_generation;
       // Refresh paused metadata as well, so pause acknowledgements and liveness remain visible.
       if (changed || paused) {
@@ -204,6 +244,7 @@ int main(int argc, char **argv) {
         json << std::setprecision(9) << "{\"version\":1,\"frame\":" << ++frame << ",\"step\":" << state->step
              << ",\"generation\":" << state->generation << ",\"mesh\":\"" << mesh_id << "\",\"time\":" << state->time
              << ",\"dt\":" << state->dt << ",\"step_seconds\":" << state->step_seconds
+             << ",\"max_speed\":" << state->max_speed << ",\"pressure_cycles\":" << state->pressure_cycles
              << ",\"pressure_residual\":" << state->pressure_residual
              << ",\"pressure_converged\":" << (state->pressure_converged ? "true" : "false")
              << ",\"divergence\":" << state->divergence_after << ",\"grid\":" << state->solver_nx
@@ -214,8 +255,8 @@ int main(int argc, char **argv) {
         json << ",\"streamline_density\":" << density
              << ",\"streamline_seeds\":" << (20 * density + 1) * (3 * density + 1)
              << ",\"domain_min\":[-6,-4,-6],\"domain_max\":[10,4,6]";
-        json
-            << ",\"solver_model\":\"claude-46184928-uniform-cubic\",\"geometry_model\":\"camber025-sealed-hinges-high-bypass\",\"force\":";
+        json << ",\"solver_model\":\"uniform-" << profile
+             << "\",\"geometry_model\":\"camber025-sealed-hinges-high-bypass\",\"force\":";
         Vector(json, state->force);
         json << ",\"moment\":";
         Vector(json, state->moment);
@@ -245,6 +286,26 @@ int main(int argc, char **argv) {
           std::cout << "frame=" << frame << " step=" << state->step << " bytes=" << packet.size() << std::endl;
       }
       next = now + std::chrono::milliseconds(500);
+    }
+    if (state && argc >= 6 && (now >= next_checkpoint || finished)) {
+      auto path = directory / ("checkpoint-" + run_id + "-" + std::to_string(++checkpoint_index) + ".bin");
+      auto checkpoint_step = simulation->Checkpoint(path.string());
+      if (!checkpoint_step) {
+        Write(directory / "error.txt", "Checkpoint failed");
+        return 2;
+      }
+      next_checkpoint = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+      std::cout << "checkpoint=" << path << " step=" << checkpoint_step << std::endl;
+    }
+    if (finished) {
+      double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+      std::ostringstream result;
+      result << std::setprecision(17) << "{\"wall_seconds\":" << wall << ",\"physical_seconds\":" << state->time
+             << ",\"steps\":" << state->step << ",\"gpus\":" << options.devices << ",\"profile\":\"" << profile
+             << "\"}";
+      if (!Write(directory / "completed.json", result.str()))
+        return 2;
+      return 0;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(40));
   }
