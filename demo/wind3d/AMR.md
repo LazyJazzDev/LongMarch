@@ -519,3 +519,30 @@ step, nor does it validate the inconsistent two-point interface as a final
 replacement. Interface consistency, energy behavior and aircraft load accuracy
 must be assessed together; a smaller linear-solver residual alone is not the
 missing acceptance evidence.
+
+## Compatible mass-matrix prototype
+
+A small all-fluid CPU/SciPy diagnostic now tests a mimetic alternative to
+prescribing G directly. For each cell, let N contain outward face normals,
+R contain face area times (face centre minus cell centre), V be cell volume,
+and Q=I-N(N^T N)^-1 N^T. The local velocity mass is
+`H = R R^T / V + Q^T diag(face_area * cell_width / 2) Q`.
+Exact face closure gives `N^T R = V I`, hence `H N = R`; the two complementary
+terms make H positive definite. Signed local-to-global assembly gives M.
+Prescribed normal pressure-correction velocities are removed from its free
+submatrix. The pressure operator is then `D M^-1 D^T`, and velocity correction
+is `M^-1 D^T p`, yielding an M-orthogonal projection rather than the oblique
+quadratic-gradient projection.
+
+On the same uniform/mixed geometry used in the energy diagnostic, the uniform
+M reduces to the existing diagonal face-volume weights. The mixed free-face
+matrix has 2272 nonzeros for 1568 unknowns, with diagonal-scaled eigenvalues
+about 0.748--1.263. Manufactured linear pressure with matching Dirichlet data
+on all outer faces yields gradient errors below 3.34e-16. Separately, the
+inlet/wall fixed-normal and outlet-pressure projection has pressure-matrix
+asymmetry below 1.12e-16 and energy decomposition error below 2.55e-16 for ten
+random perturbations. These are prototype results, not production code.
+Quadratic gradients are not reproduced exactly by this construction; spatial
+convergence, cut-cell treatment, GPU inverse-mass cost and aircraft loads remain
+to be assessed before choosing this formulation. Positive energy alone does
+not replace the accepted accuracy requirements.
