@@ -8,7 +8,7 @@
 
 int main(int argc, char **argv) {
   using namespace grassland::rhi;
-  int grid = 96, steps = 20, frames = 0;
+  int grid = 256, steps = 20, frames = 0;
   float validate_time = 0;
   bool validate = false, headless = false, debug = false;
   BackendAPI backend = BACKEND_API_VULKAN;
@@ -16,6 +16,7 @@ int main(int argc, char **argv) {
   wind3d::ViewSettings view;
   wind3d::SolverOptions solver;
   solver.leapfrog_flow_maps = true;
+  solver.export_vorticity = true;
   std::string capture;
   for (int i = 1; i < argc; ++i) {
     std::string key = argv[i];
@@ -29,9 +30,9 @@ int main(int argc, char **argv) {
       solver.leapfrog_flow_maps = false;
       solver.corrected_transport = false;
     } else if (key == "--no-flow")
-      view.flow = false;
+      view.flow = view.volume = false;
     else if (key == "--model-only")
-      view.flow = view.loads = false;
+      view.flow = view.volume = view.loads = false;
     else if (key == "--headless")
       headless = true;
     else if (key == "--debug")
@@ -178,6 +179,11 @@ int main(int argc, char **argv) {
                 << " moment=" << state->moment.x << ',' << state->moment.y << ',' << state->moment.z << std::endl;
       passed &= state->divergence_after < std::max(1e-5f, state->divergence_before * solver.pressure_tolerance * 2);
       passed &= state->pressure_residual <= solver.pressure_tolerance;
+      if (solver.export_vorticity) {
+        passed &= state->vorticity.size() == size_t(grid) * (grid / 2) * (grid * 3 / 4);
+        passed &= std::all_of(state->vorticity.begin(), state->vorticity.end(),
+                              [](float value) { return std::isfinite(value) && value >= 0; });
+      }
       if (validate_time > 0 ? state->time >= validate_time : state->step >= uint64_t(steps)) {
         std::cout << "projection_validation=" << (passed ? "PASS" : "FAIL") << std::endl;
         passed &= wind3d::ValidateLifecycle(*simulation, controls);

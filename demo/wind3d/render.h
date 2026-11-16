@@ -5,7 +5,7 @@
 namespace wind3d {
 struct ViewSettings {
   float yaw{-0.85f}, pitch{0.40f}, distance{10.5f};
-  bool flow{true}, loads{true};
+  bool flow{false}, loads{true}, volume{true};
 };
 
 bool Render(grassland::rhi::IDevice *device,

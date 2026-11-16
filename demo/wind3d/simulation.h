@@ -70,6 +70,7 @@ struct SolverOptions {
   // Restore before the first step; caller must supply the original grid and model.
   std::string initial_checkpoint;
   bool export_field{true};
+  bool export_vorticity{false};
   bool export_final{false};
 };
 
@@ -113,6 +114,8 @@ struct Snapshot {
   double drag_impulse[kComponents]{}, lift_impulse[kComponents]{};
   Controls controls;
   std::vector<Cell> cells;
+  // Full solver-grid curl magnitude, x-fastest, in s^-1.
+  std::vector<float> vorticity;
   std::shared_ptr<const std::vector<Vertex>> aircraft;
 };
 

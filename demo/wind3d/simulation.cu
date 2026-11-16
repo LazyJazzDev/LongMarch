@@ -714,6 +714,29 @@ __global__ void ReduceStatistics(const Statistics *blocks, int count, Totals *to
     totals[blockIdx.x] = values[0];
 }
 
+__global__ void ExportVorticity(Grid g,
+                                const float *u,
+                                const float *v,
+                                const float *w,
+                                const unsigned char *solid,
+                                float *output) {
+  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  if (n >= g.nx * g.ny * g.nz)
+    return;
+  int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
+  if (solid[n] || x == 0 || y == 0 || z == 0 || x == g.nx - 1 || y == g.ny - 1 || z == g.nz - 1) {
+    output[n] = 0;
+    return;
+  }
+  Vec3 dx = Scale(Add(CenterVelocity(g, u, v, w, x + 1, y, z), Scale(CenterVelocity(g, u, v, w, x - 1, y, z), -1)),
+                  0.5f / g.h);
+  Vec3 dy = Scale(Add(CenterVelocity(g, u, v, w, x, y + 1, z), Scale(CenterVelocity(g, u, v, w, x, y - 1, z), -1)),
+                  0.5f / g.h);
+  Vec3 dz = Scale(Add(CenterVelocity(g, u, v, w, x, y, z + 1), Scale(CenterVelocity(g, u, v, w, x, y, z - 1), -1)),
+                  0.5f / g.h);
+  output[n] = Length({dy.z - dz.y, dz.x - dx.z, dx.y - dy.x});
+}
+
 __global__ void
 Export(Grid g, Grid output, const float *u, const float *v, const float *w, const float *p, Cell *cells) {
   int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
@@ -989,6 +1012,7 @@ struct Simulation::Impl {
   int lfm_cycles{};
   unsigned char *solid{}, *bu{}, *bv{}, *bw{}, *au{}, *av{}, *aw{};
   Cell *cells{};
+  float *vorticity{};
   Statistics *statistics{};
   Totals *totals{};
   Grid display_grid{};
@@ -1245,10 +1269,11 @@ struct Simulation::Impl {
       if (!Allocate(lfm_gauge, nc, false) || !Allocate(lfm_div, nc))
         return false;
     }
-    return Allocate(u, nf) && Allocate(v, nf) && Allocate(w, nf) && Allocate(un, nf) && Allocate(vn, nf) &&
-           Allocate(wn, nf) && Allocate(reverse, nf) && Allocate(pressure, nc, false) && Allocate(div, nc) &&
-           Allocate(after, nc) && Allocate(solid, nc) && Allocate(bu, nf) && Allocate(bv, nf) && Allocate(bw, nf) &&
-           Allocate(au, nf) && Allocate(av, nf) && Allocate(aw, nf) &&
+    return (!options.export_vorticity || Allocate(vorticity, nc)) && Allocate(u, nf) && Allocate(v, nf) &&
+           Allocate(w, nf) && Allocate(un, nf) && Allocate(vn, nf) && Allocate(wn, nf) && Allocate(reverse, nf) &&
+           Allocate(pressure, nc, false) && Allocate(div, nc) && Allocate(after, nc) && Allocate(solid, nc) &&
+           Allocate(bu, nf) && Allocate(bv, nf) && Allocate(bw, nf) && Allocate(au, nf) && Allocate(av, nf) &&
+           Allocate(aw, nf) &&
            (!(options.display && (options.export_field || options.export_final)) ||
             Allocate(cells, display_cells, false)) &&
            Allocate(statistics, (nc + 255) / 256) && Allocate(totals, total_blocks, false) &&
@@ -1581,6 +1606,13 @@ struct Simulation::Impl {
                                    stream)))
           break;
       }
+      if (options.export_vorticity && export_field) {
+        ExportVorticity<<<cb, 256, 0, stream>>>(g, u, v, w, solid, vorticity);
+        snapshot->vorticity.resize(nc);
+        if (!Check(cudaMemcpyAsync(snapshot->vorticity.data(), vorticity, size_t(nc) * sizeof(float),
+                                   cudaMemcpyDeviceToHost, stream)))
+          break;
+      }
       if (!Check(cudaGetLastError()) ||
           !Check(cudaMemcpyAsync(measurements.data(), totals, measurements.size() * sizeof(Totals),
                                  cudaMemcpyDeviceToHost, stream)) ||
@@ -1770,6 +1802,8 @@ std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const So
   size_t free_bytes = 0, total_bytes = 0;
   size_t required_bytes =
       SolverBytes(nx) + (options.leapfrog_flow_maps ? size_t(nx + 1) * (nx / 2 + 1) * (nx * 3 / 4 + 1) * 236 : 0);
+  if (options.export_vorticity)
+    required_bytes += size_t(nx) * (nx / 2) * (nx * 3 / 4) * sizeof(float);
   if (cudaSetDevice(cuda_device) != cudaSuccess || cudaMemGetInfo(&free_bytes, &total_bytes) != cudaSuccess ||
       required_bytes > free_bytes) {
     std::cerr << "Grid " << nx << " needs about " << required_bytes / 1e9 << " GB; " << free_bytes / 1e9

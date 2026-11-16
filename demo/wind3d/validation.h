@@ -61,6 +61,8 @@ inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
     double sum = 0;
     for (const auto &cell : snapshot.cells)
       sum += cell.u + 3.0 * cell.v + 5.0 * cell.w + 7.0 * cell.pressure;
+    for (float value : snapshot.vorticity)
+      sum += value;
     return sum;
   };
   double old_checksum = checksum(*old);

@@ -20,7 +20,7 @@ requires one GPU; requesting it through `SolverOptions` with multiple devices
 fails explicitly.
 
 ```powershell
-cmake-build-release/demo/wind3d/demo_wind3d --lfm --grid 96
+cmake-build-release/demo/wind3d/demo_wind3d --lfm --grid 256
 cmake-build-release/demo/wind3d/demo_wind3d --lfm --validate --grid 96 --steps 1000 --diagnostics out/lfm.csv
 cmake --build cmake-build-release --target wind3d_lfm_check
 cmake-build-release/demo/wind3d/wind3d_lfm_check --lfm
@@ -66,6 +66,25 @@ complete worker-cycle wall time. Frontend FPS, solver Hz and physical time / wal
 time are displayed separately. Interactive rendering is capped at 60 Hz to leave
 GPU time for solving.
 
+### Vorticity volume rendering
+
+The default view ray-marches the full solver-grid magnitude of curl(u), computed
+in CUDA from the final projected MAC velocity. The volume has 256 ? 128 ? 192
+samples at the default resolution; it does not use the 192-wide display-field
+cap used by streamlines. Solid cells and the outermost domain cells are zeroed.
+The renderer uses trilinear sampling, exponential absorption and three light-ray
+samples for volumetric shadows, in the style of the standalone LFM demo. This is
+vorticity visualization, not a separate smoke-density or combustion simulation.
+
+Open **View** for volume visibility, grey/color modes, density, threshold in
+s^-1, ray-step size and optional streamlines. The aircraft and load vectors remain
+visible through depth-aware composition: an R32 color attachment stores the
+rasterized surface depth, so the RHI does not need sampled depth-format support.
+The ray stops at the nearest surface and composites with its shaded color.
+Immutable snapshots keep the volume, geometry and load panel on the same completed
+simulation cycle. `--no-flow` hides both volume and streamlines; `--model-only`
+also hides load vectors. Give the higher-resolution flow time to develop its wake.
+
 ### Validation and measured limits
 
 Windows Release, RTX 5080, 12 m/s, 5 degree incidence, default voxel/no-slip model:
@@ -74,11 +93,11 @@ Windows Release, RTX 5080, 12 m/s, 5 degree incidence, default voxel/no-slip mod
 | --- | --- | --- | --- |
 | 96 × 48 × 72 | 1,000 cycles, about 30.4 simulated seconds | 22.3 ms | 1.35× |
 | 128 × 64 × 96 | 100 cycles, about 2.2 simulated seconds | 38.2 ms | 0.58× |
+| 256 × 128 × 192 | 100 cycles, about 0.97 simulated seconds, full vorticity export | 328 ms | 0.030× |
 
 These are solver measurements, not frontend frame rates or a claim that LFM is
-faster than MacCormack at the same resolution. The default grid is deliberately
-coarser than the previous desktop default. Higher grids do not retain the same
-real-time rate. Vulkan and D3D12 window captures verify actual aircraft, flow,
+faster than MacCormack at the same resolution. The 96/128-grid results are preview measurements; they do not describe the
+new 256-grid default. Higher grids do not retain the same real-time rate. Vulkan and D3D12 window captures verify actual aircraft, flow,
 load vectors and the analysis panel. D3D12 validation reports the existing
 missing-optimized-clear-value performance warnings (820/821).
 
@@ -208,7 +227,7 @@ aircraft performance data.
 
 The absence of a turbulence model does not itself forbid unsteady vortices.
 However, the effective viscosity here is over 300 times that of room-temperature
-air (about 1.5e-5 m²/s), the default cell width is about 8.3 cm, and the
+air (about 1.5e-5 m²/s), the cell width at grid 256 is 6.25 cm, and the
 limited transport scheme still damps unresolved structures. This setup does
 not resolve a realistic turbulent aircraft wake. Instantaneous streamlines can
 show resolved recirculation, but do not convey particle histories or temporal

@@ -1,9 +1,19 @@
 struct Uniform {
   float4x4 transform;
+  float4x4 inverseTransform;
+  float4 eye;
+  uint4 grid;
+  float4 volumeSettings;  // density, threshold [s^-1], step [m], color mode
 };
 
 RHI_UNIFORM(0, 0, Uniform, globals);
+#ifdef WIND3D_VOLUME
+RHI_BYTE_ADDRESS_BUFFER(0, 1, volume);
+RHI_TEXTURE2D(0, 2, float4, sceneColor);
+RHI_TEXTURE2D(0, 3, float, sceneDepth);
+#endif
 
+#ifndef WIND3D_VOLUME
 struct Input {
   RHI_INPUT(0, float3, position);
   RHI_INPUT(1, float3, normal);
@@ -24,8 +34,97 @@ Varying VSMain(Input input) {
   return output;
 }
 
-float4 PSMain(Varying input) : SV_Target0 {
+struct SurfaceOutput {
+  float4 color : SV_Target0;
+  float depth : SV_Target1;
+};
+
+SurfaceOutput PSMain(Varying input) {
   float light =
       length(input.normal) < 0.1 ? 1 : 0.28 + 0.72 * abs(dot(normalize(input.normal), normalize(float3(-0.5, 1, 0.3))));
-  return float4(input.color * light, 1);
+  SurfaceOutput output;
+  output.color = float4(input.color * light, 1);
+  output.depth = input.position.z;
+  return output;
 }
+
+#else
+struct VolumeVarying {
+  float4 position : SV_Position;
+  float2 uv : TEXCOORD0;
+};
+
+VolumeVarying VSVolume(uint id : SV_VertexID) {
+  VolumeVarying result;
+  result.uv = float2((id << 1) & 2, id & 2);
+  result.position = float4(result.uv * float2(2, -2) + float2(-1, 1), 0, 1);
+  return result;
+}
+
+float LoadVorticity(int3 p) {
+  p = clamp(p, int3(0), int3(globals.grid.xyz) - 1);
+  uint index = (p.z * globals.grid.y + p.y) * globals.grid.x + p.x;
+  return asfloat(volume.Load(index * 4));
+}
+
+float SampleVorticity(float3 p) {
+  float3 q = (p - float3(-6, -4, -6)) * (float(globals.grid.x) / 16) - 0.5;
+  int3 i = int3(floor(q));
+  float3 f = frac(q);
+  return lerp(lerp(lerp(LoadVorticity(i), LoadVorticity(i + int3(1, 0, 0)), f.x),
+                   lerp(LoadVorticity(i + int3(0, 1, 0)), LoadVorticity(i + int3(1, 1, 0)), f.x), f.y),
+              lerp(lerp(LoadVorticity(i + int3(0, 0, 1)), LoadVorticity(i + int3(1, 0, 1)), f.x),
+                   lerp(LoadVorticity(i + int3(0, 1, 1)), LoadVorticity(i + int3(1, 1, 1)), f.x), f.y),
+              f.z);
+}
+
+float3 VorticityPalette(float value) {
+  float t = saturate(log2(1 + value) / 7);
+  return lerp(lerp(float3(0.04, 0.24, 0.43), float3(0.08, 0.76, 0.73), saturate(t * 2)), float3(1, 0.68, 0.25),
+              saturate((t - 0.5) * 2));
+}
+
+float4 PSVolume(VolumeVarying input) : SV_Target0 {
+  int2 pixel = int2(input.position.xy);
+  float3 background = sceneColor.Load(int3(pixel, 0)).rgb;
+  if (globals.grid.x == 0 || globals.volumeSettings.x <= 0)
+    return float4(background, 1);
+  float2 ndc = input.uv * float2(2, -2) + float2(-1, 1);
+  float4 farPoint = mul(globals.inverseTransform, float4(ndc, 1, 1));
+  float3 origin = globals.eye.xyz;
+  float3 direction = normalize(farPoint.xyz / farPoint.w - origin);
+  float3 inverseDirection = 1 / (direction + 1e-8);
+  float3 a = (float3(-6, -4, -6) - origin) * inverseDirection;
+  float3 b = (float3(10, 4, 6) - origin) * inverseDirection;
+  float3 entry = min(a, b), exit = max(a, b);
+  float first = max(0, max(entry.x, max(entry.y, entry.z)));
+  float last = min(exit.x, min(exit.y, exit.z));
+  float depth = sceneDepth.Load(int3(pixel, 0));
+  if (depth < 1) {
+    float4 surface = mul(globals.inverseTransform, float4(ndc, depth, 1));
+    last = min(last, length(surface.xyz / surface.w - origin));
+  }
+  float3 color = 0;
+  float transmittance = 1;
+  float dt = globals.volumeSettings.z;
+  [loop] for (float t = first + 0.5 * dt; t < last && transmittance > 0.012; t += dt) {
+    float3 p = origin + direction * t;
+    float value = SampleVorticity(p);
+    float rho = max(0, value - globals.volumeSettings.y) * globals.volumeSettings.x;
+    if (rho <= 0)
+      continue;
+    float alpha = 1 - exp(-rho * dt);
+    float3 tint = globals.volumeSettings.w < 0.5 ? float3(0.75, 0.81, 0.85) : VorticityPalette(value);
+    float shadow = 0;
+    [unroll] for (int j = 1; j <= 3; ++j) {
+      float3 q = p + float3(-0.16, 0.24, 0.12) * float(j);
+      if (all(q > float3(-6, -4, -6)) && all(q < float3(10, 4, 6)))
+        shadow += max(0, SampleVorticity(q) - globals.volumeSettings.y);
+    }
+    tint *= 0.25 + 0.75 * exp(-shadow * globals.volumeSettings.x * 0.24);
+    color += transmittance * alpha * tint;
+    transmittance *= 1 - alpha;
+  }
+  return float4(color + transmittance * background, 1);
+}
+#endif

@@ -53,15 +53,33 @@ bool Render(IDevice *device,
   desc.vertex_bindings = {{sizeof(Vertex), false}};
   desc.vertex_attributes = {{0, 0, INPUT_TYPE_FLOAT3, 0}, {1, 0, INPUT_TYPE_FLOAT3, 12}, {2, 0, INPUT_TYPE_FLOAT3, 24}};
   desc.pipeline_layout.groups = {layout};
+  desc.color_formats = {IMAGE_FORMAT_R8G8B8A8_UNORM, IMAGE_FORMAT_R32_SFLOAT};
   desc.depth_stencil.format = IMAGE_FORMAT_D32_SFLOAT;
   desc.depth_stencil.depth_test = true;
   desc.depth_stencil.depth_write = true;
   ObjPtr<IProgram> aircraft_program = device->CreateProgram(desc);
   desc.topology = PRIMITIVE_TOPOLOGY_LINE_LIST;
   ObjPtr<IProgram> line_program = device->CreateProgram(desc);
+  BindingLayoutDesc volume_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {1, BINDING_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {2, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {3, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}};
+  ObjPtr<IBindingGroup> volume_group = device->CreateBindingGroup(volume_layout);
+  std::string volume_source = "#define WIND3D_VOLUME\n" + source;
+  ObjPtr<IShader> volume_vs = device->CreateShaderFromSource(volume_source, "VSVolume", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> volume_ps = device->CreateShaderFromSource(volume_source, "PSVolume", SHADER_STAGE_FRAGMENT);
+  ProgramDesc volume_desc;
+  volume_desc.vertex_shader = volume_vs.Get();
+  volume_desc.fragment_shader = volume_ps.Get();
+  volume_desc.pipeline_layout.groups = {volume_layout};
+  ObjPtr<IProgram> volume_program = device->CreateProgram(volume_desc);
+  ObjPtr<IBuffer> volume_buffer = device->CreateBuffer({sizeof(float)});
+  if (!volume_group || !volume_program || !volume_buffer || !volume_group->BindResource(0, uniform.Get()) ||
+      !volume_group->BindResource(1, volume_buffer.Get()))
+    return RenderFailure(__LINE__);
   if (!aircraft_program || !line_program)
     return RenderFailure(__LINE__);
-  ObjPtr<IImage> canvas, depth;
+  ObjPtr<IImage> canvas, scene, depth, surface_depth;
   ObjPtr<IBuffer> aircraft_buffer, line_buffer;
   ObjPtr<ISubmissionToken> last;
 
@@ -79,6 +97,9 @@ bool Render(IDevice *device,
   std::shared_ptr<const std::vector<Vertex>> mesh;
   size_t line_count = 0;
   bool paused = false, streamlines = view.flow, show_loads = view.loads, rebuild = true;
+  bool show_volume = view.volume, colored_volume = false;
+  float volume_density = 0.035f, volume_threshold = 6.0f, volume_step = 1.0f;
+  std::shared_ptr<const Snapshot> volume_state;
   float yaw = view.yaw, pitch = view.pitch, distance = view.distance, fps = 0, logical_width = 1440;
   auto previous = std::chrono::steady_clock::now(), beginning = previous;
   int rendered = 0, updates = 0;
@@ -148,7 +169,15 @@ bool Render(IDevice *device,
             ImGui::SameLine();
             if (ImGui::Button("Reset"))
               simulation.Reset();
+            if (show_volume && state && !state->vorticity.empty())
+              ImGui::Text("Volume |curl u|: %d x %d x %d", state->solver_nx, state->solver_nx / 2,
+                          state->solver_nx * 3 / 4);
             if (ImGui::CollapsingHeader("View")) {
+              ImGui::Checkbox("Vorticity volume", &show_volume);
+              ImGui::Checkbox("Color by vorticity", &colored_volume);
+              ImGui::SliderFloat("Volume density", &volume_density, 0.01f, 0.6f, "%.3f");
+              ImGui::SliderFloat("Threshold s^-1", &volume_threshold, 0, 60, "%.1f");
+              ImGui::SliderFloat("Ray step / cell", &volume_step, 0.5f, 2, "%.2f");
               rebuild |= ImGui::Checkbox("3D streamlines", &streamlines);
               rebuild |= ImGui::Checkbox("Force and moment vectors", &show_loads);
               ImGui::SliderFloat("Orbit", &yaw, -3.14f, 3.14f);
@@ -197,13 +226,25 @@ bool Render(IDevice *device,
     }
     if (!canvas || canvas->GetDesc().width != width || canvas->GetDesc().height != height) {
       canvas = device->CreateImage({width, height, IMAGE_FORMAT_R8G8B8A8_UNORM});
+      scene = device->CreateImage({width, height, IMAGE_FORMAT_R8G8B8A8_UNORM});
       depth = device->CreateImage({width, height, IMAGE_FORMAT_D32_SFLOAT});
-      if (!canvas || !depth)
+      surface_depth = device->CreateImage({width, height, IMAGE_FORMAT_R32_SFLOAT});
+      if (!canvas || !scene || !depth || !surface_depth || !volume_group->BindResource(2, scene.Get()) ||
+          !volume_group->BindResource(3, surface_depth.Get()))
         return RenderFailure(__LINE__);
     }
     ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     if (!commands)
       return RenderFailure(__LINE__);
+    if (state && state != volume_state && !state->vorticity.empty()) {
+      volume_buffer = device->CreateBuffer({state->vorticity.size() * sizeof(float)});
+      if (!volume_buffer ||
+          !commands->CmdUploadBuffer(volume_buffer.Get(), 0, state->vorticity.data(),
+                                     state->vorticity.size() * sizeof(float)) ||
+          !volume_group->BindResource(1, volume_buffer.Get()))
+        return RenderFailure(__LINE__);
+      volume_state = state;
+    }
     if (state && mesh != state->aircraft) {
       mesh = state->aircraft;
       aircraft_buffer = device->CreateBuffer({mesh->size() * sizeof(Vertex)});
@@ -224,11 +265,29 @@ bool Render(IDevice *device,
     glm::vec3 eye{distance * cosf(pitch) * sinf(yaw), distance * sinf(pitch), distance * cosf(pitch) * cosf(yaw)};
     auto transform = glm::perspectiveZO(glm::radians(45.0f), viewport_width / height, 0.1f, 80.0f) *
                      glm::lookAt(eye, glm::vec3(0), glm::vec3(0, 1, 0));
-    if (!commands->CmdUploadBuffer(uniform.Get(), 0, &transform, sizeof(transform)))
+
+    struct Uniform {
+      glm::mat4 transform, inverse;
+      glm::vec4 eye;
+      glm::uvec4 grid;
+      glm::vec4 volume;
+    } globals{transform,
+              glm::inverse(transform),
+              glm::vec4(eye, 1),
+              glm::uvec4(0),
+              {show_volume ? volume_density : 0, volume_threshold, 0.1f, colored_volume ? 1.0f : 0.0f}};
+
+    if (volume_state && volume_state == state) {
+      uint32_t nx = uint32_t(state->solver_nx);
+      globals.grid = {nx, nx / 2, nx * 3 / 4, 0};
+      globals.volume.z = volume_step * 16.0f / nx;
+    }
+    if (!commands->CmdUploadBuffer(uniform.Get(), 0, &globals, sizeof(globals)))
       return RenderFailure(__LINE__);
     RenderingInfo render;
     render.color_attachments = {
-        {canvas.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.012f, 0.02f, 0.035f, 1}}};
+        {scene.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.012f, 0.02f, 0.035f, 1}},
+        {surface_depth.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {1, 1, 1, 1}}};
     render.depth_stencil.image = depth.Get();
     render.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
     if (!commands->CmdBeginRendering(render) ||
@@ -244,6 +303,11 @@ bool Render(IDevice *device,
          !commands->CmdBindVertexBuffer(0, line_buffer.Get()) || !commands->CmdDraw(uint32_t(line_count))))
       return RenderFailure(__LINE__);
     if (!commands->CmdEndRendering())
+      return RenderFailure(__LINE__);
+    RenderingInfo composite;
+    composite.color_attachments = {{canvas.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}};
+    if (!commands->CmdBeginRendering(composite) || !commands->CmdBindProgram(volume_program.Get()) ||
+        !commands->CmdBindGroup(0, volume_group.Get()) || !commands->CmdDraw(3) || !commands->CmdEndRendering())
       return RenderFailure(__LINE__);
     if (window && (!commands->CmdDrawImGui(window.Get(), canvas.Get()) ||
                    !commands->CmdPresentImage(window.Get(), canvas.Get(), COLOR_SPACE_BT709_LINEAR)))
