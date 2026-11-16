@@ -935,3 +935,30 @@ Removing MacCormack correction (2001280) gives Fx/Fy/Mz means
 32.639/39.426/-35.459. Neither is an acceptable simplification: both change
 loads substantially relative to the uniform compatible reference. Temporary
 sources, full statistics and raw outputs remain under `out/wind3d-amr`.
+
+
+## Inlet cache and transfer follow-up
+
+The inlet ghost diagnostic with seed 321 completed thirty seconds (2001292).
+Mixed-grid mass-weighted perturbation energy reached 9.110e-7 of its initial
+value and maximum component error was 3.159e-7. This longer body-free test did
+not exhibit late regrowth, but is not aircraft or control-envelope validation.
+
+A temporary cached inlet sampler (2001295) preserves ghost values in block
+halos and rejects cubic nearest-neighbor stencils containing upstream ghost
+sites, matching the direct prototype. All 62 printed energy/max-error records
+for uniform and mixed six-second tests matched the direct version. Aircraft
+job 2001297 then compared both versions on the same GPU for 1200 steps with
+three actual regrids. All physical CSV fields matched exactly; elapsed time
+fell from 28.560 to 23.130 seconds (19.0%). This comparison is against the
+slower direct inlet prototype, not against the original uniform solver.
+Boundary-state isolation and CPU reference parity are still required before
+promoting the prototype into the production implementation.
+
+Commit 64d19a4c separately avoids computing unused velocity components during
+CPU mesh transfer. In a 212992-cell aircraft setup with 56 additional blocks,
+six paired transfers produced exactly equal vectors. Excluding the first pair,
+mean transfer time fell from 0.4161 to 0.3816 seconds for a constant field and
+from 0.4789 to 0.4354 seconds for a perturbed field. These local measurements
+are noisy and do not establish whole-simulation speedup. Raw paired data and
+prototype sources remain under `out/wind3d-amr`.
