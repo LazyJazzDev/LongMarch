@@ -263,6 +263,15 @@ them as part of an experiment without a new reason/authorization.
   ordinary steps measured 17.26 ms, including 13.21 ms pressure. The older trace
   includes profiler overhead, so these figures alone do not establish an
   optimization speedup ratio or the full performance goal.
+- A sliced-ELL sparse layout experiment (job 2001216) preserved exact pressure
+  fields and iteration counts against CSR in free and embedded test cases, and
+  passed full-step/regrid tests and CUDA memcheck. It did not improve the
+  grid-128 startup diagnostic: pressure measured 14.47 ms versus 13.21 ms in
+  the preceding CSR run, with matching iteration counts and loads. This is a
+  short sequential-run comparison, not a controlled performance acceptance
+  measurement. The experimental layout was removed; CSR remains the default.
+  The built task from this experiment must be rebuilt from current sources
+  before further baseline measurements.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
