@@ -693,3 +693,23 @@ These short runs validate a solver acceleration, not long-term load equivalence
 or the requested speedup against the original native solver. Jobs 2001255--2001257
 continue using the frozen compatible BiCGStab executable for their original
 comparison; they are not silently switched to CG.
+
+
+## Avoiding unused reconstruction during compatible regrids
+
+Compatible projection no longer reads or validates the quadratic `FaceGradient`;
+an empty instance is accepted in that mode. `GpuFlow` skips constructing this
+unused reconstruction during initialization and regrids. The original quadratic
+projection continues requiring it. This removes setup work without changing the
+compatible operator or its iteration sequence.
+
+Job 2001262 passed projection and flow lifecycle CTests, including compatible
+projection constructed with an empty gradient and comparisons against the
+existing populated-gradient paths. A paired 1200-step adaptive aircraft run
+performed three actual hierarchy changes (steps 600, 700 and 1100). CSV physical
+time, dt, all six loads, cells and generations were exactly identical as printed;
+this is not a claim of full-field bitwise comparison. Initialization fell from
+1.970 to 1.844 seconds. The three remap/adaptation events fell from
+1.771/1.674/1.798 to 1.601/1.512/1.683 seconds (about 6--10%). Overall mean step
+time including adaptation fell from 19.472 to 19.131 ms in this paired sample.
+Timing is diagnostic on shared hardware, not an overall production speedup gate.

@@ -47,7 +47,7 @@ struct GpuFlow::Impl {
       return false;
     }
     FaceGradient gradient;
-    if (!gradient.Build(mesh)) {
+    if (!compatible_pressure && !gradient.Build(mesh)) {
       error = "Adaptive gradient construction failed";
       return false;
     }

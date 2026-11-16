@@ -14,6 +14,7 @@ class GpuProjection {
   // Fixed linear aggregation V-cycle by default; false selects Jacobi for comparison.
   // Four threads share a matrix row by default; false retains scalar rows for comparison.
   // Compatible mode uses D M^-1 D^T with a two-point multilevel preconditioner.
+  // In compatible mode the supplied gradient is unused and may be empty.
   // It uses CG by default; conjugate=false retains BiCGStab for comparison.
   // The original nonsymmetric gradient always uses BiCGStab.
   bool Build(int device,

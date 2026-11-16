@@ -196,7 +196,7 @@ bool Compatible(bool mixed, bool embedded, double width) {
   FaceGradient g;
   FaceMass mass;
   GpuProjection gpu;
-  if (!g.Build(mesh) || !mass.Build(mesh) || !gpu.Build(0, mesh, g, true, true, true)) {
+  if (!g.Build(mesh) || !mass.Build(mesh) || !gpu.Build(0, mesh, FaceGradient{}, true, true, true)) {
     std::cerr << gpu.Error() << '\n';
     return false;
   }

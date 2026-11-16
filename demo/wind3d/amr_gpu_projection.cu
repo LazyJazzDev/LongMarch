@@ -501,18 +501,18 @@ bool GpuProjection::Build(int device,
   if (!next->Check(cudaSetDevice(device)) || !next->Blas(cublasCreate(&next->blas)))
     return fail("Invalid adaptive operator or GPU allocation failure");
   if (mesh.Cells().empty() || mesh.Cells().size() > size_t(INT_MAX) || mesh.Faces().size() > size_t(INT_MAX) ||
-      gradient.Offsets().size() != mesh.Faces().size() + 1)
+      (!compatible && gradient.Offsets().size() != mesh.Faces().size() + 1))
     return fail("Invalid adaptive operator or GPU allocation failure");
   next->n = int(mesh.Cells().size());
   next->nf = int(mesh.Faces().size());
   Rows g(next->nf), d(next->n), a(next->n);
   std::vector<double> diagonal(next->n);
   for (int f = 0; f < next->nf; ++f) {
-    for (int k = gradient.Offsets()[f]; k < gradient.Offsets()[f + 1]; ++k)
-      g[f][gradient.Columns()[k]] += gradient.Weights()[k];
+    if (!compatible)
+      for (int k = gradient.Offsets()[f]; k < gradient.Offsets()[f + 1]; ++k)
+        g[f][gradient.Columns()[k]] += gradient.Weights()[k];
     auto face = mesh.Faces()[f];
     if (compatible) {
-      g[f].clear();
       if (face.aperture > 0 && face.low >= 0 && face.high >= 0) {
         g[f][face.low] = -1 / face.distance;
         g[f][face.high] = 1 / face.distance;
