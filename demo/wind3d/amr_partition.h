@@ -8,8 +8,8 @@ struct PressureExchange {
 };
 
 // Block-balanced ownership and directed imports for D, D^T and the face mass
-// matrix. IDs remain global; exchange payloads are sorted and duplicate-free.
-// This does not include transport halos or multilevel preconditioner exchanges.
+// matrix, plus the fine two-point pressure stencil. IDs remain global; exchange payloads are sorted and duplicate-free.
+// This does not include transport halos or coarse-level preconditioner exchanges.
 class PressurePartition {
  public:
   // Inputs must describe the same mesh. Failure preserves the previous plan.

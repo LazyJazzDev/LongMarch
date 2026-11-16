@@ -103,9 +103,9 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
     return f.aperture > 0 && (!pressure_boundaries || (f.low >= 0 && f.high >= 0) || (f.axis == 0 && f.high < 0));
   };
   double maximum = 0;
-  for (int operation = 0; operation < 7; ++operation) {
+  for (int operation = 0; operation < 8; ++operation) {
     double factor = operation == 4 ? -.5 : 1;
-    bool cell_input = operation == 1 || operation >= 5, cell_output = operation == 0 || operation == 6;
+    bool cell_input = operation == 1 || operation >= 5, cell_output = operation == 0 || operation >= 6;
     auto &input = cell_input ? cells : faces;
     auto &output = cell_output ? cell_out : face_out;
     for (size_t r = 0; r < devices.size(); ++r) {
@@ -119,7 +119,8 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
           cudaMemcpy(input[r], host.data(), host.size() * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess)
         return 7;
       host.assign(cell_output ? l.cells.size() : l.faces.size(), -999);
-      if (cudaMemcpy(output[r], host.data(), host.size() * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess)
+      if (cudaMemcpy(output[r], host.data(), host.size() * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess ||
+          cudaDeviceSynchronize() != cudaSuccess)
         return 8;
     }
     int saved = devices.back(), actual = -1;
@@ -130,15 +131,17 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
           : operation == 2 ? gpu.Mass(input, output)
           : operation < 5  ? gpu.InverseMass(input, output)
           : operation == 5 ? gpu.Gradient(input, output)
-                           : gpu.Pressure(input, output))) {
+          : operation == 6 ? gpu.Pressure(input, output)
+                           : gpu.TwoPointPressure(input, output))) {
       std::cerr << gpu.Error() << '\n';
       return 10;
     }
     cudaGetDevice(&actual);
     if (actual != saved)
       return 11;
-    if (gpu.Gradient(input, input) || gpu.Pressure(input, input) || gpu.InverseMass(input, input) ||
-        gpu.Mass(input, input) || gpu.Divergence({}, output) || gpu.TransposeDivergence(input, {}))
+    if (gpu.TwoPointPressure(input, input) || gpu.Gradient(input, input) || gpu.Pressure(input, input) ||
+        gpu.InverseMass(input, input) || gpu.Mass(input, input) || gpu.Divergence({}, output) ||
+        gpu.TransposeDivergence(input, {}))
       return 12;
     for (size_t r = 0; r < devices.size(); ++r) {
       auto &l = layouts[r];
@@ -170,8 +173,20 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
             assembled[id] = host[i];
           } else if (operation == 5)
             reference = gradient[id];
-          else
+          else if (operation == 6)
             reference = pressure[id];
+          else {
+            for (int k = mesh.Offsets()[id]; k < mesh.Offsets()[id + 1]; ++k) {
+              int j = std::abs(mesh.Incidence()[k]) - 1;
+              auto f = mesh.Faces()[j];
+              if (!free_face(j))
+                continue;
+              int neighbor = f.low == id ? f.high : f.low;
+              reference += f.area * f.aperture / f.distance * (p[id] - (neighbor >= 0 ? p[neighbor] : 0));
+            }
+            if (!mesh.Cells()[id].active)
+              reference = p[id];
+          }
         }
         if (!std::isfinite(host[i]) || std::abs(host[i] - reference) > 1e-12 * std::max(1., std::abs(reference)))
           return 14;

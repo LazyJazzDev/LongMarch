@@ -89,6 +89,22 @@ int Run(bool mixed, bool embedded, double width) {
       if (actual != reference)
         return 14;
     }
+    for (size_t i = 0; i < nc; ++i) {
+      double reference = 0, actual = 0;
+      for (int k = mesh.Offsets()[i]; k < mesh.Offsets()[i + 1]; ++k) {
+        auto f = mesh.Faces()[std::abs(mesh.Incidence()[k]) - 1];
+        if (f.aperture == 0)
+          continue;
+        int neighbor = f.low == int(i) ? f.high : f.low;
+        if (neighbor < 0)
+          continue;
+        double weight = f.area * f.aperture / f.distance;
+        reference += weight * (p[i] - p[neighbor]);
+        actual += weight * (local_p[owners[i]][i] - local_p[owners[i]][neighbor]);
+      }
+      if (actual != reference)
+        return 17;
+    }
     for (size_t i = 0; i < nf; ++i) {
       int r = face_owners[i];
       double reference = 0, actual = 0;

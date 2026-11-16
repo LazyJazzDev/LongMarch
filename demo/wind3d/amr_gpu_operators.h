@@ -26,6 +26,10 @@ class GpuPressureOperators {
   bool InverseMass(const std::vector<double *> &input, const std::vector<double *> &output);
 
   bool Gradient(const std::vector<double *> &cells, const std::vector<double *> &faces);
+  // Two-point D diag(area * distance * aperture)^-1 D^T approximation,
+  // with the same free-face boundary mask and inactive identity rows.
+  // Used for multilevel preconditioning; not a replacement for Pressure.
+  bool TwoPointPressure(const std::vector<double *> &input, const std::vector<double *> &output);
   bool Pressure(const std::vector<double *> &input, const std::vector<double *> &output);
 
   const std::string &Error() const {

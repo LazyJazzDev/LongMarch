@@ -74,7 +74,15 @@ bool PressurePartition::Build(const Mesh &mesh, const Topology &tree, const Face
   for (size_t i = 0; i < nc; ++i) {
     for (int k = mesh.Offsets()[i]; k < mesh.Offsets()[i + 1]; ++k) {
       int face = std::abs(mesh.Incidence()[k]) - 1;
-      face_import(next.cell_owners_[i], face);
+      int destination = next.cell_owners_[i];
+      face_import(destination, face);
+      // Owned pressure rows also need neighbors across faces owned elsewhere.
+      // D^T imports alone cover only the face owner's side of this stencil.
+      auto f = mesh.Faces()[face];
+      if (f.aperture > 0)
+        for (int cell : {f.low, f.high})
+          if (cell >= 0 && next.cell_owners_[cell] != destination)
+            imports[{next.cell_owners_[cell], destination}].cells.insert(cell);
     }
   }
   for (size_t i = 0; i < nf; ++i) {

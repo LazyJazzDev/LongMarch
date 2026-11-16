@@ -90,7 +90,7 @@ struct DeviceScope {
 
 struct GpuPressureOperators::Impl {
   struct Rank {
-    Matrix d, transpose, mass, normalized;
+    Matrix d, transpose, mass, normalized, two_point;
     unsigned char *free{}, *coupled{}, *active{};
     double *gradient{}, *flux{};
     double *scale{}, *diagonal{}, *b{}, *x{}, *scratch{}, *direction{};
@@ -221,6 +221,7 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
     for (size_t i = 0; i < layout.faces.size(); ++i)
       faces[layout.faces[i]] = int(i);
     using Rows = std::vector<std::vector<std::pair<int, double>>>;
+    Rows two_point(layout.owned_cells);
     Rows d(layout.owned_cells), transpose(layout.owned_faces), m(layout.owned_faces), normalized(layout.owned_faces);
     std::vector<unsigned char> local_free, local_coupled;
     std::vector<double> local_scale, diagonal;
@@ -228,11 +229,23 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
     for (size_t i = 0; i < layout.owned_cells; ++i) {
       int cell = layout.cells[i];
       active.push_back(mesh.Cells()[cell].active);
+      std::map<int, double> pressure_row;
+      if (!mesh.Cells()[cell].active)
+        pressure_row[cell] = 1;
       for (int k = mesh.Offsets()[cell]; k < mesh.Offsets()[cell + 1]; ++k) {
         int entry = mesh.Incidence()[k], id = std::abs(entry) - 1;
         const auto &f = mesh.Faces()[id];
         d[i].push_back({faces[id], (entry > 0 ? -1 : 1) * f.area * f.aperture});
+        if (mesh.Cells()[cell].active && free[id]) {
+          double weight = f.area * f.aperture / f.distance;
+          pressure_row[cell] += weight;
+          int neighbor = f.low == cell ? f.high : f.low;
+          if (neighbor >= 0)
+            pressure_row[neighbor] -= weight;
+        }
       }
+      for (auto [neighbor, weight] : pressure_row)
+        two_point[i].push_back({cells[neighbor], weight});
     }
     for (size_t i = 0; i < layout.owned_faces; ++i) {
       int id = layout.faces[i];
@@ -264,11 +277,11 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
     }
     auto &rank = next->ranks[r];
     int device = devices[r];
-    if (!next->MatrixBuild(device, rank.d, d) || !next->MatrixBuild(device, rank.transpose, transpose) ||
-        !next->MatrixBuild(device, rank.mass, m) || !next->MatrixBuild(device, rank.normalized, normalized) ||
-        !next->Upload(device, rank.free, local_free) || !next->Upload(device, rank.coupled, local_coupled) ||
-        !next->Upload(device, rank.scale, local_scale) || !next->Upload(device, rank.diagonal, diagonal) ||
-        !next->Allocate(device, rank.b, layout.owned_faces) ||
+    if (!next->MatrixBuild(device, rank.two_point, two_point) || !next->MatrixBuild(device, rank.d, d) ||
+        !next->MatrixBuild(device, rank.transpose, transpose) || !next->MatrixBuild(device, rank.mass, m) ||
+        !next->MatrixBuild(device, rank.normalized, normalized) || !next->Upload(device, rank.free, local_free) ||
+        !next->Upload(device, rank.coupled, local_coupled) || !next->Upload(device, rank.scale, local_scale) ||
+        !next->Upload(device, rank.diagonal, diagonal) || !next->Allocate(device, rank.b, layout.owned_faces) ||
         !next->Allocate(device, rank.direction, layout.owned_faces) || !next->Upload(device, rank.active, active) ||
         !next->Allocate(device, rank.gradient, layout.faces.size()) ||
         !next->Allocate(device, rank.flux, layout.faces.size()) ||
@@ -301,7 +314,7 @@ bool GpuPressureOperators::Apply(const std::vector<double *> &input,
   }
   auto &w = *impl_;
   DeviceScope restore;
-  if (!(operation == 1 ? w.exchange.ExchangeCells(input) : w.exchange.ExchangeFaces(input))) {
+  if (!((operation == 1 || operation == 3) ? w.exchange.ExchangeCells(input) : w.exchange.ExchangeFaces(input))) {
     error_ = w.exchange.Error();
     return false;
   }
@@ -312,7 +325,10 @@ bool GpuPressureOperators::Apply(const std::vector<double *> &input,
       break;
     }
     auto &rank = w.ranks[r];
-    Matrix matrix = operation == 0 ? rank.d : operation == 1 ? rank.transpose : rank.mass;
+    Matrix matrix = operation == 0   ? rank.d
+                    : operation == 1 ? rank.transpose
+                    : operation == 2 ? rank.mass
+                                     : rank.two_point;
     Multiply<<<(matrix.rows + 255) / 256, 256, 0, rank.stream>>>(matrix, input[r], output[r]);
     if (!w.Check(cudaGetLastError())) {
       ok = false;
@@ -341,6 +357,10 @@ bool GpuPressureOperators::TransposeDivergence(const std::vector<double *> &cell
 
 bool GpuPressureOperators::Mass(const std::vector<double *> &input, const std::vector<double *> &output) {
   return Apply(input, output, 2);
+}
+
+bool GpuPressureOperators::TwoPointPressure(const std::vector<double *> &input, const std::vector<double *> &output) {
+  return Apply(input, output, 3);
 }
 
 bool GpuPressureOperators::InverseMass(const std::vector<double *> &input, const std::vector<double *> &output) {

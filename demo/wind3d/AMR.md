@@ -1173,3 +1173,40 @@ checking owned results and unchanged ghosts on each repeat.
 
 Two-GPU job 2001327 passed the expanded direct regression, CTest (4.40 s),
 and Compute Sanitizer memcheck with zero errors.
+
+### Distributed fine-grid preconditioning stencil
+
+PressurePartition now imports open-face neighbor pressures for every owned cell,
+including faces owned by another rank. The earlier D^T-only pressure imports
+were insufficient for the two-point fine-grid residual on the opposite side of
+a partition interface. A NaN-initialized CPU stencil regression fails with the
+previous planner (code 17) and passes with the extended plan for 1/2/4/8 ranks,
+uniform/mixed meshes, two scales and open/cut geometry.
+
+GpuPressureOperators::TwoPointPressure applies the rank-local CSR approximation
+D diag(area * distance * aperture)^-1 D^T with the configured free-face mask and
+inactive identity rows. It refreshes cell ghosts and writes only owned outputs.
+It is a building block for multilevel preconditioning, not a replacement for
+the compatible pressure operator or a completed V-cycle. Two-GPU job 2001328
+passed CPU partition, expanded operator and repeated projection CTests, plus
+operator Compute Sanitizer memcheck with zero errors. Operator comparisons
+include both device orders and both boundary masks, using an independent CPU
+face-wise two-point reference and NaN ghosts.
+
+### Corrected-inlet 192-resolution comparison
+
+Jobs 2001300/2001301 both completed 30,000 steps (6 physical seconds) with the
+thin-cell barrier fix and cached inlet ghosts. The matched 2--6 second means
+in inlet-corrected-192-final.json are:
+
+| Mesh | Fx | Fy | Mz | Wall seconds / physical second |
+| --- | ---: | ---: | ---: | ---: |
+| Static adaptive 192 | 33.810144 | 73.257571 | -22.345676 | 179.754583 |
+| Uniform 192 | 33.573625 | 81.765550 | -25.319858 | 536.613313 |
+
+Static adaptive deviations are +0.704% Fx, -10.405% Fy and +11.746% Mz,
+using the magnitude of the reference component as denominator. Its roughly
+2.99x throughput advantage does not satisfy the 2% load criterion. The adaptive
+Fy mean also shifts by -10.0133 between the two halves of the window, so these
+are finite-window comparisons, not established steady-state estimates. Mesh
+coverage and statistical convergence remain required alongside solver speed.
