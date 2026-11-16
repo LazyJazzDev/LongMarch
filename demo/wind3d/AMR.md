@@ -1257,3 +1257,48 @@ ASan+UBSan and the standard CMake/CTest target passed (CTest 0.13 s, built using
 the existing allocation 2001306 without requesting additional GPUs). This is
 host assembly only: GPU V-cycle kernels, coarse solve, integration and measured
 iteration/performance improvement are still pending.
+
+### GPU distributed V-cycle and pressure integration
+
+GpuMultilevel now uploads rank-local CSR matrices, adjoint transfer operators,
+diagonals and persistent work arrays from PressureHierarchy. Every level uses
+two pre/post weighted-Jacobi sweeps (weight .9), compact gathered peer imports,
+residual restriction and additive constant prolongation. Only the terminal
+matrix (at most 64 cells) is inverted on the host during setup; its inverse rows
+and RHS are distributed for device evaluation. All-solid identity levels bypass
+the inverse. Empty coarse ranks retain imports required by prolongation without
+launching empty kernels. Fine caller fields use owned-cell order, and caller
+ghosts are untouched. Build is transactional and Apply restores the CUDA device.
+
+GpuDistributedProjection uses this V-cycle by default; Build(..., false) retains
+Jacobi for comparisons. The compatible D M^-1 D^T operator, true-residual checks,
+periodic CG restarts and convergence-only field commit remain unchanged. This
+is a synchronous peer implementation, not yet an optimized captured V-cycle.
+
+Job 2001337 passed 15 direct V-cycle configurations with independent CPU
+Cholesky coarse solves, CPU V-cycle parity, linearity, symmetry, positive sampled
+energy, repeated inputs, alias rejection and output ghost preservation, plus
+CTest and memcheck. Job 2001339 repeated validation with a one-cell coarse limit,
+exercising empty coarse ranks, and passed memcheck. Job 2001338 passed 48 full
+projection configurations (both preconditioners) and repeated-solve regression,
+CTest and memcheck. Main mixed-grid cases dropped from 50 to 11 iterations;
+actual reconstructed divergence remained within the 1e-10 test tolerance.
+
+The complete 55,296-cell / 170,624-face benchmark in job 2001339, tolerance 1e-9,
+excluded setup, input copies and the first of four repeats:
+
+| Implementation | GPUs | Preconditioner | Iterations | Mean seconds |
+| --- | ---: | --- | ---: | ---: |
+| Existing single-device | 1 | Jacobi | 2033 | 0.333093 |
+| Existing single-device | 1 | Multilevel | 27 | 0.006039 |
+| Distributed | 1 | Jacobi | 2033 | 1.052081 |
+| Distributed | 2 | Jacobi | 2033 | 3.117378 |
+| Distributed | 1 | Multilevel | 27 | 0.023825 |
+| Distributed | 2 | Multilevel | 27 | 0.078805 |
+
+The two-GPU change is about 39.6x faster than its Jacobi baseline but still about
+13x slower than the existing optimized single-device multilevel solver on this
+mesh. All multilevel repeats agreed with the Jacobi velocity reference within
+2.28e-10 and verified a true relative residual about 4.96e-10. Reducing peer/host
+synchronization remains essential. This does not establish aircraft flow
+speedup, distributed transport, or the 2% steady-load acceptance criterion.

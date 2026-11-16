@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "amr_gpu_distributed_projection.h"
+#include "amr_gpu_multilevel.h"
 
 namespace wind3d::amr {
 namespace {
@@ -72,6 +73,7 @@ struct GpuDistributedProjection::Impl {
   };
 
   GpuPressureOperators operators;
+  std::unique_ptr<GpuMultilevel> multilevel;
   std::vector<int> devices;
   std::vector<Rank> ranks;
   std::vector<std::pair<int, void *>> allocations;
@@ -199,13 +201,31 @@ struct GpuDistributedProjection::Impl {
 GpuDistributedProjection::GpuDistributedProjection() = default;
 GpuDistributedProjection::~GpuDistributedProjection() = default;
 
-bool GpuDistributedProjection::Build(const Mesh &mesh, const Topology &tree, const std::vector<int> &devices) {
+bool GpuDistributedProjection::Build(const Mesh &mesh,
+                                     const Topology &tree,
+                                     const std::vector<int> &devices,
+                                     bool multilevel) {
   error_.clear();
   DeviceScope restore;
   auto next = std::make_unique<Impl>();
   if (!next->operators.Build(mesh, tree, devices)) {
     error_ = next->operators.Error();
     return false;
+  }
+  if (multilevel) {
+    std::vector<int> owners(mesh.Cells().size(), -1);
+    for (size_t r = 0; r < devices.size(); ++r) {
+      const auto &layout = next->operators.Layouts()[r];
+      for (size_t i = 0; i < layout.owned_cells; ++i)
+        owners[layout.cells[i]] = int(r);
+    }
+    PressureHierarchy hierarchy;
+    next->multilevel = std::make_unique<GpuMultilevel>();
+    if (!hierarchy.Build(mesh, owners, int(devices.size())) || !next->multilevel->Build(hierarchy, devices)) {
+      error_ =
+          next->multilevel->Error().empty() ? "Cannot build distributed pressure hierarchy" : next->multilevel->Error();
+      return false;
+    }
   }
   next->devices = devices;
   next->ranks.resize(devices.size());
@@ -315,14 +335,22 @@ ProjectionResult GpuDistributedProjection::Project(const std::vector<double *> &
     result.relative_residual = 1;
     for (int iteration = 0; iteration < max_iterations; ++iteration) {
       result.iterations = iteration + 1;
-      for (size_t i = 0; i < w.ranks.size(); ++i) {
-        auto &r = w.ranks[i];
-        if (!w.Check(cudaSetDevice(w.devices[i])))
+      if (w.multilevel) {
+        if (!w.Sync())
           return fail();
-        Precondition<<<(r.cells + 255) / 256, 256, 0, r.stream>>>(r.cells, r.r, r.diagonal, r.z);
-        if (!w.Check(cudaGetLastError()))
+        if (!w.multilevel->Apply(w.Fields(&Impl::Rank::r), w.Fields(&Impl::Rank::z))) {
+          w.error = w.multilevel->Error();
           return fail();
-      }
+        }
+      } else
+        for (size_t i = 0; i < w.ranks.size(); ++i) {
+          auto &r = w.ranks[i];
+          if (!w.Check(cudaSetDevice(w.devices[i])))
+            return fail();
+          Precondition<<<(r.cells + 255) / 256, 256, 0, r.stream>>>(r.cells, r.r, r.diagonal, r.z);
+          if (!w.Check(cudaGetLastError()))
+            return fail();
+        }
       double rho = 0;
       if (!w.Dot(&Impl::Rank::r, &Impl::Rank::z, rho))
         return fail();

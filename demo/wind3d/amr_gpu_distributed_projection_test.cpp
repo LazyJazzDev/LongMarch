@@ -30,7 +30,7 @@ struct Buffers {
   }
 };
 
-int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices) {
+int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices, bool multilevel) {
   using namespace wind3d::amr;
   Topology tree;
   Mesh mesh;
@@ -45,7 +45,7 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
     return 2;
   GpuProjection single;
   GpuDistributedProjection gpu;
-  if (!single.Build(0, mesh, gradient, false, true, true) || !gpu.Build(mesh, tree, devices)) {
+  if (!single.Build(0, mesh, gradient, false, true, true) || !gpu.Build(mesh, tree, devices, multilevel)) {
     std::cerr << single.Error() << ' ' << gpu.Error() << '\n';
     return 3;
   }
@@ -195,8 +195,9 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
         return 20;
   }
   std::cout << "PASS distributed projection mixed=" << mixed << " embedded=" << embedded << " width=" << width
-            << " ranks=" << devices.size() << " iterations=" << result.iterations << " velocity_error=" << error
-            << " pressure_error=" << pressure_error << " divergence=" << relative << '\n';
+            << " multilevel=" << multilevel << " ranks=" << devices.size() << " iterations=" << result.iterations
+            << " velocity_error=" << error << " pressure_error=" << pressure_error << " divergence=" << relative
+            << '\n';
   return 0;
 }
 
@@ -208,8 +209,9 @@ int main() {
     for (bool embedded : {false, true})
       for (double width : {1., 1.3})
         for (auto devices : {std::vector<int>{0}, std::vector<int>{0, 1}, std::vector<int>{1, 0}})
-          if (int status = Run(mixed, embedded, width, devices)) {
-            std::cerr << "distributed projection failure " << status << '\n';
-            return status;
-          }
+          for (bool multilevel : {false, true})
+            if (int status = Run(mixed, embedded, width, devices, multilevel)) {
+              std::cerr << "distributed projection failure " << status << '\n';
+              return status;
+            }
 }
