@@ -1592,3 +1592,39 @@ All configurations retained 35 iterations, about 8.48e-10 true residual and
 edges are retained, but neither positive GPU scaling nor full-flow acceleration
 has been demonstrated. The next integration work must address transport and
 runtime ownership as well as the still-open steady-load accuracy gate.
+
+### Shared transport kernels and distributed dependencies
+
+The sampling field and the slip/reconstruction/advection CUDA kernels now live
+in the internal `amr_gpu_transport_kernels.cuh`. The single-device transport
+includes this implementation; the extraction preserves numerical kernel tokens
+apart from whitespace. This prepares a shared implementation for distributed
+transport rather than maintaining a second cubic interpolation or limiter.
+It does not yet add a distributed transport runtime.
+
+The required distributed stages follow the existing arithmetic:
+
+1. Clear closed-face values; extend first-layer slip ghosts from open faces,
+   then second-layer ghosts from the completed first layer.
+2. Reconstruct cell centres from incident face values; reconstruct slopes and
+   bounds from completed neighbouring cell centres across open faces.
+3. Sample original velocity for midpoint trajectories and forward transport.
+   Native samples read faces, virtual samples read centre/slope/bound tuples.
+4. Apply the same slip and reconstruction stages to the forward field.
+5. Correct using the forward field at the reverse trajectory, but trace both
+   directions with original velocity. Apply the original eight-donor limiter
+   using target face spacing, reverting to the forward result when required.
+
+Pressure imports alone do not cover these dependencies. The current sampler
+supports trajectories crossing block boundaries and retains a direct lookup
+fallback beyond cached halos; distributed ownership must preserve that access
+or enforce and validate an explicit trajectory bound. A fixed pressure stencil
+must not silently truncate transport donors. Runtime integration also needs
+consistent diffusion, sponge, load reductions and transactional regridding;
+none of these requirements is satisfied by pressure scaling benchmarks alone.
+
+Job 2001380 rebuilt and passed the GPU transport, complete-step and adaptive
+flow CTests (153.21/46.39/0.78 seconds). Transport compares CPU/GPU and cached/
+direct results across inlet modes, embedded geometry, linear/cubic and
+corrected/uncorrected paths, signed timesteps and long traces. This validates
+the extraction's existing single-device behavior, not distributed transport.
