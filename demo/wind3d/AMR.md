@@ -472,3 +472,14 @@ plus CUDA memcheck (zero errors). CPU/GPU differences stayed below 4.45e-16;
 cached/direct differences were zero. This fixes an identified consistency
 error, but does not by itself establish long-time aircraft stability or the
 2% load gate. The fixed-hierarchy aircraft run is being repeated separately.
+
+The transported face's adjacent fine cell now supplies the cached block halo
+when a short trace crosses the refinement boundary. Requested spacing must
+still match the cache, and traces outside its halo fall back to direct
+sampling. This preserves the repaired target-face grid rather than reverting
+to departure-cell spacing for speed. Job 2001245 passed transport/full-step/
+regrid regressions and memcheck; cached/direct errors were zero and CPU/GPU
+errors stayed below 4.45e-16. Two alternating grid-128 startup runs reduced
+transport from 5.25--5.33 ms to 4.08--4.09 ms and total step time from
+14.04--14.17 ms to 12.93--12.99 ms, with unchanged printed loads and iteration
+counts. Long-time stability and load acceptance remain separate requirements.

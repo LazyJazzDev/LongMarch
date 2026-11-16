@@ -260,7 +260,15 @@ struct Field {
     return VirtualFace(p, axis);
   }
 
-  __device__ double Component(Array<double, 3> point, int axis, bool cubic, double spacing = 0) const {
+  __device__ int FaceCell(Face face) const {
+    if (face.low < 0)
+      return face.high;
+    if (face.high < 0)
+      return face.low;
+    return cells[face.low].width <= cells[face.high].width ? face.low : face.high;
+  }
+
+  __device__ double Component(Array<double, 3> point, int axis, bool cubic, double spacing = 0, int owner = -1) const {
     if (!halo)
       return DirectComponent(point, axis, cubic, spacing);
     for (int a = 0; a < 3; ++a) {
@@ -268,7 +276,8 @@ struct Field {
         return nan("");
       point[a] = Clamp(point[a], origin_[a], origin_[a] + roots[a] * root_width_);
     }
-    int cell = CellAt(point);
+    // The target block halo also covers short traces across its level boundary.
+    int cell = owner >= 0 ? owner : CellAt(point);
     if (cell < 0)
       return 0;
     if (spacing > 0 && spacing != cells[cell].width)
@@ -492,7 +501,9 @@ __global__ void Forward(Field f, double dt, bool cubic, double *out) {
   if (i >= f.nf)
     return;
   auto face = f.faces[i];
-  out[i] = face.aperture == 0 ? 0 : f.Component(f.Departure(face.centre, dt), face.axis, cubic, sqrt(face.area));
+  out[i] = face.aperture == 0
+               ? 0
+               : f.Component(f.Departure(face.centre, dt), face.axis, cubic, sqrt(face.area), f.FaceCell(face));
 }
 
 __global__ void Correct(Field original, Field forward, double dt, bool cubic, double *out) {
@@ -504,9 +515,9 @@ __global__ void Correct(Field original, Field forward, double dt, bool cubic, do
     out[i] = 0;
     return;
   }
-  double value =
-      forward.velocity_[i] + .5 * (original.velocity_[i] - forward.Component(original.Departure(face.centre, -dt),
-                                                                             face.axis, cubic, sqrt(face.area)));
+  double value = forward.velocity_[i] +
+                 .5 * (original.velocity_[i] - forward.Component(original.Departure(face.centre, -dt), face.axis, cubic,
+                                                                 sqrt(face.area), forward.FaceCell(face)));
   if (!isfinite(value)) {
     out[i] = nan("");
     return;
@@ -514,7 +525,7 @@ __global__ void Correct(Field original, Field forward, double dt, bool cubic, do
   auto back = original.Departure(face.centre, dt);
   for (int a = 0; a < 3; ++a)
     back[a] = Clamp(back[a], original.origin_[a], original.origin_[a] + original.roots[a] * original.root_width_);
-  int cell = original.CellAt(back);
+  int cell = original.FaceCell(face);
   double h = sqrt(face.area), base[3];
   for (int a = 0; a < 3; ++a)
     base[a] = floor((back[a] - original.origin_[a]) / h - (a == face.axis ? 0 : .5));
