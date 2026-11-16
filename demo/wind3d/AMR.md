@@ -233,6 +233,15 @@ them as part of an experiment without a new reason/authorization.
   18.7 to 7.64 ms. Pressure now dominates (adaptive 7.09 ms). These small-grid
   startup results exclude regrid steps from the ordinary-step averages and
   still do not establish steady-load acceptance or speedup over native.
+- The longer startup scaling diagnostic (job 2001076, 100 steps, first 20
+  excluded, dt=0.0002, no regrids) confirms the performance target is not met.
+  Mean step times for native / AMR-uniform / adaptive were 1.26 / 7.77 / 7.47 ms
+  at grid 64 and 2.81 / 30.98 / 18.25 ms at grid 128. At grid 128 the adaptive
+  hierarchy used 212,992 cells versus 786,432 uniform cells. The simulation
+  reached only 0.02 physical seconds, and native/AMR pressure tolerances differ;
+  these are bottleneck diagnostics, not equal-accuracy or steady-load acceptance.
+  In particular, fewer cells and faster execution than AMR-uniform do not yet
+  constitute speedup over the original solver.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
