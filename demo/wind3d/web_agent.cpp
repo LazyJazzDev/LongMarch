@@ -214,7 +214,8 @@ int main(int argc, char **argv) {
         json << ",\"streamline_density\":" << density
              << ",\"streamline_seeds\":" << (20 * density + 1) * (3 * density + 1)
              << ",\"domain_min\":[-6,-4,-6],\"domain_max\":[10,4,6]";
-        json << ",\"solver_model\":\"optimized-13ea18de\",\"geometry_model\":\"high-bypass-v2\",\"force\":";
+        json
+            << ",\"solver_model\":\"claude-46184928-uniform-cubic\",\"geometry_model\":\"camber025-sealed-hinges-high-bypass\",\"force\":";
         Vector(json, state->force);
         json << ",\"moment\":";
         Vector(json, state->moment);

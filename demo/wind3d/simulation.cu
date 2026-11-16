@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
+#include <cstdio>
+#include <cstring>
 #include <deque>
 #include <iostream>
 #include <mutex>
@@ -874,9 +877,24 @@ bool ValidateWallDiffusion(int cuda_device) {
   return passed;
 }
 
+// Fixed-size header of a checkpoint file, followed by u, v, w (faces) and the
+// pressure (cells) in single precision.
+struct CheckpointHeader {
+  char magic[8];
+  int nx, ny, nz;
+  uint64_t step;  // Offset 24; the sweep reads it to match its progress file.
+  float time, max_speed;
+  double impulse[3], angular_impulse[3], friction_impulse[3], drag_impulse[kComponents], lift_impulse[kComponents];
+};
+
+static_assert(offsetof(CheckpointHeader, step) == 24, "the sweep reads the checkpoint step at offset 24");
+
 struct Simulation::Impl {
   mutable std::mutex mutex;
-  std::condition_variable wake;
+  std::condition_variable wake, checkpointed;
+  std::string checkpoint_path, restore_path;
+  bool checkpoint_pending{};
+  uint64_t checkpoint_step{};
   std::thread worker;
   bool stop{}, paused{}, working{};
   uint64_t generation{};
@@ -943,6 +961,23 @@ struct Simulation::Impl {
         if (!Check(cudaMemPrefetchAsync(address, end - begin, device + d, stream)))
           return false;
 #endif
+      }
+    }
+    return true;
+  }
+
+  // Copies between a device array and a file through a bounded host buffer.
+  bool Transfer(std::FILE *file, float *device, size_t count, bool write) {
+    std::vector<float> buffer(std::min(count, size_t(64) << 20));
+    for (size_t offset = 0; offset < count; offset += buffer.size()) {
+      size_t n = std::min(buffer.size(), count - offset);
+      if (write) {
+        if (!Check(cudaMemcpy(buffer.data(), device + offset, n * sizeof(float), cudaMemcpyDeviceToHost)) ||
+            std::fwrite(buffer.data(), sizeof(float), n, file) != n)
+          return false;
+      } else if (std::fread(buffer.data(), sizeof(float), n, file) != n ||
+                 !Check(cudaMemcpy(device + offset, buffer.data(), n * sizeof(float), cudaMemcpyHostToDevice))) {
+        return false;
       }
     }
     return true;
@@ -1056,6 +1091,15 @@ struct Simulation::Impl {
   }
 
   void Run() {
+    Loop();
+    // Release a checkpoint request that the stopped worker can no longer serve.
+    std::lock_guard<std::mutex> guard(mutex);
+    if (checkpoint_pending && error.empty())
+      error = "Solver stopped";
+    checkpointed.notify_all();
+  }
+
+  void Loop() {
     if (!Check(cudaSetDevice(device)))
       return;
     auto g = grid;
@@ -1082,11 +1126,34 @@ struct Simulation::Impl {
       {
         std::unique_lock<std::mutex> lock(mutex);
         wake.wait(lock, [&] {
-          return stop || generation != applied_generation ||
+          return stop || checkpoint_pending || generation != applied_generation ||
                  (!paused && (!options.retain_snapshots || pending_snapshots.size() < 2));
         });
         if (stop)
           break;
+        if (checkpoint_pending && applied_generation == generation && step > 0) {
+          // Write the latest completed step, outside the lock.
+          std::string path = checkpoint_path;
+          lock.unlock();
+          CheckpointHeader header{{'W', '3', 'D', 'C', 'K', 'P', 'T', '1'}, g.nx, g.ny, g.nz, step, time, max_speed};
+          std::copy(impulse, impulse + 3, header.impulse);
+          std::copy(angular_impulse, angular_impulse + 3, header.angular_impulse);
+          std::copy(friction_impulse, friction_impulse + 3, header.friction_impulse);
+          std::copy(drag_impulse, drag_impulse + kComponents, header.drag_impulse);
+          std::copy(lift_impulse, lift_impulse + kComponents, header.lift_impulse);
+          std::string temporary = path + ".tmp";
+          std::FILE *file = std::fopen(temporary.c_str(), "wb");
+          bool written = file && Check(cudaStreamSynchronize(stream)) &&
+                         std::fwrite(&header, sizeof(header), 1, file) == 1 && Transfer(file, u, nf, true) &&
+                         Transfer(file, v, nf, true) && Transfer(file, w, nf, true) &&
+                         Transfer(file, pressure, nc, true);
+          written = file && std::fclose(file) == 0 && written && std::rename(temporary.c_str(), path.c_str()) == 0;
+          lock.lock();
+          checkpoint_pending = false;
+          checkpoint_step = written ? step : 0;
+          checkpointed.notify_all();
+          continue;
+        }
         controls = requested;
         current_generation = generation;
         working = true;
@@ -1104,6 +1171,36 @@ struct Simulation::Impl {
         std::fill(lift_impulse, lift_impulse + kComponents, 0.0);
         if (!Check(cudaMemsetAsync(pressure, 0, size_t(nc) * sizeof(float), stream)))
           break;
+      }
+      bool restored = false;
+      std::string restore;
+      {
+        std::lock_guard<std::mutex> guard(mutex);
+        if (reset)
+          std::swap(restore, restore_path);
+      }
+      if (!restore.empty()) {
+        CheckpointHeader header{};
+        std::FILE *file = std::fopen(restore.c_str(), "rb");
+        restored = file && Check(cudaStreamSynchronize(stream)) && std::fread(&header, sizeof(header), 1, file) == 1 &&
+                   std::memcmp(header.magic, "W3DCKPT1", 8) == 0 && header.nx == g.nx && header.ny == g.ny &&
+                   header.nz == g.nz && Transfer(file, u, nf, false) && Transfer(file, v, nf, false) &&
+                   Transfer(file, w, nf, false) && Transfer(file, pressure, nc, false);
+        if (file)
+          std::fclose(file);
+        if (!restored) {
+          std::lock_guard<std::mutex> guard(mutex);
+          error = "Cannot restore checkpoint " + restore;
+          break;
+        }
+        step = header.step;
+        time = header.time;
+        max_speed = header.max_speed;
+        std::copy(header.impulse, header.impulse + 3, impulse);
+        std::copy(header.angular_impulse, header.angular_impulse + 3, angular_impulse);
+        std::copy(header.friction_impulse, header.friction_impulse + 3, friction_impulse);
+        std::copy(header.drag_impulse, header.drag_impulse + kComponents, drag_impulse);
+        std::copy(header.lift_impulse, header.lift_impulse + kComponents, lift_impulse);
       }
       applied_generation = current_generation;
       // No-slip ghost values can increase the diffusion diagonal from six
@@ -1136,7 +1233,7 @@ struct Simulation::Impl {
       if (!Check(cudaEventRecord(timing[0], stream)))
         break;
       if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
-            Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, u, v, w, controls.speed, reset);
+            Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, u, v, w, controls.speed, reset && !restored);
           }))
         break;
       auto extend = [&](float *x, float *y, float *z) {
@@ -1419,6 +1516,21 @@ void Simulation::Configure(const Controls &controls, bool paused) {
     impl_->paused = paused;
   }
   impl_->wake.notify_one();
+}
+
+uint64_t Simulation::Checkpoint(const std::string &path) {
+  std::unique_lock<std::mutex> lock(impl_->mutex);
+  impl_->checkpoint_path = path;
+  impl_->checkpoint_pending = true;
+  impl_->checkpoint_step = 0;
+  impl_->wake.notify_one();
+  impl_->checkpointed.wait(lock, [&] { return !impl_->checkpoint_pending || !impl_->error.empty(); });
+  return impl_->checkpoint_pending ? 0 : impl_->checkpoint_step;
+}
+
+void Simulation::Restore(const std::string &path) {
+  std::lock_guard<std::mutex> guard(impl_->mutex);
+  impl_->restore_path = path;
 }
 
 void Simulation::Reset() {

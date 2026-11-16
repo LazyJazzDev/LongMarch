@@ -439,3 +439,18 @@ trilinear interpolation around cut faces; departure tracing stays linear.
 The existing linear mode remains available as a reference. GPU parity is
 checked by CTest `wind3d_multigpu_cubic`. Adaptive-grid scope, the accepted
 accuracy gate, resource limit and remaining work are recorded in [AMR.md](AMR.md).
+
+## Uniform solver deployment (Claude source 46184928)
+
+The web agent uses the uniform MAC solver, monotone cubic transport, cut-cell
+boundaries, wall-modelled loads and CFL 0.125. It retains this repository's
+1/2/4/8-GPU execution and web controls; AMR is not part of the web deployment.
+The 2.5% wing camber and sealed control hinges are ported from the source.
+Neutral decorative colours, control-surface colours, short pylons and high-bypass
+nacelles remain as requested for this frontend.
+
+The source sweep checkpoint/restore implementation and its flushed CSV header
+are also ported. Build `wind3d_sweep` in `cmake-build-release`; use
+`--checkpoint DIRECTORY` to preserve sweep progress across preemption.
+Source revision `46184928` is provenance, not a claim of aerodynamic validation
+at every resolution or control setting.

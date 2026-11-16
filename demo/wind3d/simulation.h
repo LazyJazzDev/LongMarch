@@ -64,7 +64,7 @@ struct SolverOptions {
   bool export_final{false};
 };
 
-// Reproduce the optimized cruise sweep from ~/LongMarch, commit 13ea18de.
+// Cruise model from Claude source 46184928, including monotone cubic transport.
 inline SolverOptions OptimizedSolverOptions() {
   SolverOptions options;
   options.viscosity = 1.5e-5f;
@@ -74,6 +74,7 @@ inline SolverOptions OptimizedSolverOptions() {
   options.wall_viscosity = 9.2e-7f;
   options.sponge = 2;
   options.cfl = 0.125f;
+  options.cubic = true;
   return options;
 }
 
@@ -131,6 +132,13 @@ class Simulation {
 
   void Configure(const Controls &controls, bool paused);
   void Reset();
+  // Writes the latest completed step (fields, time, step and load integrals)
+  // to `path` and returns its step number, or 0 on failure. Blocks until the
+  // worker has written it between two steps.
+  uint64_t Checkpoint(const std::string &path);
+  // Makes the next Reset resume from a checkpoint instead of an impulsive
+  // start. The configured controls must match the checkpoint's grid.
+  void Restore(const std::string &path);
   bool Paused() const;
   std::shared_ptr<const Snapshot> Latest() const;
   // Nonblocking ordered dequeue; empty unless retain_snapshots is enabled.

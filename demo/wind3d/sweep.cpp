@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -132,6 +133,76 @@ Window Mark(const wind3d::Snapshot &s) {
   return w;
 }
 
+constexpr int quarters = 4;
+
+// Sweep position saved next to a solver checkpoint, so a preempted job can
+// resume mid-case. `step` must equal the checkpoint's step.
+struct Progress {
+  size_t index{};
+  double switch_time{-1};
+  int next_mark{}, max_cycles{};
+  float max_residual{};
+  uint64_t first_step{}, last_step{}, step{};
+  double base[6]{};
+  Window marks[quarters + 1];
+};
+
+bool SaveProgress(const std::string &path, const Progress &p) {
+  std::string temporary = path + ".tmp";
+  {
+    std::ofstream file(temporary);
+    file.precision(17);
+    file << p.index << ' ' << p.switch_time << ' ' << p.next_mark << ' ' << p.max_cycles << ' ' << p.max_residual << ' '
+         << p.first_step << ' ' << p.last_step << ' ' << p.step;
+    for (double b : p.base)
+      file << ' ' << b;
+    for (int m = 0; m < p.next_mark; ++m) {
+      const auto &w = p.marks[m];
+      file << '\n' << w.time << ' ' << w.friction;
+      for (int k = 0; k < 3; ++k)
+        file << ' ' << w.impulse[k] << ' ' << w.angular[k];
+      for (int k = 0; k < wind3d::kComponents; ++k)
+        file << ' ' << w.drag[k] << ' ' << w.lift[k];
+    }
+    file << '\n';
+    if (!file)
+      return false;
+  }
+  return std::rename(temporary.c_str(), path.c_str()) == 0;
+}
+
+bool LoadProgress(const std::string &path, Progress &p) {
+  std::ifstream file(path);
+  if (!(file >> p.index >> p.switch_time >> p.next_mark >> p.max_cycles >> p.max_residual >> p.first_step >>
+        p.last_step >> p.step))
+    return false;
+  for (double &b : p.base)
+    file >> b;
+  if (p.next_mark < 0 || p.next_mark > quarters + 1)
+    return false;
+  for (int m = 0; m < p.next_mark; ++m) {
+    auto &w = p.marks[m];
+    file >> w.time >> w.friction;
+    for (int k = 0; k < 3; ++k)
+      file >> w.impulse[k] >> w.angular[k];
+    for (int k = 0; k < wind3d::kComponents; ++k)
+      file >> w.drag[k] >> w.lift[k];
+  }
+  return bool(file);
+}
+
+// Step number stored in a solver checkpoint header, or 0 if the file is
+// missing. The header starts with an 8-byte magic and three ints; the 64-bit
+// step follows at its 8-byte alignment, offset 24.
+uint64_t CheckpointStep(const std::string &path) {
+  std::ifstream file(path, std::ios::binary);
+  char head[32];
+  uint64_t step = 0;
+  if (file.read(head, sizeof(head)) && std::string(head, 8) == "W3DCKPT1")
+    std::memcpy(&step, head + 24, sizeof(step));
+  return step;
+}
+
 bool Same(const Controls &a, const Controls &b) {
   return a.speed == b.speed && a.angle == b.angle && a.flap == b.flap && a.aileron == b.aileron &&
          a.elevator == b.elevator && a.rudder == b.rudder;
@@ -146,6 +217,7 @@ void Usage() {
                "  [--sponge METRES (default 2, 0 disables)] [--cut-cells (with --friction-only)]\n"
                "  [--cubic] [--first-order]\n"
                "  [--pressure-tolerance T] [--pressure-cycles N] [--dump-dir DIR]\n"
+               "  [--checkpoint DIR [--checkpoint-minutes M]] (resumes from DIR if it holds a checkpoint)\n"
                "Cases file rows: name angle flap aileron elevator rudder ('#' starts a comment).\n";
 }
 }  // namespace
@@ -154,7 +226,8 @@ int main(int argc, char **argv) {
   int device = 0, grid = 384;
   bool max_grid = false;
   float settle_time = 1.0f, case_time = 0.5f, average_time = 0.25f;
-  std::string preset = "controls", cases_path, output = "wind3d_sweep.csv", dump;
+  std::string preset = "controls", cases_path, output = "wind3d_sweep.csv", dump, checkpoint;
+  float checkpoint_minutes = 60;
   Controls base;
   base.speed = 30;
   base.angle = 2;
@@ -205,6 +278,10 @@ int main(int argc, char **argv) {
       cases_path = value();
     else if (key == "--output")
       output = value();
+    else if (key == "--checkpoint")
+      checkpoint = value();
+    else if (key == "--checkpoint-minutes")
+      checkpoint_minutes = number();
     else if (key == "--dump-dir")
       dump = value();
     else if (key == "--settle-time")
@@ -282,35 +359,99 @@ int main(int argc, char **argv) {
             << " cut_cells=" << solver.cut_cells << " viscosity=" << solver.viscosity << " wall_model="
             << (solver.wall_model ? (solver.wall_momentum ? "log-law" : "log-law-loads-only") : "laminar")
             << " S=" << reference.area << " b=" << reference.span << " mac=" << reference.chord << std::endl;
-  std::ofstream csv(output);
+  Progress saved;
+  const std::string fields_path = checkpoint + "/fields.bin", progress_path = checkpoint + "/progress.txt";
+  bool resume = !checkpoint.empty() && LoadProgress(progress_path, saved) && saved.step &&
+                CheckpointStep(fields_path) == saved.step;
+  if (resume && saved.index >= cases.size()) {
+    std::cout << "All cases already completed in " << output << std::endl;
+    return 0;
+  }
+  if (resume)
+    std::cout << "resume case=" << cases[saved.index].name << " step=" << saved.step << std::endl;
+  // A run killed before its first case leaves an empty file; resume then needs
+  // the header too.
+  bool header = !resume;
+  if (resume) {
+    std::ifstream existing(output);
+    header = existing.peek() == std::ifstream::traits_type::eof();
+  }
+  std::ofstream csv(output, resume ? std::ios::app : std::ios::trunc);
   if (!csv) {
     std::cerr << "Cannot write " << output << '\n';
     return 1;
   }
-  csv << "case,angle,flap,aileron,elevator,rudder,speed,grid,h,viscosity,wall_model,t_start,t_end,steps,Fx,Fy,Fz,Mx,"
-         "My,Mz,CL,CD,CY,Cl,Cm,Cn,LD,CL_spread,CD_spread,dCL,dCD,dCY,dCl,dCm,dCn,max_pressure_cycles,max_residual,"
-         "wall_seconds,CDf,CDp,CD_fuselage,CD_wing,CD_htail,CD_vtail,CD_nacelle,CL_fuselage,CL_wing,CL_htail,"
-         "CL_vtail,CL_nacelle\n";
+  if (header)
+    csv << "case,angle,flap,aileron,elevator,rudder,speed,grid,h,viscosity,wall_model,t_start,t_end,steps,Fx,Fy,Fz,Mx,"
+           "My,Mz,CL,CD,CY,Cl,Cm,Cn,LD,CL_spread,CD_spread,dCL,dCD,dCY,dCl,dCm,dCn,max_pressure_cycles,max_residual,"
+           "wall_seconds,CDf,CDp,CD_fuselage,CD_wing,CD_htail,CD_vtail,CD_nacelle,CL_fuselage,CL_wing,CL_htail,"
+           "CL_vtail,CL_nacelle\n";
+  // Flushed now: a preempted job is killed without flushing its buffers.
+  csv.flush();
 
   const double q = 0.5 * 1.225 * double(base.speed) * base.speed;
   double base_coefficients[6]{};
-  auto start_clock = std::chrono::steady_clock::now();
-  simulation->Configure(cases[0].controls, false);
+  auto start_clock = std::chrono::steady_clock::now(), last_checkpoint = start_clock;
+  const size_t first_index = resume ? saved.index : 0;
+  if (resume) {
+    std::copy(saved.base, saved.base + 6, base_coefficients);
+    simulation->Restore(fields_path);
+  }
+  simulation->Configure(cases[first_index].controls, false);
   simulation->Reset();
-  uint64_t generation_seen = 0;
-  for (size_t index = 0; index < cases.size(); ++index) {
+  uint64_t generation_seen = 0, checkpoint_step = resume ? saved.step : 0;
+  for (size_t index = first_index; index < cases.size(); ++index) {
     const auto &c = cases[index];
     auto case_clock = std::chrono::steady_clock::now();
     simulation->Configure(c.controls, false);
     double switch_time = -1;
     float wait = index ? case_time : settle_time + case_time;
-    constexpr int quarters = 4;
     Window marks[quarters + 1];
     int next_mark = 0, max_cycles = 0, fast_steps = 0;
     float max_residual = 0;
     uint64_t first_step = 0, last_step = 0, previous_step = ~uint64_t(0);
+    if (resume && index == saved.index) {
+      switch_time = saved.switch_time;
+      next_mark = saved.next_mark;
+      max_cycles = saved.max_cycles;
+      max_residual = saved.max_residual;
+      first_step = saved.first_step;
+      last_step = saved.last_step;
+      std::copy(saved.marks, saved.marks + quarters + 1, marks);
+      resume = false;
+    }
+    auto progress = [&](uint64_t step, size_t at) {
+      Progress p;
+      p.index = at;
+      p.step = step;
+      std::copy(base_coefficients, base_coefficients + 6, p.base);
+      if (at == index) {
+        p.switch_time = switch_time;
+        p.next_mark = next_mark;
+        p.max_cycles = max_cycles;
+        p.max_residual = max_residual;
+        p.first_step = first_step;
+        p.last_step = last_step;
+        std::copy(marks, marks + quarters + 1, p.marks);
+      }
+      return p;
+    };
     auto last_report = std::chrono::steady_clock::now();
     while (next_mark <= quarters) {
+      if (!checkpoint.empty() &&
+          std::chrono::steady_clock::now() - last_checkpoint > std::chrono::duration<float>(60 * checkpoint_minutes)) {
+        last_checkpoint = std::chrono::steady_clock::now();
+        // Taken before the request: every recorded mark predates the
+        // checkpointed step, and later marks are retaken after a resume.
+        Progress p = progress(0, index);
+        if (uint64_t step = simulation->Checkpoint(fields_path)) {
+          p.step = checkpoint_step = step;
+          bool saved_progress = SaveProgress(progress_path, p);
+          std::cout << "checkpoint step=" << step << (saved_progress ? "" : " (progress not saved)") << std::endl;
+        } else {
+          std::cerr << "Checkpoint failed\n";
+        }
+      }
       if (!simulation->Error().empty()) {
         std::cerr << "Solver error: " << simulation->Error() << '\n';
         return 1;
@@ -415,6 +556,8 @@ int main(int argc, char **argv) {
       }
     csv << line << breakdown << '\n';
     csv.flush();
+    if (checkpoint_step)
+      SaveProgress(progress_path, progress(checkpoint_step, index + 1));
     std::cout << "case " << line << breakdown << std::endl;
   }
   std::cout << "total_seconds=" << std::chrono::duration<double>(std::chrono::steady_clock::now() - start_clock).count()
