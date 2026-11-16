@@ -1232,3 +1232,28 @@ Jobs 2001330/2001331 run static adaptive grid 192 with padding 8/16 respectively
 model as the completed 192-resolution reference, and will be compared over the
 same 2--6 second window. Expanded protection must still demonstrate both load
 accuracy and useful cost reduction; no acceptance is inferred from cell counts.
+
+### Distributed pressure hierarchy assembly
+
+PressureHierarchy builds immutable host CSR levels for the two-point
+preconditioner with the standard pressure boundary mask. Active cells aggregate
+geometrically at doubling widths; inactive cells remain fine identity rows and
+have no coarse parent. Restriction sums integrated residuals and prolongation
+is constant, giving R=P^T and A_coarse=P^T A_fine P. The hierarchy stops at at
+most 64 unknowns or an identity operator; failed builds retain the old levels.
+Fine ownership comes from PressurePartition. Coarse ownership is balanced in
+aggregate-ID order and may leave ranks empty on small coarse levels.
+
+Per-level directed import plans include owned matrix-row columns, fine children
+needed by coarse owners for restriction, and coarse parents needed by fine
+owners for prolongation. The latter two requirements are distinct from matrix
+halos and explicitly tested with NaN-initialized unavailable entries.
+
+Forty CPU configurations cover uniform/mixed meshes, open/cut geometry, uniform
+all-solid identity, two scales and 1/2/4/8 ranks. Tests verify the independent
+fine face stencil, Galerkin actions, adjoint transfers, positive sampled energy,
+ownership, complete A/R/P imports and failure rollback. Direct Release,
+ASan+UBSan and the standard CMake/CTest target passed (CTest 0.13 s, built using
+the existing allocation 2001306 without requesting additional GPUs). This is
+host assembly only: GPU V-cycle kernels, coarse solve, integration and measured
+iteration/performance improvement are still pending.
