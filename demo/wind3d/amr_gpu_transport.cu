@@ -71,6 +71,8 @@ struct Field {
   HaloSite *sites{};
   double *halo{};
   int halo_count{};
+  bool prescribed_inlet{};
+  double inlet_speed{};
 
   __device__ int Find(int x, int y, int z) const {
     for (int level = max_level; level >= 0; --level) {
@@ -145,6 +147,14 @@ struct Field {
     return Clamp(value, limits_[cell][2 * axis], limits_[cell][2 * axis + 1]);
   }
 
+  __device__ double VirtualInlet(Array<double, 3> point, int axis) const {
+    bool reflected = prescribed_inlet && point[0] < origin_[0];
+    if (reflected)
+      point[0] = 2 * origin_[0] - point[0];
+    double value = VirtualFace(point, axis);
+    return reflected ? 2 * (axis == 0 ? inlet_speed : 0) - value : value;
+  }
+
   __device__ double DirectComponent(Array<double, 3> point, int axis, bool cubic, double spacing = 0) const {
     for (int a = 0; a < 3; ++a) {
       if (!isfinite(point[a]))
@@ -167,8 +177,9 @@ struct Field {
       Array<double, 3> p{};
       for (int a = 0; a < 3; ++a) {
         p[a] = fma(base[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]);
-        p[a] = Clamp(p[a], origin_[a] + (a == axis ? 0 : .5 * h),
-                     origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
+        if (a != 0 || !prescribed_inlet || p[a] >= origin_[0])
+          p[a] = Clamp(p[a], origin_[a] + (a == axis ? 0 : .5 * h),
+                       origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
       }
       return p;
     };
@@ -187,7 +198,7 @@ struct Field {
           for (int y = 0; y < 4; ++y) {
             double values[4];
             for (int x = 0; x < 4; ++x)
-              values[x] = VirtualFace(corner_point(x - 1, y - 1, z - 1), axis);
+              values[x] = VirtualInlet(corner_point(x - 1, y - 1, z - 1), axis);
             rows[y] = Cubic(values[0], values[1], values[2], values[3], fraction[0]);
           }
           planes[z] = Cubic(rows[0], rows[1], rows[2], rows[3], fraction[1]);
@@ -207,9 +218,10 @@ struct Field {
             weight *= corner[a] ? fraction[a] : 1 - fraction[a];
             double lower = origin_[a] + (a == axis ? 0 : .5 * h),
                    upper = origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h);
-            p[a] = Clamp(p[a], lower, upper);
+            if (a != 0 || !prescribed_inlet || p[a] >= origin_[0])
+              p[a] = Clamp(p[a], lower, upper);
           }
-          double value = VirtualFace(p, axis);
+          double value = VirtualInlet(p, axis);
           result += weight * value;
           int f = NativeFace(p, axis);
           double aperture = f < 0 ? 1 : faces[f].aperture;
@@ -231,6 +243,9 @@ struct Field {
       p[a] =
           Clamp(fma(lower[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]), origin_[a] + (a == axis ? 0 : .5 * h),
                 origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
+    double raw_x = fma(lower[0] + corner[0] + (axis == 0 ? 0 : .5), h, origin_[0]);
+    if (prescribed_inlet && raw_x < origin_[0])
+      p[0] = raw_x;
     return p;
   }
 
@@ -246,6 +261,7 @@ struct Field {
   __device__ double StencilValue(int cell, const double *base, int x, int y, int z, int axis, double spacing = 0)
       const {
     double h = spacing > 0 ? spacing : cells[cell].width;
+    bool ghost = prescribed_inlet && fma(base[0] + x + (axis == 0 ? 0 : .5), h, origin_[0]) < origin_[0];
     if (halo && h == cells[cell].width) {
       int index = StencilIndex(cell, base, x, y, z, axis);
       if (index >= 0)
@@ -253,11 +269,13 @@ struct Field {
     }
     int corner[3]{x, y, z};
     Array<double, 3> p;
-    for (int a = 0; a < 3; ++a)
-      p[a] =
-          Clamp(fma(base[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]), origin_[a] + (a == axis ? 0 : .5 * h),
-                origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
-    return VirtualFace(p, axis);
+    for (int a = 0; a < 3; ++a) {
+      p[a] = fma(base[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]);
+      if (a != 0 || !ghost)
+        p[a] = Clamp(p[a], origin_[a] + (a == axis ? 0 : .5 * h),
+                     origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
+    }
+    return VirtualInlet(p, axis);
   }
 
   __device__ int FaceCell(Face face) const {
@@ -283,6 +301,7 @@ struct Field {
     if (spacing > 0 && spacing != cells[cell].width)
       return DirectComponent(point, axis, cubic, spacing);
     double h = cells[cell].width, base[3], fraction[3];
+
     for (int a = 0; a < 3; ++a) {
       double q = (point[a] - origin_[a]) / h - (a == axis ? 0 : .5);
       base[a] = floor(q);
@@ -292,6 +311,8 @@ struct Field {
     if (StencilIndex(cell, base, -1, -1, -1, axis) < 0 || StencilIndex(cell, base, 2, 2, 2, axis) < 0)
       return DirectComponent(point, axis, cubic, spacing);
     int side = n + 5, origin_index = StencilIndex(cell, base, 0, 0, 0, axis);
+    if (prescribed_inlet && base[0] + (axis == 0 ? 0 : .5) < 0)
+      cubic = false;
     if (cubic) {
       for (int z = 0; z < 2; ++z)
         for (int y = 0; y < 2; ++y)
@@ -320,6 +341,8 @@ struct Field {
       for (int y = 0; y < 2; ++y)
         for (int x = 0; x < 2; ++x) {
           int corner[3]{x, y, z}, index = origin_index + (z * side + y) * side + x, native = sites[index].native;
+          if (prescribed_inlet && base[0] + x + (axis == 0 ? 0 : .5) < 0)
+            native = -1;
           double weight = 1;
           for (int a = 0; a < 3; ++a)
             weight *= corner[a] ? fraction[a] : 1 - fraction[a];
@@ -359,6 +382,12 @@ __global__ void FillHalos(Field f) {
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index >= f.halo_count)
     return;
+  int ghost_axis;
+  auto ghost_point = f.HaloPoint(index, ghost_axis);
+  if (f.prescribed_inlet && ghost_point[0] < f.origin_[0]) {
+    f.halo[index] = f.VirtualInlet(ghost_point, ghost_axis);
+    return;
+  }
   auto site = f.sites[index];
   double value = 0;
   if (site.native >= 0)
@@ -866,12 +895,17 @@ bool GpuTransport::AdvectDevice(const double *velocity,
                                 size_t faces,
                                 double dt,
                                 bool cubic,
-                                bool corrected) {
+                                bool corrected,
+                                std::optional<double> inlet_speed) {
   if (!impl_ || !velocity || !destination || faces != size_t(impl_->fields[0].nf) || !std::isfinite(dt))
+    return false;
+  if (inlet_speed && !std::isfinite(*inlet_speed))
     return false;
   auto &w = *impl_;
   w.error.clear();
   auto a = w.fields[0], b = w.fields[1];
+  a.prescribed_inlet = b.prescribed_inlet = inlet_speed.has_value();
+  a.inlet_speed = b.inlet_speed = inlet_speed.value_or(0);
   int blocks = (a.nf + 255) / 256;
   if (!w.Check(cudaSetDevice(w.device)) ||
       !w.Check(cudaMemcpy(a.velocity_, velocity, faces * sizeof(double), cudaMemcpyDeviceToDevice)) ||
@@ -914,7 +948,7 @@ AdvanceResult GpuTransport::AdvanceDevice(GpuProjection &projection,
     return result;
   auto &w = *impl_;
   auto transport_start = std::chrono::steady_clock::now();
-  if (!AdvectDevice(velocity, w.result, faces, dt, cubic, true))
+  if (!AdvectDevice(velocity, w.result, faces, dt, cubic, true, speed))
     return result;
   auto f = w.fields[0];
   int fb = (f.nf + 255) / 256, cb = (f.nc + 255) / 256;

@@ -18,11 +18,16 @@ double Cubic(double f0, double f1, double f2, double f3, double t) {
 }
 }  // namespace
 
-FaceField::FaceField(const Mesh &mesh, const Topology &tree, double root_width, std::array<double, 3> origin)
+FaceField::FaceField(const Mesh &mesh,
+                     const Topology &tree,
+                     double root_width,
+                     std::array<double, 3> origin,
+                     std::optional<double> inlet_speed)
     : mesh_(mesh),
       tree_(tree),
       root_width_(root_width),
-      origin_(origin) {
+      origin_(origin),
+      inlet_speed_(inlet_speed) {
 }
 
 int FaceField::CellAt(std::array<double, 3> point) const {
@@ -86,6 +91,8 @@ bool FaceField::ExtendSlip(std::vector<double> &velocity) const {
 }
 
 bool FaceField::Update(const std::vector<double> &velocity) {
+  if (inlet_speed_ && !std::isfinite(*inlet_speed_))
+    return false;
   if (velocity.size() != mesh_.Faces().size() || mesh_.Cells().empty() || !(root_width_ > 0) ||
       !std::isfinite(root_width_))
     return false;
@@ -204,6 +211,14 @@ double FaceField::VirtualFace(std::array<double, 3> point, int axis) const {
   return std::clamp(value, limits_[cell][2 * axis], limits_[cell][2 * axis + 1]);
 }
 
+double FaceField::VirtualInlet(std::array<double, 3> point, int axis) const {
+  bool reflected = inlet_speed_ && point[0] < origin_[0];
+  if (reflected)
+    point[0] = 2 * origin_[0] - point[0];
+  double value = VirtualFace(point, axis);
+  return reflected ? 2 * (axis == 0 ? *inlet_speed_ : 0) - value : value;
+}
+
 double FaceField::Component(std::array<double, 3> point, int axis, bool cubic, double spacing) const {
   for (int a = 0; a < 3; ++a) {
     if (!std::isfinite(point[a]))
@@ -228,8 +243,9 @@ double FaceField::Component(std::array<double, 3> point, int axis, bool cubic, d
     std::array<double, 3> p{};
     for (int a = 0; a < 3; ++a) {
       p[a] = std::fma(base[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]);
-      p[a] = std::clamp(p[a], origin_[a] + (a == axis ? 0 : .5 * h),
-                        origin_[a] + tree_.Roots()[a] * root_width_ - (a == axis ? 0 : .5 * h));
+      if (a != 0 || !inlet_speed_ || p[a] >= origin_[0])
+        p[a] = std::clamp(p[a], origin_[a] + (a == axis ? 0 : .5 * h),
+                          origin_[a] + tree_.Roots()[a] * root_width_ - (a == axis ? 0 : .5 * h));
     }
     return p;
   };
@@ -248,7 +264,7 @@ double FaceField::Component(std::array<double, 3> point, int axis, bool cubic, d
         for (int y = 0; y < 4; ++y) {
           double values[4];
           for (int x = 0; x < 4; ++x)
-            values[x] = VirtualFace(corner_point(x - 1, y - 1, z - 1), axis);
+            values[x] = VirtualInlet(corner_point(x - 1, y - 1, z - 1), axis);
           rows[y] = Cubic(values[0], values[1], values[2], values[3], fraction[0]);
         }
         planes[z] = Cubic(rows[0], rows[1], rows[2], rows[3], fraction[1]);
@@ -268,9 +284,10 @@ double FaceField::Component(std::array<double, 3> point, int axis, bool cubic, d
           weight *= corner[a] ? fraction[a] : 1 - fraction[a];
           double lower = origin_[a] + (a == axis ? 0 : .5 * h),
                  upper = origin_[a] + tree_.Roots()[a] * root_width_ - (a == axis ? 0 : .5 * h);
-          p[a] = std::clamp(p[a], lower, upper);
+          if (a != 0 || !inlet_speed_ || p[a] >= origin_[0])
+            p[a] = std::clamp(p[a], lower, upper);
         }
-        double value = VirtualFace(p, axis);
+        double value = VirtualInlet(p, axis);
         result += weight * value;
         int f = NativeFace(p, axis);
         double aperture = f < 0 ? 1 : mesh_.Faces()[f].aperture;

@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "amr_advance.h"
@@ -23,13 +24,15 @@ class GpuTransport {
              bool cache_halos = true);
   // Default-stream operation on caller-owned buffers on the Build device.
   // Applies two-layer slip extension before tracing. Input/output may alias.
+  // Optional inlet speed prescribes mirrored upstream samples for this call only.
   // Numerical failure leaves destination unchanged; CUDA error contents are unspecified.
   bool AdvectDevice(const double *velocity,
                     double *destination,
                     size_t faces,
                     double dt,
                     bool cubic = true,
-                    bool corrected = true);
+                    bool corrected = true,
+                    std::optional<double> inlet_speed = std::nullopt);
   // Projection must be built for the same device and mesh. Velocity and
   // physical pressure are disjoint caller-owned buffers; only successful
   // steps commit them. Default stream, as for AdvectDevice.

@@ -20,7 +20,7 @@ AdvanceResult AdvanceReference(const Mesh &mesh,
   AdvanceResult result;
   if (!(dt > 0) || !std::isfinite(dt) || !(density > 0) || !std::isfinite(density) || !std::isfinite(speed))
     return result;
-  FaceField field(mesh, tree, root_width, origin);
+  FaceField field(mesh, tree, root_width, origin, speed);
   auto extended = velocity;
   if (!field.ExtendSlip(extended) || !field.Update(extended))
     return result;

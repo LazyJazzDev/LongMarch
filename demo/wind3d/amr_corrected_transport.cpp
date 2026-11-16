@@ -9,7 +9,7 @@ bool FaceField::AdvectCorrected(double dt, std::vector<double> &destination, boo
   std::vector<double> forward;
   if (!Advect(dt, forward, cubic))
     return false;
-  FaceField transported(mesh_, tree_, root_width_, origin_);
+  FaceField transported(mesh_, tree_, root_width_, origin_, inlet_speed_);
   auto extended = forward;
   if (!transported.ExtendSlip(extended) || !transported.Update(extended))
     return false;
@@ -50,10 +50,11 @@ bool FaceField::AdvectCorrected(double dt, std::vector<double> &destination, boo
           std::array<double, 3> p{};
           for (int a = 0; a < 3; ++a) {
             p[a] = std::fma(base[a] + corner[a] + (a == face.axis ? 0 : .5), h, origin_[a]);
-            p[a] = std::clamp(p[a], origin_[a] + (a == face.axis ? 0 : .5 * h),
-                              origin_[a] + tree_.Roots()[a] * root_width_ - (a == face.axis ? 0 : .5 * h));
+            if (a != 0 || !inlet_speed_ || p[a] >= origin_[0])
+              p[a] = std::clamp(p[a], origin_[a] + (a == face.axis ? 0 : .5 * h),
+                                origin_[a] + tree_.Roots()[a] * root_width_ - (a == face.axis ? 0 : .5 * h));
           }
-          double value = VirtualFace(p, face.axis);
+          double value = VirtualInlet(p, face.axis);
           low = std::min(low, value);
           high = std::max(high, value);
         }

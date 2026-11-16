@@ -1,4 +1,6 @@
 #pragma once
+#include <optional>
+
 #include "amr_mesh.h"
 
 namespace wind3d::amr {
@@ -7,7 +9,12 @@ namespace wind3d::amr {
 // linear reconstruction. Geometry must remain unchanged during sampling.
 class FaceField {
  public:
-  FaceField(const Mesh &mesh, const Topology &tree, double root_width, std::array<double, 3> origin);
+  // Optional freestream inlet mirrors upstream samples; omission retains clamped sampling.
+  FaceField(const Mesh &mesh,
+            const Topology &tree,
+            double root_width,
+            std::array<double, 3> origin,
+            std::optional<double> inlet_speed = std::nullopt);
   bool ExtendSlip(std::vector<double> &velocity) const;
   bool Update(const std::vector<double> &velocity);
   std::array<double, 3> Sample(std::array<double, 3> point) const;
@@ -25,6 +32,7 @@ class FaceField {
 
  private:
   int CellAt(std::array<double, 3> point) const;
+  double VirtualInlet(std::array<double, 3> point, int axis) const;
   double VirtualFace(std::array<double, 3> point, int axis) const;
   double Component(std::array<double, 3> point, int axis, bool cubic = false, double spacing = 0) const;
   int NativeFace(std::array<double, 3> point, int axis) const;
@@ -32,6 +40,7 @@ class FaceField {
   const Topology &tree_;
   double root_width_;
   std::array<double, 3> origin_;
+  std::optional<double> inlet_speed_;
   std::vector<double> velocity_;
   std::vector<std::array<double, 3>> centres_;
   std::vector<std::array<double, 9>> slopes_;

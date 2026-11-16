@@ -962,3 +962,47 @@ mean transfer time fell from 0.4161 to 0.3816 seconds for a constant field and
 from 0.4789 to 0.4354 seconds for a perturbed field. These local measurements
 are noisy and do not establish whole-simulation speedup. Raw paired data and
 prototype sources remain under `out/wind3d-amr`.
+
+
+## Scoped inlet implementation and remaining validation limits
+
+`FaceField` now accepts an optional freestream inlet speed. Upstream stencil
+samples reflect about the inlet plane with `2 * prescribed - interior` values,
+including the MacCormack reverse pass and limiter. CPU `AdvanceReference` and
+GPU `AdvanceDevice` select this boundary for physical stepping. Standalone
+sampling/transfer remains clamped unless explicitly requested. GPU
+`AdvectDevice` accepts the same optional speed and sets it only on local field
+copies, so success or failure cannot leave an inlet setting on later calls.
+The persistent halo mapping stays boundary-independent; each transport pass
+fills reflected halo values as required. No velocity is overwritten after
+projection. Diffusion's existing boundary treatment is unchanged.
+
+Job 2001298 passed all eighteen AMR tests. Expanded transport comparisons cover
+three spacings, embedded/unembedded mixed meshes, omitted/positive/negative
+inlet speed, linear/cubic interpolation, corrected/uncorrected stepping and
+zero, tiny, positive and negative steps. CPU/GPU differences stayed below
+1e-15 and cached/direct differences were zero. Invalid speed rollback and
+subsequent standalone calls are checked. An analytical CPU test verifies zero
+tangential inlet velocity for a constant interior field. A follow-up run with
+explicitly matched cubic options in the standalone-call check also passed.
+Compute Sanitizer reported zero memory errors. The production 1200-step
+aircraft smoke run completed with three regrids and physical CSV fields
+identical to the cached prototype. Job 2001298 succeeded; this validation
+does not establish long-window aircraft load acceptance.
+
+The direct-inlet static aircraft run (2001289) completed six seconds. In the
+2--6 s window its Fx/Fy/Mz means were 31.674/36.475/-29.187; peak speed was
+44.954 m/s. My changed by 10.650 between half-windows, so inlet isolation has
+not resolved all aircraft drift. Cadence-500 and cadence-1000 runs completed
+with Fy means 45.244 and 40.758 N, and approximate 0.5 s batch standard errors
+2.898 and 1.620 N. These uncertainties alone are too large to certify a 2%
+load comparison; short-window proximity is not acceptance. Their wall costs
+were 141.089 and 128.662 seconds per physical second, using the direct inlet
+prototype. Await the matching uniform/dynamic full windows before comparison.
+
+The older-geometry grid-192 uniform run (2001265) also completed. Its Fx/Fy/Mz
+means were 21.754/93.230/-29.797, versus 17.845/13.003/-14.264 at grid 128.
+These are historical pre-repair results and cannot serve as the corrected
+geometry baseline. Jobs 2001300/2001301 repeat static/uniform grid 192 with
+corrected thin-cell geometry and cached inlet sampling. Resolution convergence,
+long-window stationarity, the control envelope and overall speedup remain open.

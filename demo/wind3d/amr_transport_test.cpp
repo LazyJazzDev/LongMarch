@@ -18,6 +18,14 @@ int Run(double width) {
     u[i] = mesh.Faces()[i].axis == 0 ? .7 : mesh.Faces()[i].axis == 1 ? .2 : -.1;
   if (!field.Update(u))
     return 3;
+  FaceField inlet(mesh, tree, width, {-width, -width, -width}, .7);
+  if (!inlet.Update(u))
+    return 11;
+  for (double y : {-.6 * width, .4 * width}) {
+    auto boundary = inlet.Sample({-width, y, .2 * width});
+    if (std::abs(boundary[0] - .7) > 1e-12 || std::abs(boundary[1]) > 1e-12 || std::abs(boundary[2]) > 1e-12)
+      return 12;
+  }
   std::vector<double> moved;
   if (!field.Advect(.01 * width, moved))
     return 4;
