@@ -299,8 +299,23 @@ them as part of an experiment without a new reason/authorization.
   old-generation snapshots; destruction wakes a producer blocked by a full
   queue. Job 2001223 passed slow-consumer, reset, shutdown and load-history tests,
   native lifecycle validation, and bitwise before/after field-dump comparison.
-  The restarted 30,000-step baseline is still being collected; these tests do
-  not by themselves establish steady-load acceptance.
+  The restarted 30,000-step baseline completed with contiguous CSV samples;
+  its original 12,362-step prefix retained identical loads and clocks. This
+  sampling regression does not by itself establish steady-load acceptance.
+- Completed six-second grid-128 native and AMR-uniform runs (jobs 2001223 and
+  2001221) do not establish the 2% gate. In the common 2-6 second window,
+  native mean Fx/Fy/Mz were 17.8371 / 13.3289 / -15.0727; AMR-uniform means
+  were 17.7253 / 12.6388 / -13.7308. Differences relative to native magnitudes
+  are -0.63% / -5.18% / +8.90%. Native Fy and Mz half-window drift was
+  0.9555 / 1.1596; AMR-uniform drift was -0.5783 / 0.5634. Sampling uncertainty
+  and nonstationarity prevent interpreting those differences as settled bias,
+  but they also prevent claiming equivalence. Uniform AMR already differs
+  before any grid adaptation: boundary/numerical parity and longer-time
+  statistics must be resolved alongside adaptive transfer. Native consumed
+  14.01 wall seconds per physical second versus 158.58 for AMR-uniform in this
+  window; differing pressure tolerances remain a comparison limitation.
+  Physical windows use compensated sums of dt to avoid float display-clock
+  drift. Dynamic and fixed adaptive-hierarchy controls are still running.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 
