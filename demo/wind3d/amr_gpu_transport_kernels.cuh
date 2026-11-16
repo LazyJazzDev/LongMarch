@@ -89,6 +89,8 @@ struct Field {
     return owned_cells ? (i < cell_count ? owned_cells[i] : -1) : (i < nc ? i : -1);
   }
 
+  // Optional compact halo block IDs and global-block-to-cache map.
+  const int *halo_blocks{}, *halo_indices{};
   HaloSite *sites{};
   double *halo{};
   int halo_count{};
@@ -254,6 +256,8 @@ struct Field {
 
   __device__ Array<double, 3> HaloPoint(int index, int &axis) const {
     int side = n + 5, cube = side * side * side, block = index / (3 * cube), slot = index % cube;
+    if (halo_blocks)
+      block = halo_blocks[block];
     axis = (index / cube) % 3;
     auto b = leaves[block];
     int lower[3]{b.x * n, b.y * n, b.z * n};
@@ -276,6 +280,11 @@ struct Field {
     int i = int(base[0]) - b.x * n + x + 2, j = int(base[1]) - b.y * n + y + 2, k = int(base[2]) - b.z * n + z + 2;
     if (i < 0 || i >= side || j < 0 || j >= side || k < 0 || k >= side)
       return -1;
+    if (halo_indices) {
+      block = halo_indices[block];
+      if (block < 0)
+        return -1;
+    }
     return (block * 3 + axis) * side * side * side + (k * side + j) * side + i;
   }
 

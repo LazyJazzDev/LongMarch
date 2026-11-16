@@ -128,7 +128,7 @@ struct GpuDistributedTransport::Impl {
 
   bool Prepare(int field, bool reconstruct = true) {
     // Every stage completes on all owners before any peer reads its results.
-    for (int stage = 0; stage < (reconstruct ? 5 : 3); ++stage) {
+    for (int stage = 0; stage < (reconstruct ? 6 : 3); ++stage) {
       for (size_t r = 0; r < ranks.size(); ++r) {
         auto &rank = ranks[r];
         auto f = rank.fields[field];
@@ -141,8 +141,10 @@ struct GpuDistributedTransport::Impl {
           Extend<<<fb, 256, 0, rank.stream>>>(f, rank.neighbors, rank.layers, stage);
         else if (stage == 3)
           Centres<<<cb, 256, 0, rank.stream>>>(f);
-        else
+        else if (stage == 4)
           Slopes<<<cb, 256, 0, rank.stream>>>(f);
+        else if (f.halo_count)
+          FillHalos<<<(f.halo_count + 255) / 256, 256, 0, rank.stream>>>(f);
         if (!Check(cudaGetLastError()))
           return false;
       }
@@ -255,12 +257,36 @@ bool GpuDistributedTransport::Build(const Mesh &mesh,
       return fail();
     f.slopes_.owners = f.limits_.owners = f.centres_.owners;
     f.slopes_.indices = f.limits_.indices = f.centres_.indices;
+    // Cache blocks used by owned faces; remote/long traces retain direct sampling.
+    std::set<int> blocks;
+    int cells_per_block = f.n * f.n * f.n;
+    for (int id : partition.OwnedFaces()[r]) {
+      auto face = faces[id];
+      int cell = face.low < 0                                      ? face.high
+                 : face.high < 0                                   ? face.low
+                 : cells[face.low].width <= cells[face.high].width ? face.low
+                                                                   : face.high;
+      blocks.insert(cell / cells_per_block);
+    }
+    std::vector<int> halo_blocks(blocks.begin(), blocks.end()), halo_indices(f.nb, -1);
+    for (size_t i = 0; i < halo_blocks.size(); ++i)
+      halo_indices[halo_blocks[i]] = int(i);
+    size_t side = size_t(f.n) + 5, count = halo_blocks.size() * 3 * side * side * side;
+    if (count > size_t(INT_MAX - 255)) {
+      next->error = "Distributed transport halo index capacity exceeded";
+      return fail();
+    }
+    f.halo_count = int(count);
+    if (!next->Upload(device, f.halo_blocks, halo_blocks) || !next->Upload(device, f.halo_indices, halo_indices) ||
+        !next->Allocate(device, f.sites, count))
+      return fail();
     rank.fields[1] = f;
     for (auto &field : rank.fields)
       if (!next->Allocate(device, field.velocity_.local, f.face_count) ||
           !next->Allocate(device, field.centres_.local, f.cell_count) ||
           !next->Allocate(device, field.slopes_.local, f.cell_count) ||
-          !next->Allocate(device, field.limits_.local, f.cell_count))
+          !next->Allocate(device, field.limits_.local, f.cell_count) ||
+          !next->Allocate(device, field.halo, f.halo_count))
         return fail();
     if (!next->Allocate(device, rank.neighbors, size_t(f.nf) * 6) || !next->Allocate(device, rank.layers, f.nf) ||
         !next->Allocate(device, rank.bad, 1) || !next->Allocate(device, rank.result, f.face_count) ||
@@ -270,6 +296,10 @@ bool GpuDistributedTransport::Build(const Mesh &mesh,
       return fail();
     // Complete pageable metadata uploads before the nonblocking stream reads.
     if (!next->Check(cudaDeviceSynchronize()))
+      return fail();
+    if (f.halo_count)
+      MapHalos<<<(f.halo_count + 255) / 256, 256, 0, rank.stream>>>(f);
+    if (!next->Check(cudaGetLastError()))
       return fail();
     SlipNeighbors<<<(f.nf + 255) / 256, 256, 0, rank.stream>>>(f, rank.neighbors, rank.layers);
     if (!next->Check(cudaGetLastError()))
