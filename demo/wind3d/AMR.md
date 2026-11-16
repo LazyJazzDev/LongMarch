@@ -284,6 +284,13 @@ them as part of an experiment without a new reason/authorization.
   were 2.07e-5 in force and 1.0e-5 in moment over the 30 steps. These controlled
   startup comparisons support this kernel optimization, not steady-load
   acceptance or speedup over the original uniform backend.
+- Conservative remapping uses hash lookup for integer face keys and ancestor
+  flux sums. Accumulation still follows source-face order; parent correction
+  order, wall-resolution checks and failure rollback are unchanged. Strict
+  CPU transfer tests and ASan/UBSan pass. In a local CPU diagnostic with 212,992
+  source cells and 56 additional leaf blocks, transfer time fell from 0.649 s
+  to 0.493 s and constant-flow output matched the ordered-map baseline bitwise.
+  This is a remapping microbenchmark, not a GPU or steady-load speedup claim.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

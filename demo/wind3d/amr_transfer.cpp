@@ -4,11 +4,21 @@
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <unordered_map>
 
 namespace wind3d::amr {
 namespace {
 // Axis, normal plane, two tangential lower corners and face side in finest units.
 using Key = std::array<int64_t, 5>;
+
+struct KeyHash {
+  size_t operator()(const Key &key) const {
+    size_t hash = 0;
+    for (int64_t value : key)
+      hash ^= std::hash<int64_t>{}(value) + size_t(0x9e3779b97f4a7c15ULL) + (hash << 6) + (hash >> 2);
+    return hash;
+  }
+};
 
 struct Sum {
   double area{}, open{}, flux{};
@@ -79,8 +89,11 @@ bool TransferVelocity(const Mesh &source,
     return false;
   const int64_t max_scale = int64_t(1) << std::max(source_tree.MaxLevel(), target_tree.MaxLevel());
   double unit = width / (source.CellsPerBlock() * double(max_scale));
-  std::map<Key, size_t> native;
-  std::map<Key, Sum> sums;
+  // Hash lookup changes no arithmetic order: accumulate in source-face order.
+  std::unordered_map<Key, size_t, KeyHash> native;
+  std::unordered_map<Key, Sum, KeyHash> sums;
+  native.reserve(source.Faces().size());
+  sums.reserve(source.Faces().size());
   for (size_t i = 0; i < source.Faces().size(); ++i) {
     auto face = source.Faces()[i];
     Key key;
