@@ -1352,3 +1352,35 @@ single-device solver remained 0.006045 s. These separate shared-node job
 measurements show limited two-GPU improvement and do not establish scalable
 flow speedup. Launch/communication overhead and larger-mesh scaling still need
 measurement, alongside distributed transport and load-accuracy acceptance.
+
+### Larger mesh scaling and explicit peer access
+
+Job 2001346 completed the same four-repeat multilevel projection comparison on
+442,368 cells / 1,346,048 faces (16x8x12 root blocks, four cells per block,
+refining the x<8 half). All configurations took 35 iterations and verified a
+true relative residual about 8.48e-10. Distributed velocities matched the
+single-device multilevel reference within 2.23e-16. Excluding the first repeat,
+the optimized single-device solver took 0.014431 s; the distributed implementation
+took 0.033596/0.134819/0.326778 s on 1/2/4 GPUs. Larger size alone did not produce
+positive scaling.
+
+Job 2001347 isolated peer-access initialization in separate benchmark processes
+on one four-GPU allocation. The topology reported NV18 links between every GPU
+pair. Each process ran the same mesh/solver, with the middle process explicitly
+enabling every directed CUDA peer-access pair before allocation. Baseline
+processes ran before and after it; production code was unchanged.
+
+| Implementation | Baseline before | Peer enabled | Baseline after |
+| --- | ---: | ---: | ---: |
+| Optimized single-device | 0.014594 | 0.014405 | 0.014583 |
+| Distributed, one GPU | 0.033889 | 0.033930 | 0.034162 |
+| Distributed, two GPUs | 0.139737 | 0.073811 | 0.137218 |
+| Distributed, four GPUs | 0.344826 | 0.206142 | 0.344122 |
+
+Values are warm mean seconds. Every repeat passed the same residual and field
+checks, and all three processes exited successfully. This supports explicitly
+initializing peer access at the future multi-GPU runtime boundary; merely
+checking cudaDeviceCanAccessPeer does not establish this performance behavior.
+It does not establish the internal transfer route, bandwidth, or eliminate the
+remaining scaling deficit. Library teardown must not disable another solver's
+process-wide peer-access state when this is integrated.
