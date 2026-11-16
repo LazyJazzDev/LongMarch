@@ -251,6 +251,18 @@ them as part of an experiment without a new reason/authorization.
   full-step and regrid tests and CUDA memcheck. Widths 1, 1.3 and 2/3, with and
   without embedded boundaries, now differ by at most 4.45e-16 between CPU/GPU;
   cached/direct GPU results agree exactly. Acceptance tolerances were unchanged.
+- CUDA Graph node profiling (job 2001214, grid 128, 12 startup steps)
+  identified V-cycle smoothing as 46.3% of GPU kernel time, followed by sparse
+  multiplication (11.7%) and residual evaluation (10.0%). Host dot-product
+  transfers also wait for queued work; their API duration must not be interpreted
+  as pure transfer overhead. The first Jacobi sweep of each V-cycle level now
+  directly initializes `0.65 * rhs / diagonal`, eliminating the zero-vector
+  matrix traversal and preceding memset while retaining the same sweep count.
+  Job 2001215 passed projection, full-step and regrid tests plus CUDA memcheck;
+  all six aircraft load components agreed within 1e-8 over 12 steps. Unprofiled
+  ordinary steps measured 17.26 ms, including 13.21 ms pressure. The older trace
+  includes profiler overhead, so these figures alone do not establish an
+  optimization speedup ratio or the full performance goal.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

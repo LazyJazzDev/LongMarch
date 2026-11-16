@@ -71,6 +71,13 @@ __global__ void CloseFaces(int count, const int *indices, double *velocity) {
     velocity[indices[i]] = 0;
 }
 
+// The first Jacobi sweep starts from zero: A*0 need not be read or evaluated.
+__global__ void FirstSmooth(int n, const double *diagonal, const double *rhs, double *next) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n)
+    next[i] = .65 * rhs[i] / diagonal[i];
+}
+
 __global__ void Smooth(Matrix a, const double *diagonal, const double *rhs, const double *x, double *next) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= a.rows)
@@ -331,11 +338,10 @@ struct GpuProjection::Impl {
       DenseSolve<<<blocks, 256, 0, stream>>>(count, level.inverse, level.rhs, level.x);
       return;
     }
-    Check(cudaMemsetAsync(level.x, 0, count * sizeof(double), stream));
-    for (int sweep = 0; sweep < 2; ++sweep) {
-      Smooth<<<blocks, 256, 0, stream>>>(level.a, level.diagonal, level.rhs, level.x, level.scratch);
-      std::swap(level.x, level.scratch);
-    }
+    FirstSmooth<<<blocks, 256, 0, stream>>>(count, level.diagonal, level.rhs, level.scratch);
+    std::swap(level.x, level.scratch);
+    Smooth<<<blocks, 256, 0, stream>>>(level.a, level.diagonal, level.rhs, level.x, level.scratch);
+    std::swap(level.x, level.scratch);
     Residual<<<blocks, 256, 0, stream>>>(level.a, level.rhs, level.x, level.residual);
     auto &coarse = levels[index + 1];
     Multiply<<<(coarse.a.rows + 255) / 256, 256, 0, stream>>>(level.restriction, level.residual, coarse.rhs);
