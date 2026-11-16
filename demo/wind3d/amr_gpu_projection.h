@@ -14,12 +14,15 @@ class GpuProjection {
   // Fixed linear aggregation V-cycle by default; false selects Jacobi for comparison.
   // Four threads share a matrix row by default; false retains scalar rows for comparison.
   // Compatible mode uses D M^-1 D^T with a two-point multilevel preconditioner.
+  // It uses CG by default; conjugate=false retains BiCGStab for comparison.
+  // The original nonsymmetric gradient always uses BiCGStab.
   bool Build(int device,
              const Mesh &mesh,
              const FaceGradient &gradient,
              bool multilevel = true,
              bool cooperative = true,
-             bool compatible = false);
+             bool compatible = false,
+             bool conjugate = true);
   ProjectionResult Project(std::vector<double> &velocity,
                            std::vector<double> &potential,
                            double tolerance = 1e-9,

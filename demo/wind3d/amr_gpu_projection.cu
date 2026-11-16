@@ -50,6 +50,18 @@ Search(int n, const double *r, double *p, const double *v, const double *d, doub
   phat[i] = p[i] / d[i];
 }
 
+__global__ void ConjugateDirection(int n, const double *z, double *direction, double beta) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n)
+    direction[i] = z[i] + beta * direction[i];
+}
+
+__global__ void DiagonalPrecondition(int n, const double *r, const double *diagonal, double *z) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n)
+    z[i] = r[i] / diagonal[i];
+}
+
 __global__ void Advance(int n,
                         const double *r,
                         const double *v,
@@ -145,7 +157,7 @@ using Rows = std::vector<std::map<int, double>>;
 
 struct GpuProjection::Impl {
   int device{}, n{}, nf{};
-  bool ok{true}, cooperative{true};
+  bool ok{true}, cooperative{true}, conjugate{true};
   std::string error;
   cublasHandle_t blas{};
   std::vector<void *> allocations;
@@ -476,10 +488,12 @@ bool GpuProjection::Build(int device,
                           const FaceGradient &gradient,
                           bool multilevel,
                           bool cooperative,
-                          bool compatible) {
+                          bool compatible,
+                          bool conjugate) {
   auto next = std::make_unique<Impl>();
   next->device = device;
   next->cooperative = cooperative;
+  next->conjugate = conjugate;
   auto fail = [&](const char *reason) {
     build_error_ = next->error.empty() ? reason : next->error;
     return false;
@@ -630,41 +644,85 @@ ProjectionResult GpuProjection::Solve(double tolerance, int max_iterations) {
   double rho_old = 1, alpha = 1, omega = 1;
   result.relative_residual = 1;
   int blocks = (w.n + 255) / 256;
-  for (int iteration = 0; iteration < max_iterations && w.ok; ++iteration) {
-    result.iterations = iteration + 1;
-    double rho = w.Dot(w.shadow, w.r);
-    if (!std::isfinite(rho) || std::abs(rho) < 1e-300 || std::abs(omega) < 1e-300)
-      break;
-    double beta = (rho / rho_old) * (alpha / omega);
-    Search<<<blocks, 256>>>(w.n, w.r, w.p, w.v, w.diagonal, w.phat, beta, omega);
-    w.Precondition(0);
-    w.Pressure(w.phat, w.v);
-    double divisor = w.Dot(w.shadow, w.v);
-    if (!std::isfinite(divisor) || std::abs(divisor) < 1e-300)
-      break;
-    alpha = rho / divisor;
-    Advance<<<blocks, 256>>>(w.n, w.r, w.v, w.diagonal, w.phat, w.s, w.shat, w.x, alpha);
-    if (std::sqrt(w.Dot(w.s, w.s)) / norm > tolerance) {
-      w.Precondition(1);
-      w.Pressure(w.shat, w.t);
-      auto products = w.DotPair(w.t, w.s);
-      double tt = products[0];
-      if (!std::isfinite(tt) || tt < 1e-300)
+  if (w.mass && w.conjugate) {
+    double previous = 0;
+    w.Check(cudaMemset(w.t, 0, w.n * sizeof(double)));
+    for (int iteration = 0; iteration < max_iterations && w.ok; ++iteration) {
+      result.iterations = iteration + 1;
+      copy(w.p, w.r);
+      DiagonalPrecondition<<<blocks, 256>>>(w.n, w.r, w.diagonal, w.phat);
+      w.Precondition(0);
+      double rho = w.Dot(w.r, w.phat);
+      if (!std::isfinite(rho) || rho <= 0)
         break;
-      omega = products[1] / tt;
-      Add<<<blocks, 256>>>(w.n, w.x, w.shat, omega);
+      ConjugateDirection<<<blocks, 256>>>(w.n, w.phat, w.t, previous > 0 ? rho / previous : 0);
+      w.Pressure(w.t, w.v);
+      double denominator = w.Dot(w.t, w.v);
+      if (!std::isfinite(denominator) || denominator <= 0)
+        break;
+      double step = rho / denominator;
+      Add<<<blocks, 256>>>(w.n, w.x, w.t, step);
+      Add<<<blocks, 256>>>(w.n, w.r, w.v, -step);
+      double recursive = std::sqrt(w.Dot(w.r, w.r)) / norm;
+      if (!std::isfinite(recursive))
+        break;
+      previous = rho;
+      // Verify candidates using the actual operator. Residual replacement also
+      // restarts the direction; never mix a new residual with old conjugacy.
+      if (recursive <= tolerance || (iteration + 1) % 50 == 0 || iteration + 1 == max_iterations) {
+        w.Pressure(w.x, w.ax);
+        Difference<<<blocks, 256>>>(w.n, w.rhs, w.ax, w.r);
+        result.relative_residual = std::sqrt(w.Dot(w.r, w.r)) / norm;
+        if (!std::isfinite(result.relative_residual))
+          break;
+        if (w.ok && result.relative_residual <= tolerance) {
+          result.converged = true;
+          break;
+        }
+        previous = 0;
+      }
     }
-    w.Pressure(w.x, w.ax);
-    Difference<<<blocks, 256>>>(w.n, w.rhs, w.ax, w.r);
-    result.relative_residual = std::sqrt(w.Dot(w.r, w.r)) / norm;
-    if (!std::isfinite(result.relative_residual))
-      break;
-    if (w.ok && result.relative_residual <= tolerance) {
-      result.converged = true;
-      break;
+    if (!result.converged && w.ok) {
+      w.Pressure(w.x, w.ax);
+      Difference<<<blocks, 256>>>(w.n, w.rhs, w.ax, w.r);
+      result.relative_residual = std::sqrt(w.Dot(w.r, w.r)) / norm;
     }
-    rho_old = rho;
-  }
+  } else
+    for (int iteration = 0; iteration < max_iterations && w.ok; ++iteration) {
+      result.iterations = iteration + 1;
+      double rho = w.Dot(w.shadow, w.r);
+      if (!std::isfinite(rho) || std::abs(rho) < 1e-300 || std::abs(omega) < 1e-300)
+        break;
+      double beta = (rho / rho_old) * (alpha / omega);
+      Search<<<blocks, 256>>>(w.n, w.r, w.p, w.v, w.diagonal, w.phat, beta, omega);
+      w.Precondition(0);
+      w.Pressure(w.phat, w.v);
+      double divisor = w.Dot(w.shadow, w.v);
+      if (!std::isfinite(divisor) || std::abs(divisor) < 1e-300)
+        break;
+      alpha = rho / divisor;
+      Advance<<<blocks, 256>>>(w.n, w.r, w.v, w.diagonal, w.phat, w.s, w.shat, w.x, alpha);
+      if (std::sqrt(w.Dot(w.s, w.s)) / norm > tolerance) {
+        w.Precondition(1);
+        w.Pressure(w.shat, w.t);
+        auto products = w.DotPair(w.t, w.s);
+        double tt = products[0];
+        if (!std::isfinite(tt) || tt < 1e-300)
+          break;
+        omega = products[1] / tt;
+        Add<<<blocks, 256>>>(w.n, w.x, w.shat, omega);
+      }
+      w.Pressure(w.x, w.ax);
+      Difference<<<blocks, 256>>>(w.n, w.rhs, w.ax, w.r);
+      result.relative_residual = std::sqrt(w.Dot(w.r, w.r)) / norm;
+      if (!std::isfinite(result.relative_residual))
+        break;
+      if (w.ok && result.relative_residual <= tolerance) {
+        result.converged = true;
+        break;
+      }
+      rho_old = rho;
+    }
   if (result.converged) {
     w.Gradient(w.x);
     Add<<<(w.nf + 255) / 256, 256>>>(w.nf, w.u, w.face, -1);

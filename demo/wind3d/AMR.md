@@ -668,3 +668,28 @@ had peak speed 16.514 over six seconds. Its 2--6 second Fx/Fy/Mz means were
 mean differs by about 6.5% from the earlier uniform-fine reference; reduced
 velocity peaks alone therefore do not establish load accuracy. This diagnostic
 is not the compatible mass projection and does not replace the acceptance gate.
+
+
+## Compatible pressure conjugate-gradient acceleration
+
+Compatible pressure now defaults to preconditioned conjugate gradients; the
+nonsymmetric quadratic mode continues using BiCGStab. The two-point aggregation
+preconditioner uses adjoint restriction/prolongation and matched pre/post Jacobi
+smoothing. The optional final `Build` argument retains compatible BiCGStab for
+comparisons. CG verifies candidate convergence with the actual pressure operator;
+periodic residual replacement (every 50 iterations) restarts the search direction.
+Reported final residuals are true residuals, including on numerical failure.
+
+Job 2001259 passed projection and flow lifecycle CTests and projection memcheck
+(zero errors). Additional comparisons cover CG against compatible BiCGStab and
+Jacobi-preconditioned CG on all eight uniform/mixed, body/no-body, width cases.
+The existing divergence, energy, idempotence and failure rollback checks remain.
+Alternating 100-step static-aircraft runs (10 warmup steps) measured 17.61--17.69 ms
+for BiCGStab versus 14.31--14.43 ms for CG, about 18--19% less total step time.
+At step 100 pressure time fell from 13.46--13.47 to 9.98--10.01 ms. The maximum
+absolute force-component difference over the 100 steps was 1.91e-4 and the maximum
+moment-component difference was 3.89e-5, including the impulsive first step.
+These short runs validate a solver acceleration, not long-term load equivalence
+or the requested speedup against the original native solver. Jobs 2001255--2001257
+continue using the frozen compatible BiCGStab executable for their original
+comparison; they are not silently switched to CG.

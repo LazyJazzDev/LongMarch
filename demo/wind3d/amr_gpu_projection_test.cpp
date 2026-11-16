@@ -242,6 +242,15 @@ bool Compatible(bool mixed, bool embedded, double width) {
   }
   if (std::sqrt(div1 / div0) > 2e-11)
     return false;
+  GpuProjection bicg, jacobi;
+  auto bicg_u = before, jacobi_u = before;
+  std::vector<double> bicg_p, jacobi_p;
+  if (!bicg.Build(0, mesh, g, true, true, true, false) || !bicg.Project(bicg_u, bicg_p, 1e-11).converged ||
+      !jacobi.Build(0, mesh, g, false, true, true) || !jacobi.Project(jacobi_u, jacobi_p, 1e-11).converged)
+    return false;
+  for (size_t i = 0; i < u.size(); ++i)
+    if (std::abs(u[i] - bicg_u[i]) > 1e-8 || std::abs(u[i] - jacobi_u[i]) > 1e-8)
+      return false;
   auto once = u;
   if (!gpu.Project(u, p, 1e-9).converged)
     return false;
