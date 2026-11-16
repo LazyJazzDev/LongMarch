@@ -164,7 +164,11 @@ int main(int argc, char **argv) {
       last = state->step;
       if (!state->pressure_converged || !std::isfinite(state->divergence_after) ||
           state->divergence_after > std::max(1e-5f, 2 * options.pressure_tolerance * state->divergence_before)) {
-        std::fprintf(stderr, "Projection did not converge at step %llu\n", (unsigned long long)last);
+        std::fprintf(
+            stderr,
+            "Projection did not converge at step %llu: cycles=%d residual=%.9g divergence_before=%.9g divergence_after=%.9g\n",
+            (unsigned long long)last, state->pressure_cycles, state->pressure_residual, state->divergence_before,
+            state->divergence_after);
         return 2;
       }
       if (last > uint64_t(warmup))
