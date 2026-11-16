@@ -1658,8 +1658,8 @@ leave every caller output unchanged. Invalid builds preserve the previous
 instance. CUDA failures may leave partially copied outputs, and all internal
 streams are drained before returning from failed operations.
 
-Pressure coupling and adaptive runtime integration are still required before
-full-flow or 2% steady-load acceptance.
+Adaptive runtime integration is still required before full-flow or 2%
+steady-load acceptance.
 
 Job 2001385 passed distributed transport plus the existing single-device
 transport/advance/flow CTests and distributed transport memcheck with zero
@@ -1741,3 +1741,41 @@ embedded and fully solid bodies, constant/linear/nonlinear signed pressure,
 velocity reversal and changed density/viscosity. Repeated results are identical;
 inputs including trailing NaN ghosts are preserved, invalid parameters leave
 outputs unchanged, and non-finite owned pressure/velocity rejects on any rank.
+
+### Transactional distributed timestep
+
+`GpuDistributedAdvance` owns distributed transport and compatible pressure
+projection built from the same geometry. Build verifies identical owned face
+and cell ordering before allocating layout-sized private velocity/potential
+buffers. A failed build preserves the previous stepper. The public layouts
+match the pressure solver and include its ghosts.
+
+Advance composes corrected advection, original-field diffusion, sponge and
+boundary treatment, compatible projection, density/dt pressure conversion, and
+pressure plus pre-step wall-friction loads. Original caller velocity remains
+available until friction evaluation completes. Only after every stage succeeds
+are owned velocity and physical-pressure prefixes copied to callers; trailing
+ghosts remain untouched. Projection nonconvergence and non-finite load results
+leave the entire caller state unchanged. A load failure may report a converged
+projection while `advanced` remains false; callers must use `advanced` as the
+commit signal. CUDA failures during final copies can still leave partial output.
+Stage timings include synchronization and the final load/commit work.
+
+This supplies a complete fixed-topology multi-GPU step, not yet the adaptive
+runtime: device selection, initialization, distributed timestep selection,
+regridding/remapping, snapshots and task integration remain required. Positive
+scaling and the 2% steady-load gate still require full-flow measurements.
+
+Job 2001401 passed direct/CTest full-step regression and memcheck with zero
+unsuppressed errors under the exact expected-704 peer-status suppression.
+Thirty-two geometry/scale/device configurations each advance three consecutive
+steps against single-device compatible projection and transport, changing
+speed, timestep and linear/cubic sampling. Coverage includes one/two/four GPUs,
+permuted devices, uniform/mixed grids and embedded bodies. Maximum accumulated
+velocity/physical-pressure/load component differences were 6.89e-15, 8.53e-14
+and 1.07e-14. Forced one-iteration projection nonconvergence and non-finite wall
+loads after a converged projection preserve every caller velocity/pressure
+entry, including ghosts; subsequent valid steps succeed. Build rollback,
+current-device restoration, untouched success-path ghosts and finite stage
+timings are also checked. These short comparisons do not establish steady-state
+load agreement across adaptive and uniformly fine meshes.
