@@ -1449,3 +1449,27 @@ Component checksums matched their pre-capture values. These are shared-node
 measurements; the optimized single-device reference remains faster (0.014585 s
 in the new job), and the mass inverse is still not captured. No load-accuracy
 acceptance or production distributed flow is claimed.
+
+### Captured distributed mass inverse
+
+The fixed 32-step Chebyshev mass inverse is now captured once per operator
+build across all device streams. Persistent owned-face input/result arrays keep
+graph addresses stable; Apply uploads its owned RHS, launches the joined graph,
+and copies only owned results back before returning. Initialization, polynomial
+coefficients, fixed-face masking and uncoupled diagonal treatment are unchanged.
+GpuPressureExchange::EnqueueFaces uses capturable peer-store gather kernels;
+Build enables required directed peer access monotonically. Synchronous exchange
+methods retain their packed peer-copy path.
+
+Job 2001363 passed direct repeated full-pressure regression, exchange/operator/
+V-cycle/projection CTests and projection memcheck with the exact expected-704
+suppression. This covers the operator's independent free-principal mass
+residual, changed RHS, uniform/mixed/cut cases, both device orders and output
+sentinels. Job 2001364 completed the 442,368-cell full and component benchmarks.
+Warm projection means were 0.032688/0.048459/0.089598 s on 1/2/4 GPUs, compared
+with 0.033398/0.067438/0.143557 s before mass capture. Four-GPU InverseMass
+component time decreased from 2.366 ms to 1.117 ms. All full runs retained
+35 iterations, about 8.48e-10 true residual and <=2.23e-16 velocity difference
+from the optimized single-device reference, which took 0.014551 s in this job.
+Separate shared-node timings do not establish positive scaling; the single-GPU
+baseline still wins, and full-flow integration/accuracy acceptance remain open.

@@ -158,8 +158,19 @@ bool GpuPressureExchange::Build(const PressurePartition &partition, const std::v
       error_ = "Pressure exchange requires peer-accessible GPUs";
       return false;
     }
-    // Explicit peer copies do not require changing the process-wide peer-access
-    // enable state, which may also be used by other solvers in this process.
+    // Capturable queued transfers use peer stores. Keep access enabled for the
+    // context lifetime, including when another solver shares these pairs.
+    if (!next->Check(cudaSetDevice(devices[source]))) {
+      error_ = next->error;
+      return false;
+    }
+    auto access = cudaDeviceEnablePeerAccess(devices[destination], 0);
+    if (access == cudaErrorPeerAccessAlreadyEnabled)
+      cudaGetLastError();
+    else if (!next->Check(access)) {
+      error_ = next->error;
+      return false;
+    }
     Impl::Link link;
     link.source = source;
     link.destination = destination;
@@ -255,15 +266,13 @@ bool GpuPressureExchange::EnqueueFaces(const std::vector<double *> &values, cons
     const auto &batch = link.faces;
     if (!batch.count)
       continue;
-    int source = w.devices[link.source], destination = w.devices[link.destination];
+    int source = w.devices[link.source];
     if (!w.Check(cudaSetDevice(source)))
       return fail();
     auto stream = streams[link.source];
     Gather<<<(batch.count + 255) / 256, 256, 0, stream>>>(values[link.source], batch.indices, batch.count,
-                                                          batch.packed);
-    if (!w.Check(cudaGetLastError()) ||
-        !w.Check(cudaMemcpyPeerAsync(values[link.destination] + batch.destination_offset, destination, batch.packed,
-                                     source, batch.count * sizeof(double), stream)))
+                                                          values[link.destination] + batch.destination_offset);
+    if (!w.Check(cudaGetLastError()))
       return fail();
   }
   if (!barrier())

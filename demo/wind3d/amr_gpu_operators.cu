@@ -92,7 +92,8 @@ struct GpuPressureOperators::Impl {
   struct Rank {
     Matrix d, transpose, mass, normalized, two_point;
     unsigned char *free{}, *coupled{}, *active{};
-    double *gradient{}, *flux{};
+    double *gradient{}, *flux{}, *inverse_rhs{}, *inverse_result{};
+    cudaEvent_t captured{};
     double *scale{}, *diagonal{}, *b{}, *x{}, *scratch{}, *direction{};
     cudaStream_t stream{};
   };
@@ -101,6 +102,7 @@ struct GpuPressureOperators::Impl {
   std::vector<int> devices;
   std::vector<Rank> ranks;
   bool coupled{};
+  cudaGraphExec_t inverse_graph{};
   std::vector<std::pair<int, void *>> allocations;
   std::string error;
 
@@ -111,6 +113,15 @@ struct GpuPressureOperators::Impl {
         cudaSetDevice(devices[r]);
         cudaStreamSynchronize(ranks[r].stream);
         cudaStreamDestroy(ranks[r].stream);
+      }
+    if (inverse_graph) {
+      cudaSetDevice(devices.front());
+      cudaGraphExecDestroy(inverse_graph);
+    }
+    for (size_t r = 0; r < ranks.size(); ++r)
+      if (ranks[r].captured) {
+        cudaSetDevice(devices[r]);
+        cudaEventDestroy(ranks[r].captured);
       }
     for (auto [device, p] : allocations) {
       cudaSetDevice(device);
@@ -153,6 +164,88 @@ struct GpuPressureOperators::Impl {
       return true;
     error = failure;
     return false;
+  }
+
+  bool RunInverse() {
+    std::vector<double *> current, next;
+    std::vector<cudaStream_t> streams;
+    for (size_t r = 0; r < ranks.size(); ++r) {
+      auto &rank = ranks[r];
+      streams.push_back(rank.stream);
+      current.push_back(rank.x);
+      next.push_back(rank.scratch);
+      if (!Check(cudaSetDevice(devices[r])))
+        return false;
+      if (coupled) {
+        InitializeInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
+            rank.mass.rows, rank.coupled, rank.scale, rank.inverse_rhs, rank.b, rank.x, rank.direction);
+        if (!Check(cudaGetLastError()))
+          return false;
+      }
+    }
+    if (coupled) {
+      double rho = mass_radius / mass_centre;
+      for (int step = 1; step < mass_iterations; ++step) {
+        if (!exchange.EnqueueFaces(current, streams)) {
+          error = exchange.Error();
+          return false;
+        }
+        double updated = 1 / (2 * mass_centre / mass_radius - rho);
+        for (size_t r = 0; r < ranks.size(); ++r) {
+          auto &rank = ranks[r];
+          if (!Check(cudaSetDevice(devices[r])))
+            return false;
+          IterateInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
+              rank.normalized, rank.b, current[r], next[r], rank.direction, 2 * updated / mass_radius, updated * rho);
+          if (!Check(cudaGetLastError()))
+            return false;
+        }
+        current.swap(next);
+        rho = updated;
+      }
+    }
+    for (size_t r = 0; r < ranks.size(); ++r) {
+      auto &rank = ranks[r];
+      if (!Check(cudaSetDevice(devices[r])))
+        return false;
+      FinishInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(rank.mass.rows, rank.free, rank.coupled,
+                                                                           rank.scale, rank.diagonal, rank.inverse_rhs,
+                                                                           current[r], rank.inverse_result);
+      if (!Check(cudaGetLastError()))
+        return false;
+    }
+    return true;
+  }
+
+  bool CaptureInverse() {
+    if (!Check(cudaSetDevice(devices.front())) ||
+        !Check(cudaStreamBeginCapture(ranks.front().stream, cudaStreamCaptureModeThreadLocal)))
+      return false;
+    bool ok = Check(cudaEventRecord(ranks.front().captured, ranks.front().stream));
+    for (size_t r = 1; ok && r < ranks.size(); ++r)
+      ok = Check(cudaSetDevice(devices[r])) && Check(cudaStreamWaitEvent(ranks[r].stream, ranks.front().captured, 0));
+    if (ok)
+      ok = RunInverse();
+    for (size_t r = 1; ok && r < ranks.size(); ++r)
+      ok = Check(cudaSetDevice(devices[r])) && Check(cudaEventRecord(ranks[r].captured, ranks[r].stream));
+    if (ok)
+      ok = Check(cudaSetDevice(devices.front()));
+    for (size_t r = 1; ok && r < ranks.size(); ++r)
+      ok = Check(cudaStreamWaitEvent(ranks.front().stream, ranks[r].captured, 0));
+    std::string first = ok ? std::string{} : error;
+    cudaGraph_t graph{};
+    cudaSetDevice(devices.front());
+    auto status = cudaStreamEndCapture(ranks.front().stream, &graph);
+    if (!Check(status) || !ok) {
+      if (!first.empty())
+        error = first;
+      if (graph)
+        cudaGraphDestroy(graph);
+      return false;
+    }
+    ok = Check(cudaGraphInstantiate(&inverse_graph, graph, nullptr, nullptr, 0));
+    cudaGraphDestroy(graph);
+    return ok;
   }
 
   bool MatrixBuild(int device, Matrix &a, const std::vector<std::vector<std::pair<int, double>>> &rows) {
@@ -281,16 +374,29 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
         !next->MatrixBuild(device, rank.transpose, transpose) || !next->MatrixBuild(device, rank.mass, m) ||
         !next->MatrixBuild(device, rank.normalized, normalized) || !next->Upload(device, rank.free, local_free) ||
         !next->Upload(device, rank.coupled, local_coupled) || !next->Upload(device, rank.scale, local_scale) ||
-        !next->Upload(device, rank.diagonal, diagonal) || !next->Allocate(device, rank.b, layout.owned_faces) ||
+        !next->Upload(device, rank.diagonal, diagonal) ||
+        !next->Allocate(device, rank.inverse_rhs, layout.owned_faces) ||
+        !next->Allocate(device, rank.inverse_result, layout.owned_faces) ||
+        !next->Allocate(device, rank.b, layout.owned_faces) ||
         !next->Allocate(device, rank.direction, layout.owned_faces) || !next->Upload(device, rank.active, active) ||
         !next->Allocate(device, rank.gradient, layout.faces.size()) ||
         !next->Allocate(device, rank.flux, layout.faces.size()) ||
         !next->Allocate(device, rank.x, layout.faces.size()) ||
         !next->Allocate(device, rank.scratch, layout.faces.size()) ||
-        !next->Check(cudaStreamCreateWithFlags(&rank.stream, cudaStreamNonBlocking))) {
+        !next->Check(cudaStreamCreateWithFlags(&rank.stream, cudaStreamNonBlocking)) ||
+        !next->Check(cudaEventCreateWithFlags(&rank.captured, cudaEventDisableTiming))) {
       error_ = next->error;
       return false;
     }
+  }
+  for (int device : devices)
+    if (!next->Check(cudaSetDevice(device)) || !next->Check(cudaDeviceSynchronize())) {
+      error_ = next->error;
+      return false;
+    }
+  if (!next->CaptureInverse()) {
+    error_ = next->error;
+    return false;
   }
   impl_ = std::move(next);
   return true;
@@ -380,50 +486,22 @@ bool GpuPressureOperators::InverseMass(const std::vector<double *> &input, const
     error_ = first;
     return false;
   };
-  std::vector<double *> current, next;
-  std::vector<cudaStream_t> streams;
   for (size_t r = 0; r < w.ranks.size(); ++r) {
     auto &rank = w.ranks[r];
-    streams.push_back(rank.stream);
-    current.push_back(rank.x);
-    next.push_back(rank.scratch);
-    if (!w.Check(cudaSetDevice(w.devices[r])))
+    if (!w.Check(cudaSetDevice(w.devices[r])) ||
+        !w.Check(cudaMemcpyAsync(rank.inverse_rhs, input[r], rank.mass.rows * sizeof(double), cudaMemcpyDeviceToDevice,
+                                 rank.stream)))
       return fail();
-    if (w.coupled) {
-      InitializeInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
-          rank.mass.rows, rank.coupled, rank.scale, input[r], rank.b, rank.x, rank.direction);
-      if (!w.Check(cudaGetLastError()))
-        return fail();
-    }
   }
-  if (w.coupled) {
-    double rho = mass_radius / mass_centre;
-    for (int step = 1; step < mass_iterations; ++step) {
-      if (!w.exchange.EnqueueFaces(current, streams)) {
-        w.error = w.exchange.Error();
-        return fail();
-      }
-      double updated = 1 / (2 * mass_centre / mass_radius - rho);
-      for (size_t r = 0; r < w.ranks.size(); ++r) {
-        auto &rank = w.ranks[r];
-        if (!w.Check(cudaSetDevice(w.devices[r])))
-          return fail();
-        IterateInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
-            rank.normalized, rank.b, current[r], next[r], rank.direction, 2 * updated / mass_radius, updated * rho);
-        if (!w.Check(cudaGetLastError()))
-          return fail();
-      }
-      current.swap(next);
-      rho = updated;
-    }
-  }
+  if (!w.Synchronize() || !w.Check(cudaSetDevice(w.devices.front())) ||
+      !w.Check(cudaGraphLaunch(w.inverse_graph, w.ranks.front().stream)) ||
+      !w.Check(cudaStreamSynchronize(w.ranks.front().stream)))
+    return fail();
   for (size_t r = 0; r < w.ranks.size(); ++r) {
     auto &rank = w.ranks[r];
-    if (!w.Check(cudaSetDevice(w.devices[r])))
-      return fail();
-    FinishInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
-        rank.mass.rows, rank.free, rank.coupled, rank.scale, rank.diagonal, input[r], current[r], output[r]);
-    if (!w.Check(cudaGetLastError()))
+    if (!w.Check(cudaSetDevice(w.devices[r])) ||
+        !w.Check(cudaMemcpyAsync(output[r], rank.inverse_result, rank.mass.rows * sizeof(double),
+                                 cudaMemcpyDeviceToDevice, rank.stream)))
       return fail();
   }
   if (!w.Synchronize())

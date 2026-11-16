@@ -21,6 +21,8 @@ class GpuPressureExchange {
   ~GpuPressureExchange();
   GpuPressureExchange(const GpuPressureExchange &) = delete;
   GpuPressureExchange &operator=(const GpuPressureExchange &) = delete;
+  // Enables required peer access for the CUDA contexts' lifetime; never disables
+  // access shared with other solver instances.
   bool Build(const PressurePartition &partition, const std::vector<int> &devices);
   const std::vector<PressureLocalLayout> &Layouts() const;
   // One caller-owned device allocation per rank, sized to its complete layout.
@@ -28,7 +30,8 @@ class GpuPressureExchange {
   // owned entries are unchanged. CUDA failure may leave imports incomplete.
   bool ExchangeCells(const std::vector<double *> &values);
   bool ExchangeFaces(const std::vector<double *> &values);
-  // Queue face imports between producer/consumer work on one stream per rank.
+  // Queue capturable peer-store face imports between producer/consumer work on
+  // one stream per rank.
   // Streams belong to Build's devices. Repeated enqueues on these same streams
   // are ordered by events. Caller must drain all streams, including on failure,
   // before destroying/rebuilding this object or using its synchronous methods.
