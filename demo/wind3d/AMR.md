@@ -1824,3 +1824,52 @@ below 1.69e-11. The speed kernel also agrees with an independent CPU cell-averag
 maximum in the 240 load scenarios, including all-solid grids, and preserves its
 output on non-finite input. These small cases are lifecycle verification, not
 large-case acceleration or steady-load acceptance.
+
+### Multi-GPU adaptive task entry
+
+The public `wind3d_task` entry now accepts `--gpus 2|4|8` for `--adaptive` and
+`--amr-uniform` with explicit `--amr-compatible-pressure`. Multi-GPU quadratic
+pressure is rejected rather than silently selecting a different formulation.
+One GPU retains the existing optimized single-device runtime and its pressure
+selection. Initialization, stepping, speed reduction, adaptation and CSV output
+share one task loop; setup/results report the requested GPU count. Export remains
+unsupported on this batch path.
+
+Example (single node, four allocated/visible GPUs):
+
+```sh
+cmake-build-release/demo/wind3d/wind3d_task --adaptive --amr-compatible-pressure \
+  --gpus 4 --grid 128 --steps 40 --warmup 10 --adapt-every 10 \
+  --speed 12 --angle 5 --cubic --no-export --max-dt .0002 --csv loads.csv
+```
+
+Job 2001409 passed the public CLI regression with real aircraft geometry on
+one/two/four GPUs, both uniform and adaptive grids, eight steps and adaptation
+checks every two steps. Time, timestep, cell counts and generations matched;
+maximum load-component difference from one GPU was 8.69e-12. Invalid GPU counts,
+missing compatible-pressure selection and first-order adaptive transport reject.
+The optional Python CTest uses the linked CUDA runtime to detect visible devices
+and skips when fewer than two are available. This verifies task wiring, not
+steady-state accuracy or speedup; eight-GPU execution has not been measured here.
+
+Job 2001410 compared the frozen pre-entry single-device executable with the new
+single-device path at grid 64; physical CSV differences were at most 7.78e-12
+(the outputs were not bitwise identical). It then ran the actual aircraft at
+grid 128, 212,992 adaptive cells, speed 12, angle 5, cubic transport and capped
+dt 0.0002 for 40 steps, excluding the first ten from timing. Warm mean seconds
+per full task step within one four-GPU allocation:
+
+| Adaptation cadence | 1 GPU | 2 GPUs | 4 GPUs |
+| --- | ---: | ---: | ---: |
+| Disabled | 0.014703 | 0.065904 | 0.104668 |
+| Every 10 steps | 0.015689 | 0.067231 | 0.116015 |
+
+All per-step time/grid records matched and maximum load difference was 7.93e-10.
+The cadence-10 runs checked refinement but never changed topology (generation
+remained zero), so these measurements do not measure changed-grid remapping
+cost. Four-GPU fixed-grid pressure consumed 0.085168 s/step and transport
+0.019008 s/step, versus 0.010157 and 0.004340 on one GPU. This small-workload
+result demonstrates negative scaling, not acceleration. Distributed direct
+sampling and pressure synchronization remain optimization targets; larger
+workloads and genuinely changing grids still need measurement. These startup
+windows (0.008 simulated seconds) cannot satisfy steady-load acceptance.

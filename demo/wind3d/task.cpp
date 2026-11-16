@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
           "            [--adaptive | --amr-uniform] [--levels 1] [--block-cells 4]\n"
           "            [--protect-padding-cells 2] (minimum 2 finest-cell widths)\n"
           "            (adaptive pressure tolerance defaults to 1e-8)\n"
-          "            [--amr-compatible-pressure] (requires --adaptive or --amr-uniform)\n"
+          "            [--amr-compatible-pressure] (required for multi-GPU adaptive/uniform AMR)\n"
           "            [--adapt-every 100] [--max-blocks 100000] (adaptive requires --no-export)\n"
           "Times include transport, pressure, diagnostics and optional snapshot export; startup steps are excluded.");
       return 0;
