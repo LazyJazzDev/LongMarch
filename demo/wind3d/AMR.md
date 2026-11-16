@@ -242,6 +242,15 @@ them as part of an experiment without a new reason/authorization.
   these are bottleneck diagnostics, not equal-accuracy or steady-load acceptance.
   In particular, fewer cells and faster execution than AMR-uniform do not yet
   constitute speedup over the original solver.
+- Non-binary spacing tests exposed a CPU/GPU discrepancy in virtual MAC sample
+  coordinates: separate multiply/add versus GPU FMA could select opposite
+  reconstruction cells at a coarse/fine boundary. Explicit FMA coordinates in
+  CPU and GPU sampling and correction bounds remove this mismatch. A CPU-only
+  reproduction changed from the failing value to the GPU value by changing
+  only sampling-coordinate evaluation. Job 2001211 passed five transport,
+  full-step and regrid tests and CUDA memcheck. Widths 1, 1.3 and 2/3, with and
+  without embedded boundaries, now differ by at most 4.45e-16 between CPU/GPU;
+  cached/direct GPU results agree exactly. Acceptance tolerances were unchanged.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

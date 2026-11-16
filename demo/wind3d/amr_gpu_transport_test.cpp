@@ -4,27 +4,28 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 
 #include "amr_transport.h"
 
-int Run(bool embedded) {
+int Run(bool embedded, double width) {
   using namespace wind3d::amr;
   Topology tree;
   if (!tree.Regrid({2, 2, 2}, 1, 100, [](Block b) { return b.x == 0 && b.y == 0; }))
     return 1;
   Mesh mesh;
-  if (!mesh.Build(tree, 4, 1, {-1, -1, -1}))
+  if (!mesh.Build(tree, 4, width, {-width, -width, -width}))
     return 2;
-  if (embedded && !mesh.Embed([](std::array<double, 3> p) {
-        return std::max({std::abs(p[0] + .5), std::abs(p[1] + .5), std::abs(p[2])}) - .21;
+  if (embedded && !mesh.Embed([width](std::array<double, 3> p) {
+        return std::max({std::abs(p[0] + .5 * width), std::abs(p[1] + .5 * width), std::abs(p[2])}) - .21 * width;
       }))
     return 3;
   GpuTransport gpu, direct;
-  if (!direct.Build(0, mesh, tree, 1, {-1, -1, -1}, false))
+  if (!direct.Build(0, mesh, tree, width, {-width, -width, -width}, false))
     return 14;
-  if (!gpu.Build(0, mesh, tree, 1, {-1, -1, -1})) {
+  if (!gpu.Build(0, mesh, tree, width, {-width, -width, -width})) {
     std::cerr << gpu.Error() << '\n';
     return 4;
   }
@@ -40,7 +41,7 @@ int Run(bool embedded) {
   size_t nf = mesh.Faces().size(), bytes = nf * sizeof(double);
   if (cudaMalloc(&device.u, bytes) != cudaSuccess)
     return 5;
-  FaceField cpu(mesh, tree, 1, {-1, -1, -1});
+  FaceField cpu(mesh, tree, width, {-width, -width, -width});
   double max_error = 0, cache_error = 0;
   for (int pattern = 0; pattern < 3; ++pattern)
     for (bool cubic : {false, true})
@@ -79,7 +80,16 @@ int Run(bool embedded) {
             error = std::max(error, std::abs(actual[i] - reference[i]));
           max_error = std::max(max_error, error);
           if (error > 1e-9) {
-            std::cerr << "pattern=" << pattern << " cubic=" << cubic << " corrected=" << corrected << " error=" << error
+            size_t worst = 0;
+            for (size_t i = 0; i < nf; ++i)
+              if (std::abs(actual[i] - reference[i]) > std::abs(actual[worst] - reference[worst]))
+                worst = i;
+            auto face = mesh.Faces()[worst];
+            std::cerr << std::setprecision(17) << "width=" << width << " embedded=" << embedded
+                      << " pattern=" << pattern << " cubic=" << cubic << " corrected=" << corrected << " dt=" << dt
+                      << " error=" << error << " face=" << worst << " axis=" << face.axis
+                      << " centre=" << face.centre[0] << ',' << face.centre[1] << ',' << face.centre[2]
+                      << " CPU=" << reference[worst] << " GPU=" << actual[worst] << " direct=" << direct_result[worst]
                       << '\n';
             return 8;
           }
@@ -92,7 +102,7 @@ int Run(bool embedded) {
       cudaMemcpy(actual.data(), device.u, bytes, cudaMemcpyDeviceToHost) != cudaSuccess || actual != saved)
     return 10;
   Mesh empty;
-  if (gpu.Build(0, empty, tree, 1, {-1, -1, -1}) || gpu.Error().empty())
+  if (gpu.Build(0, empty, tree, width, {-width, -width, -width}) || gpu.Error().empty())
     return 11;
   if (!gpu.AdvectDevice(device.u, device.u, nf, .01))
     return 12;
@@ -101,12 +111,16 @@ int Run(bool embedded) {
       gpu.AdvectDevice(device.u, device.u, nf, .01) ||
       cudaMemcpy(actual.data(), device.u, bytes, cudaMemcpyDeviceToHost) != cudaSuccess || actual != saved)
     return 13;
-  std::cout << "PASS GPU sparse transport embedded=" << embedded << " max CPU difference=" << max_error
-            << " cache/direct difference=" << cache_error << " with aliasing and failure rollback\n";
+  std::cout << "PASS GPU sparse transport width=" << width << " embedded=" << embedded
+            << " max CPU difference=" << max_error << " cache/direct difference=" << cache_error
+            << " with aliasing and failure rollback\n";
   return 0;
 }
 
 int main() {
-  int status = Run(false);
-  return status ? status : Run(true);
+  for (double width : {1., 1.3, 2. / 3.})
+    for (bool embedded : {false, true})
+      if (int status = Run(embedded, width))
+        return status;
+  return 0;
 }

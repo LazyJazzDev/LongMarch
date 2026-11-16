@@ -165,7 +165,7 @@ struct Field {
       int corner[3]{x, y, z};
       Array<double, 3> p{};
       for (int a = 0; a < 3; ++a) {
-        p[a] = origin_[a] + (base[a] + corner[a] + (a == axis ? 0 : .5)) * h;
+        p[a] = fma(base[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]);
         p[a] = Clamp(p[a], origin_[a] + (a == axis ? 0 : .5 * h),
                      origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
       }
@@ -202,7 +202,7 @@ struct Field {
           Array<double, 3> p{};
           double weight = 1;
           for (int a = 0; a < 3; ++a) {
-            p[a] = origin_[a] + (base[a] + corner[a] + (a == axis ? 0 : .5)) * h;
+            p[a] = fma(base[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]);
             weight *= corner[a] ? fraction[a] : 1 - fraction[a];
             double lower = origin_[a] + (a == axis ? 0 : .5 * h),
                    upper = origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h);
@@ -228,7 +228,7 @@ struct Field {
     Array<double, 3> p;
     for (int a = 0; a < 3; ++a)
       p[a] =
-          Clamp(origin_[a] + (lower[a] + corner[a] + (a == axis ? 0 : .5)) * h, origin_[a] + (a == axis ? 0 : .5 * h),
+          Clamp(fma(lower[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]), origin_[a] + (a == axis ? 0 : .5 * h),
                 origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
     return p;
   }
@@ -252,8 +252,9 @@ struct Field {
     double h = cells[cell].width;
     Array<double, 3> p;
     for (int a = 0; a < 3; ++a)
-      p[a] = Clamp(origin_[a] + (base[a] + corner[a] + (a == axis ? 0 : .5)) * h, origin_[a] + (a == axis ? 0 : .5 * h),
-                   origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
+      p[a] =
+          Clamp(fma(base[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]), origin_[a] + (a == axis ? 0 : .5 * h),
+                origin_[a] + roots[a] * root_width_ - (a == axis ? 0 : .5 * h));
     return VirtualFace(p, axis);
   }
 

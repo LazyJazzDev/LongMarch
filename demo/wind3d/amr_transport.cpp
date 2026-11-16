@@ -220,11 +220,13 @@ double FaceField::Component(std::array<double, 3> point, int axis, bool cubic) c
     base[a] = std::floor(q);
     fraction[a] = q - base[a];
   }
+  // Match GPU coordinate rounding: a non-binary spacing can otherwise select
+  // the opposite reconstruction cell at a coarse/fine boundary.
   auto corner_point = [&](int x, int y, int z) {
     int corner[3]{x, y, z};
     std::array<double, 3> p{};
     for (int a = 0; a < 3; ++a) {
-      p[a] = origin_[a] + (base[a] + corner[a] + (a == axis ? 0 : .5)) * h;
+      p[a] = std::fma(base[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]);
       p[a] = std::clamp(p[a], origin_[a] + (a == axis ? 0 : .5 * h),
                         origin_[a] + tree_.Roots()[a] * root_width_ - (a == axis ? 0 : .5 * h));
     }
@@ -261,7 +263,7 @@ double FaceField::Component(std::array<double, 3> point, int axis, bool cubic) c
         std::array<double, 3> p{};
         double weight = 1;
         for (int a = 0; a < 3; ++a) {
-          p[a] = origin_[a] + (base[a] + corner[a] + (a == axis ? 0 : .5)) * h;
+          p[a] = std::fma(base[a] + corner[a] + (a == axis ? 0 : .5), h, origin_[a]);
           weight *= corner[a] ? fraction[a] : 1 - fraction[a];
           double lower = origin_[a] + (a == axis ? 0 : .5 * h),
                  upper = origin_[a] + tree_.Roots()[a] * root_width_ - (a == axis ? 0 : .5 * h);

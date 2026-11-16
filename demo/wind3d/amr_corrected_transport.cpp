@@ -49,7 +49,7 @@ bool FaceField::AdvectCorrected(double dt, std::vector<double> &destination, boo
           int corner[3]{x, y, z};
           std::array<double, 3> p{};
           for (int a = 0; a < 3; ++a) {
-            p[a] = origin_[a] + (base[a] + corner[a] + (a == face.axis ? 0 : .5)) * h;
+            p[a] = std::fma(base[a] + corner[a] + (a == face.axis ? 0 : .5), h, origin_[a]);
             p[a] = std::clamp(p[a], origin_[a] + (a == face.axis ? 0 : .5 * h),
                               origin_[a] + tree_.Roots()[a] * root_width_ - (a == face.axis ? 0 : .5 * h));
           }
