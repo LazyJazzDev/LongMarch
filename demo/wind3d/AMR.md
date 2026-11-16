@@ -815,3 +815,29 @@ second, including adaptation. Dynamic AMR was about 15% slower in this run.
 The requested load accuracy and overall speedup therefore remain unachieved.
 The full six-component means, RMS fluctuations, half-window drifts and batch
 mean error estimates are in `out/wind3d-amr/compatible-statistics.json`.
+
+
+## Targeted thin-cell connectivity repair
+
+AMR embedding and native face masks now identify solid-centred cells whose two
+opposite face-centre probes are both fluid along at least one axis. Such an
+underresolved feature cannot safely be reopened by face-area fractions: its
+incident connections remain closed. Ordinary cut cells retain their sampled
+partial apertures. Native occupancy temporarily carries a thin-feature bit;
+`CellMask` subsequently rebuilds active-cell occupancy as before.
+
+The new flood-fill regression checks whether an infinite slab's two sides are
+connected through positive-aperture faces. It covers three coordinate planes,
+seven angles, 32 phases and two root widths (1344 cases), with slab thickness
+0.2h. All cases pass; the original algorithm leaked in 447/672 width-1 cases.
+The ordinary embedded-box partial-aperture and constant-pressure cancellation
+tests still pass, unlike the earlier all-solid-centres diagnostic fallback.
+
+Job 2001271 passed all 18 AMR CTests, GPU flow memcheck with zero errors, native
+geometry/wall-diffusion/closed-surface/lifecycle validation, and a 100-step
+compatible aircraft smoke. Native validation checked all six incident faces
+of 131 flagged cells and found them closed. This is a conservative fallback
+for underresolved geometry, not a multi-region cut-cell method: it can shift
+the effective boundary by O(h), and does not guarantee detection of arbitrarily
+thin unsampled features. Aircraft load and resolution comparisons must be
+repeated with matching corrected geometry before accuracy can be accepted.

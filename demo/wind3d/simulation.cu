@@ -136,11 +136,23 @@ __global__ void Mask(Grid g, unsigned char *solid, Controls controls) {
   if (n >= g.nx * g.ny * g.nz)
     return;
   int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
-  solid[n] = AircraftDistance(g.Position(x, y, z), controls) <= 0;
+  Vec3 center = g.Position(x, y, z);
+  solid[n] = AircraftDistance(center, controls) <= 0;
+  if (solid[n])
+    for (int axis = 0; axis < 3; ++axis) {
+      Vec3 offset{axis == 0 ? .5f * g.h : 0, axis == 1 ? .5f * g.h : 0, axis == 2 ? .5f * g.h : 0};
+      if (AircraftDistance(Add(center, offset), controls) > 0 &&
+          AircraftDistance(Add(center, Scale(offset, -1)), controls) > 0) {
+        // Bit 1 marks an underresolved solid sheet. Face-area sampling must
+        // not reconnect its two fluid sides through a single pressure cell.
+        solid[n] = 3;
+        break;
+      }
+    }
 }
 
-__device__ bool Blocked(Grid g, const unsigned char *solid, int x, int y, int z, int axis) {
-  if (g.Inside(x, y, z) && solid[g.C(x, y, z)])
+__device__ bool Blocked(Grid g, const unsigned char *solid, int x, int y, int z, int axis, unsigned char mask = 255) {
+  if (g.Inside(x, y, z) && (solid[g.C(x, y, z)] & mask))
     return true;
   if (axis == 0)
     --x;
@@ -148,7 +160,7 @@ __device__ bool Blocked(Grid g, const unsigned char *solid, int x, int y, int z,
     --y;
   if (axis == 2)
     --z;
-  return g.Inside(x, y, z) && solid[g.C(x, y, z)];
+  return g.Inside(x, y, z) && (solid[g.C(x, y, z)] & mask);
 }
 
 // Subcell sampling of the pressure-cell connection captures thin walls even
@@ -189,7 +201,7 @@ __global__ void FaceMask(Grid g,
     for (int sample = -3; sample <= 3 && !blocked; ++sample)
       blocked = AircraftDistance(Add(center, Scale(normal, sample * g.h / 8)), controls) <= 0;
     unsigned char aperture = blocked ? 0 : 255;
-    if (cut_cells && (centre_solid || !blocked)) {
+    if (cut_cells && !Blocked(g, solid, x, y, z, axis, 2) && (centre_solid || !blocked)) {
       // Open fraction from 6 x 6 samples of the face square; faces far from
       // the surface are uniform. A thin wall between fluid centres stays closed.
       float d = AircraftDistance(center, controls);
@@ -754,13 +766,28 @@ bool ValidateClosedSurface(int cuda_device, bool cut_cells) {
     Mask<<<blocks, 256>>>(g, solid, controls);
     FaceMask<<<(nf + 255) / 256, 256>>>(g, solid, masks, masks + nf, masks + 2 * nf, apertures, apertures + nf,
                                         apertures + 2 * nf, controls, cut_cells);
+    // Check the underresolved-sheet flags before CellMask replaces them with
+    // active-cell occupancy. All six connections must remain closed.
+    passed = cudaGetLastError() == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
+    int thin_cells = 0;
+    for (int i = 0; passed && i < nc; ++i)
+      if (solid[i] & 2) {
+        ++thin_cells;
+        int x = i % g.nx, y = i / g.nx % g.ny, z = i / (g.nx * g.ny);
+        for (int axis = 0; axis < 3; ++axis)
+          if (apertures[axis * nf + g.F(x, y, z)] ||
+              apertures[axis * nf + g.F(x + (axis == 0), y + (axis == 1), z + (axis == 2))])
+            passed = false;
+      }
+    passed = passed && thin_cells > 0;
+    std::cout << "thin_cell_connections=" << (passed ? "PASS" : "FAIL") << " cells=" << thin_cells << '\n';
     if (cut_cells)
       CellMask<<<blocks, 256>>>(g, solid, apertures, apertures + nf, apertures + 2 * nf);
     float *p = fields + 3 * nf;
     Measure<<<blocks, 256>>>(g, solid, masks, masks + nf, masks + 2 * nf, apertures, apertures + nf, apertures + 2 * nf,
                              fields, fields + nf, fields + 2 * nf, fields, fields + nf, fields + 2 * nf, p, p, p,
                              physics, controls, statistics);
-    passed = cudaGetLastError() == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
+    passed = passed && cudaGetLastError() == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
     for (int i = 0; passed && i < blocks; ++i) {
       force[0] += statistics[i].force.x;
       force[1] += statistics[i].force.y;

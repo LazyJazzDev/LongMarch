@@ -5,6 +5,57 @@
 #include "aircraft.h"
 #include "amr_projection.h"
 
+bool ValidateThinConnectivity() {
+  using namespace wind3d::amr;
+  Topology tree;
+  if (!tree.Regrid({1, 1, 1}, 0, 1, [](Block) { return false; }))
+    return false;
+  int leaks = 0, total = 0;
+  for (double width : {1., 1.3})
+    for (int plane = 0; plane < 3; ++plane)
+      for (int angle = 0; angle <= 90; angle += 15)
+        for (int phase = 0; phase < 32; ++phase) {
+          double n[3]{};
+          n[plane] = std::cos(angle * std::acos(-1.) / 180);
+          n[(plane + 1) % 3] = std::sin(angle * std::acos(-1.) / 180);
+          double offset = width * (.5 * (n[0] + n[1] + n[2]) + (phase / 32. - .5) * .125);
+          auto side = [&](std::array<double, 3> p) { return n[0] * p[0] + n[1] * p[1] + n[2] * p[2] - offset; };
+          Mesh mesh;
+          if (!mesh.Build(tree, 8, width) ||
+              !mesh.Embed([&](std::array<double, 3> p) { return std::abs(side(p)) - .0125 * width; }))
+            return false;
+          int start = 0, end = 0;
+          for (int i = 0; i < int(mesh.Cells().size()); ++i) {
+            if (side(mesh.Cells()[i].centre) < side(mesh.Cells()[start].centre))
+              start = i;
+            if (side(mesh.Cells()[i].centre) > side(mesh.Cells()[end].centre))
+              end = i;
+          }
+          std::vector<int> q{start};
+          std::vector<bool> seen(mesh.Cells().size());
+          seen[start] = true;
+          for (size_t k = 0; k < q.size(); ++k) {
+            int c = q[k];
+            for (int j = mesh.Offsets()[c]; j < mesh.Offsets()[c + 1]; ++j) {
+              auto f = mesh.Faces()[std::abs(mesh.Incidence()[j]) - 1];
+              int next = f.low == c ? f.high : f.low;
+              if (f.aperture > 0 && next >= 0 && !seen[next]) {
+                seen[next] = true;
+                q.push_back(next);
+              }
+            }
+          }
+          ++total;
+          if (seen[end]) {
+            ++leaks;
+            if (leaks <= 8)
+              std::cout << "leak plane=" << plane << " angle=" << angle << " phase=" << phase << '\n';
+          }
+        }
+  std::cout << "leaks=" << leaks << "/" << total << '\n';
+  return leaks == 0;
+}
+
 bool ValidateReuse() {
   using namespace wind3d::amr;
   for (double width : {1.0, 1.3}) {
@@ -61,6 +112,8 @@ bool ValidateReuse() {
 
 int main() {
   using namespace wind3d::amr;
+  if (!ValidateThinConnectivity())
+    return 18;
   if (!ValidateReuse())
     return 17;
   Topology tree;

@@ -40,6 +40,24 @@ bool Mesh::Embed(const std::function<double(std::array<double, 3>)> &distance, c
       return false;
     solid[i] = d <= 0;
   }
+  // One pressure value cannot represent fluid pockets on opposite sides of
+  // a subcell solid sheet. Keep connections incident to such cells closed.
+  std::vector<bool> thin(cells_.size());
+  for (size_t i = 0; i < cells_.size(); ++i)
+    if (solid[i]) {
+      for (int axis = 0; axis < 3; ++axis) {
+        auto a = cells_[i].centre, b = a;
+        a[axis] -= .5 * cells_[i].width;
+        b[axis] += .5 * cells_[i].width;
+        double da = distance(a), db = distance(b);
+        if (!std::isfinite(da) || !std::isfinite(db))
+          return false;
+        if (da > 0 && db > 0) {
+          thin[i] = true;
+          break;
+        }
+      }
+    }
   std::unordered_map<FaceKey, size_t, FaceHash> old_faces;
   if (previous && previous->embedded_) {
     old_faces.reserve(previous->faces_.size());
@@ -79,7 +97,8 @@ bool Mesh::Embed(const std::function<double(std::array<double, 3>)> &distance, c
       blocked = d <= 0;
     }
     double aperture = blocked ? 0 : 1;
-    if (centre_solid || !blocked) {
+    bool thin_barrier = (face.low >= 0 && thin[face.low]) || (face.high >= 0 && thin[face.high]);
+    if (!thin_barrier && (centre_solid || !blocked)) {
       double d = distance(face.centre);
       if (!std::isfinite(d))
         return false;
