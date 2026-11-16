@@ -68,6 +68,12 @@ __global__ void FinishInverse(int n,
     output[i] = !free[i] ? 0 : coupled[i] ? scale[i] * x[i] : rhs[i] / diagonal[i];
 }
 
+__global__ void PinInactive(int n, const unsigned char *active, const double *input, double *output) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n && !active[i])
+    output[i] = input[i];
+}
+
 struct DeviceScope {
   int previous{-1};
 
@@ -85,7 +91,8 @@ struct DeviceScope {
 struct GpuPressureOperators::Impl {
   struct Rank {
     Matrix d, transpose, mass, normalized;
-    unsigned char *free{}, *coupled{};
+    unsigned char *free{}, *coupled{}, *active{};
+    double *gradient{}, *flux{};
     double *scale{}, *diagonal{}, *b{}, *x{}, *scratch{}, *direction{};
     cudaStream_t stream{};
   };
@@ -217,8 +224,10 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
     Rows d(layout.owned_cells), transpose(layout.owned_faces), m(layout.owned_faces), normalized(layout.owned_faces);
     std::vector<unsigned char> local_free, local_coupled;
     std::vector<double> local_scale, diagonal;
+    std::vector<unsigned char> active;
     for (size_t i = 0; i < layout.owned_cells; ++i) {
       int cell = layout.cells[i];
+      active.push_back(mesh.Cells()[cell].active);
       for (int k = mesh.Offsets()[cell]; k < mesh.Offsets()[cell + 1]; ++k) {
         int entry = mesh.Incidence()[k], id = std::abs(entry) - 1;
         const auto &f = mesh.Faces()[id];
@@ -260,7 +269,9 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
         !next->Upload(device, rank.free, local_free) || !next->Upload(device, rank.coupled, local_coupled) ||
         !next->Upload(device, rank.scale, local_scale) || !next->Upload(device, rank.diagonal, diagonal) ||
         !next->Allocate(device, rank.b, layout.owned_faces) ||
-        !next->Allocate(device, rank.direction, layout.owned_faces) ||
+        !next->Allocate(device, rank.direction, layout.owned_faces) || !next->Upload(device, rank.active, active) ||
+        !next->Allocate(device, rank.gradient, layout.faces.size()) ||
+        !next->Allocate(device, rank.flux, layout.faces.size()) ||
         !next->Allocate(device, rank.x, layout.faces.size()) ||
         !next->Allocate(device, rank.scratch, layout.faces.size()) ||
         !next->Check(cudaStreamCreateWithFlags(&rank.stream, cudaStreamNonBlocking))) {
@@ -400,6 +411,61 @@ bool GpuPressureOperators::InverseMass(const std::vector<double *> &input, const
   if (!w.Synchronize())
     return fail();
   return true;
+}
+
+bool GpuPressureOperators::Gradient(const std::vector<double *> &cells, const std::vector<double *> &faces) {
+  error_.clear();
+  if (!impl_ || cells.size() != impl_->ranks.size() || faces.size() != cells.size() ||
+      std::any_of(cells.begin(), cells.end(), [](auto p) { return !p; }) ||
+      std::any_of(faces.begin(), faces.end(),
+                  [&](auto p) { return !p || std::find(cells.begin(), cells.end(), p) != cells.end(); })) {
+    error_ = "Gradient needs disjoint cell and face fields per rank";
+    return false;
+  }
+  std::vector<double *> transpose;
+  for (auto &rank : impl_->ranks)
+    transpose.push_back(rank.gradient);
+  return TransposeDivergence(cells, transpose) && InverseMass(transpose, faces);
+}
+
+bool GpuPressureOperators::Pressure(const std::vector<double *> &input, const std::vector<double *> &output) {
+  error_.clear();
+  if (!impl_ || input.size() != impl_->ranks.size() || output.size() != input.size() ||
+      std::any_of(input.begin(), input.end(), [](auto p) { return !p; }) ||
+      std::any_of(output.begin(), output.end(),
+                  [&](auto p) { return !p || std::find(input.begin(), input.end(), p) != input.end(); })) {
+    error_ = "Pressure needs disjoint cell fields per rank";
+    return false;
+  }
+  DeviceScope restore;
+  auto &w = *impl_;
+  std::vector<double *> flux;
+  for (auto &rank : w.ranks)
+    flux.push_back(rank.flux);
+  if (!Gradient(input, flux) || !Divergence(flux, output))
+    return false;
+  bool ok = true;
+  for (size_t r = 0; r < w.ranks.size(); ++r) {
+    auto &rank = w.ranks[r];
+    if (!w.Check(cudaSetDevice(w.devices[r]))) {
+      ok = false;
+      break;
+    }
+    PinInactive<<<(rank.d.rows + 255) / 256, 256, 0, rank.stream>>>(rank.d.rows, rank.active, input[r], output[r]);
+    if (!w.Check(cudaGetLastError())) {
+      ok = false;
+      break;
+    }
+  }
+  std::string first = ok ? std::string{} : w.error;
+  if (!w.Synchronize()) {
+    if (first.empty())
+      first = w.error;
+    ok = false;
+  }
+  if (!ok)
+    error_ = first;
+  return ok;
 }
 
 }  // namespace wind3d::amr

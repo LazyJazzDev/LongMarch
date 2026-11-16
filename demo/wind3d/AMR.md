@@ -1094,3 +1094,22 @@ alias rejection and device restoration were checked. The implementation still
 synchronizes rank streams and peer transfers at every iteration and stores
 full owned-face work vectors. Performance optimization and distributed pressure
 iteration remain necessary; correctness here does not demonstrate speedup.
+
+
+## Composed distributed pressure action
+
+`GpuPressureOperators::Gradient` now composes M^-1 D^T using private local face
+buffers. `Pressure` applies D M^-1 D^T and pins inactive cell rows to the input
+potential, matching the single-device compatible operator. Fixed boundary
+corrections use the existing free-face mask. Caller input/output allocations
+remain disjoint, only owned output entries change, and all device work finishes
+before return. This is a complete matrix action, not yet a pressure iteration.
+
+Two-GPU job 2001313 passed the expanded 48-case direct tests and CTest, with
+zero Compute Sanitizer errors. Composed gradients and pressure actions match
+CPU D/D^T combined with the existing single-device mass inverse within the
+relative 1e-12 test tolerance, including cut geometry, inactive rows, both
+boundary modes, reversed devices and unchanged output ghost slots. The overall
+suite maximum absolute difference remains 1.71e-13. Global Krylov reductions,
+pressure convergence/rollback, distributed preconditioning and runtime flow
+integration remain open.

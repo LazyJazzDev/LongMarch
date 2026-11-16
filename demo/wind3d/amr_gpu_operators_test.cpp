@@ -79,14 +79,33 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
       !single.ApplyDevice(full_rhs, full_result, u.size()) ||
       cudaMemcpy(inverse.data(), full_result, u.size() * sizeof(double), cudaMemcpyDeviceToHost) != cudaSuccess)
     return 15;
+  std::vector<double> gradient(u.size()), pressure(p.size());
+  for (size_t i = 0; i < u.size(); ++i) {
+    auto f = mesh.Faces()[i];
+    gradient[i] = ((f.low >= 0 ? -p[f.low] : 0) + (f.high >= 0 ? p[f.high] : 0)) * f.area * f.aperture;
+  }
+  if (cudaSetDevice(0) != cudaSuccess ||
+      cudaMemcpy(full_rhs, gradient.data(), u.size() * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess ||
+      !single.ApplyDevice(full_rhs, full_result, u.size()) ||
+      cudaMemcpy(gradient.data(), full_result, u.size() * sizeof(double), cudaMemcpyDeviceToHost) != cudaSuccess)
+    return 18;
+  for (size_t i = 0; i < p.size(); ++i) {
+    for (int k = mesh.Offsets()[i]; k < mesh.Offsets()[i + 1]; ++k) {
+      int e = mesh.Incidence()[k], j = std::abs(e) - 1;
+      auto f = mesh.Faces()[j];
+      pressure[i] += (e > 0 ? -1 : 1) * f.area * f.aperture * gradient[j];
+    }
+    if (!mesh.Cells()[i].active)
+      pressure[i] = p[i];
+  }
   auto free_face = [&](size_t i) {
     const auto &f = mesh.Faces()[i];
     return f.aperture > 0 && (!pressure_boundaries || (f.low >= 0 && f.high >= 0) || (f.axis == 0 && f.high < 0));
   };
   double maximum = 0;
-  for (int operation = 0; operation < 5; ++operation) {
+  for (int operation = 0; operation < 7; ++operation) {
     double factor = operation == 4 ? -.5 : 1;
-    bool cell_input = operation == 1, cell_output = operation == 0;
+    bool cell_input = operation == 1 || operation >= 5, cell_output = operation == 0 || operation == 6;
     auto &input = cell_input ? cells : faces;
     auto &output = cell_output ? cell_out : face_out;
     for (size_t r = 0; r < devices.size(); ++r) {
@@ -109,15 +128,17 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
     if (!(operation == 0   ? gpu.Divergence(input, output)
           : operation == 1 ? gpu.TransposeDivergence(input, output)
           : operation == 2 ? gpu.Mass(input, output)
-                           : gpu.InverseMass(input, output))) {
+          : operation < 5  ? gpu.InverseMass(input, output)
+          : operation == 5 ? gpu.Gradient(input, output)
+                           : gpu.Pressure(input, output))) {
       std::cerr << gpu.Error() << '\n';
       return 10;
     }
     cudaGetDevice(&actual);
     if (actual != saved)
       return 11;
-    if (gpu.InverseMass(input, input) || gpu.Mass(input, input) || gpu.Divergence({}, output) ||
-        gpu.TransposeDivergence(input, {}))
+    if (gpu.Gradient(input, input) || gpu.Pressure(input, input) || gpu.InverseMass(input, input) ||
+        gpu.Mass(input, input) || gpu.Divergence({}, output) || gpu.TransposeDivergence(input, {}))
       return 12;
     for (size_t r = 0; r < devices.size(); ++r) {
       auto &l = layouts[r];
@@ -144,17 +165,20 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
           } else if (operation == 2) {
             for (int k = mass.Offsets()[id]; k < mass.Offsets()[id + 1]; ++k)
               reference += mass.Weights()[k] * u[mass.Columns()[k]];
-          } else {
+          } else if (operation < 5) {
             reference = factor * inverse[id];
             assembled[id] = host[i];
-          }
+          } else if (operation == 5)
+            reference = gradient[id];
+          else
+            reference = pressure[id];
         }
         if (!std::isfinite(host[i]) || std::abs(host[i] - reference) > 1e-12 * std::max(1., std::abs(reference)))
           return 14;
         maximum = std::max(maximum, std::abs(host[i] - reference));
       }
     }
-    if (operation >= 3) {
+    if (operation == 3 || operation == 4) {
       double residual = 0;
       for (size_t i = 0; i < u.size(); ++i) {
         if (!free_face(i)) {
@@ -173,7 +197,7 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
       }
     }
   }
-  std::cout << "PASS distributed D/DT/M/inverse ranks=" << devices.size() << " mixed=" << mixed
+  std::cout << "PASS distributed D/DT/M/inverse/gradient/pressure ranks=" << devices.size() << " mixed=" << mixed
             << " embedded=" << embedded << " width=" << width << " error=" << maximum << '\n';
   return 0;
 }
