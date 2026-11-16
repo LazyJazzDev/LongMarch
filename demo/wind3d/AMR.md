@@ -546,3 +546,42 @@ Quadratic gradients are not reproduced exactly by this construction; spatial
 convergence, cut-cell treatment, GPU inverse-mass cost and aircraft loads remain
 to be assessed before choosing this formulation. Positive energy alone does
 not replace the accepted accuracy requirements.
+
+## Compatible operator implementation and convergence
+
+`amr_mass` now builds the compatible face mass as deterministic symmetric CSR.
+It is an independent operator building block, not yet the pressure backend.
+Uniform cut cells keep the native aperture-weighted diagonal face volumes;
+closed-face rows are pinned for inversion. Split cells must be fully open:
+unsupported cut/split configurations fail transactionally. Tests cover split
+planes in all three directions, intersecting interfaces, binary/nonbinary
+spacing, embedded bodies inside the uniform fine region, linear consistency,
+sampled positive energies, exact matrix symmetry and failure rollback.
+CMake/CTest passed (initial build job 2001249 and expanded local tests); strict
+compiler warnings and ASan/UBSan also passed on the initial cases.
+
+An independent manufactured Poisson diagnostic on `[0,2] x [0,1] x [0,1]`
+used `p=(sin(pi*x/2)+0.3*sin(pi*x))*sin(pi*y)*sin(pi*z)`, zero Dirichlet data,
+midpoint-integrated forcing and a relative iterative residual below 1e-11.
+The left root was refined one level relative to the right. Errors relative to
+analytic cell-centre pressure and face-centre gradients were:
+
+| Coarse spacing | Pressure volume-weighted relative L2 | Velocity face-volume-weighted relative L2 | Maximum gradient error |
+| --- | ---: | ---: | ---: |
+| 1/4 | 0.0246740 | 0.0231857 | 0.169156 |
+| 1/8 | 0.00617194 | 0.00758450 | 0.0924482 |
+| 1/16 | 0.00154615 | 0.00251316 | 0.0469043 |
+
+Pressure converged at about order 2, integrated velocity at about order 1.6,
+and maximum velocity error approached order 1. These results must not be
+reported as second-order velocity accuracy. They support further evaluation
+of a compatible projection; aircraft loads, embedded geometry and GPU
+inverse-mass performance still require validation.
+
+The repaired-transport dynamic aircraft run (job 2001246, old quadratic
+pressure interface) completed six seconds with a peak speed of 16.85 m/s and
+248 hierarchy changes. Its 2--6 s Fx/Fy/Mz means were
+18.0451/13.6146/-14.1117, versus 17.7253/12.6388/-13.7308 for the uniform fine
+AMR-framework reference. Recorded wall time was 215.17 seconds per physical
+second. Thus the transport repair and existing performance changes do not yet
+establish either the 2% load gate or the requested overall speedup.
