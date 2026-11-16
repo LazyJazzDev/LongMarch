@@ -1658,8 +1658,8 @@ leave every caller output unchanged. Invalid builds preserve the previous
 instance. CUDA failures may leave partially copied outputs, and all internal
 streams are drained before returning from failed operations.
 
-Distributed diffusion, sponge, loads, pressure coupling and adaptive runtime
-integration are still required before full-flow or 2% steady-load acceptance.
+Distributed loads, pressure coupling and adaptive runtime integration are still
+required before full-flow or 2% steady-load acceptance.
 
 Job 2001385 passed distributed transport plus the existing single-device
 transport/advance/flow CTests and distributed transport memcheck with zero
@@ -1673,3 +1673,32 @@ partition, aliasing, untouched trailing ghosts, build rollback, current-device
 restoration and all-rank output rollback on a non-finite input. This establishes
 advection consistency only; it does not establish a full-flow speedup or the
 steady-load acceptance gate.
+
+### Distributed diffusion and outlet treatment
+
+`GpuDistributedTransport::AdvectDiffuse` composes corrected advection, molecular
+diffusion, outlet sponge and prescribed normal boundary values. Diffusion uses
+the original slip-extended velocity and reconstructed field, adding its
+increment to the advected result; it does not diffuse the newly advected field.
+The shared `DiffuseBoundary` CUDA kernel now maps work to owned faces, so the
+single- and multi-device paths use the same formula and ordering. Peer reads
+use completed original-field data; each rank writes only its owned result.
+
+The call is self-contained, including original/forward preparation, and commits
+only after all output values pass validation. It preserves aliasing and trailing
+pressure ghosts. Positive finite timesteps, nonnegative finite viscosity and
+sponge length, finite speed, and `dt * viscosity / min(face area) <= 1/6` are
+required. Invalid or unstable parameters reject before any output mutation.
+This is the transport portion of a timestep; pressure projection and distributed
+load evaluation still need to be composed transactionally into the runtime.
+
+Job 2001386 passed the four distributed-transport/single-transport/advance/flow
+CTests and distributed transport memcheck with zero unsuppressed errors using
+the exact expected-704 suppression. The 128 added CPU-reference comparisons
+span all 32 geometry/device configurations, linear/cubic sampling, zero or
+strong diffusion (`dt*viscosity/min_area=0.1`), disabled/enabled sponge and
+positive/negative prescribed speed. Maximum error was 6.67e-16; existing
+advection-only comparisons retained zero error. Checks also cover aliasing,
+trailing ghost preservation, non-finite input rollback and unchanged outputs
+when diffusion stability, viscosity, sponge length, timestep or speed validation
+fails. Full timestep coupling, steady loads and acceleration remain unverified.

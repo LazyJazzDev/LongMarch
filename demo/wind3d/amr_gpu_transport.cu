@@ -19,50 +19,6 @@ __global__ void Validate(const double *u, int n, int *bad) {
     atomicExch(bad, 1);
 }
 
-__global__ void DiffuseBoundary(Field f, double *next, double dt, double viscosity, double length, double speed) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= f.nf)
-    return;
-  auto face = f.faces[i];
-  if (face.aperture == 0) {
-    next[i] = 0;
-    return;
-  }
-  double h = sqrt(face.area), lap = 0;
-  for (int direction = 0; direction < 3; ++direction)
-    for (int sign = -1; sign <= 1; sign += 2) {
-      auto p = face.centre;
-      p[direction] += sign * h;
-      for (int a = 0; a < 3; ++a)
-        p[a] = Clamp(p[a], f.origin_[a] + (a == face.axis ? 0 : .5 * h),
-                     f.origin_[a] + f.roots[a] * f.root_width_ - (a == face.axis ? 0 : .5 * h));
-      double fraction = 0;
-      if (direction != face.axis)
-        for (int half = -1; half <= 1; half += 2) {
-          auto wall = face.centre;
-          wall[direction] += sign * .5 * h;
-          wall[face.axis] += half * .5 * h;
-          int other = f.NativeFace(wall, direction);
-          if (other >= 0 && f.faces[other].aperture == 0)
-            fraction += .5;
-        }
-      lap += (1 - fraction) * (f.VirtualFace(p, face.axis) - f.velocity_[i]);
-    }
-  double value = next[i] + dt * viscosity * lap / (h * h);
-  if (length > 0) {
-    double column = face.centre[0] - (face.axis == 0 ? 0 : .5 * h);
-    double distance = f.origin_[0] + f.roots[0] * f.root_width_ - column;
-    if (distance < length && column > f.origin_[0]) {
-      double blend = Clamp(1 - distance / length, 0, 1);
-      blend *= .25 * blend;
-      value += blend * ((face.axis == 0 ? speed : 0) - value);
-    }
-  }
-  if ((face.low < 0 || face.high < 0) && !(face.axis == 0 && face.high < 0))
-    value = face.axis == 0 ? speed : 0;
-  next[i] = value;
-}
-
 __global__ void ScalePressure(double *p, int n, double scale) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n)

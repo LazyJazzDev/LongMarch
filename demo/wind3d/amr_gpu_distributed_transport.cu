@@ -44,6 +44,7 @@ struct GpuDistributedTransport::Impl {
   std::vector<std::vector<int>> owned_faces;
   std::vector<std::pair<int, void *>> allocations;
   std::string error;
+  double min_area{INFINITY};
 
   ~Impl() {
     DeviceScope restore;
@@ -217,6 +218,8 @@ bool GpuDistributedTransport::Build(const Mesh &mesh,
   for (auto c : mesh.Cells())
     cells.push_back({{c.centre[0], c.centre[1], c.centre[2]}, c.width, c.active});
   for (auto f : mesh.Faces())
+    next->min_area = std::min(next->min_area, f.area);
+  for (auto f : mesh.Faces())
     faces.push_back({f.low, f.high, f.axis, {f.centre[0], f.centre[1], f.centre[2]}, f.area, f.aperture});
   for (size_t r = 0; r < devices.size(); ++r) {
     int device = devices[r];
@@ -303,6 +306,26 @@ bool GpuDistributedTransport::Advect(const std::vector<const double *> &velocity
                                      bool cubic,
                                      bool corrected,
                                      std::optional<double> inlet_speed) {
+  return Apply(velocity, destination, dt, cubic, corrected, inlet_speed, std::nullopt);
+}
+
+bool GpuDistributedTransport::AdvectDiffuse(const std::vector<const double *> &velocity,
+                                            const std::vector<double *> &destination,
+                                            double dt,
+                                            double speed,
+                                            bool cubic,
+                                            double viscosity,
+                                            double sponge_length) {
+  return Apply(velocity, destination, dt, cubic, true, speed, Diffusion{viscosity, sponge_length, speed});
+}
+
+bool GpuDistributedTransport::Apply(const std::vector<const double *> &velocity,
+                                    const std::vector<double *> &destination,
+                                    double dt,
+                                    bool cubic,
+                                    bool corrected,
+                                    std::optional<double> inlet_speed,
+                                    std::optional<Diffusion> diffusion) {
   DeviceScope restore;
   error_.clear();
   if (!impl_ || velocity.size() != impl_->ranks.size() || destination.size() != velocity.size() || !std::isfinite(dt) ||
@@ -310,6 +333,12 @@ bool GpuDistributedTransport::Advect(const std::vector<const double *> &velocity
       std::any_of(velocity.begin(), velocity.end(), [](auto p) { return !p; }) ||
       std::any_of(destination.begin(), destination.end(), [](auto p) { return !p; })) {
     error_ = "Invalid distributed transport fields or parameters";
+    return false;
+  }
+  if (diffusion && (!corrected || !(dt > 0) || !std::isfinite(diffusion->viscosity) || diffusion->viscosity < 0 ||
+                    !std::isfinite(diffusion->sponge_length) || diffusion->sponge_length < 0 ||
+                    !std::isfinite(diffusion->speed) || dt * diffusion->viscosity / impl_->min_area > 1.0 / 6)) {
+    error_ = "Invalid or unstable distributed diffusion parameters";
     return false;
   }
   auto &w = *impl_;
@@ -353,6 +382,20 @@ bool GpuDistributedTransport::Advect(const std::vector<const double *> &velocity
       if (!w.Check(cudaSetDevice(w.devices[r])))
         return fail();
       Correct<<<(f.face_count + 255) / 256, 256, 0, rank.stream>>>(f, rank.fields[1], dt, cubic, rank.result);
+      if (!w.Check(cudaGetLastError()))
+        return fail();
+    }
+    if (!w.Valid(-1))
+      return fail();
+  }
+  if (diffusion) {
+    for (size_t r = 0; r < w.ranks.size(); ++r) {
+      auto &rank = w.ranks[r];
+      auto f = rank.fields[0];
+      if (!w.Check(cudaSetDevice(w.devices[r])))
+        return fail();
+      DiffuseBoundary<<<(f.face_count + 255) / 256, 256, 0, rank.stream>>>(f, rank.result, dt, diffusion->viscosity,
+                                                                           diffusion->sponge_length, diffusion->speed);
       if (!w.Check(cudaGetLastError()))
         return fail();
     }

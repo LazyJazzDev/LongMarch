@@ -8,7 +8,7 @@
 namespace wind3d::amr {
 // Single-node advection with uniquely owned dynamic fields and peer sampling.
 // Geometry is replicated. Uses the same sampling kernels as GpuTransport;
-// topology changes require Build. Diffusion/projection/runtime are separate.
+// topology changes require Build. Projection/runtime are separate.
 class GpuDistributedTransport {
  public:
   GpuDistributedTransport();
@@ -35,11 +35,34 @@ class GpuDistributedTransport {
               bool corrected = true,
               std::optional<double> inlet_speed = std::nullopt);
 
+  // Corrected advection followed by molecular diffusion from the original
+  // slip-extended field, then outlet sponge and prescribed normal boundaries.
+  // Requires dt > 0 and dt*viscosity/min(face area) <= 1/6. Same owned-prefix,
+  // aliasing and transactional-output contract as Advect; no hidden prior call.
+  bool AdvectDiffuse(const std::vector<const double *> &velocity,
+                     const std::vector<double *> &destination,
+                     double dt,
+                     double speed,
+                     bool cubic = true,
+                     double viscosity = 1.5e-5,
+                     double sponge_length = 2);
+
   const std::string &Error() const {
     return error_;
   }
 
  private:
+  struct Diffusion {
+    double viscosity, sponge_length, speed;
+  };
+
+  bool Apply(const std::vector<const double *> &velocity,
+             const std::vector<double *> &destination,
+             double dt,
+             bool cubic,
+             bool corrected,
+             std::optional<double> inlet_speed,
+             std::optional<Diffusion> diffusion);
   struct Impl;
   std::unique_ptr<Impl> impl_;
   std::string error_;
