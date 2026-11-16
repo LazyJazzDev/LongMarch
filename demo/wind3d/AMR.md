@@ -798,3 +798,20 @@ method and has not been applied to production sources. Job 2001270 runs its
 static grid-128 aircraft diagnostic using an isolated boundary object and
 frozen executable. Geometry accuracy, cut-cell connectivity and spatial
 convergence must be resolved before accepting a production correction.
+
+
+## Completed matched compatible BiCGStab comparison
+
+Jobs 2001255/2001256/2001257 all completed 30000 steps. Over the same 2--6 s
+window, uniform-grid Fx/Fy/Mz means were 17.7368/12.0686/-13.4793; dynamic
+adaptive means were 17.8756/11.9426/-13.9738. Relative mean differences were
++0.78%/-1.04%/-3.67%, respectively (signed difference divided by absolute
+reference mean). Static mixed-grid differences were +6.32%/+7.45%/-14.88%.
+These short-window averages do not certify steady-state equivalence; dynamic
+Mz exceeds the 2% gate even before resolving stationarity and near-zero loads.
+
+Uniform and dynamic costs were 192.62 and 222.41 wall seconds per physical
+second, including adaptation. Dynamic AMR was about 15% slower in this run.
+The requested load accuracy and overall speedup therefore remain unachieved.
+The full six-component means, RMS fluctuations, half-window drifts and batch
+mean error estimates are in `out/wind3d-amr/compatible-statistics.json`.
