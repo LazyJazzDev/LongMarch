@@ -1504,3 +1504,47 @@ regression was not reproduced against both adjacent baselines. Communication
 still exchanges the full pressure face plan; compact iteration alone does not
 resolve scaling. The optimized single-device reference remains faster, and
 steady-load acceptance and distributed flow integration remain incomplete.
+
+### Selected coupled-face communication
+
+GpuPressureExchange::Build accepts an optional global face mask for queued
+imports only. Empty masks retain the full queued exchange; a full-sized zero
+mask queues no payload. Separate source and destination index lists scatter
+selected faces into their original ghost slots, preserving the layouts and
+full synchronous cell/face exchanges used by D, D^T and M. Invalid mask sizes
+leave the previous plan intact. The captured mass inverse supplies its free
+coupled-face mask; its polynomial, arithmetic and boundary conditions remain
+unchanged.
+
+A CPU partition diagnostic on the 442,368-cell mixed mesh counts 22,504 imported
+faces on four ranks, of which 5,560 are coupled. Across the 31 iterative
+exchanges this reduces double payload from 5,580,992 to 1,378,880 bytes (75.3%).
+This counts payload, not event overhead or total solver traffic. The two-rank
+counts are 11,840 and 5,360 (54.7% less payload). Eight-rank counts are 35,828
+and 9,268; the global coupled mask is conservative and may include a coupled
+face imported by a destination that only needs it for divergence.
+
+Job 2001374 passed the four exchange/operator/V-cycle/projection CTests and
+projection plus exchange memcheck with zero unsuppressed errors (the existing
+exact expected-704 suppression applies). Exchange tests cover unchanged full
+layouts and synchronous imports under all/none/sparse queued masks, invalid
+mask rollback, repeated enqueues, preserved unselected ghost sentinels, mixed
+and uniform meshes, and both device orders. Operator/projection tests retain
+the independent free-principal residual and repeated full-pressure checks.
+
+Job 2001375 passed operator initcheck and the full/component benchmarks. Within
+one allocation, frozen full-payload / selected-payload / full-payload warm
+projection means were:
+
+| GPUs | Full payload before | Selected payload | Full payload after |
+| --- | ---: | ---: | ---: |
+| 1 | 0.020156 | 0.020071 | 0.021638 |
+| 2 | 0.039198 | 0.039512 | 0.039447 |
+| 4 | 0.081271 | 0.084615 | 0.088241 |
+
+All runs retained 35 iterations, approximately 8.48e-10 true residual, and
+2.22e-16 velocity difference from the single-device reference. There is no
+established wall-time improvement beyond shared-node variation: less payload
+does not remove the per-iteration event barriers and graph scheduling cost.
+The change retains lower traffic without changing numerics; positive scaling,
+full-flow integration and the 2% steady-load acceptance remain unproven.

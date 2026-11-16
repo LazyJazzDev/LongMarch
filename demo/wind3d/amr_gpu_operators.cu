@@ -297,10 +297,6 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
     return false;
   }
   auto next = std::make_unique<Impl>();
-  if (!next->exchange.Build(partition, devices)) {
-    error_ = next->exchange.Error();
-    return false;
-  }
   std::vector<unsigned char> free(mesh.Faces().size()), coupled(mesh.Faces().size());
   std::vector<double> scale(mesh.Faces().size());
   for (size_t i = 0; i < free.size(); ++i) {
@@ -317,6 +313,10 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
           scale[i] = 1 / std::sqrt(f.area * f.distance * f.aperture);
           break;
         }
+  if (!next->exchange.Build(partition, devices, coupled)) {
+    error_ = next->exchange.Error();
+    return false;
+  }
   next->devices = devices;
   next->ranks.resize(devices.size());
   for (size_t r = 0; r < devices.size(); ++r) {

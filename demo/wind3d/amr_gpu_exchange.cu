@@ -13,6 +13,16 @@ __global__ void Gather(const double *values, const int *indices, int count, doub
     packed[i] = values[indices[i]];
 }
 
+__global__ void GatherScatter(const double *values,
+                              const int *indices,
+                              const int *destinations,
+                              int count,
+                              double *output) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < count)
+    output[destinations[i]] = values[indices[i]];
+}
+
 struct DeviceScope {
   int previous{-1};
 
@@ -38,6 +48,8 @@ struct GpuPressureExchange::Impl {
   struct Link {
     int source{}, destination{};
     Batch cells, faces;
+    int queued_count{};
+    int *queued_indices{}, *queued_destinations{};
   };
 
   std::vector<int> devices;
@@ -107,12 +119,18 @@ struct GpuPressureExchange::Impl {
 GpuPressureExchange::GpuPressureExchange() = default;
 GpuPressureExchange::~GpuPressureExchange() = default;
 
-bool GpuPressureExchange::Build(const PressurePartition &partition, const std::vector<int> &devices) {
+bool GpuPressureExchange::Build(const PressurePartition &partition,
+                                const std::vector<int> &devices,
+                                const std::vector<unsigned char> &queued_face_mask) {
   error_.clear();
   DeviceScope restore;
   if (devices.empty() || devices.size() != partition.OwnedCells().size() ||
       std::set<int>(devices.begin(), devices.end()).size() != devices.size()) {
     error_ = "Distinct devices must match the pressure partition ranks";
+    return false;
+  }
+  if (!queued_face_mask.empty() && queued_face_mask.size() != partition.FaceOwners().size()) {
+    error_ = "Queued face mask must match the global face count";
     return false;
   }
   auto next = std::make_unique<Impl>();
@@ -176,6 +194,24 @@ bool GpuPressureExchange::Build(const PressurePartition &partition, const std::v
     link.destination = destination;
     if (!next->BatchBuild(link.cells, source, exchange.cells, cell_index, next->layouts[destination].cells) ||
         !next->BatchBuild(link.faces, source, exchange.faces, face_index, next->layouts[destination].faces)) {
+      error_ = next->error;
+      return false;
+    }
+    std::vector<int> indices, destinations;
+    for (size_t i = 0; i < exchange.faces.size(); ++i) {
+      int face = exchange.faces[i];
+      if (queued_face_mask.empty() || queued_face_mask[face]) {
+        indices.push_back(face_index[face]);
+        destinations.push_back(int(link.faces.destination_offset + i));
+      }
+    }
+    link.queued_count = int(indices.size());
+    if (link.queued_count && (!next->Allocate(devices[source], link.queued_indices, indices.size()) ||
+                              !next->Allocate(devices[source], link.queued_destinations, destinations.size()) ||
+                              !next->Check(cudaMemcpy(link.queued_indices, indices.data(), indices.size() * sizeof(int),
+                                                      cudaMemcpyHostToDevice)) ||
+                              !next->Check(cudaMemcpy(link.queued_destinations, destinations.data(),
+                                                      destinations.size() * sizeof(int), cudaMemcpyHostToDevice)))) {
       error_ = next->error;
       return false;
     }
@@ -263,15 +299,15 @@ bool GpuPressureExchange::EnqueueFaces(const std::vector<double *> &values, cons
   if (!barrier())
     return fail();
   for (const auto &link : w.links) {
-    const auto &batch = link.faces;
-    if (!batch.count)
+    if (!link.queued_count)
       continue;
     int source = w.devices[link.source];
     if (!w.Check(cudaSetDevice(source)))
       return fail();
     auto stream = streams[link.source];
-    Gather<<<(batch.count + 255) / 256, 256, 0, stream>>>(values[link.source], batch.indices, batch.count,
-                                                          values[link.destination] + batch.destination_offset);
+    GatherScatter<<<(link.queued_count + 255) / 256, 256, 0, stream>>>(values[link.source], link.queued_indices,
+                                                                       link.queued_destinations, link.queued_count,
+                                                                       values[link.destination]);
     if (!w.Check(cudaGetLastError()))
       return fail();
   }
