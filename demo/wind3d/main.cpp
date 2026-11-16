@@ -26,6 +26,18 @@ int main(int argc, char **argv) {
       solver.leapfrog_flow_maps = true;
     else if (key == "--maccormack")
       solver.leapfrog_flow_maps = false;
+    else if (key == "--wall-model")
+      solver.wall_model = true;
+    else if (key == "--slip-walls") {
+      solver.wall_model = true;
+      solver.wall_momentum = false;
+    } else if (key == "--cut-cells") {
+      solver.wall_model = solver.cut_cells = true;
+      solver.wall_momentum = false;
+    } else if (key == "--cubic")
+      solver.cubic = true;
+    else if (key == "--no-export")
+      solver.export_field = solver.export_vorticity = false;
     else if (key == "--first-order") {
       solver.leapfrog_flow_maps = false;
       solver.corrected_transport = false;
@@ -42,7 +54,7 @@ int main(int argc, char **argv) {
           << "demo_wind3d [--backend vulkan|d3d12] [--grid 64..640, multiple of 16] "
              "[--speed 1..30] [--angle -20..25] [--flap 0..40] [--aileron -25..25] "
              "[--elevator -25..25] [--rudder -25..25] [--frames N] [--headless] "
-             "[--lfm|--maccormack|--first-order] [--cfl 0.05..8] [--max-dt SECONDS] [--diagnostics file.csv] [--validate-time SECONDS] [--pressure-tolerance 1e-6..0.1] [--pressure-cycles 1..256] [--model-only] [--yaw RADIANS] [--pitch RADIANS] [--distance METRES] [--capture image.ppm] [--validate --steps N] [--debug]\n";
+             "[--lfm|--maccormack|--first-order] [--viscosity NU] [--wall-viscosity NU] [--wall-model|--slip-walls|--cut-cells] [--cubic] [--sponge METRES] [--no-export] [--cfl 0.05..8] [--max-dt SECONDS] [--diagnostics file.csv] [--validate-time SECONDS] [--pressure-tolerance 1e-6..0.1] [--pressure-cycles 1..256] [--model-only] [--yaw RADIANS] [--pitch RADIANS] [--distance METRES] [--capture image.ppm] [--validate --steps N] [--debug]\n";
       return 0;
     } else {
       if (++i >= argc) {
@@ -90,6 +102,12 @@ int main(int argc, char **argv) {
           solver.pressure_tolerance = number;
         else if (key == "--cfl")
           solver.cfl = number;
+        else if (key == "--viscosity")
+          solver.viscosity = number;
+        else if (key == "--wall-viscosity")
+          solver.wall_viscosity = number;
+        else if (key == "--sponge")
+          solver.sponge = number;
         else if (key == "--max-dt")
           solver.max_dt = number;
         else if (key == "--yaw")

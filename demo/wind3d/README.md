@@ -66,6 +66,28 @@ complete worker-cycle wall time. Frontend FPS, solver Hz and physical time / wal
 time are displayed separately. Interactive rendering is capped at 60 Hz to leave
 GPU time for solving.
 
+### Aerodynamic investigation controls
+
+The desktop CLI exposes `--viscosity`, `--wall-viscosity`, `--wall-model`,
+`--slip-walls`, `--cut-cells`, `--cubic`, `--sponge` and `--no-export` for controlled
+solver comparisons. Viscosities are kinematic, in m²/s. `--cut-cells` enables the
+existing slip-flow/wall-shear load split; it is not a resolved boundary layer.
+LFM extrapolates masked face velocities for every midpoint and for the physical
+pressure predictor, consistently with this slip-wall interpolation. The physical
+velocity still satisfies the blocked-face boundary condition after projection.
+
+Diagnostic CSV rows now include pressure and friction force components, each
+aircraft component's drag/lift, all control settings, grid and physical solver
+parameters. Component ordering is fuselage, wing, horizontal tail, vertical tail,
+and nacelle (including pylons). Use a fixed physical-time averaging window and
+check pressure convergence before comparing runs; a higher L/D by itself does
+not prove accuracy. The desktop defaults are unchanged by these investigation
+controls.
+
+```powershell
+demo_wind3d --lfm --grid 128 --validate-time 3 --no-export --viscosity 0.000015 --wall-viscosity 0.000015 --cut-cells --cubic --sponge 2 --cfl 0.25 --diagnostics out/aero.csv
+```
+
 ### Vorticity volume rendering
 
 The default view ray-marches the full solver-grid magnitude of curl(u), computed

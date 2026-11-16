@@ -1081,6 +1081,21 @@ struct Simulation::Impl {
     return true;
   }
 
+  bool ExtendLfmVelocity(float *x, float *y, float *z) {
+    if (!options.wall_model)
+      return true;
+    int fb = ((grid.nx + 1) * (grid.ny + 1) * (grid.nz + 1) + 255) / 256;
+    const unsigned char *masks[] = {bu, bv, bw};
+    float *fields[] = {x, y, z};
+    for (int layer = 1; layer <= 2; ++layer)
+      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+            for (int axis = 0; axis < 3; ++axis)
+              Extrapolate<<<blocks, 256, 0, queue>>>(g, masks[axis], fields[axis], layer);
+          }))
+        return false;
+    return true;
+  }
+
   // All temporary midpoint/map state is private to a cycle. Checkpoints and
   // control changes therefore always land on a complete LFM reinitialization.
   bool LfmTransport(float dt, const Controls &controls, Physics physics, bool initialize) {
@@ -1106,6 +1121,8 @@ struct Simulation::Impl {
           }))
         return false;
     }
+    if (!ExtendLfmVelocity(u, v, w))
+      return false;
     LfmHistory history{};
     for (int i = 0; i < lfm_intervals; ++i) {
       float **advecting = i ? lfm_mid[i - 1] : initial;
@@ -1137,6 +1154,8 @@ struct Simulation::Impl {
             Project<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, lfm_gauge, lfm_mid[i][0], lfm_mid[i][1], lfm_mid[i][2],
                                                interval);
           }))
+        return false;
+      if (!ExtendLfmVelocity(lfm_mid[i][0], lfm_mid[i][1], lfm_mid[i][2]))
         return false;
       for (int axis = 0; axis < 3; ++axis)
         history.velocity[i].axis[axis] = lfm_mid[i][axis];
@@ -1183,11 +1202,24 @@ struct Simulation::Impl {
     int fb = ((grid.nx + 1) * (grid.ny + 1) * (grid.nz + 1) + 255) / 256;
     int cb = (grid.nx * grid.ny * grid.nz + 255) / 256;
     float *source[] = {u, v, w};
+    // Use the same slip-wall extension as transport when recovering pressure.
+    // Zero-filled solid faces otherwise create artificial predictor deceleration.
+    if (options.wall_model) {
+      size_t bytes = size_t(grid.nx + 1) * (grid.ny + 1) * (grid.nz + 1) * sizeof(float);
+      for (int axis = 0; axis < 3; ++axis) {
+        if (!Check(cudaMemcpyAsync(lfm_impulse[axis], source[axis], bytes, cudaMemcpyDeviceToDevice, stream)))
+          return false;
+        source[axis] = lfm_impulse[axis];
+      }
+      if (!ExtendLfmVelocity(source[0], source[1], source[2]))
+        return false;
+    }
     if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
           for (int axis = 0; axis < 3; ++axis) {
-            Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, source[axis], lfm_mid[0][axis], axis, dt);
-            CorrectTransport<<<blocks, 256, 0, queue>>>(g, u, v, w, source[axis], nullptr, lfm_mid[0][axis], bu, bv, bw,
-                                                        axis, dt, physics);
+            Advect<<<blocks, 256, 0, queue>>>(g, source[0], source[1], source[2], source[axis], lfm_mid[0][axis], axis,
+                                              dt);
+            CorrectTransport<<<blocks, 256, 0, queue>>>(g, source[0], source[1], source[2], source[axis], nullptr,
+                                                        lfm_mid[0][axis], bu, bv, bw, axis, dt, physics);
           }
           Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, lfm_mid[0][0], lfm_mid[0][1], lfm_mid[0][2],
                                               controls.speed, false);
@@ -1348,7 +1380,7 @@ struct Simulation::Impl {
         return;
       }
       diagnostics
-          << "step,generation,time,dt,max_speed,divergence_before,divergence_after,pressure_residual,pressure_cycles,pressure_converged,fx,fy,fz,mx,my,mz,step_seconds,transport_seconds,pressure_seconds,diagnostics_seconds,force_norm,moment_norm,lift_drag_ratio,mean_lift_drag_ratio,lfm\n";
+          << "step,generation,time,dt,max_speed,divergence_before,divergence_after,pressure_residual,pressure_cycles,pressure_converged,fx,fy,fz,mx,my,mz,step_seconds,transport_seconds,pressure_seconds,diagnostics_seconds,force_norm,moment_norm,lift_drag_ratio,mean_lift_drag_ratio,lfm,pressure_fx,pressure_fy,pressure_fz,friction_fx,friction_fy,friction_fz,fuselage_drag,fuselage_lift,wing_drag,wing_lift,horizontal_tail_drag,horizontal_tail_lift,vertical_tail_drag,vertical_tail_lift,nacelle_drag,nacelle_lift,speed,angle,flap,aileron,elevator,rudder,grid,viscosity,wall_viscosity,wall_model,wall_momentum,cut_cells,cubic,cfl,sponge\n";
       diagnostics << std::setprecision(17);
     }
     auto g = grid;
@@ -1709,7 +1741,17 @@ struct Simulation::Impl {
         diagnostics << ',';
         if (std::abs(impulse[0]) > 1e-4 * time)
           diagnostics << impulse[1] / impulse[0];
-        diagnostics << ',' << options.leapfrog_flow_maps << '\n';
+        diagnostics << ',' << options.leapfrog_flow_maps;
+        for (int k = 0; k < 3; ++k)
+          diagnostics << ',' << force[k] - friction[k];
+        for (double value : friction)
+          diagnostics << ',' << value;
+        for (int k = 0; k < kComponents; ++k)
+          diagnostics << ',' << drag[k] << ',' << lift[k];
+        diagnostics << ',' << controls.speed << ',' << controls.angle << ',' << controls.flap << ',' << controls.aileron
+                    << ',' << controls.elevator << ',' << controls.rudder << ',' << g.nx << ',' << options.viscosity
+                    << ',' << options.wall_viscosity << ',' << options.wall_model << ',' << options.wall_momentum << ','
+                    << options.cut_cells << ',' << options.cubic << ',' << options.cfl << ',' << options.sponge << '\n';
         if (step % 32 == 0)
           diagnostics.flush();
         if (!diagnostics) {
