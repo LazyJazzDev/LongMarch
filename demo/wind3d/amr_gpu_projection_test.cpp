@@ -48,6 +48,19 @@ int Run(bool embedded) {
     if (error > 1e-7 * std::max(1.0, scale))
       return 10;
   }
+  GpuProjection scalar;
+  auto scalar_u = before;
+  std::vector<double> scalar_p;
+  if (!scalar.Build(0, mesh, g, true, false) || !scalar.Project(scalar_u, scalar_p).converged)
+    return 30;
+  double row_difference = 0;
+  for (size_t i = 0; i < u.size(); ++i)
+    row_difference = std::max(row_difference, std::abs(u[i] - scalar_u[i]));
+  for (size_t i = 0; i < p.size(); ++i)
+    row_difference = std::max(row_difference, std::abs(p[i] - scalar_p[i]));
+  if (!std::isfinite(row_difference) || row_difference > 1e-7)
+    return 31;
+  std::cout << "cooperative/scalar row maximum field difference=" << row_difference << '\n';
   GpuProjection diagonal;
   auto diagonal_u = before;
   std::vector<double> diagonal_p;

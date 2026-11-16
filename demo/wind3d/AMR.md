@@ -272,6 +272,18 @@ them as part of an experiment without a new reason/authorization.
   measurement. The experimental layout was removed; CSR remains the default.
   The built task from this experiment must be rebuilt from current sources
   before further baseline measurements.
+- Pressure CSR products, smoothing and residual kernels now use four threads
+  per row with subgroup shuffle reduction. Matrix storage and convergence
+  tolerances remain unchanged; `GpuProjection::Build(..., true, false)` retains
+  scalar rows for comparison. Job 2001219 passed projection, full-step, regrid
+  and CUDA memcheck tests. Free/embedded field differences from scalar rows
+  were below 1.25e-14. In two alternating, same-device 30-step aircraft pairs
+  (grid 128, first 10 steps excluded), pressure fell from 13.02/13.04 ms to
+  10.06/10.08 ms, while total steps fell from 17.07/17.08 ms to 14.11/14.33 ms.
+  Both variants averaged 19.4 pressure iterations. Maximum component changes
+  were 2.07e-5 in force and 1.0e-5 in moment over the 30 steps. These controlled
+  startup comparisons support this kernel optimization, not steady-load
+  acceptance or speedup over the original uniform backend.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

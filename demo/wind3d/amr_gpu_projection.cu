@@ -12,19 +12,31 @@
 namespace wind3d::amr {
 namespace {
 struct Matrix {
-  int rows{};
+  int rows{}, width{1};
   int *offsets{}, *columns{};
   double *weights{};
 };
 
+template <int Width>
+__device__ double RowProduct(Matrix a, int row, const double *x) {
+  double sum = 0;
+  for (int k = a.offsets[row] + threadIdx.x % Width; k < a.offsets[row + 1]; k += Width)
+    sum += a.weights[k] * x[a.columns[k]];
+  // Each row owns a complete subgroup, including at a partial final warp.
+  unsigned mask = __activemask();
+  for (int offset = Width / 2; offset; offset /= 2)
+    sum += __shfl_down_sync(mask, sum, offset, Width);
+  return sum;
+}
+
+template <int Width>
 __global__ void Multiply(Matrix a, const double *x, double *y) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = (blockIdx.x * blockDim.x + threadIdx.x) / Width;
   if (i >= a.rows)
     return;
-  double sum = 0;
-  for (int k = a.offsets[i]; k < a.offsets[i + 1]; ++k)
-    sum += a.weights[k] * x[a.columns[k]];
-  y[i] = sum;
+  double sum = RowProduct<Width>(a, i, x);
+  if (threadIdx.x % Width == 0)
+    y[i] = sum;
 }
 
 __global__ void
@@ -78,24 +90,24 @@ __global__ void FirstSmooth(int n, const double *diagonal, const double *rhs, do
     next[i] = .65 * rhs[i] / diagonal[i];
 }
 
+template <int Width>
 __global__ void Smooth(Matrix a, const double *diagonal, const double *rhs, const double *x, double *next) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = (blockIdx.x * blockDim.x + threadIdx.x) / Width;
   if (i >= a.rows)
     return;
-  double ax = 0;
-  for (int k = a.offsets[i]; k < a.offsets[i + 1]; ++k)
-    ax += a.weights[k] * x[a.columns[k]];
-  next[i] = x[i] + .65 * (rhs[i] - ax) / diagonal[i];
+  double ax = RowProduct<Width>(a, i, x);
+  if (threadIdx.x % Width == 0)
+    next[i] = x[i] + .65 * (rhs[i] - ax) / diagonal[i];
 }
 
+template <int Width>
 __global__ void Residual(Matrix a, const double *rhs, const double *x, double *residual) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = (blockIdx.x * blockDim.x + threadIdx.x) / Width;
   if (i >= a.rows)
     return;
-  double ax = 0;
-  for (int k = a.offsets[i]; k < a.offsets[i + 1]; ++k)
-    ax += a.weights[k] * x[a.columns[k]];
-  residual[i] = rhs[i] - ax;
+  double ax = RowProduct<Width>(a, i, x);
+  if (threadIdx.x % Width == 0)
+    residual[i] = rhs[i] - ax;
 }
 
 __global__ void Prolong(int n, const int *parent, const double *coarse, double *fine) {
@@ -125,7 +137,7 @@ using Rows = std::vector<std::map<int, double>>;
 
 struct GpuProjection::Impl {
   int device{}, n{}, nf{};
-  bool ok{true};
+  bool ok{true}, cooperative{true};
   std::string error;
   cublasHandle_t blas{};
   std::vector<void *> allocations;
@@ -194,11 +206,15 @@ struct GpuProjection::Impl {
       offsets.push_back(int(weights.size()));
     }
     m.rows = int(rows.size());
+    m.width = cooperative ? 4 : 1;
     return Upload(m.offsets, offsets) && Upload(m.columns, columns) && Upload(m.weights, weights);
   }
 
-  void Apply(Matrix m, const double *in, double *out) {
-    Multiply<<<(m.rows + 255) / 256, 256>>>(m, in, out);
+  void Apply(Matrix m, const double *in, double *out, cudaStream_t stream = nullptr) {
+    if (m.width == 4)
+      Multiply<4><<<(m.rows + 63) / 64, 256, 0, stream>>>(m, in, out);
+    else
+      Multiply<1><<<(m.rows + 255) / 256, 256, 0, stream>>>(m, in, out);
     Check(cudaGetLastError());
   }
 
@@ -338,17 +354,26 @@ struct GpuProjection::Impl {
       DenseSolve<<<blocks, 256, 0, stream>>>(count, level.inverse, level.rhs, level.x);
       return;
     }
+    auto smooth = [&] {
+      if (level.a.width == 4)
+        Smooth<4><<<(count + 63) / 64, 256, 0, stream>>>(level.a, level.diagonal, level.rhs, level.x, level.scratch);
+      else
+        Smooth<1><<<blocks, 256, 0, stream>>>(level.a, level.diagonal, level.rhs, level.x, level.scratch);
+    };
     FirstSmooth<<<blocks, 256, 0, stream>>>(count, level.diagonal, level.rhs, level.scratch);
     std::swap(level.x, level.scratch);
-    Smooth<<<blocks, 256, 0, stream>>>(level.a, level.diagonal, level.rhs, level.x, level.scratch);
+    smooth();
     std::swap(level.x, level.scratch);
-    Residual<<<blocks, 256, 0, stream>>>(level.a, level.rhs, level.x, level.residual);
+    if (level.a.width == 4)
+      Residual<4><<<(count + 63) / 64, 256, 0, stream>>>(level.a, level.rhs, level.x, level.residual);
+    else
+      Residual<1><<<blocks, 256, 0, stream>>>(level.a, level.rhs, level.x, level.residual);
     auto &coarse = levels[index + 1];
-    Multiply<<<(coarse.a.rows + 255) / 256, 256, 0, stream>>>(level.restriction, level.residual, coarse.rhs);
+    Apply(level.restriction, level.residual, coarse.rhs, stream);
     Cycle(index + 1, stream);
     Prolong<<<blocks, 256, 0, stream>>>(count, level.parent, coarse.x, level.x);
     for (int sweep = 0; sweep < 2; ++sweep) {
-      Smooth<<<blocks, 256, 0, stream>>>(level.a, level.diagonal, level.rhs, level.x, level.scratch);
+      smooth();
       std::swap(level.x, level.scratch);
     }
   }
@@ -399,9 +424,14 @@ std::string GpuProjection::Error() const {
   return !build_error_.empty() ? build_error_ : (impl_ ? impl_->error : "GPU projection is not built");
 }
 
-bool GpuProjection::Build(int device, const Mesh &mesh, const FaceGradient &gradient, bool multilevel) {
+bool GpuProjection::Build(int device,
+                          const Mesh &mesh,
+                          const FaceGradient &gradient,
+                          bool multilevel,
+                          bool cooperative) {
   auto next = std::make_unique<Impl>();
   next->device = device;
+  next->cooperative = cooperative;
   auto fail = [&](const char *reason) {
     build_error_ = next->error.empty() ? reason : next->error;
     return false;

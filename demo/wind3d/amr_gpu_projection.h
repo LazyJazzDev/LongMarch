@@ -12,7 +12,12 @@ class GpuProjection {
   GpuProjection(const GpuProjection &) = delete;
   GpuProjection &operator=(const GpuProjection &) = delete;
   // Fixed linear aggregation V-cycle by default; false selects Jacobi for comparison.
-  bool Build(int device, const Mesh &mesh, const FaceGradient &gradient, bool multilevel = true);
+  // Four threads share a matrix row by default; false retains scalar rows for comparison.
+  bool Build(int device,
+             const Mesh &mesh,
+             const FaceGradient &gradient,
+             bool multilevel = true,
+             bool cooperative = true);
   ProjectionResult Project(std::vector<double> &velocity,
                            std::vector<double> &potential,
                            double tolerance = 1e-9,
