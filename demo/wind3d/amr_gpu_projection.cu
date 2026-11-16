@@ -7,12 +7,22 @@
 #include <cmath>
 #include <limits>
 #include <map>
+#include <unordered_map>
 
 #include "amr_gpu_mass.h"
 #include "amr_gpu_projection.h"
 
 namespace wind3d::amr {
 namespace {
+struct GroupHash {
+  size_t operator()(const std::array<long long, 3> &key) const {
+    size_t hash = 0;
+    for (auto value : key)
+      hash ^= std::hash<long long>{}(value) + size_t(0x9e3779b9) + (hash << 6) + (hash >> 2);
+    return hash;
+  }
+};
+
 struct Matrix {
   int rows{}, width{1};
   int *offsets{}, *columns{};
@@ -266,7 +276,7 @@ struct GpuProjection::Impl {
   }
 
   bool BuildLevels(const Mesh &mesh, const Rows &fine) {
-    Rows current = fine;
+    Rows coarse_storage;
     std::vector<std::array<double, 3>> centres;
     std::vector<double> volumes;
     std::array<double, 3> origin{INFINITY, INFINITY, INFINITY};
@@ -279,6 +289,7 @@ struct GpuProjection::Impl {
         origin[k] = std::min(origin[k], c.centre[k] - .5 * c.width);
     }
     for (int depth = 0; depth < 32; ++depth) {
+      const Rows &current = depth ? coarse_storage : fine;
       Level level;
       if (depth == 0) {
         level.a = a;
@@ -286,7 +297,8 @@ struct GpuProjection::Impl {
       } else {
         std::vector<double> diag(current.size());
         for (size_t i = 0; i < current.size(); ++i) {
-          diag[i] = current[i][int(i)];
+          auto entry = current[i].find(int(i));
+          diag[i] = entry == current[i].end() ? 0 : entry->second;
           if (!(diag[i] > 0) || !std::isfinite(diag[i])) {
             error = "Invalid coarse diagonal";
             return false;
@@ -347,7 +359,9 @@ struct GpuProjection::Impl {
         return true;
       }
       width *= 2;
-      std::map<std::array<long long, 3>, int> groups;
+      // IDs follow first encounter in cell order; hash-table iteration is never used.
+      std::unordered_map<std::array<long long, 3>, int, GroupHash> groups;
+      groups.reserve(size_t(count) / 4 + 1);
       std::vector<int> parent(count, -1);
       std::vector<std::array<double, 3>> coarse_centres;
       std::vector<double> coarse_volumes;
@@ -386,7 +400,7 @@ struct GpuProjection::Impl {
       if (!Upload(level.parent, parent) || !UploadMatrix(level.restriction, restriction))
         return false;
       levels.push_back(level);
-      current = std::move(coarse);
+      coarse_storage = std::move(coarse);
       centres = std::move(coarse_centres);
       volumes = std::move(coarse_volumes);
     }

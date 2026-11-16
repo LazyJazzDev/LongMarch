@@ -841,3 +841,28 @@ for underresolved geometry, not a multi-region cut-cell method: it can shift
 the effective boundary by O(h), and does not guarantee detection of arbitrarily
 thin unsampled features. Aircraft load and resolution comparisons must be
 repeated with matching corrected geometry before accuracy can be accepted.
+
+
+## Pressure hierarchy construction overhead
+
+Cold-stage profiling (job 2001277) attributes typical changed-hierarchy cost to
+mesh construction (~0.09 s), embedding (~0.20 s), pressure construction
+(~0.7--0.9 s), velocity transfer (~0.45--0.50 s), and remap projection (~0.012 s).
+Within pressure construction, sparse row assembly, mass/transpose construction
+and aggregation all contribute materially; GPU remap solve time is not the
+main bottleneck.
+
+Aggregation now borrows the immutable fine matrix instead of deep-copying every
+sparse row. Spatial group lookup uses a hash table, with IDs still assigned by
+first encounter in unchanged cell order; hash iteration never determines an
+operator entry or reduction order. Coarse matrices retain the existing ordered
+assembly and arithmetic.
+
+Job 2001278 passed projection/flow CTests and flow memcheck (zero errors).
+Paired 1200-step corrected-geometry aircraft runs had exactly identical printed
+physical CSV data (loads, clocks, dt, cell counts and generations), including
+three actual regrids. Initialization measured 1.763 versus 1.636 s; individual
+regrids measured 1.566/1.513/1.535 versus 1.513/1.511/1.474 s. Overall mean step
+time was effectively unchanged (19.169 versus 19.179 ms), so this sample does
+not establish a meaningful whole-run speedup. Avoided fine-matrix allocations
+and lookup overhead remain a limited construction improvement.
