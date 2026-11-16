@@ -115,15 +115,20 @@ bool Render(IDevice *device,
       height = swap->GetDesc().height;
       if (!window->UpdateImGui([&] {
             logical_width = ImGui::GetIO().DisplaySize.x;
-            ImGui::SetNextWindowPos({logical_width - 350, 0});
-            ImGui::SetNextWindowSize({350, ImGui::GetIO().DisplaySize.y});
+            ImGui::SetNextWindowPos({logical_width - 410, 0});
+            ImGui::SetNextWindowSize({410, ImGui::GetIO().DisplaySize.y});
             ImGui::Begin("Wind3D", nullptr,
                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
             ImGui::Text("Frontend %.1f fps", fps);
             if (state) {
+              ImGui::TextUnformatted(state->leapfrog_flow_maps ? "Leapfrog Flow Maps | 5 substeps/cycle"
+                                                               : "MacCormack transport");
               ImGui::Text("CUDA step %.1f ms | #%llu", state->step_seconds * 1000,
                           static_cast<unsigned long long>(state->step));
               ImGui::Text("Simulation %.3f s | dt %.4f", state->time, state->dt);
+              if (state->step_seconds > 0)
+                ImGui::Text("Solver %.1f Hz | physical time %.2fx", 1 / state->step_seconds,
+                            state->dt / state->step_seconds);
               ImGui::Text("Grid %d | pressure %.2g (%d PCG)", state->solver_nx, state->pressure_residual,
                           state->pressure_cycles);
               if (!state->pressure_converged)
@@ -131,32 +136,47 @@ bool Render(IDevice *device,
               ImGui::Text("Divergence RMS %.4g -> %.4g", state->divergence_before, state->divergence_after);
             } else
               ImGui::TextUnformatted("Building first flow snapshot...");
-            ImGui::SeparatorText("Wind and controls");
-            ImGui::SliderFloat("Wind m/s", &controls.speed, 1, 30);
-            ImGui::SliderFloat("Incidence", &controls.angle, -20, 25, "%.1f deg");
-            ImGui::SliderFloat("Flaps", &controls.flap, 0, 40, "%.1f deg");
-            ImGui::SliderFloat("Ailerons", &controls.aileron, -25, 25, "%.1f deg");
-            ImGui::SliderFloat("Elevator", &controls.elevator, -25, 25, "%.1f deg");
-            ImGui::SliderFloat("Rudder", &controls.rudder, -25, 25, "%.1f deg");
+            if (ImGui::CollapsingHeader("Wind and controls")) {
+              ImGui::SliderFloat("Wind m/s", &controls.speed, 1, 30);
+              ImGui::SliderFloat("Incidence", &controls.angle, -20, 25, "%.1f deg");
+              ImGui::SliderFloat("Flaps", &controls.flap, 0, 40, "%.1f deg");
+              ImGui::SliderFloat("Ailerons", &controls.aileron, -25, 25, "%.1f deg");
+              ImGui::SliderFloat("Elevator", &controls.elevator, -25, 25, "%.1f deg");
+              ImGui::SliderFloat("Rudder", &controls.rudder, -25, 25, "%.1f deg");
+            }
             ImGui::Checkbox("Pause solver", &paused);
             ImGui::SameLine();
             if (ImGui::Button("Reset"))
               simulation.Reset();
-            ImGui::TextWrapped(
-                "Controls apply at the next solver step. Model and flow display the same completed state.");
-            ImGui::SeparatorText("View");
-            rebuild |= ImGui::Checkbox("3D streamlines", &streamlines);
-            rebuild |= ImGui::Checkbox("Force and moment vectors", &show_loads);
-            ImGui::SliderFloat("Orbit", &yaw, -3.14f, 3.14f);
-            ImGui::SliderFloat("Elevation", &pitch, -1.55f, 1.55f);
-            ImGui::SliderFloat("Distance", &distance, 7, 25);
-            ImGui::TextWrapped("Drag outside panel to orbit; wheel to zoom. Flow: blue = slow, yellow = fast.");
+            if (ImGui::CollapsingHeader("View")) {
+              rebuild |= ImGui::Checkbox("3D streamlines", &streamlines);
+              rebuild |= ImGui::Checkbox("Force and moment vectors", &show_loads);
+              ImGui::SliderFloat("Orbit", &yaw, -3.14f, 3.14f);
+              ImGui::SliderFloat("Elevation", &pitch, -1.55f, 1.55f);
+              ImGui::SliderFloat("Distance", &distance, 7, 25);
+              ImGui::TextWrapped("Drag outside panel to orbit; wheel to zoom. Flow: blue = slow, yellow = fast.");
+            }
             ImGui::SeparatorText("Integrated aircraft loads");
             if (state) {
               ImGui::TextColored({0.1f, 1, 0.8f, 1}, "Force [N]");
               ImGui::Text("Fx % .3f\nFy % .3f\nFz % .3f", state->force.x, state->force.y, state->force.z);
+              ImGui::Text("Magnitude %.3f N", Length(state->force));
               ImGui::TextColored({1, 0.25f, 0.85f, 1}, "Moment [N m], about body origin");
               ImGui::Text("Mx % .3f\nMy % .3f\nMz % .3f", state->moment.x, state->moment.y, state->moment.z);
+              ImGui::Text("Magnitude %.3f N m", Length(state->moment));
+              ImGui::Text("Lift %.3f N | Drag %.3f N", state->force.y, state->force.x);
+              if (std::abs(state->force.x) > 1e-4f)
+                ImGui::Text("Instant L/D %.3f", state->force.y / state->force.x);
+              else
+                ImGui::TextUnformatted("Instant L/D undefined (near-zero drag)");
+              if (state->time > 0) {
+                double drag = state->impulse[0] / state->time, lift = state->impulse[1] / state->time;
+                ImGui::Text("Mean lift %.3f N | drag %.3f N", lift, drag);
+                if (std::abs(drag) > 1e-4)
+                  ImGui::Text("Mean L/D %.3f", lift / drag);
+                ImGui::TextWrapped(
+                    "Means are time-weighted since reset, including startup. L/D is mean lift / mean drag.");
+              }
             }
             ImGui::TextWrapped(
                 "+x downstream, +y up, +z starboard. Moment follows right-hand rule. Arrows share an elevated origin with compressed length.");
@@ -200,7 +220,7 @@ bool Render(IDevice *device,
       rebuild = false;
     }
     float viewport_width =
-        headless ? float(width) : std::max(1.0f, float(width) * (logical_width - 350) / logical_width);
+        headless ? float(width) : std::max(1.0f, float(width) * (logical_width - 410) / logical_width);
     glm::vec3 eye{distance * cosf(pitch) * sinf(yaw), distance * sinf(pitch), distance * cosf(pitch) * cosf(yaw)};
     auto transform = glm::perspectiveZO(glm::radians(45.0f), viewport_width / height, 0.1f, 80.0f) *
                      glm::lookAt(eye, glm::vec3(0), glm::vec3(0, 1, 0));
@@ -252,6 +272,10 @@ bool Render(IDevice *device,
     ++rendered;
     if (headless)
       std::this_thread::sleep_for(std::chrono::milliseconds(8));
+    else
+      // The renderer otherwise spins above 1000 FPS and competes with CUDA for
+      // the same GPU. Keep camera/UI updates at 60 Hz independently of solving.
+      std::this_thread::sleep_until(now + std::chrono::microseconds(16667));
   }
   float duration = std::chrono::duration<float>(std::chrono::steady_clock::now() - beginning).count();
   std::cout << "frames=" << rendered << " snapshots=" << updates << " wall_seconds=" << duration

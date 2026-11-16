@@ -89,7 +89,21 @@ inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
   simulation.Configure(controls, false);
   if (!wait_for([&] { return simulation.Latest()->step > reset->step; }))
     return false;
-  std::cout << "lifecycle_validation=PASS (pause, reset, controls, resume, immutable snapshot)\n";
+  // Exercise a changed inlet without a geometry rebuild or resetting maps.
+  controls.speed = 10;
+  auto before_change = simulation.Latest();
+  simulation.Configure(controls, false);
+  if (!wait_for([&] {
+        auto state = simulation.Latest();
+        return state->controls.speed == controls.speed && state->step >= before_change->step + 3;
+      }))
+    return false;
+  auto changed = simulation.Latest();
+  if (changed->generation != reset->generation || !changed->pressure_converged ||
+      !std::isfinite(Length(changed->force) + Length(changed->moment)) ||
+      changed->divergence_after >= std::max(1e-5f, changed->divergence_before * 0.001f))
+    return false;
+  std::cout << "lifecycle_validation=PASS (pause, reset, controls, resume, live inlet change, immutable snapshot)\n";
   return true;
 }
 }  // namespace wind3d

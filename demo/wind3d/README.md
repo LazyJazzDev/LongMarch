@@ -11,6 +11,93 @@ cmake-build-release/demo/wind3d/demo_wind3d --backend vulkan
 cmake-build-release/demo/wind3d/demo_wind3d --backend d3d12 --grid 256
 ```
 
+## Leapfrog Flow Maps desktop solver
+
+The desktop executable now defaults to **LFM on a 96 × 48 × 72 grid**.
+`--grid 128` increases detail; `--maccormack --grid 192` selects the previous
+desktop default. The library, batch and AMR defaults are unchanged. LFM currently
+requires one GPU; requesting it through `SolverOptions` with multiple devices
+fails explicitly.
+
+```powershell
+cmake-build-release/demo/wind3d/demo_wind3d --lfm --grid 96
+cmake-build-release/demo/wind3d/demo_wind3d --lfm --validate --grid 96 --steps 1000 --diagnostics out/lfm.csv
+cmake --build cmake-build-release --target wind3d_lfm_check
+cmake-build-release/demo/wind3d/wind3d_lfm_check --lfm
+```
+
+The implementation follows the hybrid velocity/impulse algorithm in
+[Sun et al., Leapfrog Flow Maps, SIGGRAPH 2025, sections 4.1–4.3](https://yuchen-sun-cg.github.io/projects/lfm/static/pdfs/SIG_2025_Leapfrog_Flow_Maps.pdf):
+
+1. Project the initial velocity after initialization, geometry or inlet changes.
+2. Construct five projected midpoint velocities with leapfrog transport. The
+   first transport interval is dt/2, the second dt, and subsequent intervals 2dt
+   from the preceding alternating midpoint field.
+3. March backward and forward maps and their Jacobian columns with RK4 through
+   the stored midpoint fields. Pull back the initial velocity as an impulse,
+   perform a forward/backward BFECC error correction, and limit that correction.
+4. Apply viscosity over the complete cycle, enforce boundaries, then project
+   the reconstructed impulse into a divergence-free velocity.
+5. Recover **physical pressure separately** from a short velocity-form momentum
+   predictor. Its Poisson RHS uses the divergence of the velocity increment,
+   removing the residual divergence of the final flow. The impulse projection
+   potential is never used as surface pressure.
+
+This is a native adaptation to Wind3D's MAC arrays, geometry and pressure solver,
+not a binary-equivalent port of the authors' tiled CUDA solver. Map interpolation
+and its analytic derivatives use aperture-weighted trilinear interpolation,
+rather than the reference quadratic B-spline interpolation. Viscosity uses a
+first-order operator split, not the paper's accumulated-force path integral.
+The existing wall-shear and pressure surface integration supplies all six load
+components. Maps are reinitialized every five substeps; published snapshots,
+control changes and checkpoints occur only at complete cycle boundaries.
+`--cfl` applies per substep; `--max-dt` caps the entire published cycle.
+
+The panel shows force and moment components and magnitudes, lift = Fy, drag = Fx,
+instantaneous L/D, and time-weighted mean lift / mean drag since reset (including
+startup). Near-zero drag produces an undefined ratio, not infinity. Moments are
+about the fixed body origin. `--diagnostics file.csv` exports every completed
+cycle, including loads, magnitudes, instantaneous/mean L/D and the solver flag;
+undefined ratios are empty CSV fields. The PCG count sums the cycle's projections
+and physical-pressure solve; the residual is their maximum. The existing timing
+bins include midpoint projections in transport, final impulse projection in
+pressure, and physical-pressure recovery in diagnostics; `step_seconds` is the
+complete worker-cycle wall time. Frontend FPS, solver Hz and physical time / wall
+time are displayed separately. Interactive rendering is capped at 60 Hz to leave
+GPU time for solving.
+
+### Validation and measured limits
+
+Windows Release, RTX 5080, 12 m/s, 5 degree incidence, default voxel/no-slip model:
+
+| Grid | Run | Median cycle time after cycle 9 | Simulated time / solver wall time |
+| --- | --- | --- | --- |
+| 96 × 48 × 72 | 1,000 cycles, about 30.4 simulated seconds | 22.3 ms | 1.35× |
+| 128 × 64 × 96 | 100 cycles, about 2.2 simulated seconds | 38.2 ms | 0.58× |
+
+These are solver measurements, not frontend frame rates or a claim that LFM is
+faster than MacCormack at the same resolution. The default grid is deliberately
+coarser than the previous desktop default. Higher grids do not retain the same
+real-time rate. Vulkan and D3D12 window captures verify actual aircraft, flow,
+load vectors and the analysis panel. D3D12 validation reports the existing
+missing-optimized-clear-value performance warnings (820/821).
+
+GPU affine-field tests check both map directions, Jacobian columns and impulse
+pullback against constant translation and analytic shear (maximum error
+2.9e-6). Runtime validation checks pressure convergence and divergence reduction,
+plus pause/reset/control changes and immutable snapshots. The checkpoint test
+uses cut-cell geometry and verifies exact resumed loads, integrals and time,
+including a fresh solver instance and a bounded snapshot queue.
+CUDA Compute Sanitizer memcheck at grid 64 (three cycles plus lifecycle changes)
+reports zero errors.
+
+The 96-grid run's time-weighted L/D after cycle 9 is about 0.35; the short 128-grid
+run gives about 0.41. The different time windows and discretizations do **not**
+establish grid convergence. The default is an interactive qualitative wind-tunnel
+preview, not a validated aircraft performance prediction. Refinement, time-step
+convergence, turbulence modelling and comparison with reference aerodynamic data
+remain necessary for quantitative design use.
+
 The panel controls wind speed, incidence, collective flaps, differential
 ailerons, elevator and rudder. Drag outside the panel to orbit, or use the
 camera sliders; the mouse wheel zooms. Pausing the solver leaves the camera and
@@ -57,12 +144,12 @@ inspection views; normal mouse orbit and zoom remain available.
   reports all three components in N and N m. Moments follow the right-hand rule.
 - The corner triad is red +x, green +y and blue +z.
 
-## Numerical method and limits
+## MacCormack numerical method and shared limits
 
 The domain is 16 × 8 × 12 m, spanning x = [-6, 10], y = [-4, 4], z = [-6, 6].
-The default MAC grid is 192 × 96 × 144. `--grid` sets the x resolution (64–640,
+The previous desktop MAC grid was 192 × 96 × 144. `--grid` sets the x resolution (64–640,
 multiple of 16); the other dimensions retain this aspect ratio. Velocity lives
-on staggered faces and pressure at cell centres. Each step performs:
+on staggered faces and pressure at cell centres. A MacCormack step performs:
 
 1. Rebuild the solid mask when the aircraft geometry changes. Also sample each
    pressure-cell connection at h/8 spacing to block velocity faces crossed by

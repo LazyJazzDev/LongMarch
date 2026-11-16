@@ -426,6 +426,8 @@ __global__ void CorrectTransport(Grid g,
   forward[n] = transported + dt / (g.h * g.h) * (physics.viscosity * fluid_lap + wall_flux);
 }
 
+#include "lfm_transport.cuh"
+
 // With cut cells, a cell holds fluid (and a pressure unknown) when any of its
 // faces is open, even if its centre lies inside the body.
 __global__ void CellMask(Grid g,
@@ -891,6 +893,72 @@ struct CheckpointHeader {
 
 static_assert(offsetof(CheckpointHeader, step) == 24, "the sweep reads the checkpoint step at offset 24");
 
+bool ValidateFlowMaps(int cuda_device) {
+  // Analytic constant translation and incompressible affine shear. These check
+  // map direction, Jacobian columns, and covector pullback on GPU.
+  if (cudaSetDevice(cuda_device) != cudaSuccess)
+    return false;
+  Grid g{16, 12, 12, 0.25f};
+  int nf = (g.nx + 1) * (g.ny + 1) * (g.nz + 1);
+  float *fields = nullptr, *result = nullptr;
+  Vec3 *map = nullptr, *jacobian = nullptr;
+  bool ok = cudaMalloc(reinterpret_cast<void **>(&fields), 3 * nf * sizeof(float)) == cudaSuccess &&
+            cudaMalloc(reinterpret_cast<void **>(&result), nf * sizeof(float)) == cudaSuccess &&
+            cudaMalloc(reinterpret_cast<void **>(&map), nf * sizeof(Vec3)) == cudaSuccess &&
+            cudaMalloc(reinterpret_cast<void **>(&jacobian), nf * sizeof(Vec3)) == cudaSuccess;
+  float maximum = 0;
+  std::vector<float> values(3 * nf), output(nf);
+  std::vector<Vec3> maps(nf), jacobians(nf);
+  for (float shear : {0.0f, 0.2f}) {
+    if (!ok)
+      break;
+    for (int n = 0; n < nf; ++n) {
+      int y = n / (g.nx + 1) % (g.ny + 1);
+      values[n] = 1 + shear * (y + 0.5f) * g.h;
+      values[n + nf] = values[n + 2 * nf] = 0;
+    }
+    ok = cudaMemcpy(fields, values.data(), values.size() * sizeof(float), cudaMemcpyHostToDevice) == cudaSuccess;
+    LfmVelocity velocity{{fields, fields + nf, fields + 2 * nf}};
+    LfmHistory history{};
+    for (auto &mid : history.velocity)
+      mid = velocity;
+    for (int direction = 0; direction < 2 && ok; ++direction)
+      for (int axis = 0; axis < 3 && ok; ++axis) {
+        float time = (direction ? -1 : 1) * 0.02f * lfm_intervals;
+        LfmMaps<<<(nf + 255) / 256, 256>>>(g, history, 0.02f, axis, direction != 0, map, jacobian);
+        LfmPullback<<<(nf + 255) / 256, 256>>>(g, velocity, map, jacobian, result, nullptr);
+        ok = cudaGetLastError() == cudaSuccess &&
+             cudaMemcpy(maps.data(), map, nf * sizeof(Vec3), cudaMemcpyDeviceToHost) == cudaSuccess &&
+             cudaMemcpy(jacobians.data(), jacobian, nf * sizeof(Vec3), cudaMemcpyDeviceToHost) == cudaSuccess &&
+             cudaMemcpy(output.data(), result, nf * sizeof(float), cudaMemcpyDeviceToHost) == cudaSuccess;
+        for (int z = 2; z < g.nz - 2; ++z)
+          for (int y = 2; y < g.ny - 2; ++y)
+            for (int x = 2; x < g.nx - 2; ++x) {
+              int n = g.F(x, y, z);
+              Vec3 position{float(x) + (axis == 0 ? 0 : 0.5f), float(y) + (axis == 1 ? 0 : 0.5f),
+                            float(z) + (axis == 2 ? 0 : 0.5f)};
+              float speed = 1 + shear * position.y * g.h;
+              Vec3 expected_map = Add(position, Vec3{-time * speed / g.h, 0, 0});
+              Vec3 expected_jacobian{axis == 0   ? 1.0f
+                                     : axis == 1 ? -time * shear
+                                                 : 0,
+                                     axis == 1 ? 1.0f : 0, axis == 2 ? 1.0f : 0};
+              maximum = std::max({maximum, Length(Add(maps[n], Scale(expected_map, -1))),
+                                  Length(Add(jacobians[n], Scale(expected_jacobian, -1))),
+                                  std::abs(output[n] - expected_jacobian.x * speed)});
+              ok &= std::isfinite(output[n]) && std::isfinite(Length(maps[n])) && std::isfinite(Length(jacobians[n]));
+            }
+      }
+  }
+  cudaFree(fields);
+  cudaFree(result);
+  cudaFree(map);
+  cudaFree(jacobian);
+  ok &= maximum < 2e-5f;
+  std::cout << "lfm_affine_validation=" << (ok ? "PASS" : "FAIL") << " max_error=" << maximum << '\n';
+  return ok;
+}
+
 struct Simulation::Impl {
   mutable std::mutex mutex;
   std::condition_variable wake, checkpointed;
@@ -915,6 +983,10 @@ struct Simulation::Impl {
   std::vector<cudaEvent_t> ready;
   cudaEvent_t timing[4]{};
   float *u{}, *v{}, *w{}, *un{}, *vn{}, *wn{}, *reverse{}, *pressure{}, *div{}, *after{};
+  float *lfm_mid[lfm_intervals][3]{}, *lfm_impulse[3]{}, *lfm_error[3]{}, *lfm_gauge{}, *lfm_div{};
+  Vec3 *lfm_map[2][3]{}, *lfm_jacobian[2][3]{};
+  float lfm_residual{};
+  int lfm_cycles{};
   unsigned char *solid{}, *bu{}, *bv{}, *bw{}, *au{}, *av{}, *aw{};
   Cell *cells{};
   Statistics *statistics{};
@@ -985,6 +1057,129 @@ struct Simulation::Impl {
     return true;
   }
 
+  // All temporary midpoint/map state is private to a cycle. Checkpoints and
+  // control changes therefore always land on a complete LFM reinitialization.
+  bool LfmTransport(float dt, const Controls &controls, Physics physics, bool initialize) {
+    int nf = (grid.nx + 1) * (grid.ny + 1) * (grid.nz + 1);
+    int fb = (nf + 255) / 256, cb = (grid.nx * grid.ny * grid.nz + 255) / 256;
+    float *initial[] = {u, v, w}, *output[] = {un, vn, wn};
+    lfm_residual = 0;
+    lfm_cycles = 0;
+    // Gauge potentials are workspace, not checkpoint state. Starting each
+    // cycle from zero also makes a restored cycle use the same PCG path.
+    if (!Check(cudaMemsetAsync(lfm_gauge, 0, size_t(grid.nx) * grid.ny * grid.nz * sizeof(float), stream)))
+      return false;
+    if (initialize) {
+      if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Divergence<<<blocks, 256, 0, queue>>>(g, solid, au, av, aw, u, v, w, lfm_div);
+          }))
+        return false;
+      if (!Check(pressure_solver.Solve(lfm_div, lfm_gauge, density * grid.h * grid.h / dt, options.pressure_tolerance,
+                                       options.pressure_cycles, lfm_cycles, lfm_residual)))
+        return false;
+      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Project<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, lfm_gauge, u, v, w, dt);
+          }))
+        return false;
+    }
+    LfmHistory history{};
+    for (int i = 0; i < lfm_intervals; ++i) {
+      float **advecting = i ? lfm_mid[i - 1] : initial;
+      float **source = i < 2 ? (i ? lfm_mid[0] : initial) : lfm_mid[i - 2];
+      float interval = dt * (i == 0 ? 0.5f : i == 1 ? 1.0f : 2.0f);
+      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+            for (int axis = 0; axis < 3; ++axis)
+              Advect<<<blocks, 256, 0, queue>>>(g, advecting[0], advecting[1], advecting[2], source[axis],
+                                                lfm_mid[i][axis], axis, interval);
+            Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, lfm_mid[i][0], lfm_mid[i][1], lfm_mid[i][2],
+                                                controls.speed, false);
+          }))
+        return false;
+      if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Divergence<<<blocks, 256, 0, queue>>>(g, solid, au, av, aw, lfm_mid[i][0], lfm_mid[i][1], lfm_mid[i][2],
+                                                  lfm_div);
+          }))
+        return false;
+      int cycles = 0;
+      float residual = 0;
+      if (!Check(pressure_solver.Solve(lfm_div, lfm_gauge, density * grid.h * grid.h / interval,
+                                       options.pressure_tolerance, options.pressure_cycles, cycles, residual)))
+        return false;
+      lfm_residual = std::max(lfm_residual, residual);
+      lfm_cycles += cycles;
+      if (!Parallel(0, [&](Grid, int, cudaStream_t) {}))
+        return false;
+      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+            Project<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, lfm_gauge, lfm_mid[i][0], lfm_mid[i][1], lfm_mid[i][2],
+                                               interval);
+          }))
+        return false;
+      for (int axis = 0; axis < 3; ++axis)
+        history.velocity[i].axis[axis] = lfm_mid[i][axis];
+    }
+    if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+          for (int direction = 0; direction < 2; ++direction)
+            for (int axis = 0; axis < 3; ++axis)
+              LfmMaps<<<blocks, 256, 0, queue>>>(g, history, dt, axis, direction != 0, lfm_map[direction][axis],
+                                                 lfm_jacobian[direction][axis]);
+        }))
+      return false;
+    LfmVelocity start{{u, v, w}}, impulse{{lfm_impulse[0], lfm_impulse[1], lfm_impulse[2]}},
+        error_field{{lfm_error[0], lfm_error[1], lfm_error[2]}};
+    if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+          for (int axis = 0; axis < 3; ++axis)
+            LfmPullback<<<blocks, 256, 0, queue>>>(g, start, lfm_map[0][axis], lfm_jacobian[0][axis], lfm_impulse[axis],
+                                                   nullptr);
+        }))
+      return false;
+    if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+          for (int axis = 0; axis < 3; ++axis)
+            LfmPullback<<<blocks, 256, 0, queue>>>(g, impulse, lfm_map[1][axis], lfm_jacobian[1][axis], lfm_error[axis],
+                                                   initial[axis]);
+        }))
+      return false;
+    if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+          for (int axis = 0; axis < 3; ++axis) {
+            LfmPullback<<<blocks, 256, 0, queue>>>(g, error_field, lfm_map[0][axis], lfm_jacobian[0][axis],
+                                                   output[axis], nullptr);
+            LfmCorrect<<<blocks, 256, 0, queue>>>(g, initial[axis], lfm_impulse[axis], output[axis], lfm_map[0][axis],
+                                                  axis);
+            // First-order viscous operator split over the complete map cycle.
+            CorrectTransport<<<blocks, 256, 0, queue>>>(g, u, v, w, initial[axis], nullptr, output[axis], bu, bv, bw,
+                                                        axis, dt * lfm_intervals, physics);
+          }
+        }))
+      return false;
+    return true;
+  }
+
+  // Recover physical pressure from a short velocity-form momentum predictor.
+  // The impulse projection potential must never be integrated as wall pressure.
+  bool LfmPressure(float dt, const Controls &controls, Physics physics, int &cycles, float &residual) {
+    int fb = ((grid.nx + 1) * (grid.ny + 1) * (grid.nz + 1) + 255) / 256;
+    int cb = (grid.nx * grid.ny * grid.nz + 255) / 256;
+    float *source[] = {u, v, w};
+    if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+          for (int axis = 0; axis < 3; ++axis) {
+            Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, source[axis], lfm_mid[0][axis], axis, dt);
+            CorrectTransport<<<blocks, 256, 0, queue>>>(g, u, v, w, source[axis], nullptr, lfm_mid[0][axis], bu, bv, bw,
+                                                        axis, dt, physics);
+          }
+          Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, lfm_mid[0][0], lfm_mid[0][1], lfm_mid[0][2],
+                                              controls.speed, false);
+        }))
+      return false;
+    if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
+          Divergence<<<blocks, 256, 0, queue>>>(g, solid, au, av, aw, lfm_mid[0][0], lfm_mid[0][1], lfm_mid[0][2],
+                                                lfm_div);
+          LfmAccelerationDivergence<<<blocks, 256, 0, queue>>>(g, lfm_div, after);
+        }))
+      return false;
+    return Check(pressure_solver.Solve(lfm_div, pressure, density * grid.h * grid.h / dt, options.pressure_tolerance,
+                                       options.pressure_cycles, cycles, residual)) &&
+           Parallel(0, [&](Grid, int, cudaStream_t) {});
+  }
+
   bool Initialize() {
     if (!Check(cudaSetDevice(device)))
       return false;
@@ -1035,6 +1230,21 @@ struct Simulation::Impl {
     int display_nx = std::min(grid.nx, 192);
     display_grid = {display_nx, display_nx / 2, display_nx * 3 / 4, 16.0f / display_nx};
     size_t display_cells = size_t(display_grid.nx) * display_grid.ny * display_grid.nz;
+    if (options.leapfrog_flow_maps) {
+      for (auto &midpoint : lfm_mid)
+        for (auto &axis : midpoint)
+          if (!Allocate(axis, nf))
+            return false;
+      for (int axis = 0; axis < 3; ++axis) {
+        if (!Allocate(lfm_impulse[axis], nf) || !Allocate(lfm_error[axis], nf))
+          return false;
+        for (int direction = 0; direction < 2; ++direction)
+          if (!Allocate(lfm_map[direction][axis], nf) || !Allocate(lfm_jacobian[direction][axis], nf))
+            return false;
+      }
+      if (!Allocate(lfm_gauge, nc, false) || !Allocate(lfm_div, nc))
+        return false;
+    }
     return Allocate(u, nf) && Allocate(v, nf) && Allocate(w, nf) && Allocate(un, nf) && Allocate(vn, nf) &&
            Allocate(wn, nf) && Allocate(reverse, nf) && Allocate(pressure, nc, false) && Allocate(div, nc) &&
            Allocate(after, nc) && Allocate(solid, nc) && Allocate(bu, nf) && Allocate(bv, nf) && Allocate(bw, nf) &&
@@ -1113,7 +1323,7 @@ struct Simulation::Impl {
         return;
       }
       diagnostics
-          << "step,generation,time,dt,max_speed,divergence_before,divergence_after,pressure_residual,pressure_cycles,pressure_converged,fx,fy,fz,mx,my,mz,step_seconds,transport_seconds,pressure_seconds,diagnostics_seconds\n";
+          << "step,generation,time,dt,max_speed,divergence_before,divergence_after,pressure_residual,pressure_cycles,pressure_converged,fx,fy,fz,mx,my,mz,step_seconds,transport_seconds,pressure_seconds,diagnostics_seconds,force_norm,moment_norm,lift_drag_ratio,mean_lift_drag_ratio,lfm\n";
       diagnostics << std::setprecision(17);
     }
     auto g = grid;
@@ -1132,6 +1342,7 @@ struct Simulation::Impl {
         lift_impulse[kComponents]{};
     uint64_t applied_generation = ~uint64_t(0), step = 0;
     float time = 0, max_speed = 12;
+    float lfm_inlet_speed = -1;
     Controls mesh_controls;
     std::shared_ptr<const std::vector<Vertex>> mesh;
     while (true) {
@@ -1222,8 +1433,10 @@ struct Simulation::Impl {
       float speed_bound = std::max(max_speed, controls.speed);
       float diffusion = std::max(physics.viscosity, WallViscosity(physics, 2 * speed_bound, 0.5f * g.h));
       float dt = std::min(options.cfl * g.h / speed_bound, 0.08f * g.h * g.h / diffusion);
+      if (options.leapfrog_flow_maps)
+        dt = std::min(dt, 0.08f * g.h * g.h / (diffusion * lfm_intervals));
       if (options.max_dt > 0)
-        dt = std::min(dt, options.max_dt);
+        dt = std::min(dt, options.max_dt / (options.leapfrog_flow_maps ? lfm_intervals : 1));
       bool geometry_changed = !mesh || controls.angle != mesh_controls.angle || controls.flap != mesh_controls.flap ||
                               controls.aileron != mesh_controls.aileron ||
                               controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder;
@@ -1265,40 +1478,48 @@ struct Simulation::Impl {
       };
       if (!extend(u, v, w))
         break;
-      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
-            Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, u, un, 0, dt);
-          }))
-        break;
-      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
-            Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, v, vn, 1, dt);
-          }))
-        break;
-      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
-            Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, w, wn, 2, dt);
-          }))
-        break;
-      if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
-            Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, un, vn, wn, controls.speed, false);
-          }))
-        break;
-      if (options.corrected_transport && !extend(un, vn, wn))
-        break;
-      float *sources[] = {u, v, w}, *destinations[] = {un, vn, wn};
-      for (int axis = 0; axis < 3; ++axis) {
-        if (options.corrected_transport)
-          if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
-                Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, destinations[axis], reverse, axis, -dt);
-              }))
-            break;
+      if (options.leapfrog_flow_maps) {
+        if (!LfmTransport(dt, controls, physics,
+                          !restored && (reset || geometry_changed || controls.speed != lfm_inlet_speed)))
+          break;
+        lfm_inlet_speed = controls.speed;
+        dt *= lfm_intervals;
+      } else {
         if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
-              CorrectTransport<<<blocks, 256, 0, queue>>>(g, u, v, w, sources[axis],
-                                                          options.corrected_transport ? reverse : nullptr,
-                                                          destinations[axis], bu, bv, bw, axis, dt, physics);
+              Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, u, un, 0, dt);
             }))
           break;
+        if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+              Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, v, vn, 1, dt);
+            }))
+          break;
+        if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+              Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, w, wn, 2, dt);
+            }))
+          break;
+        if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+              Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, un, vn, wn, controls.speed, false);
+            }))
+          break;
+        if (options.corrected_transport && !extend(un, vn, wn))
+          break;
+        float *sources[] = {u, v, w}, *destinations[] = {un, vn, wn};
+        for (int axis = 0; axis < 3; ++axis) {
+          if (options.corrected_transport)
+            if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+                  Advect<<<blocks, 256, 0, queue>>>(g, u, v, w, destinations[axis], reverse, axis, -dt);
+                }))
+              break;
+          if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
+                CorrectTransport<<<blocks, 256, 0, queue>>>(g, u, v, w, sources[axis],
+                                                            options.corrected_transport ? reverse : nullptr,
+                                                            destinations[axis], bu, bv, bw, axis, dt, physics);
+              }))
+            break;
+        }
+        if (!error.empty())
+          break;
       }
-      if (!error.empty())
-        break;
       std::swap(u, un);
       std::swap(v, vn);
       std::swap(w, wn);
@@ -1319,7 +1540,8 @@ struct Simulation::Impl {
         break;
       int pressure_cycles = 0;
       float pressure_residual = 0;
-      if (!Check(pressure_solver.Solve(div, pressure, density * g.h * g.h / dt, options.pressure_tolerance,
+      float *projection = options.leapfrog_flow_maps ? lfm_gauge : pressure;
+      if (!Check(pressure_solver.Solve(div, projection, density * g.h * g.h / dt, options.pressure_tolerance,
                                        options.pressure_cycles, pressure_cycles, pressure_residual)))
         break;
       if (!Check(cudaEventRecord(timing[2], stream)))
@@ -1327,13 +1549,21 @@ struct Simulation::Impl {
       if (!Parallel(0, [&](Grid, int, cudaStream_t) {}))
         break;
       if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
-            Project<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, pressure, u, v, w, dt);
+            Project<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, projection, u, v, w, dt);
           }))
         break;
       if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
             Divergence<<<blocks, 256, 0, queue>>>(g, solid, au, av, aw, u, v, w, after);
           }))
         break;
+      if (options.leapfrog_flow_maps) {
+        lfm_residual = std::max(lfm_residual, pressure_residual);
+        lfm_cycles += pressure_cycles;
+        if (!LfmPressure(dt / lfm_intervals, controls, physics, pressure_cycles, pressure_residual))
+          break;
+        pressure_residual = std::max(lfm_residual, pressure_residual);
+        pressure_cycles += lfm_cycles;
+      }
       if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
             Measure<<<blocks, 256, 0, queue>>>(g, solid, bu, bv, bw, au, av, aw, u, v, w, un, vn, wn, pressure, div,
                                                after, physics, controls, statistics);
@@ -1341,6 +1571,7 @@ struct Simulation::Impl {
         break;
       ReduceStatistics<<<total_blocks, 256, 0, stream>>>(statistics, cb, totals);
       auto snapshot = std::make_shared<Snapshot>();
+      snapshot->leapfrog_flow_maps = options.leapfrog_flow_maps;
       bool export_field =
           options.export_field || (options.export_final && options.stop_after && step + 1 == options.stop_after);
       if (display_count && export_field) {
@@ -1439,7 +1670,14 @@ struct Simulation::Impl {
         for (double component : moment)
           diagnostics << ',' << component;
         diagnostics << ',' << snapshot->step_seconds << ',' << snapshot->transport_seconds << ','
-                    << snapshot->pressure_seconds << ',' << snapshot->diagnostics_seconds << '\n';
+                    << snapshot->pressure_seconds << ',' << snapshot->diagnostics_seconds << ','
+                    << Length(snapshot->force) << ',' << Length(snapshot->moment) << ',';
+        if (std::abs(force[0]) > 1e-4)
+          diagnostics << force[1] / force[0];
+        diagnostics << ',';
+        if (std::abs(impulse[0]) > 1e-4 * time)
+          diagnostics << impulse[1] / impulse[0];
+        diagnostics << ',' << options.leapfrog_flow_maps << '\n';
         if (step % 32 == 0)
           diagnostics.flush();
         if (!diagnostics) {
@@ -1520,15 +1758,21 @@ std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const So
       !(options.cfl >= 0.05f && options.cfl <= 8) || !(options.sponge >= 0 && options.sponge <= 6) ||
       (options.cut_cells && (!options.wall_model || options.wall_momentum)))
     return {};
+  // Cross-device map interpolation needs explicit halo exchange; do not silently
+  // run a different transport scheme for a requested LFM configuration.
+  if (options.leapfrog_flow_maps && options.devices != 1)
+    return {};
   if (options.max_dt < 0 || !std::isfinite(options.max_dt) || !(options.initial_controls.speed > 0) ||
       !std::isfinite(options.initial_controls.speed) || !std::isfinite(options.initial_controls.angle) ||
       !std::isfinite(options.initial_controls.flap) || !std::isfinite(options.initial_controls.aileron) ||
       !std::isfinite(options.initial_controls.elevator) || !std::isfinite(options.initial_controls.rudder))
     return {};
   size_t free_bytes = 0, total_bytes = 0;
+  size_t required_bytes =
+      SolverBytes(nx) + (options.leapfrog_flow_maps ? size_t(nx + 1) * (nx / 2 + 1) * (nx * 3 / 4 + 1) * 236 : 0);
   if (cudaSetDevice(cuda_device) != cudaSuccess || cudaMemGetInfo(&free_bytes, &total_bytes) != cudaSuccess ||
-      SolverBytes(nx) > free_bytes) {
-    std::cerr << "Grid " << nx << " needs about " << SolverBytes(nx) / 1e9 << " GB; " << free_bytes / 1e9
+      required_bytes > free_bytes) {
+    std::cerr << "Grid " << nx << " needs about " << required_bytes / 1e9 << " GB; " << free_bytes / 1e9
               << " GB is free\n";
     return {};
   }

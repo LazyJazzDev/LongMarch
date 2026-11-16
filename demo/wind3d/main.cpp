@@ -8,21 +8,27 @@
 
 int main(int argc, char **argv) {
   using namespace grassland::rhi;
-  int grid = 192, steps = 20, frames = 0;
+  int grid = 96, steps = 20, frames = 0;
   float validate_time = 0;
   bool validate = false, headless = false, debug = false;
   BackendAPI backend = BACKEND_API_VULKAN;
   wind3d::Controls controls;
   wind3d::ViewSettings view;
   wind3d::SolverOptions solver;
+  solver.leapfrog_flow_maps = true;
   std::string capture;
   for (int i = 1; i < argc; ++i) {
     std::string key = argv[i];
     if (key == "--validate")
       validate = true;
-    else if (key == "--first-order")
+    else if (key == "--lfm")
+      solver.leapfrog_flow_maps = true;
+    else if (key == "--maccormack")
+      solver.leapfrog_flow_maps = false;
+    else if (key == "--first-order") {
+      solver.leapfrog_flow_maps = false;
       solver.corrected_transport = false;
-    else if (key == "--no-flow")
+    } else if (key == "--no-flow")
       view.flow = false;
     else if (key == "--model-only")
       view.flow = view.loads = false;
@@ -35,7 +41,7 @@ int main(int argc, char **argv) {
           << "demo_wind3d [--backend vulkan|d3d12] [--grid 64..640, multiple of 16] "
              "[--speed 1..30] [--angle -20..25] [--flap 0..40] [--aileron -25..25] "
              "[--elevator -25..25] [--rudder -25..25] [--frames N] [--headless] "
-             "[--first-order] [--validate-time SECONDS] [--pressure-tolerance 1e-6..0.1] [--pressure-cycles 1..256] [--model-only] [--yaw RADIANS] [--pitch RADIANS] [--distance METRES] [--capture image.ppm] [--validate --steps N] [--debug]\n";
+             "[--lfm|--maccormack|--first-order] [--cfl 0.05..8] [--max-dt SECONDS] [--diagnostics file.csv] [--validate-time SECONDS] [--pressure-tolerance 1e-6..0.1] [--pressure-cycles 1..256] [--model-only] [--yaw RADIANS] [--pitch RADIANS] [--distance METRES] [--capture image.ppm] [--validate --steps N] [--debug]\n";
       return 0;
     } else {
       if (++i >= argc) {
@@ -54,6 +60,8 @@ int main(int argc, char **argv) {
         }
       } else if (key == "--capture")
         capture = value;
+      else if (key == "--diagnostics")
+        solver.diagnostics_path = value;
       else {
         char *end = nullptr;
         float number = std::strtof(value.c_str(), &end);
@@ -79,6 +87,10 @@ int main(int argc, char **argv) {
           validate = true;
         } else if (key == "--pressure-tolerance")
           solver.pressure_tolerance = number;
+        else if (key == "--cfl")
+          solver.cfl = number;
+        else if (key == "--max-dt")
+          solver.max_dt = number;
         else if (key == "--yaw")
           view.yaw = number;
         else if (key == "--pitch")
@@ -134,6 +146,10 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (validate && !wind3d::ValidateWallDiffusion(device->GetCUDADeviceIndex()))
+    return 2;
+  if (validate && solver.leapfrog_flow_maps && !wind3d::ValidateFlowMaps(device->GetCUDADeviceIndex()))
+    return 2;
+  if (validate && !wind3d::ValidateClosedSurface(device->GetCUDADeviceIndex(), false))
     return 2;
   auto simulation = wind3d::Simulation::Create(device->GetCUDADeviceIndex(), grid, solver);
   if (!simulation) {

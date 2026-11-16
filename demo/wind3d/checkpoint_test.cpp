@@ -7,9 +7,12 @@
 
 #include "simulation.h"
 
-int main() {
+int main(int argc, char **argv) {
   using namespace wind3d;
   auto options = OptimizedSolverOptions();
+  options.leapfrog_flow_maps = argc == 2 && std::string(argv[1]) == "--lfm";
+  if (options.leapfrog_flow_maps && !ValidateFlowMaps(0))
+    return 1;
   options.display = false;
   options.export_field = false;
   options.retain_snapshots = true;
@@ -110,6 +113,7 @@ int main() {
     if (line.substr(0, line.find(',')) != std::to_string(rows))
       return 12;
   }
+  diagnostics.close();
   std::filesystem::remove(options.diagnostics_path);
   if (rows != final->step)
     return 13;

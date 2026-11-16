@@ -20,8 +20,12 @@ struct Vertex {
 std::vector<Vertex> AircraftMesh(const Controls &controls);
 bool ValidateWallDiffusion(int cuda_device);
 bool ValidateClosedSurface(int cuda_device, bool cut_cells);
+bool ValidateFlowMaps(int cuda_device);
 
 struct SolverOptions {
+  // Five leapfrog midpoint projections followed by a bidirectional impulse
+  // reconstruction. One published step is one complete map cycle.
+  bool leapfrog_flow_maps{false};
   float pressure_tolerance{0.0001f};
   int pressure_cycles{64};
   bool corrected_transport{true};
@@ -90,6 +94,7 @@ constexpr int max_grid = 1536;
 size_t SolverBytes(int nx);
 
 struct Snapshot {
+  bool leapfrog_flow_maps{};
   int nx{}, ny{}, nz{}, pressure_cycles{}, solver_nx{};
   float pressure_residual{};
   bool pressure_converged{};
