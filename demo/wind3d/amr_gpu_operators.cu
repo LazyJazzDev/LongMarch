@@ -381,8 +381,10 @@ bool GpuPressureOperators::InverseMass(const std::vector<double *> &input, const
     return false;
   };
   std::vector<double *> current, next;
+  std::vector<cudaStream_t> streams;
   for (size_t r = 0; r < w.ranks.size(); ++r) {
     auto &rank = w.ranks[r];
+    streams.push_back(rank.stream);
     current.push_back(rank.x);
     next.push_back(rank.scratch);
     if (!w.Check(cudaSetDevice(w.devices[r])))
@@ -395,13 +397,11 @@ bool GpuPressureOperators::InverseMass(const std::vector<double *> &input, const
     }
   }
   if (w.coupled) {
-    if (!w.Synchronize())
-      return fail();
     double rho = mass_radius / mass_centre;
     for (int step = 1; step < mass_iterations; ++step) {
-      if (!w.exchange.ExchangeFaces(current)) {
-        error_ = w.exchange.Error();
-        return false;
+      if (!w.exchange.EnqueueFaces(current, streams)) {
+        w.error = w.exchange.Error();
+        return fail();
       }
       double updated = 1 / (2 * mass_centre / mass_radius - rho);
       for (size_t r = 0; r < w.ranks.size(); ++r) {
@@ -413,8 +413,6 @@ bool GpuPressureOperators::InverseMass(const std::vector<double *> &input, const
         if (!w.Check(cudaGetLastError()))
           return fail();
       }
-      if (!w.Synchronize())
-        return fail();
       current.swap(next);
       rho = updated;
     }

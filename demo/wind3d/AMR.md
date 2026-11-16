@@ -1327,3 +1327,28 @@ performance experiment; the small two-GPU difference should not be treated as
 a general scaling guarantee. The existing optimized single-device solver took
 0.006086 seconds in the new job. Mass-inverse exchange phases still synchronize
 the host, and multi-GPU transport/runtime integration remains incomplete.
+
+### Stream-ordered mass-inverse exchanges
+
+GpuPressureExchange::EnqueueFaces queues packed peer transfers on the caller's
+per-rank streams, with event barriers before producers are consumed and before
+subsequent consumers run. Repeated enqueues on the same streams are ordered;
+callers must drain those streams before destroying/rebuilding the exchange or
+using synchronous exchange methods, including after enqueue failures. The
+single-rank path relies on stream order without recording cross-device events.
+
+The distributed Chebyshev mass inverse now uses this path for its 31 iterative
+exchange phases instead of synchronizing the host after each kernel and copy.
+It preserves the same fixed polynomial, final completion guarantee and error
+handling; an exchange failure now also drains the operator streams.
+
+Job 2001343 passed direct full-projection regression, exchange/operator/V-cycle/
+projection CTests and projection Compute Sanitizer memcheck with zero errors.
+Job 2001344 completed the 55,296-cell benchmark with unchanged 27 multilevel
+iterations, approximately 4.96e-10 true residual, and <=2.28e-10 velocity error.
+Warm distributed multilevel means were 0.010856 s for one GPU and 0.072459 s for
+two GPUs, versus 0.017391/0.074412 s before this change. The existing optimized
+single-device solver remained 0.006045 s. These separate shared-node job
+measurements show limited two-GPU improvement and do not establish scalable
+flow speedup. Launch/communication overhead and larger-mesh scaling still need
+measurement, alongside distributed transport and load-accuracy acceptance.

@@ -42,6 +42,7 @@ struct GpuPressureExchange::Impl {
 
   std::vector<int> devices;
   std::vector<cudaStream_t> streams;
+  std::vector<cudaEvent_t> ready;
   std::vector<PressureLocalLayout> layouts;
   std::vector<Link> links;
   std::vector<std::pair<int, void *>> allocations;
@@ -56,6 +57,11 @@ struct GpuPressureExchange::Impl {
         cudaStreamDestroy(streams[i]);
       }
     }
+    for (size_t r = 0; r < ready.size(); ++r)
+      if (ready[r]) {
+        cudaSetDevice(devices[r]);
+        cudaEventDestroy(ready[r]);
+      }
     for (auto [device, pointer] : allocations) {
       cudaSetDevice(device);
       cudaFree(pointer);
@@ -112,6 +118,7 @@ bool GpuPressureExchange::Build(const PressurePartition &partition, const std::v
   auto next = std::make_unique<Impl>();
   next->devices = devices;
   next->streams.resize(devices.size());
+  next->ready.resize(devices.size());
   next->layouts.resize(devices.size());
   int count = 0;
   if (!next->Check(cudaGetDeviceCount(&count))) {
@@ -135,7 +142,8 @@ bool GpuPressureExchange::Build(const PressurePartition &partition, const std::v
     for (size_t i = 0; i < layout.faces.size(); ++i)
       face_index[layout.faces[i]] = int(i);
     if (!next->Check(cudaSetDevice(devices[r])) ||
-        !next->Check(cudaStreamCreateWithFlags(&next->streams[r], cudaStreamNonBlocking))) {
+        !next->Check(cudaStreamCreateWithFlags(&next->streams[r], cudaStreamNonBlocking)) ||
+        !next->Check(cudaEventCreateWithFlags(&next->ready[r], cudaEventDisableTiming))) {
       error_ = next->error;
       return false;
     }
@@ -211,6 +219,56 @@ bool GpuPressureExchange::Exchange(const std::vector<double *> &values, bool fac
   if (!ok)
     error_ = failure;
   return ok;
+}
+
+bool GpuPressureExchange::EnqueueFaces(const std::vector<double *> &values, const std::vector<cudaStream_t> &streams) {
+  error_.clear();
+  if (!impl_ || values.size() != impl_->devices.size() || streams.size() != values.size() ||
+      std::any_of(values.begin(), values.end(), [](auto p) { return !p; })) {
+    error_ = "Face enqueue needs one field and stream per rank";
+    return false;
+  }
+  DeviceScope restore;
+  auto &w = *impl_;
+  auto barrier = [&] {
+    if (w.devices.size() == 1)
+      return true;
+    for (size_t r = 0; r < streams.size(); ++r)
+      if (!w.Check(cudaSetDevice(w.devices[r])) || !w.Check(cudaEventRecord(w.ready[r], streams[r])))
+        return false;
+    for (size_t r = 0; r < streams.size(); ++r) {
+      if (!w.Check(cudaSetDevice(w.devices[r])))
+        return false;
+      for (size_t source = 0; source < streams.size(); ++source)
+        if (source != r && !w.Check(cudaStreamWaitEvent(streams[r], w.ready[source], 0)))
+          return false;
+    }
+    return true;
+  };
+  auto fail = [&] {
+    error_ = w.error;
+    return false;
+  };
+  if (!barrier())
+    return fail();
+  for (const auto &link : w.links) {
+    const auto &batch = link.faces;
+    if (!batch.count)
+      continue;
+    int source = w.devices[link.source], destination = w.devices[link.destination];
+    if (!w.Check(cudaSetDevice(source)))
+      return fail();
+    auto stream = streams[link.source];
+    Gather<<<(batch.count + 255) / 256, 256, 0, stream>>>(values[link.source], batch.indices, batch.count,
+                                                          batch.packed);
+    if (!w.Check(cudaGetLastError()) ||
+        !w.Check(cudaMemcpyPeerAsync(values[link.destination] + batch.destination_offset, destination, batch.packed,
+                                     source, batch.count * sizeof(double), stream)))
+      return fail();
+  }
+  if (!barrier())
+    return fail();
+  return true;
 }
 
 bool GpuPressureExchange::ExchangeCells(const std::vector<double *> &values) {

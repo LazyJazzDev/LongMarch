@@ -1,4 +1,6 @@
 #pragma once
+#include <cuda_runtime_api.h>
+
 #include <memory>
 #include <string>
 
@@ -26,6 +28,11 @@ class GpuPressureExchange {
   // owned entries are unchanged. CUDA failure may leave imports incomplete.
   bool ExchangeCells(const std::vector<double *> &values);
   bool ExchangeFaces(const std::vector<double *> &values);
+  // Queue face imports between producer/consumer work on one stream per rank.
+  // Streams belong to Build's devices. Repeated enqueues on these same streams
+  // are ordered by events. Caller must drain all streams, including on failure,
+  // before destroying/rebuilding this object or using its synchronous methods.
+  bool EnqueueFaces(const std::vector<double *> &values, const std::vector<cudaStream_t> &streams);
 
   const std::string &Error() const {
     return error_;
