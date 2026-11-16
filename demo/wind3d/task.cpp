@@ -25,6 +25,10 @@ int main(int argc, char **argv) {
       adaptive.uniform = !std::strcmp(arg, "--amr-uniform");
       continue;
     }
+    if (!std::strcmp(arg, "--amr-compatible-pressure")) {
+      adaptive.compatible_pressure = true;
+      continue;
+    }
     if (!std::strcmp(arg, "--validate")) {
       validate = true;
       continue;
@@ -49,6 +53,7 @@ int main(int argc, char **argv) {
           "            [--speed 12] [--angle 5] [--flap 0] [--aileron 0] [--elevator 0] [--rudder 0]\n"
           "            [--max-dt 0] [--csv loads.csv]\n"
           "            [--adaptive | --amr-uniform] [--levels 1] [--block-cells 4]\n"
+          "            [--amr-compatible-pressure] (requires --adaptive or --amr-uniform)\n"
           "            [--adapt-every 100] [--max-blocks 100000] (adaptive requires --no-export)\n"
           "Times include transport, pressure, diagnostics and optional snapshot export; startup steps are excluded.");
       return 0;
@@ -119,6 +124,10 @@ int main(int argc, char **argv) {
   }
   if ((validate && steps < 2) || steps <= warmup || !std::isfinite(options.pressure_tolerance))
     return 1;
+  if (adaptive.compatible_pressure && !adaptive_mode) {
+    std::fputs("--amr-compatible-pressure requires --adaptive or --amr-uniform.\n", stderr);
+    return 1;
+  }
   if (adaptive_mode) {
     if (dump || validate) {
       std::fputs("Adaptive dumps and --validate are not supported; use AMR CTests.\n", stderr);

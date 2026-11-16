@@ -13,6 +13,7 @@ namespace wind3d::amr {
 struct GpuFlow::Impl {
   int device{}, n{};
   double width{};
+  bool compatible_pressure{};
   std::array<double, 3> origin{};
   Distance distance;
   Topology tree;
@@ -50,7 +51,7 @@ struct GpuFlow::Impl {
       error = "Adaptive gradient construction failed";
       return false;
     }
-    if (!projection.Build(device, mesh, gradient)) {
+    if (!projection.Build(device, mesh, gradient, true, true, compatible_pressure)) {
       error = projection.Error();
       return false;
     }
@@ -94,13 +95,15 @@ bool GpuFlow::Initialize(int device,
                          double width,
                          std::array<double, 3> origin,
                          const Distance &distance,
-                         double speed) {
+                         double speed,
+                         bool compatible_pressure) {
   if (!std::isfinite(speed)) {
     error_ = "Invalid freestream speed";
     return false;
   }
   auto next = std::make_unique<Impl>();
   next->device = device;
+  next->compatible_pressure = compatible_pressure;
   next->tree = tree;
   next->n = n;
   next->width = width;
@@ -141,6 +144,7 @@ bool GpuFlow::Regrid(const Topology &tree) {
   }
   auto next = std::make_unique<Impl>();
   next->device = impl_->device;
+  next->compatible_pressure = impl_->compatible_pressure;
   next->n = impl_->n;
   next->width = impl_->width;
   next->origin = impl_->origin;

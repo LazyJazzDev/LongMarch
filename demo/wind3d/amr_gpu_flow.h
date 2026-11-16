@@ -43,7 +43,8 @@ class GpuFlow {
                   double root_width,
                   std::array<double, 3> origin,
                   const Distance &distance,
-                  double speed);
+                  double speed,
+                  bool compatible_pressure = false);
   // Same physical domain/body. Builds, transfers and projects in temporary
   // storage, then commits. Remap potential is discarded; pressure_valid remains
   // false until the next successful physical step. Time and step count persist.

@@ -638,3 +638,33 @@ projection Compute Sanitizer memcheck with zero errors. Mixed-grid cases took
 11 iterations, with relative flux divergence below 6.1e-12 and relative mass
 energy-balance defects below 9e-13. These are operator tests, not the aircraft
 2% steady-load acceptance test.
+
+
+## Aircraft task selection for compatible pressure
+
+`wind3d_task --amr-compatible-pressure` selects the compatible projection when
+combined with `--adaptive` or `--amr-uniform`; it is rejected for the native
+backend. `GpuFlow` preserves this initialization choice through transactional
+refinement/coarsening and remap projection. Setup logs identify the pressure
+mode. The existing quadratic path remains available as the default comparison.
+
+Job 2001254 passed both pressure modes through the runtime lifecycle CTest
+(refinement, coarsening, adaptation, body protection, clock/pressure validity
+and rollback) and Compute Sanitizer with zero errors. Compatible body regrids
+had maximum volume-normalized divergence about 1.6e-11. Static mixed, dynamic
+adaptive and uniform aircraft smoke runs each completed 100 steps. The 100-step
+dynamic smoke did not change the hierarchy; runtime remap coverage comes from
+the lifecycle test, not from that aircraft smoke.
+
+Three single-GPU 30000-step aircraft comparisons were submitted as jobs
+2001255 (static), 2001256 (dynamic) and 2001257 (uniform), using the frozen
+`out/wind3d-amr/compatible-task` executable, finest spacing 0.125, speed 12,
+angle 5 degrees, cubic transport and maximum dt 0.0002. Their load/stability
+and performance conclusions remain pending.
+
+The completed repaired-transport/two-point-pressure diagnostic (job 2001247)
+had peak speed 16.514 over six seconds. Its 2--6 second Fx/Fy/Mz means were
+18.8709/12.5340/-13.9435, with 56.38 wall seconds per physical second. The Fx
+mean differs by about 6.5% from the earlier uniform-fine reference; reduced
+velocity peaks alone therefore do not establish load accuracy. This diagnostic
+is not the compatible mass projection and does not replace the acceptance gate.

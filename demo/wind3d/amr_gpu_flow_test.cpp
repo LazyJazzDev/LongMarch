@@ -24,7 +24,7 @@ double Divergence(const wind3d::amr::FlowSnapshot &s) {
   return error;
 }
 
-int Run() {
+int Run(bool compatible) {
   using namespace wind3d::amr;
   Topology coarse, fine, mixed, wrong;
   if (!coarse.Regrid({2, 2, 2}, 0, 8, [](Block) { return false; }) ||
@@ -40,7 +40,8 @@ int Run() {
       distance = [](std::array<double, 3> p) {
         return std::max({std::abs(p[0] + .5), std::abs(p[1]), std::abs(p[2])}) - .21;
       };
-    if (!flow.Initialize(0, body ? mixed : coarse, 4, 1, {-1, -1, -1}, distance, 1) || !flow.Readback(state))
+    if (!flow.Initialize(0, body ? mixed : coarse, 4, 1, {-1, -1, -1}, distance, 1, compatible) ||
+        !flow.Readback(state))
       return 2;
     double maximum;
     if (!flow.MaximumSpeed(maximum) || std::abs(maximum - 1) > 1e-12)
@@ -80,7 +81,8 @@ int Run() {
     before = state;
     if (flow.Regrid(wrong) || flow.Error().empty() || !flow.Readback(state) || !Same(before, state))
       return 13;
-    if (flow.Initialize(0, coarse, 3, 1, {-1, -1, -1}, distance, 1) || !flow.Readback(state) || !Same(before, state))
+    if (flow.Initialize(0, coarse, 3, 1, {-1, -1, -1}, distance, 1, compatible) || !flow.Readback(state) ||
+        !Same(before, state))
       return 14;
     if (body && (flow.Regrid(coarse) || !flow.Readback(state) || !Same(before, state)))
       return 15;
@@ -120,7 +122,9 @@ int Run() {
 }
 
 int main() {
-  int code = Run();
+  int code = Run(false);
+  if (!code)
+    code = Run(true);
   if (code)
     std::cerr << "GPU flow lifecycle failure code=" << code << '\n';
   return code;

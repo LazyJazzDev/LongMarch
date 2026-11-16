@@ -5,7 +5,7 @@ namespace wind3d {
 struct AdaptiveTaskOptions {
   int levels{1}, block_cells{4}, adapt_every{100};
   size_t capacity{100000};
-  bool uniform{};
+  bool uniform{}, compatible_pressure{};
 };
 
 int RunAdaptiveTask(int grid,

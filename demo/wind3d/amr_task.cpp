@@ -75,7 +75,7 @@ int RunAdaptiveTask(int grid,
           [controls](std::array<double, 3> p) {
             return double(AircraftDistance({float(p[0]), float(p[1]), float(p[2])}, controls));
           },
-          controls.speed)) {
+          controls.speed, adaptive.compatible_pressure)) {
     std::fprintf(stderr, "Adaptive initialization failed: %s\n", flow.Error().c_str());
     return 2;
   }
@@ -87,8 +87,9 @@ int RunAdaptiveTask(int grid,
     file << std::setprecision(17) << "step,time,dt,Fx,Fy,Fz,Mx,My,Mz,seconds,cells,generation\n";
   }
   auto info = flow.Info();
-  std::printf("SETUP backend=%s finest_h=%.9g cells=%zu blocks=%zu seconds=%.9g\n",
-              adaptive.uniform ? "amr-uniform" : "adaptive", h, info.cells, info.blocks,
+  std::printf("SETUP backend=%s pressure=%s finest_h=%.9g cells=%zu blocks=%zu seconds=%.9g\n",
+              adaptive.uniform ? "amr-uniform" : "adaptive", adaptive.compatible_pressure ? "compatible" : "quadratic",
+              h, info.cells, info.blocks,
               std::chrono::duration<double>(std::chrono::steady_clock::now() - setup_start).count());
   amr::FlowParameters physics;
   physics.cubic = options.cubic;
