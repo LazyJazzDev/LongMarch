@@ -4,14 +4,15 @@
 namespace wind3d::amr {
 // Distributed building blocks for the compatible pressure operator. D is
 // negative integrated flux divergence; D^T is not yet the velocity gradient
-// (which requires M^-1). No pressure boundary pinning or solve is performed.
+// (which requires M^-1). InverseMass applies the free-face mask; pressure
+// row pinning and the pressure solve are not performed here.
 class GpuPressureOperators {
  public:
   GpuPressureOperators();
   ~GpuPressureOperators();
   GpuPressureOperators(const GpuPressureOperators &) = delete;
   GpuPressureOperators &operator=(const GpuPressureOperators &) = delete;
-  bool Build(const Mesh &mesh, const Topology &tree, const std::vector<int> &devices);
+  bool Build(const Mesh &mesh, const Topology &tree, const std::vector<int> &devices, bool pressure_boundaries = true);
   const std::vector<PressureLocalLayout> &Layouts() const;
   // Layout-sized device arrays, disjoint input/output allocations. Input
   // imports are refreshed; only owned output entries are written. Producers
@@ -19,6 +20,10 @@ class GpuPressureOperators {
   bool Divergence(const std::vector<double *> &faces, const std::vector<double *> &cells);
   bool TransposeDivergence(const std::vector<double *> &cells, const std::vector<double *> &faces);
   bool Mass(const std::vector<double *> &input, const std::vector<double *> &output);
+
+  // Fixed symmetric Chebyshev inverse of the free-face principal mass matrix.
+  // Closed faces, and optionally fixed inlet/wall normals, return zero.
+  bool InverseMass(const std::vector<double *> &input, const std::vector<double *> &output);
 
   const std::string &Error() const {
     return error_;

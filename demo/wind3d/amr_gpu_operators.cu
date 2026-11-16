@@ -25,6 +25,49 @@ __global__ void Multiply(Matrix a, const double *input, double *output) {
   output[i] = value;
 }
 
+constexpr double mass_centre = 1.25, mass_radius = .76;
+constexpr int mass_iterations = 32;
+
+__global__ void InitializeInverse(int n,
+                                  const unsigned char *coupled,
+                                  const double *scale,
+                                  const double *rhs,
+                                  double *b,
+                                  double *x,
+                                  double *direction) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    b[i] = coupled[i] ? rhs[i] * scale[i] : 0;
+    x[i] = direction[i] = b[i] / mass_centre;
+  }
+}
+
+__global__ void
+IterateInverse(Matrix a, const double *b, const double *x, double *next, double *direction, double alpha, double beta) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= a.rows)
+    return;
+  double product = 0;
+  for (int k = a.offsets[i]; k < a.offsets[i + 1]; ++k)
+    product += a.weights[k] * x[a.columns[k]];
+  double d = alpha * (b[i] - product) + beta * direction[i];
+  next[i] = x[i] + d;
+  direction[i] = d;
+}
+
+__global__ void FinishInverse(int n,
+                              const unsigned char *free,
+                              const unsigned char *coupled,
+                              const double *scale,
+                              const double *diagonal,
+                              const double *rhs,
+                              const double *x,
+                              double *output) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n)
+    output[i] = !free[i] ? 0 : coupled[i] ? scale[i] * x[i] : rhs[i] / diagonal[i];
+}
+
 struct DeviceScope {
   int previous{-1};
 
@@ -41,13 +84,16 @@ struct DeviceScope {
 
 struct GpuPressureOperators::Impl {
   struct Rank {
-    Matrix d, transpose, mass;
+    Matrix d, transpose, mass, normalized;
+    unsigned char *free{}, *coupled{};
+    double *scale{}, *diagonal{}, *b{}, *x{}, *scratch{}, *direction{};
     cudaStream_t stream{};
   };
 
   GpuPressureExchange exchange;
   std::vector<int> devices;
   std::vector<Rank> ranks;
+  bool coupled{};
   std::vector<std::pair<int, void *>> allocations;
   std::string error;
 
@@ -82,6 +128,26 @@ struct GpuPressureOperators::Impl {
     return Check(cudaMemcpy(pointer, values.data(), values.size() * sizeof(T), cudaMemcpyHostToDevice));
   }
 
+  template <class T>
+  bool Allocate(int device, T *&pointer, size_t count) {
+    if (!Check(cudaSetDevice(device)) || !Check(cudaMalloc(&pointer, count * sizeof(T))))
+      return false;
+    allocations.push_back({device, pointer});
+    return true;
+  }
+
+  bool Synchronize() {
+    std::string failure;
+    for (size_t r = 0; r < ranks.size(); ++r)
+      if (!Check(cudaSetDevice(devices[r])) || !Check(cudaStreamSynchronize(ranks[r].stream)))
+        if (failure.empty())
+          failure = error;
+    if (failure.empty())
+      return true;
+    error = failure;
+    return false;
+  }
+
   bool MatrixBuild(int device, Matrix &a, const std::vector<std::vector<std::pair<int, double>>> &rows) {
     std::vector<int> offsets{0}, columns;
     std::vector<double> weights;
@@ -105,7 +171,10 @@ struct GpuPressureOperators::Impl {
 GpuPressureOperators::GpuPressureOperators() = default;
 GpuPressureOperators::~GpuPressureOperators() = default;
 
-bool GpuPressureOperators::Build(const Mesh &mesh, const Topology &tree, const std::vector<int> &devices) {
+bool GpuPressureOperators::Build(const Mesh &mesh,
+                                 const Topology &tree,
+                                 const std::vector<int> &devices,
+                                 bool pressure_boundaries) {
   error_.clear();
   DeviceScope restore;
   FaceMass mass;
@@ -119,6 +188,22 @@ bool GpuPressureOperators::Build(const Mesh &mesh, const Topology &tree, const s
     error_ = next->exchange.Error();
     return false;
   }
+  std::vector<unsigned char> free(mesh.Faces().size()), coupled(mesh.Faces().size());
+  std::vector<double> scale(mesh.Faces().size());
+  for (size_t i = 0; i < free.size(); ++i) {
+    const auto &f = mesh.Faces()[i];
+    free[i] = f.aperture > 0 && (!pressure_boundaries || (f.low >= 0 && f.high >= 0) || (f.axis == 0 && f.high < 0));
+  }
+  for (size_t i = 0; i < free.size(); ++i)
+    if (free[i])
+      for (int k = mass.Offsets()[i]; k < mass.Offsets()[i + 1]; ++k)
+        if (mass.Columns()[k] != int(i) && free[mass.Columns()[k]]) {
+          coupled[i] = 1;
+          next->coupled = true;
+          const auto &f = mesh.Faces()[i];
+          scale[i] = 1 / std::sqrt(f.area * f.distance * f.aperture);
+          break;
+        }
   next->devices = devices;
   next->ranks.resize(devices.size());
   for (size_t r = 0; r < devices.size(); ++r) {
@@ -129,7 +214,9 @@ bool GpuPressureOperators::Build(const Mesh &mesh, const Topology &tree, const s
     for (size_t i = 0; i < layout.faces.size(); ++i)
       faces[layout.faces[i]] = int(i);
     using Rows = std::vector<std::vector<std::pair<int, double>>>;
-    Rows d(layout.owned_cells), transpose(layout.owned_faces), m(layout.owned_faces);
+    Rows d(layout.owned_cells), transpose(layout.owned_faces), m(layout.owned_faces), normalized(layout.owned_faces);
+    std::vector<unsigned char> local_free, local_coupled;
+    std::vector<double> local_scale, diagonal;
     for (size_t i = 0; i < layout.owned_cells; ++i) {
       int cell = layout.cells[i];
       for (int k = mesh.Offsets()[cell]; k < mesh.Offsets()[cell + 1]; ++k) {
@@ -141,6 +228,21 @@ bool GpuPressureOperators::Build(const Mesh &mesh, const Topology &tree, const s
     for (size_t i = 0; i < layout.owned_faces; ++i) {
       int id = layout.faces[i];
       const auto &f = mesh.Faces()[id];
+      local_free.push_back(free[id]);
+      local_coupled.push_back(coupled[id]);
+      local_scale.push_back(scale[id]);
+      diagonal.push_back(mass.Diagonal()[id]);
+      if (coupled[id])
+        for (int k = mass.Offsets()[id]; k < mass.Offsets()[id + 1]; ++k) {
+          int j = mass.Columns()[k];
+          if (free[j]) {
+            if (!coupled[j]) {
+              error_ = "Inconsistent symmetric mass coupling";
+              return false;
+            }
+            normalized[i].push_back({faces[j], mass.Weights()[k] * scale[id] * scale[j]});
+          }
+        }
       std::map<int, double> row;
       if (f.low >= 0)
         row[f.low] = -f.area * f.aperture;
@@ -154,7 +256,13 @@ bool GpuPressureOperators::Build(const Mesh &mesh, const Topology &tree, const s
     auto &rank = next->ranks[r];
     int device = devices[r];
     if (!next->MatrixBuild(device, rank.d, d) || !next->MatrixBuild(device, rank.transpose, transpose) ||
-        !next->MatrixBuild(device, rank.mass, m) ||
+        !next->MatrixBuild(device, rank.mass, m) || !next->MatrixBuild(device, rank.normalized, normalized) ||
+        !next->Upload(device, rank.free, local_free) || !next->Upload(device, rank.coupled, local_coupled) ||
+        !next->Upload(device, rank.scale, local_scale) || !next->Upload(device, rank.diagonal, diagonal) ||
+        !next->Allocate(device, rank.b, layout.owned_faces) ||
+        !next->Allocate(device, rank.direction, layout.owned_faces) ||
+        !next->Allocate(device, rank.x, layout.faces.size()) ||
+        !next->Allocate(device, rank.scratch, layout.faces.size()) ||
         !next->Check(cudaStreamCreateWithFlags(&rank.stream, cudaStreamNonBlocking))) {
       error_ = next->error;
       return false;
@@ -223,4 +331,75 @@ bool GpuPressureOperators::TransposeDivergence(const std::vector<double *> &cell
 bool GpuPressureOperators::Mass(const std::vector<double *> &input, const std::vector<double *> &output) {
   return Apply(input, output, 2);
 }
+
+bool GpuPressureOperators::InverseMass(const std::vector<double *> &input, const std::vector<double *> &output) {
+  error_.clear();
+  if (!impl_ || input.size() != impl_->ranks.size() || output.size() != input.size() ||
+      std::any_of(input.begin(), input.end(), [](auto p) { return !p; }) ||
+      std::any_of(output.begin(), output.end(),
+                  [&](auto p) { return !p || std::find(input.begin(), input.end(), p) != input.end(); })) {
+    error_ = "Mass inverse needs disjoint input and output fields per rank";
+    return false;
+  }
+  DeviceScope restore;
+  auto &w = *impl_;
+  auto fail = [&] {
+    std::string first = w.error;
+    w.Synchronize();
+    error_ = first;
+    return false;
+  };
+  std::vector<double *> current, next;
+  for (size_t r = 0; r < w.ranks.size(); ++r) {
+    auto &rank = w.ranks[r];
+    current.push_back(rank.x);
+    next.push_back(rank.scratch);
+    if (!w.Check(cudaSetDevice(w.devices[r])))
+      return fail();
+    if (w.coupled) {
+      InitializeInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
+          rank.mass.rows, rank.coupled, rank.scale, input[r], rank.b, rank.x, rank.direction);
+      if (!w.Check(cudaGetLastError()))
+        return fail();
+    }
+  }
+  if (w.coupled) {
+    if (!w.Synchronize())
+      return fail();
+    double rho = mass_radius / mass_centre;
+    for (int step = 1; step < mass_iterations; ++step) {
+      if (!w.exchange.ExchangeFaces(current)) {
+        error_ = w.exchange.Error();
+        return false;
+      }
+      double updated = 1 / (2 * mass_centre / mass_radius - rho);
+      for (size_t r = 0; r < w.ranks.size(); ++r) {
+        auto &rank = w.ranks[r];
+        if (!w.Check(cudaSetDevice(w.devices[r])))
+          return fail();
+        IterateInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
+            rank.normalized, rank.b, current[r], next[r], rank.direction, 2 * updated / mass_radius, updated * rho);
+        if (!w.Check(cudaGetLastError()))
+          return fail();
+      }
+      if (!w.Synchronize())
+        return fail();
+      current.swap(next);
+      rho = updated;
+    }
+  }
+  for (size_t r = 0; r < w.ranks.size(); ++r) {
+    auto &rank = w.ranks[r];
+    if (!w.Check(cudaSetDevice(w.devices[r])))
+      return fail();
+    FinishInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
+        rank.mass.rows, rank.free, rank.coupled, rank.scale, rank.diagonal, input[r], current[r], output[r]);
+    if (!w.Check(cudaGetLastError()))
+      return fail();
+  }
+  if (!w.Synchronize())
+    return fail();
+  return true;
+}
+
 }  // namespace wind3d::amr

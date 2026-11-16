@@ -7,6 +7,8 @@
 #include <iostream>
 #include <limits>
 
+#include "amr_gpu_mass.h"
+
 struct Buffers {
   std::vector<std::pair<int, double *>> allocations;
 
@@ -28,7 +30,7 @@ struct Buffers {
   }
 };
 
-int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices) {
+int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices, bool pressure_boundaries) {
   using namespace wind3d::amr;
   Topology tree;
   Mesh mesh;
@@ -45,7 +47,7 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
   if (!mass.Build(mesh))
     return 3;
   GpuPressureOperators gpu;
-  if (!gpu.Build(mesh, tree, devices)) {
+  if (!gpu.Build(mesh, tree, devices, pressure_boundaries)) {
     std::cerr << gpu.Error() << '\n';
     return 4;
   }
@@ -68,8 +70,22 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
     p[i] = std::cos(.21 * i);
   for (size_t i = 0; i < u.size(); ++i)
     u[i] = std::sin(.17 * i);
+  GpuMassInverse single;
+  double *full_rhs = nullptr, *full_result = nullptr;
+  std::vector<double> inverse(u.size()), assembled(u.size());
+  if (!single.Build(0, mesh, pressure_boundaries) || !storage.Allocate(0, u.size(), full_rhs) ||
+      !storage.Allocate(0, u.size(), full_result) ||
+      cudaMemcpy(full_rhs, u.data(), u.size() * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess ||
+      !single.ApplyDevice(full_rhs, full_result, u.size()) ||
+      cudaMemcpy(inverse.data(), full_result, u.size() * sizeof(double), cudaMemcpyDeviceToHost) != cudaSuccess)
+    return 15;
+  auto free_face = [&](size_t i) {
+    const auto &f = mesh.Faces()[i];
+    return f.aperture > 0 && (!pressure_boundaries || (f.low >= 0 && f.high >= 0) || (f.axis == 0 && f.high < 0));
+  };
   double maximum = 0;
-  for (int operation = 0; operation < 3; ++operation) {
+  for (int operation = 0; operation < 5; ++operation) {
+    double factor = operation == 4 ? -.5 : 1;
     bool cell_input = operation == 1, cell_output = operation == 0;
     auto &input = cell_input ? cells : faces;
     auto &output = cell_output ? cell_out : face_out;
@@ -79,7 +95,7 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
       size_t owned = cell_input ? l.owned_cells : l.owned_faces;
       std::vector<double> host(ids.size(), std::numeric_limits<double>::quiet_NaN());
       for (size_t i = 0; i < owned; ++i)
-        host[i] = cell_input ? p[ids[i]] : u[ids[i]];
+        host[i] = cell_input ? p[ids[i]] : factor * u[ids[i]];
       if (cudaSetDevice(devices[r]) != cudaSuccess ||
           cudaMemcpy(input[r], host.data(), host.size() * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess)
         return 7;
@@ -92,14 +108,16 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
       return 9;
     if (!(operation == 0   ? gpu.Divergence(input, output)
           : operation == 1 ? gpu.TransposeDivergence(input, output)
-                           : gpu.Mass(input, output))) {
+          : operation == 2 ? gpu.Mass(input, output)
+                           : gpu.InverseMass(input, output))) {
       std::cerr << gpu.Error() << '\n';
       return 10;
     }
     cudaGetDevice(&actual);
     if (actual != saved)
       return 11;
-    if (gpu.Mass(input, input) || gpu.Divergence({}, output) || gpu.TransposeDivergence(input, {}))
+    if (gpu.InverseMass(input, input) || gpu.Mass(input, input) || gpu.Divergence({}, output) ||
+        gpu.TransposeDivergence(input, {}))
       return 12;
     for (size_t r = 0; r < devices.size(); ++r) {
       auto &l = layouts[r];
@@ -123,9 +141,12 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
           } else if (operation == 1) {
             auto f = mesh.Faces()[id];
             reference = ((f.low >= 0 ? -p[f.low] : 0) + (f.high >= 0 ? p[f.high] : 0)) * f.area * f.aperture;
-          } else {
+          } else if (operation == 2) {
             for (int k = mass.Offsets()[id]; k < mass.Offsets()[id + 1]; ++k)
               reference += mass.Weights()[k] * u[mass.Columns()[k]];
+          } else {
+            reference = factor * inverse[id];
+            assembled[id] = host[i];
           }
         }
         if (!std::isfinite(host[i]) || std::abs(host[i] - reference) > 1e-12 * std::max(1., std::abs(reference)))
@@ -133,9 +154,27 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
         maximum = std::max(maximum, std::abs(host[i] - reference));
       }
     }
+    if (operation >= 3) {
+      double residual = 0;
+      for (size_t i = 0; i < u.size(); ++i) {
+        if (!free_face(i)) {
+          if (assembled[i] != 0)
+            return 16;
+          continue;
+        }
+        double value = 0;
+        for (int k = mass.Offsets()[i]; k < mass.Offsets()[i + 1]; ++k)
+          value += mass.Weights()[k] * assembled[mass.Columns()[k]];
+        residual = std::max(residual, std::abs(value - factor * u[i]));
+      }
+      if (residual > 1e-12) {
+        std::cerr << "true mass residual " << residual << '\n';
+        return 17;
+      }
+    }
   }
-  std::cout << "PASS distributed D/DT/M ranks=" << devices.size() << " mixed=" << mixed << " embedded=" << embedded
-            << " width=" << width << " error=" << maximum << '\n';
+  std::cout << "PASS distributed D/DT/M/inverse ranks=" << devices.size() << " mixed=" << mixed
+            << " embedded=" << embedded << " width=" << width << " error=" << maximum << '\n';
   return 0;
 }
 
@@ -147,8 +186,9 @@ int main() {
     for (bool embedded : {false, true})
       for (double width : {1., 1.3})
         for (auto devices : {std::vector<int>{0}, std::vector<int>{0, 1}, std::vector<int>{1, 0}})
-          if (int status = Run(mixed, embedded, width, devices)) {
-            std::cerr << "operator failure " << status << '\n';
-            return status;
-          }
+          for (bool boundaries : {false, true})
+            if (int status = Run(mixed, embedded, width, devices, boundaries)) {
+              std::cerr << "operator failure " << status << '\n';
+              return status;
+            }
 }

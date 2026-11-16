@@ -1072,3 +1072,25 @@ within 1.12e-16. Invalid build/input recovery and current-device restoration
 are also checked. Distributed mass inverse, global Krylov reductions, a
 partitioned preconditioner and coupling to flow advancement remain outstanding;
 no multi-GPU whole-solver speedup is claimed.
+
+
+## Distributed compatible mass inverse
+
+`GpuPressureOperators::InverseMass` now applies the same fixed 32-term
+Chebyshev inverse as the single-device implementation, using the normalized
+spectral interval [0.49,2.01]. Closed faces return zero; the default pressure
+boundary mask also fixes inlet and wall normals while leaving outlet normals
+free. Uncoupled free rows use exact diagonal division. Coupled rows exchange
+normalized iterates between devices on every polynomial step. Only owned
+output slots are written, and repeated calls reset their internal recurrence.
+
+Job 2001312 passed direct tests, CTest and Compute Sanitizer (zero errors) on
+two GPUs. Forty-eight geometry/spacing/partition/boundary-mode combinations
+compare against the existing single-device inverse. Maximum absolute output
+difference was 1.71e-13; independently applying the CPU mass matrix to the
+assembled free-face result left true principal-system residual below 1e-12.
+Repeated scaled right-hand sides, fixed-face zeros, untouched output ghosts,
+alias rejection and device restoration were checked. The implementation still
+synchronizes rank streams and peer transfers at every iteration and stores
+full owned-face work vectors. Performance optimization and distributed pressure
+iteration remain necessary; correctness here does not demonstrate speedup.
