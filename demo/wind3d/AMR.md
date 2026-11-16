@@ -399,3 +399,18 @@ replacement plus the ordinary CG recurrence is numerically fragile for this
 case. A periodic restart alone is insufficient. Establish a reliable pressure
 reference, including actual projected divergence and aircraft loads, before
 using tighter native tolerances to assess adaptive error.
+
+## Pressure relaxation performance
+
+The GPU aggregation preconditioner's two pre/post Jacobi sweeps now use weight
+0.9. Grid-128 aircraft startup controls compared 1/2/4/6 sweeps and weights
+0.65/0.8/0.9; more sweeps reduced iterations but increased total time. Two
+alternating baseline/candidate runs on one H200 (job 2001236, 30 steps, first
+10 excluded) reduced adaptive pressure time from 10.14--10.27 ms to
+8.87--8.88 ms and total step time from 14.33--14.34 ms to 13.12--13.14 ms.
+Mean iterations fell from 19.4 to 17.2. The maximum startup force-component
+change was 4.4e-5 and moment-component change 3.8e-6 at unchanged true-residual
+criteria. GPU projection, complete advancement and transactional regrid tests
+passed, as did projection memcheck (zero errors). This improves the current
+adaptive implementation; it does not establish speedup over the original
+uniform backend, steady-load preservation, or the full control envelope.

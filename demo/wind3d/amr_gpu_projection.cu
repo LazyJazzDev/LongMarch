@@ -87,7 +87,7 @@ __global__ void CloseFaces(int count, const int *indices, double *velocity) {
 __global__ void FirstSmooth(int n, const double *diagonal, const double *rhs, double *next) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n)
-    next[i] = .65 * rhs[i] / diagonal[i];
+    next[i] = .9 * rhs[i] / diagonal[i];
 }
 
 template <int Width>
@@ -97,7 +97,7 @@ __global__ void Smooth(Matrix a, const double *diagonal, const double *rhs, cons
     return;
   double ax = RowProduct<Width>(a, i, x);
   if (threadIdx.x % Width == 0)
-    next[i] = x[i] + .65 * (rhs[i] - ax) / diagonal[i];
+    next[i] = x[i] + .9 * (rhs[i] - ax) / diagonal[i];
 }
 
 template <int Width>
