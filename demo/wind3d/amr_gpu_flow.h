@@ -64,8 +64,8 @@ class GpuFlow {
   // Versioned, checksummed file checkpoint; save replaces the destination only
   // after a complete temporary write. Load requires initialized matching domain,
   // body and pressure mode. Caller must retain the same physical/time-step options.
-  bool SaveCheckpoint(const std::string &path) const;
-  bool LoadCheckpoint(const std::string &path);
+  bool SaveCheckpoint(const std::string &path, uint64_t context = 0) const;
+  bool LoadCheckpoint(const std::string &path, uint64_t context = 0);
   FlowInfo Info() const;
   std::string Error() const;
 

@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <limits>
@@ -36,11 +38,57 @@ int RunAdaptiveTask(int grid,
     std::fputs("Multi-GPU adaptive batch requires --amr-compatible-pressure.\n", stderr);
     return 1;
   }
+  if (steps <= warmup || warmup < 0 || adaptive.checkpoint_every <= 0 ||
+      (options.devices != 1 && (!adaptive.checkpoint.empty() || !adaptive.resume.empty())))
+    return 1;
+  // Bind a checkpoint to the numerical experiment, independently of output paths
+  // and its requested final step. Bump the seed when solver semantics change.
+  uint64_t context = 14695981039346656037ULL;
+  auto hash = [&](double value) {
+    uint64_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    for (int i = 0; i < 8; ++i) {
+      context ^= (bits >> (8 * i)) & 255;
+      context *= 1099511628211ULL;
+    }
+  };
+  for (double value :
+       {1., double(grid), double(adaptive.levels), double(adaptive.block_cells), double(adaptive.capacity),
+        double(adaptive.adapt_every), double(adaptive.uniform), double(adaptive.compatible_pressure),
+        adaptive.pressure_tolerance, adaptive.protect_padding_cells, double(options.cubic), double(options.cfl),
+        double(options.max_dt), double(options.viscosity), double(options.wall_viscosity), double(options.sponge)})
+    hash(value);
+  if (csv) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    auto output = fs::weakly_canonical(csv, ec);
+    if (ec)
+      return 1;
+    if (!adaptive.resume.empty() && fs::exists(output, ec)) {
+      std::fputs("Resume requires a fresh CSV segment path.\n", stderr);
+      return 1;
+    }
+    if (ec)
+      return 1;
+    for (const auto &path : {adaptive.checkpoint, adaptive.resume}) {
+      if (path.empty())
+        continue;
+      auto state = fs::weakly_canonical(path, ec);
+      if (ec || state == output)
+        return 1;
+      if (fs::exists(output, ec) && fs::exists(state, ec) && fs::equivalent(output, state, ec))
+        return 1;
+      if (ec)
+        return 1;
+    }
+  }
   const Controls controls = options.initial_controls;
   for (float value :
        {controls.speed, controls.angle, controls.flap, controls.aileron, controls.elevator, controls.rudder})
     if (!std::isfinite(value))
       return 1;
+    else
+      hash(value);
   int divisor = adaptive.block_cells * (1 << adaptive.levels);
   if (grid % divisor || (grid / 2) % divisor || (grid * 3 / 4) % divisor) {
     std::fputs("Grid dimensions must be divisible by block-cells * 2^levels.\n", stderr);
@@ -97,6 +145,19 @@ int RunAdaptiveTask(int grid,
       std::fprintf(stderr, "Adaptive initialization failed: %s\n", flow.Error().c_str());
       return 2;
     }
+    if constexpr (std::is_same_v<std::decay_t<decltype(flow)>, amr::GpuFlow>) {
+      if (!adaptive.resume.empty() && !flow.LoadCheckpoint(adaptive.resume, context)) {
+        std::fprintf(stderr, "Checkpoint resume failed: %s\n", flow.Error().c_str());
+        return 2;
+      }
+    }
+    if (flow.Info().steps >= uint64_t(steps)) {
+      std::fputs("Final step must be greater than the checkpoint step.\n", stderr);
+      return 1;
+    }
+    int first_step = int(flow.Info().steps);
+    if (!adaptive.resume.empty())
+      std::printf("RESUME step=%d time=%.17g\n", first_step, flow.Info().time);
     std::ofstream file;
     if (csv) {
       file.open(csv);
@@ -118,7 +179,9 @@ int RunAdaptiveTask(int grid,
     physics.wall_viscosity = options.wall_viscosity;
     physics.sponge_length = options.sponge;
     double maximum = controls.speed, total = 0, total_physical = 0;
-    for (int step = 1; step <= steps; ++step) {
+    if (!adaptive.resume.empty() && !flow.MaximumSpeed(maximum))
+      return 2;
+    for (int step = first_step + 1; step <= steps; ++step) {
       auto start = std::chrono::steady_clock::now();
       float bound = std::max(float(maximum), controls.speed);
       float diffusion = std::max(options.viscosity, WallEffectiveViscosity(options.wall_viscosity, 2 * bound, .5f * h));
@@ -132,7 +195,8 @@ int RunAdaptiveTask(int grid,
       }
       info = flow.Info();
       double adapt_seconds = 0;
-      if (!adaptive.uniform && adaptive.adapt_every > 0 && step % adaptive.adapt_every == 0 && step < steps) {
+      if (!adaptive.uniform && adaptive.adapt_every > 0 && step % adaptive.adapt_every == 0 &&
+          (step < steps || !adaptive.checkpoint.empty())) {
         auto adapt_start = std::chrono::steady_clock::now();
         amr::RefinementReport report;
         if (!flow.Adapt(refinement, report)) {
@@ -166,6 +230,25 @@ int RunAdaptiveTask(int grid,
         if (!file)
           return 2;
       }
+      if constexpr (std::is_same_v<std::decay_t<decltype(flow)>, amr::GpuFlow>) {
+        if (!adaptive.checkpoint.empty() && (step % adaptive.checkpoint_every == 0 || step == steps)) {
+          if (csv) {
+            file.flush();
+            if (!file)
+              return 2;
+          }
+          auto checkpoint_start = std::chrono::steady_clock::now();
+          if (!flow.SaveCheckpoint(adaptive.checkpoint, context)) {
+            std::fprintf(stderr, "Checkpoint save failed: %s\n", flow.Error().c_str());
+            return 2;
+          }
+          double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - checkpoint_start).count();
+          if (step > warmup)
+            total += elapsed;
+          std::printf("CHECKPOINT step=%d seconds=%.9g\n", step, elapsed);
+          std::fflush(stdout);
+        }
+      }
     }
     if (csv) {
       file.flush();
@@ -174,8 +257,9 @@ int RunAdaptiveTask(int grid,
     }
     std::printf(
         "RESULT backend=%s grid=%d gpus=%d steps=%d warmup=%d export=0 mean_seconds=%.9g steps_per_second=%.9g physical_seconds_per_second=%.9g\n",
-        adaptive.uniform ? "amr-uniform" : "adaptive", grid, options.devices, steps, warmup, total / (steps - warmup),
-        (steps - warmup) / total, total_physical / total);
+        adaptive.uniform ? "amr-uniform" : "adaptive", grid, options.devices, steps, warmup,
+        total / (steps - std::max(warmup, first_step)), (steps - std::max(warmup, first_step)) / total,
+        total_physical / total);
     return 0;
   };
   if (options.devices == 1) {

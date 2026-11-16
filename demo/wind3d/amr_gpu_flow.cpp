@@ -391,7 +391,7 @@ bool GpuFlow::Restore(const FlowSnapshot &snapshot) {
   return true;
 }
 
-bool GpuFlow::SaveCheckpoint(const std::string &path) const {
+bool GpuFlow::SaveCheckpoint(const std::string &path, uint64_t context) const {
   namespace fs = std::filesystem;
   FlowSnapshot snapshot;
   if (path.empty() || !Readback(snapshot)) {
@@ -401,8 +401,8 @@ bool GpuFlow::SaveCheckpoint(const std::string &path) const {
   }
   const auto &info = snapshot.info;
   auto roots = snapshot.topology.Roots();
-  std::array<uint64_t, 20> header{checkpoint_magic,
-                                  1,
+  std::array<uint64_t, 21> header{checkpoint_magic,
+                                  2,
                                   uint64_t(snapshot.compatible_pressure),
                                   uint64_t(impl_->n),
                                   uint64_t(roots[0]),
@@ -420,7 +420,8 @@ bool GpuFlow::SaveCheckpoint(const std::string &path) const {
                                   Bits(impl_->origin[0]),
                                   Bits(impl_->origin[1]),
                                   Bits(impl_->origin[2]),
-                                  Bits(info.time)};
+                                  Bits(info.time),
+                                  context};
   static std::atomic<uint64_t> serial{};
   fs::path temporary;
   std::error_code ec;
@@ -477,7 +478,7 @@ bool GpuFlow::SaveCheckpoint(const std::string &path) const {
   return true;
 }
 
-bool GpuFlow::LoadCheckpoint(const std::string &path) {
+bool GpuFlow::LoadCheckpoint(const std::string &path, uint64_t context) {
   namespace fs = std::filesystem;
   auto invalid = [&]() {
     error_ = "Invalid, truncated or incompatible checkpoint";
@@ -487,23 +488,23 @@ bool GpuFlow::LoadCheckpoint(const std::string &path) {
     return invalid();
   std::error_code ec;
   uintmax_t bytes = fs::file_size(fs::path(path), ec);
-  if (ec || bytes < 168)
+  if (ec || bytes < 176)
     return invalid();
   std::ifstream file(path, std::ios::binary);
   CheckpointIO io{&file, nullptr};
-  std::array<uint64_t, 20> h{};
+  std::array<uint64_t, 21> h{};
   for (auto &value : h)
     if (!io.Word(value))
       return invalid();
   auto roots = impl_->tree.Roots();
-  if (h[0] != checkpoint_magic || h[1] != 1 || h[2] != uint64_t(impl_->compatible_pressure) ||
+  if (h[0] != checkpoint_magic || h[1] != 2 || h[20] != context || h[2] != uint64_t(impl_->compatible_pressure) ||
       h[3] != uint64_t(impl_->n) || h[4] != uint64_t(roots[0]) || h[5] != uint64_t(roots[1]) ||
       h[6] != uint64_t(roots[2]) || h[7] > 12 || h[13] > 1 || h[15] != Bits(impl_->width) ||
       h[16] != Bits(impl_->origin[0]) || h[17] != Bits(impl_->origin[1]) || h[18] != Bits(impl_->origin[2]))
     return invalid();
   // Validate exact payload size without overflowing arithmetic or trusting
   // encoded allocation sizes. The runtime uses signed 32-bit mesh indexing.
-  uintmax_t remaining = bytes - 168;
+  uintmax_t remaining = bytes - 176;
   if (!h[8] || h[8] > remaining / 32 || h[8] > uint64_t(INT_MAX))
     return invalid();
   remaining -= h[8] * 32;

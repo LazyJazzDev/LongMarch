@@ -8,6 +8,9 @@ if (LONGMARCH_WIND3D_STANDALONE)
     if (BUILD_TESTING)
         find_package(Python3 COMPONENTS Interpreter)
         if (Python3_Interpreter_FOUND)
+            add_test(NAME wind3d_amr_task_checkpoint
+                COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_amr_checkpoint.py $<TARGET_FILE:wind3d_task> $<TARGET_FILE:CUDA::cudart>)
+            set_tests_properties(wind3d_amr_task_checkpoint PROPERTIES TIMEOUT 600 RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
             add_test(NAME wind3d_amr_task_multigpu
                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_amr_multigpu.py $<TARGET_FILE:wind3d_task> $<TARGET_FILE:CUDA::cudart>)
             set_tests_properties(wind3d_amr_task_multigpu PROPERTIES TIMEOUT 1200 RUN_SERIAL TRUE SKIP_RETURN_CODE 77)

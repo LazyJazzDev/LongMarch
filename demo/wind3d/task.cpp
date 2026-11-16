@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
   auto options = wind3d::OptimizedSolverOptions();
   bool validate = false;
   const char *dump = nullptr, *csv = nullptr;
-  bool adaptive_mode = false, specified_padding = false;
+  bool adaptive_mode = false, specified_padding = false, specified_checkpoint_interval = false;
   wind3d::AdaptiveTaskOptions adaptive;
   for (int i = 1; i < argc; ++i) {
     const char *arg = argv[i];
@@ -57,6 +57,8 @@ int main(int argc, char **argv) {
           "            (adaptive pressure tolerance defaults to 1e-8)\n"
           "            [--amr-compatible-pressure] (required for multi-GPU adaptive/uniform AMR)\n"
           "            [--adapt-every 100] [--max-blocks 100000] (adaptive requires --no-export)\n"
+          "            [--amr-checkpoint state.bin] [--amr-checkpoint-every 1000] [--amr-resume state.bin] (single GPU)\n"
+          "            Resume keeps absolute step numbers; use a new CSV file. --steps is the final total.\n"
           "Times include transport, pressure, diagnostics and optional snapshot export; startup steps are excluded.");
       return 0;
     }
@@ -67,6 +69,12 @@ int main(int argc, char **argv) {
     char *end = nullptr;
     if (!std::strcmp(arg, "--csv")) {
       csv = argv[i];
+      continue;
+    }
+    if (!std::strcmp(arg, "--amr-checkpoint") || !std::strcmp(arg, "--amr-resume")) {
+      if (!*argv[i])
+        return 1;
+      (!std::strcmp(arg, "--amr-checkpoint") ? adaptive.checkpoint : adaptive.resume) = argv[i];
       continue;
     }
     if (!std::strcmp(arg, "--dump")) {
@@ -108,7 +116,10 @@ int main(int argc, char **argv) {
         adaptive.levels = int(value);
       else if (!std::strcmp(arg, "--block-cells"))
         adaptive.block_cells = int(value);
-      else if (!std::strcmp(arg, "--adapt-every"))
+      else if (!std::strcmp(arg, "--amr-checkpoint-every")) {
+        adaptive.checkpoint_every = int(value);
+        specified_checkpoint_interval = true;
+      } else if (!std::strcmp(arg, "--adapt-every"))
         adaptive.adapt_every = int(value);
       else if (!std::strcmp(arg, "--max-blocks"))
         adaptive.capacity = size_t(value);
@@ -132,6 +143,13 @@ int main(int argc, char **argv) {
   }
   if ((validate && steps < 2) || steps <= warmup || !std::isfinite(options.pressure_tolerance))
     return 1;
+  if ((!adaptive.checkpoint.empty() || !adaptive.resume.empty() || specified_checkpoint_interval) &&
+      (!adaptive_mode || options.devices != 1 || adaptive.checkpoint_every <= 0 ||
+       (specified_checkpoint_interval && adaptive.checkpoint.empty()))) {
+    std::fputs("AMR checkpoints require single-GPU adaptive mode and a positive save interval with an output path.\n",
+               stderr);
+    return 1;
+  }
   if (specified_padding && (!adaptive_mode || adaptive.uniform)) {
     std::fputs("--protect-padding-cells requires --adaptive.\n", stderr);
     return 1;
