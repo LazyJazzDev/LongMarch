@@ -1,7 +1,10 @@
 #include "amr_gpu_flow.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 
@@ -134,6 +137,24 @@ int RestoreContinuation() {
   if (!fine.Regrid({2, 2, 2}, 1, 64, [](Block) { return true; }) ||
       !coarse.Regrid({2, 2, 2}, 1, 64, [](Block) { return false; }))
     return 30;
+  namespace fs = std::filesystem;
+  std::error_code ec;
+  auto directory =
+      fs::temp_directory_path(ec) /
+      ("wind3d-checkpoint-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+  if (ec || !fs::create_directory(directory, ec))
+    return 36;
+
+  struct Cleanup {
+    fs::path path;
+
+    ~Cleanup() {
+      std::error_code error;
+      fs::remove_all(path, error);
+    }
+  } cleanup{directory};
+
+  auto checkpoint = directory / "state.bin", damaged = directory / "damaged.bin";
   for (bool compatible : {false, true})
     for (bool body : {false, true}) {
       GpuFlow original, resumed;
@@ -149,12 +170,52 @@ int RestoreContinuation() {
       FlowSnapshot saved, actual, expected;
       if (!original.Readback(saved) || !resumed.Restore(saved) || !resumed.Readback(actual) || !Same(saved, actual))
         return 32;
+      if (!original.SaveCheckpoint(checkpoint.string()) || !resumed.LoadCheckpoint(checkpoint.string()) ||
+          !resumed.Readback(actual) || !Same(saved, actual))
+        return 37;
       for (int step = 0; step < 3; ++step) {
         double dt = .005 + .001 * step, speed = 1. + .1 * step;
         auto a = original.Advance(dt, speed), b = resumed.Advance(dt, speed);
         if (!a.advanced || !b.advanced || a.total_loads != b.total_loads || !original.Readback(expected) ||
             !resumed.Readback(actual) || !Same(expected, actual))
           return 33;
+      }
+      // Existing checkpoint replacement must contain the newer clock and fields.
+      if (!original.SaveCheckpoint(checkpoint.string()) || !resumed.LoadCheckpoint(checkpoint.string()) ||
+          !resumed.Readback(actual) || !Same(expected, actual))
+        return 38;
+      if (original.SaveCheckpoint((directory / "missing" / "state.bin").string()) ||
+          !resumed.LoadCheckpoint(checkpoint.string()))
+        return 39;
+      for (int corruption = 0; corruption < 3; ++corruption) {
+        fs::copy_file(checkpoint, damaged, fs::copy_options::overwrite_existing, ec);
+        if (ec)
+          return 40;
+        auto size = fs::file_size(damaged, ec);
+        if (ec)
+          return 40;
+        if (corruption == 0) {
+          fs::resize_file(damaged, size - 1, ec);
+          if (ec)
+            return 40;
+        } else if (corruption == 1) {
+          std::ofstream file(damaged, std::ios::binary | std::ios::app);
+          file.put('x');
+          if (!file)
+            return 40;
+        } else {
+          std::fstream file(damaged, std::ios::binary | std::ios::in | std::ios::out);
+          file.seekg(std::streamoff(size - 9));
+          char byte;
+          if (!file.get(byte))
+            return 40;
+          file.seekp(std::streamoff(size - 9));
+          file.put(char(static_cast<unsigned char>(byte) ^ 1));
+          if (!file)
+            return 40;
+        }
+        if (resumed.LoadCheckpoint(damaged.string()) || !resumed.Readback(actual) || !Same(expected, actual))
+          return 41;
       }
       for (int invalid = 0; invalid < 5; ++invalid) {
         auto bad = saved;
@@ -172,7 +233,7 @@ int RestoreContinuation() {
           return 35;
       }
     }
-  std::cout << "PASS snapshot restoration, exact continuation and invalid-state rollback\n";
+  std::cout << "PASS snapshot/file restoration, exact continuation, corrupt-file rejection and rollback\n";
   return 0;
 }
 

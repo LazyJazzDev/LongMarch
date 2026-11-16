@@ -61,6 +61,11 @@ class GpuFlow {
   // operator. Rebuilds snapshot topology and validates geometry/finite fields
   // in temporary storage. Failure preserves the live state; no remap/projection.
   bool Restore(const FlowSnapshot &snapshot);
+  // Versioned, checksummed file checkpoint; save replaces the destination only
+  // after a complete temporary write. Load requires initialized matching domain,
+  // body and pressure mode. Caller must retain the same physical/time-step options.
+  bool SaveCheckpoint(const std::string &path) const;
+  bool LoadCheckpoint(const std::string &path);
   FlowInfo Info() const;
   std::string Error() const;
 

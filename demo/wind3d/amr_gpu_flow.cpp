@@ -3,7 +3,13 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <climits>
 #include <cmath>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 
 #include "amr_gpu_projection.h"
@@ -11,6 +17,78 @@
 #include "amr_transfer.h"
 
 namespace wind3d::amr {
+namespace {
+constexpr uint64_t checkpoint_magic = 0x57494e4433414d52ULL;
+
+uint64_t Bits(double value) {
+  uint64_t bits;
+  static_assert(sizeof(bits) == sizeof(value));
+  std::memcpy(&bits, &value, sizeof(bits));
+  return bits;
+}
+
+double Value(uint64_t bits) {
+  double value;
+  std::memcpy(&value, &bits, sizeof(value));
+  return value;
+}
+
+struct CheckpointIO {
+  std::istream *input{};
+  std::ostream *output{};
+  uint64_t hash{14695981039346656037ULL};
+
+  bool Word(uint64_t &value) {
+    unsigned char bytes[8]{};
+    if (output) {
+      for (int i = 0; i < 8; ++i)
+        bytes[i] = static_cast<unsigned char>(value >> (8 * i));
+      if (!output->write(reinterpret_cast<const char *>(bytes), 8))
+        return false;
+    } else {
+      if (!input->read(reinterpret_cast<char *>(bytes), 8))
+        return false;
+      value = 0;
+      for (int i = 0; i < 8; ++i)
+        value |= uint64_t(bytes[i]) << (8 * i);
+    }
+    for (auto byte : bytes)
+      hash = (hash ^ byte) * 1099511628211ULL;
+    return true;
+  }
+};
+
+uint64_t GeometryHash(const Mesh &mesh) {
+  uint64_t hash = 14695981039346656037ULL;
+  auto word = [&](uint64_t value) {
+    for (int i = 0; i < 8; ++i)
+      hash = (hash ^ ((value >> (8 * i)) & 255)) * 1099511628211ULL;
+  };
+  word(mesh.CellsPerBlock());
+  for (const auto &cell : mesh.Cells()) {
+    for (double value : cell.centre)
+      word(Bits(value));
+    word(Bits(cell.width));
+    word(cell.active);
+  }
+  for (const auto &face : mesh.Faces()) {
+    word(uint64_t(face.low));
+    word(uint64_t(face.high));
+    word(face.axis);
+    for (double value : face.centre)
+      word(Bits(value));
+    word(Bits(face.area));
+    word(Bits(face.distance));
+    word(Bits(face.aperture));
+  }
+  for (int value : mesh.Offsets())
+    word(uint64_t(value));
+  for (int value : mesh.Incidence())
+    word(uint64_t(value));
+  return hash;
+}
+}  // namespace
+
 struct GpuFlow::Impl {
   int device{}, n{};
   double width{};
@@ -311,6 +389,160 @@ bool GpuFlow::Restore(const FlowSnapshot &snapshot) {
   impl_ = std::move(next);
   error_.clear();
   return true;
+}
+
+bool GpuFlow::SaveCheckpoint(const std::string &path) const {
+  namespace fs = std::filesystem;
+  FlowSnapshot snapshot;
+  if (path.empty() || !Readback(snapshot)) {
+    if (path.empty())
+      error_ = "Empty checkpoint path";
+    return false;
+  }
+  const auto &info = snapshot.info;
+  auto roots = snapshot.topology.Roots();
+  std::array<uint64_t, 20> header{checkpoint_magic,
+                                  1,
+                                  uint64_t(snapshot.compatible_pressure),
+                                  uint64_t(impl_->n),
+                                  uint64_t(roots[0]),
+                                  uint64_t(roots[1]),
+                                  uint64_t(roots[2]),
+                                  uint64_t(snapshot.topology.MaxLevel()),
+                                  uint64_t(info.blocks),
+                                  uint64_t(info.faces),
+                                  uint64_t(info.cells),
+                                  info.steps,
+                                  info.generation,
+                                  uint64_t(info.pressure_valid),
+                                  GeometryHash(snapshot.mesh),
+                                  Bits(impl_->width),
+                                  Bits(impl_->origin[0]),
+                                  Bits(impl_->origin[1]),
+                                  Bits(impl_->origin[2]),
+                                  Bits(info.time)};
+  static std::atomic<uint64_t> serial{};
+  fs::path temporary;
+  std::error_code ec;
+  bool created = false;
+  for (int attempt = 0; attempt < 16 && !created; ++attempt) {
+    temporary = path + ".tmp." + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + "." +
+                std::to_string(serial.fetch_add(1));
+    created = fs::create_directory(temporary, ec);
+    if (ec)
+      break;
+  }
+  if (!created) {
+    error_ = "Cannot create checkpoint temporary directory: " + ec.message();
+    return false;
+  }
+  auto payload = temporary / "state";
+  std::ofstream file(payload, std::ios::binary | std::ios::trunc);
+  CheckpointIO io{nullptr, &file};
+  bool ok = bool(file);
+  for (auto &value : header)
+    if (ok)
+      ok = io.Word(value);
+  for (auto block : snapshot.topology.Leaves())
+    for (int coordinate : {block.level, block.x, block.y, block.z}) {
+      uint64_t value = uint64_t(coordinate);
+      if (ok)
+        ok = io.Word(value);
+    }
+  for (const auto *values : {&snapshot.velocity, &snapshot.pressure})
+    for (double scalar : *values) {
+      uint64_t value = Bits(scalar);
+      if (ok)
+        ok = io.Word(value);
+    }
+  uint64_t checksum = io.hash;
+  if (ok)
+    ok = io.Word(checksum);
+  file.flush();
+  ok = ok && bool(file);
+  file.close();
+  ok = ok && !file.fail();
+  if (ok) {
+    fs::rename(payload, fs::path(path), ec);
+    ok = !ec;
+  }
+  std::error_code cleanup;
+  fs::remove(payload, cleanup);
+  fs::remove(temporary, cleanup);
+  if (!ok) {
+    error_ = "Checkpoint write/replacement failed";
+    return false;
+  }
+  error_.clear();
+  return true;
+}
+
+bool GpuFlow::LoadCheckpoint(const std::string &path) {
+  namespace fs = std::filesystem;
+  auto invalid = [&]() {
+    error_ = "Invalid, truncated or incompatible checkpoint";
+    return false;
+  };
+  if (!impl_)
+    return invalid();
+  std::error_code ec;
+  uintmax_t bytes = fs::file_size(fs::path(path), ec);
+  if (ec || bytes < 168)
+    return invalid();
+  std::ifstream file(path, std::ios::binary);
+  CheckpointIO io{&file, nullptr};
+  std::array<uint64_t, 20> h{};
+  for (auto &value : h)
+    if (!io.Word(value))
+      return invalid();
+  auto roots = impl_->tree.Roots();
+  if (h[0] != checkpoint_magic || h[1] != 1 || h[2] != uint64_t(impl_->compatible_pressure) ||
+      h[3] != uint64_t(impl_->n) || h[4] != uint64_t(roots[0]) || h[5] != uint64_t(roots[1]) ||
+      h[6] != uint64_t(roots[2]) || h[7] > 12 || h[13] > 1 || h[15] != Bits(impl_->width) ||
+      h[16] != Bits(impl_->origin[0]) || h[17] != Bits(impl_->origin[1]) || h[18] != Bits(impl_->origin[2]))
+    return invalid();
+  // Validate exact payload size without overflowing arithmetic or trusting
+  // encoded allocation sizes. The runtime uses signed 32-bit mesh indexing.
+  uintmax_t remaining = bytes - 168;
+  if (!h[8] || h[8] > remaining / 32 || h[8] > uint64_t(INT_MAX))
+    return invalid();
+  remaining -= h[8] * 32;
+  if (!h[9] || h[9] > remaining / 8 || h[9] > uint64_t(INT_MAX / 6))
+    return invalid();
+  remaining -= h[9] * 8;
+  if (!h[10] || h[10] > remaining / 8 || h[10] > uint64_t(INT_MAX) || remaining != h[10] * 8)
+    return invalid();
+  std::vector<Block> blocks(static_cast<size_t>(h[8]));
+  for (auto &block : blocks) {
+    int *coordinates[]{&block.level, &block.x, &block.y, &block.z};
+    for (auto coordinate : coordinates) {
+      uint64_t value = 0;
+      if (!io.Word(value) || value > uint64_t(INT_MAX))
+        return invalid();
+      *coordinate = int(value);
+    }
+  }
+  FlowSnapshot snapshot;
+  snapshot.compatible_pressure = impl_->compatible_pressure;
+  snapshot.info = {size_t(h[10]), size_t(h[9]), size_t(h[8]), h[11], h[12], Value(h[19]), bool(h[13])};
+  if (!snapshot.topology.Restore(roots, int(h[7]), blocks.size(), blocks) ||
+      !snapshot.mesh.Build(snapshot.topology, impl_->n, impl_->width, impl_->origin) ||
+      (impl_->distance && !snapshot.mesh.Embed(impl_->distance)) || snapshot.mesh.Cells().size() != h[10] ||
+      snapshot.mesh.Faces().size() != h[9] || GeometryHash(snapshot.mesh) != h[14])
+    return invalid();
+  snapshot.velocity.resize(size_t(h[9]));
+  snapshot.pressure.resize(size_t(h[10]));
+  for (auto *values : {&snapshot.velocity, &snapshot.pressure})
+    for (double &value : *values) {
+      uint64_t bits = 0;
+      if (!io.Word(bits))
+        return invalid();
+      value = Value(bits);
+    }
+  uint64_t expected = io.hash, checksum = 0;
+  if (!io.Word(checksum) || checksum != expected || file.peek() != std::char_traits<char>::eof())
+    return invalid();
+  return Restore(snapshot);
 }
 
 bool GpuFlow::Readback(FlowSnapshot &snapshot) const {
