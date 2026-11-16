@@ -713,3 +713,32 @@ this is not a claim of full-field bitwise comparison. Initialization fell from
 1.771/1.674/1.798 to 1.601/1.512/1.683 seconds (about 6--10%). Overall mean step
 time including adaptation fell from 19.472 to 19.131 ms in this paired sample.
 Timing is diagnostic on shared hardware, not an overall production speedup gate.
+
+
+## First completed compatible aircraft run
+
+Static compatible BiCGStab job 2001255 completed 30000 steps (six physical
+seconds). Peak speed was 21.078 m/s. Its time-weighted 2--6 second means were:
+
+| Component | Mean | RMS fluctuation | Mean(4--6 s) minus mean(2--4 s) |
+| --- | ---: | ---: | ---: |
+| Fx | 18.8571 | 0.6015 | 0.3289 |
+| Fy | 12.9675 | 2.9831 | 2.2788 |
+| Fz | -0.3902 | 2.6235 | -1.3430 |
+| Mx | 1.0749 | 2.4794 | 1.2881 |
+| My | -0.6910 | 3.9343 | 0.8145 |
+| Mz | -15.4851 | 3.0119 | 0.1669 |
+
+This run used 212992 cells and 91.51 wall seconds per physical second over the
+window. The Fy half-window drift is about 18% of its mean, so these figures
+must not be certified as steady-load accuracy. Lower peaks than the previous
+quadratic projection do not establish the 2% gate or overall speedup.
+
+Matched CG uniform-128 (2001263), static-192 (2001264), and uniform-192
+(2001265) comparisons are running to distinguish solver trajectory sensitivity
+from spatial-resolution and interface errors. A separate static CG diagnostic
+(2001266) increases protected fine-grid padding from 2h to 8h at grid 128;
+its initial mesh has 367104 cells versus 212992 at 2h. This tests interface
+placement without changing finest body spacing. Its modified source, isolated
+object/link commands and frozen executable are under `out/wind3d-amr`; the
+production refinement policy is unchanged. These experiments remain pending.
