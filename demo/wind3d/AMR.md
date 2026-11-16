@@ -1026,3 +1026,27 @@ ordered duplicate-free payloads and invalid-build rollback are also checked.
 This is pressure communication metadata, not a distributed GPU solver:
 peer-device copies, local index conversion, Krylov reductions, the multilevel
 preconditioner and transport halos still require integration and validation.
+
+
+## Peer-device pressure halo exchange
+
+`GpuPressureExchange` converts a pressure partition to compact local layouts:
+owned cells/faces precede imported entries. Persistent gather indices, send
+buffers and per-device streams pack only owned values and copy imports with
+`cudaMemcpyPeerAsync`. The API requires peer-accessible devices, waits for all
+copies before returning, leaves owned values untouched, and restores the
+caller's current CUDA device. It does not change process-wide peer-access
+enable state. Callers must finish producing owned values before exchange;
+CUDA failures can leave imports incomplete, and all enqueued streams are
+drained before returning. Invalid builds preserve the preceding exchange plan.
+
+Two-GPU job 2001310 succeeded. Direct execution and CTest verified one-rank
+no-op and two-rank exchanges in both device orders on uniform and mixed meshes.
+Eight changing payloads per case check every owned and imported value for both
+pressure and face fields; invalid build/input recovery and device restoration
+are covered. Compute Sanitizer reported zero errors. The test skips explicitly
+on hosts with fewer than two GPUs; the reported job used two real GPUs and did
+not skip. This establishes exchange correctness, not distributed pressure
+iteration, transport integration or multi-GPU speedup. Compact local operators,
+mass-inverse iteration exchanges, Krylov reductions and the preconditioner
+remain to be implemented.
