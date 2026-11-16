@@ -24,6 +24,7 @@ struct FlowInfo {
 // Copies, not mutable views into the GPU flow. Readback is an explicit cold path.
 struct FlowSnapshot {
   FlowInfo info;
+  bool compatible_pressure{};
   Topology topology;
   Mesh mesh;
   std::vector<double> velocity, pressure;
@@ -56,6 +57,10 @@ class GpuFlow {
   AdvanceResult Advance(double dt, double speed, const FlowParameters &parameters = {});
   bool MaximumSpeed(double &speed);
   bool Readback(FlowSnapshot &snapshot) const;
+  // Restore into an initialized flow with the same domain, body and pressure
+  // operator. Rebuilds snapshot topology and validates geometry/finite fields
+  // in temporary storage. Failure preserves the live state; no remap/projection.
+  bool Restore(const FlowSnapshot &snapshot);
   FlowInfo Info() const;
   std::string Error() const;
 

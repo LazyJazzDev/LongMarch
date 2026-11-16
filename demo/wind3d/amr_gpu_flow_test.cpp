@@ -3,11 +3,12 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 bool Same(const wind3d::amr::FlowSnapshot &a, const wind3d::amr::FlowSnapshot &b) {
-  return a.velocity == b.velocity && a.pressure == b.pressure && a.topology.Leaves() == b.topology.Leaves() &&
-         a.info.steps == b.info.steps && a.info.time == b.info.time && a.info.generation == b.info.generation &&
-         a.info.pressure_valid == b.info.pressure_valid;
+  return a.compatible_pressure == b.compatible_pressure && a.velocity == b.velocity && a.pressure == b.pressure &&
+         a.topology.Leaves() == b.topology.Leaves() && a.info.steps == b.info.steps && a.info.time == b.info.time &&
+         a.info.generation == b.info.generation && a.info.pressure_valid == b.info.pressure_valid;
 }
 
 double Divergence(const wind3d::amr::FlowSnapshot &s) {
@@ -127,10 +128,60 @@ int Run(bool compatible) {
   return 0;
 }
 
+int RestoreContinuation() {
+  using namespace wind3d::amr;
+  Topology fine, coarse;
+  if (!fine.Regrid({2, 2, 2}, 1, 64, [](Block) { return true; }) ||
+      !coarse.Regrid({2, 2, 2}, 1, 64, [](Block) { return false; }))
+    return 30;
+  for (bool compatible : {false, true})
+    for (bool body : {false, true}) {
+      GpuFlow original, resumed;
+      GpuFlow::Distance distance;
+      if (body)
+        distance = [](std::array<double, 3> p) {
+          return std::max({std::abs(p[0]), std::abs(p[1]), std::abs(p[2])}) - .21;
+        };
+      if (!original.Initialize(0, fine, 4, 1, {-1, -1, -1}, distance, 1, compatible) ||
+          !resumed.Initialize(0, body ? fine : coarse, 4, 1, {-1, -1, -1}, distance, 1, compatible) ||
+          !original.Advance(.01, 1).advanced)
+        return 31;
+      FlowSnapshot saved, actual, expected;
+      if (!original.Readback(saved) || !resumed.Restore(saved) || !resumed.Readback(actual) || !Same(saved, actual))
+        return 32;
+      for (int step = 0; step < 3; ++step) {
+        double dt = .005 + .001 * step, speed = 1. + .1 * step;
+        auto a = original.Advance(dt, speed), b = resumed.Advance(dt, speed);
+        if (!a.advanced || !b.advanced || a.total_loads != b.total_loads || !original.Readback(expected) ||
+            !resumed.Readback(actual) || !Same(expected, actual))
+          return 33;
+      }
+      for (int invalid = 0; invalid < 5; ++invalid) {
+        auto bad = saved;
+        if (invalid == 0)
+          bad.info.time = -1;
+        else if (invalid == 1)
+          bad.velocity[0] = std::numeric_limits<double>::quiet_NaN();
+        else if (invalid == 2)
+          bad.compatible_pressure = !compatible;
+        else if (invalid == 3)
+          bad.pressure.pop_back();
+        else if (!bad.mesh.Build(fine, 4, 2, {-1, -1, -1}))
+          return 34;
+        if (resumed.Restore(bad) || resumed.Error().empty() || !resumed.Readback(actual) || !Same(expected, actual))
+          return 35;
+      }
+    }
+  std::cout << "PASS snapshot restoration, exact continuation and invalid-state rollback\n";
+  return 0;
+}
+
 int main() {
   int code = Run(false);
   if (!code)
     code = Run(true);
+  if (!code)
+    code = RestoreContinuation();
   if (code)
     std::cerr << "GPU flow lifecycle failure code=" << code << '\n';
   return code;

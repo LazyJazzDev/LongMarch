@@ -287,6 +287,7 @@ bool GpuDistributedFlow::Readback(FlowSnapshot &snapshot) const {
     return false;
   }
   FlowSnapshot next;
+  next.compatible_pressure = true;
   next.info = impl_->info;
   next.topology = impl_->tree;
   next.mesh = impl_->mesh;

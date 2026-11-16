@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -244,12 +245,81 @@ bool GpuFlow::MaximumSpeed(double &speed) {
   return true;
 }
 
+bool GpuFlow::Restore(const FlowSnapshot &snapshot) {
+  const auto &info = snapshot.info;
+  auto finite = [](const auto &values) {
+    return std::all_of(values.begin(), values.end(), [](double v) { return std::isfinite(v); });
+  };
+  if (!impl_ || snapshot.compatible_pressure != impl_->compatible_pressure ||
+      snapshot.topology.Roots() != impl_->tree.Roots() || snapshot.mesh.CellsPerBlock() != impl_->n ||
+      info.cells != snapshot.mesh.Cells().size() || info.faces != snapshot.mesh.Faces().size() ||
+      info.blocks != snapshot.topology.Leaves().size() || snapshot.velocity.size() != info.faces ||
+      snapshot.pressure.size() != info.cells || !std::isfinite(info.time) || info.time < 0 ||
+      !finite(snapshot.velocity) || !finite(snapshot.pressure)) {
+    error_ = "Invalid or incompatible flow snapshot";
+    return false;
+  }
+
+  struct DeviceRestore {
+    int previous{-1};
+
+    ~DeviceRestore() {
+      if (previous >= 0)
+        cudaSetDevice(previous);
+    }
+  } restore;
+
+  auto status = cudaGetDevice(&restore.previous);
+  if (status != cudaSuccess) {
+    error_ = cudaGetErrorString(status);
+    return false;
+  }
+  auto next = std::make_unique<Impl>();
+  next->device = impl_->device;
+  next->n = impl_->n;
+  next->width = impl_->width;
+  next->origin = impl_->origin;
+  next->distance = impl_->distance;
+  next->compatible_pressure = impl_->compatible_pressure;
+  next->tree = snapshot.topology;
+  if (!next->Build()) {
+    error_ = next->error;
+    return false;
+  }
+  auto cell_equal = [](const MeshCell &a, const MeshCell &b) {
+    return a.centre == b.centre && a.width == b.width && a.active == b.active;
+  };
+  auto face_equal = [](const MeshFace &a, const MeshFace &b) {
+    return a.low == b.low && a.high == b.high && a.axis == b.axis && a.centre == b.centre && a.area == b.area &&
+           a.distance == b.distance && a.aperture == b.aperture;
+  };
+  if (next->info.cells != info.cells || next->info.faces != info.faces ||
+      next->mesh.Offsets() != snapshot.mesh.Offsets() || next->mesh.Incidence() != snapshot.mesh.Incidence() ||
+      !std::equal(next->mesh.Cells().begin(), next->mesh.Cells().end(), snapshot.mesh.Cells().begin(), cell_equal) ||
+      !std::equal(next->mesh.Faces().begin(), next->mesh.Faces().end(), snapshot.mesh.Faces().begin(), face_equal)) {
+    error_ = "Snapshot geometry differs from the initialized domain/body";
+    return false;
+  }
+  if (!next->UploadVelocity(snapshot.velocity) ||
+      !next->Check(
+          cudaMemcpy(next->p, snapshot.pressure.data(), info.cells * sizeof(double), cudaMemcpyHostToDevice)) ||
+      !next->Check(cudaDeviceSynchronize())) {
+    error_ = next->error;
+    return false;
+  }
+  next->info = info;
+  impl_ = std::move(next);
+  error_.clear();
+  return true;
+}
+
 bool GpuFlow::Readback(FlowSnapshot &snapshot) const {
   if (!impl_) {
     error_ = "GPU flow is not initialized";
     return false;
   }
   FlowSnapshot next;
+  next.compatible_pressure = impl_->compatible_pressure;
   next.info = impl_->info;
   next.topology = impl_->tree;
   next.mesh = impl_->mesh;
