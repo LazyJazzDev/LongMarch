@@ -612,3 +612,29 @@ linearity, bilinear symmetry, positive energy, fixed-face zeros and rollback.
 This validates the inverse building block, not a complete pressure projection.
 Pressure integration, aircraft stability/load acceptance and overall speedup
 remain outstanding.
+
+
+## Compatible GPU pressure projection
+
+`GpuProjection::Build` accepts an optional compatible mode. Its matrix-free
+pressure operator is `D M^-1 D^T`; the velocity correction uses the same mass
+inverse and transpose, including fixed inlet/wall and closed-face constraints.
+Inactive pressure rows are pinned. A sparse two-point operator supplies the
+existing multilevel preconditioner only; it is not the converged pressure
+operator. BiCGStab and the true operator residual check are retained. The
+original quadratic-gradient mode remains the default for controlled comparisons.
+
+New regression cases cover uniform/mixed grids, binary/nonbinary root widths
+and embedded bodies. They independently measure post-projection flux divergence,
+the compatible-mass Pythagorean energy identity, energy nonincrease for homogeneous
+fixed boundaries, idempotence, uniform-grid reference agreement, and unchanged
+outputs on numerical nonconvergence. These tests do not establish physical
+kinetic-energy monotonicity for arbitrary boundary forcing or full nonlinear
+flow stability. Flow/task selection and aircraft load/speed acceptance remain
+outstanding.
+
+Job 2001253 passed all four GPU projection/transport/advance/flow CTests and
+projection Compute Sanitizer memcheck with zero errors. Mixed-grid cases took
+11 iterations, with relative flux divergence below 6.1e-12 and relative mass
+energy-balance defects below 9e-13. These are operator tests, not the aircraft
+2% steady-load acceptance test.

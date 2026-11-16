@@ -4,6 +4,9 @@
 
 #include <cmath>
 #include <iostream>
+#include <random>
+
+#include "amr_mass.h"
 
 int Run(bool embedded) {
   using namespace wind3d::amr;
@@ -177,7 +180,99 @@ int Run(bool embedded) {
   return 0;
 }
 
+bool Compatible(bool mixed, bool embedded, double width) {
+  using namespace wind3d::amr;
+  Topology tree;
+  if (!tree.Regrid({2, 2, 2}, 1, 100, [mixed](Block b) { return mixed && b.x == 0; }))
+    return false;
+  Mesh mesh;
+  if (!mesh.Build(tree, 4, width))
+    return false;
+  if (embedded && !mesh.Embed([width](std::array<double, 3> p) {
+        return std::max({std::abs(p[0] - .5 * width), std::abs(p[1] - .5 * width), std::abs(p[2] - .5 * width)}) -
+               .21 * width;
+      }))
+    return false;
+  FaceGradient g;
+  FaceMass mass;
+  GpuProjection gpu;
+  if (!g.Build(mesh) || !mass.Build(mesh) || !gpu.Build(0, mesh, g, true, true, true)) {
+    std::cerr << gpu.Error() << '\n';
+    return false;
+  }
+  std::mt19937 random(123);
+  std::uniform_real_distribution<double> distribution(-1, 1);
+  std::vector<double> u(mesh.Faces().size()), p;
+  for (size_t i = 0; i < u.size(); ++i) {
+    auto f = mesh.Faces()[i];
+    if (f.aperture > 0 && ((f.low >= 0 && f.high >= 0) || (f.axis == 0 && f.high < 0)))
+      u[i] = distribution(random);
+  }
+  auto before = u;
+  auto result = gpu.Project(u, p, 1e-11);
+  if (!result.converged) {
+    std::cerr << "Compatible failed " << gpu.Error() << '\n';
+    return false;
+  }
+  std::vector<double> correction(u.size());
+  for (size_t i = 0; i < u.size(); ++i)
+    correction[i] = before[i] - u[i];
+  auto product = [&](const std::vector<double> &a, const std::vector<double> &b) {
+    double sum = 0;
+    for (size_t i = 0; i < a.size(); ++i)
+      for (int k = mass.Offsets()[i]; k < mass.Offsets()[i + 1]; ++k)
+        sum += a[i] * mass.Weights()[k] * b[mass.Columns()[k]];
+    return sum;
+  };
+  double initial = product(before, before), final = product(u, u), removed = product(correction, correction);
+  double balance = std::abs(initial - final - removed) / initial;
+  if (final > initial * (1 + 1e-10) || balance > 1e-9)
+    return false;
+  double div0 = 0, div1 = 0;
+  for (size_t c = 0; c < mesh.Cells().size(); ++c) {
+    double a = 0, b = 0;
+    for (int k = mesh.Offsets()[c]; k < mesh.Offsets()[c + 1]; ++k) {
+      int signed_face = mesh.Incidence()[k], f = std::abs(signed_face) - 1;
+      double weight = (signed_face > 0 ? 1 : -1) * mesh.Faces()[f].area * mesh.Faces()[f].aperture;
+      a += weight * before[f];
+      b += weight * u[f];
+    }
+    div0 += a * a;
+    div1 += b * b;
+  }
+  if (std::sqrt(div1 / div0) > 2e-11)
+    return false;
+  auto once = u;
+  if (!gpu.Project(u, p, 1e-9).converged)
+    return false;
+  for (size_t i = 0; i < u.size(); ++i)
+    if (std::abs(u[i] - once[i]) > 1e-8)
+      return false;
+  if (!mixed) {
+    auto reference = before;
+    std::vector<double> reference_p;
+    if (!ProjectReference(mesh, g, reference, reference_p, 1e-11).converged)
+      return false;
+    for (size_t i = 0; i < u.size(); ++i)
+      if (std::abs(u[i] - reference[i]) > 1e-8)
+        return false;
+  }
+  auto failed = before;
+  std::vector<double> sentinel(3, 17);
+  if (gpu.Project(failed, sentinel, 1e-14, 1).converged || failed != before || sentinel != std::vector<double>(3, 17))
+    return false;
+  std::cout << "Compatible mixed=" << mixed << " embedded=" << embedded << " width=" << width
+            << " iterations=" << result.iterations << " divergence=" << std::sqrt(div1 / div0)
+            << " energy ratio=" << final / initial << " balance=" << balance << '\n';
+  return true;
+}
+
 int main() {
+  for (bool mixed : {false, true})
+    for (bool embedded : {false, true})
+      for (double width : {1., 1.3})
+        if (!Compatible(mixed, embedded, width))
+          return 40;
   int status = Run(false);
   return status ? status : Run(true);
 }

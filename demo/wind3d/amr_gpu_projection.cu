@@ -8,6 +8,7 @@
 #include <limits>
 #include <map>
 
+#include "amr_gpu_mass.h"
 #include "amr_gpu_projection.h"
 
 namespace wind3d::amr {
@@ -84,6 +85,12 @@ __global__ void CloseFaces(int count, const int *indices, double *velocity) {
     velocity[indices[i]] = 0;
 }
 
+__global__ void PinInactive(int n, const unsigned char *active, const double *in, double *out) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n && !active[i])
+    out[i] = in[i];
+}
+
 // The first Jacobi sweep starts from zero: A*0 need not be read or evaluated.
 __global__ void FirstSmooth(int n, const double *diagonal, const double *rhs, double *next) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -143,6 +150,9 @@ struct GpuProjection::Impl {
   cublasHandle_t blas{};
   std::vector<void *> allocations;
   Matrix a, g, d;
+  std::unique_ptr<GpuMassInverse> mass;
+  unsigned char *active{};
+  double *transpose{};
   std::vector<Level> levels;
   cudaStream_t capture_stream{};
   cudaGraphExec_t preconditioner[2]{};
@@ -217,6 +227,29 @@ struct GpuProjection::Impl {
       Multiply<4><<<(m.rows + 63) / 64, 256, 0, stream>>>(m, in, out);
     else
       Multiply<1><<<(m.rows + 255) / 256, 256, 0, stream>>>(m, in, out);
+    Check(cudaGetLastError());
+  }
+
+  void Gradient(const double *in) {
+    if (!mass) {
+      Apply(g, in, face);
+      return;
+    }
+    Apply(g, in, transpose);
+    if (!mass->ApplyDevice(transpose, face, nf)) {
+      ok = false;
+      error = mass->Error();
+    }
+  }
+
+  void Pressure(const double *in, double *out) {
+    if (!mass) {
+      Apply(a, in, out);
+      return;
+    }
+    Gradient(in);
+    Apply(d, face, out);
+    PinInactive<<<(n + 255) / 256, 256>>>(n, active, in, out);
     Check(cudaGetLastError());
   }
 
@@ -442,7 +475,8 @@ bool GpuProjection::Build(int device,
                           const Mesh &mesh,
                           const FaceGradient &gradient,
                           bool multilevel,
-                          bool cooperative) {
+                          bool cooperative,
+                          bool compatible) {
   auto next = std::make_unique<Impl>();
   next->device = device;
   next->cooperative = cooperative;
@@ -463,6 +497,13 @@ bool GpuProjection::Build(int device,
     for (int k = gradient.Offsets()[f]; k < gradient.Offsets()[f + 1]; ++k)
       g[f][gradient.Columns()[k]] += gradient.Weights()[k];
     auto face = mesh.Faces()[f];
+    if (compatible) {
+      g[f].clear();
+      if (face.aperture > 0 && face.low >= 0 && face.high >= 0) {
+        g[f][face.low] = -1 / face.distance;
+        g[f][face.high] = 1 / face.distance;
+      }
+    }
     if (face.aperture == 0)
       next->closed.push_back(f);
     face.area *= face.aperture;
@@ -482,6 +523,23 @@ bool GpuProjection::Build(int device,
     diagonal[i] = a[i][i];
     if (!(diagonal[i] > 0) || !std::isfinite(diagonal[i]))
       return fail("Invalid adaptive operator or GPU allocation failure");
+  }
+  if (compatible) {
+    next->mass = std::make_unique<GpuMassInverse>();
+    if (!next->mass->Build(device, mesh)) {
+      next->error = next->mass->Error();
+      return fail("Compatible mass construction failed");
+    }
+    for (auto &row : g)
+      row.clear();
+    for (int i = 0; i < next->n; ++i)
+      for (auto [f, value] : d[i])
+        g[f][i] = value;
+    std::vector<unsigned char> active;
+    for (const auto &c : mesh.Cells())
+      active.push_back(c.active);
+    if (!next->Upload(next->active, active) || !next->Allocate(next->transpose, next->nf))
+      return fail("Compatible pressure allocation failed");
   }
   if (!next->UploadMatrix(next->a, a) || !next->UploadMatrix(next->g, g) || !next->UploadMatrix(next->d, d) ||
       !next->Upload(next->diagonal, diagonal))
@@ -580,7 +638,7 @@ ProjectionResult GpuProjection::Solve(double tolerance, int max_iterations) {
     double beta = (rho / rho_old) * (alpha / omega);
     Search<<<blocks, 256>>>(w.n, w.r, w.p, w.v, w.diagonal, w.phat, beta, omega);
     w.Precondition(0);
-    w.Apply(w.a, w.phat, w.v);
+    w.Pressure(w.phat, w.v);
     double divisor = w.Dot(w.shadow, w.v);
     if (!std::isfinite(divisor) || std::abs(divisor) < 1e-300)
       break;
@@ -588,7 +646,7 @@ ProjectionResult GpuProjection::Solve(double tolerance, int max_iterations) {
     Advance<<<blocks, 256>>>(w.n, w.r, w.v, w.diagonal, w.phat, w.s, w.shat, w.x, alpha);
     if (std::sqrt(w.Dot(w.s, w.s)) / norm > tolerance) {
       w.Precondition(1);
-      w.Apply(w.a, w.shat, w.t);
+      w.Pressure(w.shat, w.t);
       auto products = w.DotPair(w.t, w.s);
       double tt = products[0];
       if (!std::isfinite(tt) || tt < 1e-300)
@@ -596,7 +654,7 @@ ProjectionResult GpuProjection::Solve(double tolerance, int max_iterations) {
       omega = products[1] / tt;
       Add<<<blocks, 256>>>(w.n, w.x, w.shat, omega);
     }
-    w.Apply(w.a, w.x, w.ax);
+    w.Pressure(w.x, w.ax);
     Difference<<<blocks, 256>>>(w.n, w.rhs, w.ax, w.r);
     result.relative_residual = std::sqrt(w.Dot(w.r, w.r)) / norm;
     if (!std::isfinite(result.relative_residual))
@@ -608,7 +666,7 @@ ProjectionResult GpuProjection::Solve(double tolerance, int max_iterations) {
     rho_old = rho;
   }
   if (result.converged) {
-    w.Apply(w.g, w.x, w.face);
+    w.Gradient(w.x);
     Add<<<(w.nf + 255) / 256, 256>>>(w.nf, w.u, w.face, -1);
     if (!w.closed.empty())
       CloseFaces<<<(w.closed.size() + 255) / 256, 256>>>(int(w.closed.size()), w.closed_device, w.u);
