@@ -22,6 +22,8 @@ class GpuPressureOperators {
   bool Mass(const std::vector<double *> &input, const std::vector<double *> &output);
 
   // Fixed symmetric Chebyshev inverse of the free-face principal mass matrix.
+  // Multiple devices prefetch a 31-ring RHS neighborhood and evaluate the
+  // same degree-31 polynomial locally, without inter-iteration exchanges.
   // Closed faces, and optionally fixed inlet/wall normals, return zero.
   bool InverseMass(const std::vector<double *> &input, const std::vector<double *> &output);
 

@@ -78,6 +78,36 @@ __global__ void FinishInverse(int n,
     output[i] = !free[i] ? 0 : coupled[i] ? scale[i] * x[i] : rhs[i] / diagonal[i];
 }
 
+// Each local row reads its owning RHS once. The 31-ring neighborhood contains
+// the complete dependency cone of the fixed degree-31 inverse polynomial.
+__global__ void InitializeNeighborhood(int n,
+                                       const int *owners,
+                                       const int *indices,
+                                       const double *scale,
+                                       double *const *rhs,
+                                       double *b,
+                                       double *x,
+                                       double *direction) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) {
+    b[i] = rhs[owners[i]][indices[i]] * scale[i];
+    x[i] = direction[i] = b[i] / mass_centre;
+  }
+}
+
+__global__ void FinishNeighborhood(int n,
+                                   const unsigned char *free,
+                                   const int *rows,
+                                   const double *scale,
+                                   const double *diagonal,
+                                   const double *rhs,
+                                   const double *x,
+                                   double *output) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n)
+    output[i] = !free[i] ? 0 : rows[i] >= 0 ? scale[i] * x[rows[i]] : rhs[i] / diagonal[i];
+}
+
 __global__ void PinInactive(int n, const unsigned char *active, const double *input, double *output) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n && !active[i])
@@ -100,7 +130,11 @@ struct DeviceScope {
 
 struct GpuPressureOperators::Impl {
   struct Rank {
-    Matrix d, transpose, mass, normalized, two_point;
+    Matrix d, transpose, mass, normalized, two_point, neighborhood;
+    int *neighbor_owners{}, *neighbor_indices{}, *neighbor_rows{}, *owned_neighbors{};
+    double *neighbor_scale{}, *neighbor_b{}, *neighbor_x{}, *neighbor_scratch{}, *neighbor_direction{};
+    double **peer_rhs{};
+    cudaGraphExec_t local_inverse{};
     int *coupled_rows{};
     unsigned char *free{}, *coupled{}, *active{};
     double *gradient{}, *flux{}, *inverse_rhs{}, *inverse_result{};
@@ -124,6 +158,8 @@ struct GpuPressureOperators::Impl {
         cudaSetDevice(devices[r]);
         cudaStreamSynchronize(ranks[r].stream);
         cudaStreamDestroy(ranks[r].stream);
+        if (ranks[r].local_inverse)
+          cudaGraphExecDestroy(ranks[r].local_inverse);
       }
     if (inverse_graph) {
       cudaSetDevice(devices.front());
@@ -175,6 +211,129 @@ struct GpuPressureOperators::Impl {
       return true;
     error = failure;
     return false;
+  }
+
+  bool BuildNeighborhoods(const FaceMass &mass,
+                          const PressurePartition &partition,
+                          const std::vector<unsigned char> &coupled_mask,
+                          const std::vector<double> &global_scale) {
+    for (int source : devices)
+      for (int destination : devices)
+        if (source != destination) {
+          int accessible = 0;
+          if (!Check(cudaDeviceCanAccessPeer(&accessible, source, destination)))
+            return false;
+          if (!accessible) {
+            error = "Mass neighborhoods require mutually peer-accessible GPUs";
+            return false;
+          }
+          if (!Check(cudaSetDevice(source)))
+            return false;
+          auto status = cudaDeviceEnablePeerAccess(destination, 0);
+          if (status == cudaErrorPeerAccessAlreadyEnabled)
+            cudaGetLastError();
+          else if (!Check(status))
+            return false;
+        }
+    std::vector<int> owner_indices(coupled_mask.size());
+    std::vector<double *> pointers;
+    for (size_t r = 0; r < ranks.size(); ++r) {
+      pointers.push_back(ranks[r].inverse_rhs);
+      const auto &ids = partition.OwnedFaces()[r];
+      for (size_t i = 0; i < ids.size(); ++i)
+        owner_indices[ids[i]] = int(i);
+    }
+    for (size_t r = 0; r < ranks.size(); ++r) {
+      auto &rank = ranks[r];
+      int device = devices[r];
+      std::vector<int> depth(coupled_mask.size(), -1), ids, local(coupled_mask.size(), -1);
+      for (int id : partition.OwnedFaces()[r])
+        if (coupled_mask[id]) {
+          depth[id] = 0;
+          ids.push_back(id);
+        }
+      for (size_t head = 0; head < ids.size(); ++head) {
+        int id = ids[head];
+        if (depth[id] == mass_iterations - 1)
+          continue;
+        for (int k = mass.Offsets()[id]; k < mass.Offsets()[id + 1]; ++k) {
+          int j = mass.Columns()[k];
+          if (coupled_mask[j] && depth[j] < 0) {
+            depth[j] = depth[id] + 1;
+            ids.push_back(j);
+          }
+        }
+      }
+      for (size_t i = 0; i < ids.size(); ++i)
+        local[ids[i]] = int(i);
+      std::vector<int> owners, indices, rows, owned;
+      std::vector<double> scales;
+      std::vector<std::vector<std::pair<int, double>>> matrix(ids.size());
+      for (size_t i = 0; i < ids.size(); ++i) {
+        int id = ids[i];
+        owners.push_back(partition.FaceOwners()[id]);
+        indices.push_back(owner_indices[id]);
+        rows.push_back(int(i));
+        scales.push_back(global_scale[id]);
+        for (int k = mass.Offsets()[id]; k < mass.Offsets()[id + 1]; ++k) {
+          int j = mass.Columns()[k];
+          if (local[j] >= 0)
+            matrix[i].push_back({local[j], mass.Weights()[k] * global_scale[id] * global_scale[j]});
+        }
+      }
+      for (int id : partition.OwnedFaces()[r])
+        owned.push_back(local[id]);
+      size_t count = std::max(size_t(1), ids.size());
+      if (!MatrixBuild(device, rank.neighborhood, matrix) || !Upload(device, rank.neighbor_owners, owners) ||
+          !Upload(device, rank.neighbor_indices, indices) || !Upload(device, rank.neighbor_rows, rows) ||
+          !Upload(device, rank.owned_neighbors, owned) || !Upload(device, rank.neighbor_scale, scales) ||
+          !Upload(device, rank.peer_rhs, pointers) || !Allocate(device, rank.neighbor_b, count) ||
+          !Allocate(device, rank.neighbor_x, count) || !Allocate(device, rank.neighbor_scratch, count) ||
+          !Allocate(device, rank.neighbor_direction, count) || !Check(cudaDeviceSynchronize()))
+        return false;
+      if (!Check(cudaStreamBeginCapture(rank.stream, cudaStreamCaptureModeThreadLocal)))
+        return false;
+      int n = rank.neighborhood.rows;
+      bool ok = true;
+      double *current = rank.neighbor_x, *next = rank.neighbor_scratch;
+      if (n) {
+        InitializeNeighborhood<<<(n + 255) / 256, 256, 0, rank.stream>>>(
+            n, rank.neighbor_owners, rank.neighbor_indices, rank.neighbor_scale, rank.peer_rhs, rank.neighbor_b,
+            current, rank.neighbor_direction);
+        ok = Check(cudaGetLastError());
+        double rho = mass_radius / mass_centre;
+        for (int step = 1; ok && step < mass_iterations; ++step) {
+          double updated = 1 / (2 * mass_centre / mass_radius - rho);
+          IterateInverse<<<(n + 255) / 256, 256, 0, rank.stream>>>(
+              rank.neighborhood, rank.neighbor_rows, rank.neighbor_b, current, next, rank.neighbor_direction,
+              2 * updated / mass_radius, updated * rho);
+          ok = Check(cudaGetLastError());
+          std::swap(current, next);
+          rho = updated;
+        }
+      }
+      if (ok) {
+        FinishNeighborhood<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
+            rank.mass.rows, rank.free, rank.owned_neighbors, rank.scale, rank.diagonal, rank.inverse_rhs, current,
+            rank.inverse_result);
+        ok = Check(cudaGetLastError());
+      }
+      std::string first = error;
+      cudaGraph_t graph{};
+      auto status = cudaStreamEndCapture(rank.stream, &graph);
+      if (!Check(status) || !ok) {
+        if (!ok)
+          error = first;
+        if (graph)
+          cudaGraphDestroy(graph);
+        return false;
+      }
+      ok = Check(cudaGraphInstantiate(&rank.local_inverse, graph, nullptr, nullptr, 0));
+      cudaGraphDestroy(graph);
+      if (!ok)
+        return false;
+    }
+    return true;
   }
 
   bool RunInverse() {
@@ -412,7 +571,7 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
       error_ = next->error;
       return false;
     }
-  if (!next->CaptureInverse()) {
+  if (!(devices.size() > 1 ? next->BuildNeighborhoods(mass, partition, coupled, scale) : next->CaptureInverse())) {
     error_ = next->error;
     return false;
   }
@@ -511,9 +670,16 @@ bool GpuPressureOperators::InverseMass(const std::vector<double *> &input, const
                                  rank.stream)))
       return fail();
   }
-  if (!w.Synchronize() || !w.Check(cudaSetDevice(w.devices.front())) ||
-      !w.Check(cudaGraphLaunch(w.inverse_graph, w.ranks.front().stream)) ||
-      !w.Check(cudaStreamSynchronize(w.ranks.front().stream)))
+  // Every owning RHS is stable before any neighborhood graph reads peers.
+  if (!w.Synchronize())
+    return fail();
+  if (w.devices.size() > 1) {
+    for (size_t r = 0; r < w.ranks.size(); ++r)
+      if (!w.Check(cudaSetDevice(w.devices[r])) ||
+          !w.Check(cudaGraphLaunch(w.ranks[r].local_inverse, w.ranks[r].stream)))
+        return fail();
+  } else if (!w.Check(cudaSetDevice(w.devices.front())) ||
+             !w.Check(cudaGraphLaunch(w.inverse_graph, w.ranks.front().stream)))
     return fail();
   for (size_t r = 0; r < w.ranks.size(); ++r) {
     auto &rank = w.ranks[r];

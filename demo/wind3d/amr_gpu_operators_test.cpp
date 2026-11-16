@@ -30,12 +30,18 @@ struct Buffers {
   }
 };
 
-int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices, bool pressure_boundaries) {
+int Run(bool mixed,
+        bool embedded,
+        double width,
+        const std::vector<int> &devices,
+        bool pressure_boundaries,
+        bool elongated = false) {
   using namespace wind3d::amr;
   Topology tree;
   Mesh mesh;
   FaceMass mass;
-  if (!tree.Regrid({2, 2, 2}, 1, 64, [mixed](Block b) { return !mixed || (b.x == 0 && b.y == 0); }) ||
+  if (!tree.Regrid({2, 2, elongated ? 20 : 2}, 1, elongated ? 1024 : 64,
+                   [mixed](Block b) { return !mixed || (b.x == 0 && b.y == 0); }) ||
       !mesh.Build(tree, 4, width, {-width, -width, -width}))
     return 1;
   if (embedded && !mesh.Embed([width](std::array<double, 3> p) {
@@ -213,7 +219,8 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
     }
   }
   std::cout << "PASS distributed D/DT/M/inverse/gradient/pressure ranks=" << devices.size() << " mixed=" << mixed
-            << " embedded=" << embedded << " width=" << width << " error=" << maximum << '\n';
+            << " embedded=" << embedded << " elongated=" << elongated << " width=" << width << " error=" << maximum
+            << '\n';
   return 0;
 }
 
@@ -230,4 +237,13 @@ int main() {
               std::cerr << "operator failure " << status << '\n';
               return status;
             }
+  // The long coarse/fine interface extends beyond the inverse's dependency
+  // radius, exercising truncated neighborhoods against the global inverse.
+  for (bool boundaries : {false, true}) {
+    std::vector<int> devices = n >= 4 ? std::vector<int>{3, 1, 0, 2} : std::vector<int>{1, 0};
+    if (int status = Run(true, false, 1.3, devices, boundaries, true)) {
+      std::cerr << "long neighborhood failure " << status << '\n';
+      return status;
+    }
+  }
 }
