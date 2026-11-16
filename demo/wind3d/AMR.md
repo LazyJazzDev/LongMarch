@@ -1473,3 +1473,34 @@ component time decreased from 2.366 ms to 1.117 ms. All full runs retained
 from the optimized single-device reference, which took 0.014551 s in this job.
 Separate shared-node timings do not establish positive scaling; the single-GPU
 baseline still wins, and full-flow integration/accuracy acceptance remain open.
+
+### Compact coupled-face iteration
+
+The normalized mass matrix now stores only owned coupled rows, with a separate
+local-face index per row. Chebyshev kernels launch only those rows; uncoupled
+faces retain exact diagonal inversion in the final kernel. Both iteration
+buffers are initialized because the shared face exchange still includes
+uncoupled entries. The polynomial, row arithmetic and global face layout remain
+unchanged. The diagnostic mixed meshes contain 2,648 coupled faces out of
+170,624 (55,296 cells), and 10,672 out of 1,346,048 (442,368 cells), so traversing
+all rows in every iteration previously did mostly unnecessary work.
+
+Job 2001365 passed direct projection regression, all four relevant CTests and
+memcheck. Job 2001366 passed operator initcheck and full/component 1/2/4 GPU
+benchmarks. Residuals, iterations and velocity comparisons were unchanged.
+The first four-GPU timing appeared slower than the previous separate job, so
+job 2001367 alternated frozen full-row/compact-row/full-row executables within
+one allocation (binary hashes recorded). Warm projection means in seconds:
+
+| GPUs | Full rows before | Compact rows | Full rows after |
+| --- | ---: | ---: | ---: |
+| 1 | 0.032987 | 0.020288 | 0.032980 |
+| 2 | 0.043026 | 0.039499 | 0.042175 |
+| 4 | 0.112107 | 0.101350 | 0.101739 |
+
+Single- and two-GPU improvements persist in this comparison. Four-GPU benefit
+is not established beyond the baseline variation, and the earlier apparent
+regression was not reproduced against both adjacent baselines. Communication
+still exchanges the full pressure face plan; compact iteration alone does not
+resolve scaling. The optimized single-device reference remains faster, and
+steady-load acceptance and distributed flow integration remain incomplete.

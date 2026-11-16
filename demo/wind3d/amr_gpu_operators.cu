@@ -34,21 +34,31 @@ __global__ void InitializeInverse(int n,
                                   const double *rhs,
                                   double *b,
                                   double *x,
+                                  double *scratch,
                                   double *direction) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n) {
     b[i] = coupled[i] ? rhs[i] * scale[i] : 0;
     x[i] = direction[i] = b[i] / mass_centre;
+    // Queued exchanges include uncoupled faces too; keep both buffers defined.
+    scratch[i] = 0;
   }
 }
 
-__global__ void
-IterateInverse(Matrix a, const double *b, const double *x, double *next, double *direction, double alpha, double beta) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= a.rows)
+__global__ void IterateInverse(Matrix a,
+                               const int *rows,
+                               const double *b,
+                               const double *x,
+                               double *next,
+                               double *direction,
+                               double alpha,
+                               double beta) {
+  int row = blockIdx.x * blockDim.x + threadIdx.x;
+  if (row >= a.rows)
     return;
+  int i = rows[row];
   double product = 0;
-  for (int k = a.offsets[i]; k < a.offsets[i + 1]; ++k)
+  for (int k = a.offsets[row]; k < a.offsets[row + 1]; ++k)
     product += a.weights[k] * x[a.columns[k]];
   double d = alpha * (b[i] - product) + beta * direction[i];
   next[i] = x[i] + d;
@@ -91,6 +101,7 @@ struct DeviceScope {
 struct GpuPressureOperators::Impl {
   struct Rank {
     Matrix d, transpose, mass, normalized, two_point;
+    int *coupled_rows{};
     unsigned char *free{}, *coupled{}, *active{};
     double *gradient{}, *flux{}, *inverse_rhs{}, *inverse_result{};
     cudaEvent_t captured{};
@@ -178,7 +189,7 @@ struct GpuPressureOperators::Impl {
         return false;
       if (coupled) {
         InitializeInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
-            rank.mass.rows, rank.coupled, rank.scale, rank.inverse_rhs, rank.b, rank.x, rank.direction);
+            rank.mass.rows, rank.coupled, rank.scale, rank.inverse_rhs, rank.b, rank.x, rank.scratch, rank.direction);
         if (!Check(cudaGetLastError()))
           return false;
       }
@@ -195,8 +206,10 @@ struct GpuPressureOperators::Impl {
           auto &rank = ranks[r];
           if (!Check(cudaSetDevice(devices[r])))
             return false;
-          IterateInverse<<<(rank.mass.rows + 255) / 256, 256, 0, rank.stream>>>(
-              rank.normalized, rank.b, current[r], next[r], rank.direction, 2 * updated / mass_radius, updated * rho);
+          if (rank.normalized.rows)
+            IterateInverse<<<(rank.normalized.rows + 255) / 256, 256, 0, rank.stream>>>(
+                rank.normalized, rank.coupled_rows, rank.b, current[r], next[r], rank.direction,
+                2 * updated / mass_radius, updated * rho);
           if (!Check(cudaGetLastError()))
             return false;
         }
@@ -315,7 +328,8 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
       faces[layout.faces[i]] = int(i);
     using Rows = std::vector<std::vector<std::pair<int, double>>>;
     Rows two_point(layout.owned_cells);
-    Rows d(layout.owned_cells), transpose(layout.owned_faces), m(layout.owned_faces), normalized(layout.owned_faces);
+    Rows d(layout.owned_cells), transpose(layout.owned_faces), m(layout.owned_faces), normalized;
+    std::vector<int> coupled_rows;
     std::vector<unsigned char> local_free, local_coupled;
     std::vector<double> local_scale, diagonal;
     std::vector<unsigned char> active;
@@ -347,7 +361,9 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
       local_coupled.push_back(coupled[id]);
       local_scale.push_back(scale[id]);
       diagonal.push_back(mass.Diagonal()[id]);
-      if (coupled[id])
+      if (coupled[id]) {
+        coupled_rows.push_back(int(i));
+        normalized.emplace_back();
         for (int k = mass.Offsets()[id]; k < mass.Offsets()[id + 1]; ++k) {
           int j = mass.Columns()[k];
           if (free[j]) {
@@ -355,9 +371,10 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
               error_ = "Inconsistent symmetric mass coupling";
               return false;
             }
-            normalized[i].push_back({faces[j], mass.Weights()[k] * scale[id] * scale[j]});
+            normalized.back().push_back({faces[j], mass.Weights()[k] * scale[id] * scale[j]});
           }
         }
+      }
       std::map<int, double> row;
       if (f.low >= 0)
         row[f.low] = -f.area * f.aperture;
@@ -372,7 +389,8 @@ bool GpuPressureOperators::Build(const Mesh &mesh,
     int device = devices[r];
     if (!next->MatrixBuild(device, rank.two_point, two_point) || !next->MatrixBuild(device, rank.d, d) ||
         !next->MatrixBuild(device, rank.transpose, transpose) || !next->MatrixBuild(device, rank.mass, m) ||
-        !next->MatrixBuild(device, rank.normalized, normalized) || !next->Upload(device, rank.free, local_free) ||
+        !next->MatrixBuild(device, rank.normalized, normalized) ||
+        !next->Upload(device, rank.coupled_rows, coupled_rows) || !next->Upload(device, rank.free, local_free) ||
         !next->Upload(device, rank.coupled, local_coupled) || !next->Upload(device, rank.scale, local_scale) ||
         !next->Upload(device, rank.diagonal, diagonal) ||
         !next->Allocate(device, rank.inverse_rhs, layout.owned_faces) ||
