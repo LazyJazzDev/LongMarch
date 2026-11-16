@@ -9,7 +9,7 @@
 namespace {
 struct Buffers {
   std::vector<int> devices;
-  std::vector<double *> cells, faces;
+  std::vector<double *> cells, faces, snapshots;
   std::vector<cudaStream_t> streams;
 
   ~Buffers() {
@@ -23,6 +23,7 @@ struct Buffers {
       }
       cudaFree(cells[r]);
       cudaFree(faces[r]);
+      cudaFree(snapshots[r]);
     }
     cudaSetDevice(previous);
   }
@@ -43,7 +44,7 @@ int Run(bool mixed, std::vector<int> devices, int selection) {
   if (selection) {
     mask.resize(mesh.Faces().size());
     for (size_t i = 0; i < mask.size(); ++i)
-      mask[i] = selection == 2 && i % 3 == 1;
+      mask[i] = (selection == 2 && i % 3 == 1) || (selection == 3 && plan.FaceOwners()[i] == 0);
   }
   GpuPressureExchange exchange;
   int previous = devices.back();
@@ -78,11 +79,13 @@ int Run(bool mixed, std::vector<int> devices, int selection) {
   values.devices = devices;
   values.cells.resize(devices.size());
   values.faces.resize(devices.size());
+  values.snapshots.resize(devices.size());
   values.streams.resize(devices.size());
   for (size_t r = 0; r < devices.size(); ++r) {
     if (cudaSetDevice(devices[r]) != cudaSuccess ||
         cudaMalloc(&values.cells[r], layouts[r].cells.size() * sizeof(double)) != cudaSuccess ||
         cudaMalloc(&values.faces[r], layouts[r].faces.size() * sizeof(double)) != cudaSuccess ||
+        cudaMalloc(&values.snapshots[r], layouts[r].faces.size() * sizeof(double)) != cudaSuccess ||
         cudaStreamCreateWithFlags(&values.streams[r], cudaStreamNonBlocking) != cudaSuccess)
       return 7;
   }
@@ -145,10 +148,22 @@ int Run(bool mixed, std::vector<int> devices, int selection) {
     cudaGetDevice(&current);
     if (current != previous)
       return 20;
+    // Snapshot ghost consumers, then change owned producers on each stream.
+    // The next exchange must preserve the snapshot and publish the new values
+    // without a host barrier between these stages, including one-way links.
+    for (size_t r = 0; r < devices.size(); ++r)
+      if (cudaSetDevice(devices[r]) != cudaSuccess ||
+          cudaMemcpyAsync(values.snapshots[r], values.faces[r], layouts[r].faces.size() * sizeof(double),
+                          cudaMemcpyDeviceToDevice, values.streams[r]) != cudaSuccess ||
+          cudaMemsetAsync(values.faces[r], 0, layouts[r].owned_faces * sizeof(double), values.streams[r]) !=
+              cudaSuccess)
+        return 23;
+    if (!exchange.EnqueueFaces(values.faces, values.streams))
+      return 24;
     for (size_t r = 0; r < devices.size(); ++r) {
       std::vector<double> actual(layouts[r].faces.size());
       if (cudaSetDevice(devices[r]) != cudaSuccess || cudaStreamSynchronize(values.streams[r]) != cudaSuccess ||
-          cudaMemcpy(actual.data(), values.faces[r], actual.size() * sizeof(double), cudaMemcpyDeviceToHost) !=
+          cudaMemcpy(actual.data(), values.snapshots[r], actual.size() * sizeof(double), cudaMemcpyDeviceToHost) !=
               cudaSuccess)
         return 21;
       for (size_t i = 0; i < actual.size(); ++i) {
@@ -156,6 +171,15 @@ int Run(bool mixed, std::vector<int> devices, int selection) {
         double expected = i < layouts[r].owned_faces || mask.empty() || mask[id] ? id * 7. + repeat : -12345.;
         if (actual[i] != expected)
           return 22;
+      }
+      if (cudaMemcpy(actual.data(), values.faces[r], actual.size() * sizeof(double), cudaMemcpyDeviceToHost) !=
+          cudaSuccess)
+        return 25;
+      for (size_t i = 0; i < actual.size(); ++i) {
+        int id = layouts[r].faces[i];
+        double expected = i < layouts[r].owned_faces || mask.empty() || mask[id] ? 0. : -12345.;
+        if (actual[i] != expected)
+          return 26;
       }
     }
   }
@@ -168,9 +192,14 @@ int main() {
   int devices = 0;
   if (cudaGetDeviceCount(&devices) != cudaSuccess || devices < 2)
     return 77;
+  std::vector<std::vector<int>> mappings{{0}, {0, 1}, {1, 0}};
+  if (devices >= 4) {
+    mappings.push_back({0, 1, 2, 3});
+    mappings.push_back({3, 2, 1, 0});
+  }
   for (bool mixed : {false, true})
-    for (auto mapping : {std::vector<int>{0}, std::vector<int>{0, 1}, std::vector<int>{1, 0}})
-      for (int selection : {0, 1, 2})
+    for (auto mapping : mappings)
+      for (int selection : {0, 1, 2, 3})
         if (int status = Run(mixed, mapping, selection)) {
           std::cerr << "exchange failure " << status << '\n';
           return status;

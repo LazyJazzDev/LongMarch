@@ -1548,3 +1548,47 @@ established wall-time improvement beyond shared-node variation: less payload
 does not remove the per-iteration event barriers and graph scheduling cost.
 The change retains lower traffic without changing numerics; positive scaling,
 full-flow integration and the 2% steady-load acceptance remain unproven.
+
+### Directed dependencies for queued face exchange
+
+Queued face imports now synchronize only directed links with selected payload.
+All participating streams first record their current producers/consumers;
+each source waits for its destination to finish reading old ghosts before
+issuing peer stores. After all source completion events are recorded, each
+destination waits for its sources before running new consumers. Recording all
+events before adding waits avoids phase mixing when events are reused, and
+preserves progress through cyclic communication graphs. A rank with no queued
+links needs no exchange events; enclosing graph capture still forks and joins
+all ranks.
+
+The 442,368-cell diagnostic has six active directed links on four ranks, so
+each iteration requires 12 cross-stream waits instead of 24. Eight ranks have
+18 links (36 waits instead of 112); two ranks retain both links and four waits.
+These are dependency counts, not predicted wall-time speedups.
+
+Job 2001376 passed all four CTests and projection/exchange memcheck with zero
+unsuppressed errors. Exchange coverage now includes four ranks in forward and
+reverse device order and one-way masks (only rank zero's owned faces are
+selected). It snapshots old ghosts, changes owned producers asynchronously,
+and exchanges again without a host barrier; both the old snapshot and new
+imports must be correct, with unselected slots unchanged. Existing captured
+mass-inverse and repeated pressure projection regressions also pass.
+
+Job 2001377 passed operator initcheck and full/component benchmarks. Paired
+all-rank / directed-link / all-rank warm projection means in seconds:
+
+| GPUs | All-rank before | Directed links | All-rank after |
+| --- | ---: | ---: | ---: |
+| 1 | 0.020008 | 0.021660 | 0.020117 |
+| 2 | 0.039378 | 0.039919 | 0.039222 |
+| 4 | 0.083887 | 0.081746 | 0.081822 |
+
+The four-GPU component mass inverse measured 0.663 ms, versus 1.035 ms in the
+previous separate job; this component comparison is not paired. Full projection
+improvement remains indistinguishable from baseline variation. The one-GPU
+warm mean contains a timing outlier despite having no exchange dependencies.
+All configurations retained 35 iterations, about 8.48e-10 true residual and
+2.22e-16 velocity difference from the single-device reference. Fewer graph
+edges are retained, but neither positive GPU scaling nor full-flow acceleration
+has been demonstrated. The next integration work must address transport and
+runtime ownership as well as the still-open steady-load accuracy gate.

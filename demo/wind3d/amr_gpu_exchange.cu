@@ -56,6 +56,7 @@ struct GpuPressureExchange::Impl {
   std::vector<cudaStream_t> streams;
   std::vector<cudaEvent_t> ready;
   std::vector<PressureLocalLayout> layouts;
+  std::vector<unsigned char> queued_participants;
   std::vector<Link> links;
   std::vector<std::pair<int, void *>> allocations;
   std::string error;
@@ -138,6 +139,7 @@ bool GpuPressureExchange::Build(const PressurePartition &partition,
   next->streams.resize(devices.size());
   next->ready.resize(devices.size());
   next->layouts.resize(devices.size());
+  next->queued_participants.resize(devices.size());
   int count = 0;
   if (!next->Check(cudaGetDeviceCount(&count))) {
     error_ = next->error;
@@ -206,6 +208,8 @@ bool GpuPressureExchange::Build(const PressurePartition &partition,
       }
     }
     link.queued_count = int(indices.size());
+    if (link.queued_count)
+      next->queued_participants[source] = next->queued_participants[destination] = 1;
     if (link.queued_count && (!next->Allocate(devices[source], link.queued_indices, indices.size()) ||
                               !next->Allocate(devices[source], link.queued_destinations, destinations.size()) ||
                               !next->Check(cudaMemcpy(link.queued_indices, indices.data(), indices.size() * sizeof(int),
@@ -277,18 +281,23 @@ bool GpuPressureExchange::EnqueueFaces(const std::vector<double *> &values, cons
   }
   DeviceScope restore;
   auto &w = *impl_;
-  auto barrier = [&] {
-    if (w.devices.size() == 1)
-      return true;
+  auto dependencies = [&](bool delivered) {
+    // Record all producers before inserting any waits: each event denotes this
+    // phase, even when directed links form a cycle or events are reused.
     for (size_t r = 0; r < streams.size(); ++r)
-      if (!w.Check(cudaSetDevice(w.devices[r])) || !w.Check(cudaEventRecord(w.ready[r], streams[r])))
+      if (w.queued_participants[r] &&
+          (!w.Check(cudaSetDevice(w.devices[r])) || !w.Check(cudaEventRecord(w.ready[r], streams[r]))))
         return false;
-    for (size_t r = 0; r < streams.size(); ++r) {
-      if (!w.Check(cudaSetDevice(w.devices[r])))
+    for (const auto &link : w.links) {
+      if (!link.queued_count)
+        continue;
+      // Before peer stores, the destination must finish using its old ghosts.
+      // Afterwards, its consumers must wait for the source's completed stores.
+      int waiter = delivered ? link.destination : link.source;
+      int producer = delivered ? link.source : link.destination;
+      if (!w.Check(cudaSetDevice(w.devices[waiter])) ||
+          !w.Check(cudaStreamWaitEvent(streams[waiter], w.ready[producer], 0)))
         return false;
-      for (size_t source = 0; source < streams.size(); ++source)
-        if (source != r && !w.Check(cudaStreamWaitEvent(streams[r], w.ready[source], 0)))
-          return false;
     }
     return true;
   };
@@ -296,7 +305,7 @@ bool GpuPressureExchange::EnqueueFaces(const std::vector<double *> &values, cons
     error_ = w.error;
     return false;
   };
-  if (!barrier())
+  if (!dependencies(false))
     return fail();
   for (const auto &link : w.links) {
     if (!link.queued_count)
@@ -311,7 +320,7 @@ bool GpuPressureExchange::EnqueueFaces(const std::vector<double *> &values, cons
     if (!w.Check(cudaGetLastError()))
       return fail();
   }
-  if (!barrier())
+  if (!dependencies(true))
     return fail();
   return true;
 }
