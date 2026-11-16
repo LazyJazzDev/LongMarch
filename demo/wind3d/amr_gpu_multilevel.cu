@@ -109,10 +109,29 @@ struct GpuMultilevel::Impl {
     return false;
   }
 
-  // Record all producers before enqueuing waits. Each wait captures the current
-  // recording, so these events can be reused at the next dependency boundary.
-  // Cross-device stream waits avoid a host round trip for every smoothing phase.
+  // Before peer stores, sources wait for destination consumers to finish.
+  // Afterwards, destinations wait for the incoming stores. Record all events
+  // first so reusing them never creates a cycle within one dependency phase.
+  bool Dependencies(const Level &level, bool before) {
+    std::vector<unsigned char> participants(devices.size());
+    for (const auto &link : level.links)
+      participants[link.source] = participants[link.destination] = 1;
+    for (size_t r = 0; r < devices.size(); ++r)
+      if (participants[r] && (!Check(cudaSetDevice(devices[r])) || !Check(cudaEventRecord(ready[r], streams[r]))))
+        return false;
+    for (const auto &link : level.links) {
+      int waiter = before ? link.source : link.destination;
+      int producer = before ? link.destination : link.source;
+      if (!Check(cudaSetDevice(devices[waiter])) || !Check(cudaStreamWaitEvent(streams[waiter], ready[producer], 0)))
+        return false;
+    }
+    return true;
+  }
+
+  // Two ranks have no unrelated peers; retain the lower-overhead original path.
   bool Barrier() {
+    if (devices.size() > 2)
+      return true;
     for (size_t r = 0; r < devices.size(); ++r)
       if (!Check(cudaSetDevice(devices[r])) || !Check(cudaEventRecord(ready[r], streams[r])))
         return false;
@@ -185,6 +204,8 @@ struct GpuMultilevel::Impl {
 
   bool Exchange(size_t depth, double *Rank::*field) {
     auto &level = levels[depth];
+    if (devices.size() > 2 && !Dependencies(level, true))
+      return false;
     for (auto &link : level.links) {
       int s = link.source, t = link.destination;
       if (!Check(cudaSetDevice(devices[s])))
@@ -196,7 +217,7 @@ struct GpuMultilevel::Impl {
       if (!Check(cudaGetLastError()))
         return false;
     }
-    return Barrier();
+    return devices.size() > 2 ? Dependencies(level, false) : Barrier();
   }
 
   bool Capture() {
