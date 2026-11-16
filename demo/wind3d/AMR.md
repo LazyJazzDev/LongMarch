@@ -1006,3 +1006,23 @@ These are historical pre-repair results and cannot serve as the corrected
 geometry baseline. Jobs 2001300/2001301 repeat static/uniform grid 192 with
 corrected thin-cell geometry and cached inlet sampling. Resolution convergence,
 long-window stationarity, the control envelope and overall speedup remain open.
+
+
+## Pressure partition ownership and exchange plan
+
+`PressurePartition` constructs block-balanced Morton ownership without
+truncating topology coordinates to a 64-bit interleaved key. Each cell and
+unique flux face has one owner; a coarse/fine face belongs to its finer cell's
+rank. Directed, sorted import lists contain pressure cells needed for D^T and
+face values needed for D and face-mass rows. The same face imports can be
+refreshed during each iteration of a distributed mass inverse. Failed builds
+preserve the preceding plan.
+
+The CPU partition test covers 1/2/4/8 ranks, uniform/mixed topology, open/cut
+geometry and two physical scales. It fills only owned entries and explicit
+imports, leaving unavailable entries NaN, then requires exact equality with
+unpartitioned D, D^T and M applications. Ownership uniqueness, block balance,
+ordered duplicate-free payloads and invalid-build rollback are also checked.
+This is pressure communication metadata, not a distributed GPU solver:
+peer-device copies, local index conversion, Krylov reductions, the multilevel
+preconditioner and transport halos still require integration and validation.
