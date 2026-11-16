@@ -22,6 +22,11 @@ class Topology {
   // topology intact (including on capacity exhaustion).
   bool Regrid(std::array<int, 3> roots, int max_level, size_t capacity, const Refine &refine);
 
+  // Restore an exact leaf cover (input order is arbitrary). Reject duplicates,
+  // holes, overlaps, invalid coordinates and unbalanced covers; never silently
+  // refine a saved topology. Failure preserves the current topology.
+  bool Restore(std::array<int, 3> roots, int max_level, size_t capacity, const std::vector<Block> &leaves);
+
   const std::vector<Block> &Leaves() const {
     return leaves_;
   }

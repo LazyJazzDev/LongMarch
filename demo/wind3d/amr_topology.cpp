@@ -118,6 +118,33 @@ bool Topology::Regrid(std::array<int, 3> roots, int max_level, size_t capacity, 
   return true;
 }
 
+bool Topology::Restore(std::array<int, 3> roots, int max_level, size_t capacity, const std::vector<Block> &leaves) {
+  if (max_level < 0 || max_level > 12 || leaves.empty() || leaves.size() > capacity)
+    return false;
+  for (int n : roots)
+    if (n <= 0 || n > (std::numeric_limits<int>::max() >> max_level))
+      return false;
+  LeafSet expected, ancestors;
+  for (Block b : leaves) {
+    if (b.level < 0 || b.level > max_level || b.x < 0 || b.y < 0 || b.z < 0 || b.x >= (roots[0] << b.level) ||
+        b.y >= (roots[1] << b.level) || b.z >= (roots[2] << b.level) || !expected.insert(b).second)
+      return false;
+    while (b.level > 0) {
+      b = {b.level - 1, b.x / 2, b.y / 2, b.z / 2};
+      ancestors.insert(b);
+    }
+  }
+  Topology next;
+  if (!next.Regrid(roots, max_level, capacity, [&](Block b) { return ancestors.count(b) != 0; }) ||
+      next.Leaves().size() != leaves.size())
+    return false;
+  for (Block b : next.Leaves())
+    if (!expected.count(b))
+      return false;
+  *this = std::move(next);
+  return true;
+}
+
 int Topology::Find(int x, int y, int z) const {
   if (!Inside({x, y, z}, roots_, max_level_))
     return -1;
