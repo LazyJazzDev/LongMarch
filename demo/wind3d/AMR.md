@@ -894,3 +894,44 @@ This is a smaller reproduction of growth, not a closed-domain eigenvalue or
 energy-stability proof: the existing sampler clamps upstream tangential values
 to the first interior layer rather than prescribing freestream ghost values,
 so inlet treatment remains a possible contributor and needs isolation.
+
+
+## Inlet isolation and completed corrected-geometry comparisons
+
+Job 2001284 prescribed first-layer inlet velocities after each projection in
+an otherwise identical body-free diagnostic. At six seconds the uniform and
+mixed perturbation energy ratios fell to 0.001589 and 0.024103. This isolates
+inlet involvement but is not a valid production repair: overwriting projected
+velocities can invalidate the divergence constraint.
+
+Job 2001287 instead reflected upstream interpolation samples about the inlet
+plane with ghost value `2 * prescribed_velocity - interior_velocity`. It made
+no post-projection overwrite. Mixed perturbation energy fell to 0.023543 at
+six seconds, with maximum component error 3.625e-5. The temporary GPU prototype
+uses direct sampling near the inlet, leaves diffusion unchanged, and stores
+boundary state in transport fields; standalone-advection state isolation,
+CPU/GPU parity, cached sampling and aircraft-load validation are still needed.
+Jobs 2001289--2001291 test static, uniform and dynamic aircraft meshes; job
+2001292 extends the body-free test to thirty seconds with a different seed.
+These experiments do not establish general stability or acceptance.
+
+Corrected thin-geometry jobs 2001272--2001274 all completed 30000 steps.
+Time-weighted 2--6 s means and measured wall cost were:
+
+| Mesh | Fx | Fy | Mz | Wall seconds / physical second |
+| --- | ---: | ---: | ---: | ---: |
+| Static mixed | 31.715 | 42.375 | -28.790 | 72.658 |
+| Dynamic mixed | 30.912 | 41.932 | -27.993 | 223.212 |
+| Uniform fine | 31.212 | 39.127 | -28.582 | 157.613 |
+
+Dynamic Fx/Fy/Mz deviations from uniform are -0.961%, +7.167%, and +2.061%
+(using absolute reference denominators). The main-component 2% gate fails;
+dynamic execution also costs about 42% more than uniform. These windows are
+not certified stationary, and near-zero components require separate absolute
+and statistical checks. Static speed alone is not acceptance.
+
+Removing MacCormack correction (2001280) gives Fx/Fy/Mz means
+62.963/88.517/-45.378. Diagonal face-volume mass (2001281) gives
+32.639/39.426/-35.459. Neither is an acceptable simplification: both change
+loads substantially relative to the uniform compatible reference. Temporary
+sources, full statistics and raw outputs remain under `out/wind3d-amr`.
