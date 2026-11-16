@@ -1141,3 +1141,35 @@ multi-GPU flow. It still uses host scalar reductions, synchronous peer phases
 and Jacobi rather than a distributed multilevel preconditioner. Performance
 measurements, scalable preconditioning, distributed transport, adaptation and
 runtime integration remain required before claiming speedup or task completion.
+
+### Repeated projection and measured scaling
+
+The first larger repeated benchmark (jobs 2001318 and 2001321) was incomplete.
+The latter exited with diagnostic code 13 (field mismatch), not a CUDA failure;
+the platform subsequently reported PENDING/unknown. Its pageable host-to-device
+uploads had not been explicitly completed before the solver's nonblocking
+streams consumed the input, violating the documented producer-completion
+contract. Job 2001324 added device synchronization after each input upload,
+outside the timed region, and completed all four repeats of all configurations.
+Distributed velocities matched the single-device Jacobi reference within
+2.23e-16 on every repeat. Production projection code was unchanged.
+
+For the body-free mixed mesh with 55,296 cells and 170,624 faces, tolerance 1e-9,
+mean times excluding the first repeat and setup were:
+
+| Projection | Iterations | Seconds |
+| --- | ---: | ---: |
+| Existing single GPU, Jacobi | 2033 | 0.331825 |
+| Existing single GPU, multilevel | 27 | 0.006481 |
+| Distributed implementation, one GPU, Jacobi | 2033 | 1.030326 |
+| Distributed implementation, two GPUs, Jacobi | 2033 | 3.277667 |
+
+This is a substantial slowdown, not a speedup. Distributed multilevel
+preconditioning and fewer host-synchronized exchange phases are necessary.
+These timings concern this projection benchmark, not aircraft flow throughput.
+The regression now explicitly completes input producers and restores the
+original velocity for three further solves on each existing test configuration,
+checking owned results and unchanged ghosts on each repeat.
+
+Two-GPU job 2001327 passed the expanded direct regression, CTest (4.40 s),
+and Compute Sanitizer memcheck with zero errors.

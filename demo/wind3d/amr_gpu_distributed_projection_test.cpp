@@ -77,7 +77,8 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
         cudaMemcpy(velocity[r], before_u[r].data(), l.faces.size() * sizeof(double), cudaMemcpyHostToDevice) !=
             cudaSuccess ||
         cudaMemcpy(potential[r], before_p[r].data(), l.cells.size() * sizeof(double), cudaMemcpyHostToDevice) !=
-            cudaSuccess)
+            cudaSuccess ||
+        cudaDeviceSynchronize() != cudaSuccess)
       return 6;
   }
   if (gpu.Project(velocity, potential, 1e-14, 1).converged || gpu.Project(velocity, potential, 0).converged ||
@@ -146,12 +147,39 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
   double relative = std::sqrt(divergence2 / initial2);
   if (!std::isfinite(relative) || relative > 1.1e-10 || error > 1e-8 || pressure_error > 1e-8)
     return 16;
+  // Reuse the solver after restoring the original input. Pageable host uploads
+  // can return before DMA completes; finish producers before private streams run.
+  for (int repeat = 0; repeat < 3; ++repeat) {
+    for (size_t r = 0; r < devices.size(); ++r) {
+      if (cudaSetDevice(devices[r]) != cudaSuccess ||
+          cudaMemcpy(velocity[r], before_u[r].data(), before_u[r].size() * sizeof(double), cudaMemcpyHostToDevice) !=
+              cudaSuccess ||
+          cudaDeviceSynchronize() != cudaSuccess)
+        return 21;
+    }
+    auto repeated = gpu.Project(velocity, potential, 1e-10, 2000);
+    if (!repeated.converged || repeated.relative_residual > 1e-10)
+      return 22;
+    for (size_t r = 0; r < devices.size(); ++r) {
+      auto values = before_u[r];
+      if (cudaSetDevice(devices[r]) != cudaSuccess ||
+          cudaMemcpy(values.data(), velocity[r], values.size() * sizeof(double), cudaMemcpyDeviceToHost) != cudaSuccess)
+        return 23;
+      for (size_t i = 0; i < layouts[r].owned_faces; ++i)
+        if (!std::isfinite(values[i]) || std::abs(values[i] - assembled[layouts[r].faces[i]]) > 1e-10)
+          return 24;
+      for (size_t i = layouts[r].owned_faces; i < values.size(); ++i)
+        if (values[i] != before_u[r][i])
+          return 25;
+    }
+  }
   // A zero right-hand side must succeed and replace the previous potential.
   for (size_t r = 0; r < devices.size(); ++r) {
     auto &l = layouts[r];
     std::vector<double> zero(l.faces.size());
     if (cudaSetDevice(devices[r]) != cudaSuccess ||
-        cudaMemcpy(velocity[r], zero.data(), zero.size() * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess)
+        cudaMemcpy(velocity[r], zero.data(), zero.size() * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess ||
+        cudaDeviceSynchronize() != cudaSuccess)
       return 17;
   }
   auto zero_result = gpu.Project(velocity, potential);
