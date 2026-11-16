@@ -114,7 +114,7 @@ struct FoilPart {
 WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
   Vec3 ex{1, 0, 0}, ey{0, 1, 0}, ez{0, 0, float(side)};
   FoilSpec wing{
-      {0, -0.18f, 0}, RotateZ(ex, -1.5f), RotateZ(ey, -1.5f), ez, 2.7f, 1.10f, 0.34f, -1.04f, 0.55f, 0.09f, 0.015f,
+      {0, -0.18f, 0}, RotateZ(ex, -1.5f), RotateZ(ey, -1.5f), ez, 2.7f, 1.10f, 0.34f, -1.04f, 0.55f, 0.09f, 0.025f,
       0.13f};
   if (part == 0)
     return {wing, 0, 0.35f, 0, false, false};
@@ -184,6 +184,32 @@ WIND3D_HD Vec3 ControlTransform(const FoilPart &part, Vec3 p, bool inverse) {
   return inverse ? p : Add(p, shift);
 }
 
+// Rounded hinge fairing of a control surface: a capsule around the hinge line
+// whose radius is the airfoil half-thickness at the hinge. Each flat hinge cut
+// is a diameter of it, so at any deflection it closes the wedge between the
+// fixed part and the control, as the rounded nose of a control surface in its
+// cove does. For a Fowler flap it spans the rearward travel as well, which
+// models the flap with its slot closed.
+WIND3D_HD float HingeKnuckle(const FoilPart &part, Vec3 local) {
+  const auto &s = part.spec;
+  float slope = (s.tip - s.root) / s.span;
+  Vec3 hinge{s.leading + 0.72f * s.root, FoilCamber(0.72f, s.root, s.camber), 0};
+  Vec3 axis = Unit({s.sweep + 0.72f * slope, s.dihedral + FoilCamber(0.72f, slope, s.camber), 1});
+  float extension = part.fowler ? part.deflection / 40 : 0;
+  Vec3 shift{0.10f * s.root * extension, -0.025f * s.root * extension, 0};
+  Vec3 v = Add(local, Scale(hinge, -1));
+  Vec3 radial = Add(v, Scale(axis, -Dot(v, axis)));
+  Vec3 travel = Add(shift, Scale(axis, -Dot(shift, axis)));
+  float length = Dot(travel, travel);
+  float t = length > 0 ? fminf(fmaxf(Dot(radial, travel) / length, 0), 1) : 0;
+  // Span station of the hinge-line point nearest to `local`: the knuckle ends
+  // in planes perpendicular to the swept hinge line.
+  float station = Dot(v, axis) * axis.z;
+  float chord = s.root + (s.tip - s.root) * fminf(fmaxf(station / s.span, 0), 1);
+  float d = Length(Add(radial, Scale(travel, -t))) - FoilThickness(0.72f, chord, s.thickness);
+  return fmaxf(d, fmaxf(part.begin - station, station - part.end));
+}
+
 WIND3D_HD Vec3 FoilPoint(const FoilPart &part, float u, float span, int surface, bool control) {
   const auto &s = part.spec;
   float chord = s.root + (s.tip - s.root) * span / s.span;
@@ -215,7 +241,7 @@ WIND3D_HD float PartDistance(Vec3 body, const FoilPart &part) {
     d = fmaxf(d, fmaxf(part.begin - p.z, p.z - part.end));
     best = fminf(best, d);
   }
-  return best;
+  return part.hinged ? fminf(best, HingeKnuckle(part, local)) : best;
 }
 
 // Flow-through nacelle, as in an unpowered wind-tunnel model: an annular

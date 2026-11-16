@@ -6,6 +6,8 @@ if (LONGMARCH_WIND3D_STANDALONE)
     add_executable(wind3d_sweep EXCLUDE_FROM_ALL sweep.cpp simulation.cu geometry.cpp)
     target_link_libraries(wind3d_sweep PRIVATE CUDA::cudart Threads::Threads)
     if (BUILD_TESTING)
+        add_executable(wind3d_aircraft_geometry EXCLUDE_FROM_ALL aircraft_geometry_test.cpp geometry.cpp)
+        add_test(NAME wind3d_aircraft_geometry COMMAND wind3d_aircraft_geometry)
         find_package(Python3 COMPONENTS Interpreter)
         if (Python3_Interpreter_FOUND)
             add_test(NAME wind3d_amr_task_checkpoint

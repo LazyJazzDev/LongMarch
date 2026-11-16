@@ -53,7 +53,7 @@ int RunAdaptiveTask(int grid,
     }
   };
   for (double value :
-       {1., double(grid), double(adaptive.levels), double(adaptive.block_cells), double(adaptive.capacity),
+       {2., double(grid), double(adaptive.levels), double(adaptive.block_cells), double(adaptive.capacity),
         double(adaptive.adapt_every), double(adaptive.uniform), double(adaptive.compatible_pressure),
         adaptive.pressure_tolerance, adaptive.protect_padding_cells, double(options.cubic), double(options.cfl),
         double(options.max_dt), double(options.viscosity), double(options.wall_viscosity), double(options.sponge)})
