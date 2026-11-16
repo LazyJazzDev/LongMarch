@@ -21,7 +21,8 @@ int RunAdaptiveTask(int grid,
   if (options.devices != 1 || !options.corrected_transport || options.export_field || adaptive.levels < 0 ||
       adaptive.levels > 6 || adaptive.block_cells < 2 || adaptive.block_cells > 64 || adaptive.block_cells % 2 ||
       grid < 64 || grid > max_grid || grid % 16 || !std::isfinite(options.max_dt) || options.max_dt < 0 ||
-      !(options.initial_controls.speed > 0)) {
+      !(options.initial_controls.speed > 0) || !(adaptive.pressure_tolerance > 0) ||
+      !std::isfinite(adaptive.pressure_tolerance)) {
     std::fputs("Adaptive batch requires one GPU, corrected transport, --no-export and valid grid/options.\n", stderr);
     return 1;
   }
@@ -87,12 +88,13 @@ int RunAdaptiveTask(int grid,
     file << std::setprecision(17) << "step,time,dt,Fx,Fy,Fz,Mx,My,Mz,seconds,cells,generation\n";
   }
   auto info = flow.Info();
-  std::printf("SETUP backend=%s pressure=%s finest_h=%.9g cells=%zu blocks=%zu seconds=%.9g\n",
+  std::printf("SETUP backend=%s pressure=%s pressure_tolerance=%.9g finest_h=%.9g cells=%zu blocks=%zu seconds=%.9g\n",
               adaptive.uniform ? "amr-uniform" : "adaptive", adaptive.compatible_pressure ? "compatible" : "quadratic",
-              h, info.cells, info.blocks,
+              adaptive.pressure_tolerance, h, info.cells, info.blocks,
               std::chrono::duration<double>(std::chrono::steady_clock::now() - setup_start).count());
   amr::FlowParameters physics;
   physics.cubic = options.cubic;
+  physics.pressure_tolerance = adaptive.pressure_tolerance;
   physics.viscosity = options.viscosity;
   physics.wall_viscosity = options.wall_viscosity;
   physics.sponge_length = options.sponge;

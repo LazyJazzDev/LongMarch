@@ -216,9 +216,10 @@ AdvanceResult GpuFlow::Advance(double dt, double speed, const FlowParameters &pa
     error_ = "Simulation clock overflow";
     return {};
   }
-  auto result = impl_->transport.AdvanceDevice(
-      impl_->projection, impl_->u, impl_->info.faces, impl_->p, impl_->info.cells, dt, speed, parameters.cubic,
-      parameters.density, parameters.wall_viscosity, parameters.viscosity, parameters.sponge_length);
+  auto result =
+      impl_->transport.AdvanceDevice(impl_->projection, impl_->u, impl_->info.faces, impl_->p, impl_->info.cells, dt,
+                                     speed, parameters.cubic, parameters.density, parameters.wall_viscosity,
+                                     parameters.viscosity, parameters.sponge_length, parameters.pressure_tolerance);
   if (!result.advanced) {
     error_ = "GPU step failed: " + impl_->transport.Error();
     return result;

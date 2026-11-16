@@ -10,6 +10,7 @@
 namespace wind3d::amr {
 struct FlowParameters {
   bool cubic{true};
+  double pressure_tolerance{1e-8};
   double density{1.225}, wall_viscosity{9.2e-7}, viscosity{1.5e-5}, sponge_length{2};
 };
 

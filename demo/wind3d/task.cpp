@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
           "            [--speed 12] [--angle 5] [--flap 0] [--aileron 0] [--elevator 0] [--rudder 0]\n"
           "            [--max-dt 0] [--csv loads.csv]\n"
           "            [--adaptive | --amr-uniform] [--levels 1] [--block-cells 4]\n"
+          "            (adaptive pressure tolerance defaults to 1e-8)\n"
           "            [--amr-compatible-pressure] (requires --adaptive or --amr-uniform)\n"
           "            [--adapt-every 100] [--max-blocks 100000] (adaptive requires --no-export)\n"
           "Times include transport, pressure, diagnostics and optional snapshot export; startup steps are excluded.");
@@ -91,7 +92,8 @@ int main(int argc, char **argv) {
       if (!std::isfinite(*parameter))
         return 1;
     } else if (!std::strcmp(arg, "--pressure-tolerance")) {
-      options.pressure_tolerance = std::strtof(argv[i], &end);
+      adaptive.pressure_tolerance = std::strtod(argv[i], &end);
+      options.pressure_tolerance = float(adaptive.pressure_tolerance);
     } else {
       long value = std::strtol(argv[i], &end, 10);
       if (value < 0 || value > 1000000)

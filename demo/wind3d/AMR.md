@@ -742,3 +742,31 @@ its initial mesh has 367104 cells versus 212992 at 2h. This tests interface
 placement without changing finest body spacing. Its modified source, isolated
 object/link commands and frozen executable are under `out/wind3d-amr`; the
 production refinement policy is unchanged. These experiments remain pending.
+
+
+## Pressure tolerance sensitivity
+
+Static compatible CG job 2001260 completed six seconds. Its 2--6 second
+Fx/Fy/Fz/Mx/My/Mz means were 19.0546/12.5696/-0.3190/-0.3047/-1.1778/-14.4640;
+peak speed was 17.5965 m/s and cost was 72.24 wall seconds per physical second.
+This is about 21% less cost than compatible BiCGStab job 2001255, but the Mz
+means differ by about 7%. They must not be described as long-term load-equivalent.
+For 0.5-second batches, approximate Mz mean standard errors were 0.309 and 0.234;
+these short correlated, possibly nonstationary series do not certify equivalence.
+Force-vector differences grew from 4.5e-6 at 0.02 seconds to 0.735 at 0.1 seconds.
+This motivates tolerance sensitivity checks rather than attributing all observed
+differences to mesh interfaces.
+
+`FlowParameters::pressure_tolerance` now controls physical-step projection through
+`GpuTransport::AdvanceDevice`. `--pressure-tolerance` is forwarded by the adaptive
+task, logged at setup, and validated as finite and positive; the adaptive default
+remains 1e-8. Previously this CLI option only affected the native backend and the
+adaptive physical-step tolerance was hard-coded. Remap-only projection still uses
+its existing 1e-9 tolerance. The original native default is unchanged.
+
+Job 2001269 passed transport, advance and flow CTests, flow memcheck (zero
+errors), CLI rejection of zero tolerance, and 100-step aircraft checks at 1e-8
+and 1e-11. The default run's printed physical CSV data matched the prior CG run
+exactly. Maximum true residual in the tighter run was 9.735e-12. A subsequent
+30000-step static CG run at 1e-11 is continuing in the same job; its long-term
+load conclusions remain pending.

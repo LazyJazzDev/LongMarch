@@ -903,13 +903,14 @@ AdvanceResult GpuTransport::AdvanceDevice(GpuProjection &projection,
                                           double density,
                                           double wall_viscosity,
                                           double viscosity,
-                                          double sponge_length) {
+                                          double sponge_length,
+                                          double pressure_tolerance) {
   AdvanceResult result;
   if (!impl_ || !velocity || !pressure || velocity == pressure || faces != size_t(impl_->fields[0].nf) ||
       cells != size_t(impl_->fields[0].nc) || !(dt > 0) || !std::isfinite(dt) || !std::isfinite(speed) ||
       !(density > 0) || !std::isfinite(density) || !(wall_viscosity > 0) || !std::isfinite(wall_viscosity) ||
       viscosity < 0 || !std::isfinite(viscosity) || sponge_length < 0 || !std::isfinite(sponge_length) ||
-      dt * viscosity / impl_->min_area > 1.0 / 6)
+      !(pressure_tolerance > 0) || !std::isfinite(pressure_tolerance) || dt * viscosity / impl_->min_area > 1.0 / 6)
     return result;
   auto &w = *impl_;
   auto transport_start = std::chrono::steady_clock::now();
@@ -922,7 +923,7 @@ AdvanceResult GpuTransport::AdvanceDevice(GpuProjection &projection,
     return result;
   auto pressure_start = std::chrono::steady_clock::now();
   result.transport_seconds = std::chrono::duration<double>(pressure_start - transport_start).count();
-  result.projection = projection.ProjectDevice(w.result, faces, w.pressure, cells, 1e-8);
+  result.projection = projection.ProjectDevice(w.result, faces, w.pressure, cells, pressure_tolerance);
   if (!result.projection.converged) {
     w.error = projection.Error();
     return result;

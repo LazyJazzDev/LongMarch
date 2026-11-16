@@ -114,7 +114,13 @@ int Run(bool compatible) {
     if (flow.Adapt(options, report) || !flow.Readback(state) || !Same(before, state) ||
         report.new_blocks != saved_report.new_blocks)
       return 21;
-    if (!flow.Advance(.01, 1).advanced)
+    FlowParameters parameters;
+    parameters.pressure_tolerance = 0;
+    if (flow.Advance(.01, 1, parameters).advanced || !flow.Readback(state) || !Same(before, state))
+      return 24;
+    parameters.pressure_tolerance = 1e-11;
+    auto tight = flow.Advance(.01, 1, parameters);
+    if (!tight.advanced || tight.projection.relative_residual > parameters.pressure_tolerance)
       return 22;
   }
   std::cout << "PASS transactional runtime GPU regrids, body preservation, clock continuity and pressure validity\n";
