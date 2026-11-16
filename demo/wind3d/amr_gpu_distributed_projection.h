@@ -12,6 +12,9 @@ class GpuDistributedProjection {
   ~GpuDistributedProjection();
   GpuDistributedProjection(const GpuDistributedProjection &) = delete;
   GpuDistributedProjection &operator=(const GpuDistributedProjection &) = delete;
+  // Enables peer access between the selected devices for this CUDA context's
+  // lifetime. Existing access is retained; neither destruction nor failed
+  // construction disables any pair. The previous solver survives Build failure.
   bool Build(const Mesh &mesh, const Topology &tree, const std::vector<int> &devices, bool multilevel = true);
   const std::vector<PressureLocalLayout> &Layouts() const;
   // Layout-sized disjoint fields per rank. Producers must finish first.

@@ -1384,3 +1384,31 @@ checking cudaDeviceCanAccessPeer does not establish this performance behavior.
 It does not establish the internal transfer route, bandwidth, or eliminate the
 remaining scaling deficit. Library teardown must not disable another solver's
 process-wide peer-access state when this is integrated.
+
+### Automatic pressure peer-access initialization
+
+GpuDistributedProjection::Build now validates mutual peer capability and enables
+every directed selected-device pair. Already-enabled pairs are accepted. This
+is a documented monotonic CUDA-context initialization: neither destruction nor
+failed construction disables peer access, preserving other solver instances.
+The caller's current device is restored, and failed builds preserve the previous
+solver. No transport or flow-runtime integration is implied by this change.
+
+The expanded regression creates and destroys a second solver sharing the same
+GPUs, rejects its duplicate-device rebuild, checks that access remains enabled,
+and then exercises the first solver's full projections and repeated inputs.
+Job 2001348 passed numerical regression/CTest, but default Compute Sanitizer
+reported 190 expected API statuses when cudaGetLastError cleared error 704
+(cudaErrorPeerAccessAlreadyEnabled). A minimal probe in job 2001349 generated
+the sanitizer XML schema. The committed amr_peer_status_suppressions.xml matches
+only kind Api, api cudaGetLastError, error cudaErrorPeerAccessAlreadyEnabled and
+result 704; it does not disable API or memory checking generally.
+
+Job 2001350 passed direct regression, CTest and memcheck with zero unsuppressed
+errors using `--suppressions demo/wind3d/amr_peer_status_suppressions.xml`.
+It also completed the 442,368-cell benchmark without explicit peer setup in the
+driver: warm means were 0.033890/0.075493/0.218619 seconds on 1/2/4 GPUs, versus
+0.014472 seconds for the optimized single-device solver. All distributed cases
+used 35 iterations, about 8.48e-10 true residual and <=2.23e-16 velocity deviation
+from that reference. This reproduces the peer-enabled improvement but does not
+resolve the remaining negative scaling or establish aircraft-load acceptance.

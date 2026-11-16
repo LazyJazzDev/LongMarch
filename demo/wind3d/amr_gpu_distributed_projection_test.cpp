@@ -49,6 +49,27 @@ int Run(bool mixed, bool embedded, double width, const std::vector<int> &devices
     std::cerr << single.Error() << ' ' << gpu.Error() << '\n';
     return 3;
   }
+  // A second solver may share already-enabled peer access. Its destruction and
+  // a failed rebuild must not disrupt the first solver's subsequent projections.
+  if (devices.size() > 1) {
+    {
+      GpuDistributedProjection second;
+      if (!second.Build(mesh, tree, devices, multilevel))
+        return 26;
+      if (second.Build(mesh, tree, {devices[0], devices[0]}, multilevel))
+        return 27;
+    }
+    for (int source : devices)
+      for (int destination : devices)
+        if (source != destination) {
+          if (cudaSetDevice(source) != cudaSuccess)
+            return 28;
+          auto status = cudaDeviceEnablePeerAccess(destination, 0);
+          if (status != cudaErrorPeerAccessAlreadyEnabled)
+            return 29;
+          cudaGetLastError();
+        }
+  }
   const auto &layouts = gpu.Layouts();
   Mesh empty;
   if (gpu.Build(empty, tree, devices) || gpu.Error().empty())

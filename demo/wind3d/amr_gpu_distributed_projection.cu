@@ -212,6 +212,37 @@ bool GpuDistributedProjection::Build(const Mesh &mesh,
     error_ = next->operators.Error();
     return false;
   }
+  // Peer access is process-wide. Enable it monotonically and leave it enabled
+  // when any solver is destroyed, so overlapping solver lifetimes are safe.
+  // Validate all pairs before changing the access state.
+  for (int source : devices)
+    for (int destination : devices)
+      if (source != destination) {
+        int accessible = 0;
+        if (!next->Check(cudaDeviceCanAccessPeer(&accessible, source, destination))) {
+          error_ = next->error;
+          return false;
+        }
+        if (!accessible) {
+          error_ = "Distributed projection requires mutually peer-accessible GPUs";
+          return false;
+        }
+      }
+  for (int source : devices)
+    for (int destination : devices)
+      if (source != destination) {
+        if (!next->Check(cudaSetDevice(source))) {
+          error_ = next->error;
+          return false;
+        }
+        auto status = cudaDeviceEnablePeerAccess(destination, 0);
+        if (status == cudaErrorPeerAccessAlreadyEnabled)
+          cudaGetLastError();
+        else if (!next->Check(status)) {
+          error_ = next->error;
+          return false;
+        }
+      }
   if (multilevel) {
     std::vector<int> owners(mesh.Cells().size(), -1);
     for (size_t r = 0; r < devices.size(); ++r) {

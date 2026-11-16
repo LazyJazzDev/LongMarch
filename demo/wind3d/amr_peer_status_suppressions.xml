@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Build accepts CUDA's already-enabled status and clears that expected status.
+     Suppress only this exact API/result pair; keep other API and memory errors. -->
+<ComputeSanitizerOutput>
+  <record>
+    <kind>Api</kind>
+    <what>
+      <api>^cudaGetLastError$</api>
+      <error>^cudaErrorPeerAccessAlreadyEnabled$</error>
+      <result>704</result>
+    </what>
+  </record>
+</ComputeSanitizerOutput>
