@@ -255,6 +255,15 @@ bool GpuDistributedTransport::Build(const Mesh &mesh,
         !next->Upload(device, f.centres_.owners, partition.CellOwners()) ||
         !next->Upload(device, f.centres_.indices, cell_indices))
       return fail();
+    if (int count = BlockLookupCount(f)) {
+      int *lookup{};
+      if (!next->Allocate(device, lookup, count))
+        return fail();
+      MapBlocks<<<(count + 255) / 256, 256>>>(f, lookup, count);
+      if (!next->Check(cudaGetLastError()))
+        return fail();
+      f.block_lookup = lookup;
+    }
     f.slopes_.owners = f.limits_.owners = f.centres_.owners;
     f.slopes_.indices = f.limits_.indices = f.centres_.indices;
     // Cache blocks used by owned faces; remote/long traces retain direct sampling.

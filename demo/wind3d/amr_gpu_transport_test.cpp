@@ -10,10 +10,10 @@
 
 #include "amr_transport.h"
 
-int Run(bool embedded, double width, std::optional<double> inlet_speed) {
+int Run(bool embedded, double width, std::optional<double> inlet_speed, int max_level = 1) {
   using namespace wind3d::amr;
   Topology tree;
-  if (!tree.Regrid({2, 2, 2}, 1, 100, [](Block b) { return b.x == 0 && b.y == 0; }))
+  if (!tree.Regrid({2, 2, 2}, max_level, 100, [](Block b) { return b.level == 0 && b.x == 0 && b.y == 0; }))
     return 1;
   Mesh mesh;
   if (!mesh.Build(tree, 4, width, {-width, -width, -width}))
@@ -144,5 +144,8 @@ int main() {
       for (auto inlet : {std::optional<double>{}, std::optional<double>{.7}, std::optional<double>{-.2}})
         if (int status = Run(embedded, width, inlet))
           return status;
+  // A deep but sparse tree exceeds the bounded lookup budget and uses search.
+  if (int status = Run(true, 1.3, .7, 12))
+    return status;
   return 0;
 }

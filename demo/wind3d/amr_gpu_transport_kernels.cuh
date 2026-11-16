@@ -71,6 +71,7 @@ struct Field {
   Array<double, 3> origin_;
   double root_width_;
   const Block *leaves;
+  const int *block_lookup{};
   const Cell *cells;
   const Face *faces;
   const int *offsets, *incidence;
@@ -98,6 +99,13 @@ struct Field {
   double inlet_speed{};
 
   __device__ int Find(int x, int y, int z) const {
+    if (block_lookup) {
+      int nx = roots[0] * (1 << max_level), ny = roots[1] * (1 << max_level);
+      int nz = roots[2] * (1 << max_level);
+      if (x < 0 || x >= nx || y < 0 || y >= ny || z < 0 || z >= nz)
+        return -1;
+      return block_lookup[(z * ny + y) * nx + x];
+    }
     for (int level = max_level; level >= 0; --level) {
       int scale = 1 << (max_level - level), qx = x / scale, qy = y / scale, qz = z / scale;
       int lo = 0, hi = nb;
@@ -398,6 +406,28 @@ struct Field {
     return p;
   }
 };
+
+// A finest-block lookup costs at most 16 MiB per device. Very sparse/deep
+// trees retain binary search rather than allocating a dense domain-sized map.
+int BlockLookupCount(const Field &f) {
+  size_t count = 1;
+  constexpr size_t limit = 4 * 1024 * 1024;
+  for (int a = 0; a < 3; ++a) {
+    size_t extent = size_t(f.roots[a]) * (size_t(1) << f.max_level);
+    if (!extent || extent > limit / count)
+      return 0;
+    count *= extent;
+  }
+  return int(count);
+}
+
+__global__ void MapBlocks(Field f, int *lookup, int count) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= count)
+    return;
+  int nx = f.roots[0] * (1 << f.max_level), ny = f.roots[1] * (1 << f.max_level);
+  lookup[i] = f.Find(i % nx, i / nx % ny, i / nx / ny);
+}
 
 __global__ void MapHalos(Field f) {
   int index = blockIdx.x * blockDim.x + threadIdx.x;

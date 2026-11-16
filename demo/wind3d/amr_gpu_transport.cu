@@ -145,6 +145,15 @@ bool GpuTransport::Build(int device,
       !next->Upload(f.leaves, tree.Leaves()) || !next->Upload(f.offsets, mesh.Offsets()) ||
       !next->Upload(f.incidence, mesh.Incidence()))
     return fail();
+  if (int count = cache_halos ? BlockLookupCount(f) : 0) {
+    int *lookup{};
+    if (!next->Allocate(lookup, count))
+      return fail();
+    MapBlocks<<<(count + 255) / 256, 256>>>(f, lookup, count);
+    if (!next->Check(cudaGetLastError()))
+      return fail();
+    f.block_lookup = lookup;
+  }
   if (cache_halos) {
     size_t side = size_t(f.n) + 5, count = size_t(f.nb) * 3 * side * side * side;
     if (count > size_t(INT_MAX - 255)) {

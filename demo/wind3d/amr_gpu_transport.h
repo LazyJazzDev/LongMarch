@@ -15,7 +15,7 @@ class GpuTransport {
   ~GpuTransport();
   GpuTransport(const GpuTransport &) = delete;
   GpuTransport &operator=(const GpuTransport &) = delete;
-  // Cache block sampling halos by default; false retains direct lookup for validation.
+  // Cache block sampling halos and bounded block lookup by default; false retains direct lookup for validation.
   bool Build(int device,
              const Mesh &mesh,
              const Topology &tree,
