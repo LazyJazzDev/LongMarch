@@ -1113,3 +1113,31 @@ boundary modes, reversed devices and unchanged output ghost slots. The overall
 suite maximum absolute difference remains 1.71e-13. Global Krylov reductions,
 pressure convergence/rollback, distributed preconditioning and runtime flow
 integration remain open.
+
+
+## Distributed pressure projection baseline
+
+`GpuDistributedProjection` now solves the compatible pressure system using
+rank-local vectors, device dot products reduced as host scalars, and Jacobi
+preconditioning from the two-point pressure diagonal. CG verifies candidate
+solutions with the actual D M^-1 D^T operator, replaces the residual and restarts
+the search direction every fifty steps, and reports the true residual on
+nonconvergence. The projected velocity subtracts M^-1 D^T p, preserves fixed
+normal fluxes and closes embedded faces. Owned caller fields commit only after
+convergence; numerical failure preserves all caller entries, including ghosts.
+A zero right-hand side resets the previous potential to zero.
+
+Two-GPU job 2001316 passed direct execution, CTest and Compute Sanitizer with
+zero errors. Twenty-four cases cover uniform/mixed meshes, open/cut geometry,
+two scales and one/two ranks in both device orders. Against the existing
+single-device compatible Jacobi-CG projection, maximum velocity and potential
+differences were 3.89e-15 and 8.89e-16. Independently reconstructed post-projection
+flux divergence met the requested 1e-10 relative tolerance. Tests also exercise
+one-iteration nonconvergence, invalid tolerance/aliasing, failed-build rollback,
+unchanged output ghosts, zero RHS and restoration of the caller's CUDA device.
+
+This completes a distributed projection correctness baseline, not production
+multi-GPU flow. It still uses host scalar reductions, synchronous peer phases
+and Jacobi rather than a distributed multilevel preconditioner. Performance
+measurements, scalable preconditioning, distributed transport, adaptation and
+runtime integration remain required before claiming speedup or task completion.
