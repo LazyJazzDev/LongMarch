@@ -1050,3 +1050,25 @@ not skip. This establishes exchange correctness, not distributed pressure
 iteration, transport integration or multi-GPU speedup. Compact local operators,
 mass-inverse iteration exchanges, Krylov reductions and the preconditioner
 remain to be implemented.
+
+
+## Distributed pressure operator building blocks
+
+`GpuPressureOperators` assembles compact local CSR rows for negative integrated
+flux divergence D, its transpose D^T, and the compatible face mass M. Each rank
+stores only owned rows and locally indexed columns; the peer exchange refreshes
+required imports before rank kernels run. Calls complete all device streams,
+preserve output ghost slots and restore the caller's current device. Input and
+output allocations must be disjoint. Failed construction preserves the previous
+operators. These are raw operator applications: D^T still needs M^-1 to become
+the compatible velocity gradient, and pressure pinning/iteration is not included.
+
+Two-GPU job 2001311 passed direct execution, CTest and Compute Sanitizer with
+zero errors. Twenty-four combinations cover uniform/mixed topology,
+open/embedded geometry, two spacings, one rank and both two-device orders.
+NaN-filled input ghosts test actual imports; output sentinels verify that only
+owned rows are written. All D/D^T/M results agree with full-mesh CPU application
+within 1.12e-16. Invalid build/input recovery and current-device restoration
+are also checked. Distributed mass inverse, global Krylov reductions, a
+partitioned preconditioner and coupling to flow advancement remain outstanding;
+no multi-GPU whole-solver speedup is claimed.
