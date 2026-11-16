@@ -84,7 +84,7 @@ class MeshBuilder {
     // Outer skin and duct wall of the flow-through nacelle. The elliptical lip
     // closes the inlet; an annular face closes the thin exit trailing edge.
     constexpr int rings = 48, slices = 64;
-    auto station = [](int i) { return 0.5f * (1 - cosf(pi * i / rings)); };
+    auto station = [rings](int i) { return 0.5f * (1 - cosf(pi * i / rings)); };
     auto point = [&](float t, float phi, int surface) {
       Vec3 p = NacellePoint(t, phi, side, surface);
       float a = std::max(0.0f, t - 0.0005f), b = std::min(1.0f, t + 0.0005f);
