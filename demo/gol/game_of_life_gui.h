@@ -73,6 +73,19 @@ class GameOfLife : public Application {
     return hosted_file_action_;
   }
 
+  // Native hosts confirm destructive actions before the grid is changed.
+  void EnableNativeConfirmation() {
+    native_confirmation_ = true;
+  }
+
+  int ConfirmationRequest() const {
+    return confirmation_request_;
+  }
+
+  void CompleteConfirmation(bool accepted);
+  std::string SaveSession(const std::string &path);
+  std::string RestoreSession(const std::string &path);
+
   std::string CompleteHostedFile(const std::string &path);
 
   // Fills the grid with random live cells, each alive with the given probability.
@@ -118,6 +131,11 @@ class GameOfLife : public Application {
   void RequestFileAction(FileAction action);
   void ProcessFileAction();
 
+  void RequestDestructiveAction(int action);
+  void ApplyDestructiveAction(int action);
+  bool native_confirmation_{};
+  int confirmation_request_{};
+  bool confirmation_was_playing_{};
   int hosted_file_action_{};
   int hosted_size_axis_{};
   bool hosted_was_playing_{};

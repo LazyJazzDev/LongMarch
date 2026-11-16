@@ -91,16 +91,8 @@ void GameOfLife::CustomOnInit() {
 
   randomize_button_ = std::make_unique<RandomizeButton>(this, &cell_grid_, &white_icon_model.value());
   if (tiled_enabled_) {
-    refresh_button_->SetResetHandler([this] {
-      pending_fill_ = 0;
-      pending_pattern_.clear();
-      pending_toggles_.clear();
-    });
-    randomize_button_->SetRandomizeHandler([this] {
-      pending_fill_ = 1;
-      pending_pattern_.clear();
-      pending_toggles_.clear();
-    });
+    refresh_button_->SetResetHandler([this] { RequestDestructiveAction(1); });
+    randomize_button_->SetRandomizeHandler([this] { RequestDestructiveAction(2); });
   }
   open_button_ = std::make_unique<FileButton>(this, &white_icon_model.value(), FileButton::Kind::kOpen,
                                               [this] { RequestFileAction(FileAction::kOpen); });
@@ -818,6 +810,63 @@ void GameOfLife::InitCells(int width, int height) {
 
 // The experimental full-world format is identified by a versioned magic header.
 // Ordinary text .cells patterns remain supported for importing small designs.
+void GameOfLife::ApplyDestructiveAction(int action) {
+  pending_fill_ = action == 1 ? 0 : 1;
+  pending_pattern_.clear();
+  pending_toggles_.clear();
+  pending_steps_ = 0;
+}
+
+void GameOfLife::RequestDestructiveAction(int action) {
+  if (!native_confirmation_) {
+    ApplyDestructiveAction(action);
+    return;
+  }
+  if (confirmation_request_ || hosted_file_action_)
+    return;
+  confirmation_request_ = action;
+  confirmation_was_playing_ = pause_play_button_->IsPlaying();
+  pause_play_button_->SetPlaying(false);
+  pending_steps_ = 0;
+}
+
+void GameOfLife::CompleteConfirmation(bool accepted) {
+  if (!confirmation_request_)
+    return;
+  if (accepted)
+    ApplyDestructiveAction(confirmation_request_);
+  confirmation_request_ = 0;
+  pause_play_button_->SetPlaying(confirmation_was_playing_);
+  simulation_clock_ = {};
+  ResetFrameClock();
+}
+
+std::string GameOfLife::SaveSession(const std::string &path) {
+  if (!tiled_enabled_ || !tiled_ready_)
+    return "The canvas is not ready";
+  // The previous complete snapshot survives failed writes or an interrupted save.
+  const auto temporary = path + ".tmp";
+  auto error = SaveTiledState(temporary);
+  if (!error.empty())
+    return error;
+  std::error_code ec;
+  std::filesystem::rename(std::filesystem::u8path(temporary), std::filesystem::u8path(path), ec);
+  return ec ? "Could not replace the previous canvas" : std::string{};
+}
+
+std::string GameOfLife::RestoreSession(const std::string &path) {
+  std::error_code ec;
+  if (!std::filesystem::exists(std::filesystem::u8path(path), ec))
+    return ec ? "Could not access the previous canvas" : std::string{};
+  std::string error;
+  const auto result = LoadTiledState(path, error);
+  if (result != 1)
+    return error.empty() ? "Invalid previous canvas" : error;
+  pause_play_button_->SetPlaying(false);
+  simulation_clock_ = {};
+  return {};
+}
+
 std::string GameOfLife::SaveTiledState(const std::string &path) {
   rhi::ObjPtr<rhi::ICommandContext> commands = Queue()->CreateCommandContext();
   if (!commands || !PrepareScene(commands.Get()))
