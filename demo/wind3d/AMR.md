@@ -866,3 +866,31 @@ regrids measured 1.566/1.513/1.535 versus 1.513/1.511/1.474 s. Overall mean step
 time was effectively unchanged (19.169 versus 19.179 ms), so this sample does
 not establish a meaningful whole-run speedup. Avoided fine-matrix allocations
 and lookup overhead remain a limited construction improvement.
+
+
+## Corrected-geometry stability isolation
+
+Static corrected-geometry job 2001272 completed six seconds with peak speed
+57.629 m/s. Its 2--6 s Fx/Fy/Mz means were 31.715/42.375/-28.790, but Mz changed
+by -7.650 between the two half-windows. The thin-cell connectivity repair does
+not resolve mixed-grid time-integration stability or establish load accuracy.
+
+Jobs 2001279--2001281 isolate the corrected transport, removal of MacCormack
+correction, and diagonal face-volume mass projection, respectively. All retain
+the same corrected geometry, fine spacing, controls and time step. Diagnostic
+readbacks record peak face positions and before/advection/diffusion/projection
+maximum speeds every 100 steps. The instrumented unchanged case matched the
+original static run's printed physical CSV rows exactly through the first 6329
+available steps. The simplified variants are diagnostic controls, not accepted
+production replacements; their load accuracy remains unproven.
+
+A body-free small-perturbation diagnostic (job 2001282) completed 3000 steps at
+dt=0.002, speed 1 and initial random interior perturbations of magnitude 1e-4,
+projected before stepping. Uniform and quadrant-refined meshes used the same
+physical domain and compatible projection. At six seconds, mass-weighted
+perturbation energy ratios were 0.4337 and 1.2179; mixed-grid maximum component
+error grew to 4.12e-4. Mixed energy initially decreased and subsequently grew.
+This is a smaller reproduction of growth, not a closed-domain eigenvalue or
+energy-stability proof: the existing sampler clamps upstream tangential values
+to the first interior layer rather than prescribing freestream ghost values,
+so inlet treatment remains a possible contributor and needs isolation.
