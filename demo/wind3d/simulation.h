@@ -56,6 +56,8 @@ struct SolverOptions {
   // Publish the downsampled display field; batch runs only need loads.
   bool display{true};
   bool record_loads{false};
+  // Batch consumers receive every step through TakeNext(); at most two snapshots queue.
+  bool retain_snapshots{false};
   int devices{1};
   uint64_t stop_after{};
   bool export_field{true};
@@ -131,6 +133,8 @@ class Simulation {
   void Reset();
   bool Paused() const;
   std::shared_ptr<const Snapshot> Latest() const;
+  // Nonblocking ordered dequeue; empty unless retain_snapshots is enabled.
+  std::shared_ptr<const Snapshot> TakeNext();
   std::string Error() const;
   LoadHistory RecentLoads() const;
 

@@ -291,6 +291,16 @@ them as part of an experiment without a new reason/authorization.
   source cells and 56 additional leaf blocks, transfer time fell from 0.649 s
   to 0.493 s and constant-flow output matched the ordered-map baseline bitwise.
   This is a remapping microbenchmark, not a GPU or steady-load speedup claim.
+- Long native batch runs exposed dropped samples when the task polled only
+  `Latest()` and its consumer thread was descheduled. Batch tasks now enable
+  a two-snapshot queue and consume every step through `TakeNext()`. Backpressure
+  waits before the next solver step, outside its timing interval. Interactive
+  consumers retain the default latest-snapshot behavior. Reset clears queued
+  old-generation snapshots; destruction wakes a producer blocked by a full
+  queue. Job 2001223 passed slow-consumer, reset, shutdown and load-history tests,
+  native lifecycle validation, and bitwise before/after field-dump comparison.
+  The restarted 30,000-step baseline is still being collected; these tests do
+  not by themselves establish steady-load acceptance.
 - Existing uniform-grid pressure projection is on one GPU; merely distributing
   transport is insufficient for the requested speedup.
 

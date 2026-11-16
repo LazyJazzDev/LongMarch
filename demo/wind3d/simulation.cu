@@ -855,6 +855,7 @@ struct Simulation::Impl {
   uint64_t generation{};
   Controls requested;
   std::shared_ptr<const Snapshot> latest;
+  std::deque<std::shared_ptr<const Snapshot>> pending_snapshots;
   std::deque<LoadSample> load_history;
   bool load_capacity_limited{};
   std::string error;
@@ -1053,7 +1054,10 @@ struct Simulation::Impl {
       uint64_t current_generation;
       {
         std::unique_lock<std::mutex> lock(mutex);
-        wake.wait(lock, [&] { return stop || !paused || generation != applied_generation; });
+        wake.wait(lock, [&] {
+          return stop || generation != applied_generation ||
+                 (!paused && (!options.retain_snapshots || pending_snapshots.size() < 2));
+        });
         if (stop)
           break;
         controls = requested;
@@ -1300,6 +1304,8 @@ struct Simulation::Impl {
             if (load_capacity_limited)
               load_history.pop_front();
           }
+          if (options.retain_snapshots)
+            pending_snapshots.push_back(snapshot);
           latest = std::move(snapshot);
         }
         working = false;
@@ -1393,6 +1399,7 @@ void Simulation::Reset() {
     std::lock_guard<std::mutex> guard(impl_->mutex);
     ++impl_->generation;
     impl_->load_history.clear();
+    impl_->pending_snapshots.clear();
     impl_->load_capacity_limited = false;
   }
   impl_->wake.notify_one();
@@ -1406,6 +1413,20 @@ bool Simulation::Paused() const {
 std::shared_ptr<const Snapshot> Simulation::Latest() const {
   std::lock_guard<std::mutex> guard(impl_->mutex);
   return impl_->latest;
+}
+
+std::shared_ptr<const Snapshot> Simulation::TakeNext() {
+  std::shared_ptr<const Snapshot> result;
+  {
+    std::lock_guard<std::mutex> guard(impl_->mutex);
+    if (!impl_->pending_snapshots.empty()) {
+      result = std::move(impl_->pending_snapshots.front());
+      impl_->pending_snapshots.pop_front();
+    }
+  }
+  if (result)
+    impl_->wake.notify_one();
+  return result;
 }
 
 LoadHistory Simulation::RecentLoads() const {

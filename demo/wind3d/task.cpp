@@ -134,6 +134,7 @@ int main(int argc, char **argv) {
     csv_file << std::setprecision(17) << "step,time,dt,Fx,Fy,Fz,Mx,My,Mz,seconds,cells,generation\n";
   }
   options.stop_after = steps;
+  options.retain_snapshots = true;
   options.export_final = dump != nullptr;
   if (validate &&
       (!wind3d::ValidateGeometry() || !wind3d::ValidateWallDiffusion(0) || !wind3d::ValidateClosedSurface(0, true)))
@@ -153,7 +154,7 @@ int main(int argc, char **argv) {
       std::fprintf(stderr, "%s\n", error.c_str());
       return 2;
     }
-    auto snapshot = simulation->Latest();
+    auto snapshot = simulation->TakeNext();
     if (snapshot && snapshot->step != last) {
       if (snapshot->step != last + 1) {
         std::fputs("Missed a snapshot; timing sample is incomplete.\n", stderr);
