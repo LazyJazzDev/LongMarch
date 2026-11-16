@@ -483,3 +483,39 @@ errors stayed below 4.45e-16. Two alternating grid-128 startup runs reduced
 transport from 5.25--5.33 ms to 4.08--4.09 ms and total step time from
 14.04--14.17 ms to 12.93--12.99 ms, with unchanged printed loads and iteration
 counts. Long-time stability and load acceptance remain separate requirements.
+
+## Remaining interface stability evidence
+
+After the transport-spacing repair, the fixed-hierarchy grid-128 aircraft run
+(job 2001244) completed 30000 steps / six physical seconds. Peak speed fell
+from 204.94 m/s in job 2001239 to 48.31 m/s, for a 12 m/s freestream. This is
+an improvement, not a stability or load-equivalence pass. In the 2--5.9 s
+window, repaired fixed-grid Fx/Fy/Mz means were 18.8023/13.5218/-15.9193 versus
+17.7264/12.6396/-13.7245 for the AMR framework's uniform fine mesh; statistical
+drift remains material. A two-point pressure-interface control with the old
+transport also failed (peak 821.87 m/s), so pressure-only replacement does not
+repair the transport inconsistency.
+
+An independent linear-algebra diagnostic exported the actual pressure-gradient
+stencils on an all-fluid 2 x 1 x 1 root domain with four cells per block. It
+compared uniform refinement (1024 cells) and refinement of the left root only
+(576 cells), holding prescribed normal boundary perturbations at zero and
+retaining the zero-pressure outlet. For D equal to the implemented signed
+flux divergence, G the implemented gradient and A=D G, it formed the exact
+projection P=I-G A^-1 D using sparse direct solves. With positive face weights
+M=diag(area*normal_distance), the squared largest singular value of
+sqrt(M) P invsqrt(M) was:
+
+| Grid / interface gradient | Maximum weighted energy amplification |
+| --- | ---: |
+| Uniform / existing gradient | 1.0000000000 |
+| Mixed / quadratic reconstruction | 1.8058245070 |
+| Mixed / two-point diagnostic | 1.0000000000 |
+
+Relative divergence and idempotence errors were below 5e-16 in all cases.
+Thus an accurate, idempotent projection can still amplify this discrete energy
+norm. This diagnostic does not prove instability of the full nonlinear time
+step, nor does it validate the inconsistent two-point interface as a final
+replacement. Interface consistency, energy behavior and aircraft load accuracy
+must be assessed together; a smaller linear-solver residual alone is not the
+missing acceptance evidence.
