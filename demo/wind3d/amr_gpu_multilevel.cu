@@ -53,10 +53,10 @@ __global__ void Residual(Matrix a, const double *b, const double *x, double *r) 
     r[i] = b[i] - Product(a, i, x);
 }
 
-__global__ void Gather(const double *x, const int *indices, int n, double *packed) {
+__global__ void Gather(const double *x, const int *indices, int n, double *destination) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n)
-    packed[i] = x[indices[i]];
+    destination[i] = x[indices[i]];
 }
 
 using Rows = std::vector<std::vector<std::pair<int, double>>>;
@@ -74,7 +74,6 @@ struct GpuMultilevel::Impl {
     int source{}, destination{}, count{};
     size_t offset{};
     int *indices{};
-    double *packed{};
   };
 
   struct Level {
@@ -86,6 +85,7 @@ struct GpuMultilevel::Impl {
   std::vector<int> devices;
   std::vector<cudaStream_t> streams;
   std::vector<cudaEvent_t> ready;
+  cudaGraphExec_t cycle_graph{};
   std::vector<Level> levels;
   std::vector<std::pair<int, void *>> allocations;
   std::string error;
@@ -134,6 +134,10 @@ struct GpuMultilevel::Impl {
         cudaStreamSynchronize(streams[r]);
         cudaStreamDestroy(streams[r]);
       }
+    if (cycle_graph) {
+      cudaSetDevice(devices.front());
+      cudaGraphExecDestroy(cycle_graph);
+    }
     for (size_t r = 0; r < ready.size(); ++r)
       if (ready[r]) {
         cudaSetDevice(devices[r]);
@@ -185,14 +189,47 @@ struct GpuMultilevel::Impl {
       int s = link.source, t = link.destination;
       if (!Check(cudaSetDevice(devices[s])))
         return false;
+      // A peer store kernel is capturable across devices; cudaMemcpyPeerAsync
+      // is not supported by stream capture on the tested CUDA runtime.
       Gather<<<(link.count + 255) / 256, 256, 0, streams[s]>>>(level.ranks[s].*field, link.indices, link.count,
-                                                               link.packed);
-      if (!Check(cudaGetLastError()) ||
-          !Check(cudaMemcpyPeerAsync((level.ranks[t].*field) + link.offset, devices[t], link.packed, devices[s],
-                                     link.count * sizeof(double), streams[s])))
+                                                               (level.ranks[t].*field) + link.offset);
+      if (!Check(cudaGetLastError()))
         return false;
     }
     return Barrier();
+  }
+
+  bool Capture() {
+    if (!Check(cudaSetDevice(devices.front())) ||
+        !Check(cudaStreamBeginCapture(streams.front(), cudaStreamCaptureModeThreadLocal)))
+      return false;
+    bool ok = Check(cudaEventRecord(ready.front(), streams.front()));
+    // Fork the capture into every device stream before any level work begins.
+    for (size_t r = 1; ok && r < devices.size(); ++r)
+      ok = Check(cudaSetDevice(devices[r])) && Check(cudaStreamWaitEvent(streams[r], ready.front(), 0));
+    if (ok)
+      ok = Cycle(0);
+    // Join all branches, including ranks empty on the coarsest levels.
+    for (size_t r = 1; ok && r < devices.size(); ++r)
+      ok = Check(cudaSetDevice(devices[r])) && Check(cudaEventRecord(ready[r], streams[r]));
+    if (ok)
+      ok = Check(cudaSetDevice(devices.front()));
+    for (size_t r = 1; ok && r < devices.size(); ++r)
+      ok = Check(cudaStreamWaitEvent(streams.front(), ready[r], 0));
+    std::string first = ok ? std::string{} : error;
+    cudaGraph_t graph{};
+    cudaSetDevice(devices.front());
+    auto status = cudaStreamEndCapture(streams.front(), &graph);
+    if (!Check(status) || !ok) {
+      if (!first.empty())
+        error = first;
+      if (graph)
+        cudaGraphDestroy(graph);
+      return false;
+    }
+    ok = Check(cudaGraphInstantiate(&cycle_graph, graph, nullptr, nullptr, 0));
+    cudaGraphDestroy(graph);
+    return ok;
   }
 
   bool Cycle(size_t depth) {
@@ -379,7 +416,18 @@ bool GpuMultilevel::Build(const PressureHierarchy &hierarchy, const std::vector<
         gather.push_back(indices[d][s][i]);
         indices[d][t][i] = int(level.ranks[t].size++);
       }
-      if (!next->Upload(devices[s], link.indices, gather) || !next->Allocate(devices[s], link.packed, ids.size())) {
+      if (!next->Check(cudaSetDevice(devices[s]))) {
+        error_ = next->error;
+        return false;
+      }
+      auto access = cudaDeviceEnablePeerAccess(devices[t], 0);
+      if (access == cudaErrorPeerAccessAlreadyEnabled)
+        cudaGetLastError();
+      else if (!next->Check(access)) {
+        error_ = next->error;
+        return false;
+      }
+      if (!next->Upload(devices[s], link.indices, gather)) {
         error_ = next->error;
         return false;
       }
@@ -472,6 +520,10 @@ bool GpuMultilevel::Build(const PressureHierarchy &hierarchy, const std::vector<
       error_ = next->error;
       return false;
     }
+  if (!next->Capture()) {
+    error_ = next->error;
+    return false;
+  }
   impl_ = std::move(next);
   return true;
 }
@@ -502,7 +554,10 @@ bool GpuMultilevel::Apply(const std::vector<double *> &input, const std::vector<
         !w.Check(cudaMemcpyAsync(v.rhs, input[r], v.n * sizeof(double), cudaMemcpyDeviceToDevice, w.streams[r])))
       return fail();
   }
-  if (!w.Barrier() || !w.Cycle(0))
+  // Input copies are outside the graph; drain them before the root launch.
+  // The captured fork/join dependencies order every internal device branch.
+  if (!w.Sync() || !w.Check(cudaSetDevice(w.devices.front())) ||
+      !w.Check(cudaGraphLaunch(w.cycle_graph, w.streams.front())) || !w.Check(cudaStreamSynchronize(w.streams.front())))
     return fail();
   for (size_t r = 0; r < output.size(); ++r) {
     auto &v = w.levels.front().ranks[r];

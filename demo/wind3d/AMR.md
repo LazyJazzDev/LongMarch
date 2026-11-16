@@ -1412,3 +1412,40 @@ driver: warm means were 0.033890/0.075493/0.218619 seconds on 1/2/4 GPUs, versus
 used 35 iterations, about 8.48e-10 true residual and <=2.23e-16 velocity deviation
 from that reference. This reproduces the peer-enabled improvement but does not
 resolve the remaining negative scaling or establish aircraft-load acceptance.
+
+### Captured cross-device V-cycle
+
+Component profiling (job 2001351, 20 warm applications per component) isolated
+both the mass inverse and V-cycle as scaling bottlenecks. On the 442,368-cell
+mesh, four-GPU Pressure, InverseMass and V-cycle calls took approximately
+2.695, 2.485 and 3.194 milliseconds respectively; divergence alone was 0.060 ms.
+
+A native-sm_90 probe (2001353) verified cross-device CUDA Graph fork/join capture
+and replay with memcheck. Capturing the full V-cycle exposed an unsupported
+cudaMemcpyPeerAsync call (diagnostic 2001355). GpuMultilevel now gathers directly
+into peer-accessible destination buffers with device kernels, enabling required
+peer access monotonically, and captures its fixed V-cycle with every device
+stream forked from and rejoined into the root stream. Apply completes input
+copies before launching the graph, waits for the joined root, then commits owned
+output entries. The same matrices, smoothing weights/counts, coarse inverse and
+transfer operators are used; packed intermediate copy buffers are removed.
+
+Job 2001356 passed direct full pressure regression, standalone V-cycle and
+projection CTests, and projection memcheck with the previously documented exact
+704-status suppression. Repeated inputs, both device orders, empty coarse ranks,
+CPU V-cycle parity and convergence checks remain covered. Job 2001358 completed
+the four-GPU larger benchmark and component measurements:
+
+| GPUs | V-cycle before (ms) | Captured V-cycle (ms) | Full projection (s) |
+| --- | ---: | ---: | ---: |
+| 1 | 0.244307 | 0.224725 | 0.033398 |
+| 2 | 1.015094 | 0.488614 | 0.067438 |
+| 4 | 3.194386 | 1.236546 | 0.143557 |
+
+The prior automatic-peer four-GPU projection mean was 0.218619 s. All larger
+runs still took 35 iterations with about 8.48e-10 true residual and <=2.23e-16
+velocity difference from the optimized single-device multilevel reference.
+Component checksums matched their pre-capture values. These are shared-node
+measurements; the optimized single-device reference remains faster (0.014585 s
+in the new job), and the mass inverse is still not captured. No load-accuracy
+acceptance or production distributed flow is claimed.

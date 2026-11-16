@@ -12,6 +12,8 @@ class GpuMultilevel {
   ~GpuMultilevel();
   GpuMultilevel(const GpuMultilevel &) = delete;
   GpuMultilevel &operator=(const GpuMultilevel &) = delete;
+  // Enables required directed peer access for the CUDA contexts' lifetime;
+  // destruction does not disable shared access. Captures the fixed V-cycle.
   bool Build(const PressureHierarchy &hierarchy, const std::vector<int> &devices);
   // Arrays follow the finest level's owned_cells order. Only owned entries are
   // read/written; caller ghosts are untouched. Producers must finish first.
