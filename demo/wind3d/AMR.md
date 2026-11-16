@@ -585,3 +585,30 @@ pressure interface) completed six seconds with a peak speed of 16.85 m/s and
 AMR-framework reference. Recorded wall time was 215.17 seconds per physical
 second. Thus the transport repair and existing performance changes do not yet
 establish either the 2% load gate or the requested overall speedup.
+
+
+## GPU compatible mass inverse
+
+`GpuMassInverse` applies the free-face principal inverse of `FaceMass`.
+Closed faces and, by default, inlet/wall normal corrections are fixed to zero;
+the pressure outlet remains free. Uniform uncoupled faces use direct diagonal
+inversion. Coupled interface faces use diagonal face-volume scaling and a fixed
+32-step Chebyshev polynomial captured in a CUDA graph. Fixed iteration counts
+keep the approximate inverse linear and symmetric for a future compatible
+pressure operator; no residual-dependent inner iteration is used.
+
+An independent enumeration of all 64 canonical coarse-cell split-face patterns
+found local generalized spectra in `[0.5,2]` relative to their diagonal face
+volumes. Summing local Rayleigh bounds and restricting to free faces preserves
+these bounds; the implementation uses the slightly enlarged `[0.49,2.01]`.
+The geometry restriction remains the fully open standard 2:1 split cells
+accepted by `FaceMass`, with diagonal uniform cut cells.
+
+Job 2001251 passed CTest and Compute Sanitizer memcheck (zero errors).
+Its 140 cases cover all split-face subsets, both boundary modes, nonbinary
+spacing and embedded bodies in fine regions. Independent CPU mass products
+check true inverse residuals below 5e-12 (observed around machine precision),
+linearity, bilinear symmetry, positive energy, fixed-face zeros and rollback.
+This validates the inverse building block, not a complete pressure projection.
+Pressure integration, aircraft stability/load acceptance and overall speedup
+remain outstanding.
