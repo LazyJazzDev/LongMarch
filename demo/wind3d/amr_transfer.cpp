@@ -136,7 +136,7 @@ bool TransferVelocity(const Mesh &source,
         break;
       }
     }
-    result[i] = face.aperture > 0 ? field.Sample(face.centre)[face.axis] : 0;
+    result[i] = face.aperture > 0 ? field.SampleComponent(face.centre, face.axis) : 0;
     if (!std::isfinite(result[i]))
       return false;
   }

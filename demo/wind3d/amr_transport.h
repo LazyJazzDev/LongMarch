@@ -11,6 +11,7 @@ class FaceField {
   bool ExtendSlip(std::vector<double> &velocity) const;
   bool Update(const std::vector<double> &velocity);
   std::array<double, 3> Sample(std::array<double, 3> point) const;
+  double SampleComponent(std::array<double, 3> point, int axis) const;
   bool Advect(double dt, std::vector<double> &destination, bool cubic = false) const;
   // Both transport passes trace with the original velocity, as in the uniform
   // solver. Both passes and the limiter retain the target face spacing across

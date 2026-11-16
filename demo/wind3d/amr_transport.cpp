@@ -286,6 +286,12 @@ std::array<double, 3> FaceField::Sample(std::array<double, 3> point) const {
   return {Component(point, 0), Component(point, 1), Component(point, 2)};
 }
 
+double FaceField::SampleComponent(std::array<double, 3> point, int axis) const {
+  if (axis < 0 || axis > 2)
+    return std::nan("");
+  return velocity_.empty() ? 0 : Component(point, axis);
+}
+
 bool FaceField::Advect(double dt, std::vector<double> &destination, bool cubic) const {
   if (velocity_.empty() || !std::isfinite(dt))
     return false;

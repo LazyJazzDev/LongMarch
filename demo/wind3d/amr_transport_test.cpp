@@ -36,6 +36,9 @@ int Run(double width) {
   for (int i = 0; i < 1000; ++i) {
     std::array<double, 3> p{random(rng), random(rng), random(rng)};
     auto v = field.Sample(p);
+    for (int axis = 0; axis < 3; ++axis)
+      if (field.SampleComponent(p, axis) != v[axis])
+        return 10;
     error = std::max(error, std::abs(v[0] - (.3 + p[1])));
     error = std::max(error, std::abs(v[1] - .2));
     error = std::max(error, std::abs(v[2] - .1));
