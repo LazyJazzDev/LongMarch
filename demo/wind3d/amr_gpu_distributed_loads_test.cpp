@@ -109,6 +109,27 @@ int Run(bool mixed, int body, double width, const std::vector<int> &devices) {
             cudaDeviceSynchronize() != cudaSuccess)
           return 8;
       }
+      double expected_speed = 0;
+      for (size_t cell = 0; cell < mesh.Cells().size(); ++cell) {
+        if (!mesh.Cells()[cell].active)
+          continue;
+        std::array<double, 3> centre{}, area{};
+        for (int k = mesh.Offsets()[cell]; k < mesh.Offsets()[cell + 1]; ++k) {
+          int face = std::abs(mesh.Incidence()[k]) - 1;
+          auto g = mesh.Faces()[face];
+          centre[g.axis] += g.area * velocity[face];
+          area[g.axis] += g.area;
+        }
+        double square = 0;
+        for (int a = 0; a < 3; ++a) {
+          double value = centre[a] / area[a];
+          square += value * value;
+        }
+        expected_speed = std::max(expected_speed, std::sqrt(square));
+      }
+      double maximum = -1;
+      if (!gpu.MaximumSpeed(up, maximum) || std::abs(maximum - expected_speed) > 1e-12 * (1 + expected_speed))
+        return 20;
       cudaSetDevice(previous);
       if (!gpu.EvaluateLoads(up, pp, last, density, viscosity)) {
         std::cerr << gpu.Error() << '\n';
@@ -165,6 +186,9 @@ int Run(bool mixed, int body, double width, const std::vector<int> &devices) {
     return 18;
   if (gpu.EvaluateLoads(up, pp, last) || !Same(last, saved))
     return 19;
+  double preserved_speed = 123.;
+  if (gpu.MaximumSpeed(up, preserved_speed) || preserved_speed != 123.)
+    return 21;
   std::cout << "PASS distributed loads ranks=" << devices.size() << " mixed=" << mixed << " body=" << body
             << " width=" << width << " pressure_error=" << pressure_error << " friction_error=" << friction_error
             << '\n';

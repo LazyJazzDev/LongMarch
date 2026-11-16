@@ -126,6 +126,62 @@ const std::vector<PressureLocalLayout> &GpuDistributedAdvance::Layouts() const {
   return impl_ ? impl_->projection.Layouts() : empty;
 }
 
+bool GpuDistributedAdvance::MaximumSpeed(const std::vector<double *> &velocity, double &speed) {
+  error_.clear();
+  if (!impl_) {
+    error_ = "Distributed stepper is not built";
+    return false;
+  }
+  if (!impl_->transport.MaximumSpeed(std::vector<const double *>(velocity.begin(), velocity.end()), speed)) {
+    error_ = impl_->transport.Error();
+    return false;
+  }
+  return true;
+}
+
+ProjectionResult GpuDistributedAdvance::ProjectVelocity(const std::vector<double *> &velocity,
+                                                        double tolerance,
+                                                        int max_iterations) {
+  DeviceScope restore;
+  error_.clear();
+  ProjectionResult result;
+  if (!impl_ || velocity.size() != impl_->devices.size() || !(tolerance > 0) || !std::isfinite(tolerance) ||
+      max_iterations <= 0 || std::any_of(velocity.begin(), velocity.end(), [](auto p) { return !p; })) {
+    error_ = "Invalid regrid projection fields or parameters";
+    return result;
+  }
+  auto &w = *impl_;
+  w.error.clear();
+  const auto &layouts = w.projection.Layouts();
+  auto fail = [&] {
+    auto first = w.error;
+    w.Sync();
+    error_ = first;
+    result.converged = false;
+    return result;
+  };
+  for (size_t r = 0; r < velocity.size(); ++r)
+    if (!w.Check(cudaSetDevice(w.devices[r])) ||
+        !w.Check(cudaMemcpyAsync(w.next_velocity[r], velocity[r], layouts[r].owned_faces * sizeof(double),
+                                 cudaMemcpyDeviceToDevice, w.streams[r])))
+      return fail();
+  if (!w.Sync())
+    return fail();
+  result = w.projection.Project(w.next_velocity, w.next_pressure, tolerance, max_iterations);
+  if (!result.converged) {
+    w.error = w.projection.Error().empty() ? "Regrid projection did not converge" : w.projection.Error();
+    return fail();
+  }
+  for (size_t r = 0; r < velocity.size(); ++r)
+    if (!w.Check(cudaSetDevice(w.devices[r])) ||
+        !w.Check(cudaMemcpyAsync(velocity[r], w.next_velocity[r], layouts[r].owned_faces * sizeof(double),
+                                 cudaMemcpyDeviceToDevice, w.streams[r])))
+      return fail();
+  if (!w.Sync())
+    return fail();
+  return result;
+}
+
 AdvanceResult GpuDistributedAdvance::Advance(const std::vector<double *> &velocity,
                                              const std::vector<double *> &pressure,
                                              double dt,

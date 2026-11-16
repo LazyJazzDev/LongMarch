@@ -25,50 +25,6 @@ __global__ void ScalePressure(double *p, int n, double scale) {
     p[i] *= scale;
 }
 
-__global__ void SpeedPartials(Field f, const double *velocity, double *partial) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  double speed = 0;
-  if (i < f.nc && f.cells[i].active) {
-    Array<double, 3> u{}, area{};
-    for (int k = f.offsets[i]; k < f.offsets[i + 1]; ++k) {
-      int id = abs(f.incidence[k]) - 1;
-      auto g = f.faces[id];
-      u[g.axis] += g.area * velocity[id];
-      area[g.axis] += g.area;
-    }
-    for (int a = 0; a < 3; ++a)
-      u[a] /= area[a];
-    speed = sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]);
-    if (!isfinite(speed))
-      speed = INFINITY;
-  }
-  __shared__ double values[256];
-  values[threadIdx.x] = speed;
-  __syncthreads();
-  for (int stride = 128; stride; stride /= 2) {
-    if (threadIdx.x < stride)
-      values[threadIdx.x] = Max(values[threadIdx.x], values[threadIdx.x + stride]);
-    __syncthreads();
-  }
-  if (!threadIdx.x)
-    partial[blockIdx.x] = values[0];
-}
-
-__global__ void SpeedMaximum(const double *partial, int n, double *output) {
-  double value = 0;
-  for (int i = threadIdx.x; i < n; i += 256)
-    value = Max(value, partial[i]);
-  __shared__ double values[256];
-  values[threadIdx.x] = value;
-  __syncthreads();
-  for (int stride = 128; stride; stride /= 2) {
-    if (threadIdx.x < stride)
-      values[threadIdx.x] = Max(values[threadIdx.x], values[threadIdx.x + stride]);
-    __syncthreads();
-  }
-  if (!threadIdx.x)
-    *output = values[0];
-}
 }  // namespace
 
 struct GpuTransport::Impl {

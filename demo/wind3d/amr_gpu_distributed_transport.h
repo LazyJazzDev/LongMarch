@@ -63,6 +63,10 @@ class GpuDistributedTransport {
                      double density = 1.225,
                      double wall_viscosity = 9.2e-7);
 
+  // Area-weighted cell-centre speed maximum, matching GpuTransport. No slip
+  // extension is applied. Read-only owned prefixes; failure preserves speed.
+  bool MaximumSpeed(const std::vector<const double *> &velocity, double &speed);
+
   const std::string &Error() const {
     return error_;
   }

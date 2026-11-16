@@ -38,6 +38,14 @@ class GpuDistributedAdvance {
                         double pressure_tolerance = 1e-8,
                         int max_iterations = 2000);
 
+  // Regrid correction: project owned velocity without producing physical
+  // pressure or loads. Potential is internal and discarded. Same rollback
+  // and ghost-preservation contract as Advance.
+  ProjectionResult ProjectVelocity(const std::vector<double *> &velocity,
+                                   double tolerance = 1e-9,
+                                   int max_iterations = 2000);
+  bool MaximumSpeed(const std::vector<double *> &velocity, double &speed);
+
   const std::string &Error() const {
     return error_;
   }

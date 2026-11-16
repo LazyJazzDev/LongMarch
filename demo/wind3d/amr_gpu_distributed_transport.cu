@@ -388,6 +388,60 @@ bool GpuDistributedTransport::EvaluateLoads(const std::vector<const double *> &v
   return true;
 }
 
+bool GpuDistributedTransport::MaximumSpeed(const std::vector<const double *> &velocity, double &speed) {
+  DeviceScope restore;
+  error_.clear();
+  if (!impl_ || velocity.size() != impl_->ranks.size() ||
+      std::any_of(velocity.begin(), velocity.end(), [](auto p) { return !p; })) {
+    error_ = "Invalid distributed speed field";
+    return false;
+  }
+  auto &w = *impl_;
+  w.error.clear();
+  auto fail = [&] {
+    auto first = w.error;
+    w.Sync();
+    error_ = first;
+    return false;
+  };
+  for (size_t r = 0; r < w.ranks.size(); ++r) {
+    auto &rank = w.ranks[r];
+    if (!w.Check(cudaSetDevice(w.devices[r])) ||
+        !w.Check(cudaMemcpyAsync(rank.fields[0].velocity_.local, velocity[r], w.owned_faces[r].size() * sizeof(double),
+                                 cudaMemcpyDeviceToDevice, rank.stream)))
+      return fail();
+  }
+  if (!w.Valid(Impl::Values::Original))
+    return fail();
+  for (size_t r = 0; r < w.ranks.size(); ++r) {
+    auto &rank = w.ranks[r];
+    auto f = rank.fields[0];
+    int blocks = (f.cell_count + 255) / 256;
+    if (!w.Check(cudaSetDevice(w.devices[r])))
+      return fail();
+    SpeedPartials<<<blocks, 256, 0, rank.stream>>>(f, nullptr, rank.partial);
+    SpeedMaximum<<<1, 256, 0, rank.stream>>>(rank.partial, blocks, rank.loads);
+    if (!w.Check(cudaGetLastError()))
+      return fail();
+  }
+  if (!w.Sync())
+    return fail();
+  double maximum = 0;
+  for (size_t r = 0; r < w.ranks.size(); ++r) {
+    double value;
+    if (!w.Check(cudaSetDevice(w.devices[r])) ||
+        !w.Check(cudaMemcpy(&value, w.ranks[r].loads, sizeof(double), cudaMemcpyDeviceToHost)))
+      return fail();
+    if (!std::isfinite(value)) {
+      w.error = "Non-finite distributed speed";
+      return fail();
+    }
+    maximum = std::max(maximum, value);
+  }
+  speed = maximum;
+  return true;
+}
+
 bool GpuDistributedTransport::Advect(const std::vector<const double *> &velocity,
                                      const std::vector<double *> &destination,
                                      double dt,

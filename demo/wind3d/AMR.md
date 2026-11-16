@@ -1779,3 +1779,48 @@ entry, including ghosts; subsequent valid steps succeed. Build rollback,
 current-device restoration, untouched success-path ghosts and finite stage
 timings are also checked. These short comparisons do not establish steady-state
 load agreement across adaptive and uniformly fine meshes.
+
+### Distributed adaptive runtime
+
+`GpuDistributedFlow` provides initialization, advancement, speed maximum,
+readback, explicit regridding and policy-driven adaptation using the shared
+`FlowParameters`, `FlowInfo` and `FlowSnapshot` contracts. It retains owned GPU
+fields between timesteps. Ordinary advancement and speed selection do not
+gather complete fields on the host; snapshots and explicit adaptation remain
+cold paths that assemble global IDs from uniquely owned prefixes.
+
+Regridding builds a candidate mesh with the retained immutable body callback
+and aperture reuse, conservatively transfers velocity on the host, scatters it
+to the new ownership, and projects it before swapping state. The stepper's
+`ProjectVelocity` uses private projection buffers and discards its remap
+potential. Candidate physical pressure therefore remains zero and invalid;
+time and step count persist, while generation increments once on a changed
+successful grid. No-op grids preserve the complete state. Rejected domain,
+body-resolution, capacity or numerical changes preserve the previous runtime
+and refinement report.
+
+The speed maximum shares the single-device area-weighted cell-centre formula,
+reads raw owned velocity without slip extension, and returns one scalar per
+rank for a host maximum. Non-finite owned inputs or computed speeds preserve
+the caller's output. Shared kernels select owned cells, including inactive-cell
+handling, and all public runtime operations restore the current CUDA device.
+
+The command-line adaptive task has not yet selected this runtime; task wiring,
+large-case memory/performance measurements and the 2% steady-load acceptance
+remain open. Host adaptation/remapping and replicated immutable geometry also
+remain performance limitations to measure, rather than assumed speedups.
+
+Job 2001405 passed distributed-flow, distributed-step, distributed-load/speed
+and existing single-flow CTests, plus distributed-flow memcheck with zero
+unsuppressed errors under the exact expected-704 suppression. Lifecycle tests
+cover refinement/coarsening, geometry preservation, pressure clearing,
+clock/generation continuity, no-op grids, invalid initialization/domain/body
+resolution, capacity/report rollback and tight pressure tolerances on one/two/
+four GPUs with permuted mappings. Eight explicit single-device comparisons
+advance through fine/mixed regrids and changed speed, checking fields, loads,
+speed maxima and current-device restoration. Maximum velocity/pressure
+component differences were 6.67e-16 and 7.44e-15; post-remap divergence stayed
+below 1.69e-11. The speed kernel also agrees with an independent CPU cell-average
+maximum in the 240 load scenarios, including all-solid grids, and preserves its
+output on non-finite input. These small cases are lifecycle verification, not
+large-case acceleration or steady-load acceptance.
