@@ -46,7 +46,7 @@ int Run(bool embedded, double width) {
   for (int pattern = 0; pattern < 3; ++pattern)
     for (bool cubic : {false, true})
       for (bool corrected : {false, true})
-        for (double dt : {.07, 1.7, -.07}) {
+        for (double dt : {0.0, 1e-9, -1e-9, .07, 1.7, -.07}) {
           std::vector<double> input(nf), reference, actual(nf);
           for (size_t i = 0; i < nf; ++i) {
             auto f = mesh.Faces()[i];
@@ -75,6 +75,15 @@ int Run(bool embedded, double width) {
             cache_error = std::max(cache_error, std::abs(actual[i] - direct_result[i]));
           if (cache_error > 1e-12)
             return 16;
+          if (std::abs(dt) <= 1e-9) {
+            double identity_error = 0;
+            for (size_t i = 0; i < nf; ++i)
+              identity_error = std::max(identity_error, std::abs(actual[i] - input[i]));
+            if (identity_error > (dt == 0 ? 1e-12 : 1e-7)) {
+              std::cerr << "Transport does not approach identity: dt=" << dt << " error=" << identity_error << '\n';
+              return 25;
+            }
+          }
           double error = 0;
           for (size_t i = 0; i < nf; ++i)
             error = std::max(error, std::abs(actual[i] - reference[i]));

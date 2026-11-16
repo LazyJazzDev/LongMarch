@@ -145,7 +145,7 @@ struct Field {
     return Clamp(value, limits_[cell][2 * axis], limits_[cell][2 * axis + 1]);
   }
 
-  __device__ double DirectComponent(Array<double, 3> point, int axis, bool cubic) const {
+  __device__ double DirectComponent(Array<double, 3> point, int axis, bool cubic, double spacing = 0) const {
     for (int a = 0; a < 3; ++a) {
       if (!isfinite(point[a]))
         return nan("");
@@ -155,7 +155,8 @@ struct Field {
     int cell = CellAt(point);
     if (cell < 0)
       return 0;
-    double h = cells[cell].width, base[3], fraction[3];
+    double h = spacing > 0 ? spacing : cells[cell].width;
+    double base[3], fraction[3];
     for (int a = 0; a < 3; ++a) {
       double q = (point[a] - origin_[a]) / h - (a == axis ? 0 : .5);
       base[a] = floor(q);
@@ -242,14 +243,15 @@ struct Field {
     return (block * 3 + axis) * side * side * side + (k * side + j) * side + i;
   }
 
-  __device__ double StencilValue(int cell, const double *base, int x, int y, int z, int axis) const {
-    if (halo) {
+  __device__ double StencilValue(int cell, const double *base, int x, int y, int z, int axis, double spacing = 0)
+      const {
+    double h = spacing > 0 ? spacing : cells[cell].width;
+    if (halo && h == cells[cell].width) {
       int index = StencilIndex(cell, base, x, y, z, axis);
       if (index >= 0)
         return halo[index];
     }
     int corner[3]{x, y, z};
-    double h = cells[cell].width;
     Array<double, 3> p;
     for (int a = 0; a < 3; ++a)
       p[a] =
@@ -258,9 +260,9 @@ struct Field {
     return VirtualFace(p, axis);
   }
 
-  __device__ double Component(Array<double, 3> point, int axis, bool cubic) const {
+  __device__ double Component(Array<double, 3> point, int axis, bool cubic, double spacing = 0) const {
     if (!halo)
-      return DirectComponent(point, axis, cubic);
+      return DirectComponent(point, axis, cubic, spacing);
     for (int a = 0; a < 3; ++a) {
       if (!isfinite(point[a]))
         return nan("");
@@ -269,6 +271,8 @@ struct Field {
     int cell = CellAt(point);
     if (cell < 0)
       return 0;
+    if (spacing > 0 && spacing != cells[cell].width)
+      return DirectComponent(point, axis, cubic, spacing);
     double h = cells[cell].width, base[3], fraction[3];
     for (int a = 0; a < 3; ++a) {
       double q = (point[a] - origin_[a]) / h - (a == axis ? 0 : .5);
@@ -277,7 +281,7 @@ struct Field {
     }
     // Defensive fallback for coordinates that round outside the owning block's halo.
     if (StencilIndex(cell, base, -1, -1, -1, axis) < 0 || StencilIndex(cell, base, 2, 2, 2, axis) < 0)
-      return DirectComponent(point, axis, cubic);
+      return DirectComponent(point, axis, cubic, spacing);
     int side = n + 5, origin_index = StencilIndex(cell, base, 0, 0, 0, axis);
     if (cubic) {
       for (int z = 0; z < 2; ++z)
@@ -488,7 +492,7 @@ __global__ void Forward(Field f, double dt, bool cubic, double *out) {
   if (i >= f.nf)
     return;
   auto face = f.faces[i];
-  out[i] = face.aperture == 0 ? 0 : f.Component(f.Departure(face.centre, dt), face.axis, cubic);
+  out[i] = face.aperture == 0 ? 0 : f.Component(f.Departure(face.centre, dt), face.axis, cubic, sqrt(face.area));
 }
 
 __global__ void Correct(Field original, Field forward, double dt, bool cubic, double *out) {
@@ -501,8 +505,8 @@ __global__ void Correct(Field original, Field forward, double dt, bool cubic, do
     return;
   }
   double value =
-      forward.velocity_[i] +
-      .5 * (original.velocity_[i] - forward.Component(original.Departure(face.centre, -dt), face.axis, cubic));
+      forward.velocity_[i] + .5 * (original.velocity_[i] - forward.Component(original.Departure(face.centre, -dt),
+                                                                             face.axis, cubic, sqrt(face.area)));
   if (!isfinite(value)) {
     out[i] = nan("");
     return;
@@ -511,14 +515,14 @@ __global__ void Correct(Field original, Field forward, double dt, bool cubic, do
   for (int a = 0; a < 3; ++a)
     back[a] = Clamp(back[a], original.origin_[a], original.origin_[a] + original.roots[a] * original.root_width_);
   int cell = original.CellAt(back);
-  double h = original.cells[cell].width, base[3];
+  double h = sqrt(face.area), base[3];
   for (int a = 0; a < 3; ++a)
     base[a] = floor((back[a] - original.origin_[a]) / h - (a == face.axis ? 0 : .5));
   double lo = INFINITY, hi = -INFINITY;
   for (int z = 0; z < 2; ++z)
     for (int y = 0; y < 2; ++y)
       for (int x = 0; x < 2; ++x) {
-        double v = original.StencilValue(cell, base, x, y, z, face.axis);
+        double v = original.StencilValue(cell, base, x, y, z, face.axis, h);
         lo = Min(lo, v);
         hi = Max(hi, v);
       }

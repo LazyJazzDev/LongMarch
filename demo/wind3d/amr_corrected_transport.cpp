@@ -26,7 +26,7 @@ bool FaceField::AdvectCorrected(double dt, std::vector<double> &destination, boo
     const auto &face = mesh_.Faces()[f];
     if (face.aperture == 0)
       continue;
-    double reverse = transported.Component(departure(face.centre, -dt), face.axis, cubic);
+    double reverse = transported.Component(departure(face.centre, -dt), face.axis, cubic, std::sqrt(face.area));
     if (!std::isfinite(reverse))
       return false;
     double corrected = forward[f] + .5 * (velocity_[f] - reverse);
@@ -39,7 +39,7 @@ bool FaceField::AdvectCorrected(double dt, std::vector<double> &destination, boo
     int cell = CellAt(back);
     if (cell < 0)
       return false;
-    double h = mesh_.Cells()[cell].width, base[3];
+    double h = std::sqrt(face.area), base[3];
     for (int a = 0; a < 3; ++a)
       base[a] = std::floor((back[a] - origin_[a]) / h - (a == face.axis ? 0 : .5));
     double low = std::numeric_limits<double>::infinity(), high = -low;

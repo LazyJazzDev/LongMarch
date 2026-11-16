@@ -13,7 +13,8 @@ class FaceField {
   std::array<double, 3> Sample(std::array<double, 3> point) const;
   bool Advect(double dt, std::vector<double> &destination, bool cubic = false) const;
   // Both transport passes trace with the original velocity, as in the uniform
-  // solver. Out-of-stencil corrections revert to the first-order result.
+  // solver. Both passes and the limiter retain the target face spacing across
+  // level boundaries. Out-of-stencil corrections revert to the first-order result.
   bool AdvectCorrected(double dt, std::vector<double> &destination, bool cubic = false) const;
   bool DiffuseAndSponge(double dt,
                         double viscosity,
@@ -24,7 +25,7 @@ class FaceField {
  private:
   int CellAt(std::array<double, 3> point) const;
   double VirtualFace(std::array<double, 3> point, int axis) const;
-  double Component(std::array<double, 3> point, int axis, bool cubic = false) const;
+  double Component(std::array<double, 3> point, int axis, bool cubic = false, double spacing = 0) const;
   int NativeFace(std::array<double, 3> point, int axis) const;
   const Mesh &mesh_;
   const Topology &tree_;

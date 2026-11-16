@@ -204,7 +204,7 @@ double FaceField::VirtualFace(std::array<double, 3> point, int axis) const {
   return std::clamp(value, limits_[cell][2 * axis], limits_[cell][2 * axis + 1]);
 }
 
-double FaceField::Component(std::array<double, 3> point, int axis, bool cubic) const {
+double FaceField::Component(std::array<double, 3> point, int axis, bool cubic, double spacing) const {
   for (int a = 0; a < 3; ++a) {
     if (!std::isfinite(point[a]))
       return std::numeric_limits<double>::quiet_NaN();
@@ -214,7 +214,8 @@ double FaceField::Component(std::array<double, 3> point, int axis, bool cubic) c
   int cell = CellAt(point);
   if (cell < 0)
     return 0;
-  double h = mesh_.Cells()[cell].width, base[3], fraction[3];
+  double h = spacing > 0 ? spacing : mesh_.Cells()[cell].width;
+  double base[3], fraction[3];
   for (int a = 0; a < 3; ++a) {
     double q = (point[a] - origin_[a]) / h - (a == axis ? 0 : .5);
     base[a] = std::floor(q);
@@ -300,7 +301,8 @@ bool FaceField::Advect(double dt, std::vector<double> &destination, bool cubic) 
     u = Sample(mid);
     for (int a = 0; a < 3; ++a)
       point[a] -= dt * u[a];
-    result[i] = Component(point, face.axis, cubic);
+    // Keep the transported face grid fixed as departure crosses a level boundary.
+    result[i] = Component(point, face.axis, cubic, std::sqrt(face.area));
     if (!std::isfinite(result[i]))
       return false;
   }

@@ -447,3 +447,28 @@ Job 2001242 extended both variants to 1200 steps with actual regrids at steps
 loads matched at every step. Total adaptation time fell from 7.00 to 5.76
 seconds; mean step time after step 100 fell from 18.99 to 17.90 ms. This is one
 matched startup comparison, not steady-load or full-solver speedup acceptance.
+
+## Transport consistency at refinement interfaces
+
+Transported-value interpolation previously selected its virtual MAC spacing
+from the cell containing the departure point. A fine face at a coarse/fine
+interface could therefore be resampled on the coarse grid even at zero time.
+For a smooth transverse velocity diagnostic, the maximum error was 0.0029488
+at dt=0 and remained 0.0029488 at dt=-1e-9, while the positive-time error was
+about 6e-11. The reverse trace used by MacCormack therefore introduced a
+spacing-dependent error that did not vanish with time step.
+
+Forward/reverse transported values and the correction limiter now retain the
+target face spacing. Velocity tracing remains midpoint tracing; interpolation
+still uses aperture weighting and bounded virtual faces. A cached halo is used
+only when its spacing matches the requested grid, with direct sampling
+otherwise. The diagnostic now has zero error at dt=0 and about 6e-11 for either
+sign of dt=1e-9. GPU regression asserts identity and small-time continuity for
+constant, smooth and discontinuous fields, linear/cubic and corrected/plain
+transport, with/without embedded walls and root widths 1, 1.3 and 2/3.
+
+Job 2001243 passed five CPU/GPU transport, full-step and lifecycle regressions,
+plus CUDA memcheck (zero errors). CPU/GPU differences stayed below 4.45e-16;
+cached/direct differences were zero. This fixes an identified consistency
+error, but does not by itself establish long-time aircraft stability or the
+2% load gate. The fixed-hierarchy aircraft run is being repeated separately.
