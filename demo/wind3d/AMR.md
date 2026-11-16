@@ -1302,3 +1302,28 @@ mesh. All multilevel repeats agreed with the Jacobi velocity reference within
 2.28e-10 and verified a true relative residual about 4.96e-10. Reducing peer/host
 synchronization remains essential. This does not establish aircraft flow
 speedup, distributed transport, or the 2% steady-load acceptance criterion.
+
+### Event-ordered V-cycle phases
+
+V-cycle phase boundaries now record one CUDA event per rank before enqueuing
+cross-device stream waits. All producers are recorded before any wait, and each
+wait captures that recording before events are reused at the next boundary.
+This replaces per-phase host stream synchronization while preserving the same
+matrix operations and ordering. Apply still waits for all device work before
+returning; failure paths drain streams and destruction releases events after
+stream completion. Coarse ranks with no owned rows participate in dependencies.
+
+Job 2001340 passed direct projection regression, V-cycle/projection CTests and
+projection memcheck with zero errors. Job 2001341 completed the same larger
+benchmark with unchanged iterations, residuals and velocity errors. Warm means:
+
+| Implementation | Previous seconds | Event-ordered seconds |
+| --- | ---: | ---: |
+| Distributed multilevel, one GPU | 0.023825 | 0.017391 |
+| Distributed multilevel, two GPUs | 0.078805 | 0.074412 |
+
+These are separate job measurements on shared hardware, not an isolated paired
+performance experiment; the small two-GPU difference should not be treated as
+a general scaling guarantee. The existing optimized single-device solver took
+0.006086 seconds in the new job. Mass-inverse exchange phases still synchronize
+the host, and multi-GPU transport/runtime integration remains incomplete.

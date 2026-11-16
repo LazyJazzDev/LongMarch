@@ -85,6 +85,7 @@ struct GpuMultilevel::Impl {
 
   std::vector<int> devices;
   std::vector<cudaStream_t> streams;
+  std::vector<cudaEvent_t> ready;
   std::vector<Level> levels;
   std::vector<std::pair<int, void *>> allocations;
   std::string error;
@@ -108,6 +109,23 @@ struct GpuMultilevel::Impl {
     return false;
   }
 
+  // Record all producers before enqueuing waits. Each wait captures the current
+  // recording, so these events can be reused at the next dependency boundary.
+  // Cross-device stream waits avoid a host round trip for every smoothing phase.
+  bool Barrier() {
+    for (size_t r = 0; r < devices.size(); ++r)
+      if (!Check(cudaSetDevice(devices[r])) || !Check(cudaEventRecord(ready[r], streams[r])))
+        return false;
+    for (size_t r = 0; r < devices.size(); ++r) {
+      if (!Check(cudaSetDevice(devices[r])))
+        return false;
+      for (size_t source = 0; source < devices.size(); ++source)
+        if (source != r && !Check(cudaStreamWaitEvent(streams[r], ready[source], 0)))
+          return false;
+    }
+    return true;
+  }
+
   ~Impl() {
     DeviceScope restore;
     for (size_t r = 0; r < streams.size(); ++r)
@@ -115,6 +133,11 @@ struct GpuMultilevel::Impl {
         cudaSetDevice(devices[r]);
         cudaStreamSynchronize(streams[r]);
         cudaStreamDestroy(streams[r]);
+      }
+    for (size_t r = 0; r < ready.size(); ++r)
+      if (ready[r]) {
+        cudaSetDevice(devices[r]);
+        cudaEventDestroy(ready[r]);
       }
     for (auto [d, p] : allocations) {
       cudaSetDevice(d);
@@ -169,7 +192,7 @@ struct GpuMultilevel::Impl {
                                      link.count * sizeof(double), streams[s])))
         return false;
     }
-    return Sync();
+    return Barrier();
   }
 
   bool Cycle(size_t depth) {
@@ -183,7 +206,7 @@ struct GpuMultilevel::Impl {
             !Check(cudaMemcpyAsync(v.x, v.rhs, v.n * sizeof(double), cudaMemcpyDeviceToDevice, streams[r])))
           return false;
       }
-      return Sync();
+      return Barrier();
     }
     if (depth + 1 == levels.size()) {
       if (!Exchange(depth, &Rank::rhs))
@@ -198,7 +221,7 @@ struct GpuMultilevel::Impl {
         if (!Check(cudaGetLastError()))
           return false;
       }
-      return Sync();
+      return Barrier();
     }
     for (size_t r = 0; r < devices.size(); ++r) {
       auto &v = level.ranks[r];
@@ -207,7 +230,7 @@ struct GpuMultilevel::Impl {
       if (!Check(cudaSetDevice(devices[r])) || !Check(cudaMemsetAsync(v.x, 0, v.size * sizeof(double), streams[r])))
         return false;
     }
-    if (!Sync())
+    if (!Barrier())
       return false;
     auto smooth = [&]() {
       if (!Exchange(depth, &Rank::x))
@@ -222,7 +245,7 @@ struct GpuMultilevel::Impl {
         if (!Check(cudaGetLastError()))
           return false;
       }
-      if (!Sync())
+      if (!Barrier())
         return false;
       for (auto &v : level.ranks)
         std::swap(v.x, v.scratch);
@@ -243,7 +266,7 @@ struct GpuMultilevel::Impl {
       if (!Check(cudaGetLastError()))
         return false;
     }
-    if (!Sync() || !Exchange(depth, &Rank::residual))
+    if (!Barrier() || !Exchange(depth, &Rank::residual))
       return false;
     auto &coarse = levels[depth + 1];
     for (size_t r = 0; r < devices.size(); ++r) {
@@ -256,7 +279,7 @@ struct GpuMultilevel::Impl {
       if (!Check(cudaGetLastError()))
         return false;
     }
-    if (!Sync() || !Cycle(depth + 1) || !Exchange(depth + 1, &Rank::x))
+    if (!Barrier() || !Cycle(depth + 1) || !Exchange(depth + 1, &Rank::x))
       return false;
     for (size_t r = 0; r < devices.size(); ++r) {
       auto &v = level.ranks[r];
@@ -268,7 +291,7 @@ struct GpuMultilevel::Impl {
       if (!Check(cudaGetLastError()))
         return false;
     }
-    if (!Sync())
+    if (!Barrier())
       return false;
     for (int i = 0; i < 2; ++i)
       if (!smooth())
@@ -291,6 +314,7 @@ bool GpuMultilevel::Build(const PressureHierarchy &hierarchy, const std::vector<
   auto next = std::make_unique<Impl>();
   next->devices = devices;
   next->streams.resize(devices.size());
+  next->ready.resize(devices.size());
   next->levels.resize(host.size());
   int count = 0;
   if (!next->Check(cudaGetDeviceCount(&count))) {
@@ -299,7 +323,8 @@ bool GpuMultilevel::Build(const PressureHierarchy &hierarchy, const std::vector<
   }
   for (size_t r = 0; r < devices.size(); ++r)
     if (devices[r] < 0 || devices[r] >= count || !next->Check(cudaSetDevice(devices[r])) ||
-        !next->Check(cudaStreamCreateWithFlags(&next->streams[r], cudaStreamNonBlocking))) {
+        !next->Check(cudaStreamCreateWithFlags(&next->streams[r], cudaStreamNonBlocking)) ||
+        !next->Check(cudaEventCreateWithFlags(&next->ready[r], cudaEventDisableTiming))) {
       error_ = "Invalid multilevel device or stream";
       return false;
     }
@@ -477,7 +502,7 @@ bool GpuMultilevel::Apply(const std::vector<double *> &input, const std::vector<
         !w.Check(cudaMemcpyAsync(v.rhs, input[r], v.n * sizeof(double), cudaMemcpyDeviceToDevice, w.streams[r])))
       return fail();
   }
-  if (!w.Sync() || !w.Cycle(0))
+  if (!w.Barrier() || !w.Cycle(0))
     return fail();
   for (size_t r = 0; r < output.size(); ++r) {
     auto &v = w.levels.front().ranks[r];
