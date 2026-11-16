@@ -1658,8 +1658,8 @@ leave every caller output unchanged. Invalid builds preserve the previous
 instance. CUDA failures may leave partially copied outputs, and all internal
 streams are drained before returning from failed operations.
 
-Distributed loads, pressure coupling and adaptive runtime integration are still
-required before full-flow or 2% steady-load acceptance.
+Pressure coupling and adaptive runtime integration are still required before
+full-flow or 2% steady-load acceptance.
 
 Job 2001385 passed distributed transport plus the existing single-device
 transport/advance/flow CTests and distributed transport memcheck with zero
@@ -1702,3 +1702,42 @@ advection-only comparisons retained zero error. Checks also cover aliasing,
 trailing ghost preservation, non-finite input rollback and unchanged outputs
 when diffusion stability, viscosity, sponge length, timestep or speed validation
 fails. Full timestep coupling, steady loads and acceleration remain unverified.
+
+### Distributed pressure and friction loads
+
+`GpuDistributedTransport::EvaluateLoads` accepts owned pre-step velocity and
+owned physical-pressure prefixes and returns pressure/friction/total force XYZ
+followed by moment XYZ about the world/body origin. `OwnedCells` exposes the
+same cell ordering as the pressure partition, complementing `OwnedFaces`.
+The operation is self-contained: it copies inputs into private owned buffers,
+validates every owned entry and applies the two slip-extension layers before
+evaluating load-only wall friction. Trailing pressure/velocity imports are
+neither read nor modified; caller inputs and output loads survive every failure.
+
+Single- and multi-device paths share `LoadPartials` and `ReduceLoads`. The
+shared cell-work mapping selects each owned cell exactly once, with its local
+pressure entry and globally addressed incident face velocities. Pressure
+moments retain face positions; friction moments retain cell centres, half-cell
+wall sampling distance and the existing float Spalding viscosity evaluation.
+GPU partials use deterministic reductions; only 12 scalars per rank return to
+the host, where compensated sums combine ranks. Finite checks also cover the
+final summed components and totals before committing the result.
+
+The method does not rescale pressure: the timestep driver must convert the
+projection potential to physical pressure using density/dt before evaluation.
+It must also retain pre-step velocity until friction loads are complete.
+Transactional composition with projection and the adaptive runtime remains
+outstanding; operator load agreement alone is not steady-load acceptance.
+
+Job 2001394 passed distributed loads, distributed transport, single-device
+complete-step and adaptive-flow CTests, plus distributed-load memcheck with
+zero unsuppressed errors under the exact expected-704 suppression. Forty
+geometry/scale/device configurations each compare six pressure/velocity cases
+against independent CPU `Mesh::PressureLoads` and `WallLoads` references.
+Maximum component differences were 2.33e-16 for pressure loads and 1.25e-11
+for friction loads (the latter retains the existing float wall model).
+Coverage includes one/two/four GPUs, permuted devices, uniform/mixed grids,
+embedded and fully solid bodies, constant/linear/nonlinear signed pressure,
+velocity reversal and changed density/viscosity. Repeated results are identical;
+inputs including trailing NaN ghosts are preserved, invalid parameters leave
+outputs unchanged, and non-finite owned pressure/velocity rejects on any rank.

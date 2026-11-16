@@ -6,6 +6,7 @@
 #include <cuda/std/array>
 
 #include "amr_mesh.h"
+#include "wall_model.h"
 
 namespace wind3d::amr {
 namespace {
@@ -634,6 +635,77 @@ __global__ void DiffuseBoundary(Field f, double *next, double dt, double viscosi
   if ((face.low < 0 || face.high < 0) && !(face.axis == 0 && face.high < 0))
     value = face.axis == 0 ? speed : 0;
   next[local] = value;
+}
+
+// Per-block deterministic sums avoid load atomics and transfer only 12 scalars.
+__global__ void LoadPartials(Field f, const double *pressure, double density, double viscosity, double *partial) {
+  int local = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = f.CellWork(local);
+  double value[12]{};
+  if (i >= 0 && f.cells[i].active) {
+    Array<double, 3> normal{}, u{}, area{};
+    for (int k = f.offsets[i]; k < f.offsets[i + 1]; ++k) {
+      int id = f.incidence[k], j = abs(id) - 1;
+      auto face = f.faces[j];
+      int a = face.axis;
+      double wetted = (id > 0 ? 1 : -1) * face.area * (1 - face.aperture), force = wetted * pressure[local];
+      value[a] += force;
+      value[3 + (a + 1) % 3] += face.centre[(a + 2) % 3] * force;
+      value[3 + (a + 2) % 3] -= face.centre[(a + 1) % 3] * force;
+      normal[a] += wetted;
+      u[a] += face.area * f.velocity_[j];
+      area[a] += face.area;
+    }
+    double wetted = sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+    if (wetted > 0) {
+      double dot = 0, speed2 = 0;
+      for (int a = 0; a < 3; ++a) {
+        normal[a] /= wetted;
+        u[a] /= area[a];
+        dot += normal[a] * u[a];
+      }
+      for (int a = 0; a < 3; ++a) {
+        u[a] -= dot * normal[a];
+        speed2 += u[a] * u[a];
+      }
+      double wall = WallEffectiveViscosity(float(viscosity), float(sqrt(speed2)), float(.5 * f.cells[i].width));
+      for (int a = 0; a < 3; ++a) {
+        double force = u[a] * 2 * density * wall * wetted / f.cells[i].width;
+        value[6 + a] += force;
+        value[9 + (a + 1) % 3] += f.cells[i].centre[(a + 2) % 3] * force;
+        value[9 + (a + 2) % 3] -= f.cells[i].centre[(a + 1) % 3] * force;
+      }
+    }
+  }
+  __shared__ double sum[256];
+  for (int component = 0; component < 12; ++component) {
+    sum[threadIdx.x] = value[component];
+    __syncthreads();
+    for (int stride = 128; stride > 0; stride /= 2) {
+      if (threadIdx.x < stride)
+        sum[threadIdx.x] += sum[threadIdx.x + stride];
+      __syncthreads();
+    }
+    if (threadIdx.x == 0)
+      partial[component * gridDim.x + blockIdx.x] = sum[0];
+    __syncthreads();
+  }
+}
+
+__global__ void ReduceLoads(const double *partial, int count, double *loads) {
+  __shared__ double sum[256];
+  double value = 0;
+  for (int i = threadIdx.x; i < count; i += 256)
+    value += partial[blockIdx.x * count + i];
+  sum[threadIdx.x] = value;
+  __syncthreads();
+  for (int stride = 128; stride > 0; stride /= 2) {
+    if (threadIdx.x < stride)
+      sum[threadIdx.x] += sum[threadIdx.x + stride];
+    __syncthreads();
+  }
+  if (threadIdx.x == 0)
+    loads[blockIdx.x] = sum[0];
 }
 
 }  // namespace

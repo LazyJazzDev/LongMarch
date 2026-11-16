@@ -35,13 +35,14 @@ struct GpuDistributedTransport::Impl {
   struct Rank {
     Field fields[2]{};
     int *neighbors{}, *layers{}, *bad{};
-    double *result{};
+    double *result{}, *pressure{}, *partial{}, *loads{};
     cudaStream_t stream{};
   };
 
   std::vector<int> devices;
   std::vector<Rank> ranks;
-  std::vector<std::vector<int>> owned_faces;
+  std::vector<std::vector<int>> owned_faces, owned_cells;
+  enum class Values { Original, Forward, Result, Pressure };
   std::vector<std::pair<int, void *>> allocations;
   std::string error;
   double min_area{INFINITY};
@@ -97,11 +98,13 @@ struct GpuDistributedTransport::Impl {
     return false;
   }
 
-  bool Valid(int field) {
+  bool Valid(Values field) {
     for (size_t r = 0; r < ranks.size(); ++r) {
       auto &rank = ranks[r];
-      int n = rank.fields[0].face_count;
-      const double *values = field < 0 ? rank.result : rank.fields[field].velocity_.local;
+      int n = field == Values::Pressure ? rank.fields[0].cell_count : rank.fields[0].face_count;
+      const double *values = field == Values::Pressure ? rank.pressure
+                             : field == Values::Result ? rank.result
+                                                       : rank.fields[field == Values::Original ? 0 : 1].velocity_.local;
       if (!Check(cudaSetDevice(devices[r])) || !Check(cudaMemsetAsync(rank.bad, 0, sizeof(int), rank.stream)))
         return false;
       ValidateOwned<<<(n + 255) / 256, 256, 0, rank.stream>>>(values, n, rank.bad);
@@ -123,9 +126,9 @@ struct GpuDistributedTransport::Impl {
     return true;
   }
 
-  bool Prepare(int field) {
+  bool Prepare(int field, bool reconstruct = true) {
     // Every stage completes on all owners before any peer reads its results.
-    for (int stage = 0; stage < 5; ++stage) {
+    for (int stage = 0; stage < (reconstruct ? 5 : 3); ++stage) {
       for (size_t r = 0; r < ranks.size(); ++r) {
         auto &rank = ranks[r];
         auto f = rank.fields[field];
@@ -206,6 +209,7 @@ bool GpuDistributedTransport::Build(const Mesh &mesh,
       }
   next->ranks.resize(devices.size());
   next->owned_faces = partition.OwnedFaces();
+  next->owned_cells = partition.OwnedCells();
   std::vector<int> face_indices(mesh.Faces().size()), cell_indices(mesh.Cells().size());
   for (size_t r = 0; r < devices.size(); ++r) {
     for (size_t i = 0; i < partition.OwnedFaces()[r].size(); ++i)
@@ -259,7 +263,10 @@ bool GpuDistributedTransport::Build(const Mesh &mesh,
           !next->Allocate(device, field.limits_.local, f.cell_count))
         return fail();
     if (!next->Allocate(device, rank.neighbors, size_t(f.nf) * 6) || !next->Allocate(device, rank.layers, f.nf) ||
-        !next->Allocate(device, rank.bad, 1) || !next->Allocate(device, rank.result, f.face_count))
+        !next->Allocate(device, rank.bad, 1) || !next->Allocate(device, rank.result, f.face_count) ||
+        !next->Allocate(device, rank.pressure, f.cell_count) ||
+        !next->Allocate(device, rank.partial, size_t((f.cell_count + 255) / 256) * 12) ||
+        !next->Allocate(device, rank.loads, 12))
       return fail();
     // Complete pageable metadata uploads before the nonblocking stream reads.
     if (!next->Check(cudaDeviceSynchronize()))
@@ -298,6 +305,87 @@ bool GpuDistributedTransport::Build(const Mesh &mesh,
 const std::vector<std::vector<int>> &GpuDistributedTransport::OwnedFaces() const {
   static const std::vector<std::vector<int>> empty;
   return impl_ ? impl_->owned_faces : empty;
+}
+
+const std::vector<std::vector<int>> &GpuDistributedTransport::OwnedCells() const {
+  static const std::vector<std::vector<int>> empty;
+  return impl_ ? impl_->owned_cells : empty;
+}
+
+bool GpuDistributedTransport::EvaluateLoads(const std::vector<const double *> &velocity,
+                                            const std::vector<const double *> &pressure,
+                                            TransportLoads &loads,
+                                            double density,
+                                            double wall_viscosity) {
+  DeviceScope restore;
+  error_.clear();
+  if (!impl_ || velocity.size() != impl_->ranks.size() || pressure.size() != velocity.size() || !(density > 0) ||
+      !std::isfinite(density) || !(wall_viscosity > 0) || !std::isfinite(wall_viscosity) ||
+      std::any_of(velocity.begin(), velocity.end(), [](auto p) { return !p; }) ||
+      std::any_of(pressure.begin(), pressure.end(), [](auto p) { return !p; })) {
+    error_ = "Invalid distributed load fields or parameters";
+    return false;
+  }
+  auto &w = *impl_;
+  w.error.clear();
+  auto fail = [&] {
+    auto first = w.error;
+    w.Sync();
+    error_ = first;
+    return false;
+  };
+  for (size_t r = 0; r < w.ranks.size(); ++r) {
+    auto &rank = w.ranks[r];
+    if (!w.Check(cudaSetDevice(w.devices[r])) ||
+        !w.Check(cudaMemcpyAsync(rank.fields[0].velocity_.local, velocity[r], w.owned_faces[r].size() * sizeof(double),
+                                 cudaMemcpyDeviceToDevice, rank.stream)) ||
+        !w.Check(cudaMemcpyAsync(rank.pressure, pressure[r], w.owned_cells[r].size() * sizeof(double),
+                                 cudaMemcpyDeviceToDevice, rank.stream)))
+      return fail();
+  }
+  if (!w.Valid(Impl::Values::Original) || !w.Valid(Impl::Values::Pressure) || !w.Prepare(0, false))
+    return fail();
+  for (size_t r = 0; r < w.ranks.size(); ++r) {
+    auto &rank = w.ranks[r];
+    auto f = rank.fields[0];
+    int blocks = (f.cell_count + 255) / 256;
+    if (!w.Check(cudaSetDevice(w.devices[r])))
+      return fail();
+    LoadPartials<<<blocks, 256, 0, rank.stream>>>(f, rank.pressure, density, wall_viscosity, rank.partial);
+    ReduceLoads<<<12, 256, 0, rank.stream>>>(rank.partial, blocks, rank.loads);
+    if (!w.Check(cudaGetLastError()))
+      return fail();
+  }
+  if (!w.Sync())
+    return fail();
+  std::array<double, 12> sum{}, compensation{};
+  for (size_t r = 0; r < w.ranks.size(); ++r) {
+    double local[12];
+    if (!w.Check(cudaSetDevice(w.devices[r])) ||
+        !w.Check(cudaMemcpy(local, w.ranks[r].loads, sizeof(local), cudaMemcpyDeviceToHost)))
+      return fail();
+    for (int k = 0; k < 12; ++k) {
+      if (!std::isfinite(local[k])) {
+        w.error = "Non-finite distributed loads";
+        return fail();
+      }
+      double y = local[k] - compensation[k], next = sum[k] + y;
+      compensation[k] = (next - sum[k]) - y;
+      sum[k] = next;
+    }
+  }
+  TransportLoads next;
+  for (int k = 0; k < 6; ++k) {
+    next.pressure[k] = sum[k];
+    next.friction[k] = sum[6 + k];
+    next.total[k] = sum[k] + sum[6 + k];
+    if (!std::isfinite(next.pressure[k]) || !std::isfinite(next.friction[k]) || !std::isfinite(next.total[k])) {
+      w.error = "Non-finite distributed load reduction";
+      return fail();
+    }
+  }
+  loads = next;
+  return true;
 }
 
 bool GpuDistributedTransport::Advect(const std::vector<const double *> &velocity,
@@ -360,7 +448,7 @@ bool GpuDistributedTransport::Apply(const std::vector<const double *> &velocity,
                                  cudaMemcpyDeviceToDevice, rank.stream)))
       return fail();
   }
-  if (!w.Valid(0) || !w.Prepare(0))
+  if (!w.Valid(Impl::Values::Original) || !w.Prepare(0))
     return fail();
   for (size_t r = 0; r < w.ranks.size(); ++r) {
     auto &rank = w.ranks[r];
@@ -371,7 +459,7 @@ bool GpuDistributedTransport::Apply(const std::vector<const double *> &velocity,
     if (!w.Check(cudaGetLastError()))
       return fail();
   }
-  if (!w.Valid(1))
+  if (!w.Valid(Impl::Values::Forward))
     return fail();
   if (corrected) {
     if (!w.Prepare(1))
@@ -385,7 +473,7 @@ bool GpuDistributedTransport::Apply(const std::vector<const double *> &velocity,
       if (!w.Check(cudaGetLastError()))
         return fail();
     }
-    if (!w.Valid(-1))
+    if (!w.Valid(Impl::Values::Result))
       return fail();
   }
   if (diffusion) {
@@ -399,7 +487,7 @@ bool GpuDistributedTransport::Apply(const std::vector<const double *> &velocity,
       if (!w.Check(cudaGetLastError()))
         return fail();
     }
-    if (!w.Valid(-1))
+    if (!w.Valid(Impl::Values::Result))
       return fail();
   }
   for (size_t r = 0; r < w.ranks.size(); ++r) {
