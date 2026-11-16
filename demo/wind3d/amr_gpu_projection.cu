@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <array>
 #include <climits>
 #include <cmath>
 #include <limits>
@@ -147,6 +148,7 @@ struct GpuProjection::Impl {
   cudaGraphExec_t preconditioner[2]{};
   std::vector<int> closed;
   int *closed_device{};
+  double *dot_pair{};
   double *diagonal{}, *u{}, *face{}, *rhs{}, *x{}, *r{}, *shadow{}, *p{}, *v{}, *s{}, *t{}, *phat{}, *shat{}, *ax{};
 
   ~Impl() {
@@ -410,6 +412,18 @@ struct GpuProjection::Impl {
       Check(cudaGraphLaunch(preconditioner[k], nullptr));
   }
 
+  std::array<double, 2> DotPair(const double *a, const double *b) {
+    std::array<double, 2> result{};
+    // Queue both reductions before transferring their scalars to the host.
+    if (!Blas(cublasSetPointerMode(blas, CUBLAS_POINTER_MODE_DEVICE)))
+      return result;
+    Blas(cublasDdot(blas, n, a, 1, a, 1, dot_pair));
+    Blas(cublasDdot(blas, n, a, 1, b, 1, dot_pair + 1));
+    Blas(cublasSetPointerMode(blas, CUBLAS_POINTER_MODE_HOST));
+    Check(cudaMemcpy(result.data(), dot_pair, sizeof(double) * result.size(), cudaMemcpyDeviceToHost));
+    return result;
+  }
+
   double Dot(const double *a, const double *b) {
     double result = 0;
     Blas(cublasDdot(blas, n, a, 1, b, 1, &result));
@@ -479,6 +493,8 @@ bool GpuProjection::Build(int device,
                        &next->phat, &next->shat, &next->ax})
     if (!next->Allocate(*ptr, next->n))
       return fail("Invalid adaptive operator or GPU allocation failure");
+  if (!next->Allocate(next->dot_pair, 2))
+    return fail("Paired reduction allocation failed");
   if (!next->closed.empty() && !next->Upload(next->closed_device, next->closed))
     return fail("Closed-face upload failed");
   if (multilevel && (!next->BuildLevels(mesh, a) || !next->Capture()))
@@ -573,10 +589,11 @@ ProjectionResult GpuProjection::Solve(double tolerance, int max_iterations) {
     if (std::sqrt(w.Dot(w.s, w.s)) / norm > tolerance) {
       w.Precondition(1);
       w.Apply(w.a, w.shat, w.t);
-      double tt = w.Dot(w.t, w.t);
+      auto products = w.DotPair(w.t, w.s);
+      double tt = products[0];
       if (!std::isfinite(tt) || tt < 1e-300)
         break;
-      omega = w.Dot(w.t, w.s) / tt;
+      omega = products[1] / tt;
       Add<<<blocks, 256>>>(w.n, w.x, w.shat, omega);
     }
     w.Apply(w.a, w.x, w.ax);

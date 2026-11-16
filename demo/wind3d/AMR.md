@@ -414,3 +414,11 @@ criteria. GPU projection, complete advancement and transactional regrid tests
 passed, as did projection memcheck (zero errors). This improves the current
 adaptive implementation; it does not establish speedup over the original
 uniform backend, steady-load preservation, or the full control envelope.
+
+The BiCGStab omega stage queues its two cuBLAS dot products with device scalar
+outputs and transfers both scalars together. Job 2001237 passed the same three
+GPU regressions and memcheck. Alternating 30-step aircraft runs retained
+identical printed force/moment components and 17.2 mean iterations; total time
+fell from 12.96--12.98 ms to 12.83--12.86 ms (about 1%). This removes one host
+synchronization per full iteration; it does not fuse the reduction kernels or
+change the pressure operator/tolerance.
