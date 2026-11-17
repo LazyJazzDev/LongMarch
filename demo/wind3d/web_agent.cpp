@@ -268,7 +268,7 @@ int main(int argc, char **argv) {
              << ",\"streamline_seeds\":" << (20 * density + 1) * (3 * density + 1)
              << ",\"domain_min\":[-6,-4,-6],\"domain_max\":[10,4,6]";
         json << ",\"solver_model\":\"uniform-" << profile
-             << "\",\"geometry_model\":\"narrowbody-span572-washout3\",\"force\":";
+             << "\",\"geometry_model\":\"narrowbody-blended-tip-slotted-flaps\",\"force\":";
         Vector(json, state->force);
         json << ",\"moment\":";
         Vector(json, state->moment);
