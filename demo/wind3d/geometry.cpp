@@ -20,6 +20,7 @@ class MeshBuilder {
 
   std::vector<Vertex> Build() {
     Fuselage();
+    Glazing();
     for (int side : {-1, 1}) {
       for (int part = 0; part < aircraft_part_count; ++part) {
         if (part == 5 && side == -1)
@@ -68,7 +69,7 @@ class MeshBuilder {
     Triangle(a, c, d);
   }
 
-  Vertex BodyVertex(float x, float phi) const {
+  Vertex BodyVertex(float x, float phi, Vec3 color = skin, float offset = 0) const {
     Vec3 p = FuselagePoint(x, phi);
     Vec3 dx =
         Add(FuselagePoint(std::min(3.0f, x + 0.001f), phi), Scale(FuselagePoint(std::max(-3.0f, x - 0.001f), phi), -1));
@@ -76,7 +77,7 @@ class MeshBuilder {
     Vec3 n = Unit(Cross(dp, dx));
     if (std::abs(x) >= 3)
       n = {x < 0 ? -1.0f : 1.0f, 0, 0};
-    return MakeVertex(p, n, skin);
+    return MakeVertex(Add(p, Scale(n, offset)), n, color);
   }
 
   void Fuselage() {
@@ -88,6 +89,34 @@ class MeshBuilder {
     for (int i = 0; i < rings; ++i)
       for (int j = 0; j < slices; ++j)
         Quad(point(i, j), point(i + 1, j), point(i + 1, (j + 1) % slices), point(i, (j + 1) % slices));
+  }
+
+  void Glazing() {
+    // Shallow surface markings only; they do not alter the aerodynamic solid.
+    const Vec3 glass{.11f, .16f, .20f};
+    auto vertex = [&](float x, float phi) { return BodyVertex(x, phi, glass, .0006f); };
+    for (int side : {-1, 1}) {
+      for (int window = 0; window < 30; ++window) {
+        float x = -1.72f + .11f * window, phi = side * 1.28f;
+        auto center = vertex(x, phi);
+        for (int k = 0; k < 20; ++k) {
+          float a = 2 * pi * k / 20, b = 2 * pi * (k + 1) / 20;
+          Triangle(center, vertex(x + .024f * cosf(a), phi + .08f * sinf(a)),
+                   vertex(x + .024f * cosf(b), phi + .08f * sinf(b)));
+        }
+      }
+      for (int panel = 0; panel < 3; ++panel) {
+        auto patch = [&](float u, float v) {
+          float phi = .18f + .36f * panel + .32f * v;
+          float front = -2.84f + .40f * phi, rear = -2.66f + .40f * phi;
+          return vertex(front + (rear - front) * u, side * phi);
+        };
+        for (int u = 0; u < 4; ++u)
+          for (int v = 0; v < 6; ++v)
+            Quad(patch(u / 4.f, v / 6.f), patch((u + 1) / 4.f, v / 6.f), patch((u + 1) / 4.f, (v + 1) / 6.f),
+                 patch(u / 4.f, (v + 1) / 6.f));
+      }
+    }
   }
 
   void Nacelle(int side) {

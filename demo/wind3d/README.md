@@ -11,7 +11,7 @@ cmake-build-release/demo/wind3d/demo_wind3d --aero --backend vulkan
 cmake-build-release/demo/wind3d/demo_wind3d --aero --backend d3d12 --grid 256
 ```
 
-The procedural airframe is being revised around a 6 m-long narrow-body
+The procedural airframe is built around a 6 m-long narrow-body
 transport: nominal span about 5.80 m (5.72 m with raked tips), cabin diameter 0.63 m, and nacelle outer
 diameter approximately 0.40 m. These proportions use the A320 family as a
 reference, not an exact certified aircraft surface:
@@ -445,6 +445,11 @@ mesh and occupancy test share the complete geometry specification and hinge
 transforms in `aircraft.h`. Rendering does not reconstruct an implicit surface.
 The fluid still voxelizes the solid at its own grid resolution.
 
+Cockpit glazing and two cabin-window rows are shallow surface markings used to
+make the model's passenger-aircraft scale legible. They do not alter the
+fluid solid or loads. Structural proportions and all movable aerodynamic
+surfaces remain defined by the shared geometry functions.
+
 Use `--model-only` to inspect the aircraft without flow/load vectors. Camera
 arguments `--yaw`, `--pitch` (radians) and `--distance` (metres) support repeatable
 inspection views; normal mouse orbit and zoom remain available.
@@ -679,7 +684,12 @@ graphics demo remains single-GPU by default.
 
 The CUDA-only `wind3d_web` worker supports the same wind speed, incidence,
 flap, differential aileron, elevator and rudder controls as the native demo,
-plus pause/resume and reset. The browser displays the actual aircraft mesh,
+plus stabilizer trim, wingtip selection, independent outer flaps, cruise camber,
+aileron droop, slats, spoilers and their linkages. The mailbox preserves the
+legacy six-control/density prefix and appends a `wing-v1` extension; old saved
+relay states acquire neutral/default values for the new fields. Control-change
+history events include all these parameters. The worker also supports
+pause/resume and reset. The browser displays the actual aircraft mesh,
 instantaneous streamlines, full-grid force and moment, and solver diagnostics.
 Geometry and streamline construction are shared with the native renderer in
 `visualization.h`; the web console does not substitute a different aircraft.

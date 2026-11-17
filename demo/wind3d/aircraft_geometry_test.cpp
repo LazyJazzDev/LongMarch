@@ -249,7 +249,7 @@ int main() {
         }
         bool color_ok = false;
         for (Vec3 color : {Vec3{.78f, .78f, .78f}, Vec3{.72f, .66f, .52f}, Vec3{.45f, .61f, .72f},
-                           Vec3{.48f, .65f, .59f}, Vec3{.35f, .49f, .69f}})
+                           Vec3{.48f, .65f, .59f}, Vec3{.35f, .49f, .69f}, Vec3{.11f, .16f, .20f}})
           color_ok |= Length(Add(vertex.color, Scale(color, -1))) < 1e-6f;
         if (!color_ok)
           return 6;
