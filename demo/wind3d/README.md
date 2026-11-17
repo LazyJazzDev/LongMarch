@@ -112,6 +112,15 @@ also hides load vectors. Give the higher-resolution flow time to develop its wak
 
 ### Validation and measured limits
 
+Pressure PCG and its multigrid work vectors use double precision, including dot
+products and true residual evaluation. Velocity and published pressure remain
+single precision. This prevents loss of convergence during large inlet-speed
+changes; it increases solver memory and time, especially on consumer GPUs.
+LFM stops if an initial or midpoint projection fails to converge, before using
+that field to advance flow maps. CTest `wind3d_lfm_lifecycle` and
+`wind3d_lfm_cut_lifecycle` cover reset, combined control-surface changes and a
+live inlet change at grid 128, for voxel and cut-cell configurations respectively.
+
 Windows Release, RTX 5080, 12 m/s, 5 degree incidence, default voxel/no-slip model:
 
 | Grid | Run | Median cycle time after cycle 9 | Simulated time / solver wall time |

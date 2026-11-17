@@ -133,6 +133,13 @@ if (LONGMARCH_CUDA_ENABLED)
     endif ()
     add_executable(${DEMO_NAME} main.cpp simulation.cu geometry.cpp render.cpp)
     target_link_libraries(${DEMO_NAME} PRIVATE grassland_rhi grassland_util CUDA::cudart_static)
+    if (BUILD_TESTING)
+        add_test(NAME wind3d_lfm_lifecycle COMMAND ${DEMO_NAME} --validate --grid 128 --steps 3 --no-export)
+        add_test(NAME wind3d_lfm_cut_lifecycle COMMAND ${DEMO_NAME} --validate --grid 128 --steps 3 --no-export
+                --viscosity 0.000015 --wall-viscosity 0.000015 --cut-cells --cubic --sponge 2 --cfl 0.25
+                --pressure-cycles 128)
+        set_tests_properties(wind3d_lfm_lifecycle wind3d_lfm_cut_lifecycle PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE)
+    endif ()
     set(HEADER ${CMAKE_CURRENT_BINARY_DIR}/display.slang.h)
     add_custom_command(OUTPUT ${HEADER}
             COMMAND "$<TARGET_FILE:simple_xxd>" display.slang ${HEADER}

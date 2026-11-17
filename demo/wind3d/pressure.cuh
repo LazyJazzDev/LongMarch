@@ -9,7 +9,10 @@ namespace wind3d::pressure {
 struct Level {
   int nx{}, ny{}, nz{};
   float4 *edges{};  // +x,+y,+z conductances and outlet Dirichlet anchor.
-  float *x{}, *rhs{}, *residual{};
+  // Pressure increments from inlet changes can have a large smooth component.
+  // Keep Krylov vectors and multigrid arithmetic in double precision so true
+  // residual recomputation does not lose the small local pressure corrections.
+  double *x{}, *rhs{}, *residual{};
 
   __host__ __device__ int Count() const {
     return nx * ny * nz;
@@ -20,13 +23,13 @@ struct Level {
   }
 };
 
-__device__ float Diagonal(Level l, int n, int x, int y, int z) {
+__device__ double Diagonal(Level l, int n, int x, int y, int z) {
   float4 e = l.edges[n];
-  return e.x + e.y + e.z + e.w + (x ? l.edges[n - 1].x : 0) + (y ? l.edges[n - l.nx].y : 0) +
+  return double(e.x) + e.y + e.z + e.w + (x ? l.edges[n - 1].x : 0) + (y ? l.edges[n - l.nx].y : 0) +
          (z ? l.edges[n - l.nx * l.ny].z : 0);
 }
 
-__device__ float NeighborSum(Level l, int n, int x, int y, int z) {
+__device__ double NeighborSum(Level l, int n, int x, int y, int z) {
   float4 e = l.edges[n];
   return (x + 1 < l.nx ? e.x * l.x[n + 1] : 0) + (y + 1 < l.ny ? e.y * l.x[n + l.nx] : 0) +
          (z + 1 < l.nz ? e.z * l.x[n + l.nx * l.ny] : 0) + (x ? l.edges[n - 1].x * l.x[n - 1] : 0) +
@@ -87,7 +90,7 @@ __global__ void SetRhs(Level l, const float *divergence, float factor) {
   if (n >= l.Count())
     return;
   l.x[n] = 0;
-  l.rhs[n] = -divergence[n] * factor;
+  l.rhs[n] = -double(divergence[n]) * factor;
 }
 
 __global__ void Smooth(Level l, int parity) {
@@ -112,7 +115,7 @@ __global__ void Smooth(Level l, int parity) {
     if ((x + y + z) % 2 != parity)
       return;
   }
-  float d = Diagonal(l, n, x, y, z);
+  double d = Diagonal(l, n, x, y, z);
   if (d > 0)
     l.x[n] += 1.3f * ((l.rhs[n] + NeighborSum(l, n, x, y, z)) / d - l.x[n]);
 }
@@ -125,7 +128,7 @@ __global__ void CoarseSmooth(Level l) {
   for (int sweep = 0; sweep < 64; ++sweep) {
     int parity = sweep < 32 ? sweep % 2 : 1 - sweep % 2;
     if (n < l.Count() && (x + y + z) % 2 == parity) {
-      float d = Diagonal(l, n, x, y, z);
+      double d = Diagonal(l, n, x, y, z);
       if (d > 0)
         l.x[n] += 1.3f * ((l.rhs[n] + NeighborSum(l, n, x, y, z)) / d - l.x[n]);
     }
@@ -146,7 +149,7 @@ __global__ void Restrict(Level fine, Level coarse) {
   if (n >= coarse.Count())
     return;
   int x = 2 * (n % coarse.nx), y = 2 * (n / coarse.nx % coarse.ny), z = 2 * (n / (coarse.nx * coarse.ny));
-  float sum = 0;
+  double sum = 0;
   for (int k = 0; k < 2; ++k)
     for (int j = 0; j < 2; ++j)
       for (int i = 0; i < 2; ++i)
@@ -164,10 +167,15 @@ __global__ void Prolong(Level coarse, Level fine) {
   fine.x[n] += coarse.x[coarse.Index(x / 2, y / 2, z / 2)];
 }
 
-__global__ void DotProducts(int count, const float *a, const float *b, const float *c, const float *d, float2 *blocks) {
-  __shared__ float2 values[256];
+__global__ void DotProducts(int count,
+                            const double *a,
+                            const double *b,
+                            const double *c,
+                            const double *d,
+                            double2 *blocks) {
+  __shared__ double2 values[256];
   int n = blockIdx.x * blockDim.x + threadIdx.x;
-  float2 v{};
+  double2 v{};
   if (n < count)
     v = {a[n] * b[n], c[n] * d[n]};
   values[threadIdx.x] = v;
@@ -185,9 +193,9 @@ __global__ void DotProducts(int count, const float *a, const float *b, const flo
 
 constexpr int dot_blocks = 256;
 
-// Second stage in double precision: each thread sums a strided subset of the
-// single-precision block partials, so only dot_blocks values reach the host.
-__global__ void ReduceDots(int count, const float2 *blocks, double2 *totals) {
+// Each thread sums a strided subset of double-precision block partials, so
+// only dot_blocks values reach the host.
+__global__ void ReduceDots(int count, const double2 *blocks, double2 *totals) {
   __shared__ double2 values[256];
   double2 v{};
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < count; i += gridDim.x * blockDim.x) {
@@ -207,13 +215,13 @@ __global__ void ReduceDots(int count, const float2 *blocks, double2 *totals) {
     totals[blockIdx.x] = values[0];
 }
 
-__global__ void Direction(int count, const float *z, float beta, float *d) {
+__global__ void Direction(int count, const double *z, double beta, double *d) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < count)
     d[n] = z[n] + (beta == 0 ? 0 : beta * d[n]);
 }
 
-__global__ void Apply(Level l, float *result) {
+__global__ void Apply(Level l, double *result) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= l.Count())
     return;
@@ -221,10 +229,17 @@ __global__ void Apply(Level l, float *result) {
   result[n] = Diagonal(l, n, x, y, z) * l.x[n] - NeighborSum(l, n, x, y, z);
 }
 
-__global__ void Update(int count, float *x, const float *direction, float alpha) {
+__global__ void Update(int count, double *x, const double *direction, double alpha) {
   int n = blockIdx.x * blockDim.x + threadIdx.x;
   if (n < count)
     x[n] += alpha * direction[n];
+}
+
+template <class Source, class Destination>
+__global__ void CopyPressure(int count, const Source *source, Destination *destination) {
+  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  if (n < count)
+    destination[n] = Destination(source[n]);
 }
 
 class Solver {
@@ -257,15 +272,15 @@ class Solver {
     cudaError_t error;
     int count = levels_[0].Count();
     if ((error = Allocate(residual_, count)) != cudaSuccess || (error = Allocate(direction_, count)) != cudaSuccess ||
-        (error = Allocate(product_, count)) != cudaSuccess)
+        (error = Allocate(product_, count)) != cudaSuccess || (error = Allocate(solution_, count)) != cudaSuccess)
       return error;
     if ((error = Allocate(norm_, Blocks(levels_[0]))) != cudaSuccess ||
         (error = Allocate(totals_, dot_blocks)) != cudaSuccess)
       return error;
     if ((error = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeThreadLocal)) != cudaSuccess)
       return error;
-    cudaMemsetAsync(levels_[0].x, 0, size_t(count) * sizeof(float), stream_);
-    float *rhs = levels_[0].rhs;
+    cudaMemsetAsync(levels_[0].x, 0, size_t(count) * sizeof(double), stream_);
+    double *rhs = levels_[0].rhs;
     levels_[0].rhs = residual_;
     Cycle(0);
     levels_[0].rhs = rhs;
@@ -302,7 +317,8 @@ class Solver {
     // Warm-start from the previous physical pressure, but normalize convergence
     // against the new RHS and always measure the true b-Ax residual.
     Level initial = first;
-    initial.x = output;
+    CopyPressure<<<Blocks(first), 256, 0, stream_>>>(first.Count(), output, solution_);
+    initial.x = solution_;
     initial.residual = residual_;
     Residual<<<Blocks(first), 256, 0, stream_>>>(initial);
     double rhs_norm = 0, previous_rho = 0, unused_norm;
@@ -331,7 +347,7 @@ class Solver {
                       double(relative_residual));
         return cudaErrorUnknown;
       }
-      float beta = cycles ? float(rho / previous_rho) : 0;
+      double beta = cycles ? rho / previous_rho : 0;
       Direction<<<Blocks(first), 256, 0, stream_>>>(first.Count(), first.x, beta, direction_);
       Level operation = first;
       operation.x = direction_;
@@ -345,8 +361,8 @@ class Solver {
                       double(relative_residual));
         return cudaErrorUnknown;
       }
-      Update<<<Blocks(first), 256, 0, stream_>>>(first.Count(), output, direction_, float(rho / denominator));
-      operation.x = output;
+      Update<<<Blocks(first), 256, 0, stream_>>>(first.Count(), solution_, direction_, rho / denominator);
+      operation.x = solution_;
       operation.residual = residual_;
       // Recompute b-Ax, rather than accepting a drifted recursive CG residual.
       Residual<<<Blocks(first), 256, 0, stream_>>>(operation);
@@ -360,6 +376,7 @@ class Solver {
       if (relative_residual <= tolerance)
         break;
     }
+    CopyPressure<<<Blocks(first), 256, 0, stream_>>>(first.Count(), solution_, output);
     return cudaGetLastError();
   }
 
@@ -417,7 +434,7 @@ class Solver {
         Smooth<<<SmoothBlocks(l), 256, 0, stream_>>>(l, parity);
   }
 
-  cudaError_t Dot(const float *a, const float *b, const float *c, const float *d, double &first, double &second) {
+  cudaError_t Dot(const double *a, const double *b, const double *c, const double *d, double &first, double &second) {
     DotProducts<<<Blocks(levels_[0]), 256, 0, stream_>>>(levels_[0].Count(), a, b, c, d, norm_);
     ReduceDots<<<dot_blocks, 256, 0, stream_>>>(Blocks(levels_[0]), norm_, totals_);
     auto error = cudaMemcpyAsync(host_norm_.data(), totals_, host_norm_.size() * sizeof(double2),
@@ -435,11 +452,11 @@ class Solver {
   }
 
   cudaGraphExec_t preconditioner_{};
-  float *residual_{}, *direction_{}, *product_{};
+  double *residual_{}, *direction_{}, *product_{}, *solution_{};
   cudaStream_t stream_{};
   std::vector<Level> levels_;
   std::vector<void *> allocations_;
-  float2 *norm_{};
+  double2 *norm_{};
   double2 *totals_{};
   std::vector<double2> host_norm_;
 };
