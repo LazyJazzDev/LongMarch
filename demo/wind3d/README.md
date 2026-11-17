@@ -127,10 +127,15 @@ boundary, not turbulent aircraft aerodynamics. `wind3d_lfm_check --lfm` includes
 these sphere checks, an analytic rotating-flow predictor check, and checkpoints.
 
 With quadratic maps and centered pressure recovery, the 128-grid aircraft gives
-18.68 N drag and 66.79 N lift in the 2–3 second window (12 m/s, 5 degrees, cut
+21.05 N drag and 107.63 N lift in the 2–3 second window (12 m/s, 5 degrees, cut
 cells, molecular viscosity 1.5e-5 m²/s, CFL 0.25, 2 m sponge).
-The 2–3 second mean L/D is 3.5752, with negligible variation in that window.
+The 2–3 second mean L/D is 5.1137, with negligible variation in that window.
 This demonstrates temporal settling at that grid, not spatial convergence.
+The main half-wing span increased from 2.7 to 3.6 m with the same root/tip
+chords and airfoil. Including raked tips, total span is 7.84 m and planform aspect
+ratio is about 11.56. Flap/aileron stations and the occupancy broad phase follow
+the new span. The former 6.04 m span gave L/D 3.5752 under the same algorithm
+and 128-grid conditions; higher-resolution comparison remains in progress.
 Keeping the centered pressure predictor but using the earlier trilinear maps
 gave L/D 0.51 on the same grid. The interpolation regression checks a sampled
 quadratic and its derivative across a stencil transition, and constant-velocity
@@ -186,7 +191,7 @@ Changes take effect at a solver-step boundary. The displayed model, flow and
 loads always belong to the same completed snapshot, so a slow backend can lag
 behind the requested panel values.
 
-The model is a generic scaled narrow-body airliner, 6 m long with a 6.04 m
+The model is a generic scaled narrow-body airliner, 6 m long with a 7.84 m
 span. It has a constant-section cabin, rounded forebody, upswept tailcone,
 continuous belly/wing-root fairing, cockpit glazing, passenger windows and doors.
 The low-mounted main wing has sweep, dihedral, camber and raked tips. Two
@@ -547,7 +552,7 @@ The viewport shows model length and span measured from the received mesh in
 body axes (undoing incidence), plus a metre scale bar that follows zoom and
 viewport size. The bar is calibrated at the orbit target depth; perspective
 means it is not a universal ruler for objects at other depths. The current
-model is 6.00 m long with 6.04 m span; the domain remains 16 × 8 × 12 m.
+model is 6.00 m long with 7.84 m span; the domain remains 16 × 8 × 12 m.
 
 ### Per-step load history
 

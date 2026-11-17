@@ -109,19 +109,33 @@ struct FoilPart {
   bool hinged, fowler;
 };
 
+// Main half-wing span, excluding the 0.32 m raked tip. Preserve the chord
+// distribution while increasing the full-wing aspect ratio to about 11.56.
+constexpr float wing_main_span = 3.6f;
+constexpr float aircraft_span_bound = wing_main_span + 0.7f;
+
 // Parts: buried wing root, flap, aileron, raked tip, horizontal stabilizer,
 // vertical stabilizer, nacelle pylon. Mirrors share exactly one specification.
 WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
   Vec3 ex{1, 0, 0}, ey{0, 1, 0}, ez{0, 0, float(side)};
-  FoilSpec wing{
-      {0, -0.18f, 0}, RotateZ(ex, -1.5f), RotateZ(ey, -1.5f), ez, 2.7f, 1.10f, 0.34f, -1.04f, 0.55f, 0.09f, 0.025f,
-      0.13f};
+  FoilSpec wing{{0, -0.18f, 0},
+                RotateZ(ex, -1.5f),
+                RotateZ(ey, -1.5f),
+                ez,
+                wing_main_span,
+                1.10f,
+                0.34f,
+                -1.04f,
+                0.55f,
+                0.09f,
+                0.025f,
+                0.13f};
   if (part == 0)
     return {wing, 0, 0.35f, 0, false, false};
   if (part == 1)
-    return {wing, 0.35f, 1.75f, controls.flap, true, true};
+    return {wing, 0.35f, wing_main_span * (1.75f / 2.7f), controls.flap, true, true};
   if (part == 2)
-    return {wing, 1.75f, 2.7f, side * controls.aileron, true, false};
+    return {wing, wing_main_span * (1.75f / 2.7f), wing_main_span, side * controls.aileron, true, false};
   if (part == 3) {
     wing.origin = Add(wing.origin, Add(Scale(wing.y_axis, wing.dihedral * wing.span), Scale(wing.z_axis, wing.span)));
     wing.leading += wing.sweep * wing.span;
@@ -281,7 +295,7 @@ enum Component { kFuselage, kWing, kHorizontalTail, kVerticalTail, kNacelle, kCo
 WIND3D_HD float AircraftDistance(Vec3 world, const Controls &controls, int &component) {
   Vec3 p = BodyPoint(world, controls);
   component = kFuselage;
-  if (p.x < -3.1f || p.x > 3.4f || fabsf(p.z) > 3.4f || p.y < -0.85f || p.y > 1.4f)
+  if (p.x < -3.1f || p.x > 3.4f || fabsf(p.z) > aircraft_span_bound || p.y < -0.85f || p.y > 1.4f)
     return 1;
   float dy = p.y - FuselageCenter(p.x), radial = sqrtf(dy * dy + p.z * p.z);
   float body = fmaxf(radial - FuselageRadius(p.x, dy / fmaxf(radial, 1e-12f)), fabsf(p.x) - 3);

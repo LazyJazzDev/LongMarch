@@ -195,7 +195,7 @@ __global__ void FaceMask(Grid g,
   bu[n] = bv[n] = bw[n] = 0;
   au[n] = av[n] = aw[n] = 255;
   Vec3 body = BodyPoint(g.Position(x, y, z), controls);
-  if (body.x < -3.1f - 2 * g.h || body.x > 3.4f + 2 * g.h || fabsf(body.z) > 3.4f + 2 * g.h ||
+  if (body.x < -3.1f - 2 * g.h || body.x > 3.4f + 2 * g.h || fabsf(body.z) > aircraft_span_bound + 2 * g.h ||
       body.y < -0.85f - 2 * g.h || body.y > 1.4f + 2 * g.h)
     return;
   unsigned char *faces[] = {bu, bv, bw}, *apertures[] = {au, av, aw};
