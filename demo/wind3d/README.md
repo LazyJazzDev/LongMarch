@@ -42,6 +42,13 @@ includes the selected tip device. `aircraft_reference.h` supplies this shared
 convention; legacy sweep coefficients that included tip developed length use
 a different reference and must not be compared without renormalization.
 
+Desktop and web load readouts additionally show moment about the assumed trim
+CG at `(quarter_chord_x, 0, 0)` in body coordinates. The offset is rotated into
+world coordinates before applying `M_CG = M_origin - r_CG cross F`. This is an
+explicit reference assumption, not inferred aircraft mass properties. Existing
+history curves and moment arrows remain about the body origin and are labeled
+accordingly; a nonzero origin moment can coexist with zero CG pitch moment.
+
 The horizontal stabilizer has an independent incidence setting via
 `--tail-incidence -10..10` and **Wind and controls / Stabilizer trim** in the
 desktop UI. Positive incidence raises its leading edge. The whole stabilizer

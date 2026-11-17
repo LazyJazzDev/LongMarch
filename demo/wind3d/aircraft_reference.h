@@ -24,4 +24,16 @@ inline AircraftReference MainWingReference(const Controls &controls = {}) {
   return {s.span * (s.root + s.tip), 2 * s.span,
           2 * (s.root * s.root + s.root * s.tip + s.tip * s.tip) / (3 * (s.root + s.tip)), float(quarter_x / weight)};
 }
+
+// Assumed trim CG: longitudinal quarter chord, body y=z=0. It is not a
+// mass-properties estimate of a production aircraft.
+inline Vec3 ReferenceCG(const Controls &controls = {}) {
+  return {MainWingReference(controls).quarter_chord_x, 0, 0};
+}
+
+inline Vec3 MomentAtReferenceCG(Vec3 force, Vec3 moment, const Controls &controls) {
+  Vec3 offset = RotateZ(ReferenceCG(controls), -controls.angle);
+  return Add(moment, Scale(Cross(offset, force), -1));
+}
+
 }  // namespace wind3d

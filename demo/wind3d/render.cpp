@@ -7,6 +7,7 @@
 #include <iostream>
 #include <thread>
 
+#include "aircraft_reference.h"
 #include "imgui.h"
 #include "load_charts.h"
 #include "visualization.h"
@@ -264,6 +265,11 @@ bool Render(IDevice *device,
                           body_moment.y);
               ImGui::TextWrapped(
                   "Body moments [N m] use the same body origin and right-hand signs, not a specified center of mass.");
+              Vec3 reference_cg = ReferenceCG(state->controls);
+              Vec3 trim_moment =
+                  RotateZ(MomentAtReferenceCG(state->force, state->moment, state->controls), state->controls.angle);
+              ImGui::Text("Assumed CG: (%.4f, 0, 0) m, 25%% MAC", reference_cg.x);
+              ImGui::Text("CG roll % .3f | pitch % .3f | yaw % .3f N m", trim_moment.x, trim_moment.z, trim_moment.y);
               ImGui::Text("Lift %.3f N | Drag %.3f N", state->force.y, state->force.x);
               if (std::abs(state->force.x) > 1e-4f)
                 ImGui::Text("Instant L/D %.3f", state->force.y / state->force.x);

@@ -38,6 +38,8 @@ function updateControlLabels(){
 }
 function setControls(values){for(const [k,,,,,fallback] of specs){const value=values[k]??fallback;const input=$(`input-${k}`);if(flags.has(k)) input.checked=Boolean(value);else input.value=value;}updateControlLabels();}
 updateControlLabels();
+const cgReadout=document.createElement('p');cgReadout.className='hint';
+$('moment').closest('.panel').append(cgReadout);
 function send(patch){
   ++pending; $('ack').textContent='发送中…';
   commands=commands.catch(()=>{}).then(async()=>{
@@ -139,6 +141,9 @@ function updateNumbers(meta,bytes){
     $(key+'-norm').textContent=`${Math.hypot(...meta[key]).toFixed(2)} ${unit}`;
     $(key).textContent=meta[key].map((v,i)=>`${['X','Y','Z'][i]} ${v.toFixed(3)}`).join(' · ');
   }
+  cgReadout.textContent=meta.reference_cg_body&&meta.moment_reference_cg?
+    `假定重心 (${meta.reference_cg_body.map(v=>v.toFixed(4)).join(', ')}) m（25% MAC） · 该点俯仰力矩 Z ${meta.moment_reference_cg[2].toFixed(3)} N·m`:
+    '当前数据未提供参考重心力矩';
   $('mean-ld').textContent=meta.mean_ld == null ? '流场建立中…' : `${meta.mean_ld.toFixed(3)}（${meta.average_seconds.toFixed(3)} s 平均）`;
   updateDomain(meta);
   $('density-applied').textContent=`已显示：${meta.streamline_density??1} 级 · ${meta.streamline_seeds??84} 条种子流线（遇机体或低速区会截断）`;

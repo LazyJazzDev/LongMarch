@@ -18,6 +18,14 @@ int main() {
     return 30;
   std::cout << "Main-wing reference: area=" << reference.area << " span=" << reference.span
             << " MAC=" << reference.chord << " quarter_chord_x=" << reference.quarter_chord_x << '\n';
+  for (float angle : {0.f, 10.f}) {
+    Controls pose;
+    pose.angle = angle;
+    auto r = RotateZ(ReferenceCG(pose), -angle);
+    Vec3 force{0, 100, 0}, applied_at_cg{0, 0, 100 * r.x};
+    if (Length(MomentAtReferenceCG(force, applied_at_cg, pose)) > 1e-5f)
+      return 31;
+  }
   auto wing = AircraftPart(0, 1, controls);
   auto pylon = AircraftPart(6, 1, controls);
   const float length = 6, diameter = 2 * FuselageRadius(-1.5f, 1);

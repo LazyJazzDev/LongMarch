@@ -10,6 +10,7 @@
 #include <sstream>
 #include <thread>
 
+#include "aircraft_reference.h"
 #include "visualization.h"
 
 namespace {
@@ -295,6 +296,10 @@ int main(int argc, char **argv) {
         Vector(json, state->force);
         json << ",\"moment\":";
         Vector(json, state->moment);
+        json << ",\"reference_cg_body\":";
+        Vector(json, wind3d::ReferenceCG(state->controls));
+        json << ",\"moment_reference_cg\":";
+        Vector(json, wind3d::MomentAtReferenceCG(state->force, state->moment, state->controls));
         json << ",\"average_seconds\":" << average_span << ",\"mean_ld\":";
         double drag = state->impulse[0] - history.front().impulse[0];
         if (average_ready && drag > 1e-9)
