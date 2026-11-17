@@ -156,8 +156,19 @@ The 320 run completed 819 cycles to 3.00041 seconds and passed the same checks.
 For both runs, the 2–2.5 and 2.5–3 second L/D values differ by less than 1e-6.
 This demonstrates temporal settling, not spatial convergence: L/D increases
 14.2% from 256 to 320, with most of the lift increase on the main wing and lower
-tail/nacelle drag. The 384 study is pending; proximity to L/D 10 alone is not an
-accuracy criterion.
+tail/nacelle drag. The 384 study was stopped before completion when the evaluation
+priority changed; its partial trajectory is not a convergence result.
+
+The evaluation priority is computational efficiency and credible lift, drag,
+and control forces/moments across aircraft configurations. Strict spatial
+convergence is not an acceptance requirement. L/D near 10 at this one condition
+is a reference result, not a calibration target for other aircraft. Compare
+force and moment responses to incidence and flap/aileron/elevator/rudder changes,
+using consistent geometry, reference axes and physical settings, and report
+accuracy together with computation cost. Temporal settling and failed-projection
+checks remain necessary. Reference aerodynamic data are needed before claiming
+quantitative accuracy across configurations; the current fixed-aircraft runs
+alone do not establish it.
 The main half-wing span increased from 2.7 to 3.6 m with the same root/tip
 chords. Including raked tips, total span is 7.84 m and planform aspect
 ratio is about 11.56. Flap/aileron stations and the occupancy broad phase follow
