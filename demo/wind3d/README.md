@@ -733,3 +733,32 @@ are also ported. Build `wind3d_sweep` in `cmake-build-release`; use
 `--checkpoint DIRECTORY` to preserve sweep progress across preemption.
 Source revision `46184928` is provenance, not a claim of aerodynamic validation
 at every resolution or control setting.
+
+## 通用气动模型描述（基础接口）
+
+目标用途是游戏中的不可压缩气动近似：按物体离线采集不同来流与联动控制状态下的合力、合力矩，再拟合供实时引擎使用的模型。优先考虑采样效率、响应连续性与稳定性，不以严格网格收敛或指定升阻比作为验收要求。
+
+`wind3d_aero_model` 提供与飞机参数无关的 JSON 描述、部件层级和控制混合。当前阶段只解析描述并计算刚体姿态；不会加载或验证 mesh 文件，也尚未接入 CUDA 网格边界、批量气动采集或代理模型训练。
+
+```json
+{
+  "version": 1,
+  "units": "metres",
+  "reference_point": [0, 0, 0],
+  "controls": [{"name": "pitch", "min": -1, "max": 1, "default": 0}],
+  "parts": [
+    {"name": "body", "mesh": "body.obj"},
+    {"name": "tail", "mesh": "tail.obj", "parent": "body",
+     "translation": [2, 0, 0], "rotation_xyzw": [0, 0, 0, 1],
+     "hinge": {"pivot": [0, 0, 0], "axis": [0, 0, 1],
+               "offset_deg": 0, "min_deg": -30, "max_deg": 30,
+               "weights": {"pitch": 25}}}
+  ]
+}
+```
+
+mesh 路径相对于 JSON 文件；坐标使用右手系与米，旋转使用单位四元数。部件变换按 `parent * bind * hinge` 组合，铰链轴和支点位于部件局部坐标中。角度为 `offset_deg + sum(weight * control)`，按机械行程限幅并返回 `limited`。多个部件可引用同一控制量，同一部件可混合多个控制量；控制输入自身越界时返回错误。
+
+`BodyLoads` 接收世界坐标中的合力及关于世界原点的合力矩，返回物体坐标中的合力及关于指定物体局部参考点的合力矩。调用者必须传入刚体变换；力使用 N，力矩使用 N·m。
+
+在现有原生构建目录构建 `wind3d_model_inspect` 和 `wind3d_aero_model_check`。运行 `wind3d_model_inspect model.json [按声明顺序排列的控制值]` 查看部件姿态；省略控制值时使用默认状态。运行 `wind3d_aero_model_check out/wind3d-aero/model-contract-test.json` 验证控制混合、限位、父子变换、铰链支点以及力矩参考点转换（参数为可覆盖并删除的临时测试文件）。
