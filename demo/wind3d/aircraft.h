@@ -346,7 +346,7 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
     float pivot = airframe.tail_leading + .25f * .62f;
     Vec3 tx = RotateZ(ex, -airframe.tail_incidence), ty = RotateZ(ey, -airframe.tail_incidence);
     Vec3 origin = Add(Vec3{pivot, .12f, 0}, Scale(tx, -pivot));
-    FoilSpec tail{origin, tx, ty, ez, airframe.tail_span, .62f, .22f, airframe.tail_leading, .36f, .04f, 0, .12f};
+    FoilSpec tail{origin, tx, ty, ez, airframe.tail_span, .62f, .22f, airframe.tail_leading, .65f, .04f, 0, .12f};
     tail.root_fairing = {.22f * tail.span, .22f, 2.f};
     float begin = .24f * tail.span, end = .94f * tail.span;
     if (part == 8)

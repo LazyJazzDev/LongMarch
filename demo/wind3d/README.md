@@ -80,6 +80,10 @@ the body and rotates the wing about its fixed root quarter-chord. The tip has
 3 degrees of washout. Stabilizer installation (`--tail-incidence`) rotates the
 whole horizontal tail independently of elevator deflection. Both interfaces
 expose these distinct angles; CSV diagnostics record wing installation too.
+The generic horizontal tail uses a 0.65 leading-edge sweep slope (33.0 degrees;
+28.7 degrees at quarter chord for the default span) and retains its 2.29-degree
+dihedral. This is a swept transport-tail design choice, not a production-aircraft
+dimensional specification.
 
 The forebody now separates its radome crown, windshield region and cabin roof
 in the longitudinal profile. A nearly straight upper profile at body x
