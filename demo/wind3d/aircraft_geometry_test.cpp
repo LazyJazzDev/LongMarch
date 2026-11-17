@@ -66,7 +66,7 @@ int main() {
   split.flap = 0;
   if (Length(FowlerShift(AircraftPart(1, 1, split))) != 0)
     return 18;
-  for (int field = 0; field < 7; ++field) {
+  for (int field = 0; field < 9; ++field) {
     Controls changed;
     if (field == 0)
       changed.wing_controls.linked_flaps = false;
@@ -82,9 +82,17 @@ int main() {
       changed.wing_controls.spoiler_roll = 10;
     if (field == 6)
       changed.wing_controls.linked_spoiler_roll = true;
+    if (field == 7)
+      changed.wing_controls.slat = 20;
+    if (field == 8)
+      changed.wing_controls.linked_slats = true;
     if (SameAircraftGeometry(changed, Controls{}))
       return 19;
   }
+  WingControls invalid_slat;
+  invalid_slat.slat = 31;
+  if (ValidWingControls(invalid_slat))
+    return 27;
   size_t checked = 0, slots = 0;
   for (Airframe airframe : {Airframe{}, Airframe{2.7f, .025f, .55f, 1.05f, 1.65f}, Airframe{2, 0, 0, .6f, 1},
                             Airframe{4.2f, .06f, .7f, 1.4f, 2}, Airframe{2.65f, .025f, .55f, .98f, 1.65f, -10},
@@ -100,6 +108,40 @@ int main() {
       controls.wing_controls.spoiler = std::clamp(1.5f * deflection, 0.f, 60.f);
       controls.wing_controls.spoiler_roll = deflection < 0 ? -10.f : 10.f;
       controls.wing_controls.linked_spoiler_roll = deflection == 20;
+      controls.wing_controls.slat = std::clamp(.75f * deflection, 0.f, 30.f);
+      controls.wing_controls.linked_slats = deflection == 20;
+      for (int side : {-1, 1})
+        for (int panel = 0; panel < slat_panel_count; ++panel) {
+          auto slat = AircraftSlat(panel, side, controls);
+          float span = .5f * (slat.begin + slat.end);
+          for (float u : {0.f, .25f, .5f, .9f, 1.f})
+            for (float face : {-1.f, 1.f}) {
+              auto p = SlatPoint(slat, u, span, face);
+              if (slat.deflection > 0 && std::abs(SlatDistance(p, slat)) > 3e-6f)
+                return 23;
+              if (slat.deflection == 0 && AircraftDistance(RotateZ(p, -controls.angle), controls) > 3e-6f)
+                return 24;
+            }
+          if (slat.deflection >= 15) {
+            // Passage from the slat's aft upper surface to the main wing lower
+            // surface at the same developed chord station.
+            const auto &s = slat.spec;
+            auto a = SlatPoint(slat, .9f, span, 1);
+            auto local = SectionShape(s, FoilLocal(s, a), true);
+            float chord = s.root + (s.tip - s.root) * span / s.span;
+            float u = (local.x - s.leading - s.sweep * span) / chord;
+            local.y = s.dihedral * span + FoilCamber(u, chord, s.camber) - FoilThickness(u, chord, s.thickness);
+            auto b = Add(s.origin, FoilVector(s, SectionShape(s, local)));
+            auto middle = Scale(Add(a, b), .5f);
+            if (SlatDistance(middle, slat) <= .001f) {
+              std::cerr << "Slat passage: angle=" << slat.deflection << " panel=" << panel << " span=" << span
+                        << " camber=" << s.camber << " distance=" << SlatDistance(middle, slat) << '\n';
+              return 25;
+            }
+            if (panel >= 2 && AircraftDistance(RotateZ(middle, -controls.angle), controls) <= .001f)
+              return 26;
+          }
+        }
       for (int side : {-1, 1})
         for (int panel = 0; panel < spoiler_panel_count; ++panel) {
           auto spoiler = AircraftSpoiler(panel, side, controls);
@@ -175,8 +217,13 @@ int main() {
                         vertex.normal.z, vertex.color.x, vertex.color.y, vertex.color.z})
           if (!std::isfinite(v))
             return 4;
-        if (std::abs(Length(vertex.normal) - 1) > 2e-5f || AircraftDistance(vertex.position, controls) > .003f)
+        if (std::abs(Length(vertex.normal) - 1) > 2e-5f || AircraftDistance(vertex.position, controls) > .003f) {
+          std::cerr << "Mesh boundary mismatch: position=" << vertex.position.x << ',' << vertex.position.y << ','
+                    << vertex.position.z << " normal=" << Length(vertex.normal)
+                    << " distance=" << AircraftDistance(vertex.position, controls) << " deflection=" << deflection
+                    << '\n';
           return 5;
+        }
         bool color_ok = false;
         for (Vec3 color : {Vec3{.78f, .78f, .78f}, Vec3{.72f, .66f, .52f}, Vec3{.45f, .61f, .72f},
                            Vec3{.48f, .65f, .59f}, Vec3{.35f, .49f, .69f}})

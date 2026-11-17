@@ -38,6 +38,11 @@ class MeshBuilder {
         if (spoiler.deflection > 0)
           Spoiler(spoiler);
       }
+      for (int panel = 0; panel < slat_panel_count; ++panel) {
+        auto slat = AircraftSlat(panel, side, controls_);
+        if (slat.deflection > 0)
+          Slat(slat);
+      }
       Nacelle(side);
     }
     return std::move(vertices_);
@@ -120,6 +125,16 @@ class MeshBuilder {
       return SpoilerPoint(part, spoiler_first + (spoiler_last - spoiler_first) * p.x,
                           part.begin + (part.end - part.begin) * p.z, 2 * p.y - 1);
     };
+    Panel(position, {.45f, .61f, .72f});
+  }
+
+  void Slat(const SlatPart &part) {
+    Panel([&](Vec3 p) { return SlatPoint(part, p.x, part.begin + (part.end - part.begin) * p.z, 2 * p.y - 1); },
+          {.72f, .66f, .52f});
+  }
+
+  template <class Position>
+  void Panel(const Position &position, Vec3 color) {
     // Six sampled parametric faces, including the thin edges. Orient normals
     // against the derivative along the outward parameter direction.
     for (int face = 0; face < 3; ++face)
@@ -140,9 +155,16 @@ class MeshBuilder {
               Add(position(parameter(a, b + e, float(side))), Scale(position(parameter(a, b - e, float(side))), -1));
           Vec3 outward = Add(position(parameter(a, b, side + e)), Scale(position(parameter(a, b, side - e)), -1));
           Vec3 n = Cross(da, db);
+          if (face == 2) {
+            // All cap points share a section plane. Use an interior chord
+            // station and the full thickness to avoid cancellation at poles.
+            da = Add(position(parameter(.501f, b, float(side))), Scale(position(parameter(.499f, b, float(side))), -1));
+            db = Add(position(parameter(.5f, 1, float(side))), Scale(position(parameter(.5f, 0, float(side))), -1));
+            n = Cross(da, db);
+          }
           if (Dot(n, outward) * (side ? 1 : -1) < 0)
             n = Scale(n, -1);
-          return MakeVertex(p, n, {.45f, .61f, .72f});
+          return MakeVertex(p, n, color);
         };
         int na = face == 0 ? 1 : 12, nb = face == 2 ? 1 : 8;
         for (int a = 0; a < na; ++a)

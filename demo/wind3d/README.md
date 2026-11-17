@@ -377,6 +377,17 @@ symmetric bias to the roll controls. These are explicit geometric deflections,
 not force multipliers. Load histories track these changes, and diagnostics
 append all four configuration fields.
 
+Five leading-edge slat elements per wing can be deployed with **Leading-edge
+slats** / `--slat 0..30`. **Link slats to flaps** / `--link-slats` commands 75%
+of the larger flap deployment. Each element is a small closed airfoil, buried
+inside the main wing when retracted. The simplified telescoping track moves it
+forward by 16% and down by 9% of the local chord, reaching full travel at 15
+degrees, while rotating its section nose down. Deployed aft gaps and stowed
+containment are checked against the same analytic solids used by the solver.
+The main wing's existing nose remains as the exposed main-element nose; this
+is a generic slotted leading edge, not an exact production slat/cove mechanism.
+It adds no empirical lift increment or stall correction.
+
 Four finite-thickness spoiler panels per wing follow the upper wing skin when
 stowed and rotate upward about their swept leading hinges. **Speed brakes**
 (`--spoiler 0..60`) raises all panels symmetrically. **Spoiler roll**
@@ -392,6 +403,13 @@ measured `(drag, lift)` in N as `(115.84, 368.85)` stowed,
 Thus full deployment increases drag and dumps lift in this configuration;
 30-degree deployment reduces lift but does not monotonically increase total
 drag. These are coarse-grid behavior checks, not calibrated aircraft data.
+The 30-degree roll-only command produced a weak world-x moment of -0.55 N m
+at grid 128 and +0.36 N m at grid 256 in the same averaging window. The sign
+change and small response mean spoiler roll authority is not validated at
+these resolutions; the geometry/control path is implemented, but these values
+must not be treated as calibrated control derivatives. No solver changes or
+artificial force gains were introduced to hide this limitation.
+
 
 
 Inboard Fowler-type flaps extend rearward and down as they deflect. Their

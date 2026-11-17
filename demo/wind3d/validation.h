@@ -77,7 +77,7 @@ inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
   controls.speed = controls.speed > 15 ? 8 : 20;
   controls.angle = controls.angle == -8 ? 8 : -8;
   controls.flap = 25;
-  controls.wing_controls = {false, 15, -2, 3, 30, 10, false};
+  controls.wing_controls = {false, 15, -2, 3, 30, 10, false, 20, false};
   controls.aileron = 15;
   controls.elevator = -15;
   controls.rudder = 20;

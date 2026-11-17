@@ -53,6 +53,8 @@ int main(int argc, char **argv) {
       solver.corrected_transport = false;
     } else if (key == "--no-flow")
       view.flow = view.volume = false;
+    else if (key == "--link-slats")
+      controls.wing_controls.linked_slats = true;
     else if (key == "--link-spoiler-roll")
       controls.wing_controls.linked_spoiler_roll = true;
     else if (key == "--winglets")
@@ -85,6 +87,7 @@ int main(int argc, char **argv) {
       std::cout
           << "Wing devices: --outer-flap 0..40 (unlinks outer flap), --cruise-camber -5..5, --aileron-droop 0..15 (deg).\n";
       std::cout << "Spoilers: --spoiler 0..60 --spoiler-roll -30..30 --link-spoiler-roll.\n";
+      std::cout << "Leading edge: --slat 0..30 --link-slats (slat = 0.75 * maximum flap command).\n";
       return 0;
     } else {
       if (++i >= argc) {
@@ -182,6 +185,8 @@ int main(int argc, char **argv) {
           controls.wing_controls.cruise_camber = number;
         else if (key == "--aileron-droop")
           controls.wing_controls.aileron_droop = number;
+        else if (key == "--slat")
+          controls.wing_controls.slat = number;
         else if (key == "--spoiler")
           controls.wing_controls.spoiler = number;
         else if (key == "--spoiler-roll")
