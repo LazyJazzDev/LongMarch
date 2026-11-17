@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
              "[--aero] [--lfm|--maccormack|--first-order] [--viscosity NU] [--wall-viscosity NU] [--wall-model|--slip-walls|--cut-cells] [--cubic] [--sponge METRES] [--no-export] [--cfl 0.05..8] [--max-dt SECONDS] [--diagnostics file.csv] [--validate-time SECONDS] [--pressure-tolerance 1e-6..0.1] [--pressure-cycles 1..256] [--model-only] [--yaw RADIANS] [--pitch RADIANS] [--distance METRES] [--capture image.ppm] [--validate --steps N] [--debug]\n"
           << "--aero: LFM, air viscosity 1.5e-5 m^2/s, slip cut cells with wall-shear loads, CFL 0.25, 2 m sponge.\n"
           << "Place --aero before any individual solver overrides.\n";
+      std::cout << "--restore FILE resumes a checkpoint; supply its original grid, controls and solver settings.\n";
       return 0;
     } else {
       if (++i >= argc) {
@@ -87,6 +88,8 @@ int main(int argc, char **argv) {
         capture = value;
       else if (key == "--diagnostics")
         solver.diagnostics_path = value;
+      else if (key == "--restore")
+        solver.initial_checkpoint = value;
       else {
         char *end = nullptr;
         float number = std::strtof(value.c_str(), &end);
@@ -182,13 +185,16 @@ int main(int argc, char **argv) {
     return 2;
   if (validate && !wind3d::ValidateClosedSurface(device->GetCUDADeviceIndex(), solver.cut_cells))
     return 2;
+  solver.initial_controls = controls;
   auto simulation = wind3d::Simulation::Create(device->GetCUDADeviceIndex(), grid, solver);
   if (!simulation) {
     std::cerr << "CUDA initialization failed\n";
     return 1;
   }
-  simulation->Configure(controls, false);
-  simulation->Reset();
+  if (solver.initial_checkpoint.empty()) {
+    simulation->Configure(controls, false);
+    simulation->Reset();
+  }
   if (!validate)
     return wind3d::Render(device.Get(), *simulation, controls, frames, headless, capture, view) ? 0 : 1;
   uint64_t previous = 0;
@@ -200,7 +206,7 @@ int main(int argc, char **argv) {
       return 1;
     }
     auto state = simulation->Latest();
-    if (state && state->generation >= 1 && state->step != previous) {
+    if (state && (solver.initial_checkpoint.size() || state->generation >= 1) && state->step != previous) {
       previous = state->step;
       std::cout << "step=" << state->step << " time=" << state->time << " seconds=" << state->step_seconds
                 << " pressure_cycles=" << state->pressure_cycles << " residual=" << state->pressure_residual

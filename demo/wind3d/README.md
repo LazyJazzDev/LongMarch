@@ -18,6 +18,13 @@ It preserves grid, camera, control, export and diagnostic options. Put it before
 individual solver overrides. Without this preset, the original high-viscosity
 desktop demonstration defaults remain in effect.
 
+To inspect an existing solver checkpoint without repeating its startup, use
+`--aero --grid 256 --restore path/to/flow.checkpoint`. Supply the original grid,
+controls and solver settings: the checkpoint stores fields and load integrals,
+not those settings. The viewer resumes from the saved cycle; its Reset control
+still starts a fresh flow. Restoration errors are reported instead of silently
+starting over.
+
 ## Leapfrog Flow Maps desktop solver
 
 The desktop executable now defaults to **LFM on a 256 × 128 × 192 grid**.
