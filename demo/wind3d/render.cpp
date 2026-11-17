@@ -122,6 +122,7 @@ bool Render(IDevice *device,
   size_t stream_count = 0;
   int streamline_density = view.streamline_density;
   float streamline_width = view.streamline_width;
+  float opaque_curvature = view.opaque_curvature;
   bool paused = false, streamlines = view.flow, show_loads = view.loads, rebuild = true;
   bool show_volume = view.volume, colored_volume = false;
   float volume_density = 0.035f, volume_threshold = 6.0f, volume_step = 1.0f;
@@ -217,6 +218,10 @@ bool Render(IDevice *device,
               rebuild |= ImGui::Checkbox("3D streamlines", &streamlines);
               rebuild |= ImGui::SliderInt("Streamline density", &streamline_density, 1, 4);
               ImGui::SliderFloat("Streamline width (px)", &streamline_width, 0.75f, 4.0f);
+              ImGui::SliderFloat("Opaque curvature (1/m)", &opaque_curvature, 0.001f, 10.0f, "%.3f",
+                                 ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
+              ImGui::TextWrapped(
+                  "Straight flow is transparent. Curvature at this threshold is fully opaque; lower values reveal gentler bends.");
               rebuild |= ImGui::Checkbox("Force and moment vectors", &show_loads);
               ImGui::SliderFloat("Orbit", &yaw, -3.14f, 3.14f);
               ImGui::SliderFloat("Elevation", &pitch, -1.55f, 1.55f);
@@ -305,7 +310,7 @@ bool Render(IDevice *device,
       line_buffer = device->CreateBuffer({line_count * sizeof(Vertex)});
       if (!line_buffer || !commands->CmdUploadBuffer(line_buffer.Get(), 0, lines.data(), line_count * sizeof(Vertex)))
         return RenderFailure(__LINE__);
-      auto flow = FlowLines(*state, streamlines, false, streamline_density, false);
+      auto flow = streamlines ? visualization::DomainFlowLines(*state, streamline_density) : std::vector<Vertex>{};
       std::vector<StreamSegment> segments;
       segments.reserve(flow.size() / 2);
       auto same_point = [](Vec3 a, Vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; };
@@ -343,7 +348,7 @@ bool Render(IDevice *device,
               glm::vec4(eye, 1),
               glm::uvec4(0),
               {show_volume ? volume_density : 0, volume_threshold, 0.1f, colored_volume ? 1.0f : 0.0f},
-              {viewport_width, viewport_height, streamline_width, 0.72f / streamline_density}};
+              {viewport_width, viewport_height, streamline_width, opaque_curvature}};
 
     if (volume_state && volume_state == state) {
       uint32_t nx = uint32_t(state->solver_nx);

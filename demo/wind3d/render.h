@@ -8,6 +8,7 @@ struct ViewSettings {
   bool flow{false}, loads{true}, volume{true};
   int streamline_density{2};
   float streamline_width{1.5f};
+  float opaque_curvature{0.15f};
 };
 
 bool Render(grassland::rhi::IDevice *device,

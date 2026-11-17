@@ -4,7 +4,7 @@ struct Uniform {
   float4 eye;
   uint4 grid;
   float4 volumeSettings;      // density, threshold [s^-1], step [m], color mode
-  float4 streamlineSettings;  // viewport pixels, width pixels, opacity
+  float4 streamlineSettings;  // viewport pixels, width pixels, opaque curvature [1/m]
 };
 
 RHI_UNIFORM(0, 0, Uniform, globals);
@@ -29,7 +29,14 @@ struct StreamVarying {
   nointerpolation float segmentLength : TEXCOORD1;
   nointerpolation float3 color : COLOR0;
   nointerpolation float2 caps : TEXCOORD2;
+  float curvature : TEXCOORD3;
 };
+
+float Curvature(float3 a, float3 b, float3 c) {
+  float3 u = b - a, v = c - b;
+  float denominator = length(u) * length(v) * length(c - a);
+  return denominator > 1e-12 ? 2 * length(cross(u, v)) / denominator : 0;
+}
 
 StreamVarying VSStream(StreamInput input, uint id : SV_VertexID) {
   StreamVarying result;
@@ -37,6 +44,7 @@ StreamVarying VSStream(StreamInput input, uint id : SV_VertexID) {
   float4 b = mul(globals.transform, float4(input.end, 1));
   result.color = input.color;
   result.local = 0;
+  result.curvature = 0;
   result.segmentLength = 0;
   result.caps = float2(all(input.previous == input.start) ? 1 : 0, all(input.next == input.end) ? 1 : 0);
   result.position = float4(0, 0, -1, 1);
@@ -59,6 +67,13 @@ StreamVarying VSStream(StreamInput input, uint id : SV_VertexID) {
   float2 normal = float2(-direction.y, direction.x);
   const float2 corners[6] = {float2(0, -1), float2(1, -1), float2(0, 1), float2(0, 1), float2(1, -1), float2(1, 1)};
   float2 corner = corners[id];
+  float ka = Curvature(input.previous, input.start, input.end);
+  float kb = Curvature(input.start, input.end, input.next);
+  if (result.caps.x > 0)
+    ka = kb;
+  if (result.caps.y > 0)
+    kb = ka;
+  result.curvature = corner.x > 0 ? kb : ka;
   float extent = globals.streamlineSettings.z * 0.5 + 1;
   float4 clip = corner.x > 0 ? b : a;
   float cap = corner.x > 0 ? result.caps.y : result.caps.x;
@@ -93,7 +108,11 @@ float4 PSStream(StreamVarying input) : SV_Target0 {
   float coverage = saturate(0.5 - distance);
   if (coverage <= 0)
     discard;
-  return float4(input.color, coverage * globals.streamlineSettings.w);
+  float emphasis = saturate(input.curvature / globals.streamlineSettings.w);
+  if (emphasis <= 0)
+    discard;
+  float3 color = lerp(input.color, float3(1, 0.35, 0.06), emphasis);
+  return float4(color, coverage * emphasis);
 }
 
 #elif !defined(WIND3D_VOLUME)

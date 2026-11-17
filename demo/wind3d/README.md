@@ -18,6 +18,16 @@ It preserves grid, camera, control, export and diagnostic options. Put it before
 individual solver overrides. Without this preset, the original high-viscosity
 desktop demonstration defaults remain in effect.
 
+Desktop streamlines use seeds throughout the 16 x 8 x 12 m flow domain and
+trace both directions, including regions disconnected from inlet streamlines.
+Occupied seed bins limit duplicate coverage. In **View**, **Opaque curvature
+(1/m)** controls the world-space curvature at which a line becomes opaque and
+warm-colored (default 0.15/m). Straight segments are fully transparent; below
+the threshold opacity scales linearly with curvature. Lower the threshold to
+reveal gentler bending. Camera motion does not change this metric, and the
+slider updates shading without rebuilding trajectories. The same initial
+threshold can be set with `--streamline-curvature 0.15`.
+
 The desktop ImGui window includes side-by-side force (Fx/Fy/Fz) and moment
 (Mx/My/Mz) histories, using the same RGB axes and physical-time windows as the
 web frontend. Each completed solver step is recorded, retaining up to two
