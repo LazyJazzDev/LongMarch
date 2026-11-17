@@ -163,28 +163,23 @@ class MeshBuilder {
     }
   }
 
-  // Hinge fairing matching HingeKnuckle: a stadium cross-section (the circle of
-  // the hinge half-thickness, swept along any Fowler travel) extruded along the
-  // hinge line between the control's span limits, with capped ends.
+  // Rounded control nose matching HingeKnuckle, with capped ends. Fowler
+  // translation moves this nose without filling the open slot behind the wing.
   void Knuckle(const FoilPart &part, Vec3 color) {
     const auto &s = part.spec;
     float slope = (s.tip - s.root) / s.span;
     Vec3 hinge{s.leading + 0.72f * s.root, FoilCamber(0.72f, s.root, s.camber), 0};
     Vec3 axis = Unit({s.sweep + 0.72f * slope, s.dihedral + FoilCamber(0.72f, slope, s.camber), 1});
-    float extension = part.fowler ? part.deflection / 40 : 0;
-    Vec3 shift{0.10f * s.root * extension, -0.025f * s.root * extension, 0};
-    Vec3 travel = Add(shift, Scale(axis, -Dot(shift, axis)));
-    Vec3 e1 = Length(travel) > 1e-6f ? Unit(travel) : Unit(Cross(axis, Vec3{0, 0, 1}));
-    if (Length(travel) <= 1e-6f && Length(e1) < 0.5f)
+    Vec3 shift = FowlerShift(part);
+    Vec3 e1 = Unit(Cross(axis, Vec3{0, 0, 1}));
+    if (Length(e1) < 0.5f)
       e1 = Unit(Cross(axis, Vec3{0, 1, 0}));
     Vec3 e2 = Cross(axis, e1);
     constexpr int around = 48, along = 16;
     auto point = [&](float z, int k, Vec3 &normal) {
       float angle = 2 * pi * k / around;
       Vec3 d = Add(Scale(e1, cosf(angle)), Scale(e2, sinf(angle)));
-      Vec3 center = Add(hinge, Scale(axis, z / axis.z));
-      if (cosf(angle) >= 0)
-        center = Add(center, travel);
+      Vec3 center = Add(Add(hinge, Scale(axis, z / axis.z)), shift);
       float chord = s.root + (s.tip - s.root) * std::min(std::max(z / s.span, 0.0f), 1.0f);
       normal = FoilVector(s, d);
       return Add(s.origin,
@@ -202,8 +197,7 @@ class MeshBuilder {
     }
     for (float z : {part.begin, part.end}) {
       Vec3 normal = FoilVector(s, Scale(Vec3{0, 0, 1}, z == part.begin ? -1.0f : 1.0f)), unused;
-      Vec3 middle =
-          Add(s.origin, FoilVector(s, SectionShape(s, Add(Add(hinge, Scale(axis, z / axis.z)), Scale(travel, 0.5f)))));
+      Vec3 middle = Add(s.origin, FoilVector(s, SectionShape(s, Add(Add(hinge, Scale(axis, z / axis.z)), shift))));
       for (int k = 0; k < around; ++k)
         Triangle(MakeVertex(middle, normal, color), MakeVertex(point(z, k, unused), normal, color),
                  MakeVertex(point(z, k + 1, unused), normal, color));

@@ -364,10 +364,17 @@ span. It has a constant-section cabin, rounded forebody, upswept tailcone,
 continuous belly/wing-root fairing, cockpit glazing, passenger windows and doors.
 The low-mounted main wing has sweep, dihedral, camber and raked tips. Two
 stationary nacelles and pylons are part of both the visible geometry and solid
-boundary. They are unpowered solid nacelles with a dark fan-face representation;
+boundary. They are unpowered flow-through nacelles with an annular wall;
 this is not an engine mass-flow or thrust model.
 
-Inboard Fowler-type flaps extend rearward as they deflect. Outboard differential
+Inboard Fowler-type flaps extend rearward and down as they deflect. Their
+rounded leading edges translate with the flap, leaving a real open slot behind
+the fixed wing; no connecting capsule fills this passage. Travel reaches
+16% of root chord rearward and 6% downward at 20 degrees. The surface and solid
+boundary share this motion. CPU geometry checks verify fluid passages through
+the deployed slots as well as sealed ordinary hinges. Resolving the slot flow
+still depends on the local fluid grid; this is not a validation of high-lift
+performance. Outboard differential
 ailerons, the horizontal stabilizer's elevators and the vertical stabilizer's
 rudder rotate about their actual swept three-dimensional hinge lines. Control
 surfaces have closed hinge, root and tip faces. Muted tan, blue and green surfaces

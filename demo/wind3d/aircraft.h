@@ -279,6 +279,13 @@ WIND3D_HD Vec3 RotateAxis(Vec3 p, Vec3 axis, float angle) {
   return Add(Add(Scale(p, cosf(a)), Scale(Cross(axis, p), sinf(a))), Scale(axis, Dot(axis, p) * (1 - cosf(a))));
 }
 
+// Fowler travel is shared by the flap surface and its rounded leading edge.
+// The nose moves with the flap; no solid bridge fills the deployed slot.
+WIND3D_HD Vec3 FowlerShift(const FoilPart &part) {
+  float extension = part.fowler ? fminf(fmaxf(part.deflection / 20, 0), 1) : 0;
+  return {.16f * part.spec.root * extension, -.06f * part.spec.root * extension, 0};
+}
+
 // Rotate the entire control about its swept, tapered 3D hinge line, rather
 // than independently rotating each section about the world span axis.
 WIND3D_HD Vec3 ControlTransform(const FoilPart &part, Vec3 p, bool inverse) {
@@ -286,8 +293,7 @@ WIND3D_HD Vec3 ControlTransform(const FoilPart &part, Vec3 p, bool inverse) {
   float slope = (s.tip - s.root) / s.span;
   Vec3 hinge{s.leading + 0.72f * s.root, FoilCamber(0.72f, s.root, s.camber), 0};
   Vec3 axis = Unit({s.sweep + 0.72f * slope, s.dihedral + FoilCamber(0.72f, slope, s.camber), 1});
-  float extension = part.fowler ? part.deflection / 40 : 0;
-  Vec3 shift{0.10f * s.root * extension, -0.025f * s.root * extension, 0};
+  Vec3 shift = FowlerShift(part);
   if (inverse)
     p = Add(p, Scale(shift, -1));
   p = Add(hinge, RotateAxis(Add(p, Scale(hinge, -1)), axis, inverse ? part.deflection : -part.deflection));
@@ -298,25 +304,20 @@ WIND3D_HD Vec3 ControlTransform(const FoilPart &part, Vec3 p, bool inverse) {
 // whose radius is the airfoil half-thickness at the hinge. Each flat hinge cut
 // is a diameter of it, so at any deflection it closes the wedge between the
 // fixed part and the control, as the rounded nose of a control surface in its
-// cove does. For a Fowler flap it spans the rearward travel as well, which
-// models the flap with its slot closed.
+// cove does. A Fowler nose translates with the flap, leaving an open slot.
 WIND3D_HD float HingeKnuckle(const FoilPart &part, Vec3 local) {
   const auto &s = part.spec;
   float slope = (s.tip - s.root) / s.span;
   Vec3 hinge{s.leading + 0.72f * s.root, FoilCamber(0.72f, s.root, s.camber), 0};
   Vec3 axis = Unit({s.sweep + 0.72f * slope, s.dihedral + FoilCamber(0.72f, slope, s.camber), 1});
-  float extension = part.fowler ? part.deflection / 40 : 0;
-  Vec3 shift{0.10f * s.root * extension, -0.025f * s.root * extension, 0};
-  Vec3 v = Add(local, Scale(hinge, -1));
+  Vec3 shift = FowlerShift(part);
+  Vec3 v = Add(Add(local, Scale(shift, -1)), Scale(hinge, -1));
   Vec3 radial = Add(v, Scale(axis, -Dot(v, axis)));
-  Vec3 travel = Add(shift, Scale(axis, -Dot(shift, axis)));
-  float length = Dot(travel, travel);
-  float t = length > 0 ? fminf(fmaxf(Dot(radial, travel) / length, 0), 1) : 0;
   // Span station of the hinge-line point nearest to `local`: the knuckle ends
   // in planes perpendicular to the swept hinge line.
   float station = Dot(v, axis) * axis.z;
   float chord = s.root + (s.tip - s.root) * fminf(fmaxf(station / s.span, 0), 1);
-  float d = Length(Add(radial, Scale(travel, -t))) - FoilThickness(0.72f, chord, s.thickness);
+  float d = Length(radial) - FoilThickness(0.72f, chord, s.thickness);
   return fmaxf(d, fmaxf(part.begin - station, station - part.end));
 }
 

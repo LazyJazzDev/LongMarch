@@ -54,7 +54,7 @@ int main() {
   raked.airframe.winglets = false;
   if (SameAirframe(raked.airframe, controls.airframe) || AircraftPart(3, 1, raked).spec.blended_tip)
     return 14;
-  size_t checked = 0;
+  size_t checked = 0, slots = 0;
   for (Airframe airframe : {Airframe{}, Airframe{2.7f, .025f, .55f, 1.05f, 1.65f}, Airframe{2, 0, 0, .6f, 1},
                             Airframe{4.2f, .06f, .7f, 1.4f, 2}, Airframe{2.65f, .025f, .55f, .98f, 1.65f, -10},
                             Airframe{2.65f, .025f, .55f, .98f, 1.65f, 10}}) {
@@ -70,8 +70,24 @@ int main() {
           auto foil = AircraftPart(part, side, controls);
           for (int station = 1; station < 10; ++station) {
             float span = foil.begin + (foil.end - foil.begin) * station / 10;
-            // The line between the fixed and deflected hinge sections must stay
-            // inside the fairing, including the full Fowler translation.
+            if (foil.fowler && foil.deflection > 0) {
+              // A deployed slot must contain fluid between the fixed trailing
+              // face and the translated flap nose, on both mirrored wings.
+              auto fixed = FoilPoint(foil, .72f, span, 0, false);
+              auto moved = FoilPoint(foil, .72f, span, 0, true);
+              bool gap = false;
+              for (int i = 1; i < 20; ++i) {
+                auto p = Add(Scale(fixed, 1 - i / 20.f), Scale(moved, i / 20.f));
+                gap |= AircraftDistance(RotateZ(p, -controls.angle), controls) > .001f;
+              }
+              if (!gap) {
+                std::cerr << "Closed Fowler slot\n";
+                return 15;
+              }
+              ++slots;
+              continue;
+            }
+            // Ordinary hinges and retracted flaps stay sealed.
             for (float surface : {-.8f, 0.f, .8f}) {
               auto fixed = FoilPoint(foil, .72f, span, 0, false);
               fixed = Add(foil.spec.origin,
@@ -112,6 +128,6 @@ int main() {
       }
     }
   }
-  std::cout << "PASS " << checked
-            << " sealed hinge samples, mesh/occupancy agreement, neutral skin and retained nacelle/pylon\n";
+  std::cout << "PASS " << checked << " sealed hinge samples, " << slots
+            << " open slot sections, mesh/occupancy agreement\n";
 }
