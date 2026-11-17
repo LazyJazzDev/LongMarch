@@ -187,12 +187,17 @@ bool Render(IDevice *device,
             }
             ImGui::SeparatorText("Integrated aircraft loads");
             if (state) {
-              ImGui::TextColored({0.1f, 1, 0.8f, 1}, "Force [N]");
+              ImGui::TextColored({0.1f, 1, 0.8f, 1}, "World-axis force [N]");
               ImGui::Text("Fx % .3f\nFy % .3f\nFz % .3f", state->force.x, state->force.y, state->force.z);
               ImGui::Text("Magnitude %.3f N", Length(state->force));
-              ImGui::TextColored({1, 0.25f, 0.85f, 1}, "Moment [N m], about body origin");
+              ImGui::TextColored({1, 0.25f, 0.85f, 1}, "World-axis moment [N m], about body origin");
               ImGui::Text("Mx % .3f\nMy % .3f\nMz % .3f", state->moment.x, state->moment.y, state->moment.z);
               ImGui::Text("Magnitude %.3f N m", Length(state->moment));
+              Vec3 body_moment = RotateZ(state->moment, state->controls.angle);
+              ImGui::Text("Body roll  % .3f\nBody pitch % .3f\nBody yaw   % .3f", body_moment.x, body_moment.z,
+                          body_moment.y);
+              ImGui::TextWrapped(
+                  "Body moments [N m] use the same body origin and right-hand signs, not a specified center of mass.");
               ImGui::Text("Lift %.3f N | Drag %.3f N", state->force.y, state->force.x);
               if (std::abs(state->force.x) > 1e-4f)
                 ImGui::Text("Instant L/D %.3f", state->force.y / state->force.x);
@@ -210,7 +215,7 @@ bool Render(IDevice *device,
             ImGui::TextWrapped(
                 "+x downstream, +y up, +z starboard. Moment follows right-hand rule. Arrows share an elevated origin with compressed length.");
             ImGui::TextWrapped(
-                "Incompressible, laminar, voxel boundary. Qualitative demonstration; no turbulence or aerodynamic certification.");
+                "Incompressible flow without a turbulence model. Absolute aircraft loads require aerodynamic reference validation.");
             ImGui::End();
             auto &io = ImGui::GetIO();
             if (!io.WantCaptureMouse) {

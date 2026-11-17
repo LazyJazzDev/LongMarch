@@ -169,6 +169,27 @@ accuracy together with computation cost. Temporal settling and failed-projection
 checks remain necessary. Reference aerodynamic data are needed before claiming
 quantitative accuracy across configurations; the current fixed-aircraft runs
 alone do not establish it.
+
+A 128-grid control-response screen at 12 m/s and 5 degrees used the time-weighted
+1–1.5 second window. Each fresh-start case required about 12.6–12.8 seconds of
+cumulative solver time on the RTX 5080 (excluding setup, rendering and lifecycle
+checks). All seven cases passed projection and lifecycle checks. Body-axis
+moments follow the right-hand rule about the fixed body origin, not a specified
+center of mass; roll/pitch/yaw are body x/z/y respectively.
+
+| Control | Body roll (N m) | Body pitch (N m) | Body yaw (N m) |
+| --- | ---: | ---: | ---: |
+| Neutral | 0.10 | -10.14 | 0.02 |
+| Aileron +10° | -33.92 | -3.13 | 1.03 |
+| Aileron -10° | 34.14 | -3.13 | -0.99 |
+| Elevator +10° | 0.11 | 32.53 | 0.02 |
+| Elevator -10° | 0.09 | -41.17 | 0.02 |
+| Rudder +10° | 1.13 | -10.14 | -3.50 |
+| Rudder -10° | -0.93 | -10.14 | 3.54 |
+
+This checks control-response direction and lateral symmetry, not agreement with
+measured aircraft derivatives. The desktop load panel displays both world-axis
+components and these body-axis moments using the snapshot's applied incidence.
 The main half-wing span increased from 2.7 to 3.6 m with the same root/tip
 chords. Including raked tips, total span is 7.84 m and planform aspect
 ratio is about 11.56. Flap/aileron stations and the occupancy broad phase follow
