@@ -114,6 +114,38 @@ checks change controls or reset the flow. This checkpoint can be restored by
 the desktop with the same settings, avoiding another startup transient.
 The save option requires validation mode and reports write failures.
 
+### Revised-airframe cruise trim example
+
+For the default narrow-body dimensions and blended winglets, a clean-airframe
+approximate pitch trim was verified at 30 m/s on the 256 x 128 x 192 grid:
+incidence **7.83 degrees**, stabilizer incidence **+3.09 degrees**, and elevator
+**-8.00 degrees** (trailing edge up). All other deflections, including cruise
+camber, are zero. The assumed body CG is `(-0.293852, 0, 0)` m; no aircraft mass
+or measured CG was supplied. This is aerodynamic pitch trim at a prescribed
+attitude, not a free-flight equilibrium including propulsion or mass dynamics.
+
+The dt-weighted 0.5..0.6 s mean force in world axes was
+`(131.56685, 850.77716, -0.01088)` N. Mean moment about the assumed CG was
+`(0.08099, 0.01264, 1.17001)` N m, with pitch coefficient `Cm = 0.0010171`.
+`CL = 0.493559` and `L/D = 6.46650`; lift is 1.29% below the provisional
+CL=0.5 search target. The 0.4..0.5 s window gave lift 850.94995 N and CG pitch
+moment 1.18989 N m: the adjacent-window changes are 0.0203% in lift and
+0.01988 N m in pitch moment. Projection and lifecycle checks passed. These
+are finite-grid game-model results, not a grid-convergence or real-aircraft
+accuracy claim. Small control changes can have non-monotone load responses
+on this grid, so these values are not a fitted elevator derivative.
+
+```powershell
+cmake-build-release/demo/wind3d/demo_wind3d --aero --grid 256 --speed 30 --angle 7.83 --tail-incidence 3.09 --elevator -8 --validate --validate-time 0.6 --no-export --diagnostics out/wind3d-aero/trim-e-8-256.csv --save-checkpoint out/wind3d-aero/trim-e-8-256.bin
+cmake-build-release/demo/wind3d/demo_wind3d --aero --grid 256 --speed 30 --angle 7.83 --tail-incidence 3.09 --elevator -8 --restore out/wind3d-aero/trim-e-8-256.bin
+```
+
+The saved checkpoint is a local generated artifact. For web restoration, first
+set the mailbox to those same controls, then run `wind3d_web DIRECTORY 256 1
+aero 0 out/wind3d-aero/trim-e-8-256.bin`. The worker applies startup controls
+before restoring the field. Removing decorative surface markings does not
+change the solid boundary or invalidate this flow state.
+
 The desktop also accepts bounded airframe parameters: `--wing-span` (half-span
 excluding the raked tip, 2–4.2 m), `--wing-camber` (0–0.06 chord), `--wing-sweep`
 (leading-edge slope, 0–0.7), `--tail-span` (horizontal half-span, 0.6–1.4 m), and
@@ -392,7 +424,7 @@ behind the requested panel values.
 The model is a generic scaled narrow-body airliner, 6 m long with a nominal
 5.80 m span including blended winglets (5.72 m with raked tips). It has a
 constant-section cabin, rounded forebody, upswept tailcone,
-continuous belly/wing-root fairing, cockpit glazing, passenger windows and doors.
+and a continuous belly/wing-root fairing.
 The low-mounted main wing has sweep, dihedral, spanwise section variation and
 selectable blended winglets or raked tips. Two
 stationary nacelles and pylons are part of both the visible geometry and solid
@@ -455,14 +487,15 @@ performance. Outboard differential
 ailerons, the horizontal stabilizer's elevators and the vertical stabilizer's
 rudder rotate about their actual swept three-dimensional hinge lines. Control
 surfaces have closed hinge, root and tip faces. Muted tan, blue and green surfaces
-identify flaps, ailerons and elevators; the fin has a blue livery. The explicit
+identify flaps, ailerons and elevators; blue identifies the rudder. The explicit
 mesh and occupancy test share the complete geometry specification and hinge
 transforms in `aircraft.h`. Rendering does not reconstruct an implicit surface.
 The fluid still voxelizes the solid at its own grid resolution.
 
-Cockpit glazing and two cabin-window rows are shallow surface markings used to
-make the model's passenger-aircraft scale legible. They do not alter the
-fluid solid or loads. Structural proportions and all movable aerodynamic
+The aircraft is a plain neutral white/gray model. Color identifies control
+surface regions only; there are no cockpit/window markings, door outlines,
+livery or nacelle tinting. Removing these decorative overlays does not alter
+the fluid solid or loads. Structural proportions and all movable aerodynamic
 surfaces remain defined by the shared geometry functions.
 
 Use `--model-only` to inspect the aircraft without flow/load vectors. Camera
@@ -810,13 +843,14 @@ Fx 107.986 N, Fy 852.039 N, CL 0.384566, CD 0.048739, L/D 7.8903
 over 0.55008–0.70007 s (7,910 steps). The 1/2/4/8-GPU regression also
 compares per-step loads as well as full/final-export fields.
 
-The current `high-bypass-v2` geometry uses a neutral gray skin, with colors only
+The historical `high-bypass-v2` geometry used a neutral gray skin, with colors only
 on flap, aileron, elevator and rudder surfaces. Decorative glazing, door outlines,
-belly/tail paint and inlet/duct tinting are removed. The pylons are 0.18 m high
-(previously 0.32 m); the unpowered flow-through nacelles use a larger rounded
+belly/tail paint and inlet/duct tinting were removed. Its pylons were 0.18 m high
+(previously 0.32 m); its unpowered flow-through nacelles used a larger rounded
 inlet, a short 0.83 m fan cowl and a contracted aft body. Rendering and the solver
-share these profiles. The reference coefficients above describe the earlier
-imported geometry, not this revised engine installation.
+shared these profiles. The reference coefficients above describe the earlier
+imported geometry, not that revised engine installation or the current
+narrow-body dimensions documented at the start of this file.
 
 The web console provides four streamline seed densities: 84, 287, 610 and
 1,053 (default 287). Density changes retrace the current display field on the
