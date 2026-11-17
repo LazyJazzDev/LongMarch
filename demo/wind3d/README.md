@@ -25,6 +25,15 @@ geometric option, not a guaranteed drag improvement. Diagnostics record the
 choice as `winglets`; projected span accounts for the bend rather than using
 the tip's developed length.
 
+Horizontal and vertical tail roots now flare in both chord and thickness,
+with a smooth compact transition back to their regular sections. The nacelle
+pylon has separate lower and upper shoulders meeting the nacelle crown and
+wing underside. The same invertible section deformation generates their
+rendered skins and solid boundaries. These are generic junction fairings;
+no claim of globally tangent production surfaces or measured drag reduction
+is implied. The wing-body belly and root shoulders remain integrated in the
+fuselage skin.
+
 The horizontal stabilizer has an independent incidence setting via
 `--tail-incidence -10..10` and **Wind and controls / Stabilizer trim** in the
 desktop UI. Positive incidence raises its leading edge. The whole stabilizer

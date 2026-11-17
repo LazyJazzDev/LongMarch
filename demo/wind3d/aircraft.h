@@ -165,6 +165,7 @@ struct FoilSpec {
   float span, root, tip, leading, sweep, dihedral, camber, thickness;
   float washout{}, tip_camber_scale{1}, tip_thickness_scale{1};
   bool blended_tip{};
+  Vec3 root_fairing{}, tip_fairing{};  // Span extent, extra chord scale, extra thickness scale.
 };
 
 // Circular root blend followed by a straight canted tip. Cross-sections rotate
@@ -197,14 +198,21 @@ WIND3D_HD Vec3 SectionShape(const FoilSpec &s, Vec3 p, bool inverse = false) {
   float chord = s.root + (s.tip - s.root) * t;
   float leading = s.leading + s.sweep * p.z;
   float camber = s.camber * (1 + (s.tip_camber_scale - 1) * t);
-  float thickness_scale = 1 + (s.tip_thickness_scale - 1) * t;
+  float root = s.root_fairing.x > 0 ? 1 - Smooth(p.z / s.root_fairing.x) : 0;
+  float tip = s.tip_fairing.x > 0 ? 1 - Smooth((s.span - p.z) / s.tip_fairing.x) : 0;
+  float chord_scale = 1 + root * s.root_fairing.y + tip * s.tip_fairing.y;
+  float thickness_scale = (1 + (s.tip_thickness_scale - 1) * t) * (1 + root * s.root_fairing.z + tip * s.tip_fairing.z);
   Vec3 pivot{leading + .25f * chord, s.dihedral * p.z + FoilCamber(.25f, chord, camber), p.z};
   if (inverse)
     p = Add(pivot, RotateZ(Add(p, Scale(pivot, -1)), -s.washout * t));
+  if (inverse)
+    p.x = pivot.x + (p.x - pivot.x) / chord_scale;
   float u = fminf(fmaxf((p.x - leading) / chord, 0), 1);
   float base = s.dihedral * p.z + FoilCamber(u, chord, s.camber);
   float shaped = s.dihedral * p.z + FoilCamber(u, chord, camber);
   p.y = inverse ? base + (p.y - shaped) / thickness_scale : shaped + (p.y - base) * thickness_scale;
+  if (!inverse)
+    p.x = pivot.x + (p.x - pivot.x) * chord_scale;
   return inverse ? p : TipBend(s, Add(pivot, RotateZ(Add(p, Scale(pivot, -1)), s.washout * t)));
 }
 
@@ -287,27 +295,21 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
     float pivot = airframe.tail_leading + .25f * .62f;
     Vec3 tx = RotateZ(ex, -airframe.tail_incidence), ty = RotateZ(ey, -airframe.tail_incidence);
     Vec3 origin = Add(Vec3{pivot, .12f, 0}, Scale(tx, -pivot));
-    return {{origin, tx, ty, ez, airframe.tail_span, .62f, .22f, airframe.tail_leading, .36f, .04f, 0, .12f},
-            0,
-            airframe.tail_span,
-            controls.elevator,
-            true,
-            false};
+    FoilSpec tail{origin, tx, ty, ez, airframe.tail_span, .62f, .22f, airframe.tail_leading, .36f, .04f, 0, .12f};
+    tail.root_fairing = {.42f, .22f, 2.f};
+    return {tail, 0, airframe.tail_span, controls.elevator, true, false};
   }
-  if (part == 5)
-    return {{{0, 0.15f, 0}, ex, {0, 0, 1}, {0, 1, 0}, 0.85f, 0.90f, 0.30f, 1.40f, 0.6f, 0, 0, 0.12f},
-            0,
-            0.85f,
-            controls.rudder,
-            true,
-            false};
-  // The pylon root sits inside the nacelle's upper wall, clear of the duct.
-  return {{{0, -0.25f, side * 0.92f}, ex, {0, 0, 1}, {0, 1, 0}, 0.12f, 0.40f, 0.46f, -0.65f, 0.65f, 0, 0, 0.12f},
-          0,
-          0.12f,
-          0,
-          false,
-          false};
+  if (part == 5) {
+    FoilSpec fin{{0, .15f, 0}, ex, {0, 0, 1}, {0, 1, 0}, .85f, .90f, .30f, 1.40f, .6f, 0, 0, .12f};
+    fin.root_fairing = {.30f, .45f, 2.f};
+    return {fin, 0, .85f, controls.rudder, true, false};
+  }
+  // Flared pylon shoulders meet the nacelle crown and wing underside. The
+  // root remains inside the nacelle wall, clear of its through-flow duct.
+  FoilSpec pylon{{0, -.25f, side * .92f}, ex, {0, 0, 1}, {0, 1, 0}, .12f, .40f, .46f, -.65f, .65f, 0, 0, .12f};
+  pylon.root_fairing = {.05f, .08f, 2.f};
+  pylon.tip_fairing = {.055f, .10f, 2.5f};
+  return {pylon, 0, .12f, 0, false, false};
 }
 
 WIND3D_HD float ProjectedWingSpan(const Controls &controls) {

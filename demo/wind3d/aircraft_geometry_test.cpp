@@ -25,6 +25,18 @@ int main() {
         return 8;
     }
   }
+  for (int part : {4, 5, 6})
+    for (int side : {-1, 1}) {
+      const auto spec = AircraftPart(part, side, controls).spec;
+      for (float fraction : {0.f, .1f, .3f, .7f, 1.f})
+        for (float u : {0.f, .25f, .72f, 1.f}) {
+          float z = spec.span * fraction, chord = spec.root + (spec.tip - spec.root) * fraction;
+          Vec3 point{spec.leading + spec.sweep * z + u * chord, .03f, z};
+          auto restored = SectionShape(spec, SectionShape(spec, point), true);
+          if (Length(Add(restored, Scale(point, -1))) > 3e-6f)
+            return 28;
+        }
+    }
   auto tip = AircraftPart(3, 1, controls);
   for (float u : {0.f, .25f, .5f, .9f, 1.f})
     for (int surface : {-1, 1}) {
