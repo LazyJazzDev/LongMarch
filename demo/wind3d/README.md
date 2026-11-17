@@ -598,6 +598,21 @@ instantaneous streamlines, full-grid force and moment, and solver diagnostics.
 Geometry and streamline construction are shared with the native renderer in
 `visualization.h`; the web console does not substitute a different aircraft.
 
+For a native Windows preview with the desktop aerodynamic settings, build
+`wind3d_web` in the existing release directory, then run these in separate
+terminals from the repository root:
+
+```powershell
+cmake-build-release/demo/wind3d/wind3d_web.exe out/wind3d-web/local-modern 128 1 aero 0
+python demo/wind3d/web/server.py --directory out/wind3d-web/local-modern --bind 127.0.0.1 --port 10510
+```
+
+Open `http://127.0.0.1:10510`. The `aero` profile uses the existing LFM desktop
+settings and starts at 30 m/s. The trailing zero means no automatic stop time.
+The full procedural surface is exported independently of fluid grid resolution.
+After geometry source changes, rebuild and restart the worker; the page fetches
+the new mesh ID automatically. No fluid algorithm is changed by this profile.
+
 On the login node, start the relay (Python 3 standard library only):
 
 ```sh

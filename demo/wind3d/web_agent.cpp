@@ -48,7 +48,8 @@ bool Same(const wind3d::Controls &a, const wind3d::Controls &b) {
 
 int main(int argc, char **argv) {
   if (argc != 4 && argc != 6 && argc != 7) {
-    std::cerr << "wind3d_web DIRECTORY GRID GPUS [baseline|linear-cut|linear-slip|viscous STOP_TIME [CHECKPOINT]]\n";
+    std::cerr
+        << "wind3d_web DIRECTORY GRID GPUS [aero|baseline|linear-cut|linear-slip|viscous STOP_TIME [CHECKPOINT]]\n";
     return 1;
   }
   std::filesystem::path directory(argv[1]);
@@ -62,7 +63,8 @@ int main(int argc, char **argv) {
   options.devices = std::atoi(argv[3]);
   options.record_loads = true;
   std::string profile = argc >= 6 ? argv[4] : "baseline";
-  if (profile != "baseline" && profile != "linear-cut" && profile != "linear-slip" && profile != "viscous")
+  if (profile != "baseline" && profile != "linear-cut" && profile != "linear-slip" && profile != "viscous" &&
+      profile != "aero")
     return 1;
   if (argc >= 6) {
     if (options.devices != 1)
@@ -73,7 +75,7 @@ int main(int argc, char **argv) {
     options.initial_controls.speed = 30;
     options.initial_controls.angle = 6;
     options.diagnostics_path = (directory / "diagnostics.csv").string();
-    if (profile != "baseline") {
+    if (profile != "baseline" && profile != "aero") {
       options.corrected_transport = false;
       options.cubic = false;
       options.cut_cells = profile == "linear-cut";
@@ -85,6 +87,16 @@ int main(int argc, char **argv) {
       options.wall_momentum = true;
       options.viscosity = 0.005f;
     }
+  }
+  if (profile == "aero") {
+    options.leapfrog_flow_maps = true;
+    options.viscosity = options.wall_viscosity = 1.5e-5f;
+    options.wall_model = options.cut_cells = true;
+    options.wall_momentum = false;
+    options.cubic = false;
+    options.sponge = 2;
+    options.cfl = .25f;
+    options.pressure_cycles = 128;
   }
   if (argc == 7)
     options.initial_checkpoint = argv[6];
@@ -256,7 +268,7 @@ int main(int argc, char **argv) {
              << ",\"streamline_seeds\":" << (20 * density + 1) * (3 * density + 1)
              << ",\"domain_min\":[-6,-4,-6],\"domain_max\":[10,4,6]";
         json << ",\"solver_model\":\"uniform-" << profile
-             << "\",\"geometry_model\":\"camber025-sealed-hinges-high-bypass\",\"force\":";
+             << "\",\"geometry_model\":\"narrowbody-span572-washout3\",\"force\":";
         Vector(json, state->force);
         json << ",\"moment\":";
         Vector(json, state->moment);
