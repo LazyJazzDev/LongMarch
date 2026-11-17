@@ -195,7 +195,7 @@ __global__ void FaceMask(Grid g,
   bu[n] = bv[n] = bw[n] = 0;
   au[n] = av[n] = aw[n] = 255;
   Vec3 body = BodyPoint(g.Position(x, y, z), controls);
-  if (body.x < -3.1f - 2 * g.h || body.x > 3.4f + 2 * g.h || fabsf(body.z) > aircraft_span_bound + 2 * g.h ||
+  if (body.x < -3.1f - 2 * g.h || body.x > 3.4f + 2 * g.h || fabsf(body.z) > AircraftSpanBound(controls) + 2 * g.h ||
       body.y < -0.85f - 2 * g.h || body.y > 1.4f + 2 * g.h)
     return;
   unsigned char *faces[] = {bu, bv, bw}, *apertures[] = {au, av, aw};
@@ -1480,7 +1480,7 @@ struct Simulation::Impl {
         return;
       }
       diagnostics
-          << "step,generation,time,dt,max_speed,divergence_before,divergence_after,pressure_residual,pressure_cycles,pressure_converged,fx,fy,fz,mx,my,mz,step_seconds,transport_seconds,pressure_seconds,diagnostics_seconds,force_norm,moment_norm,lift_drag_ratio,mean_lift_drag_ratio,lfm,pressure_fx,pressure_fy,pressure_fz,friction_fx,friction_fy,friction_fz,fuselage_drag,fuselage_lift,wing_drag,wing_lift,horizontal_tail_drag,horizontal_tail_lift,vertical_tail_drag,vertical_tail_lift,nacelle_drag,nacelle_lift,speed,angle,flap,aileron,elevator,rudder,grid,viscosity,wall_viscosity,wall_model,wall_momentum,cut_cells,cubic,cfl,sponge\n";
+          << "step,generation,time,dt,max_speed,divergence_before,divergence_after,pressure_residual,pressure_cycles,pressure_converged,fx,fy,fz,mx,my,mz,step_seconds,transport_seconds,pressure_seconds,diagnostics_seconds,force_norm,moment_norm,lift_drag_ratio,mean_lift_drag_ratio,lfm,pressure_fx,pressure_fy,pressure_fz,friction_fx,friction_fy,friction_fz,fuselage_drag,fuselage_lift,wing_drag,wing_lift,horizontal_tail_drag,horizontal_tail_lift,vertical_tail_drag,vertical_tail_lift,nacelle_drag,nacelle_lift,speed,angle,flap,aileron,elevator,rudder,grid,viscosity,wall_viscosity,wall_model,wall_momentum,cut_cells,cubic,cfl,sponge,wing_span,wing_camber,wing_sweep,tail_span,tail_leading\n";
       diagnostics << std::setprecision(17);
     }
     auto g = grid;
@@ -1541,6 +1541,11 @@ struct Simulation::Impl {
         working = true;
       }
       auto start = std::chrono::steady_clock::now();
+      if (!ValidAirframe(controls.airframe)) {
+        std::lock_guard<std::mutex> guard(mutex);
+        error = "Airframe parameters are outside the supported geometry bounds";
+        break;
+      }
       bool reset = current_generation != applied_generation;
       if (reset) {
         step = 0;
@@ -1594,7 +1599,8 @@ struct Simulation::Impl {
         dt = std::min(dt, 0.08f * g.h * g.h / (diffusion * lfm_intervals));
       if (options.max_dt > 0)
         dt = std::min(dt, options.max_dt / (options.leapfrog_flow_maps ? lfm_intervals : 1));
-      bool geometry_changed = !mesh || controls.angle != mesh_controls.angle || controls.flap != mesh_controls.flap ||
+      bool geometry_changed = !mesh || !SameAirframe(controls.airframe, mesh_controls.airframe) ||
+                              controls.angle != mesh_controls.angle || controls.flap != mesh_controls.flap ||
                               controls.aileron != mesh_controls.aileron ||
                               controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder;
       if (geometry_changed) {
@@ -1815,9 +1821,9 @@ struct Simulation::Impl {
       snapshot->time = time += dt;
       snapshot->dt = dt;
       snapshot->controls = controls;
-      if (!mesh || controls.angle != mesh_controls.angle || controls.flap != mesh_controls.flap ||
-          controls.aileron != mesh_controls.aileron || controls.elevator != mesh_controls.elevator ||
-          controls.rudder != mesh_controls.rudder) {
+      if (!mesh || !SameAirframe(controls.airframe, mesh_controls.airframe) || controls.angle != mesh_controls.angle ||
+          controls.flap != mesh_controls.flap || controls.aileron != mesh_controls.aileron ||
+          controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder) {
         mesh = std::make_shared<const std::vector<Vertex>>(AircraftMesh(controls));
         mesh_controls = controls;
       }
@@ -1851,7 +1857,10 @@ struct Simulation::Impl {
         diagnostics << ',' << controls.speed << ',' << controls.angle << ',' << controls.flap << ',' << controls.aileron
                     << ',' << controls.elevator << ',' << controls.rudder << ',' << g.nx << ',' << options.viscosity
                     << ',' << options.wall_viscosity << ',' << options.wall_model << ',' << options.wall_momentum << ','
-                    << options.cut_cells << ',' << options.cubic << ',' << options.cfl << ',' << options.sponge << '\n';
+                    << options.cut_cells << ',' << options.cubic << ',' << options.cfl << ',' << options.sponge << ','
+                    << controls.airframe.wing_span << ',' << controls.airframe.wing_camber << ','
+                    << controls.airframe.wing_sweep << ',' << controls.airframe.tail_span << ','
+                    << controls.airframe.tail_leading << '\n';
         if (step % 32 == 0)
           diagnostics.flush();
         if (!diagnostics) {
@@ -1936,10 +1945,11 @@ std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const So
   // run a different transport scheme for a requested LFM configuration.
   if (options.leapfrog_flow_maps && options.devices != 1)
     return {};
-  if (options.max_dt < 0 || !std::isfinite(options.max_dt) || !(options.initial_controls.speed > 0) ||
-      !std::isfinite(options.initial_controls.speed) || !std::isfinite(options.initial_controls.angle) ||
-      !std::isfinite(options.initial_controls.flap) || !std::isfinite(options.initial_controls.aileron) ||
-      !std::isfinite(options.initial_controls.elevator) || !std::isfinite(options.initial_controls.rudder))
+  if (!ValidAirframe(options.initial_controls.airframe) || options.max_dt < 0 || !std::isfinite(options.max_dt) ||
+      !(options.initial_controls.speed > 0) || !std::isfinite(options.initial_controls.speed) ||
+      !std::isfinite(options.initial_controls.angle) || !std::isfinite(options.initial_controls.flap) ||
+      !std::isfinite(options.initial_controls.aileron) || !std::isfinite(options.initial_controls.elevator) ||
+      !std::isfinite(options.initial_controls.rudder))
     return {};
   size_t free_bytes = 0, total_bytes = 0;
   size_t required_bytes =

@@ -68,6 +68,8 @@ int main(int argc, char **argv) {
           << "--aero: LFM, air viscosity 1.5e-5 m^2/s, slip cut cells with wall-shear loads, CFL 0.25, 2 m sponge.\n"
           << "Place --aero before any individual solver overrides.\n";
       std::cout << "--restore FILE resumes a checkpoint; supply its original grid, controls and solver settings.\n";
+      std::cout
+          << "Airframe: --wing-span 2..4.2 (half-span, m), --wing-camber 0..0.06, --wing-sweep 0..0.7 (slope), --tail-span 0.6..1.4 (half-span, m), --tail-leading 1..2 (body x, m).\n";
       return 0;
     } else {
       if (++i >= argc) {
@@ -131,6 +133,16 @@ int main(int argc, char **argv) {
           view.pitch = number;
         else if (key == "--distance")
           view.distance = number;
+        else if (key == "--wing-span")
+          controls.airframe.wing_span = number;
+        else if (key == "--wing-camber")
+          controls.airframe.wing_camber = number;
+        else if (key == "--wing-sweep")
+          controls.airframe.wing_sweep = number;
+        else if (key == "--tail-span")
+          controls.airframe.tail_span = number;
+        else if (key == "--tail-leading")
+          controls.airframe.tail_leading = number;
         else if (key == "--speed")
           controls.speed = number;
         else if (key == "--angle")
@@ -150,10 +162,10 @@ int main(int argc, char **argv) {
       }
     }
   }
-  if (grid < 64 || grid > 640 || grid % 16 || steps < 1 || controls.speed < 1 || controls.speed > 30 ||
-      controls.angle < -20 || controls.angle > 25 || controls.flap < 0 || controls.flap > 40 ||
-      std::abs(view.pitch) > 1.55f || view.distance < 7 || view.distance > 25 || std::abs(controls.aileron) > 25 ||
-      std::abs(controls.elevator) > 25 || std::abs(controls.rudder) > 25)
+  if (!wind3d::ValidAirframe(controls.airframe) || grid < 64 || grid > 640 || grid % 16 || steps < 1 ||
+      controls.speed < 1 || controls.speed > 30 || controls.angle < -20 || controls.angle > 25 || controls.flap < 0 ||
+      controls.flap > 40 || std::abs(view.pitch) > 1.55f || view.distance < 7 || view.distance > 25 ||
+      std::abs(controls.aileron) > 25 || std::abs(controls.elevator) > 25 || std::abs(controls.rudder) > 25)
     return 1;
   if (headless && !frames)
     frames = 300;
