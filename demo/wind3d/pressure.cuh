@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 
 #include <cmath>
+#include <cstdio>
 #include <vector>
 
 namespace wind3d::pressure {
@@ -294,6 +295,7 @@ class Solver {
                     int limit,
                     int &cycles,
                     float &relative_residual) {
+    diagnostic_[0] = 0;
     auto first = levels_.front();
     SetRhs<<<Blocks(first), 256, 0, stream_>>>(first, divergence, factor);
     cudaError_t error;
@@ -306,6 +308,11 @@ class Solver {
     double rhs_norm = 0, previous_rho = 0, unused_norm;
     if ((error = Dot(first.rhs, first.rhs, first.rhs, first.rhs, rhs_norm, unused_norm)) != cudaSuccess)
       return error;
+    if (!std::isfinite(rhs_norm)) {
+      std::snprintf(diagnostic_, sizeof(diagnostic_), "Nonfinite pressure RHS: factor=%g rhs_norm=%g", double(factor),
+                    rhs_norm);
+      return cudaErrorUnknown;
+    }
     relative_residual = 1;
     for (cycles = 0; cycles < limit;) {
       // A symmetric V-cycle is an SPD preconditioner. CG removes the slow
@@ -318,8 +325,12 @@ class Solver {
       relative_residual = float(std::sqrt(residual_norm / std::fmax(rhs_norm, 1e-30)));
       if (relative_residual <= tolerance)
         break;
-      if (!(rho > 0) || !std::isfinite(rho))
+      if (!(rho > 0) || !std::isfinite(rho)) {
+        std::snprintf(diagnostic_, sizeof(diagnostic_),
+                      "PCG preconditioner breakdown: cycle=%d rho=%g rhs_norm=%g residual=%g", cycles, rho, rhs_norm,
+                      double(relative_residual));
         return cudaErrorUnknown;
+      }
       float beta = cycles ? float(rho / previous_rho) : 0;
       Direction<<<Blocks(first), 256, 0, stream_>>>(first.Count(), first.x, beta, direction_);
       Level operation = first;
@@ -328,8 +339,12 @@ class Solver {
       double denominator, unused;
       if ((error = Dot(direction_, product_, direction_, product_, denominator, unused)) != cudaSuccess)
         return error;
-      if (!(denominator > 0) || !std::isfinite(denominator))
+      if (!(denominator > 0) || !std::isfinite(denominator)) {
+        std::snprintf(diagnostic_, sizeof(diagnostic_),
+                      "PCG operator breakdown: cycle=%d pAp=%g rhs_norm=%g residual=%g", cycles, denominator, rhs_norm,
+                      double(relative_residual));
         return cudaErrorUnknown;
+      }
       Update<<<Blocks(first), 256, 0, stream_>>>(first.Count(), output, direction_, float(rho / denominator));
       operation.x = output;
       operation.residual = residual_;
@@ -348,6 +363,10 @@ class Solver {
     return cudaGetLastError();
   }
 
+  const char *Diagnostic() const {
+    return diagnostic_;
+  }
+
   void Release() {
     if (preconditioner_)
       cudaGraphExecDestroy(preconditioner_);
@@ -359,6 +378,8 @@ class Solver {
   }
 
  private:
+  char diagnostic_[192]{};
+
   static int Blocks(Level l) {
     return (l.Count() + 255) / 256;
   }

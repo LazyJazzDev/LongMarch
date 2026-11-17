@@ -43,12 +43,17 @@ inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
   auto wait_for = [&](auto predicate) {
     auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(3);
     while (std::chrono::steady_clock::now() < deadline) {
-      if (!simulation.Error().empty())
+      if (!simulation.Error().empty()) {
+        std::cerr << "Lifecycle solver error: " << simulation.Error() << '\n';
         return false;
+      }
       if (predicate())
         return true;
       std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
+    auto state = simulation.Latest();
+    std::cerr << "Lifecycle wait timed out: step=" << (state ? state->step : 0)
+              << " generation=" << (state ? state->generation : 0) << " paused=" << simulation.Paused() << '\n';
     return false;
   };
   simulation.Configure(controls, true);
@@ -86,8 +91,11 @@ inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
   if (reset->step != 1 || reset->controls.speed != controls.speed || reset->controls.angle != controls.angle ||
       reset->controls.flap != controls.flap || reset->controls.aileron != controls.aileron ||
       reset->controls.elevator != controls.elevator || reset->controls.rudder != controls.rudder ||
-      reset->aircraft == old->aircraft || checksum(*old) != old_checksum)
+      reset->aircraft == old->aircraft || checksum(*old) != old_checksum) {
+    std::cerr << "Lifecycle reset/snapshot check failed: step=" << reset->step << " speed=" << reset->controls.speed
+              << " angle=" << reset->controls.angle << '\n';
     return false;
+  }
   simulation.Configure(controls, false);
   if (!wait_for([&] { return simulation.Latest()->step > reset->step; }))
     return false;
@@ -103,8 +111,13 @@ inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
   auto changed = simulation.Latest();
   if (changed->generation != reset->generation || !changed->pressure_converged ||
       !std::isfinite(Length(changed->force) + Length(changed->moment)) ||
-      changed->divergence_after >= std::max(1e-5f, changed->divergence_before * 0.001f))
+      changed->divergence_after >= std::max(1e-5f, changed->divergence_before * 0.001f)) {
+    std::cerr << "Live inlet validation failed: generation=" << changed->generation << " expected=" << reset->generation
+              << " pressure=" << changed->pressure_residual << " divergence=" << changed->divergence_before << " -> "
+              << changed->divergence_after << " force=" << Length(changed->force)
+              << " moment=" << Length(changed->moment) << '\n';
     return false;
+  }
   std::cout << "lifecycle_validation=PASS (pause, reset, controls, resume, live inlet change, immutable snapshot)\n";
   return true;
 }

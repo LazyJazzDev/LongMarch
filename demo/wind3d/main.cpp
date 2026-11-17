@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
     return 2;
   if (validate && solver.leapfrog_flow_maps && !wind3d::ValidateFlowMaps(device->GetCUDADeviceIndex()))
     return 2;
-  if (validate && !wind3d::ValidateClosedSurface(device->GetCUDADeviceIndex(), false))
+  if (validate && !wind3d::ValidateClosedSurface(device->GetCUDADeviceIndex(), solver.cut_cells))
     return 2;
   auto simulation = wind3d::Simulation::Create(device->GetCUDADeviceIndex(), grid, solver);
   if (!simulation) {

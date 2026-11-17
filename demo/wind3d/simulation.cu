@@ -1037,6 +1037,8 @@ struct Simulation::Impl {
       return true;
     std::lock_guard<std::mutex> guard(mutex);
     error = cudaGetErrorString(result);
+    if (result == cudaErrorUnknown && *pressure_solver.Diagnostic())
+      error += std::string(": ") + pressure_solver.Diagnostic();
     return false;
   }
 
@@ -1130,6 +1132,11 @@ struct Simulation::Impl {
       if (!Check(pressure_solver.Solve(lfm_div, lfm_gauge, density * grid.h * grid.h / dt, options.pressure_tolerance,
                                        options.pressure_cycles, lfm_cycles, lfm_residual)))
         return false;
+      if (!(lfm_residual <= options.pressure_tolerance)) {
+        std::lock_guard<std::mutex> guard(mutex);
+        error = "LFM initialization projection did not converge: residual=" + std::to_string(lfm_residual);
+        return false;
+      }
       if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
             Project<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, lfm_gauge, u, v, w, dt);
           }))
@@ -1160,6 +1167,12 @@ struct Simulation::Impl {
       if (!Check(pressure_solver.Solve(lfm_div, lfm_gauge, density * grid.h * grid.h / interval,
                                        options.pressure_tolerance, options.pressure_cycles, cycles, residual)))
         return false;
+      if (!(residual <= options.pressure_tolerance)) {
+        std::lock_guard<std::mutex> guard(mutex);
+        error =
+            "LFM midpoint " + std::to_string(i) + " projection did not converge: residual=" + std::to_string(residual);
+        return false;
+      }
       lfm_residual = std::max(lfm_residual, residual);
       lfm_cycles += cycles;
       if (!Parallel(0, [&](Grid, int, cudaStream_t) {}))
