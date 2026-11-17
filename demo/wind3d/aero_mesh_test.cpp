@@ -12,7 +12,7 @@ using namespace wind3d::aero;
 bool CheckCudaMesh(const MeshGeometry &mesh, const std::vector<Vector> &points, const std::vector<double> &expected);
 #endif
 namespace {
-std::string Voxels(const std::set<std::array<int, 3>> &cells) {
+std::string Voxels(const std::set<std::array<int, 3>> &cells, double scale_x = 1) {
   std::ostringstream out;
   int count = 0;
   for (auto cell : cells)
@@ -28,7 +28,7 @@ std::string Voxels(const std::set<std::array<int, 3>> &cells) {
           p[axis] += sign > 0;
           p[u] += corner[0];
           p[v] += corner[1];
-          out << "v " << p[0] << ' ' << p[1] << ' ' << p[2] << '\n';
+          out << "v " << p[0] * scale_x << ' ' << p[1] << ' ' << p[2] << '\n';
         }
         if (sign > 0)
           out << "f " << count + 1 << ' ' << count + 2 << ' ' << count + 3 << ' ' << count + 4 << '\n';
@@ -39,8 +39,8 @@ std::string Voxels(const std::set<std::array<int, 3>> &cells) {
   return out.str();
 }
 
-double BoxDistance(Vector p) {
-  double x = std::abs(p.x - .5) - .5, y = std::abs(p.y - .5) - .5, z = std::abs(p.z - .5) - .5;
+double BoxDistance(Vector p, double half_x = .5) {
+  double x = std::abs(p.x - half_x) - half_x, y = std::abs(p.y - .5) - .5, z = std::abs(p.z - .5) - .5;
   return std::hypot(std::max(x, 0.0), std::max(y, 0.0), std::max(z, 0.0)) + std::min(std::max({x, y, z}), 0.0);
 }
 }  // namespace
@@ -65,6 +65,9 @@ int main(int argc, char **argv) {
     std::cerr << error;
     return 2;
   }
+  if (cube->View().Distance({-1e-15, .5, .5}) != 0 || cube->View().Distance({1e-15, .5, .5}) != 0 ||
+      !(cube->View().Distance({-1e-13, .5, .5}) > 0) || !(cube->View().Distance({1e-13, .5, .5}) < 0))
+    return 18;
   std::vector<Vector> points;
   std::vector<double> expected;
   for (int x = -8; x <= 16; ++x)
@@ -82,6 +85,27 @@ int main(int argc, char **argv) {
 #ifdef WIND3D_MESH_CUDA_TEST
   if (!CheckCudaMesh(*cube, points, expected))
     return 4;
+#endif
+  auto elongated = load(Voxels({{0, 0, 0}}, 2));
+  if (!elongated)
+    return 15;
+  points.clear();
+  expected.clear();
+  for (int x = -8; x <= 16; ++x)
+    for (int y = -8; y <= 16; ++y)
+      for (int z = -8; z <= 16; ++z) {
+        Vector p{x / 4.0, y / 8.0, z / 8.0};
+        double want = BoxDistance(p, 1), got = elongated->View().Distance(p);
+        if (std::abs(want - got) > 1e-10 || (want == 0 && got != 0)) {
+          std::cerr << "Rectangular face sample misclassified: " << got;
+          return 16;
+        }
+        points.push_back(p);
+        expected.push_back(want);
+      }
+#ifdef WIND3D_MESH_CUDA_TEST
+  if (!CheckCudaMesh(*elongated, points, expected))
+    return 17;
 #endif
   auto concave = load(Voxels({{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}));
   if (!concave) {

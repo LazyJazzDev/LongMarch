@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "aero_model.h"
 #include "aircraft.h"
 
 namespace wind3d {
@@ -58,6 +59,11 @@ struct SolverOptions {
   // Optional upper bound on the adaptive time step; 0 keeps the automatic rule.
   float max_dt{};
   Controls initial_controls;
+  // Optional articulated OBJ model (native build, one CUDA device).
+  std::shared_ptr<const aero::Model> model;
+  std::vector<double> initial_model_state;  // Empty selects declared defaults.
+  aero::Transform initial_body_pose;
+
   // Publish the downsampled display field; batch runs only need loads.
   bool display{true};
   bool record_loads{false};
@@ -96,6 +102,11 @@ constexpr int max_grid = 1536;
 size_t SolverBytes(int nx);
 
 struct Snapshot {
+  bool generic_geometry{};
+  std::vector<double> model_state;
+  aero::Transform body_to_world;
+  aero::Loads body_loads;  // About the model reference point, in body axes.
+
   bool leapfrog_flow_maps{};
   int nx{}, ny{}, nz{}, pressure_cycles{}, solver_nx{};
   float pressure_residual{};
@@ -145,6 +156,13 @@ class Simulation {
   Simulation &operator=(const Simulation &) = delete;
 
   void Configure(const Controls &controls, bool paused);
+  // Changes a stationary geometry/control state, retaining the fluid warm start.
+  // This samples equilibrium states; it does not simulate moving-wall actuation.
+  bool ConfigureModel(const std::vector<double> &state,
+                      const aero::Transform &body_pose,
+                      float speed,
+                      bool paused,
+                      std::string &error);
   void Reset();
   // Writes the latest completed step (fields, time, step and load integrals)
   // to `path` and returns its step number, or 0 on failure. Blocks until the

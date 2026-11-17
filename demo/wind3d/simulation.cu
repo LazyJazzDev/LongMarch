@@ -13,9 +13,15 @@
 #include <mutex>
 #include <thread>
 
+#include "aero_mesh_view.h"
 #include "pressure.cuh"
 #include "simulation.h"
 #include "wall_model.h"
+#ifdef WIND3D_GENERIC_GEOMETRY
+#include <unordered_map>
+
+#include "aero_mesh.h"
+#endif
 
 namespace wind3d {
 namespace {
@@ -136,18 +142,22 @@ __device__ float SampleTransported(const float *f, Grid g, Vec3 p, int component
   return MonotoneCubic(planes[0], planes[1], planes[2], planes[3], tz);
 }
 
-__global__ void Mask(Grid g, unsigned char *solid, Controls controls) {
+__device__ float SolidDistance(Vec3 p, Controls controls, aero::ModelView model) {
+  return model.count ? float(model.Distance({p.x, p.y, p.z})) : AircraftDistance(p, controls);
+}
+
+__global__ void Mask(Grid g, unsigned char *solid, Controls controls, aero::ModelView model = {}) {
   int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= g.nx * g.ny * g.nz)
     return;
   int x = n % g.nx, y = n / g.nx % g.ny, z = n / (g.nx * g.ny);
   Vec3 center = g.Position(x, y, z);
-  solid[n] = AircraftDistance(center, controls) <= 0;
+  solid[n] = SolidDistance(center, controls, model) <= 0;
   if (solid[n])
     for (int axis = 0; axis < 3; ++axis) {
       Vec3 offset{axis == 0 ? .5f * g.h : 0, axis == 1 ? .5f * g.h : 0, axis == 2 ? .5f * g.h : 0};
-      if (AircraftDistance(Add(center, offset), controls) > 0 &&
-          AircraftDistance(Add(center, Scale(offset, -1)), controls) > 0) {
+      if (SolidDistance(Add(center, offset), controls, model) > 0 &&
+          SolidDistance(Add(center, Scale(offset, -1)), controls, model) > 0) {
         // Bit 1 marks an underresolved solid sheet. Face-area sampling must
         // not reconnect its two fluid sides through a single pressure cell.
         solid[n] = 3;
@@ -187,7 +197,8 @@ __global__ void FaceMask(Grid g,
                          unsigned char *av,
                          unsigned char *aw,
                          Controls controls,
-                         bool cut_cells) {
+                         bool cut_cells,
+                         aero::ModelView model = {}) {
   int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
@@ -195,8 +206,14 @@ __global__ void FaceMask(Grid g,
   bu[n] = bv[n] = bw[n] = 0;
   au[n] = av[n] = aw[n] = 255;
   Vec3 body = BodyPoint(g.Position(x, y, z), controls);
-  if (body.x < -3.1f - 2 * g.h || body.x > 3.4f + 2 * g.h || fabsf(body.z) > AircraftSpanBound(controls) + 2 * g.h ||
-      body.y < -0.85f - 2 * g.h || body.y > 1.4f + 2 * g.h)
+  if (model.count) {
+    Vec3 point = g.Position(x, y, z);
+    if (point.x < model.lower.x - 2 * g.h || point.x > model.upper.x + 2 * g.h || point.y < model.lower.y - 2 * g.h ||
+        point.y > model.upper.y + 2 * g.h || point.z < model.lower.z - 2 * g.h || point.z > model.upper.z + 2 * g.h)
+      return;
+  } else if (body.x < -3.1f - 2 * g.h || body.x > 3.4f + 2 * g.h ||
+             fabsf(body.z) > AircraftSpanBound(controls) + 2 * g.h || body.y < -0.85f - 2 * g.h ||
+             body.y > 1.4f + 2 * g.h)
     return;
   unsigned char *faces[] = {bu, bv, bw}, *apertures[] = {au, av, aw};
   for (int axis = 0; axis < 3; ++axis) {
@@ -204,12 +221,12 @@ __global__ void FaceMask(Grid g,
     Vec3 normal{axis == 0 ? 1.0f : 0, axis == 1 ? 1.0f : 0, axis == 2 ? 1.0f : 0};
     Vec3 center = Add(g.Position(x, y, z), Scale(normal, -0.5f * g.h));
     for (int sample = -3; sample <= 3 && !blocked; ++sample)
-      blocked = AircraftDistance(Add(center, Scale(normal, sample * g.h / 8)), controls) <= 0;
+      blocked = SolidDistance(Add(center, Scale(normal, sample * g.h / 8)), controls, model) <= 0;
     unsigned char aperture = blocked ? 0 : 255;
     if (cut_cells && !Blocked(g, solid, x, y, z, axis, 2) && (centre_solid || !blocked)) {
       // Open fraction from 6 x 6 samples of the face square; faces far from
       // the surface are uniform. A thin wall between fluid centres stays closed.
-      float d = AircraftDistance(center, controls);
+      float d = SolidDistance(center, controls, model);
       if (fabsf(d) > 2 * g.h) {
         aperture = d > 0 ? 255 : 0;
       } else {
@@ -219,7 +236,7 @@ __global__ void FaceMask(Grid g,
           for (int j = 0; j < samples; ++j) {
             float a = ((i + 0.5f) / samples - 0.5f) * g.h, b = ((j + 0.5f) / samples - 0.5f) * g.h;
             Vec3 offset{axis == 0 ? 0 : a, axis == 1 ? 0 : (axis == 0 ? a : b), axis == 2 ? 0 : b};
-            open += AircraftDistance(Add(center, offset), controls) > 0;
+            open += SolidDistance(Add(center, offset), controls, model) > 0;
           }
         // Faces with a sliver of open area are closed: the projection barely
         // constrains their velocity, which can then grow without bound.
@@ -234,7 +251,7 @@ __global__ void FaceMask(Grid g,
       for (int k = 0; k < 3; ++k) {
         Vec3 e{k == 0 ? d : 0, k == 1 ? d : 0, k == 2 ? d : 0};
         gradient[k] =
-            AircraftDistance(Add(center, e), controls) - AircraftDistance(Add(center, Scale(e, -1)), controls);
+            SolidDistance(Add(center, e), controls, model) - SolidDistance(Add(center, Scale(e, -1)), controls, model);
       }
       float l1 = fabsf(gradient[0]) + fabsf(gradient[1]) + fabsf(gradient[2]);
       float l2 = sqrtf(gradient[0] * gradient[0] + gradient[1] * gradient[1] + gradient[2] * gradient[2]);
@@ -548,7 +565,8 @@ __global__ void Measure(Grid g,
                         const float *after,
                         Physics physics,
                         Controls controls,
-                        Statistics *blocks) {
+                        Statistics *blocks,
+                        bool generic_geometry = false) {
   __shared__ Statistics values[256];
   int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   Statistics value;
@@ -613,7 +631,7 @@ __global__ void Measure(Grid g,
         value.force = Add(value.force, shear);
         value.moment = Add(value.moment, Cross(g.Position(x, y, z), shear));
       }
-      if (total.x != 0 || total.y != 0) {
+      if (!generic_geometry && (total.x != 0 || total.y != 0)) {
         int component;
         AircraftDistance(g.Position(x, y, z), controls, component);
         value.drag[component] = total.x;
@@ -1089,6 +1107,17 @@ struct Simulation::Impl {
   Grid grid{};
   pressure::Solver pressure_solver;
   SolverOptions options;
+  aero::ModelView model_view;
+#ifdef WIND3D_GENERIC_GEOMETRY
+  std::unique_ptr<aero::ModelGeometry> model_geometry;
+  std::vector<aero::MeshView> device_meshes;
+  aero::MeshInstanceView *device_instances{};
+  std::vector<aero::PartPose> requested_poses;
+  std::vector<double> requested_model_state;
+  aero::Transform requested_body_pose;
+  uint64_t model_revision{1};
+#endif
+
   int device{};
   cudaStream_t stream{};
   std::vector<cudaStream_t> streams;
@@ -1337,6 +1366,10 @@ struct Simulation::Impl {
            Parallel(0, [&](Grid, int, cudaStream_t) {});
   }
 
+#ifdef WIND3D_GENERIC_GEOMETRY
+#include "aero_solver_geometry.cuh"
+#endif
+
   bool Initialize() {
     if (!Check(cudaSetDevice(device)))
       return false;
@@ -1382,6 +1415,10 @@ struct Simulation::Impl {
     }
     if (!Check(cudaSetDevice(device)))
       return false;
+#ifdef WIND3D_GENERIC_GEOMETRY
+    if (options.model && !InitializeModel())
+      return false;
+#endif
     size_t nf = size_t(grid.nx + 1) * (grid.ny + 1) * (grid.nz + 1);
     size_t nc = size_t(grid.nx) * grid.ny * grid.nz;
     int display_nx = std::min(grid.nx, 192);
@@ -1502,9 +1539,18 @@ struct Simulation::Impl {
     float time = 0, max_speed = 12;
     float lfm_inlet_speed = -1;
     Controls mesh_controls;
+#ifdef WIND3D_GENERIC_GEOMETRY
+    uint64_t applied_model_revision = 0;
+#endif
     std::shared_ptr<const std::vector<Vertex>> mesh;
     while (true) {
       Controls controls;
+#ifdef WIND3D_GENERIC_GEOMETRY
+      std::vector<aero::PartPose> model_poses;
+      std::vector<double> model_state;
+      aero::Transform body_pose;
+      uint64_t current_model_revision{};
+#endif
       uint64_t current_generation;
       {
         std::unique_lock<std::mutex> lock(mutex);
@@ -1538,6 +1584,12 @@ struct Simulation::Impl {
           continue;
         }
         controls = requested;
+#ifdef WIND3D_GENERIC_GEOMETRY
+        model_poses = requested_poses;
+        model_state = requested_model_state;
+        body_pose = requested_body_pose;
+        current_model_revision = model_revision;
+#endif
         current_generation = generation;
         working = true;
       }
@@ -1604,13 +1656,23 @@ struct Simulation::Impl {
                               controls.angle != mesh_controls.angle || controls.flap != mesh_controls.flap ||
                               controls.aileron != mesh_controls.aileron ||
                               controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder;
+#ifdef WIND3D_GENERIC_GEOMETRY
+      if (options.model)
+        geometry_changed = current_model_revision != applied_model_revision;
+      if (options.model && geometry_changed) {
+        if (!UploadModel(model_poses, mesh))
+          break;
+        applied_model_revision = current_model_revision;
+      }
+#endif
       if (geometry_changed) {
         if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
-              Mask<<<blocks, 256, 0, queue>>>(g, solid, controls);
+              Mask<<<blocks, 256, 0, queue>>>(g, solid, controls, model_view);
             }))
           break;
         if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
-              FaceMask<<<blocks, 256, 0, queue>>>(g, solid, bu, bv, bw, au, av, aw, controls, physics.cut_cells);
+              FaceMask<<<blocks, 256, 0, queue>>>(g, solid, bu, bv, bw, au, av, aw, controls, physics.cut_cells,
+                                                  model_view);
             }))
           break;
         if (physics.cut_cells)
@@ -1730,7 +1792,7 @@ struct Simulation::Impl {
       }
       if (!Parallel(cb, [&](Grid g, int blocks, cudaStream_t queue) {
             Measure<<<blocks, 256, 0, queue>>>(g, solid, bu, bv, bw, au, av, aw, u, v, w, un, vn, wn, pressure, div,
-                                               after, physics, controls, statistics);
+                                               after, physics, controls, statistics, model_view.count != 0);
           }))
         break;
       ReduceStatistics<<<total_blocks, 256, 0, stream>>>(statistics, cb, totals);
@@ -1822,13 +1884,23 @@ struct Simulation::Impl {
       snapshot->time = time += dt;
       snapshot->dt = dt;
       snapshot->controls = controls;
-      if (!mesh || !SameAirframe(controls.airframe, mesh_controls.airframe) || controls.angle != mesh_controls.angle ||
-          controls.flap != mesh_controls.flap || controls.aileron != mesh_controls.aileron ||
-          controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder) {
+      if (!options.model &&
+          (!mesh || !SameAirframe(controls.airframe, mesh_controls.airframe) || controls.angle != mesh_controls.angle ||
+           controls.flap != mesh_controls.flap || controls.aileron != mesh_controls.aileron ||
+           controls.elevator != mesh_controls.elevator || controls.rudder != mesh_controls.rudder)) {
         mesh = std::make_shared<const std::vector<Vertex>>(AircraftMesh(controls));
         mesh_controls = controls;
       }
       snapshot->aircraft = mesh;
+#ifdef WIND3D_GENERIC_GEOMETRY
+      if (options.model) {
+        snapshot->generic_geometry = true;
+        snapshot->model_state = model_state;
+        snapshot->body_to_world = body_pose;
+        snapshot->body_loads = aero::BodyLoads({{force[0], force[1], force[2]}, {moment[0], moment[1], moment[2]}},
+                                               body_pose, options.model->ReferencePoint());
+      }
+#endif
       snapshot->divergence_before = float(std::sqrt(before_sum / nc));
       snapshot->divergence_after = float(std::sqrt(after_sum / nc));
       snapshot->step_seconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
@@ -1929,6 +2001,12 @@ Simulation::Simulation() : impl_(std::make_unique<Impl>()) {
 Simulation::~Simulation() = default;
 
 std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const SolverOptions &options) {
+  if (options.model && options.devices != 1)
+    return {};
+#ifndef WIND3D_GENERIC_GEOMETRY
+  if (options.model)
+    return {};
+#endif
   int available = 0;
   if (cudaGetDeviceCount(&available) != cudaSuccess || options.devices < 1 || options.devices > 8 || cuda_device < 0 ||
       cuda_device >= available || options.devices > available - cuda_device)
@@ -1973,6 +2051,42 @@ std::unique_ptr<Simulation> Simulation::Create(int cuda_device, int nx, const So
     return {};
   result->impl_->worker = std::thread([p = result->impl_.get()] { p->Run(); });
   return result;
+}
+
+bool Simulation::ConfigureModel(const std::vector<double> &state,
+                                const aero::Transform &body_pose,
+                                float speed,
+                                bool paused,
+                                std::string &error) {
+#ifdef WIND3D_GENERIC_GEOMETRY
+  std::vector<aero::PartPose> poses;
+  if (!impl_->options.model || !(speed > 0) || !std::isfinite(speed)) {
+    error = "Invalid model or inlet speed";
+    return false;
+  }
+  if (!impl_->ModelPoses(state, body_pose, poses, error))
+    return false;
+  {
+    std::lock_guard<std::mutex> guard(impl_->mutex);
+    if (state != impl_->requested_model_state || body_pose.rotation != impl_->requested_body_pose.rotation ||
+        body_pose.translation.x != impl_->requested_body_pose.translation.x ||
+        body_pose.translation.y != impl_->requested_body_pose.translation.y ||
+        body_pose.translation.z != impl_->requested_body_pose.translation.z) {
+      impl_->requested_poses = std::move(poses);
+      impl_->requested_model_state = state;
+      impl_->requested_body_pose = body_pose;
+      ++impl_->model_revision;
+    }
+    impl_->requested.speed = speed;
+    impl_->paused = paused;
+  }
+  error.clear();
+  impl_->wake.notify_one();
+  return true;
+#else
+  error = "Generic geometry is unavailable in this build";
+  return false;
+#endif
 }
 
 void Simulation::Configure(const Controls &controls, bool paused) {

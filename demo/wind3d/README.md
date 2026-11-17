@@ -738,7 +738,7 @@ at every resolution or control setting.
 
 目标用途是游戏中的不可压缩气动近似：按物体离线采集不同来流与联动控制状态下的合力、合力矩，再拟合供实时引擎使用的模型。优先考虑采样效率、响应连续性与稳定性，不以严格网格收敛或指定升阻比作为验收要求。
 
-`wind3d_aero_model` 提供与飞机参数无关的 JSON 描述、部件层级和控制混合。`wind3d_aero_mesh` 进一步加载 OBJ 部件，构建可在 CPU/CUDA 查询的局部三角形 BVH。相同 mesh 路径复用几何；部件姿态变化时不重建 BVH。目前尚未接入流体求解器的网格边界、批量气动采集或代理模型训练。
+`wind3d_aero_model` 提供与飞机参数无关的 JSON 描述、部件层级和控制混合。`wind3d_aero_mesh` 进一步加载 OBJ 部件，构建可在 CPU/CUDA 查询的局部三角形 BVH。相同 mesh 路径复用几何；部件姿态变化时不重建 BVH。原生 CUDA 求解器和 wind3d_model_sample 已接入这些网格与控制状态。代理模型训练和实时推理尚未实现。
 
 ```json
 {
@@ -765,6 +765,36 @@ mesh 路径相对于 JSON 文件；坐标使用右手系与米，旋转使用单
 
 `wind3d_model_inspect --geometry model.json [控制值]` 同时加载网格并报告三角形和 BVH 节点数量。OBJ 应为无自交、封闭、法线朝外的实体表面；导入器焊接完全相同位置的顶点，检查退化三角形、边的封闭性与一致绕序以及正有向体积。它不进行完整自交检测，也不会自动填洞或修复错误的面朝向。材料、纹理不参与气动几何。
 
-距离查询使用最近三角形特征的角度加权伪法线判断内外，参考 [Bærentzen / Aanæs 2005](https://orbit.dtu.dk/en/publications/signed-distance-computation-using-the-angle-weighted-pseudo-norma/)。`MeshView` 为直接上传 CUDA 的只读数组视图，复用同一查询实现；`ModelGeometry::Distance` 将查询点变换至各部件局部坐标，取有符号距离最小值构造实体并集（交叠内部不保证精确欧氏距离）。
+距离查询使用最近三角形特征的角度加权伪法线判断内外，参考 [Bærentzen / Aanæs 2005](https://orbit.dtu.dk/en/publications/signed-distance-computation-using-the-angle-weighted-pseudo-norma/)。本实现的数值表面容差为局部查询坐标尺度乘 64 倍双精度机器 epsilon，避免平面上的点因切向舍入或刚体变换误差而被误判为流体。`MeshView` 为直接上传 CUDA 的只读数组视图，复用同一查询实现；`ModelGeometry::Distance` 将查询点变换至各部件局部坐标，取有符号距离最小值构造实体并集（交叠内部不保证精确欧氏距离）。
 
 构建并运行 `wind3d_aero_mesh_check out/wind3d-aero/mesh-contract-test.obj` 验证立方体解析距离、凹形内外判定、BVH 与穷举距离、几何共享、旋转平移和无效输入。启用 CUDA 的原生构建还会在 GPU 上检查相同查询。测试参数是可覆盖并删除的临时 OBJ 文件，并会使用相邻的 `.obj.json` 临时描述文件。
+
+### 通用模型批量载荷采样（原生 CUDA）
+
+构建目标 `wind3d_model_sample`，运行：
+
+```text
+cmake-build-release/demo/wind3d/wind3d_model_sample.exe model.json cases.json loads.csv --grid 128 --settle 0.5 --average 0.5
+```
+
+`cases.json` 使用以下格式，控制值按模型 `controls` 的声明顺序排列。省略控制值、速度或姿态时分别采用模型默认控制、12 m/s、单位旋转与零平移。case 名称必须唯一。
+
+```json
+{"version": 1, "cases": [
+  {"name": "neutral", "speed": 12, "controls": [0]},
+  {"name": "pitch_positive", "speed": 12, "controls": [0.5]},
+  {"name": "rotated", "speed": 12, "controls": [0],
+   "rotation_xyzw": [0, 0, 0.7071067811865476, 0.7071067811865476],
+   "translation": [0, 0, 0]}
+]}
+```
+
+来流沿世界 +X；四元数把物体坐标转至世界坐标。CSV 保存物体坐标中的来流速度、控制量、平均合力（N）和关于模型 `reference_point` 的平均合力矩（N·m），以及窗口内载荷波动的 RMS、最大压力残差和该状态采样阶段的墙钟耗时（不含一次性初始化）。RMS 是各分量时间方差之和的平方根，不是绝对载荷的均方根，也不是对实测数据的误差。
+
+整个批次复用一套求解器和每个网格的 GPU BVH。切换控制/姿态时更新实例变换、固体掩码与压力算子，保留流场作为初值；因此每个状态先等待 `--settle` 秒物理时间，再在 `--average` 秒物理时间内逐步时间加权平均。CSV 的窗口时间相对于该状态首个纳入处理的步长，从零计时，并用双精度累计物理步长。窗口长度由使用者根据输出波动选择，目前不自动判定稳态，也不模拟舵面运动时的移动壁面速度。失败时返回非零并保留 `.partial` 文件；全部状态完成后才发布目标 CSV，不覆盖已有输出。
+
+默认采用 LFM、空气运动黏度 1.5e-5 m²/s、密度 1.225 kg/m³、滑移切割单元与壁面摩擦载荷、CFL 0.25、2 m 出口缓冲区。可显式选择 `--maccormack`，但其耗散和载荷可能不同，CSV 会记录算法。初版使用一张 CUDA GPU，计算域仍为 X[-6,10]、Y[-4,4]、Z[-6,6] 米，所有姿态的包围盒须离边界至少两个单元；不支持地面边界与移动地面。
+
+程序接口为 `SolverOptions::model / initial_model_state / initial_body_pose` 和 `Simulation::ConfigureModel`。`Snapshot::force/moment` 保持世界坐标、关于世界原点的原语义；通用模型的 `Snapshot::body_loads` 才是物体坐标下关于模型参考点的载荷。传统飞机部件分项不适用于通用模型，保持为零。通用模型渲染顶点会随姿态更新；当前桌面窗口的交互入口仍是原有飞机控件，通用模型的用户入口是上述批采样工具。
+
+`wind3d_aero_solver_check out/wind3d-aero/solver-integration-test.obj` 覆盖真实 OBJ 流体边界、控制切换后的流场复用、显示网格姿态、载荷坐标/参考点转换，以及越界控制、非刚体变换和域外几何的拒绝。测试路径及相邻 `.obj.json` 为可覆盖并删除的临时文件。验证这些数据通路不代表已验证任意外形的气动精度。

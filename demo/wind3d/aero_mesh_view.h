@@ -1,4 +1,5 @@
 #pragma once
+#include <cfloat>
 #include <cmath>
 
 #include "aero_model.h"
@@ -116,7 +117,45 @@ struct MeshView {
   WIND3D_GEOMETRY_HD double Distance(Vector p) const {
     auto hit = Closest(p);
     double d = sqrt(hit.squared_distance);
-    return mesh_math::Dot(mesh_math::Sub(p, hit.point), hit.normal) < 0 ? -d : d;
+    if (hit.triangle < 0)
+      return d;
+    double scale = fmax(1.0, fmax(fabs(p.x), fmax(fabs(p.y), fabs(p.z))));
+    // Rigid transforms (e.g. a 90 degree quaternion rotation) can displace a
+    // surface sample by a few double-precision ulps. Use a numerical, not a
+    // grid-sized, surface tolerance to keep the mask independent of that noise.
+    if (d <= 64 * DBL_EPSILON * scale)
+      return 0;
+    double side = mesh_math::Dot(mesh_math::Sub(p, hit.point), hit.normal);
+    // Tangential roundoff in a closest point must not turn a point on the
+    // surface into fluid. Cut-face samples frequently land exactly on a plane.
+    return side < 0 ? -d : side > 0 ? d : 0;
+  }
+};
+
+struct MeshInstanceView {
+  MeshView mesh;
+  double rotation[9]{};
+  Vector translation;
+
+  WIND3D_GEOMETRY_HD double Distance(Vector p) const {
+    p = mesh_math::Sub(p, translation);
+    Vector local{rotation[0] * p.x + rotation[3] * p.y + rotation[6] * p.z,
+                 rotation[1] * p.x + rotation[4] * p.y + rotation[7] * p.z,
+                 rotation[2] * p.x + rotation[5] * p.y + rotation[8] * p.z};
+    return mesh.Distance(local);
+  }
+};
+
+struct ModelView {
+  const MeshInstanceView *instances{};
+  int count{};
+  Vector lower{}, upper{};
+
+  WIND3D_GEOMETRY_HD double Distance(Vector p) const {
+    double distance = 1e300;
+    for (int i = 0; i < count; ++i)
+      distance = fmin(distance, instances[i].Distance(p));
+    return distance;
   }
 };
 }  // namespace wind3d::aero

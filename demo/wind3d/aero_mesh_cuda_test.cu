@@ -52,7 +52,8 @@ bool CheckCudaMesh(const MeshGeometry &mesh, const std::vector<Vector> &points, 
       !check(cudaMemcpy(result.data(), b.distance, result.size() * sizeof(double), cudaMemcpyDeviceToHost)))
     return false;
   for (size_t i = 0; i < result.size(); ++i)
-    if (!std::isfinite(result[i]) || std::abs(result[i] - expected[i]) > 1e-10) {
+    if (!std::isfinite(result[i]) || std::abs(result[i] - expected[i]) > 1e-10 ||
+        (expected[i] == 0 && result[i] != 0)) {
       std::cerr << "CUDA signed distance mismatch at " << i;
       return false;
     }
