@@ -34,6 +34,14 @@ no claim of globally tangent production surfaces or measured drag reduction
 is implied. The wing-body belly and root shoulders remain integrated in the
 fuselage skin.
 
+Aerodynamic coefficient normalization now uses the main-wing trapezoid,
+including its buried carry-through and excluding wingtip devices: nominal
+area 3.127 m2, reference span 5.30 m, and MAC 0.667345 m. The area-weighted
+quarter-chord body x coordinate is -0.293852 m. Displayed tip-to-tip span still
+includes the selected tip device. `aircraft_reference.h` supplies this shared
+convention; legacy sweep coefficients that included tip developed length use
+a different reference and must not be compared without renormalization.
+
 The horizontal stabilizer has an independent incidence setting via
 `--tail-incidence -10..10` and **Wind and controls / Stabilizer trim** in the
 desktop UI. Positive incidence raises its leading edge. The whole stabilizer

@@ -19,6 +19,7 @@
 #include <thread>
 #include <vector>
 
+#include "aircraft_reference.h"
 #include "validation.h"
 
 namespace {
@@ -28,28 +29,6 @@ struct Case {
   std::string name;
   Controls controls;
 };
-
-struct Reference {
-  float area{}, span{}, chord{};
-};
-
-// Reference wing from the geometry specification: the trapezoidal wing
-// including its carry-through to the symmetry plane, plus the raked tips.
-Reference WingReference() {
-  Controls none;
-  double area = 0, chord_squared = 0, span = 0;
-  for (int part : {0, 3}) {
-    auto spec = wind3d::AircraftPart(part, 1, none).spec;
-    constexpr int samples = 4096;
-    for (int i = 0; i < samples; ++i) {
-      double t = (i + 0.5) / samples, c = spec.root + (spec.tip - spec.root) * t, dz = spec.span / samples;
-      area += c * dz;
-      chord_squared += c * c * dz;
-    }
-    span += spec.span;
-  }
-  return {float(2 * area), float(2 * span), float(chord_squared / area)};
-}
 
 bool ParseCases(const std::string &path, const Controls &base, std::vector<Case> &cases) {
   std::ifstream file(path);
@@ -204,8 +183,7 @@ uint64_t CheckpointStep(const std::string &path) {
 }
 
 bool Same(const Controls &a, const Controls &b) {
-  return a.speed == b.speed && a.angle == b.angle && a.flap == b.flap && a.aileron == b.aileron &&
-         a.elevator == b.elevator && a.rudder == b.rudder;
+  return a.speed == b.speed && wind3d::SameAircraftGeometry(a, b);
 }
 
 void Usage() {
@@ -351,7 +329,7 @@ int main(int argc, char **argv) {
     std::cerr << "CUDA initialization failed for grid " << grid << '\n';
     return 1;
   }
-  const auto reference = WingReference();
+  const auto reference = wind3d::MainWingReference(base);
   const float h = 16.0f / grid;
   std::cout << "device=" << properties.name << " grid=" << grid << 'x' << grid / 2 << 'x' << grid * 3 / 4 << " h=" << h
             << " m solver_gb=" << wind3d::SolverBytes(grid) / 1e9 << " speed=" << base.speed

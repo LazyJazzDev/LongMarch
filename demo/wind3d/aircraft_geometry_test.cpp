@@ -2,11 +2,22 @@
 #include <cmath>
 #include <iostream>
 
+#include "aircraft_reference.h"
 #include "simulation.h"
 
 int main() {
   using namespace wind3d;
   Controls controls;
+  const auto reference = MainWingReference(controls);
+  if (std::abs(reference.area - 3.127f) > 1e-5f || std::abs(reference.span - 5.3f) > 1e-5f ||
+      reference.quarter_chord_x < -.31f || reference.quarter_chord_x > -.28f)
+    return 29;
+  Controls other_tip = controls;
+  other_tip.airframe.winglets = false;
+  if (MainWingReference(other_tip).area != reference.area)
+    return 30;
+  std::cout << "Main-wing reference: area=" << reference.area << " span=" << reference.span
+            << " MAC=" << reference.chord << " quarter_chord_x=" << reference.quarter_chord_x << '\n';
   auto wing = AircraftPart(0, 1, controls);
   auto pylon = AircraftPart(6, 1, controls);
   const float length = 6, diameter = 2 * FuselageRadius(-1.5f, 1);
