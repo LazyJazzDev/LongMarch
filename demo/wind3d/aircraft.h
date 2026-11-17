@@ -232,6 +232,8 @@ struct FoilPart {
   float hinge_fraction{.72f};
 };
 
+WIND3D_HD Vec3 FoilPoint(const FoilPart &part, float u, float span, int surface, bool control);
+
 WIND3D_HD float AircraftSpanBound(const Controls &controls) {
   return controls.airframe.wing_span + 0.7f;
 }
@@ -327,12 +329,31 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
       return {fin, .80f, fin.span, 0, false, false};
     return {fin, .18f, .80f, controls.rudder, true, false, 0, .68f};
   }
-  // Flared pylon shoulders meet the nacelle crown and wing underside. The
-  // root remains inside the nacelle wall, clear of its through-flow duct.
-  FoilSpec pylon{{0, -.25f, side * .92f}, ex, {0, 0, 1}, {0, 1, 0}, .12f, .40f, .46f, -.65f, .65f, 0, 0, .12f};
-  pylon.root_fairing = {.05f, .08f, 2.f};
-  pylon.tip_fairing = {.055f, .10f, 2.5f};
-  return {pylon, 0, .12f, 0, false, false};
+  // Mount the complete upper cap inside the fixed wing, rather than setting
+  // an unrelated horizontal top plane. The lower cap stays in the nacelle
+  // wall, clear of the flow-through duct. All axes remain orthonormal.
+  FoilPart mounting_wing{wing, 0, wing.span, 0, false, false};
+  Vec3 front = FoilPoint(mounting_wing, .22f, .92f, 0, false);
+  Vec3 rear = FoilPoint(mounting_wing, .62f, .92f, 0, false);
+  Vec3 chord_axis = Unit(Add(rear, Scale(front, -1)));
+  Vec3 span_axis{-chord_axis.y, chord_axis.x, 0};
+  Vec3 base{-.76f, -.26f, side * .92f}, offset = Add(front, Scale(base, -1));
+  float height = Dot(offset, span_axis);
+  FoilSpec pylon{base,
+                 chord_axis,
+                 {0, 0, 1},
+                 span_axis,
+                 height,
+                 .29f,
+                 Length(Add(rear, Scale(front, -1))),
+                 0,
+                 Dot(offset, chord_axis) / height,
+                 0,
+                 0,
+                 .12f};
+  pylon.root_fairing = {.04f, .08f, 2.f};
+  pylon.tip_fairing = {.055f, .10f, .8f};
+  return {pylon, 0, height, 0, false, false};
 }
 
 WIND3D_HD float ProjectedWingSpan(const Controls &controls) {

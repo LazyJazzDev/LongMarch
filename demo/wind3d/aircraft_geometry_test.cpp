@@ -6,6 +6,43 @@
 #include "simulation.h"
 
 namespace {
+bool PylonAttachments() {
+  using namespace wind3d;
+  for (float span : {2.f, 2.65f, 4.2f})
+    for (float sweep : {0.f, .55f, .7f})
+      for (float camber : {0.f, .025f, .06f})
+        for (int side : {-1, 1}) {
+          Controls c;
+          c.airframe.wing_span = span;
+          c.airframe.wing_sweep = sweep;
+          c.airframe.wing_camber = camber;
+          c.flap = 40;
+          c.aileron = 25;
+          auto pylon = AircraftPart(6, side, c);
+          if (!(pylon.spec.span > .05f))
+            return false;
+          for (int i = 0; i <= 100; ++i)
+            for (int surface : {-1, 1}) {
+              auto top = FoilPoint(pylon, i / 100.f, pylon.end, surface, false);
+              float distance = 1;
+              for (int part : {0, 1, 2, 3, 7, 12})
+                distance = std::min(distance, PartDistance(top, AircraftPart(part, side, c)));
+              if (distance > -.0001f) {
+                std::cerr << "Exposed pylon upper cap: " << distance << '\n';
+                return false;
+              }
+              auto root = FoilPoint(pylon, i / 100.f, 0, surface, false);
+              float t = (root.x - nacelle_inlet) / nacelle_length;
+              float radius = std::hypot(root.y - nacelle_y, root.z - side * .92f);
+              if (t < 0 || t > 1 || radius < NacelleRadius(t, -1) + .0001f || radius > NacelleRadius(t, 1) - .0001f) {
+                std::cerr << "Pylon lower cap leaves nacelle wall\n";
+                return false;
+              }
+            }
+        }
+  return true;
+}
+
 bool RigidControls() {
   using namespace wind3d;
   Controls controls;
@@ -49,6 +86,8 @@ int main() {
   using namespace wind3d;
   if (!RigidControls())
     return 32;
+  if (!PylonAttachments())
+    return 35;
   for (int part : {8, 9, 10, 11, 12}) {
     Controls neutral, deflected;
     deflected.aileron = deflected.elevator = deflected.rudder = 25;
@@ -89,8 +128,7 @@ int main() {
   for (int i = 0; i <= 100; ++i)
     nacelle_diameter = std::max(nacelle_diameter, 2 * NacelleRadius(i / 100.f, 1));
   if (span / length < .93f || span / length > .97f || diameter / length < .10f || diameter / length > .11f ||
-      nacelle_diameter / diameter < .55f || nacelle_diameter / diameter > .68f ||
-      std::abs(pylon.spec.span - .12f) > 1e-7f)
+      nacelle_diameter / diameter < .55f || nacelle_diameter / diameter > .68f || pylon.spec.span <= .05f)
     return 1;
   for (float z : {0.f, .5f, 1.5f, 2.65f}) {
     for (Vec3 point : {Vec3{-.3f, .1f, z}, Vec3{.4f, -.2f, z}}) {

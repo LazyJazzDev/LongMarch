@@ -28,7 +28,12 @@ the tip's developed length.
 Horizontal and vertical tail roots now flare in both chord and thickness,
 with a smooth compact transition back to their regular sections. The nacelle
 pylon has separate lower and upper shoulders meeting the nacelle crown and
-wing underside. The same invertible section deformation generates their
+wing underside. Its upper cap is positioned from the shaped wing's 22% and
+62% chord stations at the engine span location. Its height, sweep and chord
+frame follow that attachment; the lower cap remains inside the nacelle wall
+and outside the through-flow duct. Geometry checks cover both attachment caps
+across low/nominal/high wing span, sweep and camber settings, including deployed
+flaps and ailerons. The same invertible section deformation generates their
 rendered skins and solid boundaries. These are generic junction fairings;
 no claim of globally tangent production surfaces or measured drag reduction
 is implied. The wing-body belly and root shoulders remain integrated in the
