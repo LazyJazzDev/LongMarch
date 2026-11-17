@@ -148,13 +148,16 @@ cut cells, molecular viscosity 1.5e-5 m²/s, CFL 0.25, 2 m sponge; `--aero`):
 | --- | ---: | ---: | ---: |
 | 128 × 64 × 96 | 22.60 | 143.38 | 6.3456 |
 | 256 × 128 × 192 | 28.82 | 268.30 | 9.3099 |
+| 320 × 160 × 240 | 27.28 | 289.95 | 10.6298 |
 
 The 256 run completed 731 cycles to 3.00071 seconds, with no failed projections
 or nonfinite loads, and passed checkpoint writing and lifecycle validation.
-Its 2–2.5 and 2.5–3 second L/D values differ by less than 1e-6.
-This demonstrates temporal settling, not spatial convergence: the substantial
-128-to-256 change still requires finer-grid comparison. The 320 and 384 studies
-are pending; proximity to L/D 10 alone is not an accuracy criterion.
+The 320 run completed 819 cycles to 3.00041 seconds and passed the same checks.
+For both runs, the 2–2.5 and 2.5–3 second L/D values differ by less than 1e-6.
+This demonstrates temporal settling, not spatial convergence: L/D increases
+14.2% from 256 to 320, with most of the lift increase on the main wing and lower
+tail/nacelle drag. The 384 study is pending; proximity to L/D 10 alone is not an
+accuracy criterion.
 The main half-wing span increased from 2.7 to 3.6 m with the same root/tip
 chords. Including raked tips, total span is 7.84 m and planform aspect
 ratio is about 11.56. Flap/aileron stations and the occupancy broad phase follow
