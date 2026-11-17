@@ -53,6 +53,10 @@ int main(int argc, char **argv) {
       solver.corrected_transport = false;
     } else if (key == "--no-flow")
       view.flow = view.volume = false;
+    else if (key == "--streamlines")
+      view.flow = true;
+    else if (key == "--no-volume")
+      view.volume = false;
     else if (key == "--model-only")
       view.flow = view.volume = view.loads = false;
     else if (key == "--headless")
@@ -68,6 +72,8 @@ int main(int argc, char **argv) {
           << "--aero: LFM, air viscosity 1.5e-5 m^2/s, slip cut cells with wall-shear loads, CFL 0.25, 2 m sponge.\n"
           << "Place --aero before any individual solver overrides.\n";
       std::cout << "--restore FILE resumes a checkpoint; supply its original grid, controls and solver settings.\n";
+      std::cout
+          << "Flow view: --streamlines --no-volume --streamline-density 1..4 --streamline-width 0.75..4 (pixels).\n";
       std::cout
           << "Airframe: --wing-span 2..4.2 (half-span, m), --wing-camber 0..0.06, --wing-sweep 0..0.7 (slope), --tail-span 0.6..1.4 (half-span, m), --tail-leading 1..2 (body x, m).\n";
       return 0;
@@ -99,7 +105,8 @@ int main(int argc, char **argv) {
           std::cerr << "Invalid number\n";
           return 1;
         }
-        if (key == "--grid" || key == "--steps" || key == "--frames" || key == "--pressure-cycles") {
+        if (key == "--grid" || key == "--steps" || key == "--frames" || key == "--pressure-cycles" ||
+            key == "--streamline-density") {
           if (number != std::floor(number) || number < 0 || number > 1000000)
             return 1;
           if (key == "--pressure-cycles")
@@ -110,6 +117,8 @@ int main(int argc, char **argv) {
             steps = int(number);
           if (key == "--frames")
             frames = int(number);
+          if (key == "--streamline-density")
+            view.streamline_density = int(number);
         } else if (key == "--validate-time") {
           if (number <= 0)
             return 1;
@@ -133,6 +142,8 @@ int main(int argc, char **argv) {
           view.pitch = number;
         else if (key == "--distance")
           view.distance = number;
+        else if (key == "--streamline-width")
+          view.streamline_width = number;
         else if (key == "--wing-span")
           controls.airframe.wing_span = number;
         else if (key == "--wing-camber")
@@ -162,10 +173,12 @@ int main(int argc, char **argv) {
       }
     }
   }
-  if (!wind3d::ValidAirframe(controls.airframe) || grid < 64 || grid > 640 || grid % 16 || steps < 1 ||
-      controls.speed < 1 || controls.speed > 30 || controls.angle < -20 || controls.angle > 25 || controls.flap < 0 ||
-      controls.flap > 40 || std::abs(view.pitch) > 1.55f || view.distance < 7 || view.distance > 25 ||
-      std::abs(controls.aileron) > 25 || std::abs(controls.elevator) > 25 || std::abs(controls.rudder) > 25)
+  if (view.streamline_density < 1 || view.streamline_density > 4 || view.streamline_width < .75f ||
+      view.streamline_width > 4 || !wind3d::ValidAirframe(controls.airframe) || grid < 64 || grid > 640 || grid % 16 ||
+      steps < 1 || controls.speed < 1 || controls.speed > 30 || controls.angle < -20 || controls.angle > 25 ||
+      controls.flap < 0 || controls.flap > 40 || std::abs(view.pitch) > 1.55f || view.distance < 7 ||
+      view.distance > 25 || std::abs(controls.aileron) > 25 || std::abs(controls.elevator) > 25 ||
+      std::abs(controls.rudder) > 25)
     return 1;
   if (headless && !frames)
     frames = 300;

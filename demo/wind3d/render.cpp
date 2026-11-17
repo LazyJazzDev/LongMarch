@@ -21,6 +21,10 @@ bool RenderFailure(int line) {
 }
 
 using visualization::FlowLines;
+
+struct StreamSegment {
+  Vec3 start, end, color, previous, next;
+};
 }  // namespace
 
 bool Render(IDevice *device,
@@ -38,7 +42,7 @@ bool Render(IDevice *device,
       return RenderFailure(__LINE__);
   }
   ObjPtr<IBuffer> uniform = device->CreateBuffer({256});
-  BindingLayoutDesc layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}};
+  BindingLayoutDesc layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX | SHADER_VISIBILITY_FRAGMENT}}};
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   if (!queue || !uniform || !group || !group->BindResource(0, uniform.Get()))
     return RenderFailure(__LINE__);
@@ -60,6 +64,24 @@ bool Render(IDevice *device,
   ObjPtr<IProgram> aircraft_program = device->CreateProgram(desc);
   desc.topology = PRIMITIVE_TOPOLOGY_LINE_LIST;
   ObjPtr<IProgram> line_program = device->CreateProgram(desc);
+  std::string stream_source = "#define WIND3D_STREAMLINES\n" + source;
+  ObjPtr<IShader> stream_vs = device->CreateShaderFromSource(stream_source, "VSStream", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> stream_ps = device->CreateShaderFromSource(stream_source, "PSStream", SHADER_STAGE_FRAGMENT);
+  if (!stream_vs || !stream_ps)
+    return RenderFailure(__LINE__);
+  ProgramDesc stream_desc = desc;
+  stream_desc.vertex_shader = stream_vs.Get();
+  stream_desc.fragment_shader = stream_ps.Get();
+  stream_desc.topology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  stream_desc.vertex_bindings = {{sizeof(StreamSegment), true}};
+  stream_desc.vertex_attributes.push_back({3, 0, INPUT_TYPE_FLOAT3, 36});
+  stream_desc.vertex_attributes.push_back({4, 0, INPUT_TYPE_FLOAT3, 48});
+  stream_desc.color_formats = {IMAGE_FORMAT_R8G8B8A8_UNORM};
+  stream_desc.depth_stencil.depth_write = false;
+  stream_desc.blend_states = {BlendState(true)};
+  ObjPtr<IProgram> stream_program = device->CreateProgram(stream_desc);
+  if (!stream_program)
+    return RenderFailure(__LINE__);
   BindingLayoutDesc volume_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
                                    {1, BINDING_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
                                    {2, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT},
@@ -80,7 +102,7 @@ bool Render(IDevice *device,
   if (!aircraft_program || !line_program)
     return RenderFailure(__LINE__);
   ObjPtr<IImage> canvas, scene, depth, surface_depth;
-  ObjPtr<IBuffer> aircraft_buffer, line_buffer;
+  ObjPtr<IBuffer> aircraft_buffer, line_buffer, stream_buffer;
   ObjPtr<ISubmissionToken> last;
 
   // Ensure early failure also waits before destroying resources/window.
@@ -96,6 +118,9 @@ bool Render(IDevice *device,
   std::shared_ptr<const Snapshot> state;
   std::shared_ptr<const std::vector<Vertex>> mesh;
   size_t line_count = 0;
+  size_t stream_count = 0;
+  int streamline_density = view.streamline_density;
+  float streamline_width = view.streamline_width;
   bool paused = false, streamlines = view.flow, show_loads = view.loads, rebuild = true;
   bool show_volume = view.volume, colored_volume = false;
   float volume_density = 0.035f, volume_threshold = 6.0f, volume_step = 1.0f;
@@ -179,6 +204,8 @@ bool Render(IDevice *device,
               ImGui::SliderFloat("Threshold s^-1", &volume_threshold, 0, 60, "%.1f");
               ImGui::SliderFloat("Ray step / cell", &volume_step, 0.5f, 2, "%.2f");
               rebuild |= ImGui::Checkbox("3D streamlines", &streamlines);
+              rebuild |= ImGui::SliderInt("Streamline density", &streamline_density, 1, 4);
+              ImGui::SliderFloat("Streamline width (px)", &streamline_width, 0.75f, 4.0f);
               rebuild |= ImGui::Checkbox("Force and moment vectors", &show_loads);
               ImGui::SliderFloat("Orbit", &yaw, -3.14f, 3.14f);
               ImGui::SliderFloat("Elevation", &pitch, -1.55f, 1.55f);
@@ -187,6 +214,9 @@ bool Render(IDevice *device,
             }
             ImGui::SeparatorText("Integrated aircraft loads");
             if (state) {
+              const auto &airframe = state->controls.airframe;
+              ImGui::Text("Wing span %.2f m | camber %.1f%%", 2 * (airframe.wing_span + .32f),
+                          100 * airframe.wing_camber);
               ImGui::TextColored({0.1f, 1, 0.8f, 1}, "World-axis force [N]");
               ImGui::Text("Fx % .3f\nFy % .3f\nFz % .3f", state->force.x, state->force.y, state->force.z);
               ImGui::Text("Magnitude %.3f N", Length(state->force));
@@ -258,11 +288,28 @@ bool Render(IDevice *device,
         return RenderFailure(__LINE__);
     }
     if (state && rebuild) {
-      auto lines = FlowLines(*state, streamlines, show_loads);
+      auto lines = FlowLines(*state, false, show_loads);
       line_count = lines.size();
       line_buffer = device->CreateBuffer({line_count * sizeof(Vertex)});
       if (!line_buffer || !commands->CmdUploadBuffer(line_buffer.Get(), 0, lines.data(), line_count * sizeof(Vertex)))
         return RenderFailure(__LINE__);
+      auto flow = FlowLines(*state, streamlines, false, streamline_density, false);
+      std::vector<StreamSegment> segments;
+      segments.reserve(flow.size() / 2);
+      auto same_point = [](Vec3 a, Vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; };
+      for (size_t i = 0; i + 1 < flow.size(); i += 2) {
+        Vec3 start = flow[i].position, end = flow[i + 1].position;
+        Vec3 previous = i >= 2 && same_point(flow[i - 1].position, start) ? flow[i - 2].position : start;
+        Vec3 next = i + 2 < flow.size() && same_point(flow[i + 2].position, end) ? flow[i + 3].position : end;
+        segments.push_back({start, end, flow[i].color, previous, next});
+      }
+      stream_count = segments.size();
+      if (stream_count) {
+        stream_buffer = device->CreateBuffer({stream_count * sizeof(StreamSegment)});
+        if (!stream_buffer ||
+            !commands->CmdUploadBuffer(stream_buffer.Get(), 0, segments.data(), stream_count * sizeof(StreamSegment)))
+          return RenderFailure(__LINE__);
+      }
       rebuild = false;
     }
     float viewport_width =
@@ -276,11 +323,13 @@ bool Render(IDevice *device,
       glm::vec4 eye;
       glm::uvec4 grid;
       glm::vec4 volume;
+      glm::vec4 streamlines;
     } globals{transform,
               glm::inverse(transform),
               glm::vec4(eye, 1),
               glm::uvec4(0),
-              {show_volume ? volume_density : 0, volume_threshold, 0.1f, colored_volume ? 1.0f : 0.0f}};
+              {show_volume ? volume_density : 0, volume_threshold, 0.1f, colored_volume ? 1.0f : 0.0f},
+              {viewport_width, float(height), streamline_width, 0.72f / streamline_density}};
 
     if (volume_state && volume_state == state) {
       uint32_t nx = uint32_t(state->solver_nx);
@@ -314,6 +363,17 @@ bool Render(IDevice *device,
     if (!commands->CmdBeginRendering(composite) || !commands->CmdBindProgram(volume_program.Get()) ||
         !commands->CmdBindGroup(0, volume_group.Get()) || !commands->CmdDraw(3) || !commands->CmdEndRendering())
       return RenderFailure(__LINE__);
+    if (stream_count) {
+      RenderingInfo overlay;
+      overlay.color_attachments = {{canvas.Get(), ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_STORE_OP_STORE}};
+      overlay.depth_stencil.image = depth.Get();
+      overlay.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_LOAD;
+      if (!commands->CmdBeginRendering(overlay) || !commands->CmdBindProgram(stream_program.Get()) ||
+          !commands->CmdSetViewport({0, 0, viewport_width, float(height), 0, 1}) ||
+          !commands->CmdBindGroup(0, group.Get()) || !commands->CmdBindVertexBuffer(0, stream_buffer.Get()) ||
+          !commands->CmdDraw(6, uint32_t(stream_count)) || !commands->CmdEndRendering())
+        return RenderFailure(__LINE__);
+    }
     if (window && (!commands->CmdDrawImGui(window.Get(), canvas.Get()) ||
                    !commands->CmdPresentImage(window.Get(), canvas.Get(), COLOR_SPACE_BT709_LINEAR)))
       return RenderFailure(__LINE__);

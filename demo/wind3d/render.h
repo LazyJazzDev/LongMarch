@@ -6,6 +6,8 @@ namespace wind3d {
 struct ViewSettings {
   float yaw{-0.85f}, pitch{0.40f}, distance{10.5f};
   bool flow{false}, loads{true}, volume{true};
+  int streamline_density{2};
+  float streamline_width{1.5f};
 };
 
 bool Render(grassland::rhi::IDevice *device,

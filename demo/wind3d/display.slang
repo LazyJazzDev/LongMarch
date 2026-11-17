@@ -3,7 +3,8 @@ struct Uniform {
   float4x4 inverseTransform;
   float4 eye;
   uint4 grid;
-  float4 volumeSettings;  // density, threshold [s^-1], step [m], color mode
+  float4 volumeSettings;      // density, threshold [s^-1], step [m], color mode
+  float4 streamlineSettings;  // viewport pixels, width pixels, opacity
 };
 
 RHI_UNIFORM(0, 0, Uniform, globals);
@@ -13,7 +14,89 @@ RHI_TEXTURE2D(0, 2, float4, sceneColor);
 RHI_TEXTURE2D(0, 3, float, sceneDepth);
 #endif
 
-#ifndef WIND3D_VOLUME
+#if defined(WIND3D_STREAMLINES)
+struct StreamInput {
+  RHI_INPUT(0, float3, start);
+  RHI_INPUT(1, float3, end);
+  RHI_INPUT(2, float3, color);
+  RHI_INPUT(3, float3, previous);
+  RHI_INPUT(4, float3, next);
+};
+
+struct StreamVarying {
+  float4 position : SV_Position;
+  noperspective float2 local : TEXCOORD0;
+  nointerpolation float segmentLength : TEXCOORD1;
+  nointerpolation float3 color : COLOR0;
+  nointerpolation float2 caps : TEXCOORD2;
+};
+
+StreamVarying VSStream(StreamInput input, uint id : SV_VertexID) {
+  StreamVarying result;
+  float4 a = mul(globals.transform, float4(input.start, 1));
+  float4 b = mul(globals.transform, float4(input.end, 1));
+  result.color = input.color;
+  result.local = 0;
+  result.segmentLength = 0;
+  result.caps = float2(all(input.previous == input.start) ? 1 : 0, all(input.next == input.end) ? 1 : 0);
+  result.position = float4(0, 0, -1, 1);
+  if (a.z < 0 && b.z < 0)
+    return result;
+  if (a.z < 0) {
+    a = lerp(a, b, a.z / (a.z - b.z));
+    result.caps.x = 1;
+  }
+  if (b.z < 0) {
+    b = lerp(b, a, b.z / (b.z - a.z));
+    result.caps.y = 1;
+  }
+  float2 viewport = globals.streamlineSettings.xy;
+  float2 delta = (b.xy / b.w - a.xy / a.w) * viewport * 0.5;
+  float segmentLength = length(delta);
+  if (segmentLength < 1e-4)
+    return result;
+  float2 direction = delta / segmentLength;
+  float2 normal = float2(-direction.y, direction.x);
+  const float2 corners[6] = {float2(0, -1), float2(1, -1), float2(0, 1), float2(0, 1), float2(1, -1), float2(1, 1)};
+  float2 corner = corners[id];
+  float extent = globals.streamlineSettings.z * 0.5 + 1;
+  float4 clip = corner.x > 0 ? b : a;
+  float cap = corner.x > 0 ? result.caps.y : result.caps.x;
+  float2 joinNormal = normal;
+  if (cap == 0) {
+    float4 neighbor = mul(globals.transform, float4(corner.x > 0 ? input.next : input.previous, 1));
+    if (neighbor.z > 0) {
+      float2 adjacent = (neighbor.xy / neighbor.w - clip.xy / clip.w) * viewport * (corner.x > 0 ? 0.5 : -0.5);
+      float adjacentLength = length(adjacent);
+      if (adjacentLength > 1e-4) {
+        adjacent /= adjacentLength;
+        float2 miter = normal + float2(-adjacent.y, adjacent.x);
+        if (length(miter) > 1e-4) {
+          miter = normalize(miter);
+          joinNormal = miter / max(dot(miter, normal), 0.5);
+        }
+      }
+    }
+  }
+  float extension = (corner.x * 2 - 1) * extent * cap;
+  float2 offset = direction * extension + joinNormal * corner.y * extent;
+  clip.xy += offset * 2 / viewport * clip.w;
+  result.position = clip;
+  result.local = float2(corner.x * segmentLength + extension, corner.y * extent);
+  result.segmentLength = segmentLength;
+  return result;
+}
+
+float4 PSStream(StreamVarying input) : SV_Target0 {
+  float cap = max(max(-input.local.x * input.caps.x, (input.local.x - input.segmentLength) * input.caps.y), 0);
+  float distance = length(float2(cap, input.local.y)) - globals.streamlineSettings.z * 0.5;
+  float coverage = saturate(0.5 - distance);
+  if (coverage <= 0)
+    discard;
+  return float4(input.color, coverage * globals.streamlineSettings.w);
+}
+
+#elif !defined(WIND3D_VOLUME)
 struct Input {
   RHI_INPUT(0, float3, position);
   RHI_INPUT(1, float3, normal);

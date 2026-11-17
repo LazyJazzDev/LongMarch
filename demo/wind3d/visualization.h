@@ -39,16 +39,22 @@ inline void Arrow(std::vector<Vertex> &lines, Vec3 origin, Vec3 vector, Vec3 col
   Line(lines, end, Add(base, Scale(perpendicular, -1)), color);
 }
 
-inline std::vector<Vertex> FlowLines(const Snapshot &snapshot, bool streamlines, bool loads, int density = 1) {
+inline std::vector<Vertex> FlowLines(const Snapshot &snapshot,
+                                     bool streamlines,
+                                     bool loads,
+                                     int density = 1,
+                                     bool decorations = true) {
   std::vector<Vertex> lines;
-  for (int x = -5; x <= 9; ++x)
-    Line(lines, {float(x), -2, -5}, {float(x), -2, 5}, {0.055f, 0.08f, 0.12f});
-  for (int z = -5; z <= 5; ++z)
-    Line(lines, {-5, -2, float(z)}, {9, -2, float(z)}, {0.055f, 0.08f, 0.12f});
-  Arrow(lines, {-4, -1.8f, -4.7f}, {1, 0, 0}, {1, 0.25f, 0.2f});
-  Arrow(lines, {-4, -1.8f, -4.7f}, {0, 1, 0}, {0.2f, 1, 0.3f});
-  Arrow(lines, {-4, -1.8f, -4.7f}, {0, 0, 1}, {0.2f, 0.5f, 1});
-  if (streamlines) {
+  if (decorations) {
+    for (int x = -5; x <= 9; ++x)
+      Line(lines, {float(x), -2, -5}, {float(x), -2, 5}, {0.055f, 0.08f, 0.12f});
+    for (int z = -5; z <= 5; ++z)
+      Line(lines, {-5, -2, float(z)}, {9, -2, float(z)}, {0.055f, 0.08f, 0.12f});
+    Arrow(lines, {-4, -1.8f, -4.7f}, {1, 0, 0}, {1, 0.25f, 0.2f});
+    Arrow(lines, {-4, -1.8f, -4.7f}, {0, 1, 0}, {0.2f, 1, 0.3f});
+    Arrow(lines, {-4, -1.8f, -4.7f}, {0, 0, 1}, {0.2f, 0.5f, 1});
+  }
+  if (streamlines && !snapshot.cells.empty()) {
     density = std::clamp(density, 1, 4);
     for (int iz = -10 * density; iz <= 10 * density; ++iz)
       for (int iy = -density; iy <= 2 * density; ++iy) {

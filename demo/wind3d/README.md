@@ -25,6 +25,17 @@ not those settings. The viewer resumes from the saved cycle; its Reset control
 still starts a fresh flow. Restoration errors are reported instead of silently
 starting over.
 
+The desktop also accepts bounded airframe parameters: `--wing-span` (half-span
+excluding the raked tip, 2–4.2 m), `--wing-camber` (0–0.06 chord), `--wing-sweep`
+(leading-edge slope, 0–0.7), `--tail-span` (horizontal half-span, 0.6–1.4 m), and
+`--tail-leading` (horizontal-tail leading edge at its root, body x 1–2 m).
+They share one specification between the explicit mesh and CUDA occupancy,
+including control-surface stations and the wing broad-phase bound. Diagnostic
+CSV rows record all five parameters. Keep them identical when restoring a
+checkpoint. These options vary the current conventional aircraft family;
+they do not import arbitrary meshes or establish aerodynamic accuracy for a
+new configuration.
+
 ## Leapfrog Flow Maps desktop solver
 
 The desktop executable now defaults to **LFM on a 256 × 128 × 192 grid**.
@@ -110,6 +121,18 @@ demo_wind3d --lfm --grid 128 --validate-time 3 --no-export --viscosity 0.000015 
 ```
 
 ### Vorticity volume rendering
+
+For the web-style streamline view, use `--streamlines --no-volume` or the
+corresponding **View** controls. Desktop streamlines share the web tracer and
+speed colors, with the same four seed densities (84/287/610/1053, default 287)
+and opacity rule (0.72 divided by the density level). The RHI draws instanced
+triangle ribbons with analytic pixel coverage, connected limited-miter joins
+and round endpoints instead of hardware line primitives. Width stays constant
+in screen pixels and is adjustable from 0.75 to 4 with **Streamline width** or
+`--streamline-width`; `--streamline-density` selects the density. They depth-test
+against the aircraft without writing depth, and composite after the vorticity
+volume so enabling both views does not make transparent lines terminate volume
+rays. Grid and load-vector overlays retain their existing rendering.
 
 The default view ray-marches the full solver-grid magnitude of curl(u), computed
 in CUDA from the final projected MAC velocity. The volume has 256 × 128 × 192
