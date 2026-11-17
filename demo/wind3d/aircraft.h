@@ -94,9 +94,15 @@ WIND3D_HD float FuselageRadius(float x, float cosine) {
     radius *= sqrtf(fmaxf(0, 1 - (x + 2) * (x + 2)));
   if (x > 1.5f)
     radius *= 1 - Smooth((x - 1.5f) / 1.5f);
-  float u = (x + 0.2f) / 1.1f;
-  float fairing = fmaxf(0, 1 - u * u);
-  return radius + 0.055f * fairing * fairing * (1 - cosine) * 0.5f;
+  // Longitudinal belly canoe and bilateral wing-root shoulders. Compact
+  // quartic envelopes have zero slope at their ends, avoiding hard ridges.
+  float u = (x + 0.15f) / 1.3f;
+  float envelope = fmaxf(0, 1 - u * u);
+  envelope *= envelope;
+  float shoulder = (cosine + 0.48f) / 0.48f;
+  shoulder = fmaxf(0, 1 - shoulder * shoulder);
+  float belly = 0.045f * (1 - cosine) * .5f;
+  return radius + envelope * (belly + 0.075f * shoulder * shoulder);
 }
 
 WIND3D_HD Vec3 FuselagePoint(float x, float phi) {
