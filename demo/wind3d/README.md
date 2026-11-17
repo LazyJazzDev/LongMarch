@@ -49,8 +49,10 @@ The implementation follows the hybrid velocity/impulse algorithm in
 This is a native adaptation to Wind3D's MAC arrays, geometry and pressure solver,
 not a binary-equivalent port of the authors' tiled CUDA solver. Map interpolation,
 its analytic derivatives and impulse pullback use the reference quadratic
-B-spline (N2) kernel on extended MAC velocities. Apertures remain in midpoint
-transport, divergence and projection; they do not normalize the map interpolant.
+B-spline (N2) kernel on extended MAC velocities. Leapfrog midpoint prediction
+also uses N2 for RK2 velocity tracing and transported values, as in the reference.
+Apertures remain in divergence and projection; they do not normalize the map interpolant.
+`--cubic` affects the MacCormack path; LFM consistently uses quadratic interpolation.
 Values outside each component's MAC extent use a constant extension. Viscosity uses a
 first-order operator split, not the paper's accumulated-force path integral.
 The existing wall-shear and pressure surface integration supplies all six load
@@ -125,14 +127,15 @@ boundary, not turbulent aircraft aerodynamics. `wind3d_lfm_check --lfm` includes
 these sphere checks, an analytic rotating-flow predictor check, and checkpoints.
 
 With quadratic maps and centered pressure recovery, the 128-grid aircraft gives
-18.51 N drag and 64.29 N lift in the 2–3 second window (12 m/s, 5 degrees, cut
-cells, molecular viscosity 1.5e-5 m²/s, CFL 0.25, cubic midpoint transport,
-2 m sponge). The 1–2 and 2–3 second mean L/D values are 3.4736 and 3.4735.
+18.68 N drag and 66.79 N lift in the 2–3 second window (12 m/s, 5 degrees, cut
+cells, molecular viscosity 1.5e-5 m²/s, CFL 0.25, 2 m sponge).
+The 2–3 second mean L/D is 3.5752, with negligible variation in that window.
 This demonstrates temporal settling at that grid, not spatial convergence.
 Keeping the centered pressure predictor but using the earlier trilinear maps
 gave L/D 0.51 on the same grid. The interpolation regression checks a sampled
-quadratic and its derivative across a stencil transition, in addition to affine
-flow maps. Later performance/load measurements below predate these corrections
+quadratic and its derivative across a stencil transition, and constant-velocity
+transport of a quadratic field, in addition to affine flow maps.
+Later performance/load measurements below predate these corrections
 and should not be used as current aerodynamic predictions.
 
 Pressure PCG and its multigrid work vectors use double precision, including dot

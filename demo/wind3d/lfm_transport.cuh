@@ -82,6 +82,26 @@ __device__ float LfmSample(Grid g, const float *field, Vec3 p, int axis, Vec3 ta
   return value;
 }
 
+__device__ Vec3 LfmVelocityAt(Grid g, LfmVelocity velocity, Vec3 p) {
+  float unused;
+  return {LfmSample(g, velocity.axis[0], p, 0, {}, unused), LfmSample(g, velocity.axis[1], p, 1, {}, unused),
+          LfmSample(g, velocity.axis[2], p, 2, {}, unused)};
+}
+
+// The reference leapfrog midpoint predictor uses RK2 departure tracing with
+// N2 interpolation for both the tracing velocity and the transported component.
+__global__ void LfmAdvect(Grid g, LfmVelocity velocity, const float *source, float *destination, int axis, float dt) {
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
+  if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
+    return;
+  int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
+  Vec3 p = Add(Vec3{float(x), float(y), float(z)}, LfmOffset(axis));
+  Vec3 first = LfmVelocityAt(g, velocity, p);
+  Vec3 mid = LfmVelocityAt(g, velocity, Add(p, Scale(first, -0.5f * dt / g.h)));
+  float unused;
+  destination[n] = LfmSample(g, source, Add(p, Scale(mid, -dt / g.h)), axis, {}, unused);
+}
+
 __device__ void LfmDerivative(Grid g, LfmVelocity velocity, Vec3 p, Vec3 tangent, Vec3 &dp, Vec3 &dt) {
   dp.x = LfmSample(g, velocity.axis[0], p, 0, tangent, dt.x);
   dp.y = LfmSample(g, velocity.axis[1], p, 1, tangent, dt.y);
@@ -133,9 +153,7 @@ __global__ void LfmPullback(Grid g,
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   Vec3 p = map[n];
-  float unused;
-  Vec3 value{LfmSample(g, source.axis[0], p, 0, {}, unused), LfmSample(g, source.axis[1], p, 1, {}, unused),
-             LfmSample(g, source.axis[2], p, 2, {}, unused)};
+  Vec3 value = LfmVelocityAt(g, source, p);
   destination[n] = Dot(jacobian[n], value) - (subtract ? subtract[n] : 0);
 }
 

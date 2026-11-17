@@ -996,6 +996,29 @@ bool ValidateFlowMaps(int cuda_device) {
       ok &= std::isfinite(output[2 * n]) && std::isfinite(output[2 * n + 1]);
     }
   }
+  // Transport a quadratic component in a constant unit-x velocity field.
+  // The departure must translate by -dt, with the same N2 variance as sampling.
+  for (int n = 0; n < nf; ++n) {
+    float x = (n % (g.nx + 1) + 0.5f) * g.h;
+    values[n] = 1;
+    values[n + nf] = x * x;
+    values[n + 2 * nf] = 0;
+  }
+  if (ok) {
+    ok = cudaMemcpy(fields, values.data(), values.size() * sizeof(float), cudaMemcpyHostToDevice) == cudaSuccess;
+    constexpr float dt = 0.03f;
+    LfmAdvect<<<(nf + 255) / 256, 256>>>(g, LfmVelocity{{fields, fields + 2 * nf, fields + 2 * nf}}, fields + nf,
+                                         result, 1, dt);
+    ok &= cudaGetLastError() == cudaSuccess &&
+          cudaMemcpy(output.data(), result, nf * sizeof(float), cudaMemcpyDeviceToHost) == cudaSuccess;
+    for (int z = 2; z < g.nz - 2; ++z)
+      for (int y = 2; y < g.ny - 2; ++y)
+        for (int x = 2; x < g.nx - 2; ++x) {
+          float departure = (x + 0.5f) * g.h - dt;
+          maximum = std::max(maximum, std::abs(output[g.F(x, y, z)] - departure * departure - 0.25f * g.h * g.h));
+          ok &= std::isfinite(output[g.F(x, y, z)]);
+        }
+  }
   // Solid-body rotation: (u.grad)u = -omega^2 (x,y,0). This checks the
   // physical-pressure predictor independently of flow-map reconstruction.
   constexpr float omega = 0.7f;
@@ -1202,8 +1225,8 @@ struct Simulation::Impl {
       float interval = dt * (i == 0 ? 0.5f : i == 1 ? 1.0f : 2.0f);
       if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
             for (int axis = 0; axis < 3; ++axis)
-              Advect<<<blocks, 256, 0, queue>>>(g, advecting[0], advecting[1], advecting[2], source[axis],
-                                                lfm_mid[i][axis], axis, interval);
+              LfmAdvect<<<blocks, 256, 0, queue>>>(g, LfmVelocity{{advecting[0], advecting[1], advecting[2]}},
+                                                   source[axis], lfm_mid[i][axis], axis, interval);
             Boundary<<<blocks, 256, 0, queue>>>(g, bu, bv, bw, lfm_mid[i][0], lfm_mid[i][1], lfm_mid[i][2],
                                                 controls.speed, false);
           }))
