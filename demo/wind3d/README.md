@@ -738,7 +738,7 @@ at every resolution or control setting.
 
 目标用途是游戏中的不可压缩气动近似：按物体离线采集不同来流与联动控制状态下的合力、合力矩，再拟合供实时引擎使用的模型。优先考虑采样效率、响应连续性与稳定性，不以严格网格收敛或指定升阻比作为验收要求。
 
-`wind3d_aero_model` 提供与飞机参数无关的 JSON 描述、部件层级和控制混合。当前阶段只解析描述并计算刚体姿态；不会加载或验证 mesh 文件，也尚未接入 CUDA 网格边界、批量气动采集或代理模型训练。
+`wind3d_aero_model` 提供与飞机参数无关的 JSON 描述、部件层级和控制混合。`wind3d_aero_mesh` 进一步加载 OBJ 部件，构建可在 CPU/CUDA 查询的局部三角形 BVH。相同 mesh 路径复用几何；部件姿态变化时不重建 BVH。目前尚未接入流体求解器的网格边界、批量气动采集或代理模型训练。
 
 ```json
 {
@@ -762,3 +762,9 @@ mesh 路径相对于 JSON 文件；坐标使用右手系与米，旋转使用单
 `BodyLoads` 接收世界坐标中的合力及关于世界原点的合力矩，返回物体坐标中的合力及关于指定物体局部参考点的合力矩。调用者必须传入刚体变换；力使用 N，力矩使用 N·m。
 
 在现有原生构建目录构建 `wind3d_model_inspect` 和 `wind3d_aero_model_check`。运行 `wind3d_model_inspect model.json [按声明顺序排列的控制值]` 查看部件姿态；省略控制值时使用默认状态。运行 `wind3d_aero_model_check out/wind3d-aero/model-contract-test.json` 验证控制混合、限位、父子变换、铰链支点以及力矩参考点转换（参数为可覆盖并删除的临时测试文件）。
+
+`wind3d_model_inspect --geometry model.json [控制值]` 同时加载网格并报告三角形和 BVH 节点数量。OBJ 应为无自交、封闭、法线朝外的实体表面；导入器焊接完全相同位置的顶点，检查退化三角形、边的封闭性与一致绕序以及正有向体积。它不进行完整自交检测，也不会自动填洞或修复错误的面朝向。材料、纹理不参与气动几何。
+
+距离查询使用最近三角形特征的角度加权伪法线判断内外，参考 [Bærentzen / Aanæs 2005](https://orbit.dtu.dk/en/publications/signed-distance-computation-using-the-angle-weighted-pseudo-norma/)。`MeshView` 为直接上传 CUDA 的只读数组视图，复用同一查询实现；`ModelGeometry::Distance` 将查询点变换至各部件局部坐标，取有符号距离最小值构造实体并集（交叠内部不保证精确欧氏距离）。
+
+构建并运行 `wind3d_aero_mesh_check out/wind3d-aero/mesh-contract-test.obj` 验证立方体解析距离、凹形内外判定、BVH 与穷举距离、几何共享、旋转平移和无效输入。启用 CUDA 的原生构建还会在 GPU 上检查相同查询。测试参数是可覆盖并删除的临时 OBJ 文件，并会使用相邻的 `.obj.json` 临时描述文件。
