@@ -16,6 +16,12 @@ transport: nominal span 5.72 m, cabin diameter 0.63 m, and nacelle outer
 diameter approximately 0.40 m. These proportions use the A320 family as a
 reference, not an exact certified aircraft surface:
 [Airbus aircraft characteristics](https://www.aircraft.airbus.com/sites/g/files/jlcbta126/files/2024-06/AC_A320_0624.pdf).
+The main wing now varies its sections continuously: thickness/chord falls
+from 15% to 12%, camber/chord from 2.5% to 1.5%, and incidence decreases by
+3 degrees from root to tip. A shared reversible section deformation includes
+the control hinge fairings; the tip extension inherits the exact terminal
+section, with continuity checked in the geometry test. These are initial
+transport-like design choices, not a measured A320 airfoil reconstruction.
 The wing, empennage and pylon dimensions share the same geometric definitions
 between the renderer and fluid boundary. Older checkpoints and the historical
 9.3099 L/D results below describe the previous, larger-span geometry; do not

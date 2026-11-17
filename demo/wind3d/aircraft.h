@@ -120,7 +120,26 @@ WIND3D_HD float FoilCamber(float u, float chord, float camber) {
 struct FoilSpec {
   Vec3 origin, x_axis, y_axis, z_axis;
   float span, root, tip, leading, sweep, dihedral, camber, thickness;
+  float washout{}, tip_camber_scale{1}, tip_thickness_scale{1};
 };
+
+// Reversible section shaping preserves span station. The same deformation
+// maps the explicit surface and its analytic solid boundary, including hinges.
+WIND3D_HD Vec3 SectionShape(const FoilSpec &s, Vec3 p, bool inverse = false) {
+  float t = fminf(fmaxf(p.z / s.span, 0), 1);
+  float chord = s.root + (s.tip - s.root) * t;
+  float leading = s.leading + s.sweep * p.z;
+  float camber = s.camber * (1 + (s.tip_camber_scale - 1) * t);
+  float thickness_scale = 1 + (s.tip_thickness_scale - 1) * t;
+  Vec3 pivot{leading + .25f * chord, s.dihedral * p.z + FoilCamber(.25f, chord, camber), p.z};
+  if (inverse)
+    p = Add(pivot, RotateZ(Add(p, Scale(pivot, -1)), -s.washout * t));
+  float u = fminf(fmaxf((p.x - leading) / chord, 0), 1);
+  float base = s.dihedral * p.z + FoilCamber(u, chord, s.camber);
+  float shaped = s.dihedral * p.z + FoilCamber(u, chord, camber);
+  p.y = inverse ? base + (p.y - shaped) / thickness_scale : shaped + (p.y - base) * thickness_scale;
+  return inverse ? p : Add(pivot, RotateZ(Add(p, Scale(pivot, -1)), s.washout * t));
+}
 
 struct FoilPart {
   FoilSpec spec;
@@ -148,7 +167,10 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
                 airframe.wing_sweep,
                 0.09f,
                 airframe.wing_camber,
-                0.13f};
+                0.15f,
+                3.0f,
+                0.6f,
+                0.8f};
   if (part == 0)
     return {wing, 0, 0.35f, 0, false, false};
   if (part == 1)
@@ -156,8 +178,18 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
   if (part == 2)
     return {wing, airframe.wing_span * (1.75f / 2.7f), airframe.wing_span, side * controls.aileron, true, false};
   if (part == 3) {
-    wing.origin = Add(wing.origin, Add(Scale(wing.y_axis, wing.dihedral * wing.span), Scale(wing.z_axis, wing.span)));
-    wing.leading += wing.sweep * wing.span;
+    float leading = wing.leading + wing.sweep * wing.span;
+    Vec3 root =
+        SectionShape(wing, {leading, wing.dihedral * wing.span + FoilCamber(0, wing.tip, wing.camber), wing.span});
+    wing.origin =
+        Add(wing.origin, Add(Add(Scale(wing.x_axis, root.x), Scale(wing.y_axis, root.y)), Scale(wing.z_axis, root.z)));
+    wing.x_axis = RotateZ(wing.x_axis, wing.washout);
+    wing.y_axis = RotateZ(wing.y_axis, wing.washout);
+    wing.camber *= wing.tip_camber_scale;
+    wing.thickness *= wing.tip_thickness_scale;
+    wing.washout = 0;
+    wing.tip_camber_scale = wing.tip_thickness_scale = 1;
+    wing.leading = 0;
     wing.root = wing.tip;
     wing.tip = 0.06f;
     wing.span = 0.21f;
@@ -251,11 +283,11 @@ WIND3D_HD Vec3 FoilPoint(const FoilPart &part, float u, float span, int surface,
          s.dihedral * span + FoilCamber(u, chord, s.camber) + surface * FoilThickness(u, chord, s.thickness), span};
   if (control)
     p = ControlTransform(part, p, false);
-  return Add(s.origin, FoilVector(s, p));
+  return Add(s.origin, FoilVector(s, SectionShape(s, p)));
 }
 
 WIND3D_HD float PartDistance(Vec3 body, const FoilPart &part) {
-  Vec3 local = FoilLocal(part.spec, body);
+  Vec3 local = SectionShape(part.spec, FoilLocal(part.spec, body), true);
   // Conservative broad phase including the full permitted control sweep.
   float margin = 0.8f * part.spec.root;
   if (local.z < part.begin - margin || local.z > part.end + margin ||

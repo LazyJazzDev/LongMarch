@@ -18,6 +18,21 @@ int main() {
       nacelle_diameter / diameter < .55f || nacelle_diameter / diameter > .68f ||
       std::abs(pylon.spec.span - .12f) > 1e-7f)
     return 1;
+  for (float z : {0.f, .5f, 1.5f, 2.65f}) {
+    for (Vec3 point : {Vec3{-.3f, .1f, z}, Vec3{.4f, -.2f, z}}) {
+      auto restored = SectionShape(wing.spec, SectionShape(wing.spec, point), true);
+      if (Length(Add(restored, Scale(point, -1))) > 2e-6f)
+        return 8;
+    }
+  }
+  auto tip = AircraftPart(3, 1, controls);
+  for (float u : {0.f, .25f, .5f, .9f, 1.f})
+    for (int surface : {-1, 1}) {
+      auto a = FoilPoint(wing, u, wing.spec.span, surface, false);
+      auto b = FoilPoint(tip, u, 0, surface, false);
+      if (Length(Add(a, Scale(b, -1))) > 2e-6f)
+        return 9;
+    }
   size_t checked = 0;
   for (Airframe airframe : {Airframe{}, Airframe{2.7f, .025f, .55f, 1.05f, 1.65f}, Airframe{2, 0, 0, .6f, 1},
                             Airframe{4.2f, .06f, .7f, 1.4f, 2}}) {
@@ -37,6 +52,8 @@ int main() {
             // inside the fairing, including the full Fowler translation.
             for (float surface : {-.8f, 0.f, .8f}) {
               auto fixed = FoilPoint(foil, .72f, span, 0, false);
+              fixed = Add(foil.spec.origin,
+                          FoilVector(foil.spec, SectionShape(foil.spec, FoilLocal(foil.spec, fixed), true)));
               float chord = foil.spec.root + (foil.spec.tip - foil.spec.root) * span / foil.spec.span;
               auto radial = Scale(foil.spec.y_axis, surface * FoilThickness(.72f, chord, foil.spec.thickness));
               fixed = Add(fixed, radial);
@@ -44,6 +61,7 @@ int main() {
               auto moved = Add(foil.spec.origin, FoilVector(foil.spec, ControlTransform(foil, local, false)));
               for (int i = 0; i <= 10; ++i) {
                 auto p = Add(Scale(fixed, 1 - i / 10.f), Scale(moved, i / 10.f));
+                p = Add(foil.spec.origin, FoilVector(foil.spec, SectionShape(foil.spec, FoilLocal(foil.spec, p))));
                 if (PartDistance(p, foil) > 2e-6f) {
                   std::cerr << "Open hinge: part=" << part << " deflection=" << deflection << '\n';
                   return 2;

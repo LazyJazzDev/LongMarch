@@ -187,7 +187,8 @@ class MeshBuilder {
         center = Add(center, travel);
       float chord = s.root + (s.tip - s.root) * std::min(std::max(z / s.span, 0.0f), 1.0f);
       normal = FoilVector(s, d);
-      return Add(s.origin, FoilVector(s, Add(center, Scale(d, FoilThickness(0.72f, chord, s.thickness)))));
+      return Add(s.origin,
+                 FoilVector(s, SectionShape(s, Add(center, Scale(d, FoilThickness(0.72f, chord, s.thickness))))));
     };
     for (int j = 0; j < along; ++j) {
       float a = part.begin + (part.end - part.begin) * j / along,
@@ -201,7 +202,8 @@ class MeshBuilder {
     }
     for (float z : {part.begin, part.end}) {
       Vec3 normal = FoilVector(s, Scale(Vec3{0, 0, 1}, z == part.begin ? -1.0f : 1.0f)), unused;
-      Vec3 middle = Add(s.origin, FoilVector(s, Add(Add(hinge, Scale(axis, z / axis.z)), Scale(travel, 0.5f))));
+      Vec3 middle =
+          Add(s.origin, FoilVector(s, SectionShape(s, Add(Add(hinge, Scale(axis, z / axis.z)), Scale(travel, 0.5f)))));
       for (int k = 0; k < around; ++k)
         Triangle(MakeVertex(middle, normal, color), MakeVertex(point(z, k, unused), normal, color),
                  MakeVertex(point(z, k + 1, unused), normal, color));
