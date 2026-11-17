@@ -249,9 +249,12 @@ WIND3D_HD float PartDistance(Vec3 body, const FoilPart &part) {
 // Short, large-diameter fan cowl with a rounded inlet and contracted aft body.
 // The open duct remains unpowered; no fan thrust is added to the flow model.
 constexpr float nacelle_inlet = -1.3f, nacelle_length = 0.83f, nacelle_y = -0.50f;
+// A mild contraction for an unpowered through-duct. The previous 0.085 m
+// contraction reduced the nominal exit area to roughly 40% of the inlet.
+constexpr float nacelle_exit_contraction = 0.025f;
 
 WIND3D_HD float NacelleMean(float t) {
-  return 0.235f + 0.018f * sinf(3.14159265359f * t) - 0.085f * Smooth((t - 0.35f) / 0.65f);
+  return 0.235f + 0.018f * sinf(3.14159265359f * t) - nacelle_exit_contraction * Smooth((t - 0.35f) / 0.65f);
 }
 
 WIND3D_HD float NacelleHalfThickness(float t) {
