@@ -278,9 +278,10 @@ pressure operator. For a thin wall with fluid on both sides, their pressure
 contributions form the pressure jump; no solid cell is required for that load. A first-order
 tangential wall-shear estimate uses the same pre-step velocities and viscosity
 as the explicit diffusion update, and each
-surface force contributes `r × F` to the moment. GPU fields use single precision;
-GPU reductions use single precision and their block totals accumulate on the
-CPU in double precision, with no double atomicAdd.
+surface force contributes `r × F` to the moment. Velocity and published fields
+use single precision; pressure iterations and pressure dot products use double
+precision. Load reductions use single-precision blocks with double-precision
+CPU accumulation, with no double atomicAdd.
 
 This is a qualitative laminar demonstration. It has no turbulence model,
 compressibility, ground effect or moving-wall actuator dynamics. Controls are
@@ -289,13 +290,15 @@ of a moving flap. Transport limiting remains dissipative, the pressure solve
 has finite residual, and voxel boundaries underresolve thin trailing edges and
 small deflections, especially at coarse grids. Higher grids improve geometric
 resolution at substantially higher step cost. Grid 640 uses 640 × 320 × 480
-cells at 2.5 cm spacing and approximately 8.1 GiB of explicit solver/display
-allocations, before CUDA/runtime and graphics overhead. Mesh smoothness does not imply
+cells at 2.5 cm spacing. Memory depends on transport mode: LFM adds maps,
+Jacobians and midpoint velocities to the double-precision pressure workspace.
+Startup estimates these allocations and rejects grids that exceed available
+device memory. Mesh smoothness does not imply
 equally fine fluid resolution. Do not interpret the loads as calibrated
 aircraft performance data.
 
 The absence of a turbulence model does not itself forbid unsteady vortices.
-However, the effective viscosity here is over 300 times that of room-temperature
+However, the default desktop viscosity is over 300 times that of room-temperature
 air (about 1.5e-5 m²/s), the cell width at grid 256 is 6.25 cm, and the
 limited transport scheme still damps unresolved structures. This setup does
 not resolve a realistic turbulent aircraft wake. Instantaneous streamlines can
