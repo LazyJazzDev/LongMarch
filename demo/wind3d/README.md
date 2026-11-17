@@ -223,6 +223,14 @@ Faster transport choices need separate aerodynamic validation: in the same
 128-grid 1–1.5 second window, cubic MacCormack gives 75.58 N lift versus LFM's
 143.40 N, and increasing LFM CFL from 0.25 to 0.5 gives 120.05 N. These settings
 are not equivalent accelerations of the reference result.
+
+The pressure hierarchy caches each assembled double-precision diagonal and its
+reciprocal when geometry changes. Three alternating 128-grid runs reduce the
+median solver cost from 8.231 to 6.080 wall seconds per physical second (26.1%),
+with the same CFL, pressure tolerance and physics. Reference-window lift and
+drag differ by less than 0.000001 N. Krylov vectors, matrix application and true
+residual checks remain double precision. The cache costs about 110 MiB at grid
+256 across all hierarchy levels, included in the allocation estimate.
 The main half-wing span increased from 2.7 to 3.6 m with the same root/tip
 chords. Including raked tips, total span is 7.84 m and planform aspect
 ratio is about 11.56. Flap/aileron stations and the occupancy broad phase follow

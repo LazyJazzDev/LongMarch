@@ -8,7 +8,8 @@
 namespace wind3d::pressure {
 struct Level {
   int nx{}, ny{}, nz{};
-  float4 *edges{};  // +x,+y,+z conductances and outlet Dirichlet anchor.
+  float4 *edges{};      // +x,+y,+z conductances and outlet Dirichlet anchor.
+  double2 *diagonal{};  // Exact assembled diagonal and its reciprocal.
   // Pressure increments from inlet changes can have a large smooth component.
   // Keep Krylov vectors and multigrid arithmetic in double precision so true
   // residual recomputation does not lose the small local pressure corrections.
@@ -23,10 +24,19 @@ struct Level {
   }
 };
 
-__device__ double Diagonal(Level l, int n, int x, int y, int z) {
+__device__ double Diagonal(Level l, int n) {
+  return l.diagonal[n].x;
+}
+
+__global__ void BuildDiagonal(Level l) {
+  int n = blockIdx.x * blockDim.x + threadIdx.x;
+  if (n >= l.Count())
+    return;
+  int x = n % l.nx, y = n / l.nx % l.ny, z = n / (l.nx * l.ny);
   float4 e = l.edges[n];
-  return double(e.x) + e.y + e.z + e.w + (x ? l.edges[n - 1].x : 0) + (y ? l.edges[n - l.nx].y : 0) +
-         (z ? l.edges[n - l.nx * l.ny].z : 0);
+  double d = double(e.x) + e.y + e.z + e.w + (x ? l.edges[n - 1].x : 0) + (y ? l.edges[n - l.nx].y : 0) +
+             (z ? l.edges[n - l.nx * l.ny].z : 0);
+  l.diagonal[n] = {d, d > 0 ? 1 / d : 0};
 }
 
 __device__ double NeighborSum(Level l, int n, int x, int y, int z) {
@@ -115,9 +125,9 @@ __global__ void Smooth(Level l, int parity) {
     if ((x + y + z) % 2 != parity)
       return;
   }
-  double d = Diagonal(l, n, x, y, z);
+  double d = Diagonal(l, n);
   if (d > 0)
-    l.x[n] += 1.3f * ((l.rhs[n] + NeighborSum(l, n, x, y, z)) / d - l.x[n]);
+    l.x[n] += 1.3f * ((l.rhs[n] + NeighborSum(l, n, x, y, z)) * l.diagonal[n].y - l.x[n]);
 }
 
 // The final level fits in one block. Block barriers replace 64 graph kernel
@@ -128,9 +138,9 @@ __global__ void CoarseSmooth(Level l) {
   for (int sweep = 0; sweep < 64; ++sweep) {
     int parity = sweep < 32 ? sweep % 2 : 1 - sweep % 2;
     if (n < l.Count() && (x + y + z) % 2 == parity) {
-      double d = Diagonal(l, n, x, y, z);
+      double d = Diagonal(l, n);
       if (d > 0)
-        l.x[n] += 1.3f * ((l.rhs[n] + NeighborSum(l, n, x, y, z)) / d - l.x[n]);
+        l.x[n] += 1.3f * ((l.rhs[n] + NeighborSum(l, n, x, y, z)) * l.diagonal[n].y - l.x[n]);
     }
     __syncthreads();
   }
@@ -141,7 +151,7 @@ __global__ void Residual(Level l) {
   if (n >= l.Count())
     return;
   int x = n % l.nx, y = n / l.nx % l.ny, z = n / (l.nx * l.ny);
-  l.residual[n] = l.rhs[n] - Diagonal(l, n, x, y, z) * l.x[n] + NeighborSum(l, n, x, y, z);
+  l.residual[n] = l.rhs[n] - Diagonal(l, n) * l.x[n] + NeighborSum(l, n, x, y, z);
 }
 
 __global__ void Restrict(Level fine, Level coarse) {
@@ -226,7 +236,7 @@ __global__ void Apply(Level l, double *result) {
   if (n >= l.Count())
     return;
   int x = n % l.nx, y = n / l.nx % l.ny, z = n / (l.nx * l.ny);
-  result[n] = Diagonal(l, n, x, y, z) * l.x[n] - NeighborSum(l, n, x, y, z);
+  result[n] = Diagonal(l, n) * l.x[n] - NeighborSum(l, n, x, y, z);
 }
 
 __global__ void Update(int count, double *x, const double *direction, double alpha) {
@@ -257,8 +267,9 @@ class Solver {
     for (;;) {
       Level l{nx, ny, nz};
       cudaError_t error;
-      if ((error = Allocate(l.edges, l.Count())) != cudaSuccess || (error = Allocate(l.x, l.Count())) != cudaSuccess ||
-          (error = Allocate(l.rhs, l.Count())) != cudaSuccess ||
+      if ((error = Allocate(l.edges, l.Count())) != cudaSuccess ||
+          (error = Allocate(l.diagonal, l.Count())) != cudaSuccess ||
+          (error = Allocate(l.x, l.Count())) != cudaSuccess || (error = Allocate(l.rhs, l.Count())) != cudaSuccess ||
           (error = Allocate(l.residual, l.Count())) != cudaSuccess)
         return error;
       levels_.push_back(l);
@@ -300,6 +311,8 @@ class Solver {
     FineOperator<<<Blocks(first), 256, 0, stream_>>>(first, solid, au, av, aw);
     for (size_t i = 1; i < levels_.size(); ++i)
       CoarseOperator<<<Blocks(levels_[i]), 256, 0, stream_>>>(levels_[i - 1], levels_[i]);
+    for (auto level : levels_)
+      BuildDiagonal<<<Blocks(level), 256, 0, stream_>>>(level);
     return cudaGetLastError();
   }
 
