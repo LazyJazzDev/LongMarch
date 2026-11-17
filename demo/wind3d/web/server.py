@@ -214,7 +214,7 @@ def make_handler(relay, static):
                 path = relay.directory / ("mesh-" + route.rsplit("/", 1)[-1] + ".bin")
             else:
                 allowed = {"/": "index.html", "/index.html": "index.html", "/app.js": "app.js",
-                           "/style.css": "style.css", "/charts.js": "charts.js", "/vendor/three.module.js": "vendor/three.module.js",
+                           "/style.css": "style.css", "/charts.js": "charts.js", "/origin-view.js": "origin-view.js", "/vendor/three.module.js": "vendor/three.module.js",
                            "/vendor/OrbitControls.js": "vendor/OrbitControls.js"}
                 if route not in allowed:
                     self.respond(404, b'{"error":"Not found"}')
