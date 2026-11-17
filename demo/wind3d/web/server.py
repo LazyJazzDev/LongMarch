@@ -16,6 +16,7 @@ from urllib.parse import urlsplit, parse_qs
 
 from loads import WINDOWS, window_packet
 
+
 BOUNDS = {"speed": (1, 30), "angle": (-20, 25), "flap": (0, 40),
           "aileron": (-25, 25), "elevator": (-25, 25), "rudder": (-25, 25)}
 LEGACY = tuple(BOUNDS)
@@ -29,6 +30,16 @@ DEFAULT = dict(speed=30, angle=4, flap=0, aileron=0, elevator=0, rudder=0,
                tail_incidence=0, winglets=1, linked_flaps=1, outer_flap=0, cruise_camber=0,
                aileron_droop=0, spoiler=0, spoiler_roll=0, linked_spoiler_roll=0, slat=0, linked_slats=0,
                wing_incidence=4.7)
+VIEW_BOUNDS = dict(flow=(0, 1), loads=(0, 1), aircraft=(0, 1), domain=(0, 1), volume=(0, 1),
+                   width=(.75, 4), transparent_curvature=(0, 9.999), opaque_curvature=(.001, 10),
+                   yaw=(-3.15, 3.15), pitch=(-1.55, 1.55), distance=(.6, 40), colored_volume=(0, 1),
+                   volume_density=(.01, .6), volume_threshold=(0, 60), volume_step=(.5, 2))
+VIEW_DEFAULT = dict(flow=0, loads=1, aircraft=1, domain=0, volume=1, width=1.5,
+                    transparent_curvature=.01, opaque_curvature=.15, yaw=-.85, pitch=.4, distance=10.5,
+                    colored_volume=0, volume_density=.035, volume_threshold=6, volume_step=1)
+CHART_BOUNDS = dict(history_window=(0, 5), history_skip=(0, 4), history=(0, 1),
+                    history_demean=(0, 1), history_hide_changes=(0, 1))
+VIEW_DEFAULT.update(history_window=2, history_skip=2, history=1, history_demean=0, history_hide_changes=1)
 
 
 def atomic(path, data):
@@ -41,6 +52,8 @@ def simplify_frame(data):
     """Simplify display polylines to 2 mm and 0.02 RGB; never touch solver data."""
     size = struct.unpack_from("<I", data)[0]
     meta = json.loads(data[4:4 + size])
+    if meta.get("version") == 2:
+        return data  # Preserve curvature history and the exact shared polyline.
     output = bytearray()
     chain = []
 
@@ -100,16 +113,37 @@ class Relay:
         for key, value in DEFAULT.items():
             self.desired["controls"].setdefault(key, value)
         self.desired.setdefault("streamline_density", 2)
+        self.desired.setdefault("view", VIEW_DEFAULT.copy())
+        for key, value in VIEW_DEFAULT.items():
+            self.desired["view"].setdefault(key, value)
         self.save()
+
+    def refresh_applied(self):
+        """Adopt desktop edits only after outstanding web commands are consumed."""
+        try:
+            with (self.directory / "frame.bin").open("rb") as file:
+                size = struct.unpack("<I", file.read(4))[0]
+                if size > 65536:
+                    return
+                frame = json.loads(file.read(size))
+            if frame.get("version") == 2 and frame.get("ack") == self.desired["sequence"]:
+                self.desired["controls"].update(frame.get("requested_controls", frame["controls"]))
+                self.desired["view"].update(frame["view"])
+                self.desired["paused"] = frame.get("requested_paused", frame["paused"])
+                self.desired["streamline_density"] = frame["streamline_density"]
+        except (OSError, ValueError, KeyError, struct.error):
+            pass
 
     def save(self):
         d = self.desired
         atomic(self.directory / "desired.json", json.dumps(d))
         values = [d["sequence"], d["reset"], int(d["paused"])] + [d["controls"][k] for k in LEGACY] + [d["streamline_density"], "wing-v2"] + [d["controls"][k] for k in EXTENDED]
+        values += ["view-v1"] + [d["view"][k] for k in VIEW_BOUNDS]
+        values += ["charts-v1"] + [d["view"][k] for k in CHART_BOUNDS]
         atomic(self.directory / "controls.txt", " ".join(map(str, values)) + "\n")
 
     def update(self, data):
-        if not isinstance(data, dict) or set(data) - {"controls", "paused", "reset", "streamline_density"}:
+        if not isinstance(data, dict) or set(data) - {"controls", "paused", "reset", "streamline_density", "view"}:
             raise ValueError("Unknown control fields")
         if "streamline_density" in data:
             density = data["streamline_density"]
@@ -129,6 +163,23 @@ class Relay:
             if key in data and not isinstance(data[key], bool):
                 raise ValueError(f"{key} must be boolean")
         with self.lock:
+            self.refresh_applied()
+            view = data.get("view", {})
+            all_bounds = VIEW_BOUNDS | CHART_BOUNDS
+            if not isinstance(view, dict) or set(view) - all_bounds.keys():
+                raise ValueError("Unknown view field")
+            for key, value in view.items():
+                lo, hi = all_bounds[key]
+                if type(value) not in (int, float) or not math.isfinite(value) or not lo <= value <= hi:
+                    raise ValueError("Invalid view value: " + key)
+                if (lo, hi) == (0, 1) and value not in (0, 1):
+                    raise ValueError("Expected a view flag")
+                if key in CHART_BOUNDS and int(value) != value:
+                    raise ValueError("Expected a chart selection index")
+            merged = self.desired["view"] | view
+            if merged["opaque_curvature"] - merged["transparent_curvature"] < .000999:
+                raise ValueError("Curvature thresholds must be separated by at least 0.001")
+            self.desired["view"] = merged
             self.desired["streamline_density"] = data.get("streamline_density", self.desired["streamline_density"])
             self.desired["controls"].update(controls)
             self.desired["paused"] = data.get("paused", self.desired["paused"])
@@ -163,9 +214,12 @@ def make_handler(relay, static):
             compact = route == "/api/frame" and urlsplit(self.path).query == "compact=1"
             if route == "/api/status":
                 with relay.lock:
+                    relay.refresh_applied()
                     state = json.loads(json.dumps(relay.desired))
                 frame = relay.directory / "frame.bin"
-                state["age"] = max(0, time.time() - frame.stat().st_mtime) if frame.exists() else None
+                heartbeat = relay.directory / "heartbeat.txt"
+                live = heartbeat if heartbeat.exists() else frame
+                state["age"] = max(0, time.time() - live.stat().st_mtime) if frame.exists() else None
                 error = relay.directory / "error.txt"
                 state["error"] = error.read_text() if error.exists() else None
                 self.respond(200, json.dumps(state).encode())
@@ -174,6 +228,7 @@ def make_handler(relay, static):
                 try:
                     seconds = float(parse_qs(urlsplit(self.path).query).get("seconds", ["0.25"])[0])
                     skip_steps = int(parse_qs(urlsplit(self.path).query).get("skip_steps", ["0"])[0])
+                    hide_changes = parse_qs(urlsplit(self.path).query).get("hide_changes", ["1"])[0] != "0"
                     if not 0 <= skip_steps <= 10000:
                         raise ValueError("Startup steps must be between 0 and 10000")
                     if seconds not in WINDOWS:
@@ -185,7 +240,7 @@ def make_handler(relay, static):
                     path = relay.directory / "loads.bin"
                     with path.open("rb") as file:
                         stat = os.fstat(file.fileno())
-                        etag = f'"loads-{stat.st_mtime_ns}-{stat.st_size}-{seconds}-{skip_steps}"'
+                        etag = f'"loads-{stat.st_mtime_ns}-{stat.st_size}-{seconds}-{skip_steps}-{int(hide_changes)}"'
                         if self.headers.get("If-None-Match") == etag:
                             self.respond(304, b"", headers={"ETag": etag})
                             return
@@ -194,7 +249,7 @@ def make_handler(relay, static):
                     key = (str(path), etag, compressed)
                     with relay.cache_lock:
                         if key not in relay.compressed:
-                            packet = window_packet(data, seconds, skip_steps)
+                            packet = window_packet(data, seconds, skip_steps, hide_changes)
                             relay.compressed[key] = gzip.compress(packet, compresslevel=1) if compressed else packet
                             while len(relay.compressed) > 6:
                                 relay.compressed.popitem(last=False)
@@ -212,9 +267,11 @@ def make_handler(relay, static):
                 path = relay.directory / "frame.bin"
             elif re.fullmatch(r"/api/mesh/[0-9]+", route):
                 path = relay.directory / ("mesh-" + route.rsplit("/", 1)[-1] + ".bin")
+            elif re.fullmatch(r"/api/volume/[0-9]+-[0-9]+-[0-9]+", route):
+                path = relay.directory / ("volume-" + route.rsplit("/", 1)[-1] + ".bin")
             else:
                 allowed = {"/": "index.html", "/index.html": "index.html", "/app.js": "app.js",
-                           "/style.css": "style.css", "/charts.js": "charts.js", "/origin-view.js": "origin-view.js", "/vendor/three.module.js": "vendor/three.module.js",
+                           "/style.css": "style.css", "/charts.js": "charts.js", "/presentation.js": "presentation.js", "/origin-view.js": "origin-view.js", "/vendor/three.module.js": "vendor/three.module.js",
                            "/vendor/OrbitControls.js": "vendor/OrbitControls.js"}
                 if route not in allowed:
                     self.respond(404, b'{"error":"Not found"}')

@@ -126,7 +126,7 @@ int main() {
   Controls controls;
   const auto reference = MainWingReference(controls);
   if (std::abs(reference.area - 3.127f) > 1e-5f || std::abs(reference.span - 5.3f) > 1e-5f ||
-      reference.quarter_chord_x < -.31f || reference.quarter_chord_x > -.28f)
+      std::abs(reference.quarter_chord_x) > 1e-6f)
     return 29;
   Controls other_tip = controls;
   other_tip.airframe.winglets = false;
@@ -137,10 +137,18 @@ int main() {
   for (float angle : {0.f, 10.f}) {
     Controls pose;
     pose.angle = angle;
-    auto r = RotateZ(ReferenceCG(pose), -angle);
-    Vec3 force{0, 100, 0}, applied_at_cg{0, 0, 100 * r.x};
-    if (Length(MomentAtReferenceCG(force, applied_at_cg, pose)) > 1e-5f)
-      return 31;
+    for (Vec3 p : {Vec3{-3, 0, 0}, Vec3{3, .1f, 2}, ModelDatum()}) {
+      auto world = ConstructionToWorld(p, pose);
+      if (Length(Add(ConstructionPoint(world, pose), Scale(p, -1))) > 1e-6f)
+        return 31;
+      Vec3 f{23, 100, -4};
+      auto old = RotateZ(p, -angle);
+      auto shifted = Add(Cross(old, f), Scale(Cross(RotateZ(ModelDatum(), -angle), f), -1));
+      if (Length(Add(Cross(world, f), Scale(shifted, -1))) > 5e-5f)
+        return 39;
+    }
+    if (Length(ConstructionToWorld(ModelDatum(), pose)) > 1e-7f)
+      return 40;
   }
   auto wing = AircraftPart(0, 1, controls);
   auto pylon = AircraftPart(6, 1, controls);
@@ -277,7 +285,7 @@ int main() {
               auto p = SlatPoint(slat, u, span, face);
               if (slat.deflection > 0 && std::abs(SlatDistance(p, slat)) > 3e-6f)
                 return 23;
-              if (slat.deflection == 0 && AircraftDistance(RotateZ(p, -controls.angle), controls) > 3e-6f)
+              if (slat.deflection == 0 && AircraftDistance(ConstructionToWorld(p, controls), controls) > 3e-6f)
                 return 24;
             }
           if (slat.deflection >= 15) {
@@ -296,7 +304,7 @@ int main() {
                         << " camber=" << s.camber << " distance=" << SlatDistance(middle, slat) << '\n';
               return 25;
             }
-            if (panel >= 2 && AircraftDistance(RotateZ(middle, -controls.angle), controls) <= .001f)
+            if (panel >= 2 && AircraftDistance(ConstructionToWorld(middle, controls), controls) <= .001f)
               return 26;
           }
         }
@@ -311,7 +319,7 @@ int main() {
                 return 20;
               if (spoiler.deflection == 0 && PartDistance(p, AircraftPart(0, side, controls)) > 0) {
                 // Part zero covers only the buried root: query the full wing union.
-                if (AircraftDistance(RotateZ(p, -controls.angle), controls) > 3e-6f)
+                if (AircraftDistance(ConstructionToWorld(p, controls), controls) > 3e-6f)
                   return 21;
               }
             }
@@ -336,7 +344,7 @@ int main() {
               bool gap = false;
               for (int i = 1; i < 20; ++i) {
                 auto p = Add(Scale(fixed, 1 - i / 20.f), Scale(moved, i / 20.f));
-                gap |= AircraftDistance(RotateZ(p, -controls.angle), controls) > .001f;
+                gap |= AircraftDistance(ConstructionToWorld(p, controls), controls) > .001f;
               }
               if (!gap) {
                 std::cerr << "Closed Fowler slot\n";

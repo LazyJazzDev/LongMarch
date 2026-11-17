@@ -7,7 +7,7 @@ ROW = struct.Struct('<Qdf6f')
 WINDOWS = (0.05, 0.1, 0.25, 0.5, 1.0, 2.0)
 
 
-def window_packet(data, seconds, skip_steps=0):
+def window_packet(data, seconds, skip_steps=0, hide_changes=True):
     length = struct.unpack_from('<I', data)[0]
     meta = json.loads(data[4:4 + length])
     body = memoryview(data)[4 + length:]
@@ -26,7 +26,7 @@ def window_packet(data, seconds, skip_steps=0):
     selected = rows[first:]
     # The first event describes the retained baseline, not a new input change.
     events = meta.get('controls_events', [])
-    changes = [event['step'] for event in events[1:]]
+    changes = [event['step'] for event in events[1:]] if hide_changes else []
     invalid = set()
     for step in changes:
         invalid.update(row[0] for row in selected if step <= row[0] < step + 20)

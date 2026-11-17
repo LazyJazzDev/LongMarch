@@ -1,16 +1,9 @@
 #pragma once
 #include "grassland/rhi/rhi.h"
+#include "presentation.h"
 #include "simulation.h"
 
 namespace wind3d {
-struct ViewSettings {
-  float yaw{-0.85f}, pitch{0.40f}, distance{10.5f};
-  bool flow{false}, loads{true}, volume{true};
-  int streamline_density{2};
-  float streamline_width{1.5f};
-  float opaque_curvature{0.15f};
-  float transparent_curvature{0.01f};
-};
 
 bool Render(grassland::rhi::IDevice *device,
             Simulation &simulation,

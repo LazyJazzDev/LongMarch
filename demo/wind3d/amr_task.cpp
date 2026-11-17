@@ -112,7 +112,7 @@ int RunAdaptiveTask(int grid,
   for (float x : {-3.1f, 3.4f})
     for (float y : {-.85f, 1.4f})
       for (float z : {-3.4f, 3.4f}) {
-        auto p = RotateZ({x, y, z}, -controls.angle);
+        auto p = ConstructionToWorld({x, y, z}, controls);
         double coordinate[3]{p.x, p.y, p.z};
         for (int a = 0; a < 3; ++a) {
           box.lower[a] = std::min(box.lower[a], coordinate[a]);

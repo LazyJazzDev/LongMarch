@@ -11,6 +11,7 @@
 #include "imgui.h"
 #include "load_charts.h"
 #include "visualization.h"
+#include "web_session.h"
 
 namespace wind3d {
 namespace {
@@ -123,18 +124,24 @@ bool Render(IDevice *device,
   std::shared_ptr<const std::vector<Vertex>> mesh;
   size_t line_count = 0;
   size_t stream_count = 0;
-  int streamline_density = view.streamline_density;
-  float streamline_width = view.streamline_width;
-  float opaque_curvature = view.opaque_curvature;
-  float transparent_curvature = view.transparent_curvature;
-  bool paused = false, streamlines = view.flow, show_loads = view.loads, rebuild = true;
-  bool show_volume = view.volume, colored_volume = false;
-  float volume_density = 0.035f, volume_threshold = 6.0f, volume_step = 1.0f;
+  ViewSettings presentation = view;
+  web::Session web_session(view.web_directory);
+  std::vector<Vertex> published_flow;
+  int &streamline_density = presentation.streamline_density;
+  float &streamline_width = presentation.streamline_width;
+  float &opaque_curvature = presentation.opaque_curvature;
+  float &transparent_curvature = presentation.transparent_curvature;
+  bool paused = false, rebuild = true;
+  bool &streamlines = presentation.flow, &show_loads = presentation.loads;
+  bool &show_volume = presentation.volume, &colored_volume = presentation.colored_volume;
+  float &volume_density = presentation.volume_density, &volume_threshold = presentation.volume_threshold,
+        &volume_step = presentation.volume_step;
   std::shared_ptr<const Snapshot> volume_state;
-  float yaw = view.yaw, pitch = view.pitch, distance = view.distance, fps = 0, logical_width = 1440;
+  float &yaw = presentation.yaw, &pitch = presentation.pitch, &distance = presentation.distance;
+  float fps = 0, logical_width = 1440;
   LoadHistory load_history;
   load_charts::Settings chart_settings;
-  bool show_history = true;
+  bool &show_history = presentation.history;
   float logical_height = 900, chart_height = 0;
   auto previous = std::chrono::steady_clock::now(), beginning = previous;
   int rendered = 0, updates = 0;
@@ -152,11 +159,12 @@ bool Render(IDevice *device,
     float seconds = std::chrono::duration<float>(now - previous).count();
     previous = now;
     fps = fps == 0 ? 1 / std::max(seconds, 0.0001f) : fps * 0.95f + 0.05f / std::max(seconds, 0.0001f);
+    rebuild |= web_session.Poll(simulation, controls, paused, presentation);
     auto next = simulation.Latest();
     if (next && next != state) {
       state = next;
-      if (window)
-        load_history = simulation.RecentLoads();
+      if (window || web_session.Enabled())
+        load_history = HistoryAtSnapshot(simulation.RecentLoads(), *state);
       rebuild = true;
       ++updates;
     }
@@ -179,6 +187,8 @@ bool Render(IDevice *device,
             ImGui::Begin("Wind3D", nullptr,
                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
             ImGui::Text("Frontend %.1f fps", fps);
+            if (web_session.Enabled())
+              ImGui::Text("Shared run %s", web_session.ID().c_str());
             if (state) {
               ImGui::TextUnformatted(state->leapfrog_flow_maps ? "Leapfrog Flow Maps | 5 substeps/cycle"
                                                                : "MacCormack transport");
@@ -232,6 +242,8 @@ bool Render(IDevice *device,
               ImGui::Text("Volume |curl u|: %d x %d x %d", state->solver_nx, state->solver_nx / 2,
                           state->solver_nx * 3 / 4);
             if (ImGui::CollapsingHeader("View")) {
+              ImGui::Checkbox("Aircraft", &presentation.aircraft);
+              rebuild |= ImGui::Checkbox("Simulation domain", &presentation.domain);
               ImGui::Checkbox("Vorticity volume", &show_volume);
               ImGui::Checkbox("Color by vorticity", &colored_volume);
               ImGui::SliderFloat("Volume density", &volume_density, 0.01f, 0.6f, "%.3f");
@@ -249,7 +261,7 @@ bool Render(IDevice *device,
               rebuild |= ImGui::Checkbox("Force and moment vectors", &show_loads);
               ImGui::SliderFloat("Orbit", &yaw, -3.14f, 3.14f);
               ImGui::SliderFloat("Elevation", &pitch, -1.55f, 1.55f);
-              ImGui::SliderFloat("Distance", &distance, 7, 25);
+              ImGui::SliderFloat("Distance", &distance, .6f, 40);
               ImGui::TextWrapped("Drag outside panel to orbit; wheel to zoom. Flow: blue = slow, yellow = fast.");
             }
             ImGui::SeparatorText("Integrated aircraft loads");
@@ -268,11 +280,8 @@ bool Render(IDevice *device,
                           body_moment.y);
               ImGui::TextWrapped(
                   "Body moments [N m] use the same body origin and right-hand signs, not a specified center of mass.");
-              Vec3 reference_cg = ReferenceCG(state->controls);
-              Vec3 trim_moment =
-                  RotateZ(MomentAtReferenceCG(state->force, state->moment, state->controls), state->controls.angle);
-              ImGui::Text("Assumed CG: (%.4f, 0, 0) m, 25%% MAC", reference_cg.x);
-              ImGui::Text("CG roll % .3f | pitch % .3f | yaw % .3f N m", trim_moment.x, trim_moment.z, trim_moment.y);
+              ImGui::TextWrapped("Fixed model origin (0, 0, 0); mass center unspecified");
+              ImGui::Text("Original construction datum X = %.6f m", ModelDatum().x);
               ImGui::Text("Lift %.3f N | Drag %.3f N", state->force.y, state->force.x);
               if (std::abs(state->force.x) > 1e-4f)
                 ImGui::Text("Instant L/D %.3f", state->force.y / state->force.x);
@@ -292,14 +301,22 @@ bool Render(IDevice *device,
             ImGui::TextWrapped(
                 "Incompressible flow without a turbulence model. Absolute aircraft loads require aerodynamic reference validation.");
             ImGui::End();
+            chart_settings.window_index = presentation.history_window;
+            chart_settings.skip_index = presentation.history_skip;
+            chart_settings.demean = presentation.history_demean;
+            chart_settings.hide_changes = presentation.history_hide_changes;
             chart_height = load_charts::Draw(load_history, chart_settings, show_history, 410);
+            presentation.history_window = chart_settings.window_index;
+            presentation.history_skip = chart_settings.skip_index;
+            presentation.history_demean = chart_settings.demean;
+            presentation.history_hide_changes = chart_settings.hide_changes;
             auto &io = ImGui::GetIO();
             if (!io.WantCaptureMouse) {
               if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
                 yaw -= io.MouseDelta.x * 0.006f;
                 pitch = std::clamp(pitch + io.MouseDelta.y * 0.006f, -1.55f, 1.55f);
               }
-              distance = std::clamp(distance - io.MouseWheel, 7.0f, 25.0f);
+              distance = std::clamp(distance - io.MouseWheel, .6f, 40.0f);
             }
           }))
         return RenderFailure(__LINE__);
@@ -334,12 +351,13 @@ bool Render(IDevice *device,
         return RenderFailure(__LINE__);
     }
     if (state && rebuild) {
-      auto lines = FlowLines(*state, false, show_loads);
+      auto lines = visualization::PresentationLines(*state, presentation);
       line_count = lines.size();
       line_buffer = device->CreateBuffer({line_count * sizeof(Vertex)});
       if (!line_buffer || !commands->CmdUploadBuffer(line_buffer.Get(), 0, lines.data(), line_count * sizeof(Vertex)))
         return RenderFailure(__LINE__);
-      auto flow = streamlines ? visualization::DomainFlowLines(*state, streamline_density) : std::vector<Vertex>{};
+      published_flow = streamlines ? visualization::DomainFlowLines(*state, streamline_density) : std::vector<Vertex>{};
+      const auto &flow = published_flow;
       std::vector<StreamSegment> segments;
       segments.reserve(flow.size() / 2);
       auto same_point = [](Vec3 a, Vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; };
@@ -357,6 +375,11 @@ bool Render(IDevice *device,
           return RenderFailure(__LINE__);
       }
       rebuild = false;
+    }
+    if (state && !web_session.Publish(*state, load_history, presentation, simulation.Paused(), published_flow, controls,
+                                      paused)) {
+      std::cerr << "Cannot publish shared web presentation\n";
+      return RenderFailure(__LINE__);
     }
     float viewport_width =
         headless ? float(width) : std::max(1.0f, float(width) * (logical_width - 410) / logical_width);
@@ -398,7 +421,7 @@ bool Render(IDevice *device,
         !commands->CmdSetViewport({0, 0, viewport_width, viewport_height, 0, 1}) ||
         !commands->CmdSetScissor({0, 0, width, height}))
       return RenderFailure(__LINE__);
-    if (aircraft_buffer &&
+    if (presentation.aircraft && aircraft_buffer &&
         (!commands->CmdBindProgram(aircraft_program.Get()) || !commands->CmdBindGroup(0, group.Get()) ||
          !commands->CmdBindVertexBuffer(0, aircraft_buffer.Get()) || !commands->CmdDraw(uint32_t(mesh->size()))))
       return RenderFailure(__LINE__);

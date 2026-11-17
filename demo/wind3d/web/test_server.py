@@ -22,7 +22,7 @@ class RelayMailboxTest(unittest.TestCase):
             relay = Relay(directory)
             fields = (directory / "controls.txt").read_text().split()
             self.assertEqual(fields[:11], ["7", "2", "1", "18", "6", "20", "1", "2", "3", "2", "wing-v2"])
-            self.assertEqual(dict(zip(EXTENDED, map(float, fields[11:]))), {key: DEFAULT[key] for key in EXTENDED})
+            self.assertEqual(dict(zip(EXTENDED, map(float, fields[11:11+len(EXTENDED)]))), {key: DEFAULT[key] for key in EXTENDED})
             self.assertEqual(relay.desired["controls"]["winglets"], 1)
 
     def test_new_devices_round_trip_without_losing_density(self):
@@ -35,7 +35,7 @@ class RelayMailboxTest(unittest.TestCase):
             result = relay.update(dict(controls=values, streamline_density=4))
             fields = (directory / "controls.txt").read_text().split()
             self.assertEqual(fields[9:11], ["4", "wing-v2"])
-            self.assertEqual(dict(zip(EXTENDED, map(float, fields[11:]))), values)
+            self.assertEqual(dict(zip(EXTENDED, map(float, fields[11:11+len(EXTENDED)]))), values)
             self.assertEqual(Relay(directory).desired, result)
 
     def test_invalid_new_controls_leave_state_unchanged(self):
@@ -49,6 +49,30 @@ class RelayMailboxTest(unittest.TestCase):
 
 
 class RelayTest(unittest.TestCase):
+    def test_shared_frame_preserves_curvature_and_desktop_edits(self):
+        meta = dict(version=2, ack=self.relay.desired['sequence'], controls=DEFAULT | {'angle':3.94},
+                    view=self.relay.desired['view'] | {'width':2.25}, paused=True, streamline_density=3,
+                    line_vertices=2, decoration_vertices=0)
+        header = json.dumps(meta).encode()
+        raw = struct.pack('<I',len(header))+header+struct.pack('<18f',*range(18))
+        (self.directory/'frame.bin').write_bytes(raw)
+        self.assertEqual(simplify_frame(raw),raw)
+        result = self.relay.update({'view':{'domain':1}})
+        self.assertEqual(result['controls']['angle'],3.94)
+        self.assertEqual(result['view']['width'],2.25)
+        self.assertTrue(result['paused'])
+        # The previous frame must not overwrite an unacknowledged web edit.
+        result = self.relay.update({'controls':{'angle':6}})
+        self.relay.refresh_applied()
+        self.assertEqual(self.relay.desired['controls']['angle'],6)
+
+    def test_invalid_shared_view_is_not_persisted(self):
+        for view in ({'width':0},{'opaque_curvature':.005},{'flow':.5},
+                     {'history_window':1.5},{'yaw':float('nan')},{'unknown':1}):
+            before=json.dumps(self.relay.desired,sort_keys=True)
+            with self.assertRaises(ValueError):self.relay.update({'view':view})
+            self.assertEqual(json.dumps(self.relay.desired,sort_keys=True),before)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.directory = Path(self.temporary.name)

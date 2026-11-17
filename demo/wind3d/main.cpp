@@ -67,6 +67,8 @@ int main(int argc, char **argv) {
       view.volume = false;
     else if (key == "--model-only")
       view.flow = view.volume = view.loads = false;
+    else if (key == "--web-directory" && i + 1 < argc)
+      view.web_directory = argv[++i];
     else if (key == "--headless")
       headless = true;
     else if (key == "--debug")
@@ -78,6 +80,7 @@ int main(int argc, char **argv) {
              "[--elevator -25..25] [--rudder -25..25] [--frames N] [--headless] "
              "[--aero] [--lfm|--maccormack|--first-order] [--viscosity NU] [--wall-viscosity NU] [--wall-model|--slip-walls|--cut-cells] [--cubic] [--sponge METRES] [--no-export] [--cfl 0.05..8] [--max-dt SECONDS] [--diagnostics file.csv] [--validate-time SECONDS] [--pressure-tolerance 1e-6..0.1] [--pressure-cycles 1..256] [--model-only] [--yaw RADIANS] [--pitch RADIANS] [--distance METRES] [--capture image.ppm] [--validate --steps N] [--debug]\n"
           << "--aero: LFM, air viscosity 1.5e-5 m^2/s, slip cut cells with wall-shear loads, CFL 0.25, 2 m sponge.\n"
+          << "--web-directory PATH: share desktop snapshots and controls with the local web relay.\n"
           << "Place --aero before any individual solver overrides.\n";
       std::cout << "--restore FILE resumes a checkpoint; supply its original grid, controls and solver settings.\n";
       std::cout
@@ -253,7 +256,7 @@ int main(int argc, char **argv) {
     return 2;
   if (validate && !wind3d::ValidateClosedSurface(device->GetCUDADeviceIndex(), solver.cut_cells))
     return 2;
-  solver.record_loads = !headless && !validate;
+  solver.record_loads = (!headless || !view.web_directory.empty()) && !validate;
   solver.initial_controls = controls;
   auto simulation = wind3d::Simulation::Create(device->GetCUDADeviceIndex(), grid, solver);
   if (!simulation) {

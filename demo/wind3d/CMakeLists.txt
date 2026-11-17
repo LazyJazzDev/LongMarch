@@ -1,6 +1,8 @@
 add_executable(wind3d_streamline_check EXCLUDE_FROM_ALL streamline_test.cpp)
+add_executable(wind3d_web_protocol_check EXCLUDE_FROM_ALL web_protocol_test.cpp)
 if (BUILD_TESTING)
     add_test(NAME wind3d_streamline_check COMMAND wind3d_streamline_check)
+    add_test(NAME wind3d_web_protocol_check COMMAND wind3d_web_protocol_check)
 endif ()
 
 add_executable(wind3d_load_charts_check EXCLUDE_FROM_ALL load_charts_test.cpp)

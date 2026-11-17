@@ -50,7 +50,7 @@ class MeshBuilder {
 
  private:
   Vertex MakeVertex(Vec3 p, Vec3 n, Vec3 color) const {
-    return {RotateZ(p, -controls_.angle), RotateZ(Normalize(n), -controls_.angle), color};
+    return {ConstructionToWorld(p, controls_), RotateZ(Normalize(n), -controls_.angle), color};
   }
 
   void Triangle(Vertex a, Vertex b, Vertex c) {

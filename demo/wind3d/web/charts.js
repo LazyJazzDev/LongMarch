@@ -1,6 +1,17 @@
 const $=id=>document.getElementById(id);
 const colors={x:'#ff5050',y:'#40df60',z:'#5080ff'};
 let history=null,etag='',timer,controller,hover=null;
+let editView=()=>{};
+const hideLabel=document.createElement('label');hideLabel.innerHTML='<input id="history-hide" type="checkbox" checked>隐藏参数变化后 20 步';
+document.querySelector('.history-options').append(hideLabel);
+export function onHistoryEdit(callback){editView=callback;}
+export function applyHistoryView(v){
+  const changed=$('history-window').selectedIndex!==v.history_window||$('history-skip').selectedIndex!==v.history_skip||$('history-hide').checked!==!!v.history_hide_changes;
+  $('history-window').selectedIndex=v.history_window;$('history-skip').selectedIndex=v.history_skip;
+  $('history-demean').checked=!!v.history_demean;$('history-hide').checked=!!v.history_hide_changes;
+  $('load-history').hidden=!v.history;
+  if(changed){etag='';clearTimeout(timer);controller?.abort();fetchHistory();}else redraw();
+}
 const keys=()=>['x','y','z'];
 const charts=['force','moment'].map(kind=>({kind,canvas:$(kind+'-chart')}));
 const value=(kind,key,i)=>{
@@ -73,13 +84,15 @@ for(const chart of charts){
   });
   canvas.addEventListener('pointerleave',()=>{hover=null;$('history-cursor').textContent='指向曲线可查看每一个仿真步；虚线标记工况变化。';redraw();});
 }
-$('history-demean').onchange=redraw;
-$('history-skip').onchange=$('history-window').onchange=()=>{etag='';clearTimeout(timer);controller?.abort();fetchHistory();};
+$('history-demean').onchange=()=>{redraw();editView({history_demean:Number($('history-demean').checked)});};
+$('history-hide').onchange=$('history-skip').onchange=$('history-window').onchange=()=>{
+  editView({history_window:$('history-window').selectedIndex,history_skip:$('history-skip').selectedIndex,history_hide_changes:Number($('history-hide').checked)});
+  etag='';clearTimeout(timer);controller?.abort();fetchHistory();};
 async function fetchHistory(){
   const request=new AbortController();controller=request;
   try{
     const seconds=$('history-window').value;
-    const response=await fetch(`/api/loads?seconds=${seconds}&skip_steps=${$('history-skip').value}`,{signal:request.signal,headers:etag?{'If-None-Match':etag}:{}});
+    const response=await fetch(`/api/loads?seconds=${seconds}&skip_steps=${$('history-skip').value}&hide_changes=${Number($('history-hide').checked)}`,{signal:request.signal,headers:etag?{'If-None-Match':etag}:{}});
     if(response.status===304)return;
     if(response.status===404){$('history-status').textContent='等待后端逐步采样，历史数据从新版后端启动时开始。';return;}
     if(!response.ok)throw new Error(`载荷历史 HTTP ${response.status}`);

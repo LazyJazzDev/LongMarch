@@ -12,6 +12,8 @@
 
 #include "aircraft_reference.h"
 #include "visualization.h"
+#include "web_protocol.h"
+#include "web_session.h"
 
 namespace {
 std::atomic<bool> running{true};
@@ -20,79 +22,7 @@ void Stop(int) {
   running = false;
 }
 
-bool Write(const std::filesystem::path &path, const std::string &bytes) {
-  auto temporary = path.string() + ".tmp";
-  std::ofstream file(temporary, std::ios::binary);
-  file.write(bytes.data(), bytes.size());
-  file.close();
-  if (!file)
-    return false;
-  std::error_code error;
-  std::filesystem::rename(temporary, path, error);
-  return !error;
-}
-
-void Vector(std::ostream &s, wind3d::Vec3 v) {
-  s << '[' << v.x << ',' << v.y << ',' << v.z << ']';
-}
-
-void Controls(std::ostream &s, const wind3d::Controls &c) {
-  s << "{\"speed\":" << c.speed << ",\"angle\":" << c.angle << ",\"flap\":" << c.flap << ",\"aileron\":" << c.aileron
-    << ",\"elevator\":" << c.elevator << ",\"rudder\":" << c.rudder
-    << ",\"tail_incidence\":" << c.airframe.tail_incidence << ",\"winglets\":" << int(c.airframe.winglets)
-    << ",\"linked_flaps\":" << int(c.wing_controls.linked_flaps) << ",\"outer_flap\":" << c.wing_controls.outer_flap
-    << ",\"cruise_camber\":" << c.wing_controls.cruise_camber << ",\"aileron_droop\":" << c.wing_controls.aileron_droop
-    << ",\"spoiler\":" << c.wing_controls.spoiler << ",\"spoiler_roll\":" << c.wing_controls.spoiler_roll
-    << ",\"linked_spoiler_roll\":" << int(c.wing_controls.linked_spoiler_roll) << ",\"slat\":" << c.wing_controls.slat
-    << ",\"linked_slats\":" << int(c.wing_controls.linked_slats) << ",\"wing_incidence\":" << c.airframe.wing_incidence
-    << '}';
-}
-
-bool Same(const wind3d::Controls &a, const wind3d::Controls &b) {
-  return a.speed == b.speed && wind3d::SameAircraftGeometry(a, b);
-}
-
-struct Command {
-  uint64_t sequence{}, reset{};
-  bool paused{};
-  int density{2};
-  wind3d::Controls controls;
-};
-
-bool ReadCommand(const std::filesystem::path &path, Command &command) {
-  std::ifstream input(path);
-  int pause = 0;
-  auto &controls = command.controls;
-  if (!(input >> command.sequence >> command.reset >> pause >> controls.speed >> controls.angle >> controls.flap >>
-        controls.aileron >> controls.elevator >> controls.rudder))
-    return false;
-  command.paused = pause != 0;
-  int &requested_density = command.density;
-  input >> requested_density;
-  bool extension_valid = true;
-  std::string extension;
-  if (input >> extension) {
-    int winglets = 1, linked_flaps = 1, linked_roll = 0, linked_slats = 0;
-    auto &w = controls.wing_controls;
-    extension_valid =
-        (extension == "wing-v1" || extension == "wing-v2") &&
-        bool(input >> controls.airframe.tail_incidence >> winglets >> linked_flaps >> w.outer_flap >> w.cruise_camber >>
-             w.aileron_droop >> w.spoiler >> w.spoiler_roll >> linked_roll >> w.slat >> linked_slats);
-    if (extension == "wing-v2")
-      extension_valid = extension_valid && bool(input >> controls.airframe.wing_incidence);
-    auto flag = [](int value) { return value == 0 || value == 1; };
-    extension_valid &= flag(winglets) && flag(linked_flaps) && flag(linked_roll) && flag(linked_slats);
-    controls.airframe.winglets = winglets != 0;
-    w.linked_flaps = linked_flaps != 0;
-    w.linked_spoiler_roll = linked_roll != 0;
-    w.linked_slats = linked_slats != 0;
-  }
-  return extension_valid && wind3d::ValidAirframe(controls.airframe) &&
-         wind3d::ValidWingControls(controls.wing_controls) && requested_density >= 1 && requested_density <= 4 &&
-         (pause == 0 || pause == 1) && controls.speed >= 1 && controls.speed <= 30 && controls.angle >= -20 &&
-         controls.angle <= 25 && controls.flap >= 0 && controls.flap <= 40 && std::abs(controls.aileron) <= 25 &&
-         std::abs(controls.elevator) <= 25 && std::abs(controls.rudder) <= 25;
-}
+using namespace wind3d::web;
 
 }  // namespace
 
@@ -112,6 +42,7 @@ int main(int argc, char **argv) {
   auto options = wind3d::OptimizedSolverOptions();
   options.devices = std::atoi(argv[3]);
   options.record_loads = true;
+  options.export_vorticity = true;
   std::string profile = argc >= 6 ? argv[4] : "baseline";
   if (profile != "baseline" && profile != "linear-cut" && profile != "linear-slip" && profile != "viscous" &&
       profile != "aero")
@@ -163,210 +94,63 @@ int main(int argc, char **argv) {
     return 2;
   }
   std::filesystem::remove(directory / "error.txt", error);
-  uint64_t request = initial_command ? initial.sequence : 0, reset = initial_command ? initial.reset : 0;
-  uint64_t expected_generation = 0, last_step = 0, last_generation = ~uint64_t(0);
-  uint64_t frame = 0;
-  // Unique mesh IDs survive restarting the agent in the same mailbox.
-  uint64_t mesh_id = std::chrono::system_clock::now().time_since_epoch().count();
-  const auto run_id = std::to_string(mesh_id);
-  uint64_t published_load_step = 0, published_load_generation = ~uint64_t(0);
-  auto next_loads = std::chrono::steady_clock::now();
-  bool paused = initial_command && initial.paused;
-  int density = initial_command ? initial.density : 2;
-  if (paused)
-    simulation->Configure(options.initial_controls, true);
+  wind3d::web::Session session(directory.string());
   wind3d::Controls requested = options.initial_controls;
-  std::shared_ptr<const std::vector<wind3d::Vertex>> mesh;
-
-  struct Sample {
-    double time;
-    std::array<double, 3> impulse;
-  };
-
-  std::deque<Sample> history;
-  wind3d::Controls history_controls;
-  uint64_t history_generation = ~uint64_t(0);
-  double condition_start = 0;
-  auto next = std::chrono::steady_clock::now();
+  wind3d::ViewSettings view;
+  if (initial_command && initial.has_view)
+    view = initial.view;
+  view.web_directory = directory.string();
+  view.streamline_density = initial_command ? initial.density : 2;
+  bool paused = initial_command && initial.paused;
+  simulation->Configure(requested, paused);
+  std::shared_ptr<const wind3d::Snapshot> rendered;
+  std::vector<wind3d::Vertex> flow;
+  int previous_density = 0;
+  bool previous_flow = false;
   while (running) {
-    Command command;
-    if (ReadCommand(directory / "controls.txt", command) && command.sequence != request) {
-      density = command.density;
-      requested = command.controls;
-      paused = command.paused;
-      request = command.sequence;
-      simulation->Configure(requested, paused);
-      if (command.reset != reset) {
-        simulation->Reset();
-        ++expected_generation;
-        reset = command.reset;
-      }
-    }
+    session.Poll(*simulation, requested, paused, view);
     auto failure = simulation->Error();
     if (!failure.empty()) {
       Write(directory / "error.txt", failure);
       return 2;
     }
-    bool actual_paused = simulation->Paused();
     auto state = simulation->Latest();
     auto now = std::chrono::steady_clock::now();
-    if (state && argc >= 6 &&
-        (!std::isfinite(state->max_speed) || state->max_speed > 600 || state->dt < 1e-7f ||
-         !std::isfinite(state->force.x + state->force.y + state->force.z + state->moment.x + state->moment.y +
-                        state->moment.z))) {
-      simulation->Configure(state->controls, true);
-      simulation->Checkpoint((directory / "anomaly.bin").string());
-      Write(directory / "error.txt", "Stability guard stopped the run; see raw diagnostics and checkpoints");
-      return 2;
-    }
-    bool finished = state && options.stop_time > 0 && state->time >= options.stop_time && actual_paused;
-    if (now >= next_loads || finished) {
-      const auto loads = simulation->RecentLoads();
-      if (!loads.samples.empty() &&
-          (loads.samples.back().step != published_load_step || loads.generation != published_load_generation)) {
-        std::ostringstream header;
-        header << std::setprecision(9) << "{\"version\":1,\"run\":\"" << run_id
-               << "\",\"generation\":" << loads.generation << ",\"count\":" << loads.samples.size()
-               << ",\"stride\":44,\"retention_seconds\":2,\"capacity_limited\":"
-               << (loads.capacity_limited ? "true" : "false") << ",\"controls_events\":[";
-        bool first = true;
-        wind3d::Controls previous;
-        for (const auto &sample : loads.samples) {
-          if (first || !Same(sample.controls, previous)) {
-            if (!first)
-              header << ',';
-            header << "{\"step\":" << sample.step << ",\"time\":" << sample.time << ",\"controls\":";
-            Controls(header, sample.controls);
-            header << '}';
-            previous = sample.controls;
-            first = false;
-          }
-        }
-        header << "]}";
-        auto json = header.str();
-        uint32_t length = uint32_t(json.size());
-        std::string packet(reinterpret_cast<const char *>(&length), sizeof(length));
-        packet += json;
-        for (const auto &sample : loads.samples) {
-          packet.append(reinterpret_cast<const char *>(&sample.step), sizeof(sample.step));
-          packet.append(reinterpret_cast<const char *>(&sample.time), sizeof(sample.time));
-          packet.append(reinterpret_cast<const char *>(&sample.dt), sizeof(sample.dt));
-          packet.append(reinterpret_cast<const char *>(&sample.force), sizeof(sample.force));
-          packet.append(reinterpret_cast<const char *>(&sample.moment), sizeof(sample.moment));
-        }
-        if (!Write(directory / "loads.bin", packet))
-          return 2;
-        published_load_step = loads.samples.back().step;
-        published_load_generation = loads.generation;
-      }
-      next_loads = now + std::chrono::seconds(1);
-    }
-    if (state && (now >= next || finished)) {
-      bool changed = state->step != last_step || state->generation != last_generation;
-      // Refresh paused metadata as well, so pause acknowledgements and liveness remain visible.
-      if (changed || paused) {
-        if (mesh != state->aircraft) {
-          mesh = state->aircraft;
-          ++mesh_id;
-          std::string bytes(reinterpret_cast<const char *>(mesh->data()), mesh->size() * sizeof(wind3d::Vertex));
-          if (!Write(directory / ("mesh-" + std::to_string(mesh_id) + ".bin"), bytes))
-            return 2;
-          // Keep recent immutable meshes for clients that are finishing a frame fetch.
-          std::vector<std::filesystem::path> files;
-          for (const auto &entry : std::filesystem::directory_iterator(directory))
-            if (entry.path().filename().string().rfind("mesh-", 0) == 0 && entry.path().extension() == ".bin")
-              files.push_back(entry.path());
-          std::sort(files.begin(), files.end());
-          while (files.size() > 32) {
-            std::filesystem::remove(files.front(), error);
-            files.erase(files.begin());
-          }
-        }
-        if (history_generation != state->generation || !Same(history_controls, state->controls)) {
-          history.clear();
-          history_generation = state->generation;
-          history_controls = state->controls;
-          condition_start = state->time;
-        }
-        if (history.empty() || history.back().time < state->time)
-          history.push_back({state->time, {state->impulse[0], state->impulse[1], state->impulse[2]}});
-        while (history.size() > 2 && history[1].time <= state->time - 0.15)
-          history.pop_front();
-        double average_span = state->time - history.front().time;
-        bool average_ready = state->time - condition_start >= 0.55 && average_span >= 0.15;
-        auto lines = wind3d::visualization::FlowLines(*state, true, false, density);
-        bool acknowledged =
-            Same(state->controls, requested) && state->generation == expected_generation && actual_paused == paused;
-        std::ostringstream json;
-        json << std::setprecision(9) << "{\"version\":1,\"frame\":" << ++frame << ",\"step\":" << state->step
-             << ",\"generation\":" << state->generation << ",\"mesh\":\"" << mesh_id << "\",\"time\":" << state->time
-             << ",\"dt\":" << state->dt << ",\"step_seconds\":" << state->step_seconds
-             << ",\"max_speed\":" << state->max_speed << ",\"pressure_cycles\":" << state->pressure_cycles
-             << ",\"pressure_residual\":" << state->pressure_residual
-             << ",\"pressure_converged\":" << (state->pressure_converged ? "true" : "false")
-             << ",\"divergence\":" << state->divergence_after << ",\"grid\":" << state->solver_nx
-             << ",\"gpus\":" << options.devices << ",\"paused\":" << (actual_paused ? "true" : "false")
-             << ",\"ack\":" << (acknowledged ? request : 0) << ",\"line_vertices\":" << lines.size()
-             << ",\"mesh_vertices\":" << mesh->size() << ",\"controls\":";
-        Controls(json, state->controls);
-        json << ",\"streamline_density\":" << density
-             << ",\"streamline_seeds\":" << (20 * density + 1) * (3 * density + 1)
-             << ",\"domain_min\":[-6,-4,-6],\"domain_max\":[10,4,6]";
-        json << ",\"solver_model\":\"uniform-" << profile
-             << "\",\"geometry_model\":\"narrowbody-rigid-controls-cockpit-v2\",\"force\":";
-        Vector(json, state->force);
-        json << ",\"moment\":";
-        Vector(json, state->moment);
-        json << ",\"reference_cg_body\":";
-        Vector(json, wind3d::ReferenceCG(state->controls));
-        json << ",\"moment_reference_cg\":";
-        Vector(json, wind3d::MomentAtReferenceCG(state->force, state->moment, state->controls));
-        json << ",\"average_seconds\":" << average_span << ",\"mean_ld\":";
-        double drag = state->impulse[0] - history.front().impulse[0];
-        if (average_ready && drag > 1e-9)
-          json << (state->impulse[1] - history.front().impulse[1]) / drag;
-        else
-          json << "null";
-        json << '}';
-        auto header = json.str();
-        while (header.size() % 4)
-          header += ' ';
-        uint32_t length = uint32_t(header.size());
-        std::string packet(reinterpret_cast<const char *>(&length), sizeof(length));
-        packet += header;
-        // Only line position/color reaches shared storage, never the velocity/pressure volume.
-        for (const auto &v : lines) {
-          packet.append(reinterpret_cast<const char *>(&v.position), sizeof(v.position));
-          packet.append(reinterpret_cast<const char *>(&v.color), sizeof(v.color));
-        }
-        if (!Write(directory / "frame.bin", packet))
-          return 2;
-        last_step = state->step;
-        last_generation = state->generation;
-        if (frame % 40 == 1)
-          std::cout << "frame=" << frame << " step=" << state->step << " bytes=" << packet.size() << std::endl;
-      }
-      next = now + std::chrono::milliseconds(500);
-    }
-    if (state && argc >= 6 && (now >= next_checkpoint || finished)) {
-      auto path = directory / ("checkpoint-" + run_id + "-" + std::to_string(++checkpoint_index) + ".bin");
-      auto checkpoint_step = simulation->Checkpoint(path.string());
-      if (!checkpoint_step) {
-        Write(directory / "error.txt", "Checkpoint failed");
+    bool actual_paused = simulation->Paused();
+    if (state) {
+      if (!std::isfinite(state->max_speed) || state->max_speed > 600 || state->dt < 1e-7f ||
+          !std::isfinite(wind3d::Length(state->force) + wind3d::Length(state->moment))) {
+        simulation->Configure(state->controls, true);
+        simulation->Checkpoint((directory / "anomaly.bin").string());
+        Write(directory / "error.txt", "Stability guard stopped the run");
         return 2;
       }
-      next_checkpoint = std::chrono::steady_clock::now() + std::chrono::seconds(10);
-      std::cout << "checkpoint=" << path << " step=" << checkpoint_step << std::endl;
-    }
-    if (finished) {
-      double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-      std::ostringstream result;
-      result << std::setprecision(17) << "{\"wall_seconds\":" << wall << ",\"physical_seconds\":" << state->time
-             << ",\"steps\":" << state->step << ",\"gpus\":" << options.devices << ",\"profile\":\"" << profile
-             << "\"}";
-      if (!Write(directory / "completed.json", result.str()))
+      if (state != rendered || previous_density != view.streamline_density || previous_flow != view.flow) {
+        flow = view.flow ? wind3d::visualization::DomainFlowLines(*state, view.streamline_density)
+                         : std::vector<wind3d::Vertex>{};
+        rendered = state;
+        previous_density = view.streamline_density;
+        previous_flow = view.flow;
+      }
+      if (!session.Publish(*state, wind3d::HistoryAtSnapshot(simulation->RecentLoads(), *state), view, actual_paused,
+                           flow, requested, paused)) {
+        Write(directory / "error.txt", "Cannot publish web presentation");
         return 2;
-      return 0;
+      }
+      bool finished = options.stop_time > 0 && state->time >= options.stop_time && actual_paused;
+      if (argc >= 6 && (now >= next_checkpoint || finished)) {
+        auto path = directory / ("checkpoint-" + session.ID() + "-" + std::to_string(++checkpoint_index) + ".bin");
+        if (!simulation->Checkpoint(path.string()))
+          return 2;
+        next_checkpoint = now + std::chrono::seconds(10);
+      }
+      if (finished) {
+        double wall = std::chrono::duration<double>(now - started).count();
+        std::ostringstream result;
+        result << "{\"wall_seconds\":" << wall << ",\"physical_seconds\":" << state->time
+               << ",\"steps\":" << state->step << "}";
+        return Write(directory / "completed.json", result.str()) ? 0 : 2;
+      }
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(40));
   }

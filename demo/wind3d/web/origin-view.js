@@ -22,7 +22,7 @@ document.head.append(style);
 
 async function show(){
   const snapshot=query.get('mesh');
-  let angle=0,reference;
+  let angle=0,reference,constructionDatum;
   let meshID=snapshot;
   if(snapshot){
     if(!/^\d+$/.test(snapshot))throw new Error('无效的模型编号');
@@ -35,8 +35,10 @@ async function show(){
     const bytes=await response.arrayBuffer(),length=new DataView(bytes).getUint32(0,true);
     if(length>65536||length+4>bytes.byteLength)throw new Error('快照头无效');
     const meta=JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,4,length)));
-    if(!meta.reference_cg_body?.every(Number.isFinite)||meta.reference_cg_body.length!==3)throw new Error('快照未提供几何参考点');
-    reference=new THREE.Vector3(...meta.reference_cg_body);
+    const origin=meta.model_origin_body??meta.reference_cg_body;
+    if(!origin?.every(Number.isFinite)||origin.length!==3)throw new Error('快照未提供模型原点');
+    reference=new THREE.Vector3(...origin);
+    constructionDatum=meta.construction_datum?new THREE.Vector3(...meta.construction_datum):reference;
     angle=meta.controls.angle*Math.PI/180;
     meshID=meta.mesh;
   }
@@ -59,7 +61,7 @@ async function show(){
   aircraft.rotation.z=angle;aircraft.position.copy(reference).negate();scene.add(aircraft);aircraft.updateMatrixWorld(true);
   const grid=new THREE.GridHelper(10,10,0x516273,0x263542);grid.position.y=-.7;scene.add(grid);
   const axes=new THREE.AxesHelper(1.15);axes.material.depthTest=false;axes.material.depthWrite=false;axes.renderOrder=10;scene.add(axes);
-  const oldOrigin=reference.clone().negate(),newOrigin=new THREE.Vector3();
+  const oldOrigin=(constructionDatum??reference).clone().negate(),newOrigin=new THREE.Vector3();
   function dot(point,color){const mesh=new THREE.Mesh(new THREE.SphereGeometry(.025,16,12),new THREE.MeshBasicMaterial({color,depthTest:false,depthWrite:false}));mesh.position.copy(point);mesh.renderOrder=12;scene.add(mesh);}
   dot(newOrigin,0xffffff);dot(oldOrigin,0xffc66b);
   const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([newOrigin,oldOrigin]),new THREE.LineBasicMaterial({color:0xffc66b,depthTest:false,depthWrite:false}));line.renderOrder=11;scene.add(line);
@@ -74,7 +76,7 @@ async function show(){
   const coordinates=v=>v.toArray().map(x=>Math.abs(x)<1e-9?'0':x.toFixed(6)).join(', ');
   note.innerHTML='<strong>同一架飞机，只换坐标原点</strong><p id="reference-coordinate"></p><p id="previous-coordinate"></p><p>坐标轴方向保持不变。质量分布、外形及舵面状态均未改变；本页不表示真实重心已确定。</p><p id="origin-extents"></p>';
   $('viewport').append(note);
-  $('reference-coordinate').textContent=`新原点在旧坐标中：(${coordinates(reference)}) m`;
+  $('reference-coordinate').textContent=`新原点在旧坐标中：(${coordinates(constructionDatum??reference)}) m`;
   $('previous-coordinate').textContent=`旧原点在新坐标中：(${coordinates(oldOrigin)}) m`;
   const box=new THREE.Box3().setFromObject(aircraft);
   $('origin-extents').textContent=`新坐标：机头 X≈${box.min.x.toFixed(3)} m，机尾 X≈${box.max.x.toFixed(3)} m。`;

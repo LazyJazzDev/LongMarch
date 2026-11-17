@@ -177,7 +177,7 @@ uint64_t CheckpointStep(const std::string &path) {
   std::ifstream file(path, std::ios::binary);
   char head[32];
   uint64_t step = 0;
-  if (file.read(head, sizeof(head)) && std::string(head, 8) == "W3DCKPT1")
+  if (file.read(head, sizeof(head)) && std::string(head, 8) == "W3DCKPT2")
     std::memcpy(&step, head + 24, sizeof(step));
   return step;
 }

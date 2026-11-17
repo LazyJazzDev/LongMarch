@@ -205,7 +205,7 @@ __global__ void FaceMask(Grid g,
   int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
   bu[n] = bv[n] = bw[n] = 0;
   au[n] = av[n] = aw[n] = 255;
-  Vec3 body = BodyPoint(g.Position(x, y, z), controls);
+  Vec3 body = ConstructionPoint(g.Position(x, y, z), controls);
   if (model.count) {
     Vec3 point = g.Position(x, y, z);
     if (point.x < model.lower.x - 2 * g.h || point.x > model.upper.x + 2 * g.h || point.y < model.lower.y - 2 * g.h ||
@@ -1564,7 +1564,7 @@ struct Simulation::Impl {
           // Write the latest completed step, outside the lock.
           std::string path = checkpoint_path;
           lock.unlock();
-          CheckpointHeader header{{'W', '3', 'D', 'C', 'K', 'P', 'T', '1'}, g.nx, g.ny, g.nz, step, time, max_speed};
+          CheckpointHeader header{{'W', '3', 'D', 'C', 'K', 'P', 'T', '2'}, g.nx, g.ny, g.nz, step, time, max_speed};
           std::copy(impulse, impulse + 3, header.impulse);
           std::copy(angular_impulse, angular_impulse + 3, header.angular_impulse);
           std::copy(friction_impulse, friction_impulse + 3, header.friction_impulse);
@@ -1623,7 +1623,7 @@ struct Simulation::Impl {
         CheckpointHeader header{};
         std::FILE *file = std::fopen(restore.c_str(), "rb");
         restored = file && Check(cudaStreamSynchronize(stream)) && std::fread(&header, sizeof(header), 1, file) == 1 &&
-                   std::memcmp(header.magic, "W3DCKPT1", 8) == 0 && header.nx == g.nx && header.ny == g.ny &&
+                   std::memcmp(header.magic, "W3DCKPT2", 8) == 0 && header.nx == g.nx && header.ny == g.ny &&
                    header.nz == g.nz && Transfer(file, u, nf, false) && Transfer(file, v, nf, false) &&
                    Transfer(file, w, nf, false) && Transfer(file, pressure, nc, false);
         if (file)

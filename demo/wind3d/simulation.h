@@ -146,6 +146,16 @@ struct LoadHistory {
   std::vector<LoadSample> samples;
 };
 
+// A solver step may finish between Latest() and RecentLoads(). Both frontends
+// must stop their chart window at the displayed snapshot, not a newer step.
+inline LoadHistory HistoryAtSnapshot(LoadHistory history, const Snapshot &snapshot) {
+  if (history.generation != snapshot.generation)
+    history.samples.clear();
+  while (!history.samples.empty() && history.samples.back().step > snapshot.step)
+    history.samples.pop_back();
+  return history;
+}
+
 // Single worker owns all CUDA state. Published snapshots are immutable: the
 // renderer never waits for a solver step or observes half-written velocity data.
 class Simulation {

@@ -110,10 +110,24 @@ WIND3D_HD Vec3 RotateZ(Vec3 p, float degrees) {
   return {cosf(a) * p.x - sinf(a) * p.y, sinf(a) * p.x + cosf(a) * p.y, p.z};
 }
 
+// Fixed model datum in the original construction coordinates. Chosen from the
+// baseline main-wing quarter chord; never follows control or shape changes.
+WIND3D_HD Vec3 ModelDatum() {
+  return {-0.2894136608f, 0, 0};
+}
+
+WIND3D_HD Vec3 ConstructionToWorld(Vec3 point, const Controls &controls) {
+  return RotateZ(Add(point, Scale(ModelDatum(), -1)), -controls.angle);
+}
+
 // World coordinates: +x downstream, +y up, +z starboard. Positive incidence
 // raises the nose (-x). All angles are degrees. Moments use the right-hand rule.
 WIND3D_HD Vec3 BodyPoint(Vec3 world, const Controls &controls) {
   return RotateZ(world, controls.angle);
+}
+
+WIND3D_HD Vec3 ConstructionPoint(Vec3 world, const Controls &controls) {
+  return Add(BodyPoint(world, controls), ModelDatum());
 }
 
 WIND3D_HD float Dot(Vec3 a, Vec3 b) {
@@ -640,7 +654,7 @@ enum Component { kFuselage, kWing, kHorizontalTail, kVerticalTail, kNacelle, kCo
 
 // Signed distance to the aircraft (negative inside) and the nearest component.
 WIND3D_HD float AircraftDistance(Vec3 world, const Controls &controls, int &component) {
-  Vec3 p = BodyPoint(world, controls);
+  Vec3 p = ConstructionPoint(world, controls);
   component = kFuselage;
   if (p.x < -3.1f || p.x > 3.4f || fabsf(p.z) > AircraftSpanBound(controls) || p.y < -0.85f || p.y > 1.4f)
     return 1;

@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 
+#include "presentation.h"
 #include "simulation.h"
 
 namespace wind3d::visualization {
@@ -184,6 +185,25 @@ inline std::vector<Vertex> FlowLines(const Snapshot &snapshot,
     Line(lines, {}, origin, {0.3f, 0.35f, 0.4f});
     Arrow(lines, origin, Scale(snapshot.force, 3 / (100 + Length(snapshot.force))), {0.1f, 1, 0.8f});
     Arrow(lines, origin, Scale(snapshot.moment, 3 / (100 + Length(snapshot.moment))), {1, 0.25f, 0.85f});
+  }
+  return lines;
+}
+
+inline std::vector<Vertex> PresentationLines(const Snapshot &snapshot, const ViewSettings &view) {
+  auto lines = FlowLines(snapshot, false, view.loads);
+  Arrow(lines, {}, {.7f, 0, 0}, {1, .25f, .2f});
+  Arrow(lines, {}, {0, .7f, 0}, {.2f, 1, .3f});
+  Arrow(lines, {}, {0, 0, .7f}, {.2f, .5f, 1});
+  if (view.domain) {
+    const Vec3 lo{-6, -4, -6}, hi{10, 4, 6};
+    for (int mask = 0; mask < 8; ++mask)
+      for (int axis = 0; axis < 3; ++axis)
+        if (!(mask & (1 << axis))) {
+          auto corner = [&](int bits) {
+            return Vec3{bits & 1 ? hi.x : lo.x, bits & 2 ? hi.y : lo.y, bits & 4 ? hi.z : lo.z};
+          };
+          Line(lines, corner(mask), corner(mask | (1 << axis)), {.5f, .78f, 1});
+        }
   }
   return lines;
 }

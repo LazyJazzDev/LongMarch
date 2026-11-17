@@ -5,6 +5,45 @@ airliner model. CUDA advances the fluid on a worker thread while an RHI frontend
 renders the latest completed state. NVIDIA CUDA is required; the Windows
 frontend supports Vulkan and D3D12.
 
+## Shared desktop and web presentation
+
+Run **one** simulation publisher per mailbox. The desktop can publish the same
+completed snapshots that it displays; do not also start `wind3d_web` in that
+directory. Start the relay first, then the desktop:
+
+```powershell
+python demo/wind3d/web/server.py --directory out/wind3d-web/shared --bind 127.0.0.1 --port 10514
+# In a second terminal:
+cmake-build-release/demo/wind3d/demo_wind3d --aero --grid 256 --speed 30 --angle 3.94 --wing-incidence 4.7 --tail-incidence 1.337 --streamlines --no-volume --web-directory out/wind3d-web/shared
+```
+
+Open `http://127.0.0.1:10514/`. Desktop and browser share controls, pause/reset,
+camera, aircraft/domain/load visibility, full-domain streamlines, both curvature
+thresholds and line width, vorticity volume settings, and load-history settings.
+The run ID, step, and physical time identify the displayed result. Web updates
+are asynchronous (500 ms publication/polling plus transfer time); pausing gives
+an exact comparison. Charts retain every solver step and use the same window,
+startup/change exclusions, time weighting and demeaning. Camera framing can
+differ with viewport aspect ratio, and widget layouts are native to each frontend.
+
+The procedural aircraft's fixed model origin is the former construction point
+`(-0.2894136608, 0, 0)` m. Its location does not track wing/control changes.
+Geometry, solid boundaries, rotation pivot, load integration, CSV and charts now
+use this datum; it is **not** a mass-derived CG. At zero body incidence the nose
+and tail are approximately X = -2.710586 and +3.289414 m. Analytic construction
+helpers retain their local coordinates behind explicit conversion functions.
+Uniform checkpoints now use `W3DCKPT2`: old fields occupy a different position
+relative to the fixed grid and cannot be restored silently. Recompute a new
+flow; old trim measurements are historical, not validation of the relocated grid.
+
+Version-2 display packets preserve the exact desktop polylines and upstream
+curvature history. Both frontends use the same surface lighting, linear-color
+compositing, line coverage and vorticity ray-march rules. Volume data is sent
+only when enabled. Unchanged paused frames use a heartbeat rather than repeating
+geometry transfers. The publisher retries transient Windows sharing conflicts during atomic
+replacement; readers never receive a partially written packet. A web-only worker uses the same
+publisher and protocol when no desktop is needed.
+
 ```powershell
 cmake --build cmake-build-release --target demo_wind3d
 cmake-build-release/demo/wind3d/demo_wind3d --aero --backend vulkan
