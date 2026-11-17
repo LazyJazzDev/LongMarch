@@ -13,8 +13,8 @@ cmake-build-release/demo/wind3d/demo_wind3d --backend d3d12 --grid 256
 
 ## Leapfrog Flow Maps desktop solver
 
-The desktop executable now defaults to **LFM on a 96 × 48 × 72 grid**.
-`--grid 128` increases detail; `--maccormack --grid 192` selects the previous
+The desktop executable now defaults to **LFM on a 256 × 128 × 192 grid**.
+`--grid 128` provides a faster preview; `--maccormack --grid 192` selects the previous
 desktop default. The library, batch and AMR defaults are unchanged. LFM currently
 requires one GPU; requesting it through `SolverOptions` with multiple devices
 fails explicitly.
@@ -94,7 +94,7 @@ demo_wind3d --lfm --grid 128 --validate-time 3 --no-export --viscosity 0.000015 
 ### Vorticity volume rendering
 
 The default view ray-marches the full solver-grid magnitude of curl(u), computed
-in CUDA from the final projected MAC velocity. The volume has 256 ? 128 ? 192
+in CUDA from the final projected MAC velocity. The volume has 256 × 128 × 192
 samples at the default resolution; it does not use the 192-wide display-field
 cap used by streamlines. Solid cells and the outermost domain cells are zeroed.
 The renderer uses trilinear sampling, exponential absorption and three light-ray
