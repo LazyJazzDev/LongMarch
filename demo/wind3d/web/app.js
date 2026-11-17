@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
 const $ = id => document.getElementById(id);
-const specs = [ ['speed','来流速度',1,30,'m/s',30], ['angle','迎角',-20,25,'°',4],
+const specs = [ ['speed','来流速度',1,30,'m/s',30], ['angle','机身迎角（相对来流）',-20,25,'°',4],
   ['flap','襟翼',0,40,'°',0], ['aileron','副翼（差动）',-25,25,'°',0],
   ['elevator','升降舵',-25,25,'°',0], ['rudder','方向舵',-25,25,'°',0],
-  ['tail_incidence','平尾配平',-10,10,'°',0], ['winglets','上翘小翼',0,1,'',1],
+  ['wing_incidence','主翼根部安装角（相对机身，翼尖洗出 3°）',0,6,'°',1.5],
+  ['tail_incidence','平尾安装角（整体配平）',-10,10,'°',0], ['winglets','上翘小翼',0,1,'',1],
   ['linked_flaps','内外襟翼联动',0,1,'',1], ['outer_flap','外段襟翼',0,40,'°',0],
   ['cruise_camber','巡航弯度偏角',-5,5,'°',0], ['aileron_droop','副翼对称下偏',0,15,'°',0],
   ['spoiler','对称扰流板',0,60,'°',0], ['spoiler_roll','扰流板差动',-30,30,'°',0],

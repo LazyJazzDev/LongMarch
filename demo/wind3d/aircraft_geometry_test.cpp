@@ -11,35 +11,39 @@ bool PylonAttachments() {
   for (float span : {2.f, 2.65f, 4.2f})
     for (float sweep : {0.f, .55f, .7f})
       for (float camber : {0.f, .025f, .06f})
-        for (int side : {-1, 1}) {
-          Controls c;
-          c.airframe.wing_span = span;
-          c.airframe.wing_sweep = sweep;
-          c.airframe.wing_camber = camber;
-          c.flap = 40;
-          c.aileron = 25;
-          auto pylon = AircraftPart(6, side, c);
-          if (!(pylon.spec.span > .05f))
-            return false;
-          for (int i = 0; i <= 100; ++i)
-            for (int surface : {-1, 1}) {
-              auto top = FoilPoint(pylon, i / 100.f, pylon.end, surface, false);
-              float distance = 1;
-              for (int part : {0, 1, 2, 3, 7, 12})
-                distance = std::min(distance, PartDistance(top, AircraftPart(part, side, c)));
-              if (distance > -.0001f) {
-                std::cerr << "Exposed pylon upper cap: " << distance << '\n';
-                return false;
+        for (float incidence : {0.f, 1.5f, 4.f, 6.f})
+          for (int side : {-1, 1}) {
+            Controls c;
+            c.airframe.wing_span = span;
+            c.airframe.wing_sweep = sweep;
+            c.airframe.wing_camber = camber;
+            c.airframe.wing_incidence = incidence;
+            c.flap = 40;
+            c.aileron = 25;
+            auto pylon = AircraftPart(6, side, c);
+            if (!(pylon.spec.span > .05f))
+              return false;
+            for (int i = 0; i <= 100; ++i)
+              for (int surface : {-1, 1}) {
+                auto top = FoilPoint(pylon, i / 100.f, pylon.end, surface, false);
+                float distance = 1;
+                for (int part : {0, 1, 2, 3, 7, 12})
+                  distance = std::min(distance, PartDistance(top, AircraftPart(part, side, c)));
+                if (distance > -.0001f) {
+                  std::cerr << "Exposed pylon upper cap: " << distance << '\n';
+                  return false;
+                }
+                auto root = FoilPoint(pylon, i / 100.f, 0, surface, false);
+                float t = (root.x - nacelle_inlet) / nacelle_length;
+                float radius = std::hypot(root.y - nacelle_y, root.z - side * .92f);
+                if (t < 0 || t > 1 || radius < NacelleRadius(t, -1) + .0001f || radius > NacelleRadius(t, 1) - .0001f) {
+                  std::cerr << "Pylon lower cap leaves nacelle wall: incidence=" << incidence << " span=" << span
+                            << " sweep=" << sweep << " camber=" << camber << " u=" << i / 100.f << " radius=" << radius
+                            << " inner=" << NacelleRadius(t, -1) << " outer=" << NacelleRadius(t, 1) << '\n';
+                  return false;
+                }
               }
-              auto root = FoilPoint(pylon, i / 100.f, 0, surface, false);
-              float t = (root.x - nacelle_inlet) / nacelle_length;
-              float radius = std::hypot(root.y - nacelle_y, root.z - side * .92f);
-              if (t < 0 || t > 1 || radius < NacelleRadius(t, -1) + .0001f || radius > NacelleRadius(t, 1) - .0001f) {
-                std::cerr << "Pylon lower cap leaves nacelle wall\n";
-                return false;
-              }
-            }
-        }
+          }
   return true;
 }
 
@@ -176,6 +180,18 @@ int main() {
         return 9;
     }
   Controls trim = controls;
+  for (float incidence : {0.f, 4.f, 6.f}) {
+    Controls installed = controls;
+    installed.airframe.wing_incidence = incidence;
+    if (!ValidAirframe(installed.airframe) || SameAircraftGeometry(installed, controls))
+      return 39;
+    auto a = AircraftPart(0, 1, installed).spec, b = AircraftPart(0, 1, controls).spec;
+    Vec3 pa = Add(a.origin, Scale(a.x_axis, a.leading + .25f * a.root));
+    Vec3 pb = Add(b.origin, Scale(b.x_axis, b.leading + .25f * b.root));
+    if (Length(Add(pa, Scale(pb, -1))) > 1e-6f ||
+        std::abs(std::atan2(-a.x_axis.y, a.x_axis.x) * 57.2957795f - incidence) > 1e-5f)
+      return 40;
+  }
   trim.airframe.tail_incidence = 7;
   if (SameAirframe(trim.airframe, controls.airframe))
     return 10;

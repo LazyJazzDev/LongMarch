@@ -22,12 +22,13 @@ LEGACY = tuple(BOUNDS)
 EXTENDED = {"tail_incidence": (-10, 10), "winglets": (0, 1), "linked_flaps": (0, 1),
             "outer_flap": (0, 40), "cruise_camber": (-5, 5), "aileron_droop": (0, 15),
             "spoiler": (0, 60), "spoiler_roll": (-30, 30), "linked_spoiler_roll": (0, 1),
-            "slat": (0, 30), "linked_slats": (0, 1)}
+            "slat": (0, 30), "linked_slats": (0, 1), "wing_incidence": (0, 6)}
 FLAGS = {"winglets", "linked_flaps", "linked_spoiler_roll", "linked_slats"}
 BOUNDS.update(EXTENDED)
 DEFAULT = dict(speed=30, angle=4, flap=0, aileron=0, elevator=0, rudder=0,
                tail_incidence=0, winglets=1, linked_flaps=1, outer_flap=0, cruise_camber=0,
-               aileron_droop=0, spoiler=0, spoiler_roll=0, linked_spoiler_roll=0, slat=0, linked_slats=0)
+               aileron_droop=0, spoiler=0, spoiler_roll=0, linked_spoiler_roll=0, slat=0, linked_slats=0,
+               wing_incidence=1.5)
 
 
 def atomic(path, data):
@@ -104,7 +105,7 @@ class Relay:
     def save(self):
         d = self.desired
         atomic(self.directory / "desired.json", json.dumps(d))
-        values = [d["sequence"], d["reset"], int(d["paused"])] + [d["controls"][k] for k in LEGACY] + [d["streamline_density"], "wing-v1"] + [d["controls"][k] for k in EXTENDED]
+        values = [d["sequence"], d["reset"], int(d["paused"])] + [d["controls"][k] for k in LEGACY] + [d["streamline_density"], "wing-v2"] + [d["controls"][k] for k in EXTENDED]
         atomic(self.directory / "controls.txt", " ".join(map(str, values)) + "\n")
 
     def update(self, data):

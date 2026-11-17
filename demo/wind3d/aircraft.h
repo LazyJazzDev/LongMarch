@@ -22,18 +22,20 @@ struct Airframe {
   float tail_leading{1.65f};
   float tail_incidence{};  // Positive raises the stabilizer leading edge.
   bool winglets{true};
+  float wing_incidence{1.5f};  // Root chord to body x axis; positive raises leading edge.
 };
 
 WIND3D_HD bool ValidAirframe(const Airframe &a) {
   return a.wing_span >= 2 && a.wing_span <= 4.2f && a.wing_camber >= 0 && a.wing_camber <= .06f && a.wing_sweep >= 0 &&
          a.wing_sweep <= .7f && a.tail_span >= .6f && a.tail_span <= 1.4f && a.tail_leading >= 1 &&
-         a.tail_leading <= 2 && a.tail_incidence >= -10 && a.tail_incidence <= 10;
+         a.tail_leading <= 2 && a.tail_incidence >= -10 && a.tail_incidence <= 10 && a.wing_incidence >= 0 &&
+         a.wing_incidence <= 6;
 }
 
 WIND3D_HD bool SameAirframe(const Airframe &a, const Airframe &b) {
   return a.wing_span == b.wing_span && a.wing_camber == b.wing_camber && a.wing_sweep == b.wing_sweep &&
          a.tail_span == b.tail_span && a.tail_leading == b.tail_leading && a.tail_incidence == b.tail_incidence &&
-         a.winglets == b.winglets;
+         a.winglets == b.winglets && a.wing_incidence == b.wing_incidence;
 }
 
 struct WingControls {
@@ -274,9 +276,12 @@ WIND3D_HD float AircraftSpanBound(const Controls &controls) {
 WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
   const auto &airframe = controls.airframe;
   Vec3 ex{1, 0, 0}, ey{0, 1, 0}, ez{0, 0, float(side)};
-  FoilSpec wing{{0, -0.18f, 0},
-                RotateZ(ex, -1.5f),
-                RotateZ(ey, -1.5f),
+  // Hold the original root quarter-chord fixed while adjusting installation.
+  Vec3 wx = RotateZ(ex, -airframe.wing_incidence);
+  Vec3 pivot = Add(Vec3{0, -.18f, 0}, Scale(RotateZ(ex, -1.5f), -.8f));
+  FoilSpec wing{Add(pivot, Scale(wx, .8f)),
+                wx,
+                RotateZ(ey, -airframe.wing_incidence),
                 ez,
                 airframe.wing_span,
                 0.96f,
@@ -367,7 +372,8 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
   Vec3 rear = FoilPoint(mounting_wing, .62f, .92f, 0, false);
   Vec3 chord_axis = Unit(Add(rear, Scale(front, -1)));
   Vec3 span_axis{-chord_axis.y, chord_axis.x, 0};
-  Vec3 base{-.76f, -.26f, side * .92f}, offset = Add(front, Scale(base, -1));
+  // Keep the lower cap's chord midpoint in the nacelle wall as installation changes.
+  Vec3 base{-.76f, -.26f - .145f * chord_axis.y, side * .92f}, offset = Add(front, Scale(base, -1));
   float height = Dot(offset, span_axis);
   FoilSpec pylon{base,
                  chord_axis,

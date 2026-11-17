@@ -21,7 +21,7 @@ class RelayMailboxTest(unittest.TestCase):
             (directory / "desired.json").write_text(json.dumps(old), encoding="utf-8")
             relay = Relay(directory)
             fields = (directory / "controls.txt").read_text().split()
-            self.assertEqual(fields[:11], ["7", "2", "1", "18", "6", "20", "1", "2", "3", "2", "wing-v1"])
+            self.assertEqual(fields[:11], ["7", "2", "1", "18", "6", "20", "1", "2", "3", "2", "wing-v2"])
             self.assertEqual(dict(zip(EXTENDED, map(float, fields[11:]))), {key: DEFAULT[key] for key in EXTENDED})
             self.assertEqual(relay.desired["controls"]["winglets"], 1)
 
@@ -31,10 +31,10 @@ class RelayMailboxTest(unittest.TestCase):
             relay = Relay(directory)
             values = dict(tail_incidence=1.75, winglets=0, linked_flaps=0, outer_flap=10,
                           cruise_camber=-2, aileron_droop=5, spoiler=30, spoiler_roll=-15,
-                          linked_spoiler_roll=1, slat=20, linked_slats=1)
+                          linked_spoiler_roll=1, slat=20, linked_slats=1, wing_incidence=4)
             result = relay.update(dict(controls=values, streamline_density=4))
             fields = (directory / "controls.txt").read_text().split()
-            self.assertEqual(fields[9:11], ["4", "wing-v1"])
+            self.assertEqual(fields[9:11], ["4", "wing-v2"])
             self.assertEqual(dict(zip(EXTENDED, map(float, fields[11:]))), values)
             self.assertEqual(Relay(directory).desired, result)
 
@@ -42,7 +42,7 @@ class RelayMailboxTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             relay = Relay(Path(temporary))
             before = json.dumps(relay.desired)
-            for values in [dict(slat=31), dict(spoiler=61), dict(tail_incidence=-11),
+            for values in [dict(wing_incidence=6.01), dict(wing_incidence=-.01), dict(slat=31), dict(spoiler=61), dict(tail_incidence=-11),
                            dict(linked_flaps=.5), dict(winglets=True), dict(cruise_camber=float("nan"))]:
                 with self.assertRaises(ValueError): relay.update(dict(controls=values))
                 self.assertEqual(json.dumps(relay.desired), before)

@@ -74,6 +74,13 @@ between the renderer and fluid boundary. Older checkpoints and the historical
 restore those fields as a settled state for the revised aircraft. New trim
 results must be generated from the revised geometry.
 
+Body angle of attack (`--angle`) is measured against the inlet. Wing root
+installation (`--wing-incidence`, 0–6 degrees, initially 1.5) is measured against
+the body and rotates the wing about its fixed root quarter-chord. The tip has
+3 degrees of washout. Stabilizer installation (`--tail-incidence`) rotates the
+whole horizontal tail independently of elevator deflection. Both interfaces
+expose these distinct angles; CSV diagnostics record wing installation too.
+
 The forebody now separates its radome crown, windshield region and cabin roof
 in the longitudinal profile. A nearly straight upper profile at body x
 -2.72..-2.48 m joins the radome and cabin with continuous first derivatives;

@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
       std::cout
           << "Flow view: --streamlines --no-volume --streamline-density 1..4 --streamline-width 0.75..4 (pixels) --streamline-curvature 0.001..10 (1/m) --streamline-transparent-curvature 0..upper (exclusive).\n";
       std::cout
-          << "Airframe: --wing-span 2..4.2 (half-span, m), --wing-camber 0..0.06, --wing-sweep 0..0.7 (slope), --tail-span 0.6..1.4 (half-span, m), --tail-leading 1..2 (body x, m), --tail-incidence -10..10 (deg), --winglets|--raked-tips.\n";
+          << "Airframe: --wing-span 2..4.2 (half-span, m), --wing-camber 0..0.06, --wing-sweep 0..0.7 (slope), --tail-span 0.6..1.4 (half-span, m), --tail-leading 1..2 (body x, m), --tail-incidence -10..10 (deg), --wing-incidence 0..6 (root chord to body, deg), --winglets|--raked-tips.\n";
       std::cout
           << "Wing devices: --outer-flap 0..40 (unlinks outer flap), --cruise-camber -5..5, --aileron-droop 0..15 (deg).\n";
       std::cout << "Spoilers: --spoiler 0..60 --spoiler-roll -30..30 --link-spoiler-roll.\n";
@@ -172,6 +172,8 @@ int main(int argc, char **argv) {
           controls.airframe.wing_sweep = number;
         else if (key == "--tail-span")
           controls.airframe.tail_span = number;
+        else if (key == "--wing-incidence")
+          controls.airframe.wing_incidence = number;
         else if (key == "--tail-incidence")
           controls.airframe.tail_incidence = number;
         else if (key == "--tail-leading")

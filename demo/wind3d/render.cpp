@@ -197,7 +197,7 @@ bool Render(IDevice *device,
               ImGui::TextUnformatted("Building first flow snapshot...");
             if (ImGui::CollapsingHeader("Wind and controls")) {
               ImGui::SliderFloat("Wind m/s", &controls.speed, 1, 30);
-              ImGui::SliderFloat("Incidence", &controls.angle, -20, 25, "%.1f deg");
+              ImGui::SliderFloat("Body angle of attack", &controls.angle, -20, 25, "%.1f deg");
               ImGui::Checkbox("Link inner/outer flaps", &controls.wing_controls.linked_flaps);
               ImGui::SliderFloat(controls.wing_controls.linked_flaps ? "Flaps" : "Inner flap", &controls.flap, 0, 40,
                                  "%.1f deg");
@@ -214,6 +214,9 @@ bool Render(IDevice *device,
                 ImGui::SliderFloat("Spoiler roll", &controls.wing_controls.spoiler_roll, -30, 30, "%.1f deg");
               ImGui::SliderFloat("Ailerons", &controls.aileron, -25, 25, "%.1f deg");
               ImGui::Checkbox("Blended winglets", &controls.airframe.winglets);
+              ImGui::SliderFloat("Wing root installation", &controls.airframe.wing_incidence, 0, 6, "%.2f deg");
+              ImGui::TextWrapped(
+                  "Body AoA is relative to the inlet. Wing installation is relative to the body; tip washout is 3 deg. Stabilizer trim rotates the whole tail independently of elevator.");
               ImGui::SliderFloat("Stabilizer trim", &controls.airframe.tail_incidence, -10, 10, "%.2f deg");
               ImGui::SliderFloat("Elevator", &controls.elevator, -25, 25, "%.1f deg");
               ImGui::SliderFloat("Rudder", &controls.rudder, -25, 25, "%.1f deg");
