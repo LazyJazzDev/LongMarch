@@ -112,6 +112,7 @@ struct FoilPart {
 // Main half-wing span, excluding the 0.32 m raked tip. Preserve the chord
 // distribution while increasing the full-wing aspect ratio to about 11.56.
 constexpr float wing_main_span = 3.6f;
+constexpr float wing_camber = 0.04f;
 constexpr float aircraft_span_bound = wing_main_span + 0.7f;
 
 // Parts: buried wing root, flap, aileron, raked tip, horizontal stabilizer,
@@ -128,7 +129,7 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
                 -1.04f,
                 0.55f,
                 0.09f,
-                0.025f,
+                wing_camber,
                 0.13f};
   if (part == 0)
     return {wing, 0, 0.35f, 0, false, false};

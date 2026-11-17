@@ -9,7 +9,7 @@ int main() {
   Controls controls;
   auto wing = AircraftPart(0, 1, controls);
   auto pylon = AircraftPart(6, 1, controls);
-  if (std::abs(wing.spec.camber - .025f) > 1e-7f || std::abs(pylon.spec.span - .18f) > 1e-7f ||
+  if (std::abs(wing.spec.camber - .04f) > 1e-7f || std::abs(pylon.spec.span - .18f) > 1e-7f ||
       std::abs(pylon.spec.origin.y + .26f) > 1e-7f || NacelleRadius(.2f, 1) < .24f)
     return 1;
   size_t checked = 0;

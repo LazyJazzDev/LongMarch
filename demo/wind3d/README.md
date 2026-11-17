@@ -127,15 +127,18 @@ boundary, not turbulent aircraft aerodynamics. `wind3d_lfm_check --lfm` includes
 these sphere checks, an analytic rotating-flow predictor check, and checkpoints.
 
 With quadratic maps and centered pressure recovery, the 128-grid aircraft gives
-21.05 N drag and 107.63 N lift in the 2–3 second window (12 m/s, 5 degrees, cut
+22.60 N drag and 143.38 N lift in the 2–3 second window (12 m/s, 5 degrees, cut
 cells, molecular viscosity 1.5e-5 m²/s, CFL 0.25, 2 m sponge).
-The 2–3 second mean L/D is 5.1137, with negligible variation in that window.
+The 2–3 second mean L/D is 6.3456, with negligible variation in that window.
 This demonstrates temporal settling at that grid, not spatial convergence.
 The main half-wing span increased from 2.7 to 3.6 m with the same root/tip
-chords and airfoil. Including raked tips, total span is 7.84 m and planform aspect
+chords. Including raked tips, total span is 7.84 m and planform aspect
 ratio is about 11.56. Flap/aileron stations and the occupancy broad phase follow
-the new span. The former 6.04 m span gave L/D 3.5752 under the same algorithm
-and 128-grid conditions; higher-resolution comparison remains in progress.
+the new span. Maximum main-wing camber increased from 2.5% to 4% chord,
+keeping its 40%-chord peak, 13% thickness and incidence unchanged. The 6.04 m
+span with 2.5% camber gave L/D 3.5752; increasing span alone gave 5.1137 under
+the same algorithm and 128-grid conditions. Higher-resolution comparison remains
+in progress.
 Keeping the centered pressure predictor but using the earlier trilinear maps
 gave L/D 0.51 on the same grid. The interpolation regression checks a sampled
 quadratic and its derivative across a stencil transition, and constant-velocity
@@ -617,7 +620,8 @@ accuracy gate, resource limit and remaining work are recorded in [AMR.md](AMR.md
 The web agent uses the uniform MAC solver, monotone cubic transport, cut-cell
 boundaries, wall-modelled loads and CFL 0.125. It retains this repository's
 1/2/4/8-GPU execution and web controls; AMR is not part of the web deployment.
-The 2.5% wing camber and sealed control hinges are ported from the source.
+The original 2.5% wing camber and sealed control hinges were ported from the source;
+the aerodynamic geometry update increases main-wing camber to 4%.
 Neutral decorative colours, control-surface colours, short pylons and high-bypass
 nacelles remain as requested for this frontend.
 
