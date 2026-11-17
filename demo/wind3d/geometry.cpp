@@ -33,6 +33,11 @@ class MeshBuilder {
         if (foil.hinged)
           Knuckle(foil, color);
       }
+      for (int panel = 0; panel < spoiler_panel_count; ++panel) {
+        auto spoiler = AircraftSpoiler(panel, side, controls_);
+        if (spoiler.deflection > 0)
+          Spoiler(spoiler);
+      }
       Nacelle(side);
     }
     return std::move(vertices_);
@@ -108,6 +113,43 @@ class MeshBuilder {
       Quad(MakeVertex(NacellePoint(1, a, side, 1), back, skin), MakeVertex(NacellePoint(1, b, side, 1), back, skin),
            MakeVertex(NacellePoint(1, b, side, -1), back, skin), MakeVertex(NacellePoint(1, a, side, -1), back, skin));
     }
+  }
+
+  void Spoiler(const SpoilerPart &part) {
+    auto position = [&](Vec3 p) {
+      return SpoilerPoint(part, spoiler_first + (spoiler_last - spoiler_first) * p.x,
+                          part.begin + (part.end - part.begin) * p.z, 2 * p.y - 1);
+    };
+    // Six sampled parametric faces, including the thin edges. Orient normals
+    // against the derivative along the outward parameter direction.
+    for (int face = 0; face < 3; ++face)
+      for (int side : {0, 1}) {
+        auto parameter = [&](float a, float b, float fixed) -> Vec3 {
+          if (face == 0)
+            return {fixed, a, b};
+          if (face == 1)
+            return {a, fixed, b};
+          return {a, b, fixed};
+        };
+        auto vertex = [&](float a, float b) {
+          constexpr float e = .0001f;
+          Vec3 p = position(parameter(a, b, float(side)));
+          Vec3 da =
+              Add(position(parameter(a + e, b, float(side))), Scale(position(parameter(a - e, b, float(side))), -1));
+          Vec3 db =
+              Add(position(parameter(a, b + e, float(side))), Scale(position(parameter(a, b - e, float(side))), -1));
+          Vec3 outward = Add(position(parameter(a, b, side + e)), Scale(position(parameter(a, b, side - e)), -1));
+          Vec3 n = Cross(da, db);
+          if (Dot(n, outward) * (side ? 1 : -1) < 0)
+            n = Scale(n, -1);
+          return MakeVertex(p, n, {.45f, .61f, .72f});
+        };
+        int na = face == 0 ? 1 : 12, nb = face == 2 ? 1 : 8;
+        for (int a = 0; a < na; ++a)
+          for (int b = 0; b < nb; ++b)
+            Quad(vertex(float(a) / na, float(b) / nb), vertex(float(a + 1) / na, float(b) / nb),
+                 vertex(float(a + 1) / na, float(b + 1) / nb), vertex(float(a) / na, float(b + 1) / nb));
+      }
   }
 
   void Foil(const FoilPart &part, Vec3 control_color, Vec3 fixed_color) {

@@ -41,16 +41,21 @@ struct WingControls {
   float outer_flap{};
   float cruise_camber{};  // Symmetric trailing-edge bias, degrees.
   float aileron_droop{};  // Symmetric bias, independent of roll command.
+  float spoiler{};        // Symmetric speed-brake deployment.
+  float spoiler_roll{};
+  bool linked_spoiler_roll{};
 };
 
 WIND3D_HD bool ValidWingControls(const WingControls &w) {
   return w.outer_flap >= 0 && w.outer_flap <= 40 && w.cruise_camber >= -5 && w.cruise_camber <= 5 &&
-         w.aileron_droop >= 0 && w.aileron_droop <= 15;
+         w.aileron_droop >= 0 && w.aileron_droop <= 15 && w.spoiler >= 0 && w.spoiler <= 60 && w.spoiler_roll >= -30 &&
+         w.spoiler_roll <= 30;
 }
 
 WIND3D_HD bool SameWingControls(const WingControls &a, const WingControls &b) {
   return a.linked_flaps == b.linked_flaps && a.outer_flap == b.outer_flap && a.cruise_camber == b.cruise_camber &&
-         a.aileron_droop == b.aileron_droop;
+         a.aileron_droop == b.aileron_droop && a.spoiler == b.spoiler && a.spoiler_roll == b.spoiler_roll &&
+         a.linked_spoiler_roll == b.linked_spoiler_roll;
 }
 
 struct Controls {
@@ -398,6 +403,59 @@ WIND3D_HD float PartDistance(Vec3 body, const FoilPart &part) {
   return part.hinged ? fminf(best, HingeKnuckle(part, local)) : best;
 }
 
+// Four closed, finite-thickness panels per wing. Their stowed upper skin
+// follows the wing; raised panels rotate about a swept forward hinge.
+constexpr int spoiler_panel_count = 4;
+constexpr float spoiler_first = .48f, spoiler_last = .70f, spoiler_thickness = .006f;
+
+struct SpoilerPart {
+  FoilSpec spec;
+  float begin, end, deflection;
+};
+
+WIND3D_HD SpoilerPart AircraftSpoiler(int panel, int side, const Controls &controls) {
+  auto spec = AircraftPart(0, side, controls).spec;
+  float width = spec.span * .16f;
+  float start = spec.span * .18f + panel * width;
+  float roll = controls.wing_controls.linked_spoiler_roll ? controls.aileron : controls.wing_controls.spoiler_roll;
+  float angle = fminf(fmaxf(controls.wing_controls.spoiler + (panel ? side * roll : 0), 0), 60);
+  return {spec, start + .008f, start + width - .008f, angle};
+}
+
+WIND3D_HD float WingUpper(const FoilSpec &s, float u, float chord) {
+  return FoilCamber(u, chord, s.camber) + FoilThickness(u, chord, s.thickness);
+}
+
+WIND3D_HD Vec3 SpoilerTransform(const SpoilerPart &part, Vec3 p, bool inverse = false) {
+  const auto &s = part.spec;
+  float slope = (s.tip - s.root) / s.span;
+  Vec3 hinge{s.leading + spoiler_first * s.root, WingUpper(s, spoiler_first, s.root), 0};
+  Vec3 axis = Unit({s.sweep + spoiler_first * slope, s.dihedral + WingUpper(s, spoiler_first, slope), 1});
+  return Add(hinge, RotateAxis(Add(p, Scale(hinge, -1)), axis, inverse ? -part.deflection : part.deflection));
+}
+
+WIND3D_HD Vec3 SpoilerPoint(const SpoilerPart &part, float u, float span, float surface) {
+  const auto &s = part.spec;
+  float chord = s.root + (s.tip - s.root) * span / s.span;
+  Vec3 p{s.leading + s.sweep * span + u * chord,
+         s.dihedral * span + WingUpper(s, u, chord) + (surface - 1) * .5f * spoiler_thickness, span};
+  return Add(s.origin, FoilVector(s, SectionShape(s, SpoilerTransform(part, p))));
+}
+
+WIND3D_HD float SpoilerDistance(Vec3 body, const SpoilerPart &part) {
+  if (part.deflection <= 0)
+    return 1;
+  const auto &s = part.spec;
+  Vec3 p = SpoilerTransform(part, SectionShape(s, FoilLocal(s, body), true), true);
+  float chord = s.root + (s.tip - s.root) * fminf(fmaxf(p.z / s.span, 0), 1);
+  float x = p.x - s.leading - s.sweep * p.z;
+  float u = fminf(fmaxf(x / chord, spoiler_first), spoiler_last);
+  float middle = s.dihedral * p.z + WingUpper(s, u, chord) - .5f * spoiler_thickness;
+  float d = fabsf(p.y - middle) - .5f * spoiler_thickness;
+  d = fmaxf(d, fmaxf(spoiler_first * chord - x, x - spoiler_last * chord));
+  return fmaxf(d, fmaxf(part.begin - p.z, p.z - part.end));
+}
+
 // Flow-through nacelle, as in an unpowered wind-tunnel model: an annular
 // duct whose wall has an elliptical inlet lip and a thin trailing edge.
 // Short, large-diameter fan cowl with a rounded inlet and contracted aft body.
@@ -454,6 +512,10 @@ WIND3D_HD float AircraftDistance(Vec3 world, const Controls &controls, int &comp
                                                                 : part == 5              ? kVerticalTail
                                                                                          : kNacelle);
     }
+    if (controls.wing_controls.spoiler > 0 || controls.wing_controls.spoiler_roll != 0 ||
+        (controls.wing_controls.linked_spoiler_roll && controls.aileron != 0))
+      for (int panel = 0; panel < spoiler_panel_count; ++panel)
+        keep(SpoilerDistance(p, AircraftSpoiler(panel, side, controls)), kWing);
     float t = fminf(fmaxf((p.x - nacelle_inlet) / nacelle_length, 0), 1);
     float y = p.y - nacelle_y, z = p.z - side * 0.92f;
     keep(fmaxf(fabsf(sqrtf(y * y + z * z) - NacelleMean(t)) - NacelleHalfThickness(t),

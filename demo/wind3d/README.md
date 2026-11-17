@@ -377,6 +377,23 @@ symmetric bias to the roll controls. These are explicit geometric deflections,
 not force multipliers. Load histories track these changes, and diagnostics
 append all four configuration fields.
 
+Four finite-thickness spoiler panels per wing follow the upper wing skin when
+stowed and rotate upward about their swept leading hinges. **Speed brakes**
+(`--spoiler 0..60`) raises all panels symmetrically. **Spoiler roll**
+(`--spoiler-roll -30..30`) adds differential deployment to the three outer
+panels per side; **Link spoilers to ailerons** (`--link-spoiler-roll`) uses the
+aileron command instead. Each panel clamps to 0..60 degrees. The 6 mm panel
+solid and its closed rendering mesh use the same transform. The shallow pocket
+below a stowed spoiler is not modeled; the fixed wing skin remains underneath.
+Thin-panel load accuracy remains limited by the chosen fluid grid.
+A 128-grid, 30 m/s, 6-degree-incidence smoke check (mean over 0.5..0.6 s)
+measured `(drag, lift)` in N as `(115.84, 368.85)` stowed,
+`(113.14, 325.45)` at 30 degrees and `(156.17, 300.74)` at 60 degrees.
+Thus full deployment increases drag and dumps lift in this configuration;
+30-degree deployment reduces lift but does not monotonically increase total
+drag. These are coarse-grid behavior checks, not calibrated aircraft data.
+
+
 Inboard Fowler-type flaps extend rearward and down as they deflect. Their
 rounded leading edges translate with the flap, leaving a real open slot behind
 the fixed wing; no connecting capsule fills this passage. Travel reaches

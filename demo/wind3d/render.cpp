@@ -204,6 +204,10 @@ bool Render(IDevice *device,
                 ImGui::SliderFloat("Outer flap", &controls.wing_controls.outer_flap, 0, 40, "%.1f deg");
               ImGui::SliderFloat("Cruise camber", &controls.wing_controls.cruise_camber, -5, 5, "%.1f deg");
               ImGui::SliderFloat("Aileron droop", &controls.wing_controls.aileron_droop, 0, 15, "%.1f deg");
+              ImGui::SliderFloat("Speed brakes", &controls.wing_controls.spoiler, 0, 60, "%.1f deg");
+              ImGui::Checkbox("Link spoilers to ailerons", &controls.wing_controls.linked_spoiler_roll);
+              if (!controls.wing_controls.linked_spoiler_roll)
+                ImGui::SliderFloat("Spoiler roll", &controls.wing_controls.spoiler_roll, -30, 30, "%.1f deg");
               ImGui::SliderFloat("Ailerons", &controls.aileron, -25, 25, "%.1f deg");
               ImGui::Checkbox("Blended winglets", &controls.airframe.winglets);
               ImGui::SliderFloat("Stabilizer trim", &controls.airframe.tail_incidence, -10, 10, "%.2f deg");

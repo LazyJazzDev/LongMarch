@@ -66,7 +66,7 @@ int main() {
   split.flap = 0;
   if (Length(FowlerShift(AircraftPart(1, 1, split))) != 0)
     return 18;
-  for (int field = 0; field < 4; ++field) {
+  for (int field = 0; field < 7; ++field) {
     Controls changed;
     if (field == 0)
       changed.wing_controls.linked_flaps = false;
@@ -76,6 +76,12 @@ int main() {
       changed.wing_controls.cruise_camber = 2;
     if (field == 3)
       changed.wing_controls.aileron_droop = 5;
+    if (field == 4)
+      changed.wing_controls.spoiler = 30;
+    if (field == 5)
+      changed.wing_controls.spoiler_roll = 10;
+    if (field == 6)
+      changed.wing_controls.linked_spoiler_roll = true;
     if (SameAircraftGeometry(changed, Controls{}))
       return 19;
   }
@@ -91,6 +97,32 @@ int main() {
       controls.wing_controls = {deflection <= 0, 40 - controls.flap, deflection < 0 ? -5.f : 5.f, 10};
       controls.aileron = controls.elevator = controls.rudder = std::clamp(deflection, -20.f, 20.f);
       controls.angle = 5;
+      controls.wing_controls.spoiler = std::clamp(1.5f * deflection, 0.f, 60.f);
+      controls.wing_controls.spoiler_roll = deflection < 0 ? -10.f : 10.f;
+      controls.wing_controls.linked_spoiler_roll = deflection == 20;
+      for (int side : {-1, 1})
+        for (int panel = 0; panel < spoiler_panel_count; ++panel) {
+          auto spoiler = AircraftSpoiler(panel, side, controls);
+          float span = .5f * (spoiler.begin + spoiler.end);
+          for (float u : {spoiler_first, .59f, spoiler_last})
+            for (float face : {-1.f, 1.f}) {
+              auto p = SpoilerPoint(spoiler, u, span, face);
+              if (spoiler.deflection > 0 && std::abs(SpoilerDistance(p, spoiler)) > 3e-6f)
+                return 20;
+              if (spoiler.deflection == 0 && PartDistance(p, AircraftPart(0, side, controls)) > 0) {
+                // Part zero covers only the buried root: query the full wing union.
+                if (AircraftDistance(RotateZ(p, -controls.angle), controls) > 3e-6f)
+                  return 21;
+              }
+            }
+          if (spoiler.deflection > 10) {
+            auto raised = SpoilerPoint(spoiler, spoiler_last, span, 1);
+            spoiler.deflection = 0;
+            auto stowed = SpoilerPoint(spoiler, spoiler_last, span, 1);
+            if (raised.y <= stowed.y + .005f)
+              return 22;
+          }
+        }
       for (int side : {-1, 1})
         for (int part : {1, 2, 4, 5, 7}) {
           auto foil = AircraftPart(part, side, controls);

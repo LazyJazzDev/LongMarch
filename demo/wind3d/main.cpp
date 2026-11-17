@@ -53,6 +53,8 @@ int main(int argc, char **argv) {
       solver.corrected_transport = false;
     } else if (key == "--no-flow")
       view.flow = view.volume = false;
+    else if (key == "--link-spoiler-roll")
+      controls.wing_controls.linked_spoiler_roll = true;
     else if (key == "--winglets")
       controls.airframe.winglets = true;
     else if (key == "--raked-tips")
@@ -82,6 +84,7 @@ int main(int argc, char **argv) {
           << "Airframe: --wing-span 2..4.2 (half-span, m), --wing-camber 0..0.06, --wing-sweep 0..0.7 (slope), --tail-span 0.6..1.4 (half-span, m), --tail-leading 1..2 (body x, m), --tail-incidence -10..10 (deg), --winglets|--raked-tips.\n";
       std::cout
           << "Wing devices: --outer-flap 0..40 (unlinks outer flap), --cruise-camber -5..5, --aileron-droop 0..15 (deg).\n";
+      std::cout << "Spoilers: --spoiler 0..60 --spoiler-roll -30..30 --link-spoiler-roll.\n";
       return 0;
     } else {
       if (++i >= argc) {
@@ -179,6 +182,10 @@ int main(int argc, char **argv) {
           controls.wing_controls.cruise_camber = number;
         else if (key == "--aileron-droop")
           controls.wing_controls.aileron_droop = number;
+        else if (key == "--spoiler")
+          controls.wing_controls.spoiler = number;
+        else if (key == "--spoiler-roll")
+          controls.wing_controls.spoiler_roll = number;
         else if (key == "--aileron")
           controls.aileron = number;
         else if (key == "--elevator")
