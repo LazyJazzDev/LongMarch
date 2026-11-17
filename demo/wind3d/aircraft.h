@@ -22,7 +22,7 @@ struct Airframe {
   float tail_leading{1.65f};
   float tail_incidence{};  // Positive raises the stabilizer leading edge.
   bool winglets{true};
-  float wing_incidence{1.5f};  // Root chord to body x axis; positive raises leading edge.
+  float wing_incidence{4.7f};  // Root chord to body x axis; positive raises leading edge.
 };
 
 WIND3D_HD bool ValidAirframe(const Airframe &a) {

@@ -11,7 +11,7 @@ bool PylonAttachments() {
   for (float span : {2.f, 2.65f, 4.2f})
     for (float sweep : {0.f, .55f, .7f})
       for (float camber : {0.f, .025f, .06f})
-        for (float incidence : {0.f, 1.5f, 4.f, 6.f})
+        for (float incidence : {0.f, 1.5f, 4.f, 4.7f, 6.f})
           for (int side : {-1, 1}) {
             Controls c;
             c.airframe.wing_span = span;

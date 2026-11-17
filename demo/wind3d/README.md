@@ -42,7 +42,8 @@ fuselage skin.
 Aerodynamic coefficient normalization now uses the main-wing trapezoid,
 including its buried carry-through and excluding wingtip devices: nominal
 area 3.127 m2, reference span 5.30 m, and MAC 0.667345 m. The area-weighted
-quarter-chord body x coordinate is -0.293852 m. Displayed tip-to-tip span still
+quarter-chord body x coordinate is -0.289414 m at the default 4.7-degree wing
+installation; it is recomputed when the wing geometry changes. Displayed tip-to-tip span still
 includes the selected tip device. `aircraft_reference.h` supplies this shared
 convention; legacy sweep coefficients that included tip developed length use
 a different reference and must not be compared without renormalization.
@@ -75,7 +76,7 @@ restore those fields as a settled state for the revised aircraft. New trim
 results must be generated from the revised geometry.
 
 Body angle of attack (`--angle`) is measured against the inlet. Wing root
-installation (`--wing-incidence`, 0–6 degrees, initially 1.5) is measured against
+installation (`--wing-incidence`, 0–6 degrees, default 4.7) is measured against
 the body and rotates the wing about its fixed root quarter-chord. The tip has
 3 degrees of washout. Stabilizer installation (`--tail-incidence`) rotates the
 whole horizontal tail independently of elevator deflection. Both interfaces
@@ -164,16 +165,10 @@ are finite-grid game-model results, not a grid-convergence or real-aircraft
 accuracy claim. Small control changes can have non-monotone load responses
 on this grid, so these values are not a fitted elevator derivative.
 
-```powershell
-cmake-build-release/demo/wind3d/demo_wind3d --aero --grid 256 --speed 30 --angle 7.83 --tail-incidence 3.09 --elevator -8 --validate --validate-time 0.6 --no-export --diagnostics out/wind3d-aero/trim-e-8-256.csv --save-checkpoint out/wind3d-aero/trim-e-8-256.bin
-cmake-build-release/demo/wind3d/demo_wind3d --aero --grid 256 --speed 30 --angle 7.83 --tail-incidence 3.09 --elevator -8 --restore out/wind3d-aero/trim-e-8-256.bin
-```
-
-The saved checkpoint is a local generated artifact. For web restoration, first
-set the mailbox to those same controls, then run `wind3d_web DIRECTORY 256 1
-aero 0 out/wind3d-aero/trim-e-8-256.bin`. The worker applies startup controls
-before restoring the field. Removing decorative surface markings does not
-change the solid boundary or invalidate this flow state.
+These measurements belong to the pre-repair airframe (`da44cd5a`). Its saved
+checkpoint is historical and must not be restored by the current desktop or
+web model. The revised cockpit, control boundaries, pylon and tail all change
+the fluid boundary, even though the white surface appearance remains simple.
 
 The desktop also accepts bounded airframe parameters: `--wing-span` (half-span
 excluding the raked tip, 2–4.2 m), `--wing-camber` (0–0.06 chord), `--wing-sweep`

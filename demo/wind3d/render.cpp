@@ -217,7 +217,7 @@ bool Render(IDevice *device,
               ImGui::SliderFloat("Wing root installation", &controls.airframe.wing_incidence, 0, 6, "%.2f deg");
               ImGui::TextWrapped(
                   "Body AoA is relative to the inlet. Wing installation is relative to the body; tip washout is 3 deg. Stabilizer trim rotates the whole tail independently of elevator.");
-              ImGui::SliderFloat("Stabilizer trim", &controls.airframe.tail_incidence, -10, 10, "%.2f deg");
+              ImGui::SliderFloat("Stabilizer trim", &controls.airframe.tail_incidence, -10, 10, "%.3f deg");
               ImGui::SliderFloat("Elevator", &controls.elevator, -25, 25, "%.1f deg");
               ImGui::SliderFloat("Rudder", &controls.rudder, -25, 25, "%.1f deg");
             }

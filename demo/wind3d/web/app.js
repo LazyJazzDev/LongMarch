@@ -4,7 +4,7 @@ const $ = id => document.getElementById(id);
 const specs = [ ['speed','来流速度',1,30,'m/s',30], ['angle','机身迎角（相对来流）',-20,25,'°',4],
   ['flap','襟翼',0,40,'°',0], ['aileron','副翼（差动）',-25,25,'°',0],
   ['elevator','升降舵',-25,25,'°',0], ['rudder','方向舵',-25,25,'°',0],
-  ['wing_incidence','主翼根部安装角（相对机身，翼尖洗出 3°）',0,6,'°',1.5],
+  ['wing_incidence','主翼根部安装角（相对机身，翼尖洗出 3°）',0,6,'°',4.7],
   ['tail_incidence','平尾安装角（整体配平）',-10,10,'°',0], ['winglets','上翘小翼',0,1,'',1],
   ['linked_flaps','内外襟翼联动',0,1,'',1], ['outer_flap','外段襟翼',0,40,'°',0],
   ['cruise_camber','巡航弯度偏角',-5,5,'°',0], ['aileron_droop','副翼对称下偏',0,15,'°',0],
@@ -21,7 +21,7 @@ let frameTag = '', meshID = '', lastStatus = null, transferred = 0;
 function showError(message) { $('error').textContent=message; $('error').hidden=!message; }
 for (const [key,name,min,max,unit,value] of specs) {
   const section=document.createElement('div'); section.className='control';
-  section.innerHTML=`<div class="control-head"><label for="input-${key}">${name}</label><output id="value-${key}">${value.toFixed(1)} ${unit}</output></div><input id="input-${key}" type="${flags.has(key)?'checkbox':'range'}" min="${min}" max="${max}" step="0.01" value="${value}"><div class="control-limits" ${flags.has(key)?'hidden':''}><span>${min} ${unit}</span><span>${max} ${unit}</span></div>`;
+  section.innerHTML=`<div class="control-head"><label for="input-${key}">${name}</label><output id="value-${key}">${value.toFixed(1)} ${unit}</output></div><input id="input-${key}" type="${flags.has(key)?'checkbox':'range'}" min="${min}" max="${max}" step="${key==='tail_incidence'?'0.001':'0.01'}" value="${value}"><div class="control-limits" ${flags.has(key)?'hidden':''}><span>${min} ${unit}</span><span>${max} ${unit}</span></div>`;
   $('controls').append(section);
   if(flags.has(key)) $(`input-${key}`).checked=Boolean(value);
   $(`input-${key}`).addEventListener('input',()=> {
@@ -32,7 +32,7 @@ for (const [key,name,min,max,unit,value] of specs) {
 }
 function readControls(){return Object.fromEntries(specs.map(([k])=>[k,flags.has(k)?Number($(`input-${k}`).checked):Number($(`input-${k}`).value)]));}
 function updateControlLabels(){
-  for(const [k,,,,unit] of specs){const input=$(`input-${k}`);$(`value-${k}`).textContent=flags.has(k)?(input.checked?'开启':'关闭'):`${Number(input.value).toFixed(2)} ${unit}`;}
+  for(const [k,,,,unit] of specs){const input=$(`input-${k}`);$(`value-${k}`).textContent=flags.has(k)?(input.checked?'开启':'关闭'):`${Number(input.value).toFixed(k==='tail_incidence'?3:2)} ${unit}`;}
   $('input-outer_flap').disabled=$('input-linked_flaps').checked;
   $('input-spoiler_roll').disabled=$('input-linked_spoiler_roll').checked;
   $('input-slat').disabled=$('input-linked_slats').checked;
@@ -150,7 +150,7 @@ function updateNumbers(meta,bytes){
   $('density-applied').textContent=`已显示：${meta.streamline_density??1} 级 · ${meta.streamline_seeds??84} 条种子流线（遇机体或低速区会截断）`;
   const c=meta.controls;
   const slat=c.linked_slats?0.75*Math.max(c.flap,c.linked_flaps?c.flap:(c.outer_flap??0)):(c.slat??0);
-  $('applied').textContent=`已生效：${c.speed.toFixed(1)} m/s · 迎角 ${c.angle.toFixed(2)}° · 平尾 ${(c.tail_incidence??0).toFixed(2)}° · 襟翼 ${c.flap.toFixed(1)}° · 缝翼 ${slat.toFixed(1)}° · 扰流板 ${(c.spoiler??0).toFixed(1)}°`;
+  $('applied').textContent=`已生效：${c.speed.toFixed(1)} m/s · 机身迎角 ${c.angle.toFixed(2)}° · 主翼安装 ${(c.wing_incidence??1.5).toFixed(2)}° · 平尾 ${(c.tail_incidence??0).toFixed(3)}° · 襟翼 ${c.flap.toFixed(1)}° · 缝翼 ${slat.toFixed(1)}° · 扰流板 ${(c.spoiler??0).toFixed(1)}°`;
   $('payload').textContent=`显示帧 ${(bytes/1024).toFixed(0)} KB · 已接收 ${(transferred/1048576).toFixed(1)} MB`;
 }
 async function getFrame(){

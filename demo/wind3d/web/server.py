@@ -28,7 +28,7 @@ BOUNDS.update(EXTENDED)
 DEFAULT = dict(speed=30, angle=4, flap=0, aileron=0, elevator=0, rudder=0,
                tail_incidence=0, winglets=1, linked_flaps=1, outer_flap=0, cruise_camber=0,
                aileron_droop=0, spoiler=0, spoiler_roll=0, linked_spoiler_roll=0, slat=0, linked_slats=0,
-               wing_incidence=1.5)
+               wing_incidence=4.7)
 
 
 def atomic(path, data):
