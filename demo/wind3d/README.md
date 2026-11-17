@@ -108,6 +108,12 @@ not those settings. The viewer resumes from the saved cycle; its Reset control
 still starts a fresh flow. Restoration errors are reported instead of silently
 starting over.
 
+For a reusable settled state, add `--save-checkpoint FILE` to a `--validate`
+run. The requested aircraft state is paused and saved before the lifecycle
+checks change controls or reset the flow. This checkpoint can be restored by
+the desktop with the same settings, avoiding another startup transient.
+The save option requires validation mode and reports write failures.
+
 The desktop also accepts bounded airframe parameters: `--wing-span` (half-span
 excluding the raked tip, 2–4.2 m), `--wing-camber` (0–0.06 chord), `--wing-sweep`
 (leading-edge slope, 0–0.7), `--tail-span` (horizontal half-span, 0.6–1.4 m), and

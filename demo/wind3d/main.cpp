@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
   wind3d::SolverOptions solver;
   solver.leapfrog_flow_maps = true;
   solver.export_vorticity = true;
-  std::string capture;
+  std::string capture, save_checkpoint;
   for (int i = 1; i < argc; ++i) {
     std::string key = argv[i];
     if (key == "--validate")
@@ -81,6 +81,8 @@ int main(int argc, char **argv) {
           << "Place --aero before any individual solver overrides.\n";
       std::cout << "--restore FILE resumes a checkpoint; supply its original grid, controls and solver settings.\n";
       std::cout
+          << "--save-checkpoint FILE saves the settled validation state before lifecycle checks (requires --validate).\n";
+      std::cout
           << "Flow view: --streamlines --no-volume --streamline-density 1..4 --streamline-width 0.75..4 (pixels) --streamline-curvature 0.001..10 (1/m) --streamline-transparent-curvature 0..upper (exclusive).\n";
       std::cout
           << "Airframe: --wing-span 2..4.2 (half-span, m), --wing-camber 0..0.06, --wing-sweep 0..0.7 (slope), --tail-span 0.6..1.4 (half-span, m), --tail-leading 1..2 (body x, m), --tail-incidence -10..10 (deg), --winglets|--raked-tips.\n";
@@ -108,6 +110,8 @@ int main(int argc, char **argv) {
         capture = value;
       else if (key == "--diagnostics")
         solver.diagnostics_path = value;
+      else if (key == "--save-checkpoint")
+        save_checkpoint = value;
       else if (key == "--restore")
         solver.initial_checkpoint = value;
       else {
@@ -213,6 +217,10 @@ int main(int argc, char **argv) {
       view.distance < 7 || view.distance > 25 || std::abs(controls.aileron) > 25 || std::abs(controls.elevator) > 25 ||
       std::abs(controls.rudder) > 25)
     return 1;
+  if (!save_checkpoint.empty() && !validate) {
+    std::cerr << "--save-checkpoint requires --validate\n";
+    return 1;
+  }
   if (headless && !frames)
     frames = 300;
   if (!capture.empty() && !frames) {
@@ -281,6 +289,16 @@ int main(int argc, char **argv) {
       }
       if (validate_time > 0 ? state->time >= validate_time : state->step >= uint64_t(steps)) {
         std::cout << "projection_validation=" << (passed ? "PASS" : "FAIL") << std::endl;
+        if (!save_checkpoint.empty()) {
+          simulation->Configure(controls, true);
+          auto saved_step = simulation->Checkpoint(save_checkpoint);
+          if (!saved_step) {
+            std::cerr << "Could not save validation checkpoint: " << simulation->Error() << '\n';
+            passed = false;
+          } else {
+            std::cout << "validation_checkpoint=" << save_checkpoint << " step=" << saved_step << std::endl;
+          }
+        }
         passed &= wind3d::ValidateLifecycle(*simulation, controls);
         return passed ? 0 : 2;
       }
