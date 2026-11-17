@@ -47,9 +47,11 @@ The implementation follows the hybrid velocity/impulse algorithm in
    potential is never used as surface pressure.
 
 This is a native adaptation to Wind3D's MAC arrays, geometry and pressure solver,
-not a binary-equivalent port of the authors' tiled CUDA solver. Map interpolation
-and its analytic derivatives use aperture-weighted trilinear interpolation,
-rather than the reference quadratic B-spline interpolation. Viscosity uses a
+not a binary-equivalent port of the authors' tiled CUDA solver. Map interpolation,
+its analytic derivatives and impulse pullback use the reference quadratic
+B-spline (N2) kernel on extended MAC velocities. Apertures remain in midpoint
+transport, divergence and projection; they do not normalize the map interpolant.
+Values outside each component's MAC extent use a constant extension. Viscosity uses a
 first-order operator split, not the paper's accumulated-force path integral.
 The existing wall-shear and pressure surface integration supplies all six load
 components. Maps are reinitialized every five substeps; published snapshots,
@@ -122,13 +124,16 @@ contribution to the recovered physical pressure. This validates a curved slip
 boundary, not turbulent aircraft aerodynamics. `wind3d_lfm_check --lfm` includes
 these sphere checks, an analytic rotating-flow predictor check, and checkpoints.
 
-Aircraft loads must be remeasured after this change. On the identical 128-grid
-flow in the 2–3 second window, the new predictor gives 22.63 N drag and 11.44 N
-lift, versus 58.94 N and 65.85 N previously (12 m/s, 5 degrees, cut cells,
-molecular viscosity 1.5e-5 m²/s, CFL 0.25, cubic transport, 2 m sponge).
-The resulting L/D of 0.51 is a short coarse-grid measurement, not a converged
-aircraft result. Later performance/load measurements below predate this pressure
-correction and should not be used as current aerodynamic predictions.
+With quadratic maps and centered pressure recovery, the 128-grid aircraft gives
+18.51 N drag and 64.29 N lift in the 2–3 second window (12 m/s, 5 degrees, cut
+cells, molecular viscosity 1.5e-5 m²/s, CFL 0.25, cubic midpoint transport,
+2 m sponge). The 1–2 and 2–3 second mean L/D values are 3.4736 and 3.4735.
+This demonstrates temporal settling at that grid, not spatial convergence.
+Keeping the centered pressure predictor but using the earlier trilinear maps
+gave L/D 0.51 on the same grid. The interpolation regression checks a sampled
+quadratic and its derivative across a stencil transition, in addition to affine
+flow maps. Later performance/load measurements below predate these corrections
+and should not be used as current aerodynamic predictions.
 
 Pressure PCG and its multigrid work vectors use double precision, including dot
 products and true residual evaluation. Velocity and published pressure remain

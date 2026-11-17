@@ -978,6 +978,24 @@ bool ValidateFlowMaps(int cuda_device) {
             }
       }
   }
+  // N2 reproduces a sampled quadratic plus its kernel variance h^2/4.
+  // Check both sides of a stencil transition; its derivative must be continuous.
+  for (int n = 0; n < nf; ++n) {
+    float y = (n / (g.nx + 1) % (g.ny + 1) + 0.5f) * g.h;
+    values[n] = y * y;
+  }
+  if (ok) {
+    ok = cudaMemcpy(fields, values.data(), nf * sizeof(float), cudaMemcpyHostToDevice) == cudaSuccess;
+    LfmSampleProbe<<<1, 32>>>(g, fields, result);
+    ok &= cudaGetLastError() == cudaSuccess &&
+          cudaMemcpy(output.data(), result, 8 * sizeof(float), cudaMemcpyDeviceToHost) == cudaSuccess;
+    for (int n = 0; n < 4; ++n) {
+      float y = 6.0f + (n - 1.5f) * 0.02f;
+      maximum = std::max({maximum, std::abs(output[2 * n] - (y * y + 0.25f) * g.h * g.h),
+                          std::abs(output[2 * n + 1] - 2 * y * g.h * g.h)});
+      ok &= std::isfinite(output[2 * n]) && std::isfinite(output[2 * n + 1]);
+    }
+  }
   // Solid-body rotation: (u.grad)u = -omega^2 (x,y,0). This checks the
   // physical-pressure predictor independently of flow-map reconstruction.
   constexpr float omega = 0.7f;

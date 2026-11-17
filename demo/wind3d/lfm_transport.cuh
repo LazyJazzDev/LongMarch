@@ -3,7 +3,7 @@
 // Included inside simulation.cu's private namespace, after its MAC samplers.
 // Sun et al., Leapfrog Flow Maps (SIGGRAPH 2025), sections 4.1-4.3.
 // Coordinates and map derivatives here are in grid units. Unlike the reference
-// tiled implementation, interpolation uses the wind tunnel's face apertures.
+// tiled implementation, fields use a Cartesian MAC layout with wall extensions.
 constexpr int lfm_intervals = 5;
 
 __global__ void LfmAccelerationDivergence(Grid g, float *predicted, const float *current) {
@@ -40,45 +40,46 @@ __global__ void LfmMomentumPredictor(Grid g, LfmVelocity source, float *output, 
   output[n] = f[n] - dt * Dot(velocity, gradient) / (2 * g.h);
 }
 
-// Value and directional derivative of the same aperture-weighted interpolant.
-// Differentiating the normalized weights is essential near partial faces.
+// Quadratic B-spline interpolation and its directional derivative, matching
+// the reference LFM N2/dN2 kernels. Maps differentiate the extended velocity
+// field rather than a normalized aperture quotient near closed faces.
+__device__ float2 LfmQuadratic(float x) {
+  float a = fabsf(x);
+  if (a < 0.5f)
+    return {0.75f - x * x, -2 * x};
+  float t = fmaxf(0, 1.5f - a);
+  return {0.5f * t * t, -copysignf(t, x)};
+}
+
 __device__ float LfmSample(Grid g, const float *field, Vec3 p, int axis, Vec3 tangent, float &derivative) {
   p = Add(p, Scale(LfmOffset(axis), -1));
-  if (p.x < 0 || p.x > g.nx)
+  int upper[] = {g.nx - (axis != 0), g.ny - (axis != 1), g.nz - (axis != 2)};
+  if (p.x < 0 || p.x > upper[0])
     tangent.x = 0;
-  if (p.y < 0 || p.y > g.ny)
+  if (p.y < 0 || p.y > upper[1])
     tangent.y = 0;
-  if (p.z < 0 || p.z > g.nz)
+  if (p.z < 0 || p.z > upper[2])
     tangent.z = 0;
-  p = {fminf(fmaxf(p.x, 0), float(g.nx)), fminf(fmaxf(p.y, 0), float(g.ny)), fminf(fmaxf(p.z, 0), float(g.nz))};
-  int x = int(p.x), y = int(p.y), z = int(p.z);
-  float value = 0, norm = 0, grad = 0, norm_grad = 0;
-  float plain = 0, plain_grad = 0;
-  for (int k = 0; k < 2; ++k)
-    for (int j = 0; j < 2; ++j)
-      for (int i = 0; i < 2; ++i) {
-        float wx = i ? p.x - x : 1 - p.x + x;
-        float wy = j ? p.y - y : 1 - p.y + y;
-        float wz = k ? p.z - z : 1 - p.z + z;
-        float weight = wx * wy * wz;
-        float dw = (i ? 1 : -1) * tangent.x * wy * wz + (j ? 1 : -1) * tangent.y * wx * wz +
-                   (k ? 1 : -1) * tangent.z * wx * wy;
-        int n = g.F(min(x + i, g.nx), min(y + j, g.ny), min(z + k, g.nz));
-        float f = field[n];
-        float a = g.aperture[axis] ? g.aperture[axis][n] / 255.0f : 1;
-        value += f * weight * a;
-        norm += weight * a;
-        grad += f * dw * a;
-        norm_grad += dw * a;
-        plain += f * weight;
-        plain_grad += f * dw;
-      }
-  if (norm < 1e-6f) {
-    derivative = plain_grad;
-    return plain;
+  p = {fminf(fmaxf(p.x, 0), float(upper[0])), fminf(fmaxf(p.y, 0), float(upper[1])),
+       fminf(fmaxf(p.z, 0), float(upper[2]))};
+  int x = int(floorf(p.x - 0.5f)), y = int(floorf(p.y - 0.5f)), z = int(floorf(p.z - 0.5f));
+  float2 wx[3], wy[3], wz[3];
+  for (int i = 0; i < 3; ++i) {
+    wx[i] = LfmQuadratic(p.x - x - i);
+    wy[i] = LfmQuadratic(p.y - y - i);
+    wz[i] = LfmQuadratic(p.z - z - i);
   }
-  derivative = (grad * norm - value * norm_grad) / (norm * norm);
-  return value / norm;
+  float value = 0;
+  derivative = 0;
+  for (int k = 0; k < 3; ++k)
+    for (int j = 0; j < 3; ++j)
+      for (int i = 0; i < 3; ++i) {
+        float f = field[g.F(max(0, min(x + i, upper[0])), max(0, min(y + j, upper[1])), max(0, min(z + k, upper[2])))];
+        value += f * wx[i].x * wy[j].x * wz[k].x;
+        derivative += f * (wx[i].y * wy[j].x * wz[k].x * tangent.x + wx[i].x * wy[j].y * wz[k].x * tangent.y +
+                           wx[i].x * wy[j].x * wz[k].y * tangent.z);
+      }
+  return value;
 }
 
 __device__ void LfmDerivative(Grid g, LfmVelocity velocity, Vec3 p, Vec3 tangent, Vec3 &dp, Vec3 &dt) {
@@ -87,6 +88,16 @@ __device__ void LfmDerivative(Grid g, LfmVelocity velocity, Vec3 p, Vec3 tangent
   dp.z = LfmSample(g, velocity.axis[2], p, 2, tangent, dt.z);
   dp = Scale(dp, -1 / g.h);
   dt = Scale(dt, -1 / g.h);
+}
+
+__global__ void LfmSampleProbe(Grid g, const float *field, float *result) {
+  int n = threadIdx.x;
+  if (n >= 4)
+    return;
+  float y = 6.0f + (n - 1.5f) * 0.02f;
+  float derivative;
+  result[2 * n] = LfmSample(g, field, {5.3f, y, 6.2f}, 0, {0, 1, 0}, derivative);
+  result[2 * n + 1] = derivative;
 }
 
 __device__ void LfmRK4(Grid g, LfmVelocity velocity, float dt, Vec3 &p, Vec3 &t) {
@@ -122,7 +133,9 @@ __global__ void LfmPullback(Grid g,
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
   Vec3 p = map[n];
-  Vec3 value = FaceVelocity(g, source.axis[0], source.axis[1], source.axis[2], p);
+  float unused;
+  Vec3 value{LfmSample(g, source.axis[0], p, 0, {}, unused), LfmSample(g, source.axis[1], p, 1, {}, unused),
+             LfmSample(g, source.axis[2], p, 2, {}, unused)};
   destination[n] = Dot(jacobian[n], value) - (subtract ? subtract[n] : 0);
 }
 
