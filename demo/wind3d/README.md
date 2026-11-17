@@ -389,10 +389,12 @@ Changes take effect at a solver-step boundary. The displayed model, flow and
 loads always belong to the same completed snapshot, so a slow backend can lag
 behind the requested panel values.
 
-The model is a generic scaled narrow-body airliner, 6 m long with a 7.84 m
-span. It has a constant-section cabin, rounded forebody, upswept tailcone,
+The model is a generic scaled narrow-body airliner, 6 m long with a nominal
+5.80 m span including blended winglets (5.72 m with raked tips). It has a
+constant-section cabin, rounded forebody, upswept tailcone,
 continuous belly/wing-root fairing, cockpit glazing, passenger windows and doors.
-The low-mounted main wing has sweep, dihedral, camber and raked tips. Two
+The low-mounted main wing has sweep, dihedral, spanwise section variation and
+selectable blended winglets or raked tips. Two
 stationary nacelles and pylons are part of both the visible geometry and solid
 boundary. They are unpowered flow-through nacelles with an annular wall;
 this is not an engine mass-flow or thrust model.
@@ -900,8 +902,9 @@ accuracy gate, resource limit and remaining work are recorded in [AMR.md](AMR.md
 The web agent uses the uniform MAC solver, monotone cubic transport, cut-cell
 boundaries, wall-modelled loads and CFL 0.125. It retains this repository's
 1/2/4/8-GPU execution and web controls; AMR is not part of the web deployment.
-The original 2.5% wing camber and sealed control hinges were ported from the source;
-the aerodynamic geometry update increases main-wing camber to 4%.
+The original 2.5% wing camber and sealed control hinges were ported from the source.
+The current narrow-body geometry varies main-wing camber from 2.5% at the root
+to 1.5% at the tip; the earlier 4% configuration is historical.
 Neutral decorative colours, control-surface colours, short pylons and high-bypass
 nacelles remain as requested for this frontend.
 
