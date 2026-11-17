@@ -133,10 +133,40 @@ WIND3D_HD float FuselageCenter(float x) {
   return -0.045f * (1 - Smooth(x + 3)) + 0.12f * Smooth((x - 1.5f) / 1.5f);
 }
 
+WIND3D_HD float ProfileSegment(float x, float a, float b, float ya, float yb, float da, float db) {
+  float t = fminf(fmaxf((x - a) / (b - a), 0), 1), t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * ya + (t3 - 2 * t2 + t) * (b - a) * da + (-2 * t3 + 3 * t2) * yb +
+         (t3 - t2) * (b - a) * db;
+}
+
+// A lower radome crown, a nearly planar windshield region, then a smooth
+// transition to the cabin roof. These are geometric surfaces, not markings.
+WIND3D_HD float CockpitRoof(float x) {
+  if (x <= -2.9f)
+    return FuselageCenter(x) + .23f * sqrtf(fmaxf(0, 1 - (x + 2) * (x + 2)));
+  if (x < -2.72f)
+    return ProfileSegment(x, -2.9f, -2.72f, .23f * sqrtf(.19f) - .045f * (1 - Smooth(.1f)), .14f,
+                          .23f * .9f / sqrtf(.19f) + .0243f, .124f / .24f);
+  if (x < -2.48f)
+    return .14f + (x + 2.72f) * (.124f / .24f);
+  if (x < -2.26f)
+    return ProfileSegment(x, -2.48f, -2.26f, .264f, .315f, .124f / .24f, 0);
+  return .315f;
+}
+
 WIND3D_HD float FuselageRadius(float x, float cosine) {
   float radius = 0.315f;
-  if (x < -2)
+  if (x < -2) {
     radius *= sqrtf(fmaxf(0, 1 - (x + 2) * (x + 2)));
+    if (radius > 1e-6f && cosine > 0) {
+      float roof = fmaxf(CockpitRoof(x) - FuselageCenter(x), 1e-6f);
+      float yy = cosine * cosine / (roof * roof), zz = (1 - cosine * cosine) / (radius * radius);
+      float elliptical = 1 / sqrtf(yy + zz);
+      float rounded_rectangle = 1 / sqrtf(sqrtf(yy * yy + zz * zz));
+      float cockpit = .65f * Smooth((x + 2.95f) / .23f) * (1 - Smooth((x + 2.48f) / .48f));
+      radius = elliptical + cockpit * (rounded_rectangle - elliptical);
+    }
+  }
   if (x > 1.5f)
     radius *= 1 - Smooth((x - 1.5f) / 1.5f);
   // Longitudinal belly canoe and bilateral wing-root shoulders. Compact

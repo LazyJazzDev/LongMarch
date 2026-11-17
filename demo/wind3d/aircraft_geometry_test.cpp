@@ -88,6 +88,24 @@ int main() {
     return 32;
   if (!PylonAttachments())
     return 35;
+  for (float x : {-2.9f, -2.72f, -2.48f, -2.26f, -2.f}) {
+    constexpr float h = .0002f;
+    float left = (CockpitRoof(x) - CockpitRoof(x - h)) / h;
+    float right = (CockpitRoof(x + h) - CockpitRoof(x)) / h;
+    if (std::abs(left - right) > .01f)
+      return 36;
+  }
+  for (int i = 1; i < 100; ++i) {
+    float x = -3 + i / 100.f;
+    auto top = FuselagePoint(x, 0);
+    if (std::abs(top.y - CockpitRoof(x)) > 1e-6f || top.y > .315001f)
+      return 37;
+    for (int j = 0; j < 32; ++j) {
+      float radius = FuselageRadius(x, std::cos(j * 6.2831853f / 32));
+      if (!(radius > 0) || !std::isfinite(radius))
+        return 38;
+    }
+  }
   for (int part : {8, 9, 10, 11, 12}) {
     Controls neutral, deflected;
     deflected.aileron = deflected.elevator = deflected.rudder = 25;

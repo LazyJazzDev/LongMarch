@@ -74,6 +74,14 @@ between the renderer and fluid boundary. Older checkpoints and the historical
 restore those fields as a settled state for the revised aircraft. New trim
 results must be generated from the revised geometry.
 
+The forebody now separates its radome crown, windshield region and cabin roof
+in the longitudinal profile. A nearly straight upper profile at body x
+-2.72..-2.48 m joins the radome and cabin with continuous first derivatives;
+the upper cross-section blends toward a rounded rectangle around the cockpit
+and returns to the circular cabin. The lower jaw retains its rounded profile.
+This provides cockpit volume and a less bulbous crown without adding decorative
+windows. The profile is generic, not a certified cockpit visibility design.
+
 `--aero` reproduces the aerodynamic study settings: LFM, air kinematic viscosity
 and molecular wall viscosity of 1.5e-5 m²/s, slip cut cells with wall-shear loads,
 CFL 0.25, a 2 m outlet sponge and up to 128 pressure iterations per projection.
