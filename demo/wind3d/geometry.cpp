@@ -21,13 +21,13 @@ class MeshBuilder {
   std::vector<Vertex> Build() {
     Fuselage();
     for (int side : {-1, 1}) {
-      for (int part = 0; part < 7; ++part) {
+      for (int part = 0; part < aircraft_part_count; ++part) {
         if (part == 5 && side == -1)
           continue;
-        Vec3 color = part == 1   ? Vec3{0.72f, 0.66f, 0.52f}
-                     : part == 2 ? Vec3{0.45f, 0.61f, 0.72f}
-                     : part == 4 ? Vec3{0.48f, 0.65f, 0.59f}
-                                 : Vec3{0.35f, 0.49f, 0.69f};
+        Vec3 color = (part == 1 || part == 7) ? Vec3{0.72f, 0.66f, 0.52f}
+                     : part == 2              ? Vec3{0.45f, 0.61f, 0.72f}
+                     : part == 4              ? Vec3{0.48f, 0.65f, 0.59f}
+                                              : Vec3{0.35f, 0.49f, 0.69f};
         auto foil = AircraftPart(part, side, controls_);
         Foil(foil, color, skin);
         if (foil.hinged)

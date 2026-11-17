@@ -197,7 +197,13 @@ bool Render(IDevice *device,
             if (ImGui::CollapsingHeader("Wind and controls")) {
               ImGui::SliderFloat("Wind m/s", &controls.speed, 1, 30);
               ImGui::SliderFloat("Incidence", &controls.angle, -20, 25, "%.1f deg");
-              ImGui::SliderFloat("Flaps", &controls.flap, 0, 40, "%.1f deg");
+              ImGui::Checkbox("Link inner/outer flaps", &controls.wing_controls.linked_flaps);
+              ImGui::SliderFloat(controls.wing_controls.linked_flaps ? "Flaps" : "Inner flap", &controls.flap, 0, 40,
+                                 "%.1f deg");
+              if (!controls.wing_controls.linked_flaps)
+                ImGui::SliderFloat("Outer flap", &controls.wing_controls.outer_flap, 0, 40, "%.1f deg");
+              ImGui::SliderFloat("Cruise camber", &controls.wing_controls.cruise_camber, -5, 5, "%.1f deg");
+              ImGui::SliderFloat("Aileron droop", &controls.wing_controls.aileron_droop, 0, 15, "%.1f deg");
               ImGui::SliderFloat("Ailerons", &controls.aileron, -25, 25, "%.1f deg");
               ImGui::Checkbox("Blended winglets", &controls.airframe.winglets);
               ImGui::SliderFloat("Stabilizer trim", &controls.airframe.tail_incidence, -10, 10, "%.2f deg");

@@ -54,6 +54,31 @@ int main() {
   raked.airframe.winglets = false;
   if (SameAirframe(raked.airframe, controls.airframe) || AircraftPart(3, 1, raked).spec.blended_tip)
     return 14;
+  Controls split;
+  split.flap = 20;
+  split.wing_controls = {false, 10, -2, 5};
+  if (SameAircraftGeometry(split, Controls{}) || AircraftPart(1, 1, split).deflection != 18 ||
+      AircraftPart(7, 1, split).deflection != 8 || AircraftPart(2, 1, split).deflection != 3)
+    return 16;
+  split.wing_controls.linked_flaps = true;
+  if (AircraftPart(7, 1, split).deflection != 18)
+    return 17;
+  split.flap = 0;
+  if (Length(FowlerShift(AircraftPart(1, 1, split))) != 0)
+    return 18;
+  for (int field = 0; field < 4; ++field) {
+    Controls changed;
+    if (field == 0)
+      changed.wing_controls.linked_flaps = false;
+    if (field == 1)
+      changed.wing_controls.outer_flap = 10;
+    if (field == 2)
+      changed.wing_controls.cruise_camber = 2;
+    if (field == 3)
+      changed.wing_controls.aileron_droop = 5;
+    if (SameAircraftGeometry(changed, Controls{}))
+      return 19;
+  }
   size_t checked = 0, slots = 0;
   for (Airframe airframe : {Airframe{}, Airframe{2.7f, .025f, .55f, 1.05f, 1.65f}, Airframe{2, 0, 0, .6f, 1},
                             Airframe{4.2f, .06f, .7f, 1.4f, 2}, Airframe{2.65f, .025f, .55f, .98f, 1.65f, -10},
@@ -63,14 +88,15 @@ int main() {
     controls.airframe = airframe;
     for (float deflection : {-20.f, -10.f, 0.f, 10.f, 20.f, 40.f}) {
       controls.flap = std::max(0.f, deflection);
+      controls.wing_controls = {deflection <= 0, 40 - controls.flap, deflection < 0 ? -5.f : 5.f, 10};
       controls.aileron = controls.elevator = controls.rudder = std::clamp(deflection, -20.f, 20.f);
       controls.angle = 5;
       for (int side : {-1, 1})
-        for (int part : {1, 2, 4, 5}) {
+        for (int part : {1, 2, 4, 5, 7}) {
           auto foil = AircraftPart(part, side, controls);
           for (int station = 1; station < 10; ++station) {
             float span = foil.begin + (foil.end - foil.begin) * station / 10;
-            if (foil.fowler && foil.deflection > 0) {
+            if (foil.fowler && foil.deployment > 0) {
               // A deployed slot must contain fluid between the fixed trailing
               // face and the translated flap nose, on both mirrored wings.
               auto fixed = FoilPoint(foil, .72f, span, 0, false);

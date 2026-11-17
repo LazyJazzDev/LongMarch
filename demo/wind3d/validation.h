@@ -77,6 +77,7 @@ inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
   controls.speed = controls.speed > 15 ? 8 : 20;
   controls.angle = controls.angle == -8 ? 8 : -8;
   controls.flap = 25;
+  controls.wing_controls = {false, 15, -2, 3};
   controls.aileron = 15;
   controls.elevator = -15;
   controls.rudder = 20;
@@ -92,7 +93,8 @@ inline bool ValidateLifecycle(Simulation &simulation, Controls controls) {
   if (reset->step != 1 || reset->controls.speed != controls.speed || reset->controls.angle != controls.angle ||
       reset->controls.flap != controls.flap || reset->controls.aileron != controls.aileron ||
       reset->controls.elevator != controls.elevator || reset->controls.rudder != controls.rudder ||
-      !SameAirframe(reset->controls.airframe, controls.airframe) || reset->aircraft == old->aircraft ||
+      !SameAirframe(reset->controls.airframe, controls.airframe) ||
+      !SameWingControls(reset->controls.wing_controls, controls.wing_controls) || reset->aircraft == old->aircraft ||
       checksum(*old) != old_checksum) {
     std::cerr << "Lifecycle reset/snapshot check failed: step=" << reset->step << " speed=" << reset->controls.speed
               << " angle=" << reset->controls.angle << '\n';

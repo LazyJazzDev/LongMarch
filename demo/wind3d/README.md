@@ -367,6 +367,16 @@ stationary nacelles and pylons are part of both the visible geometry and solid
 boundary. They are unpowered flow-through nacelles with an annular wall;
 this is not an engine mass-flow or thrust model.
 
+The trailing edge is split into inner and outer flap panels plus differential
+ailerons. **Link inner/outer flaps** preserves a single flap command by default;
+unlink it to set each panel independently. `--outer-flap 0..40` unlinks the
+outer panel from `--flap`. **Cruise camber** (`--cruise-camber -5..5`) adds a
+symmetric angular bias to both flap panels and ailerons without extending the
+Fowler tracks. **Aileron droop** (`--aileron-droop 0..15`) adds a separate
+symmetric bias to the roll controls. These are explicit geometric deflections,
+not force multipliers. Load histories track these changes, and diagnostics
+append all four configuration fields.
+
 Inboard Fowler-type flaps extend rearward and down as they deflect. Their
 rounded leading edges translate with the flap, leaving a real open slot behind
 the fixed wing; no connecting capsule fills this passage. Travel reaches

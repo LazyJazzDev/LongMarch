@@ -36,6 +36,23 @@ WIND3D_HD bool SameAirframe(const Airframe &a, const Airframe &b) {
          a.winglets == b.winglets;
 }
 
+struct WingControls {
+  bool linked_flaps{true};
+  float outer_flap{};
+  float cruise_camber{};  // Symmetric trailing-edge bias, degrees.
+  float aileron_droop{};  // Symmetric bias, independent of roll command.
+};
+
+WIND3D_HD bool ValidWingControls(const WingControls &w) {
+  return w.outer_flap >= 0 && w.outer_flap <= 40 && w.cruise_camber >= -5 && w.cruise_camber <= 5 &&
+         w.aileron_droop >= 0 && w.aileron_droop <= 15;
+}
+
+WIND3D_HD bool SameWingControls(const WingControls &a, const WingControls &b) {
+  return a.linked_flaps == b.linked_flaps && a.outer_flap == b.outer_flap && a.cruise_camber == b.cruise_camber &&
+         a.aileron_droop == b.aileron_droop;
+}
+
 struct Controls {
   float speed{12};
   float angle{5};
@@ -44,7 +61,16 @@ struct Controls {
   float elevator{};
   float rudder{};
   Airframe airframe;
+  WingControls wing_controls;
 };
+
+WIND3D_HD bool SameAircraftGeometry(const Controls &a, const Controls &b) {
+  return a.angle == b.angle && a.flap == b.flap && a.aileron == b.aileron && a.elevator == b.elevator &&
+         a.rudder == b.rudder && SameAirframe(a.airframe, b.airframe) &&
+         SameWingControls(a.wing_controls, b.wing_controls);
+}
+
+constexpr int aircraft_part_count = 8;
 
 WIND3D_HD Vec3 Add(Vec3 a, Vec3 b) {
   return {a.x + b.x, a.y + b.y, a.z + b.z};
@@ -179,14 +205,15 @@ struct FoilPart {
   FoilSpec spec;
   float begin, end, deflection;
   bool hinged, fowler;
+  float deployment{};  // Fowler travel command, separate from cruise camber.
 };
 
 WIND3D_HD float AircraftSpanBound(const Controls &controls) {
   return controls.airframe.wing_span + 0.7f;
 }
 
-// Parts: buried wing root, flap, aileron, raked tip, horizontal stabilizer,
-// vertical stabilizer, nacelle pylon. Mirrors share exactly one specification.
+// Parts: buried wing root, inner flap, aileron, tip, horizontal stabilizer,
+// vertical stabilizer, nacelle pylon, outer flap. Mirrors share exactly one specification.
 WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
   const auto &airframe = controls.airframe;
   Vec3 ex{1, 0, 0}, ey{0, 1, 0}, ez{0, 0, float(side)};
@@ -207,10 +234,26 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
                 0.8f};
   if (part == 0)
     return {wing, 0, 0.35f, 0, false, false};
-  if (part == 1)
-    return {wing, 0.35f, airframe.wing_span * (1.75f / 2.7f), controls.flap, true, true};
+  float flap_split = airframe.wing_span * .36f;
+  float flap_end = airframe.wing_span * (1.75f / 2.7f);
+  if (part == 1 || part == 7) {
+    float deployment =
+        part == 1 || controls.wing_controls.linked_flaps ? controls.flap : controls.wing_controls.outer_flap;
+    return {wing,
+            part == 1 ? .35f : flap_split,
+            part == 1 ? flap_split : flap_end,
+            deployment + controls.wing_controls.cruise_camber,
+            true,
+            true,
+            deployment};
+  }
   if (part == 2)
-    return {wing, airframe.wing_span * (1.75f / 2.7f), airframe.wing_span, side * controls.aileron, true, false};
+    return {wing,
+            flap_end,
+            airframe.wing_span,
+            side * controls.aileron + controls.wing_controls.cruise_camber + controls.wing_controls.aileron_droop,
+            true,
+            false};
   if (part == 3) {
     float leading = wing.leading + wing.sweep * wing.span;
     Vec3 root =
@@ -282,7 +325,7 @@ WIND3D_HD Vec3 RotateAxis(Vec3 p, Vec3 axis, float angle) {
 // Fowler travel is shared by the flap surface and its rounded leading edge.
 // The nose moves with the flap; no solid bridge fills the deployed slot.
 WIND3D_HD Vec3 FowlerShift(const FoilPart &part) {
-  float extension = part.fowler ? fminf(fmaxf(part.deflection / 20, 0), 1) : 0;
+  float extension = part.fowler ? fminf(fmaxf(part.deployment / 20, 0), 1) : 0;
   return {.16f * part.spec.root * extension, -.06f * part.spec.root * extension, 0};
 }
 
@@ -403,13 +446,13 @@ WIND3D_HD float AircraftDistance(Vec3 world, const Controls &controls, int &comp
     }
   };
   for (int side = -1; side <= 1; side += 2) {
-    for (int part = 0; part < 7; ++part) {
+    for (int part = 0; part < aircraft_part_count; ++part) {
       if (part == 5 && side == -1)
         continue;
-      keep(PartDistance(p, AircraftPart(part, side, controls)), part <= 3   ? kWing
-                                                                : part == 4 ? kHorizontalTail
-                                                                : part == 5 ? kVerticalTail
-                                                                            : kNacelle);
+      keep(PartDistance(p, AircraftPart(part, side, controls)), (part <= 3 || part == 7) ? kWing
+                                                                : part == 4              ? kHorizontalTail
+                                                                : part == 5              ? kVerticalTail
+                                                                                         : kNacelle);
     }
     float t = fminf(fmaxf((p.x - nacelle_inlet) / nacelle_length, 0), 1);
     float y = p.y - nacelle_y, z = p.z - side * 0.92f;

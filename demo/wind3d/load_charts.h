@@ -22,8 +22,7 @@ struct Window {
 };
 
 inline bool SameControls(const Controls &a, const Controls &b) {
-  return a.speed == b.speed && a.angle == b.angle && a.flap == b.flap && a.aileron == b.aileron &&
-         a.elevator == b.elevator && a.rudder == b.rudder && SameAirframe(a.airframe, b.airframe);
+  return a.speed == b.speed && SameAircraftGeometry(a, b);
 }
 
 inline double Value(const LoadSample &sample, int component) {
