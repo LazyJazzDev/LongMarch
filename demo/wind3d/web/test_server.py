@@ -9,7 +9,43 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from server import Relay, make_handler, simplify_frame
+from server import Relay, make_handler, simplify_frame, DEFAULT, EXTENDED
+
+
+class RelayMailboxTest(unittest.TestCase):
+    def test_legacy_state_migrates_and_preserves_mailbox_prefix(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            old = dict(sequence=7, reset=2, paused=True,
+                       controls=dict(speed=18, angle=6, flap=20, aileron=1, elevator=2, rudder=3))
+            (directory / "desired.json").write_text(json.dumps(old), encoding="utf-8")
+            relay = Relay(directory)
+            fields = (directory / "controls.txt").read_text().split()
+            self.assertEqual(fields[:11], ["7", "2", "1", "18", "6", "20", "1", "2", "3", "2", "wing-v1"])
+            self.assertEqual(dict(zip(EXTENDED, map(float, fields[11:]))), {key: DEFAULT[key] for key in EXTENDED})
+            self.assertEqual(relay.desired["controls"]["winglets"], 1)
+
+    def test_new_devices_round_trip_without_losing_density(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            relay = Relay(directory)
+            values = dict(tail_incidence=1.75, winglets=0, linked_flaps=0, outer_flap=10,
+                          cruise_camber=-2, aileron_droop=5, spoiler=30, spoiler_roll=-15,
+                          linked_spoiler_roll=1, slat=20, linked_slats=1)
+            result = relay.update(dict(controls=values, streamline_density=4))
+            fields = (directory / "controls.txt").read_text().split()
+            self.assertEqual(fields[9:11], ["4", "wing-v1"])
+            self.assertEqual(dict(zip(EXTENDED, map(float, fields[11:]))), values)
+            self.assertEqual(Relay(directory).desired, result)
+
+    def test_invalid_new_controls_leave_state_unchanged(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            relay = Relay(Path(temporary))
+            before = json.dumps(relay.desired)
+            for values in [dict(slat=31), dict(spoiler=61), dict(tail_incidence=-11),
+                           dict(linked_flaps=.5), dict(winglets=True), dict(cruise_camber=float("nan"))]:
+                with self.assertRaises(ValueError): relay.update(dict(controls=values))
+                self.assertEqual(json.dumps(relay.desired), before)
 
 
 class RelayTest(unittest.TestCase):
@@ -40,7 +76,7 @@ class RelayTest(unittest.TestCase):
             state = json.load(response)
         self.assertEqual(state["sequence"], 2)
         self.assertEqual(state["reset"], 1)
-        self.assertEqual((self.directory / "controls.txt").read_text().split(), ["2", "1", "1", "18", "4", "20", "0", "0", "0", "2"])
+        self.assertEqual((self.directory / "controls.txt").read_text().split()[:10], ["2", "1", "1", "18", "4", "20", "0", "0", "0", "2"])
         self.assertEqual(Relay(self.directory).desired, state)
 
     def test_invalid_commands_do_not_mutate(self):
@@ -64,7 +100,7 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(state["paused"], before["paused"])
         self.assertEqual(state["streamline_density"], 4)
         self.assertEqual(Relay(self.directory).desired, state)
-        self.assertEqual((self.directory / "controls.txt").read_text().split()[-1], "4")
+        self.assertEqual((self.directory / "controls.txt").read_text().split()[9], "4")
 
     def test_compact_representation_has_distinct_etag(self):
         header = json.dumps(dict(version=1, line_vertices=6)).encode()

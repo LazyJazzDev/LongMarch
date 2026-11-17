@@ -18,7 +18,16 @@ from loads import WINDOWS, window_packet
 
 BOUNDS = {"speed": (1, 30), "angle": (-20, 25), "flap": (0, 40),
           "aileron": (-25, 25), "elevator": (-25, 25), "rudder": (-25, 25)}
-DEFAULT = dict(speed=30, angle=4, flap=0, aileron=0, elevator=0, rudder=0)
+LEGACY = tuple(BOUNDS)
+EXTENDED = {"tail_incidence": (-10, 10), "winglets": (0, 1), "linked_flaps": (0, 1),
+            "outer_flap": (0, 40), "cruise_camber": (-5, 5), "aileron_droop": (0, 15),
+            "spoiler": (0, 60), "spoiler_roll": (-30, 30), "linked_spoiler_roll": (0, 1),
+            "slat": (0, 30), "linked_slats": (0, 1)}
+FLAGS = {"winglets", "linked_flaps", "linked_spoiler_roll", "linked_slats"}
+BOUNDS.update(EXTENDED)
+DEFAULT = dict(speed=30, angle=4, flap=0, aileron=0, elevator=0, rudder=0,
+               tail_incidence=0, winglets=1, linked_flaps=1, outer_flap=0, cruise_camber=0,
+               aileron_droop=0, spoiler=0, spoiler_roll=0, linked_spoiler_roll=0, slat=0, linked_slats=0)
 
 
 def atomic(path, data):
@@ -87,13 +96,15 @@ class Relay:
         path = directory / "desired.json"
         self.desired = json.loads(path.read_text()) if path.exists() else dict(
             sequence=1, reset=0, paused=False, controls=DEFAULT.copy())
+        for key, value in DEFAULT.items():
+            self.desired["controls"].setdefault(key, value)
         self.desired.setdefault("streamline_density", 2)
         self.save()
 
     def save(self):
         d = self.desired
         atomic(self.directory / "desired.json", json.dumps(d))
-        values = [d["sequence"], d["reset"], int(d["paused"])] + [d["controls"][k] for k in BOUNDS] + [d["streamline_density"]]
+        values = [d["sequence"], d["reset"], int(d["paused"])] + [d["controls"][k] for k in LEGACY] + [d["streamline_density"], "wing-v1"] + [d["controls"][k] for k in EXTENDED]
         atomic(self.directory / "controls.txt", " ".join(map(str, values)) + "\n")
 
     def update(self, data):
@@ -109,6 +120,8 @@ class Relay:
         for key, value in controls.items():
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                 raise ValueError("Control values must be finite numbers")
+            if key in FLAGS and value not in (0, 1):
+                raise ValueError(f"{key} must be 0 or 1")
             if not BOUNDS[key][0] <= value <= BOUNDS[key][1]:
                 raise ValueError(f"{key} outside {BOUNDS[key]}")
         for key in ("paused", "reset"):

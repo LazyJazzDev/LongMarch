@@ -37,12 +37,17 @@ void Vector(std::ostream &s, wind3d::Vec3 v) {
 
 void Controls(std::ostream &s, const wind3d::Controls &c) {
   s << "{\"speed\":" << c.speed << ",\"angle\":" << c.angle << ",\"flap\":" << c.flap << ",\"aileron\":" << c.aileron
-    << ",\"elevator\":" << c.elevator << ",\"rudder\":" << c.rudder << '}';
+    << ",\"elevator\":" << c.elevator << ",\"rudder\":" << c.rudder
+    << ",\"tail_incidence\":" << c.airframe.tail_incidence << ",\"winglets\":" << int(c.airframe.winglets)
+    << ",\"linked_flaps\":" << int(c.wing_controls.linked_flaps) << ",\"outer_flap\":" << c.wing_controls.outer_flap
+    << ",\"cruise_camber\":" << c.wing_controls.cruise_camber << ",\"aileron_droop\":" << c.wing_controls.aileron_droop
+    << ",\"spoiler\":" << c.wing_controls.spoiler << ",\"spoiler_roll\":" << c.wing_controls.spoiler_roll
+    << ",\"linked_spoiler_roll\":" << int(c.wing_controls.linked_spoiler_roll) << ",\"slat\":" << c.wing_controls.slat
+    << ",\"linked_slats\":" << int(c.wing_controls.linked_slats) << '}';
 }
 
 bool Same(const wind3d::Controls &a, const wind3d::Controls &b) {
-  return a.speed == b.speed && a.angle == b.angle && a.flap == b.flap && a.aileron == b.aileron &&
-         a.elevator == b.elevator && a.rudder == b.rudder;
+  return a.speed == b.speed && wind3d::SameAircraftGeometry(a, b);
 }
 }  // namespace
 
@@ -140,10 +145,28 @@ int main(int argc, char **argv) {
         controls.aileron >> controls.elevator >> controls.rudder) {
       int requested_density = 2;
       input >> requested_density;
-      bool valid = requested_density >= 1 && requested_density <= 4 && (pause == 0 || pause == 1) &&
-                   controls.speed >= 1 && controls.speed <= 30 && controls.angle >= -20 && controls.angle <= 25 &&
-                   controls.flap >= 0 && controls.flap <= 40 && std::abs(controls.aileron) <= 25 &&
-                   std::abs(controls.elevator) <= 25 && std::abs(controls.rudder) <= 25;
+      bool extension_valid = true;
+      std::string extension;
+      if (input >> extension) {
+        int winglets = 1, linked_flaps = 1, linked_roll = 0, linked_slats = 0;
+        auto &w = controls.wing_controls;
+        extension_valid =
+            extension == "wing-v1" && bool(input >> controls.airframe.tail_incidence >> winglets >> linked_flaps >>
+                                           w.outer_flap >> w.cruise_camber >> w.aileron_droop >> w.spoiler >>
+                                           w.spoiler_roll >> linked_roll >> w.slat >> linked_slats);
+        auto flag = [](int value) { return value == 0 || value == 1; };
+        extension_valid &= flag(winglets) && flag(linked_flaps) && flag(linked_roll) && flag(linked_slats);
+        controls.airframe.winglets = winglets != 0;
+        w.linked_flaps = linked_flaps != 0;
+        w.linked_spoiler_roll = linked_roll != 0;
+        w.linked_slats = linked_slats != 0;
+      }
+      bool valid = extension_valid && wind3d::ValidAirframe(controls.airframe) &&
+                   wind3d::ValidWingControls(controls.wing_controls) && requested_density >= 1 &&
+                   requested_density <= 4 && (pause == 0 || pause == 1) && controls.speed >= 1 &&
+                   controls.speed <= 30 && controls.angle >= -20 && controls.angle <= 25 && controls.flap >= 0 &&
+                   controls.flap <= 40 && std::abs(controls.aileron) <= 25 && std::abs(controls.elevator) <= 25 &&
+                   std::abs(controls.rudder) <= 25;
       if (valid && sequence != request) {
         density = requested_density;
         requested = controls;
@@ -268,7 +291,7 @@ int main(int argc, char **argv) {
              << ",\"streamline_seeds\":" << (20 * density + 1) * (3 * density + 1)
              << ",\"domain_min\":[-6,-4,-6],\"domain_max\":[10,4,6]";
         json << ",\"solver_model\":\"uniform-" << profile
-             << "\",\"geometry_model\":\"narrowbody-blended-tip-slotted-flaps\",\"force\":";
+             << "\",\"geometry_model\":\"narrowbody-junctions-slats-spoilers\",\"force\":";
         Vector(json, state->force);
         json << ",\"moment\":";
         Vector(json, state->moment);
