@@ -139,6 +139,42 @@ checks change controls or reset the flow. This checkpoint can be restored by
 the desktop with the same settings, avoiding another startup transient.
 The save option requires validation mode and reports write failures.
 
+### Revised airframe reference point
+
+The revised geometry has a numerically checked low-pitch operating point at
+30 m/s: body AoA **3.94 degrees**, wing root installation **4.7 degrees**,
+stabilizer installation **1.337 degrees**, and **zero elevator and other control
+deflections**, with blended winglets. The reference body CG is
+`(-0.2894136608, 0, 0)` m. This is a geometric reference, not measured mass
+properties or a free-flight equilibrium.
+
+On the 256 x 128 x 192 grid, the dt-weighted 0.5..0.6 s mean force is
+`(91.50015, 811.22655, -0.01705)` N; moment about that CG is
+`(0.07779, 0.01897, -0.53045)` N m. CL is 0.470615, L/D is 8.86585, and
+pitch Cm is -0.0004611. Compared with 0.4..0.5 s, lift changes by -0.02175%
+and CG pitch moment by -0.03276 N m. CL remains 5.88% below the provisional
+0.5 search target. Projection and lifecycle checks passed.
+
+The measured run used a fresh field to 0.35 s, then resumed the same controls
+to 0.6 s. Reproduce it and launch the desktop with the generated checkpoint:
+
+```powershell
+cmake-build-release/demo/wind3d/demo_wind3d --aero --grid 256 --speed 30 --angle 3.94 --wing-incidence 4.7 --tail-incidence 1.337 --elevator 0 --validate --validate-time 0.35 --no-export --diagnostics out/wind3d-aero/design-review/trim-wing47-a394-t1337-short.csv --save-checkpoint out/wind3d-aero/design-review/trim-wing47-a394-t1337-short.bin
+cmake-build-release/demo/wind3d/demo_wind3d --aero --grid 256 --speed 30 --angle 3.94 --wing-incidence 4.7 --tail-incidence 1.337 --elevator 0 --restore out/wind3d-aero/design-review/trim-wing47-a394-t1337-short.bin --validate --validate-time 0.6 --no-export --diagnostics out/wind3d-aero/design-review/revised-trim-256.csv --save-checkpoint out/wind3d-aero/design-review/revised-trim-256.bin
+cmake-build-release/demo/wind3d/demo_wind3d --aero --grid 256 --speed 30 --angle 3.94 --wing-incidence 4.7 --tail-incidence 1.337 --elevator 0 --restore out/wind3d-aero/design-review/revised-trim-256.bin --streamlines --no-volume
+```
+
+For web restoration, set the same controls in its mailbox before launching
+`wind3d_web DIRECTORY 256 1 aero 0 out/wind3d-aero/design-review/revised-trim-256.bin`.
+Both interfaces preserve stabilizer trim to 0.001 degrees. The solver is not
+auto-trimmed: changing controls requires another operating-point check.
+
+See [the airframe review](AIRFRAME_REVIEW.md) for the lift curve, geometry
+acceptance evidence, and local control-response discontinuities. This single
+trim point does not validate static stability, continuous control derivatives,
+grid convergence, or real-aircraft cruise accuracy. Transport, projection and
+load-integration algorithms were not changed in this repair.
+
 ### Previous airframe cruise trim example
 
 These results precede the rigid-control and independent-boundary repair in
