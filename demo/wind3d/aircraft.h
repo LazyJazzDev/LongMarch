@@ -20,16 +20,18 @@ struct Airframe {
   float wing_sweep{0.55f};  // Leading-edge x offset per metre of span.
   float tail_span{0.98f};
   float tail_leading{1.65f};
+  float tail_incidence{};  // Positive raises the stabilizer leading edge.
 };
 
 WIND3D_HD bool ValidAirframe(const Airframe &a) {
   return a.wing_span >= 2 && a.wing_span <= 4.2f && a.wing_camber >= 0 && a.wing_camber <= .06f && a.wing_sweep >= 0 &&
-         a.wing_sweep <= .7f && a.tail_span >= .6f && a.tail_span <= 1.4f && a.tail_leading >= 1 && a.tail_leading <= 2;
+         a.wing_sweep <= .7f && a.tail_span >= .6f && a.tail_span <= 1.4f && a.tail_leading >= 1 &&
+         a.tail_leading <= 2 && a.tail_incidence >= -10 && a.tail_incidence <= 10;
 }
 
 WIND3D_HD bool SameAirframe(const Airframe &a, const Airframe &b) {
   return a.wing_span == b.wing_span && a.wing_camber == b.wing_camber && a.wing_sweep == b.wing_sweep &&
-         a.tail_span == b.tail_span && a.tail_leading == b.tail_leading;
+         a.tail_span == b.tail_span && a.tail_leading == b.tail_leading && a.tail_incidence == b.tail_incidence;
 }
 
 struct Controls {
@@ -203,14 +205,18 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
     wing.dihedral = 0.12f;
     return {wing, 0, wing.span, 0, false, false};
   }
-  if (part == 4)
-    return {
-        {{0, 0.12f, 0}, ex, ey, ez, airframe.tail_span, 0.62f, 0.22f, airframe.tail_leading, 0.36f, 0.04f, 0, 0.12f},
-        0,
-        airframe.tail_span,
-        controls.elevator,
-        true,
-        false};
+  if (part == 4) {
+    // Trim about the quarter-chord of the root, independently of elevator.
+    float pivot = airframe.tail_leading + .25f * .62f;
+    Vec3 tx = RotateZ(ex, -airframe.tail_incidence), ty = RotateZ(ey, -airframe.tail_incidence);
+    Vec3 origin = Add(Vec3{pivot, .12f, 0}, Scale(tx, -pivot));
+    return {{origin, tx, ty, ez, airframe.tail_span, .62f, .22f, airframe.tail_leading, .36f, .04f, 0, .12f},
+            0,
+            airframe.tail_span,
+            controls.elevator,
+            true,
+            false};
+  }
   if (part == 5)
     return {{{0, 0.15f, 0}, ex, {0, 0, 1}, {0, 1, 0}, 0.85f, 0.90f, 0.30f, 1.40f, 0.6f, 0, 0, 0.12f},
             0,

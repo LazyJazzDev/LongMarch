@@ -1518,7 +1518,7 @@ struct Simulation::Impl {
         return;
       }
       diagnostics
-          << "step,generation,time,dt,max_speed,divergence_before,divergence_after,pressure_residual,pressure_cycles,pressure_converged,fx,fy,fz,mx,my,mz,step_seconds,transport_seconds,pressure_seconds,diagnostics_seconds,force_norm,moment_norm,lift_drag_ratio,mean_lift_drag_ratio,lfm,pressure_fx,pressure_fy,pressure_fz,friction_fx,friction_fy,friction_fz,fuselage_drag,fuselage_lift,wing_drag,wing_lift,horizontal_tail_drag,horizontal_tail_lift,vertical_tail_drag,vertical_tail_lift,nacelle_drag,nacelle_lift,speed,angle,flap,aileron,elevator,rudder,grid,viscosity,wall_viscosity,wall_model,wall_momentum,cut_cells,cubic,cfl,sponge,wing_span,wing_camber,wing_sweep,tail_span,tail_leading\n";
+          << "step,generation,time,dt,max_speed,divergence_before,divergence_after,pressure_residual,pressure_cycles,pressure_converged,fx,fy,fz,mx,my,mz,step_seconds,transport_seconds,pressure_seconds,diagnostics_seconds,force_norm,moment_norm,lift_drag_ratio,mean_lift_drag_ratio,lfm,pressure_fx,pressure_fy,pressure_fz,friction_fx,friction_fy,friction_fz,fuselage_drag,fuselage_lift,wing_drag,wing_lift,horizontal_tail_drag,horizontal_tail_lift,vertical_tail_drag,vertical_tail_lift,nacelle_drag,nacelle_lift,speed,angle,flap,aileron,elevator,rudder,grid,viscosity,wall_viscosity,wall_model,wall_momentum,cut_cells,cubic,cfl,sponge,wing_span,wing_camber,wing_sweep,tail_span,tail_leading,tail_incidence\n";
       diagnostics << std::setprecision(17);
     }
     auto g = grid;
@@ -1933,7 +1933,7 @@ struct Simulation::Impl {
                     << options.cut_cells << ',' << options.cubic << ',' << options.cfl << ',' << options.sponge << ','
                     << controls.airframe.wing_span << ',' << controls.airframe.wing_camber << ','
                     << controls.airframe.wing_sweep << ',' << controls.airframe.tail_span << ','
-                    << controls.airframe.tail_leading << '\n';
+                    << controls.airframe.tail_leading << ',' << controls.airframe.tail_incidence << '\n';
         if (step % 32 == 0)
           diagnostics.flush();
         if (!diagnostics) {

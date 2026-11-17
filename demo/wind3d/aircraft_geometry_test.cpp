@@ -33,9 +33,20 @@ int main() {
       if (Length(Add(a, Scale(b, -1))) > 2e-6f)
         return 9;
     }
+  Controls trim = controls;
+  trim.airframe.tail_incidence = 7;
+  if (SameAirframe(trim.airframe, controls.airframe))
+    return 10;
+  auto trimmed = AircraftPart(4, 1, trim), neutral = AircraftPart(4, 1, controls);
+  auto pivot_a = FoilPoint(trimmed, .25f, 0, 0, false), pivot_b = FoilPoint(neutral, .25f, 0, 0, false);
+  if (Length(Add(pivot_a, Scale(pivot_b, -1))) > 1e-6f)
+    return 11;
+  if (FoilPoint(trimmed, 0, 0, 0, false).y <= FoilPoint(neutral, 0, 0, 0, false).y)
+    return 12;
   size_t checked = 0;
   for (Airframe airframe : {Airframe{}, Airframe{2.7f, .025f, .55f, 1.05f, 1.65f}, Airframe{2, 0, 0, .6f, 1},
-                            Airframe{4.2f, .06f, .7f, 1.4f, 2}}) {
+                            Airframe{4.2f, .06f, .7f, 1.4f, 2}, Airframe{2.65f, .025f, .55f, .98f, 1.65f, -10},
+                            Airframe{2.65f, .025f, .55f, .98f, 1.65f, 10}}) {
     if (!ValidAirframe(airframe))
       return 7;
     controls.airframe = airframe;

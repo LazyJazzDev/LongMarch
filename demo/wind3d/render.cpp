@@ -199,6 +199,7 @@ bool Render(IDevice *device,
               ImGui::SliderFloat("Incidence", &controls.angle, -20, 25, "%.1f deg");
               ImGui::SliderFloat("Flaps", &controls.flap, 0, 40, "%.1f deg");
               ImGui::SliderFloat("Ailerons", &controls.aileron, -25, 25, "%.1f deg");
+              ImGui::SliderFloat("Stabilizer trim", &controls.airframe.tail_incidence, -10, 10, "%.2f deg");
               ImGui::SliderFloat("Elevator", &controls.elevator, -25, 25, "%.1f deg");
               ImGui::SliderFloat("Rudder", &controls.rudder, -25, 25, "%.1f deg");
             }
