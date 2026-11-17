@@ -72,13 +72,16 @@ __device__ float LfmSample(Grid g, const float *field, Vec3 p, int axis, Vec3 ta
   float value = 0;
   derivative = 0;
   for (int k = 0; k < 3; ++k)
-    for (int j = 0; j < 3; ++j)
+    for (int j = 0; j < 3; ++j) {
+      // Reuse the transverse products for all three x samples.
+      float yz = wy[j].x * wz[k].x;
+      float dyz = wy[j].y * wz[k].x * tangent.y + wy[j].x * wz[k].y * tangent.z;
       for (int i = 0; i < 3; ++i) {
         float f = field[g.F(max(0, min(x + i, upper[0])), max(0, min(y + j, upper[1])), max(0, min(z + k, upper[2])))];
-        value += f * wx[i].x * wy[j].x * wz[k].x;
-        derivative += f * (wx[i].y * wy[j].x * wz[k].x * tangent.x + wx[i].x * wy[j].y * wz[k].x * tangent.y +
-                           wx[i].x * wy[j].x * wz[k].y * tangent.z);
+        value += f * wx[i].x * yz;
+        derivative += f * (wx[i].y * yz * tangent.x + wx[i].x * dyz);
       }
+    }
   return value;
 }
 

@@ -190,6 +190,16 @@ center of mass; roll/pitch/yaw are body x/z/y respectively.
 This checks control-response direction and lateral symmetry, not agreement with
 measured aircraft derivatives. The desktop load panel displays both world-axis
 components and these body-axis moments using the snapshot's applied incidence.
+
+Reusing transverse products in the quadratic sampler reduces the median cost
+from 8.275 to 8.166 wall seconds per physical second in three alternating
+128-grid fresh-start runs on the RTX 5080, with display exports disabled.
+The reference-window lift and drag changes are below 0.0001 N. This is a small
+arithmetic optimization, not a different integration or boundary model.
+Faster transport choices need separate aerodynamic validation: in the same
+128-grid 1–1.5 second window, cubic MacCormack gives 75.58 N lift versus LFM's
+143.40 N, and increasing LFM CFL from 0.25 to 0.5 gives 120.05 N. These settings
+are not equivalent accelerations of the reference result.
 The main half-wing span increased from 2.7 to 3.6 m with the same root/tip
 chords. Including raked tips, total span is 7.84 m and planform aspect
 ratio is about 11.56. Flap/aileron stations and the occupancy broad phase follow
