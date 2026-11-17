@@ -10,7 +10,7 @@ int main() {
   auto wing = AircraftPart(0, 1, controls);
   auto pylon = AircraftPart(6, 1, controls);
   const float length = 6, diameter = 2 * FuselageRadius(-1.5f, 1);
-  const float span = 2 * (wing.spec.span + AircraftPart(3, 1, controls).spec.span);
+  const float span = ProjectedWingSpan(controls);
   float nacelle_diameter = 0;
   for (int i = 0; i <= 100; ++i)
     nacelle_diameter = std::max(nacelle_diameter, 2 * NacelleRadius(i / 100.f, 1));
@@ -43,6 +43,17 @@ int main() {
     return 11;
   if (FoilPoint(trimmed, 0, 0, 0, false).y <= FoilPoint(neutral, 0, 0, 0, false).y)
     return 12;
+  for (float z : {0.f, .05f, .2f, .35f, .45f})
+    for (float y : {-.015f, 0.f, .015f}) {
+      Vec3 point{.1f, y, z};
+      auto restored = TipBend(tip.spec, TipBend(tip.spec, point), true);
+      if (Length(Add(restored, Scale(point, -1))) > 2e-6f)
+        return 13;
+    }
+  Controls raked = controls;
+  raked.airframe.winglets = false;
+  if (SameAirframe(raked.airframe, controls.airframe) || AircraftPart(3, 1, raked).spec.blended_tip)
+    return 14;
   size_t checked = 0;
   for (Airframe airframe : {Airframe{}, Airframe{2.7f, .025f, .55f, 1.05f, 1.65f}, Airframe{2, 0, 0, .6f, 1},
                             Airframe{4.2f, .06f, .7f, 1.4f, 2}, Airframe{2.65f, .025f, .55f, .98f, 1.65f, -10},

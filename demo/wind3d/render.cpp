@@ -199,6 +199,7 @@ bool Render(IDevice *device,
               ImGui::SliderFloat("Incidence", &controls.angle, -20, 25, "%.1f deg");
               ImGui::SliderFloat("Flaps", &controls.flap, 0, 40, "%.1f deg");
               ImGui::SliderFloat("Ailerons", &controls.aileron, -25, 25, "%.1f deg");
+              ImGui::Checkbox("Blended winglets", &controls.airframe.winglets);
               ImGui::SliderFloat("Stabilizer trim", &controls.airframe.tail_incidence, -10, 10, "%.2f deg");
               ImGui::SliderFloat("Elevator", &controls.elevator, -25, 25, "%.1f deg");
               ImGui::SliderFloat("Rudder", &controls.rudder, -25, 25, "%.1f deg");
@@ -237,7 +238,7 @@ bool Render(IDevice *device,
             ImGui::SeparatorText("Integrated aircraft loads");
             if (state) {
               const auto &airframe = state->controls.airframe;
-              ImGui::Text("Wing span %.2f m | camber %.1f%%", 2 * (airframe.wing_span + .21f),
+              ImGui::Text("Wing span %.2f m | camber %.1f%%", ProjectedWingSpan(state->controls),
                           100 * airframe.wing_camber);
               ImGui::TextColored({0.1f, 1, 0.8f, 1}, "World-axis force [N]");
               ImGui::Text("Fx % .3f\nFy % .3f\nFz % .3f", state->force.x, state->force.y, state->force.z);

@@ -12,10 +12,19 @@ cmake-build-release/demo/wind3d/demo_wind3d --aero --backend d3d12 --grid 256
 ```
 
 The procedural airframe is being revised around a 6 m-long narrow-body
-transport: nominal span 5.72 m, cabin diameter 0.63 m, and nacelle outer
+transport: nominal span about 5.80 m (5.72 m with raked tips), cabin diameter 0.63 m, and nacelle outer
 diameter approximately 0.40 m. These proportions use the A320 family as a
 reference, not an exact certified aircraft surface:
 [Airbus aircraft characteristics](https://www.aircraft.airbus.com/sites/g/files/jlcbta126/files/2024-06/AC_A320_0624.pdf).
+The default blended wingtip has a circular 0.18 m root blend and a 70-degree
+canted outer section. Section normals rotate with the centerline, preserving
+normal thickness; the same analytic forward/inverse mapping defines the mesh
+and solid boundary. Select **Blended winglets** in the desktop control panel,
+`--winglets`, or `--raked-tips` to compare tip configurations. This adds a
+geometric option, not a guaranteed drag improvement. Diagnostics record the
+choice as `winglets`; projected span accounts for the bend rather than using
+the tip's developed length.
+
 The horizontal stabilizer has an independent incidence setting via
 `--tail-incidence -10..10` and **Wind and controls / Stabilizer trim** in the
 desktop UI. Positive incidence raises its leading edge. The whole stabilizer

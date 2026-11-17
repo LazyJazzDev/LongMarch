@@ -15,12 +15,13 @@ struct Vec3 {
 };
 
 struct Airframe {
-  float wing_span{2.65f};  // Half-span excluding the 0.21 m tip.
+  float wing_span{2.65f};  // Half-span excluding the selected tip device.
   float wing_camber{0.025f};
   float wing_sweep{0.55f};  // Leading-edge x offset per metre of span.
   float tail_span{0.98f};
   float tail_leading{1.65f};
   float tail_incidence{};  // Positive raises the stabilizer leading edge.
+  bool winglets{true};
 };
 
 WIND3D_HD bool ValidAirframe(const Airframe &a) {
@@ -31,7 +32,8 @@ WIND3D_HD bool ValidAirframe(const Airframe &a) {
 
 WIND3D_HD bool SameAirframe(const Airframe &a, const Airframe &b) {
   return a.wing_span == b.wing_span && a.wing_camber == b.wing_camber && a.wing_sweep == b.wing_sweep &&
-         a.tail_span == b.tail_span && a.tail_leading == b.tail_leading && a.tail_incidence == b.tail_incidence;
+         a.tail_span == b.tail_span && a.tail_leading == b.tail_leading && a.tail_incidence == b.tail_incidence &&
+         a.winglets == b.winglets;
 }
 
 struct Controls {
@@ -129,11 +131,35 @@ struct FoilSpec {
   Vec3 origin, x_axis, y_axis, z_axis;
   float span, root, tip, leading, sweep, dihedral, camber, thickness;
   float washout{}, tip_camber_scale{1}, tip_thickness_scale{1};
+  bool blended_tip{};
 };
+
+// Circular root blend followed by a straight canted tip. Cross-sections rotate
+// with the centerline, preserving true normal thickness. Both maps are analytic.
+WIND3D_HD Vec3 TipBend(const FoilSpec &s, Vec3 p, bool inverse = false) {
+  if (!s.blended_tip || p.z < 0)
+    return p;
+  constexpr float radius = .18f, angle = 1.221730476f;  // 70 degrees.
+  float sa = sinf(angle), ca = cosf(angle), cy = radius * (1 - ca), cz = radius * sa;
+  if (inverse) {
+    float theta = atan2f(p.z, radius - p.y);
+    if (theta <= angle) {
+      float y = radius - sqrtf((radius - p.y) * (radius - p.y) + p.z * p.z);
+      return {p.x, y, radius * theta};
+    }
+    float dy = p.y - cy, dz = p.z - cz;
+    return {p.x, dy * ca - dz * sa, radius * angle + dy * sa + dz * ca};
+  }
+  float theta = fminf(p.z / radius, angle), rest = fmaxf(0, p.z - radius * angle);
+  return {p.x, radius * (1 - cosf(theta)) + rest * sa + p.y * cosf(theta),
+          radius * sinf(theta) + rest * ca - p.y * sinf(theta)};
+}
 
 // Reversible section shaping preserves span station. The same deformation
 // maps the explicit surface and its analytic solid boundary, including hinges.
 WIND3D_HD Vec3 SectionShape(const FoilSpec &s, Vec3 p, bool inverse = false) {
+  if (inverse)
+    p = TipBend(s, p, true);
   float t = fminf(fmaxf(p.z / s.span, 0), 1);
   float chord = s.root + (s.tip - s.root) * t;
   float leading = s.leading + s.sweep * p.z;
@@ -146,7 +172,7 @@ WIND3D_HD Vec3 SectionShape(const FoilSpec &s, Vec3 p, bool inverse = false) {
   float base = s.dihedral * p.z + FoilCamber(u, chord, s.camber);
   float shaped = s.dihedral * p.z + FoilCamber(u, chord, camber);
   p.y = inverse ? base + (p.y - shaped) / thickness_scale : shaped + (p.y - base) * thickness_scale;
-  return inverse ? p : Add(pivot, RotateZ(Add(p, Scale(pivot, -1)), s.washout * t));
+  return inverse ? p : TipBend(s, Add(pivot, RotateZ(Add(p, Scale(pivot, -1)), s.washout * t)));
 }
 
 struct FoilPart {
@@ -200,9 +226,10 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
     wing.leading = 0;
     wing.root = wing.tip;
     wing.tip = 0.06f;
-    wing.span = 0.21f;
-    wing.sweep = 1.15f;
-    wing.dihedral = 0.12f;
+    wing.blended_tip = airframe.winglets;
+    wing.span = airframe.winglets ? .45f : .21f;
+    wing.sweep = airframe.winglets ? .65f : 1.15f;
+    wing.dihedral = airframe.winglets ? 0.f : .12f;
     return {wing, 0, wing.span, 0, false, false};
   }
   if (part == 4) {
@@ -231,6 +258,11 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
           0,
           false,
           false};
+}
+
+WIND3D_HD float ProjectedWingSpan(const Controls &controls) {
+  auto tip = AircraftPart(3, 1, controls).spec;
+  return 2 * (controls.airframe.wing_span + TipBend(tip, {0, 0, tip.span}).z);
 }
 
 WIND3D_HD Vec3 FoilVector(const FoilSpec &s, Vec3 p) {

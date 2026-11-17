@@ -53,6 +53,10 @@ int main(int argc, char **argv) {
       solver.corrected_transport = false;
     } else if (key == "--no-flow")
       view.flow = view.volume = false;
+    else if (key == "--winglets")
+      controls.airframe.winglets = true;
+    else if (key == "--raked-tips")
+      controls.airframe.winglets = false;
     else if (key == "--streamlines")
       view.flow = true;
     else if (key == "--no-volume")
@@ -75,7 +79,7 @@ int main(int argc, char **argv) {
       std::cout
           << "Flow view: --streamlines --no-volume --streamline-density 1..4 --streamline-width 0.75..4 (pixels) --streamline-curvature 0.001..10 (1/m) --streamline-transparent-curvature 0..upper (exclusive).\n";
       std::cout
-          << "Airframe: --wing-span 2..4.2 (half-span, m), --wing-camber 0..0.06, --wing-sweep 0..0.7 (slope), --tail-span 0.6..1.4 (half-span, m), --tail-leading 1..2 (body x, m), --tail-incidence -10..10 (deg).\n";
+          << "Airframe: --wing-span 2..4.2 (half-span, m), --wing-camber 0..0.06, --wing-sweep 0..0.7 (slope), --tail-span 0.6..1.4 (half-span, m), --tail-leading 1..2 (body x, m), --tail-incidence -10..10 (deg), --winglets|--raked-tips.\n";
       return 0;
     } else {
       if (++i >= argc) {
