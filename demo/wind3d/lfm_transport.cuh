@@ -110,27 +110,26 @@ __global__ void LfmPullback(Grid g,
   destination[n] = Dot(jacobian[n], value) - (subtract ? subtract[n] : 0);
 }
 
-__global__ void LfmCorrect(Grid g,
-                           const float *initial,
-                           const float *impulse,
-                           float *correction,
-                           const Vec3 *map,
-                           int axis) {
+// Reference LFM limits the corrected impulse against the six adjacent
+// uncorrected impulses, after pullback. Initial velocity bounds belong to a
+// different covector basis and can incorrectly discard a valid correction.
+__global__ void LfmCorrect(Grid g, const float *impulse, float *correction, int axis) {
   int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
   if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
     return;
-  Vec3 p = Add(map[n], Scale(LfmOffset(axis), -1));
-  int x = int(floorf(p.x)), y = int(floorf(p.y)), z = int(floorf(p.z));
+  int upper[] = {g.nx - (axis != 0), g.ny - (axis != 1), g.nz - (axis != 2)};
+  int p[] = {min(n % (g.nx + 1), upper[0]), min(n / (g.nx + 1) % (g.ny + 1), upper[1]),
+             min(n / ((g.nx + 1) * (g.ny + 1)), upper[2])};
   float low = 1e30f, high = -1e30f;
-  for (int k = 0; k < 2; ++k)
-    for (int j = 0; j < 2; ++j)
-      for (int i = 0; i < 2; ++i) {
-        float value = Read(initial, g, x + i, y + j, z + k);
-        low = fminf(low, value);
-        high = fmaxf(high, value);
-      }
-  // Limit only the BFECC correction: the Jacobian can legitimately amplify
-  // an impulse beyond the initial velocity bounds.
-  float corrected = impulse[n] - 0.5f * correction[n];
-  correction[n] = corrected >= low && corrected <= high ? corrected : impulse[n];
+  for (int dimension = 0; dimension < 3; ++dimension)
+    for (int sign = -1; sign <= 1; sign += 2) {
+      int q[] = {p[0], p[1], p[2]};
+      q[dimension] += sign;
+      if (q[dimension] < 0 || q[dimension] > upper[dimension])
+        continue;
+      float value = impulse[g.F(q[0], q[1], q[2])];
+      low = fminf(low, value);
+      high = fmaxf(high, value);
+    }
+  correction[n] = fminf(high, fmaxf(low, impulse[n] - 0.5f * correction[n]));
 }

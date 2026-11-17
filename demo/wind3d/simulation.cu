@@ -973,12 +973,26 @@ bool ValidateFlowMaps(int cuda_device) {
             }
       }
   }
+  // An isolated impulse overshoot must be bounded by the surrounding impulse,
+  // even when its raw BFECC error is zero. Constant fields must stay constant.
+  for (int axis = 0; axis < 3 && ok; ++axis) {
+    std::fill(values.begin(), values.end(), 12.0f);
+    int spike = g.F(5, 5, 5);
+    values[spike] = 100;
+    std::fill(output.begin(), output.end(), 0.0f);
+    ok = cudaMemcpy(fields, values.data(), nf * sizeof(float), cudaMemcpyHostToDevice) == cudaSuccess &&
+         cudaMemcpy(result, output.data(), nf * sizeof(float), cudaMemcpyHostToDevice) == cudaSuccess;
+    LfmCorrect<<<(nf + 255) / 256, 256>>>(g, fields, result, axis);
+    ok &= cudaGetLastError() == cudaSuccess &&
+          cudaMemcpy(output.data(), result, nf * sizeof(float), cudaMemcpyDeviceToHost) == cudaSuccess;
+    ok &= output[spike] == 12 && output[g.F(2, 2, 2)] == 12 && output[0] == 12;
+  }
   cudaFree(fields);
   cudaFree(result);
   cudaFree(map);
   cudaFree(jacobian);
   ok &= maximum < 2e-5f;
-  std::cout << "lfm_affine_validation=" << (ok ? "PASS" : "FAIL") << " max_error=" << maximum << '\n';
+  std::cout << "lfm_map_and_limiter_validation=" << (ok ? "PASS" : "FAIL") << " max_error=" << maximum << '\n';
   return ok;
 }
 
@@ -1185,8 +1199,7 @@ struct Simulation::Impl {
           for (int axis = 0; axis < 3; ++axis) {
             LfmPullback<<<blocks, 256, 0, queue>>>(g, error_field, lfm_map[0][axis], lfm_jacobian[0][axis],
                                                    output[axis], nullptr);
-            LfmCorrect<<<blocks, 256, 0, queue>>>(g, initial[axis], lfm_impulse[axis], output[axis], lfm_map[0][axis],
-                                                  axis);
+            LfmCorrect<<<blocks, 256, 0, queue>>>(g, lfm_impulse[axis], output[axis], axis);
             // First-order viscous operator split over the complete map cycle.
             CorrectTransport<<<blocks, 256, 0, queue>>>(g, u, v, w, initial[axis], nullptr, output[axis], bu, bv, bw,
                                                         axis, dt * lfm_intervals, physics);

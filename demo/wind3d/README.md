@@ -36,6 +36,9 @@ The implementation follows the hybrid velocity/impulse algorithm in
 3. March backward and forward maps and their Jacobian columns with RK4 through
    the stored midpoint fields. Pull back the initial velocity as an impulse,
    perform a forward/backward BFECC error correction, and limit that correction.
+   The limiter clamps to the six adjacent **uncorrected pulled-back impulses**,
+   matching the reference implementation's `BfeccClampKernel`. Initial velocity
+   bounds are not interchangeable with impulse bounds after a Jacobian pullback.
 4. Apply viscosity over the complete cycle, enforce boundaries, then project
    the reconstructed impulse into a divergence-free velocity.
 5. Recover **physical pressure separately** from a short velocity-form momentum
@@ -125,7 +128,8 @@ missing-optimized-clear-value performance warnings (820/821).
 
 GPU affine-field tests check both map directions, Jacobian columns and impulse
 pullback against constant translation and analytic shear (maximum error
-2.9e-6). Runtime validation checks pressure convergence and divergence reduction,
+2.9e-6). A manufactured isolated impulse overshoot checks that the limiter uses
+the impulse neighbourhood and preserves a constant field. Runtime validation checks pressure convergence and divergence reduction,
 plus pause/reset/control changes and immutable snapshots. The checkpoint test
 uses cut-cell geometry and verifies exact resumed loads, integrals and time,
 including a fresh solver instance and a bounded snapshot queue.
