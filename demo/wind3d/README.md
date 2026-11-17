@@ -41,8 +41,8 @@ The implementation follows the hybrid velocity/impulse algorithm in
    bounds are not interchangeable with impulse bounds after a Jacobian pullback.
 4. Apply viscosity over the complete cycle, enforce boundaries, then project
    the reconstructed impulse into a divergence-free velocity.
-5. Recover **physical pressure separately** from a short velocity-form momentum
-   predictor. Its Poisson RHS uses the divergence of the velocity increment,
+5. Recover **physical pressure separately** from a short Eulerian momentum
+   predictor with centered spatial derivatives. Its Poisson RHS uses the divergence of the velocity increment,
    removing the residual divergence of the final flow. The impulse projection
    potential is never used as surface pressure.
 
@@ -111,6 +111,24 @@ simulation cycle. `--no-flow` hides both volume and streamlines; `--model-only`
 also hides load vectors. Give the higher-resolution flow time to develop its wake.
 
 ### Validation and measured limits
+
+The pressure-recovery test samples analytic potential flow around a 0.75 m sphere
+at 12 m/s, then exercises the actual predictor, face apertures and pressure solve.
+At grids 64/128/256, the area-weighted pressure-coefficient RMS errors are
+0.136/0.078/0.047; net pressure drag stays below 0.006 N (analytic drag is zero).
+The previous semi-Lagrangian pressure predictor produced 126/77/44 N of numerical
+drag on the same fields. Centered momentum derivatives remove this interpolation
+contribution to the recovered physical pressure. This validates a curved slip
+boundary, not turbulent aircraft aerodynamics. `wind3d_lfm_check --lfm` includes
+these sphere checks, an analytic rotating-flow predictor check, and checkpoints.
+
+Aircraft loads must be remeasured after this change. On the identical 128-grid
+flow in the 2–3 second window, the new predictor gives 22.63 N drag and 11.44 N
+lift, versus 58.94 N and 65.85 N previously (12 m/s, 5 degrees, cut cells,
+molecular viscosity 1.5e-5 m²/s, CFL 0.25, cubic transport, 2 m sponge).
+The resulting L/D of 0.51 is a short coarse-grid measurement, not a converged
+aircraft result. Later performance/load measurements below predate this pressure
+correction and should not be used as current aerodynamic predictions.
 
 Pressure PCG and its multigrid work vectors use double precision, including dot
 products and true residual evaluation. Velocity and published pressure remain

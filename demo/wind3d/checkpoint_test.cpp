@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
   using namespace wind3d;
   auto options = OptimizedSolverOptions();
   options.leapfrog_flow_maps = argc == 2 && std::string(argv[1]) == "--lfm";
-  if (options.leapfrog_flow_maps && !ValidateFlowMaps(0))
+  if (options.leapfrog_flow_maps && (!ValidateFlowMaps(0) || !ValidatePressureRecovery(0)))
     return 1;
   options.display = false;
   options.export_field = false;

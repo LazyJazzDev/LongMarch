@@ -21,6 +21,7 @@ std::vector<Vertex> AircraftMesh(const Controls &controls);
 bool ValidateWallDiffusion(int cuda_device);
 bool ValidateClosedSurface(int cuda_device, bool cut_cells);
 bool ValidateFlowMaps(int cuda_device);
+bool ValidatePressureRecovery(int cuda_device);
 
 struct SolverOptions {
   // Five leapfrog midpoint projections followed by a bidirectional impulse

@@ -978,6 +978,32 @@ bool ValidateFlowMaps(int cuda_device) {
             }
       }
   }
+  // Solid-body rotation: (u.grad)u = -omega^2 (x,y,0). This checks the
+  // physical-pressure predictor independently of flow-map reconstruction.
+  constexpr float omega = 0.7f;
+  for (int n = 0; n < nf; ++n) {
+    int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1);
+    values[n] = -omega * (y + 0.5f) * g.h;
+    values[n + nf] = omega * (x + 0.5f) * g.h;
+    values[n + 2 * nf] = 0;
+  }
+  if (ok)
+    ok = cudaMemcpy(fields, values.data(), values.size() * sizeof(float), cudaMemcpyHostToDevice) == cudaSuccess;
+  for (float dt : {0.01f, 0.02f})
+    for (int axis = 0; axis < 3 && ok; ++axis) {
+      LfmMomentumPredictor<<<(nf + 255) / 256, 256>>>(g, LfmVelocity{{fields, fields + nf, fields + 2 * nf}}, result,
+                                                      axis, dt);
+      ok = cudaGetLastError() == cudaSuccess &&
+           cudaMemcpy(output.data(), result, nf * sizeof(float), cudaMemcpyDeviceToHost) == cudaSuccess;
+      for (int z = 2; z < g.nz - 2; ++z)
+        for (int y = 2; y < g.ny - 2; ++y)
+          for (int x = 2; x < g.nx - 2; ++x) {
+            int n = g.F(x, y, z);
+            float expected = values[axis * nf + n] + dt * omega * omega * g.h * (axis == 0 ? x : axis == 1 ? y : 0);
+            maximum = std::max(maximum, std::abs(output[n] - expected));
+            ok &= std::isfinite(output[n]);
+          }
+    }
   // An isolated impulse overshoot must be bounded by the surrounding impulse,
   // even when its raw BFECC error is zero. Constant fields must stay constant.
   for (int axis = 0; axis < 3 && ok; ++axis) {
@@ -1000,6 +1026,8 @@ bool ValidateFlowMaps(int cuda_device) {
   std::cout << "lfm_map_and_limiter_validation=" << (ok ? "PASS" : "FAIL") << " max_error=" << maximum << '\n';
   return ok;
 }
+
+#include "lfm_pressure_validation.cuh"
 
 struct Simulation::Impl {
   mutable std::mutex mutex;
@@ -1247,8 +1275,8 @@ struct Simulation::Impl {
     }
     if (!Parallel(fb, [&](Grid g, int blocks, cudaStream_t queue) {
           for (int axis = 0; axis < 3; ++axis) {
-            Advect<<<blocks, 256, 0, queue>>>(g, source[0], source[1], source[2], source[axis], lfm_mid[0][axis], axis,
-                                              dt);
+            LfmMomentumPredictor<<<blocks, 256, 0, queue>>>(g, LfmVelocity{{source[0], source[1], source[2]}},
+                                                            lfm_mid[0][axis], axis, dt);
             CorrectTransport<<<blocks, 256, 0, queue>>>(g, source[0], source[1], source[2], source[axis], nullptr,
                                                         lfm_mid[0][axis], bu, bv, bw, axis, dt, physics);
           }

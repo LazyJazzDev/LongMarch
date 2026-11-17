@@ -24,6 +24,22 @@ __device__ Vec3 LfmOffset(int axis) {
   return {axis == 0 ? 0.0f : 0.5f, axis == 1 ? 0.0f : 0.5f, axis == 2 ? 0.0f : 0.5f};
 }
 
+// Eulerian momentum predictor for physical pressure recovery. Central spatial
+// derivatives avoid interpreting semi-Lagrangian interpolation diffusion as a
+// physical pressure force. The input includes the slip-wall velocity extension.
+__global__ void LfmMomentumPredictor(Grid g, LfmVelocity source, float *output, int axis, float dt) {
+  int n = g.begin + blockIdx.x * blockDim.x + threadIdx.x;
+  if (n >= (g.nx + 1) * (g.ny + 1) * (g.nz + 1))
+    return;
+  int x = n % (g.nx + 1), y = n / (g.nx + 1) % (g.ny + 1), z = n / ((g.nx + 1) * (g.ny + 1));
+  Vec3 p = Add(Vec3{float(x), float(y), float(z)}, LfmOffset(axis));
+  Vec3 velocity = FaceVelocity(g, source.axis[0], source.axis[1], source.axis[2], p);
+  const float *f = source.axis[axis];
+  Vec3 gradient{Read(f, g, x + 1, y, z) - Read(f, g, x - 1, y, z), Read(f, g, x, y + 1, z) - Read(f, g, x, y - 1, z),
+                Read(f, g, x, y, z + 1) - Read(f, g, x, y, z - 1)};
+  output[n] = f[n] - dt * Dot(velocity, gradient) / (2 * g.h);
+}
+
 // Value and directional derivative of the same aperture-weighted interpolant.
 // Differentiating the normalized weights is essential near partial faces.
 __device__ float LfmSample(Grid g, const float *field, Vec3 p, int axis, Vec3 tangent, float &derivative) {
