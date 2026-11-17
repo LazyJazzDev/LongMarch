@@ -133,19 +133,29 @@ contribution to the recovered physical pressure. This validates a curved slip
 boundary, not turbulent aircraft aerodynamics. `wind3d_lfm_check --lfm` includes
 these sphere checks, an analytic rotating-flow predictor check, and checkpoints.
 
-With quadratic maps and centered pressure recovery, the 128-grid aircraft gives
-22.60 N drag and 143.38 N lift in the 2–3 second window (12 m/s, 5 degrees, cut
-cells, molecular viscosity 1.5e-5 m²/s, CFL 0.25, 2 m sponge).
-The 2–3 second mean L/D is 6.3456, with negligible variation in that window.
-This demonstrates temporal settling at that grid, not spatial convergence.
+With quadratic maps and centered pressure recovery, the current aircraft gives
+the following time-weighted loads in the 2–3 second window (12 m/s, 5 degrees,
+cut cells, molecular viscosity 1.5e-5 m²/s, CFL 0.25, 2 m sponge; `--aero`):
+
+| Grid | Drag (N) | Lift (N) | Mean lift / mean drag |
+| --- | ---: | ---: | ---: |
+| 128 × 64 × 96 | 22.60 | 143.38 | 6.3456 |
+| 256 × 128 × 192 | 28.82 | 268.30 | 9.3099 |
+
+The 256 run completed 731 cycles to 3.00071 seconds, with no failed projections
+or nonfinite loads, and passed checkpoint writing and lifecycle validation.
+Its 2–2.5 and 2.5–3 second L/D values differ by less than 1e-6.
+This demonstrates temporal settling, not spatial convergence: the substantial
+128-to-256 change still requires finer-grid comparison. The 320 and 384 studies
+are pending; proximity to L/D 10 alone is not an accuracy criterion.
 The main half-wing span increased from 2.7 to 3.6 m with the same root/tip
 chords. Including raked tips, total span is 7.84 m and planform aspect
 ratio is about 11.56. Flap/aileron stations and the occupancy broad phase follow
 the new span. Maximum main-wing camber increased from 2.5% to 4% chord,
 keeping its 40%-chord peak, 13% thickness and incidence unchanged. The 6.04 m
 span with 2.5% camber gave L/D 3.5752; increasing span alone gave 5.1137 under
-the same algorithm and 128-grid conditions. Higher-resolution comparison remains
-in progress.
+the same algorithm and 128-grid conditions. At grid 256, increasing camber from
+2.5% to 4% on the longer wing changes the 2–3 second L/D from 8.6627 to 9.3099.
 Keeping the centered pressure predictor but using the earlier trilinear maps
 gave L/D 0.51 on the same grid. The interpolation regression checks a sampled
 quadratic and its derivative across a stencil transition, and constant-velocity
