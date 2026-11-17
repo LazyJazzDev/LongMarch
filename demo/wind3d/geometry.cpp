@@ -22,7 +22,7 @@ class MeshBuilder {
     Fuselage();
     for (int side : {-1, 1}) {
       for (int part = 0; part < aircraft_part_count; ++part) {
-        if (part == 5 && side == -1)
+        if (VerticalPart(part) && side == -1)
           continue;
         Vec3 color = (part == 1 || part == 7) ? Vec3{0.72f, 0.66f, 0.52f}
                      : part == 2              ? Vec3{0.45f, 0.61f, 0.72f}
@@ -31,7 +31,7 @@ class MeshBuilder {
         auto foil = AircraftPart(part, side, controls_);
         Foil(foil, color, skin);
         if (foil.hinged)
-          Knuckle(foil, color);
+          Knuckle(foil, foil.fowler ? color : skin);
       }
       for (int panel = 0; panel < spoiler_panel_count; ++panel) {
         auto spoiler = AircraftSpoiler(panel, side, controls_);
@@ -180,7 +180,7 @@ class MeshBuilder {
     // at every deflection. Spanwise caps close tips and flap/aileron boundaries.
     constexpr int chord_segments = 48, span_segments = 16;
     for (int piece = 0; piece < (part.hinged ? 2 : 1); ++piece) {
-      float first = piece ? 0.72f : 0, last = piece || !part.hinged ? 1 : 0.72f;
+      float first = piece ? part.hinge_fraction : 0, last = piece || !part.hinged ? 1 : part.hinge_fraction;
       Vec3 color = piece ? control_color : fixed_color;
       auto position = [&](float u, float s, int surface) { return FoilPoint(part, u, s, surface, piece != 0); };
       auto fraction = [&](int i) { return first + (last - first) * (1 - cosf(pi * i / chord_segments)) * 0.5f; };
@@ -232,9 +232,15 @@ class MeshBuilder {
   void Knuckle(const FoilPart &part, Vec3 color) {
     const auto &s = part.spec;
     float slope = (s.tip - s.root) / s.span;
-    Vec3 hinge{s.leading + 0.72f * s.root, FoilCamber(0.72f, s.root, s.camber), 0};
-    Vec3 axis = Unit({s.sweep + 0.72f * slope, s.dihedral + FoilCamber(0.72f, slope, s.camber), 1});
-    Vec3 shift = FowlerShift(part);
+    Vec3 hinge{s.leading + part.hinge_fraction * s.root, FoilCamber(part.hinge_fraction, s.root, s.camber), 0};
+    Vec3 axis =
+        Unit({s.sweep + part.hinge_fraction * slope, s.dihedral + FoilCamber(part.hinge_fraction, slope, s.camber), 1});
+    auto placed = [&](Vec3 p) {
+      p = SectionShape(s, p);
+      if (part.fowler)
+        p = ControlTransform(part, p, false);
+      return Add(s.origin, FoilVector(s, p));
+    };
     Vec3 e1 = Unit(Cross(axis, Vec3{0, 0, 1}));
     if (Length(e1) < 0.5f)
       e1 = Unit(Cross(axis, Vec3{0, 1, 0}));
@@ -243,11 +249,12 @@ class MeshBuilder {
     auto point = [&](float z, int k, Vec3 &normal) {
       float angle = 2 * pi * k / around;
       Vec3 d = Add(Scale(e1, cosf(angle)), Scale(e2, sinf(angle)));
-      Vec3 center = Add(Add(hinge, Scale(axis, z / axis.z)), shift);
+      Vec3 center = Add(hinge, Scale(axis, z / axis.z));
       float chord = s.root + (s.tip - s.root) * std::min(std::max(z / s.span, 0.0f), 1.0f);
-      normal = FoilVector(s, d);
-      return Add(s.origin,
-                 FoilVector(s, SectionShape(s, Add(center, Scale(d, FoilThickness(0.72f, chord, s.thickness))))));
+      Vec3 direction =
+          part.fowler ? Add(ControlTransform(part, d, false), Scale(ControlTransform(part, {}, false), -1)) : d;
+      normal = FoilVector(s, direction);
+      return placed(Add(center, Scale(d, FoilThickness(part.hinge_fraction, chord, s.thickness))));
     };
     for (int j = 0; j < along; ++j) {
       float a = part.begin + (part.end - part.begin) * j / along,
@@ -261,7 +268,7 @@ class MeshBuilder {
     }
     for (float z : {part.begin, part.end}) {
       Vec3 normal = FoilVector(s, Scale(Vec3{0, 0, 1}, z == part.begin ? -1.0f : 1.0f)), unused;
-      Vec3 middle = Add(s.origin, FoilVector(s, SectionShape(s, Add(Add(hinge, Scale(axis, z / axis.z)), shift))));
+      Vec3 middle = placed(Add(hinge, Scale(axis, z / axis.z)));
       for (int k = 0; k < around; ++k)
         Triangle(MakeVertex(middle, normal, color), MakeVertex(point(z, k, unused), normal, color),
                  MakeVertex(point(z, k + 1, unused), normal, color));

@@ -77,7 +77,15 @@ WIND3D_HD bool SameAircraftGeometry(const Controls &a, const Controls &b) {
          SameWingControls(a.wing_controls, b.wing_controls);
 }
 
-constexpr int aircraft_part_count = 8;
+constexpr int aircraft_part_count = 13;
+
+WIND3D_HD bool VerticalPart(int part) {
+  return part == 5 || part == 10 || part == 11;
+}
+
+WIND3D_HD bool HorizontalPart(int part) {
+  return part == 4 || part == 8 || part == 9;
+}
 
 WIND3D_HD Vec3 Add(Vec3 a, Vec3 b) {
   return {a.x + b.x, a.y + b.y, a.z + b.z};
@@ -221,6 +229,7 @@ struct FoilPart {
   float begin, end, deflection;
   bool hinged, fowler;
   float deployment{};  // Fowler travel command, separate from cruise camber.
+  float hinge_fraction{.72f};
 };
 
 WIND3D_HD float AircraftSpanBound(const Controls &controls) {
@@ -228,7 +237,8 @@ WIND3D_HD float AircraftSpanBound(const Controls &controls) {
 }
 
 // Parts: buried wing root, inner flap, aileron, tip, horizontal stabilizer,
-// vertical stabilizer, nacelle pylon, outer flap. Mirrors share exactly one specification.
+// vertical stabilizer, nacelle pylon, outer flap; fixed horizontal root/tip,
+// fixed vertical root/tip, and fixed main-wing tip shoulder. Mirrors share specifications.
 WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
   const auto &airframe = controls.airframe;
   Vec3 ex{1, 0, 0}, ey{0, 1, 0}, ez{0, 0, float(side)};
@@ -262,13 +272,17 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
             true,
             deployment};
   }
+  if (part == 12)
+    return {wing, .94f * airframe.wing_span, airframe.wing_span, 0, false, false};
   if (part == 2)
     return {wing,
             flap_end,
-            airframe.wing_span,
+            .94f * airframe.wing_span,
             side * controls.aileron + controls.wing_controls.cruise_camber + controls.wing_controls.aileron_droop,
             true,
-            false};
+            false,
+            0,
+            .77f};
   if (part == 3) {
     float leading = wing.leading + wing.sweep * wing.span;
     Vec3 root =
@@ -290,19 +304,28 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
     wing.dihedral = airframe.winglets ? 0.f : .12f;
     return {wing, 0, wing.span, 0, false, false};
   }
-  if (part == 4) {
+  if (HorizontalPart(part)) {
     // Trim about the quarter-chord of the root, independently of elevator.
     float pivot = airframe.tail_leading + .25f * .62f;
     Vec3 tx = RotateZ(ex, -airframe.tail_incidence), ty = RotateZ(ey, -airframe.tail_incidence);
     Vec3 origin = Add(Vec3{pivot, .12f, 0}, Scale(tx, -pivot));
     FoilSpec tail{origin, tx, ty, ez, airframe.tail_span, .62f, .22f, airframe.tail_leading, .36f, .04f, 0, .12f};
-    tail.root_fairing = {.42f, .22f, 2.f};
-    return {tail, 0, airframe.tail_span, controls.elevator, true, false};
+    tail.root_fairing = {.22f * tail.span, .22f, 2.f};
+    float begin = .24f * tail.span, end = .94f * tail.span;
+    if (part == 8)
+      return {tail, 0, begin, 0, false, false};
+    if (part == 9)
+      return {tail, end, tail.span, 0, false, false};
+    return {tail, begin, end, controls.elevator, true, false, 0, .73f};
   }
-  if (part == 5) {
+  if (VerticalPart(part)) {
     FoilSpec fin{{0, .15f, 0}, ex, {0, 0, 1}, {0, 1, 0}, .85f, .90f, .30f, 1.40f, .6f, 0, 0, .12f};
-    fin.root_fairing = {.30f, .45f, 2.f};
-    return {fin, 0, .85f, controls.rudder, true, false};
+    fin.root_fairing = {.16f, .45f, 2.f};
+    if (part == 10)
+      return {fin, 0, .18f, 0, false, false};
+    if (part == 11)
+      return {fin, .80f, fin.span, 0, false, false};
+    return {fin, .18f, .80f, controls.rudder, true, false, 0, .68f};
   }
   // Flared pylon shoulders meet the nacelle crown and wing underside. The
   // root remains inside the nacelle wall, clear of its through-flow duct.
@@ -338,13 +361,17 @@ WIND3D_HD Vec3 FowlerShift(const FoilPart &part) {
   return {.16f * part.spec.root * extension, -.06f * part.spec.root * extension, 0};
 }
 
-// Rotate the entire control about its swept, tapered 3D hinge line, rather
-// than independently rotating each section about the world span axis.
+// Operates in the shaped foil frame. Shape the neutral surface first, then
+// rotate it as a rigid body about a straight hinge through its end stations.
 WIND3D_HD Vec3 ControlTransform(const FoilPart &part, Vec3 p, bool inverse) {
   const auto &s = part.spec;
-  float slope = (s.tip - s.root) / s.span;
-  Vec3 hinge{s.leading + 0.72f * s.root, FoilCamber(0.72f, s.root, s.camber), 0};
-  Vec3 axis = Unit({s.sweep + 0.72f * slope, s.dihedral + FoilCamber(0.72f, slope, s.camber), 1});
+  float a = s.root + (s.tip - s.root) * part.begin / s.span;
+  float b = s.root + (s.tip - s.root) * part.end / s.span;
+  Vec3 hinge = SectionShape(s, {s.leading + s.sweep * part.begin + part.hinge_fraction * a,
+                                s.dihedral * part.begin + FoilCamber(part.hinge_fraction, a, s.camber), part.begin});
+  Vec3 end = SectionShape(s, {s.leading + s.sweep * part.end + part.hinge_fraction * b,
+                              s.dihedral * part.end + FoilCamber(part.hinge_fraction, b, s.camber), part.end});
+  Vec3 axis = Unit(Add(end, Scale(hinge, -1)));
   Vec3 shift = FowlerShift(part);
   if (inverse)
     p = Add(p, Scale(shift, -1));
@@ -360,16 +387,18 @@ WIND3D_HD Vec3 ControlTransform(const FoilPart &part, Vec3 p, bool inverse) {
 WIND3D_HD float HingeKnuckle(const FoilPart &part, Vec3 local) {
   const auto &s = part.spec;
   float slope = (s.tip - s.root) / s.span;
-  Vec3 hinge{s.leading + 0.72f * s.root, FoilCamber(0.72f, s.root, s.camber), 0};
-  Vec3 axis = Unit({s.sweep + 0.72f * slope, s.dihedral + FoilCamber(0.72f, slope, s.camber), 1});
-  Vec3 shift = FowlerShift(part);
-  Vec3 v = Add(Add(local, Scale(shift, -1)), Scale(hinge, -1));
+  Vec3 hinge{s.leading + part.hinge_fraction * s.root, FoilCamber(part.hinge_fraction, s.root, s.camber), 0};
+  Vec3 axis =
+      Unit({s.sweep + part.hinge_fraction * slope, s.dihedral + FoilCamber(part.hinge_fraction, slope, s.camber), 1});
+  // Neutral nose geometry. The caller removes the rigid Fowler motion before
+  // querying this shape; ordinary hinges use it as a stationary sealed cove.
+  Vec3 v = Add(local, Scale(hinge, -1));
   Vec3 radial = Add(v, Scale(axis, -Dot(v, axis)));
   // Span station of the hinge-line point nearest to `local`: the knuckle ends
   // in planes perpendicular to the swept hinge line.
   float station = Dot(v, axis) * axis.z;
   float chord = s.root + (s.tip - s.root) * fminf(fmaxf(station / s.span, 0), 1);
-  float d = Length(radial) - FoilThickness(0.72f, chord, s.thickness);
+  float d = Length(radial) - FoilThickness(part.hinge_fraction, chord, s.thickness);
   return fmaxf(d, fmaxf(part.begin - station, station - part.end));
 }
 
@@ -378,21 +407,24 @@ WIND3D_HD Vec3 FoilPoint(const FoilPart &part, float u, float span, int surface,
   float chord = s.root + (s.tip - s.root) * span / s.span;
   Vec3 p{s.leading + s.sweep * span + u * chord,
          s.dihedral * span + FoilCamber(u, chord, s.camber) + surface * FoilThickness(u, chord, s.thickness), span};
+  p = SectionShape(s, p);
   if (control)
     p = ControlTransform(part, p, false);
-  return Add(s.origin, FoilVector(s, SectionShape(s, p)));
+  return Add(s.origin, FoilVector(s, p));
 }
 
 WIND3D_HD float PartDistance(Vec3 body, const FoilPart &part) {
-  Vec3 local = SectionShape(part.spec, FoilLocal(part.spec, body), true);
+  Vec3 shaped = FoilLocal(part.spec, body);
+  Vec3 local = SectionShape(part.spec, shaped, true);
   // Conservative broad phase including the full permitted control sweep.
   float margin = 0.8f * part.spec.root;
   if (local.z < part.begin - margin || local.z > part.end + margin ||
       fabsf(local.y - part.spec.dihedral * local.z) > margin)
     return 1;
+  Vec3 moved = part.hinged ? SectionShape(part.spec, ControlTransform(part, shaped, true), true) : local;
   float best = 1e10f;
   for (int piece = 0; piece < (part.hinged ? 2 : 1); ++piece) {
-    Vec3 p = piece ? ControlTransform(part, local, true) : local;
+    Vec3 p = piece ? moved : local;
     const auto &s = part.spec;
     float chord = s.root + (s.tip - s.root) * fminf(fmaxf(p.z / s.span, 0), 1);
     float x = p.x - s.leading - s.sweep * p.z;
@@ -400,11 +432,12 @@ WIND3D_HD float PartDistance(Vec3 body, const FoilPart &part) {
     float d = fabsf(p.y - s.dihedral * p.z - FoilCamber(u, chord, s.camber)) - FoilThickness(u, chord, s.thickness);
     d = fmaxf(d, fmaxf(-x, x - chord));
     if (part.hinged)
-      d = fmaxf(d, piece ? 0.72f * chord - x : x - 0.72f * chord);
+      d = fmaxf(d, piece ? part.hinge_fraction * chord - x : x - part.hinge_fraction * chord);
     d = fmaxf(d, fmaxf(part.begin - p.z, p.z - part.end));
     best = fminf(best, d);
   }
-  return part.hinged ? fminf(best, HingeKnuckle(part, local)) : best;
+  Vec3 nose = part.fowler ? moved : local;
+  return part.hinged ? fminf(best, HingeKnuckle(part, nose)) : best;
 }
 
 // Four closed, finite-thickness panels per wing. Their stowed upper skin
@@ -564,12 +597,12 @@ WIND3D_HD float AircraftDistance(Vec3 world, const Controls &controls, int &comp
   };
   for (int side = -1; side <= 1; side += 2) {
     for (int part = 0; part < aircraft_part_count; ++part) {
-      if (part == 5 && side == -1)
+      if (VerticalPart(part) && side == -1)
         continue;
-      keep(PartDistance(p, AircraftPart(part, side, controls)), (part <= 3 || part == 7) ? kWing
-                                                                : part == 4              ? kHorizontalTail
-                                                                : part == 5              ? kVerticalTail
-                                                                                         : kNacelle);
+      keep(PartDistance(p, AircraftPart(part, side, controls)), (part <= 3 || part == 7 || part == 12) ? kWing
+                                                                : HorizontalPart(part)                 ? kHorizontalTail
+                                                                : VerticalPart(part)                   ? kVerticalTail
+                                                                                                       : kNacelle);
     }
     if (controls.wing_controls.spoiler > 0 || controls.wing_controls.spoiler_roll != 0 ||
         (controls.wing_controls.linked_spoiler_roll && controls.aileron != 0))

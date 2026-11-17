@@ -5,8 +5,63 @@
 #include "aircraft_reference.h"
 #include "simulation.h"
 
+namespace {
+bool RigidControls() {
+  using namespace wind3d;
+  Controls controls;
+  for (int id : {1, 2, 4, 5, 7})
+    for (int side : {-1, 1})
+      for (float angle : {-20.f, -8.f, 15.f, 30.f}) {
+        auto neutral = AircraftPart(id, side, controls), moved = neutral;
+        moved.deflection = angle;
+        moved.deployment = moved.fowler ? std::max(angle, 0.f) : 0;
+        std::vector<Vec3> before, after;
+        for (float fraction : {.05f, .3f, .6f, .95f})
+          for (float chord_fraction : {.05f, .5f, 1.f})
+            for (int surface : {-1, 1}) {
+              float span = neutral.begin + (neutral.end - neutral.begin) * fraction;
+              float u = neutral.hinge_fraction + (1 - neutral.hinge_fraction) * chord_fraction;
+              before.push_back(FoilPoint(neutral, u, span, surface, true));
+              after.push_back(FoilPoint(moved, u, span, surface, true));
+              auto local = FoilLocal(moved.spec, after.back());
+              auto restored = ControlTransform(moved, ControlTransform(moved, local, true), false);
+              if (Length(Add(restored, Scale(local, -1))) > 2e-6f)
+                return false;
+            }
+        float maximum = 0;
+        for (size_t i = 0; i < before.size(); ++i)
+          for (size_t j = i + 1; j < before.size(); ++j) {
+            float a = Length(Add(before[i], Scale(before[j], -1)));
+            float b = Length(Add(after[i], Scale(after[j], -1)));
+            maximum = std::max(maximum, std::abs(a - b));
+          }
+        if (maximum > 2e-5f) {
+          std::cerr << "Non-rigid control: part=" << id << " side=" << side << " angle=" << angle
+                    << " distance_change=" << maximum << '\n';
+          return false;
+        }
+      }
+  return true;
+}
+}  // namespace
+
 int main() {
   using namespace wind3d;
+  if (!RigidControls())
+    return 32;
+  for (int part : {8, 9, 10, 11, 12}) {
+    Controls neutral, deflected;
+    deflected.aileron = deflected.elevator = deflected.rudder = 25;
+    auto a = AircraftPart(part, 1, neutral), b = AircraftPart(part, 1, deflected);
+    if (a.hinged || b.hinged)
+      return 33;
+    for (float u : {0.f, .5f, 1.f})
+      for (float t : {0.f, .5f, 1.f}) {
+        float z = a.begin + (a.end - a.begin) * t;
+        if (Length(Add(FoilPoint(a, u, z, 1, false), Scale(FoilPoint(b, u, z, 1, false), -1))) > 1e-7f)
+          return 34;
+      }
+  }
   Controls controls;
   const auto reference = MainWingReference(controls);
   if (std::abs(reference.area - 3.127f) > 1e-5f || std::abs(reference.span - 5.3f) > 1e-5f ||
@@ -204,8 +259,8 @@ int main() {
             if (foil.fowler && foil.deployment > 0) {
               // A deployed slot must contain fluid between the fixed trailing
               // face and the translated flap nose, on both mirrored wings.
-              auto fixed = FoilPoint(foil, .72f, span, 0, false);
-              auto moved = FoilPoint(foil, .72f, span, 0, true);
+              auto fixed = FoilPoint(foil, foil.hinge_fraction, span, 0, false);
+              auto moved = FoilPoint(foil, foil.hinge_fraction, span, 0, true);
               bool gap = false;
               for (int i = 1; i < 20; ++i) {
                 auto p = Add(Scale(fixed, 1 - i / 20.f), Scale(moved, i / 20.f));
@@ -220,17 +275,13 @@ int main() {
             }
             // Ordinary hinges and retracted flaps stay sealed.
             for (float surface : {-.8f, 0.f, .8f}) {
-              auto fixed = FoilPoint(foil, .72f, span, 0, false);
-              fixed = Add(foil.spec.origin,
-                          FoilVector(foil.spec, SectionShape(foil.spec, FoilLocal(foil.spec, fixed), true)));
-              float chord = foil.spec.root + (foil.spec.tip - foil.spec.root) * span / foil.spec.span;
-              auto radial = Scale(foil.spec.y_axis, surface * FoilThickness(.72f, chord, foil.spec.thickness));
-              fixed = Add(fixed, radial);
+              auto fixed = FoilPoint(foil, foil.hinge_fraction, span, 0, false);
+              auto upper = FoilPoint(foil, foil.hinge_fraction, span, 1, false);
+              fixed = Add(fixed, Scale(Add(upper, Scale(fixed, -1)), surface));
               auto local = FoilLocal(foil.spec, fixed);
               auto moved = Add(foil.spec.origin, FoilVector(foil.spec, ControlTransform(foil, local, false)));
               for (int i = 0; i <= 10; ++i) {
                 auto p = Add(Scale(fixed, 1 - i / 10.f), Scale(moved, i / 10.f));
-                p = Add(foil.spec.origin, FoilVector(foil.spec, SectionShape(foil.spec, FoilLocal(foil.spec, p))));
                 if (PartDistance(p, foil) > 2e-6f) {
                   std::cerr << "Open hinge: part=" << part << " deflection=" << deflection << '\n';
                   return 2;

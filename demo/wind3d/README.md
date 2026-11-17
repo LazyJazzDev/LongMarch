@@ -114,7 +114,12 @@ checks change controls or reset the flow. This checkpoint can be restored by
 the desktop with the same settings, avoiding another startup transient.
 The save option requires validation mode and reports write failures.
 
-### Revised-airframe cruise trim example
+### Previous airframe cruise trim example
+
+These results precede the rigid-control and independent-boundary repair in
+[the airframe review](AIRFRAME_REVIEW.md). They are historical operating-point
+data, not validation of the current geometry. Regenerate the flow and trim
+after the geometry repairs; do not restore the old checkpoint into a new solid.
 
 For the default narrow-body dimensions and blended winglets, a clean-airframe
 approximate pitch trim was verified at 30 m/s on the 256 x 128 x 192 grid:
@@ -430,6 +435,15 @@ selectable blended winglets or raked tips. Two
 stationary nacelles and pylons are part of both the visible geometry and solid
 boundary. They are unpowered flow-through nacelles with an annular wall;
 this is not an engine mass-flow or thrust model.
+
+Control deflections are rigid transformations of the already-shaped neutral
+surface. Fixed tail-root fairings and fixed tip sections do not deform with
+the adjacent control. Ailerons occupy 64.8%..94% of main-wing semispan with
+23% local chord; elevators occupy 24%..94% of horizontal-tail semispan with
+27% chord; the rudder spans body-height stations 0.18..0.80 m relative to
+its fin root with 32% chord. These are generic modeling choices, not certified
+dimensions of a particular transport. Ordinary hinge coves are fixed gray
+surfaces, while a Fowler flap and its rounded nose move together.
 
 The trailing edge is split into inner and outer flap panels plus differential
 ailerons. **Link inner/outer flaps** preserves a single flap command by default;
