@@ -18,6 +18,16 @@ It preserves grid, camera, control, export and diagnostic options. Put it before
 individual solver overrides. Without this preset, the original high-viscosity
 desktop demonstration defaults remain in effect.
 
+The desktop ImGui window includes side-by-side force (Fx/Fy/Fz) and moment
+(Mx/My/Mz) histories, using the same RGB axes and physical-time windows as the
+web frontend. Each completed solver step is recorded, retaining up to two
+seconds (65,536 samples maximum). Choose the time window and startup-step
+filter, subtract each component mean, or hide the first 20 steps after a
+control change. Hover for exact values; tables report time-weighted means,
+peak-to-peak ranges and standard deviations. Moments use world axes about the
+world origin. Pause freezes history; Reset clears it. Reopen a closed chart
+using **Load history plots** in the right panel.
+
 To inspect an existing solver checkpoint without repeating its startup, use
 `--aero --grid 256 --restore path/to/flow.checkpoint`. Supply the original grid,
 controls and solver settings: the checkpoint stores fields and load integrals,

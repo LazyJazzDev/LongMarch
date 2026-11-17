@@ -210,6 +210,7 @@ int main(int argc, char **argv) {
     return 2;
   if (validate && !wind3d::ValidateClosedSurface(device->GetCUDADeviceIndex(), solver.cut_cells))
     return 2;
+  solver.record_loads = !headless && !validate;
   solver.initial_controls = controls;
   auto simulation = wind3d::Simulation::Create(device->GetCUDADeviceIndex(), grid, solver);
   if (!simulation) {

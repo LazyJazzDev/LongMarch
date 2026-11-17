@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "imgui.h"
+#include "load_charts.h"
 #include "visualization.h"
 
 namespace wind3d {
@@ -126,6 +127,10 @@ bool Render(IDevice *device,
   float volume_density = 0.035f, volume_threshold = 6.0f, volume_step = 1.0f;
   std::shared_ptr<const Snapshot> volume_state;
   float yaw = view.yaw, pitch = view.pitch, distance = view.distance, fps = 0, logical_width = 1440;
+  LoadHistory load_history;
+  load_charts::Settings chart_settings;
+  bool show_history = true;
+  float logical_height = 900, chart_height = 0;
   auto previous = std::chrono::steady_clock::now(), beginning = previous;
   int rendered = 0, updates = 0;
   simulation.Configure(controls, paused);
@@ -145,6 +150,8 @@ bool Render(IDevice *device,
     auto next = simulation.Latest();
     if (next && next != state) {
       state = next;
+      if (window)
+        load_history = simulation.RecentLoads();
       rebuild = true;
       ++updates;
     }
@@ -161,6 +168,7 @@ bool Render(IDevice *device,
       height = swap->GetDesc().height;
       if (!window->UpdateImGui([&] {
             logical_width = ImGui::GetIO().DisplaySize.x;
+            logical_height = ImGui::GetIO().DisplaySize.y;
             ImGui::SetNextWindowPos({logical_width - 410, 0});
             ImGui::SetNextWindowSize({410, ImGui::GetIO().DisplaySize.y});
             ImGui::Begin("Wind3D", nullptr,
@@ -192,8 +200,11 @@ bool Render(IDevice *device,
             }
             ImGui::Checkbox("Pause solver", &paused);
             ImGui::SameLine();
-            if (ImGui::Button("Reset"))
+            if (ImGui::Button("Reset")) {
               simulation.Reset();
+              load_history = {};
+            }
+            ImGui::Checkbox("Load history plots", &show_history);
             if (show_volume && state && !state->vorticity.empty())
               ImGui::Text("Volume |curl u|: %d x %d x %d", state->solver_nx, state->solver_nx / 2,
                           state->solver_nx * 3 / 4);
@@ -247,6 +258,7 @@ bool Render(IDevice *device,
             ImGui::TextWrapped(
                 "Incompressible flow without a turbulence model. Absolute aircraft loads require aerodynamic reference validation.");
             ImGui::End();
+            chart_height = load_charts::Draw(load_history, chart_settings, show_history, 410);
             auto &io = ImGui::GetIO();
             if (!io.WantCaptureMouse) {
               if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
@@ -315,7 +327,9 @@ bool Render(IDevice *device,
     float viewport_width =
         headless ? float(width) : std::max(1.0f, float(width) * (logical_width - 410) / logical_width);
     glm::vec3 eye{distance * cosf(pitch) * sinf(yaw), distance * sinf(pitch), distance * cosf(pitch) * cosf(yaw)};
-    auto transform = glm::perspectiveZO(glm::radians(45.0f), viewport_width / height, 0.1f, 80.0f) *
+    float viewport_height =
+        headless ? float(height) : std::max(1.0f, float(height) * (logical_height - chart_height) / logical_height);
+    auto transform = glm::perspectiveZO(glm::radians(45.0f), viewport_width / viewport_height, 0.1f, 80.0f) *
                      glm::lookAt(eye, glm::vec3(0), glm::vec3(0, 1, 0));
 
     struct Uniform {
@@ -329,7 +343,7 @@ bool Render(IDevice *device,
               glm::vec4(eye, 1),
               glm::uvec4(0),
               {show_volume ? volume_density : 0, volume_threshold, 0.1f, colored_volume ? 1.0f : 0.0f},
-              {viewport_width, float(height), streamline_width, 0.72f / streamline_density}};
+              {viewport_width, viewport_height, streamline_width, 0.72f / streamline_density}};
 
     if (volume_state && volume_state == state) {
       uint32_t nx = uint32_t(state->solver_nx);
@@ -345,7 +359,7 @@ bool Render(IDevice *device,
     render.depth_stencil.image = depth.Get();
     render.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
     if (!commands->CmdBeginRendering(render) ||
-        !commands->CmdSetViewport({0, 0, viewport_width, float(height), 0, 1}) ||
+        !commands->CmdSetViewport({0, 0, viewport_width, viewport_height, 0, 1}) ||
         !commands->CmdSetScissor({0, 0, width, height}))
       return RenderFailure(__LINE__);
     if (aircraft_buffer &&
@@ -369,7 +383,7 @@ bool Render(IDevice *device,
       overlay.depth_stencil.image = depth.Get();
       overlay.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_LOAD;
       if (!commands->CmdBeginRendering(overlay) || !commands->CmdBindProgram(stream_program.Get()) ||
-          !commands->CmdSetViewport({0, 0, viewport_width, float(height), 0, 1}) ||
+          !commands->CmdSetViewport({0, 0, viewport_width, viewport_height, 0, 1}) ||
           !commands->CmdBindGroup(0, group.Get()) || !commands->CmdBindVertexBuffer(0, stream_buffer.Get()) ||
           !commands->CmdDraw(6, uint32_t(stream_count)) || !commands->CmdEndRendering())
         return RenderFailure(__LINE__);
