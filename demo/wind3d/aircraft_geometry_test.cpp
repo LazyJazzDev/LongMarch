@@ -9,8 +9,14 @@ int main() {
   Controls controls;
   auto wing = AircraftPart(0, 1, controls);
   auto pylon = AircraftPart(6, 1, controls);
-  if (std::abs(wing.spec.camber - .04f) > 1e-7f || std::abs(pylon.spec.span - .18f) > 1e-7f ||
-      std::abs(pylon.spec.origin.y + .26f) > 1e-7f || NacelleRadius(.2f, 1) < .24f)
+  const float length = 6, diameter = 2 * FuselageRadius(-1.5f, 1);
+  const float span = 2 * (wing.spec.span + AircraftPart(3, 1, controls).spec.span);
+  float nacelle_diameter = 0;
+  for (int i = 0; i <= 100; ++i)
+    nacelle_diameter = std::max(nacelle_diameter, 2 * NacelleRadius(i / 100.f, 1));
+  if (span / length < .93f || span / length > .97f || diameter / length < .10f || diameter / length > .11f ||
+      nacelle_diameter / diameter < .55f || nacelle_diameter / diameter > .68f ||
+      std::abs(pylon.spec.span - .12f) > 1e-7f)
     return 1;
   size_t checked = 0;
   for (Airframe airframe : {Airframe{}, Airframe{2.7f, .025f, .55f, 1.05f, 1.65f}, Airframe{2, 0, 0, .6f, 1},

@@ -134,6 +134,11 @@ if (LONGMARCH_WIND3D_STANDALONE)
     return()
 endif ()
 
+add_executable(wind3d_aircraft_geometry_check EXCLUDE_FROM_ALL aircraft_geometry_test.cpp geometry.cpp)
+if (BUILD_TESTING)
+    add_test(NAME wind3d_aircraft_geometry_check COMMAND wind3d_aircraft_geometry_check)
+endif ()
+
 add_library(wind3d_aero_model STATIC EXCLUDE_FROM_ALL aero_model.cpp)
 target_link_libraries(wind3d_aero_model PRIVATE RapidJSON)
 add_library(wind3d_aero_mesh STATIC EXCLUDE_FROM_ALL aero_mesh.cpp)

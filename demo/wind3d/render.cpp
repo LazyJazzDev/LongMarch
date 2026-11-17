@@ -236,7 +236,7 @@ bool Render(IDevice *device,
             ImGui::SeparatorText("Integrated aircraft loads");
             if (state) {
               const auto &airframe = state->controls.airframe;
-              ImGui::Text("Wing span %.2f m | camber %.1f%%", 2 * (airframe.wing_span + .32f),
+              ImGui::Text("Wing span %.2f m | camber %.1f%%", 2 * (airframe.wing_span + .21f),
                           100 * airframe.wing_camber);
               ImGui::TextColored({0.1f, 1, 0.8f, 1}, "World-axis force [N]");
               ImGui::Text("Fx % .3f\nFy % .3f\nFz % .3f", state->force.x, state->force.y, state->force.z);

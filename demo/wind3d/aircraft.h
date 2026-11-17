@@ -15,10 +15,10 @@ struct Vec3 {
 };
 
 struct Airframe {
-  float wing_span{3.6f};  // Half-span excluding the 0.32 m raked tip.
-  float wing_camber{0.04f};
+  float wing_span{2.65f};  // Half-span excluding the 0.21 m tip.
+  float wing_camber{0.025f};
   float wing_sweep{0.55f};  // Leading-edge x offset per metre of span.
-  float tail_span{1.05f};
+  float tail_span{0.98f};
   float tail_leading{1.65f};
 };
 
@@ -89,7 +89,7 @@ WIND3D_HD float FuselageCenter(float x) {
 }
 
 WIND3D_HD float FuselageRadius(float x, float cosine) {
-  float radius = 0.30f;
+  float radius = 0.315f;
   if (x < -2)
     radius *= sqrtf(fmaxf(0, 1 - (x + 2) * (x + 2)));
   if (x > 1.5f)
@@ -142,8 +142,8 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
                 RotateZ(ey, -1.5f),
                 ez,
                 airframe.wing_span,
-                1.10f,
-                0.34f,
+                0.96f,
+                0.22f,
                 -1.04f,
                 airframe.wing_sweep,
                 0.09f,
@@ -159,31 +159,31 @@ WIND3D_HD FoilPart AircraftPart(int part, int side, const Controls &controls) {
     wing.origin = Add(wing.origin, Add(Scale(wing.y_axis, wing.dihedral * wing.span), Scale(wing.z_axis, wing.span)));
     wing.leading += wing.sweep * wing.span;
     wing.root = wing.tip;
-    wing.tip = 0.07f;
-    wing.span = 0.32f;
+    wing.tip = 0.06f;
+    wing.span = 0.21f;
     wing.sweep = 1.15f;
     wing.dihedral = 0.12f;
     return {wing, 0, wing.span, 0, false, false};
   }
   if (part == 4)
     return {
-        {{0, 0.12f, 0}, ex, ey, ez, airframe.tail_span, 0.75f, 0.28f, airframe.tail_leading, 0.36f, 0.04f, 0, 0.12f},
+        {{0, 0.12f, 0}, ex, ey, ez, airframe.tail_span, 0.62f, 0.22f, airframe.tail_leading, 0.36f, 0.04f, 0, 0.12f},
         0,
         airframe.tail_span,
         controls.elevator,
         true,
         false};
   if (part == 5)
-    return {{{0, 0.15f, 0}, ex, {0, 0, 1}, {0, 1, 0}, 1.05f, 1.15f, 0.4f, 1.3f, 0.6f, 0, 0, 0.12f},
+    return {{{0, 0.15f, 0}, ex, {0, 0, 1}, {0, 1, 0}, 0.85f, 0.90f, 0.30f, 1.40f, 0.6f, 0, 0, 0.12f},
             0,
-            1.05f,
+            0.85f,
             controls.rudder,
             true,
             false};
   // The pylon root sits inside the nacelle's upper wall, clear of the duct.
-  return {{{0, -0.26f, side * 0.92f}, ex, {0, 0, 1}, {0, 1, 0}, 0.18f, 0.48f, 0.58f, -0.95f, 0.94f, 0, 0, 0.12f},
+  return {{{0, -0.25f, side * 0.92f}, ex, {0, 0, 1}, {0, 1, 0}, 0.12f, 0.40f, 0.46f, -0.65f, 0.65f, 0, 0, 0.12f},
           0,
-          0.18f,
+          0.12f,
           0,
           false,
           false};
@@ -282,20 +282,20 @@ WIND3D_HD float PartDistance(Vec3 body, const FoilPart &part) {
 // duct whose wall has an elliptical inlet lip and a thin trailing edge.
 // Short, large-diameter fan cowl with a rounded inlet and contracted aft body.
 // The open duct remains unpowered; no fan thrust is added to the flow model.
-constexpr float nacelle_inlet = -1.3f, nacelle_length = 0.83f, nacelle_y = -0.50f;
+constexpr float nacelle_inlet = -0.98f, nacelle_length = 0.70f, nacelle_y = -0.43f;
 // A mild contraction for an unpowered through-duct. The previous 0.085 m
 // contraction reduced the nominal exit area to roughly 40% of the inlet.
-constexpr float nacelle_exit_contraction = 0.025f;
+constexpr float nacelle_exit_contraction = 0.020f;
 
 WIND3D_HD float NacelleMean(float t) {
-  return 0.235f + 0.018f * sinf(3.14159265359f * t) - nacelle_exit_contraction * Smooth((t - 0.35f) / 0.65f);
+  return 0.170f + 0.012f * sinf(3.14159265359f * t) - nacelle_exit_contraction * Smooth((t - 0.35f) / 0.65f);
 }
 
 WIND3D_HD float NacelleHalfThickness(float t) {
   float lip = fminf(fmaxf(t / 0.08f, 0), 1);
   // The last fifth tapers the wall to a thin exit trailing edge.
   float exit = 1 - 0.7f * Smooth((t - 0.8f) / 0.2f);
-  return 0.032f * sqrtf(lip * (2 - lip)) * (1 - 0.45f * t) * exit;
+  return 0.026f * sqrtf(lip * (2 - lip)) * (1 - 0.45f * t) * exit;
 }
 
 // surface: +1 outer skin, -1 duct wall.

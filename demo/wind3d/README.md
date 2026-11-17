@@ -11,6 +11,17 @@ cmake-build-release/demo/wind3d/demo_wind3d --aero --backend vulkan
 cmake-build-release/demo/wind3d/demo_wind3d --aero --backend d3d12 --grid 256
 ```
 
+The procedural airframe is being revised around a 6 m-long narrow-body
+transport: nominal span 5.72 m, cabin diameter 0.63 m, and nacelle outer
+diameter approximately 0.40 m. These proportions use the A320 family as a
+reference, not an exact certified aircraft surface:
+[Airbus aircraft characteristics](https://www.aircraft.airbus.com/sites/g/files/jlcbta126/files/2024-06/AC_A320_0624.pdf).
+The wing, empennage and pylon dimensions share the same geometric definitions
+between the renderer and fluid boundary. Older checkpoints and the historical
+9.3099 L/D results below describe the previous, larger-span geometry; do not
+restore those fields as a settled state for the revised aircraft. New trim
+results must be generated from the revised geometry.
+
 `--aero` reproduces the aerodynamic study settings: LFM, air kinematic viscosity
 and molecular wall viscosity of 1.5e-5 m²/s, slip cut cells with wall-shear loads,
 CFL 0.25, a 2 m outlet sponge and up to 128 pressure iterations per projection.
