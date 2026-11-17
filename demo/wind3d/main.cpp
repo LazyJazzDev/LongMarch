@@ -24,7 +24,17 @@ int main(int argc, char **argv) {
       validate = true;
     else if (key == "--lfm")
       solver.leapfrog_flow_maps = true;
-    else if (key == "--maccormack")
+    else if (key == "--aero") {
+      // Reproduce the aerodynamic validation model without changing export,
+      // diagnostics, grid or controls selected by other command-line options.
+      solver.leapfrog_flow_maps = true;
+      solver.viscosity = solver.wall_viscosity = 1.5e-5f;
+      solver.wall_model = solver.cut_cells = true;
+      solver.wall_momentum = false;
+      solver.sponge = 2;
+      solver.cfl = 0.25f;
+      solver.pressure_cycles = 128;
+    } else if (key == "--maccormack")
       solver.leapfrog_flow_maps = false;
     else if (key == "--wall-model")
       solver.wall_model = true;
@@ -54,7 +64,9 @@ int main(int argc, char **argv) {
           << "demo_wind3d [--backend vulkan|d3d12] [--grid 64..640, multiple of 16] "
              "[--speed 1..30] [--angle -20..25] [--flap 0..40] [--aileron -25..25] "
              "[--elevator -25..25] [--rudder -25..25] [--frames N] [--headless] "
-             "[--lfm|--maccormack|--first-order] [--viscosity NU] [--wall-viscosity NU] [--wall-model|--slip-walls|--cut-cells] [--cubic] [--sponge METRES] [--no-export] [--cfl 0.05..8] [--max-dt SECONDS] [--diagnostics file.csv] [--validate-time SECONDS] [--pressure-tolerance 1e-6..0.1] [--pressure-cycles 1..256] [--model-only] [--yaw RADIANS] [--pitch RADIANS] [--distance METRES] [--capture image.ppm] [--validate --steps N] [--debug]\n";
+             "[--aero] [--lfm|--maccormack|--first-order] [--viscosity NU] [--wall-viscosity NU] [--wall-model|--slip-walls|--cut-cells] [--cubic] [--sponge METRES] [--no-export] [--cfl 0.05..8] [--max-dt SECONDS] [--diagnostics file.csv] [--validate-time SECONDS] [--pressure-tolerance 1e-6..0.1] [--pressure-cycles 1..256] [--model-only] [--yaw RADIANS] [--pitch RADIANS] [--distance METRES] [--capture image.ppm] [--validate --steps N] [--debug]\n"
+          << "--aero: LFM, air viscosity 1.5e-5 m^2/s, slip cut cells with wall-shear loads, CFL 0.25, 2 m sponge.\n"
+          << "Place --aero before any individual solver overrides.\n";
       return 0;
     } else {
       if (++i >= argc) {

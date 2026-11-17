@@ -7,9 +7,16 @@ frontend supports Vulkan and D3D12.
 
 ```powershell
 cmake --build cmake-build-release --target demo_wind3d
-cmake-build-release/demo/wind3d/demo_wind3d --backend vulkan
-cmake-build-release/demo/wind3d/demo_wind3d --backend d3d12 --grid 256
+cmake-build-release/demo/wind3d/demo_wind3d --aero --backend vulkan
+cmake-build-release/demo/wind3d/demo_wind3d --aero --backend d3d12 --grid 256
 ```
+
+`--aero` reproduces the aerodynamic study settings: LFM, air kinematic viscosity
+and molecular wall viscosity of 1.5e-5 m²/s, slip cut cells with wall-shear loads,
+CFL 0.25, a 2 m outlet sponge and up to 128 pressure iterations per projection.
+It preserves grid, camera, control, export and diagnostic options. Put it before
+individual solver overrides. Without this preset, the original high-viscosity
+desktop demonstration defaults remain in effect.
 
 ## Leapfrog Flow Maps desktop solver
 
