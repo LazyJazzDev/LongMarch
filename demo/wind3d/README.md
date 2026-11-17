@@ -192,6 +192,12 @@ This demonstrates temporal settling, not spatial convergence: L/D increases
 tail/nacelle drag. The 384 study was stopped before completion when the evaluation
 priority changed; its partial trajectory is not a convergence result.
 
+A current-build continuation of the 256 checkpoint through 3.123 seconds
+reproduced L/D 9.309895 (mean lift 268.297 N, drag 28.819 N), with all
+projections and pause/reset/control/resume lifecycle checks passing. This
+checks preservation of the settled state; it does not replace the fresh-start
+trajectory above or establish spatial convergence.
+
 The evaluation priority is computational efficiency and credible lift, drag,
 and control forces/moments across aircraft configurations. Strict spatial
 convergence is not an acceptance requirement. L/D near 10 at this one condition
@@ -808,3 +814,15 @@ cmake-build-release/demo/wind3d/wind3d_model_sample.exe model.json cases.json lo
 程序接口为 `SolverOptions::model / initial_model_state / initial_body_pose` 和 `Simulation::ConfigureModel`。`Snapshot::force/moment` 保持世界坐标、关于世界原点的原语义；通用模型的 `Snapshot::body_loads` 才是物体坐标下关于模型参考点的载荷。传统飞机部件分项不适用于通用模型，保持为零。通用模型渲染顶点会随姿态更新；当前桌面窗口的交互入口仍是原有飞机控件，通用模型的用户入口是上述批采样工具。
 
 `wind3d_aero_solver_check out/wind3d-aero/solver-integration-test.obj` 覆盖真实 OBJ 流体边界、控制切换后的流场复用、显示网格姿态、载荷坐标/参考点转换，以及越界控制、非刚体变换和域外几何的拒绝。测试路径及相邻 `.obj.json` 为可覆盖并删除的临时文件。验证这些数据通路不代表已验证任意外形的气动精度。
+
+For settling checks, repeat a state without changing controls and compare
+successive physical-time windows for **both force and moment**. Also test
+returning to that state after a different deflection. A 128-grid box test with
+2 s settling and 0.5 s averaging changed its mean moment by 8.38% when the
+same state continued for another 2.5 s, even though pressure converged. After
+an A-to-B-to-A sequence and the same additional continuation, mean force and
+moment agreed with the earlier continued A state within 0.010% and 0.048%,
+respectively. This is evidence of repeatable relaxation for that test, not a
+universal settling time or validation of arbitrary-shape aerodynamic accuracy.
+The default 0.5 s wait is a starting setting, not a declaration of steady loads;
+small within-window RMS alone cannot rule out drift over longer time scales.
