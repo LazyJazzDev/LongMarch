@@ -25,6 +25,7 @@ using visualization::FlowLines;
 
 struct StreamSegment {
   Vec3 start, end, color, previous, next;
+  float curvature_start, curvature_end;
 };
 }  // namespace
 
@@ -77,6 +78,7 @@ bool Render(IDevice *device,
   stream_desc.vertex_bindings = {{sizeof(StreamSegment), true}};
   stream_desc.vertex_attributes.push_back({3, 0, INPUT_TYPE_FLOAT3, 36});
   stream_desc.vertex_attributes.push_back({4, 0, INPUT_TYPE_FLOAT3, 48});
+  stream_desc.vertex_attributes.push_back({5, 0, INPUT_TYPE_FLOAT2, 60});
   stream_desc.color_formats = {IMAGE_FORMAT_R8G8B8A8_UNORM};
   stream_desc.depth_stencil.depth_write = false;
   stream_desc.blend_states = {BlendState(true)};
@@ -123,6 +125,7 @@ bool Render(IDevice *device,
   int streamline_density = view.streamline_density;
   float streamline_width = view.streamline_width;
   float opaque_curvature = view.opaque_curvature;
+  float transparent_curvature = view.transparent_curvature;
   bool paused = false, streamlines = view.flow, show_loads = view.loads, rebuild = true;
   bool show_volume = view.volume, colored_volume = false;
   float volume_density = 0.035f, volume_threshold = 6.0f, volume_step = 1.0f;
@@ -218,10 +221,12 @@ bool Render(IDevice *device,
               rebuild |= ImGui::Checkbox("3D streamlines", &streamlines);
               rebuild |= ImGui::SliderInt("Streamline density", &streamline_density, 1, 4);
               ImGui::SliderFloat("Streamline width (px)", &streamline_width, 0.75f, 4.0f);
-              ImGui::SliderFloat("Opaque curvature (1/m)", &opaque_curvature, 0.001f, 10.0f, "%.3f",
-                                 ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
+              ImGui::SliderFloat("Transparent curvature (1/m)", &transparent_curvature, 0.0f, opaque_curvature - 0.001f,
+                                 "%.3f", ImGuiSliderFlags_AlwaysClamp);
+              ImGui::SliderFloat("Opaque curvature (1/m)", &opaque_curvature, transparent_curvature + 0.001f, 10.0f,
+                                 "%.3f", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
               ImGui::TextWrapped(
-                  "Straight flow is transparent. Curvature at this threshold is fully opaque; lower values reveal gentler bends.");
+                  "Opacity remembers the largest upstream curvature. Below the lower threshold: transparent; at the upper threshold: opaque. Bends remain visible downstream.");
               rebuild |= ImGui::Checkbox("Force and moment vectors", &show_loads);
               ImGui::SliderFloat("Orbit", &yaw, -3.14f, 3.14f);
               ImGui::SliderFloat("Elevation", &pitch, -1.55f, 1.55f);
@@ -318,7 +323,7 @@ bool Render(IDevice *device,
         Vec3 start = flow[i].position, end = flow[i + 1].position;
         Vec3 previous = i >= 2 && same_point(flow[i - 1].position, start) ? flow[i - 2].position : start;
         Vec3 next = i + 2 < flow.size() && same_point(flow[i + 2].position, end) ? flow[i + 3].position : end;
-        segments.push_back({start, end, flow[i].color, previous, next});
+        segments.push_back({start, end, flow[i].color, previous, next, flow[i].normal.x, flow[i + 1].normal.x});
       }
       stream_count = segments.size();
       if (stream_count) {
@@ -343,12 +348,14 @@ bool Render(IDevice *device,
       glm::uvec4 grid;
       glm::vec4 volume;
       glm::vec4 streamlines;
+      glm::vec4 curvature;
     } globals{transform,
               glm::inverse(transform),
               glm::vec4(eye, 1),
               glm::uvec4(0),
               {show_volume ? volume_density : 0, volume_threshold, 0.1f, colored_volume ? 1.0f : 0.0f},
-              {viewport_width, viewport_height, streamline_width, opaque_curvature}};
+              {viewport_width, viewport_height, streamline_width, opaque_curvature},
+              {transparent_curvature, 0, 0, 0}};
 
     if (volume_state && volume_state == state) {
       uint32_t nx = uint32_t(state->solver_nx);

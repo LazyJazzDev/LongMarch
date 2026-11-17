@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
           << "Place --aero before any individual solver overrides.\n";
       std::cout << "--restore FILE resumes a checkpoint; supply its original grid, controls and solver settings.\n";
       std::cout
-          << "Flow view: --streamlines --no-volume --streamline-density 1..4 --streamline-width 0.75..4 (pixels) --streamline-curvature 0.001..10 (1/m).\n";
+          << "Flow view: --streamlines --no-volume --streamline-density 1..4 --streamline-width 0.75..4 (pixels) --streamline-curvature 0.001..10 (1/m) --streamline-transparent-curvature 0..upper (exclusive).\n";
       std::cout
           << "Airframe: --wing-span 2..4.2 (half-span, m), --wing-camber 0..0.06, --wing-sweep 0..0.7 (slope), --tail-span 0.6..1.4 (half-span, m), --tail-leading 1..2 (body x, m).\n";
       return 0;
@@ -142,6 +142,8 @@ int main(int argc, char **argv) {
           view.pitch = number;
         else if (key == "--distance")
           view.distance = number;
+        else if (key == "--streamline-transparent-curvature")
+          view.transparent_curvature = number;
         else if (key == "--streamline-curvature")
           view.opaque_curvature = number;
         else if (key == "--streamline-width")
@@ -177,6 +179,7 @@ int main(int argc, char **argv) {
   }
   if (view.streamline_density < 1 || view.streamline_density > 4 || view.streamline_width < .75f ||
       view.streamline_width > 4 || view.opaque_curvature < .001f || view.opaque_curvature > 10 ||
+      view.transparent_curvature < 0 || view.transparent_curvature >= view.opaque_curvature ||
       !wind3d::ValidAirframe(controls.airframe) || grid < 64 || grid > 640 || grid % 16 || steps < 1 ||
       controls.speed < 1 || controls.speed > 30 || controls.angle < -20 || controls.angle > 25 || controls.flap < 0 ||
       controls.flap > 40 || std::abs(view.pitch) > 1.55f || view.distance < 7 || view.distance > 25 ||

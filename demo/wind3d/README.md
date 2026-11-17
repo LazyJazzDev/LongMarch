@@ -20,13 +20,18 @@ desktop demonstration defaults remain in effect.
 
 Desktop streamlines use seeds throughout the 16 x 8 x 12 m flow domain and
 trace both directions, including regions disconnected from inlet streamlines.
-Occupied seed bins limit duplicate coverage. In **View**, **Opaque curvature
-(1/m)** controls the world-space curvature at which a line becomes opaque and
-warm-colored (default 0.15/m). Straight segments are fully transparent; below
-the threshold opacity scales linearly with curvature. Lower the threshold to
-reveal gentler bending. Camera motion does not change this metric, and the
-slider updates shading without rebuilding trajectories. The same initial
-threshold can be set with `--streamline-curvature 0.15`.
+Occupied seed bins limit duplicate seeds without truncating downstream paths.
+In **View**, **Transparent curvature (1/m)** sets the fully transparent lower
+threshold (default 0.01/m), and **Opaque curvature (1/m)** sets the fully opaque,
+warm-colored upper threshold (default 0.15/m). Opacity scales linearly between
+these thresholds using the **largest curvature encountered upstream**, so it
+never decreases along the flow direction, even after a bend straightens out.
+Entirely straight lines remain invisible. Each new streamline starts its own
+history; this is spatial accumulation within a snapshot, not persistence across
+simulation frames. Camera motion does not change the metric, and both sliders
+update shading without rebuilding trajectories. Initial thresholds can also be
+set with `--streamline-transparent-curvature 0.01 --streamline-curvature 0.15`.
+The lower threshold must be smaller than the upper threshold.
 
 The desktop ImGui window includes side-by-side force (Fx/Fy/Fz) and moment
 (Mx/My/Mz) histories, using the same RGB axes and physical-time windows as the

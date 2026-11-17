@@ -5,6 +5,7 @@ struct Uniform {
   uint4 grid;
   float4 volumeSettings;      // density, threshold [s^-1], step [m], color mode
   float4 streamlineSettings;  // viewport pixels, width pixels, opaque curvature [1/m]
+  float4 curvatureSettings;   // fully transparent curvature [1/m]
 };
 
 RHI_UNIFORM(0, 0, Uniform, globals);
@@ -21,6 +22,7 @@ struct StreamInput {
   RHI_INPUT(2, float3, color);
   RHI_INPUT(3, float3, previous);
   RHI_INPUT(4, float3, next);
+  RHI_INPUT(5, float2, curvatureHistory);
 };
 
 struct StreamVarying {
@@ -31,12 +33,6 @@ struct StreamVarying {
   nointerpolation float2 caps : TEXCOORD2;
   float curvature : TEXCOORD3;
 };
-
-float Curvature(float3 a, float3 b, float3 c) {
-  float3 u = b - a, v = c - b;
-  float denominator = length(u) * length(v) * length(c - a);
-  return denominator > 1e-12 ? 2 * length(cross(u, v)) / denominator : 0;
-}
 
 StreamVarying VSStream(StreamInput input, uint id : SV_VertexID) {
   StreamVarying result;
@@ -67,13 +63,7 @@ StreamVarying VSStream(StreamInput input, uint id : SV_VertexID) {
   float2 normal = float2(-direction.y, direction.x);
   const float2 corners[6] = {float2(0, -1), float2(1, -1), float2(0, 1), float2(0, 1), float2(1, -1), float2(1, 1)};
   float2 corner = corners[id];
-  float ka = Curvature(input.previous, input.start, input.end);
-  float kb = Curvature(input.start, input.end, input.next);
-  if (result.caps.x > 0)
-    ka = kb;
-  if (result.caps.y > 0)
-    kb = ka;
-  result.curvature = corner.x > 0 ? kb : ka;
+  result.curvature = corner.x > 0 ? input.curvatureHistory.y : input.curvatureHistory.x;
   float extent = globals.streamlineSettings.z * 0.5 + 1;
   float4 clip = corner.x > 0 ? b : a;
   float cap = corner.x > 0 ? result.caps.y : result.caps.x;
@@ -108,7 +98,8 @@ float4 PSStream(StreamVarying input) : SV_Target0 {
   float coverage = saturate(0.5 - distance);
   if (coverage <= 0)
     discard;
-  float emphasis = saturate(input.curvature / globals.streamlineSettings.w);
+  float emphasis = saturate((input.curvature - globals.curvatureSettings.x) /
+                            (globals.streamlineSettings.w - globals.curvatureSettings.x));
   if (emphasis <= 0)
     discard;
   float3 color = lerp(input.color, float3(1, 0.35, 0.06), emphasis);

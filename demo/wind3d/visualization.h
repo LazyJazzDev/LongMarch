@@ -39,6 +39,24 @@ inline void Arrow(std::vector<Vertex> &lines, Vec3 origin, Vec3 vector, Vec3 col
   Line(lines, end, Add(base, Scale(perpendicular, -1)), color);
 }
 
+// Prefix maximum follows the ordered polyline in the velocity direction.
+inline std::vector<float> CurvatureHistory(const std::vector<Vec3> &points) {
+  std::vector<float> history(points.size());
+  if (points.size() < 3)
+    return history;
+  for (size_t i = 1; i + 1 < points.size(); ++i) {
+    Vec3 u = Add(points[i], Scale(points[i - 1], -1));
+    Vec3 v = Add(points[i + 1], Scale(points[i], -1));
+    float denominator = Length(u) * Length(v) * Length(Add(u, v));
+    history[i] = denominator > 1e-12f ? 2 * Length(Cross(u, v)) / denominator : 0;
+  }
+  history.front() = history[1];
+  history.back() = history[history.size() - 2];
+  for (size_t i = 1; i < history.size(); ++i)
+    history[i] = std::max(history[i], history[i - 1]);
+  return history;
+}
+
 // Volumetric seeds catch disconnected recirculation as well as inlet flow.
 // Occupied seed bins prevent tracing the same region repeatedly.
 inline std::vector<Vertex> DomainFlowLines(const Snapshot &snapshot, int density) {
@@ -95,8 +113,6 @@ inline std::vector<Vertex> DomainFlowLines(const Snapshot &snapshot, int density
             if (AircraftDistance(mid, snapshot.controls) < 0 || AircraftDistance(next, snapshot.controls) < 0)
               break;
             int cell = bin(next);
-            if (occupied[cell] >= 0 && occupied[cell] != owner)
-              break;
             occupied[cell] = owner;
             if (Length(Add(next, Scale(p, -1))) < 1e-6f)
               break;
@@ -111,11 +127,14 @@ inline std::vector<Vertex> DomainFlowLines(const Snapshot &snapshot, int density
         std::reverse(backward.begin(), backward.end());
         backward.push_back(seed);
         backward.insert(backward.end(), forward.begin(), forward.end());
+        auto curvature = CurvatureHistory(backward);
         for (size_t i = 1; i < backward.size(); ++i) {
           float ratio =
               std::clamp(Length(SampleVelocity(snapshot, backward[i - 1])) / snapshot.controls.speed * .6f, 0.f, 1.f);
           Line(lines, backward[i - 1], backward[i],
                {.05f + ratio * ratio * .8f, .25f + .6f * ratio, .9f - .75f * ratio});
+          lines[lines.size() - 2].normal.x = curvature[i - 1];
+          lines.back().normal.x = curvature[i];
         }
         ++owner;
       }
