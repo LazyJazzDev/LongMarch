@@ -701,7 +701,12 @@ plus stabilizer trim, wingtip selection, independent outer flaps, cruise camber,
 aileron droop, slats, spoilers and their linkages. The mailbox preserves the
 legacy six-control/density prefix and appends a `wing-v1` extension; old saved
 relay states acquire neutral/default values for the new fields. Control-change
-history events include all these parameters. The worker also supports
+history events include all these parameters. Startup reads the current mailbox
+before creating the solver, including when restoring a checkpoint, so the
+first restored step already uses the requested full configuration. A historical
+reset counter is acknowledged at startup rather than resetting the restored
+flow a second time. Supply matching controls and solver settings for restores.
+The worker also supports
 pause/resume and reset. The browser displays the actual aircraft mesh,
 instantaneous streamlines, full-grid force and moment, and solver diagnostics.
 Geometry and streamline construction are shared with the native renderer in

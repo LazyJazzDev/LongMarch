@@ -50,6 +50,47 @@ void Controls(std::ostream &s, const wind3d::Controls &c) {
 bool Same(const wind3d::Controls &a, const wind3d::Controls &b) {
   return a.speed == b.speed && wind3d::SameAircraftGeometry(a, b);
 }
+
+struct Command {
+  uint64_t sequence{}, reset{};
+  bool paused{};
+  int density{2};
+  wind3d::Controls controls;
+};
+
+bool ReadCommand(const std::filesystem::path &path, Command &command) {
+  std::ifstream input(path);
+  int pause = 0;
+  auto &controls = command.controls;
+  if (!(input >> command.sequence >> command.reset >> pause >> controls.speed >> controls.angle >> controls.flap >>
+        controls.aileron >> controls.elevator >> controls.rudder))
+    return false;
+  command.paused = pause != 0;
+  int &requested_density = command.density;
+  input >> requested_density;
+  bool extension_valid = true;
+  std::string extension;
+  if (input >> extension) {
+    int winglets = 1, linked_flaps = 1, linked_roll = 0, linked_slats = 0;
+    auto &w = controls.wing_controls;
+    extension_valid =
+        extension == "wing-v1" &&
+        bool(input >> controls.airframe.tail_incidence >> winglets >> linked_flaps >> w.outer_flap >> w.cruise_camber >>
+             w.aileron_droop >> w.spoiler >> w.spoiler_roll >> linked_roll >> w.slat >> linked_slats);
+    auto flag = [](int value) { return value == 0 || value == 1; };
+    extension_valid &= flag(winglets) && flag(linked_flaps) && flag(linked_roll) && flag(linked_slats);
+    controls.airframe.winglets = winglets != 0;
+    w.linked_flaps = linked_flaps != 0;
+    w.linked_spoiler_roll = linked_roll != 0;
+    w.linked_slats = linked_slats != 0;
+  }
+  return extension_valid && wind3d::ValidAirframe(controls.airframe) &&
+         wind3d::ValidWingControls(controls.wing_controls) && requested_density >= 1 && requested_density <= 4 &&
+         (pause == 0 || pause == 1) && controls.speed >= 1 && controls.speed <= 30 && controls.angle >= -20 &&
+         controls.angle <= 25 && controls.flap >= 0 && controls.flap <= 40 && std::abs(controls.aileron) <= 25 &&
+         std::abs(controls.elevator) <= 25 && std::abs(controls.rudder) <= 25;
+}
+
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -109,21 +150,28 @@ int main(int argc, char **argv) {
   const auto started = std::chrono::steady_clock::now();
   auto next_checkpoint = started;
   unsigned checkpoint_index = 0;
+  Command initial;
+  const bool initial_command = ReadCommand(directory / "controls.txt", initial);
+  if (initial_command)
+    options.initial_controls = initial.controls;
   auto simulation = wind3d::Simulation::Create(0, std::atoi(argv[2]), options);
   if (!simulation) {
     Write(directory / "error.txt", "CUDA solver initialization failed");
     return 2;
   }
   std::filesystem::remove(directory / "error.txt", error);
-  uint64_t request = 0, reset = 0, expected_generation = 0, last_step = 0, last_generation = ~uint64_t(0);
+  uint64_t request = initial_command ? initial.sequence : 0, reset = initial_command ? initial.reset : 0;
+  uint64_t expected_generation = 0, last_step = 0, last_generation = ~uint64_t(0);
   uint64_t frame = 0;
   // Unique mesh IDs survive restarting the agent in the same mailbox.
   uint64_t mesh_id = std::chrono::system_clock::now().time_since_epoch().count();
   const auto run_id = std::to_string(mesh_id);
   uint64_t published_load_step = 0, published_load_generation = ~uint64_t(0);
   auto next_loads = std::chrono::steady_clock::now();
-  bool paused = false;
-  int density = 2;
+  bool paused = initial_command && initial.paused;
+  int density = initial_command ? initial.density : 2;
+  if (paused)
+    simulation->Configure(options.initial_controls, true);
   wind3d::Controls requested = options.initial_controls;
   std::shared_ptr<const std::vector<wind3d::Vertex>> mesh;
 
@@ -138,47 +186,17 @@ int main(int argc, char **argv) {
   double condition_start = 0;
   auto next = std::chrono::steady_clock::now();
   while (running) {
-    std::ifstream input(directory / "controls.txt");
-    uint64_t sequence, reset_request;
-    int pause;
-    wind3d::Controls controls;
-    if (input >> sequence >> reset_request >> pause >> controls.speed >> controls.angle >> controls.flap >>
-        controls.aileron >> controls.elevator >> controls.rudder) {
-      int requested_density = 2;
-      input >> requested_density;
-      bool extension_valid = true;
-      std::string extension;
-      if (input >> extension) {
-        int winglets = 1, linked_flaps = 1, linked_roll = 0, linked_slats = 0;
-        auto &w = controls.wing_controls;
-        extension_valid =
-            extension == "wing-v1" && bool(input >> controls.airframe.tail_incidence >> winglets >> linked_flaps >>
-                                           w.outer_flap >> w.cruise_camber >> w.aileron_droop >> w.spoiler >>
-                                           w.spoiler_roll >> linked_roll >> w.slat >> linked_slats);
-        auto flag = [](int value) { return value == 0 || value == 1; };
-        extension_valid &= flag(winglets) && flag(linked_flaps) && flag(linked_roll) && flag(linked_slats);
-        controls.airframe.winglets = winglets != 0;
-        w.linked_flaps = linked_flaps != 0;
-        w.linked_spoiler_roll = linked_roll != 0;
-        w.linked_slats = linked_slats != 0;
-      }
-      bool valid = extension_valid && wind3d::ValidAirframe(controls.airframe) &&
-                   wind3d::ValidWingControls(controls.wing_controls) && requested_density >= 1 &&
-                   requested_density <= 4 && (pause == 0 || pause == 1) && controls.speed >= 1 &&
-                   controls.speed <= 30 && controls.angle >= -20 && controls.angle <= 25 && controls.flap >= 0 &&
-                   controls.flap <= 40 && std::abs(controls.aileron) <= 25 && std::abs(controls.elevator) <= 25 &&
-                   std::abs(controls.rudder) <= 25;
-      if (valid && sequence != request) {
-        density = requested_density;
-        requested = controls;
-        paused = pause != 0;
-        request = sequence;
-        simulation->Configure(requested, paused);
-        if (reset_request != reset) {
-          simulation->Reset();
-          ++expected_generation;
-          reset = reset_request;
-        }
+    Command command;
+    if (ReadCommand(directory / "controls.txt", command) && command.sequence != request) {
+      density = command.density;
+      requested = command.controls;
+      paused = command.paused;
+      request = command.sequence;
+      simulation->Configure(requested, paused);
+      if (command.reset != reset) {
+        simulation->Reset();
+        ++expected_generation;
+        reset = command.reset;
       }
     }
     auto failure = simulation->Error();
