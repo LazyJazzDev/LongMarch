@@ -764,10 +764,15 @@ size_t SolverBytes(int nx) {
   size_t ny = nx / 2, nz = nx * 3 / 4;
   size_t nf = (nx + 1) * (ny + 1) * (nz + 1), nc = nx * ny * nz;
   // Seven face velocity fields, three face masks, three cell fields, the cell
-  // mask, block statistics, the pressure fine level and CG vectors, and the
-  // multigrid hierarchy (a geometric series bounded by 1/7 of the fine level).
+  // mask, block statistics, the pressure hierarchy and double-precision CG
+  // vectors. Count rounded coarse levels explicitly, including odd dimensions.
   size_t fluid = 7 * 4 * nf + 6 * nf + 3 * 4 * nc + nc + (nc + 255) / 256 * sizeof(Statistics);
-  size_t pressure = (sizeof(float4) + 3 * 4) * nc * 8 / 7 + 3 * 4 * nc;
+  size_t pressure = 4 * sizeof(double) * nc + ((nc + 255) / 256 + 256) * sizeof(double2);
+  for (size_t x = nx, y = ny, z = nz;; x = (x + 1) / 2, y = (y + 1) / 2, z = (z + 1) / 2) {
+    pressure += (sizeof(float4) + 3 * sizeof(double)) * x * y * z;
+    if (x <= 4 && y <= 4 && z <= 4)
+      break;
+  }
   size_t display = size_t(192) * 96 * 144 * sizeof(Cell);
   return fluid + pressure + display + (size_t(256) << 20);
 }
