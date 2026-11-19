@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstring>
@@ -304,18 +305,24 @@ bool MetalCommandContextImpl::CopyBuffer(IMetalBuffer *src,
   return true;
 }
 
-bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
+bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level) {
   auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
-  const uint64_t pitch = native ? uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) : 0;
+  if (!native || mip_level >= image->GetDesc().mip_levels || mip_level >= 32) {
+    recording_failed_ = true;
+    return false;
+  }
+  auto desc = image->GetDesc();
+  desc.width = std::max(1u, desc.width >> mip_level);
+  desc.height = std::max(1u, desc.height >> mip_level);
+  const uint64_t pitch = uint64_t(desc.width) * ImageFormatSize(desc.format);
   if (sealed_ || encoder_ || !native || !image->IsValid() ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
       !IsColorFormat(image->GetDesc().format) || !pitch || row_pitch < pitch ||
-      (image->GetDesc().height - 1) > (SIZE_MAX - pitch) / row_pitch) {
+      (desc.height - 1) > (SIZE_MAX - pitch) / row_pitch) {
     recording_failed_ = true;
     return false;
   }
 
-  const auto desc = image->GetDesc();
   const uint64_t size = pitch * desc.height;
   auto upload = device_->UploadPool().Acquire(size);
   if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
@@ -333,7 +340,7 @@ bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
     return false;
   }
   blit->copyFromBuffer(upload->NativeBuffer(), 0, pitch, size, MTL::Size::Make(desc.width, desc.height, 1),
-                       native->NativeImage(), 0, 0, MTL::Origin::Make(0, 0, 0));
+                       native->NativeImage(), 0, mip_level, MTL::Origin::Make(0, 0, 0));
   blit->endEncoding();
   return true;
 }

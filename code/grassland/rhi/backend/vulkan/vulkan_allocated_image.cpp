@@ -43,7 +43,7 @@ VkImage VulkanAllocatedImageImpl::NativeImage() const {
 }
 
 IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc &desc) {
-  if (!desc.width || !desc.height)
+  if (!desc.mip_levels || desc.mip_levels > MaxImageMipLevels(desc))
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (format == VK_FORMAT_UNDEFINED)
@@ -63,7 +63,8 @@ IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc 
   info.imageType = VK_IMAGE_TYPE_2D;
   info.format = format;
   info.extent = {desc.width, desc.height, 1};
-  info.mipLevels = info.arrayLayers = 1;
+  info.mipLevels = desc.mip_levels;
+  info.arrayLayers = 1;
   info.samples = VK_SAMPLE_COUNT_1_BIT;
   info.tiling = VK_IMAGE_TILING_OPTIMAL;
   info.usage =
@@ -78,7 +79,7 @@ IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc 
   if (!Check(vmaCreateImage(device->Allocator(), &info, &memory, &image->image_, &image->allocation_, nullptr),
              "Allocate image"))
     return nullptr;
-  if (!image->views_.Initialize(device->NativeDevice(), image->image_, desc.format, true))
+  if (!image->views_.Initialize(device->NativeDevice(), image->image_, desc.format, true, desc.mip_levels))
     return nullptr;
   // Establish the fixed default layout once, before exposing the resource.
   // Temporary initialization commands are outside the rendering loop.
@@ -111,7 +112,7 @@ IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc 
     barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
     barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image->image_;
-    barrier.subresourceRange = {ImageAspect(desc.format), 0, 1, 0, 1};
+    barrier.subresourceRange = {ImageAspect(desc.format), 0, desc.mip_levels, 0, 1};
     vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
                          0, nullptr, 1, &barrier);
     status = vkEndCommandBuffer(commands);

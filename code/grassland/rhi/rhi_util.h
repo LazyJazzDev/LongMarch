@@ -314,7 +314,11 @@ struct ImageDesc {
   uint32_t width{};
   uint32_t height{};
   ImageFormat format{IMAGE_FORMAT_UNKNOWN};
+  uint32_t mip_levels{1};
 };
+
+// Maximum complete mip chain for a non-empty two-dimensional image.
+uint32_t MaxImageMipLevels(const ImageDesc &desc);
 
 typedef enum {
   SHADER_STAGE_VERTEX,

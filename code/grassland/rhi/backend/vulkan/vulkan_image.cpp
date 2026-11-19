@@ -42,7 +42,11 @@ VkImageView VulkanImageViews::Binding() const {
   return binding_;
 }
 
-bool VulkanImageViews::Initialize(VkDevice device, VkImage image, ImageFormat format, bool sampled) {
+bool VulkanImageViews::Initialize(VkDevice device,
+                                  VkImage image,
+                                  ImageFormat format,
+                                  bool sampled,
+                                  uint32_t mip_levels) {
   Reset();
   device_ = device;
   VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
@@ -53,8 +57,11 @@ bool VulkanImageViews::Initialize(VkDevice device, VkImage image, ImageFormat fo
   if (!Check(vkCreateImageView(device, &create, nullptr, &attachment_), "Create attachment view"))
     return false;
   if (sampled) {
-    if (IsDepthFormat(format) && (create.subresourceRange.aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT)) {
-      create.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (mip_levels > 1 ||
+        (IsDepthFormat(format) && (create.subresourceRange.aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT))) {
+      if (IsDepthFormat(format))
+        create.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+      create.subresourceRange.levelCount = mip_levels;
       if (!Check(vkCreateImageView(device, &create, nullptr, &binding_), "Create depth binding view")) {
         Reset();
         return false;

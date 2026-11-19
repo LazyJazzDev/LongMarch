@@ -1,5 +1,27 @@
 # RHI native validation
 
+## Mipmapped color textures
+
+`ImageDesc::mip_levels` defaults to one. Requests outside the complete chain for
+the given dimensions return a null image. `CmdUploadImage(image, data, row_pitch,
+mip_level)` uploads a single color level; each level uses its own reduced width
+and height. Sampled bindings expose all levels, while render targets, storage
+bindings, clears and downloads address level zero.
+
+`SamplerDesc` controls mip filtering, LOD clamps and maximum anisotropy. Values
+above one require linear min/mag/mip filtering and hardware support; unsupported
+requests fail instead of silently changing the requested filtering. Existing
+single-level image uploads remain source-compatible.
+
+`test_rhi_mipmaps` uploads three distinct levels with padded rows and verifies
+GPU readback of explicit LOD selection, trilinear interpolation and LOD clamps,
+plus anisotropic sampler creation and rejection of invalid inputs. Select the
+backend with `RHI_TEST_BACKEND=d3d12`, `vulkan` or `metal`. The same test source
+also builds as `football_texture_test` in the independent native football
+consumer. It passed on Windows D3D12/Vulkan, Linux Vulkan and macOS Metal;
+consumer CI run `LazyJazz/ragdoll-football-cpp/actions/runs/44489732338` records
+the Linux and macOS executions with engine revision `195a6e5`.
+
 `CreateCore(api, CoreDesc{enable_debug})` selects native backend diagnostics.
 Omitting the descriptor enables them when `NDEBUG` is undefined and disables them otherwise;
 callers can explicitly pass `{false}` for profiling or `{true}` for Release diagnostics.

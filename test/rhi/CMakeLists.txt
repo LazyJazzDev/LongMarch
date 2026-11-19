@@ -1,4 +1,7 @@
 add_executable(test_rhi rasterizer_test.cpp format_test.cpp download_test.cpp core_test.cpp rhi_test.cpp object_ptr_test.cpp obj_ptr_test.cpp raw_api_test.cpp window_test.cpp program_test.cpp buffer_test.cpp image_test.cpp descriptor_pool_test.cpp ray_tracing_test.cpp)
+add_executable(test_rhi_mipmaps mipmap_test.cpp)
+target_link_libraries(test_rhi_mipmaps PRIVATE grassland_rhi)
+add_test(NAME rhi_mipmaps COMMAND test_rhi_mipmaps)
 target_link_libraries(test_rhi PRIVATE grassland_rhi GTest::gtest_main)
 target_sources(test_rhi PRIVATE timeline_test.cpp query_interface_test.cpp)
 include(GoogleTest)
