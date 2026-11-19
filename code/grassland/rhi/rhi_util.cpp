@@ -3,6 +3,18 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi {
+uint32_t MaxImageMipLevels(const ImageDesc &desc) {
+  if (!desc.width || !desc.height)
+    return 0;
+  uint32_t extent = desc.width > desc.height ? desc.width : desc.height;
+  uint32_t levels = 0;
+  do {
+    ++levels;
+    extent >>= 1;
+  } while (extent);
+  return levels;
+}
+
 ClearValue::ClearValue() : color{} {
 }
 

@@ -68,7 +68,7 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
                      uint64_t destination_offset,
                      uint64_t size) override;
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
-  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
+  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) override;
   bool CmdBindComputeProgram(IComputeProgram *program) override;
   bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;

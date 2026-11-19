@@ -103,7 +103,9 @@ class ICommandContext : public IObject {
                              uint64_t destination_offset,
                              uint64_t size) = 0;
   virtual bool CmdBindGroup(uint32_t index, IBindingGroup *group) = 0;
-  virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) = 0;
+  // Upload one color mip. Rendering/storage bindings and downloads still target
+  // level zero; sampled bindings expose the image's complete mip chain.
+  virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) = 0;
   // One active graphics or compute program. Switching programs clears group bindings.
   // Dispatch requires no rendering scope; dependencies between dispatches are automatic.
   virtual bool CmdBindComputeProgram(IComputeProgram *program) = 0;
