@@ -24,7 +24,7 @@ bool D3D12AllocatedImageImpl::IsValid() const {
 }
 
 IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &desc) {
-  if (!desc.width || !desc.height)
+  if (!desc.mip_levels || desc.mip_levels > MaxImageMipLevels(desc))
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (format == DXGI_FORMAT_UNKNOWN)
@@ -41,7 +41,7 @@ IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &d
   info.Width = desc.width;
   info.Height = desc.height;
   info.DepthOrArraySize = 1;
-  info.MipLevels = 1;
+  info.MipLevels = static_cast<UINT16>(desc.mip_levels);
   info.Format = format;
   info.SampleDesc.Count = 1;
   info.Flags =

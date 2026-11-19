@@ -191,7 +191,8 @@ bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
   auto native = device_->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(images.size());
   for (size_t i = 0; i < images.size(); ++i) {
-    infos[i].imageView = native_images[i]->BindingView();
+    infos[i].imageView =
+        binding.type == BINDING_TEXTURE2D ? native_images[i]->BindingView() : native_images[i]->AttachmentView();
     infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};

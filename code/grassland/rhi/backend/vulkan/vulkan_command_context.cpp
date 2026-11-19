@@ -102,7 +102,7 @@ bool VulkanCommandContextImpl::TransitionImage(IVulkanImage *image,
     barrier.dstAccessMask = access;
     barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image->NativeImage();
-    barrier.subresourceRange = {image->Aspect(), 0, 1, 0, 1};
+    barrier.subresourceRange = {image->Aspect(), 0, rhi::QueryInterfacePtr<IImage>(image)->GetDesc().mip_levels, 0, 1};
     vkCmdPipelineBarrier(command_, current.stages, stages, 0, 0, nullptr, 0, nullptr, 1, &barrier);
     current = {layout, stages, access};
   } else {
@@ -817,18 +817,22 @@ bool VulkanCommandContextImpl::TransitionBuffer(IVulkanBuffer *buffer,
   return true;
 }
 
-bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
+bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level) {
   auto native = rhi::QueryInterfacePtr<IVulkanImage>(image).Get();
-  if (sealed_ || render_target_ || !native || !image->IsValid() ||
-      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
-      IsDepthFormat(image->GetDesc().format) ||
-      row_pitch < uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) ||
-      (image->GetDesc().height - 1) >
-          (SIZE_MAX - uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format)) / row_pitch) {
+  if (!native || mip_level >= image->GetDesc().mip_levels || mip_level >= 32) {
     recording_failed_ = true;
     return false;
   }
-  const auto desc = image->GetDesc();
+  auto desc = image->GetDesc();
+  desc.width = std::max(1u, desc.width >> mip_level);
+  desc.height = std::max(1u, desc.height >> mip_level);
+  if (sealed_ || render_target_ || !native || !image->IsValid() ||
+      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
+      IsDepthFormat(image->GetDesc().format) || row_pitch < uint64_t(desc.width) * ImageFormatSize(desc.format) ||
+      (desc.height - 1) > (SIZE_MAX - uint64_t(desc.width) * ImageFormatSize(desc.format)) / row_pitch) {
+    recording_failed_ = true;
+    return false;
+  }
   const uint64_t packed = uint64_t(desc.width) * ImageFormatSize(desc.format);
   std::vector<uint8_t> pixels(packed * desc.height);
   for (uint32_t y = 0; y < desc.height; ++y)
@@ -843,7 +847,7 @@ bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, u
                        VK_ACCESS_TRANSFER_WRITE_BIT))
     return false;
   VkBufferImageCopy region{};
-  region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, mip_level, 0, 1};
   region.imageExtent = {desc.width, desc.height, 1};
   vkCmdCopyBufferToImage(command_, upload->NativeBuffer(), native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          1, &region);

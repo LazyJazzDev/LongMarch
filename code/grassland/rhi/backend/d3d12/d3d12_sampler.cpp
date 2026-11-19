@@ -18,12 +18,19 @@ rhi::ISampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc 
                                               D3D12_TEXTURE_ADDRESS_MODE_MIRROR};
   auto &native = sampler->native_desc_;
   native.Filter =
-      desc.filter == SAMPLER_FILTER_LINEAR ? D3D12_FILTER_MIN_MAG_MIP_LINEAR : D3D12_FILTER_MIN_MAG_MIP_POINT;
+      desc.max_anisotropy > 1
+          ? D3D12_FILTER_ANISOTROPIC
+          : D3D12_ENCODE_BASIC_FILTER(
+                desc.filter == SAMPLER_FILTER_LINEAR ? D3D12_FILTER_TYPE_LINEAR : D3D12_FILTER_TYPE_POINT,
+                desc.filter == SAMPLER_FILTER_LINEAR ? D3D12_FILTER_TYPE_LINEAR : D3D12_FILTER_TYPE_POINT,
+                desc.mip_filter == SAMPLER_FILTER_LINEAR ? D3D12_FILTER_TYPE_LINEAR : D3D12_FILTER_TYPE_POINT,
+                D3D12_FILTER_REDUCTION_TYPE_STANDARD);
   native.AddressU = modes[desc.address_u];
   native.AddressV = native.AddressW = modes[desc.address_v];
-  native.MaxLOD = D3D12_FLOAT32_MAX;
+  native.MinLOD = desc.min_lod;
+  native.MaxLOD = desc.max_lod;
   native.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-  native.MaxAnisotropy = 1;
+  native.MaxAnisotropy = desc.max_anisotropy;
   device->NativeDevice()->CreateSampler(&native, sampler->Descriptor());
   return sampler.Detach();
 }

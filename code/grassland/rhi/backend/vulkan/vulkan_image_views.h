@@ -7,7 +7,7 @@ class VulkanImageViews final {
   VulkanImageViews() = default;
   VulkanImageViews(VulkanImageViews &&other) noexcept;
   VulkanImageViews &operator=(VulkanImageViews &&other) noexcept;
-  bool Initialize(VkDevice device, VkImage image, ImageFormat format, bool sampled);
+  bool Initialize(VkDevice device, VkImage image, ImageFormat format, bool sampled, uint32_t mip_levels = 1);
   ~VulkanImageViews();
   VulkanImageViews(const VulkanImageViews &) = delete;
   VulkanImageViews &operator=(const VulkanImageViews &) = delete;

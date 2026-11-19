@@ -892,13 +892,18 @@ bool D3D12CommandContextImpl::PrepareGroups() {
   return true;
 }
 
-bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
+bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level) {
   auto native = rhi::QueryInterfacePtr<ID3D12Image>(image).Get();
+  if (!native || mip_level >= image->GetDesc().mip_levels || mip_level >= 32) {
+    recording_failed_ = true;
+    return false;
+  }
+  const auto width = std::max(1u, image->GetDesc().width >> mip_level);
+  const auto height = std::max(1u, image->GetDesc().height >> mip_level);
   if (!native || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !image->IsValid() ||
       !data || sealed_ || rendering_active_ || IsDepthFormat(image->GetDesc().format) ||
-      row_pitch < uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) ||
-      (image->GetDesc().height - 1) >
-          (SIZE_MAX - uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format)) / row_pitch) {
+      row_pitch < uint64_t(width) * ImageFormatSize(image->GetDesc().format) ||
+      (height - 1) > (SIZE_MAX - uint64_t(width) * ImageFormatSize(image->GetDesc().format)) / row_pitch) {
     recording_failed_ = true;
     return false;
   }
@@ -906,7 +911,7 @@ bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
   D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
   UINT rows{};
   UINT64 bytes{}, total{};
-  device_->NativeDevice()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &rows, &bytes, &total);
+  device_->NativeDevice()->GetCopyableFootprints(&desc, mip_level, 1, 0, &footprint, &rows, &bytes, &total);
   auto upload = device_->UploadPool().Acquire(total);
   if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
     recording_failed_ = true;
@@ -927,6 +932,7 @@ bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
   src.PlacedFootprint = footprint;
   dst.pResource = native->NativeImage();
   dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  dst.SubresourceIndex = mip_level;
   list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
   return true;
 }

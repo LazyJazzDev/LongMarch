@@ -24,6 +24,11 @@ rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc 
   descriptor->setMinFilter(desc.filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
                                                                  : MTL::SamplerMinMagFilterLinear);
   descriptor->setMagFilter(descriptor->minFilter());
+  descriptor->setMipFilter(desc.mip_filter == SAMPLER_FILTER_LINEAR ? MTL::SamplerMipFilterLinear
+                                                                    : MTL::SamplerMipFilterNearest);
+  descriptor->setLodMinClamp(desc.min_lod);
+  descriptor->setLodMaxClamp(desc.max_lod);
+  descriptor->setMaxAnisotropy(desc.max_anisotropy);
   const MTL::SamplerAddressMode modes[] = {MTL::SamplerAddressModeRepeat, MTL::SamplerAddressModeClampToEdge,
                                            MTL::SamplerAddressModeMirrorRepeat};
   descriptor->setSAddressMode(modes[desc.address_u]);

@@ -11,6 +11,11 @@ enum SamplerAddressMode { SAMPLER_ADDRESS_REPEAT, SAMPLER_ADDRESS_CLAMP_TO_EDGE,
 struct SamplerDesc {
   SamplerFilter filter{SAMPLER_FILTER_LINEAR};
   SamplerAddressMode address_u{SAMPLER_ADDRESS_REPEAT}, address_v{SAMPLER_ADDRESS_REPEAT};
+  SamplerFilter mip_filter{SAMPLER_FILTER_LINEAR};
+  float min_lod{0.0f}, max_lod{1000.0f};
+  // Values above one require linear filtering and device support; creation
+  // returns null if the requested anisotropy cannot be represented.
+  uint32_t max_anisotropy{1};
 };
 
 // Immutable sampler state, reusable across binding groups.
