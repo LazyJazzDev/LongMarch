@@ -60,6 +60,8 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
   ~D3D12CommandContextImpl() override;
   static ICommandContext *Create(ID3D12Queue *queue);
   IDownloadToken *CmdDownloadBuffer(IBuffer *buffer, uint64_t offset, uint64_t size) override;
+  IDownloadToken *CmdWriteTimestamp() override;
+  bool GetSubmissionCpuTiming(SubmissionCpuTiming &timing) const override;
   IDownloadToken *CmdDownloadImage(IImage *image, const ImageDownloadRegion &region = {}) override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
   bool CmdCopyBuffer(IBuffer *source,
@@ -145,6 +147,9 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
   ID3D12Device *device_;
   ComPtr<ID3D12CommandAllocator> allocator_;
   ComPtr<ID3D12GraphicsCommandList> list_;
+  ComPtr<ID3D12QueryHeap> timestamp_heap_;
+  std::vector<ObjectPtr<ID3D12TemporalBufferLease>> timestamp_readbacks_;
+  SubmissionCpuTiming cpu_timing_{};
   ComPtr<ID3D12GraphicsCommandList4> ray_list_;
   bool submission_failed_{};
   bool reusable_{};

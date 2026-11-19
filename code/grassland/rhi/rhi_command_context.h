@@ -18,6 +18,11 @@ struct SubmitInfo {
   std::vector<Event> waits;
 };
 
+struct SubmissionCpuTiming {
+  uint64_t present_ns{};
+  uint64_t next_image_ns{};
+};
+
 class IBuffer;
 class IProgram;
 class IComputeProgram;
@@ -63,6 +68,21 @@ class ICommandContext : public IObject {
   // Ends recording and submits to the bound queue. Accepted work retains its
   // resources until completion. Returns an owned token, or nullptr on failure.
   virtual ISubmissionToken *Submit(const SubmitInfo &info = {}) = 0;
+
+  // Optional profiling. Returns one uint64_t GPU tick through the normal async
+  // download contract; nullptr means unsupported or recording failure. Resolve
+  // occurs at the end of recording, outside the measured intervals. The query
+  // may be written inside a rendering scope. D3D12 supports 256 per context.
+  virtual IDownloadToken *CmdWriteTimestamp() {
+    return nullptr;
+  }
+
+  // Optional CPU durations inside Submit, populated only when timestamp
+  // profiling is enabled. Call after Submit returns, on its calling thread.
+  virtual bool GetSubmissionCpuTiming(SubmissionCpuTiming &timing) const {
+    return false;
+  }
+
   // AS build/copy/query and DispatchRays require no active rendering scope.
   // Modifying contexts for one AS must be submitted before recording later uses
   // in another context; Build/Update retain inputs and rent scratch automatically.

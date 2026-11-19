@@ -10,6 +10,10 @@
 #include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend::d3d12 {
+uint64_t D3D12QueueImpl::TimestampFrequency() const {
+  UINT64 frequency = 0;
+  return SUCCEEDED(queue_->GetTimestampFrequency(&frequency)) ? frequency : 0;
+}
 
 rhi::ICommandContext *D3D12QueueImpl::CreateCommandContext() {
   return CreateD3D12CommandContext(this);

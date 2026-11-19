@@ -72,6 +72,7 @@ class D3D12QueueImpl final : public Object<rhi::IQueue, ID3D12Queue> {
   ID3D12Device *Owner() const override;
 
   QueueType GetType() const override;
+  uint64_t TimestampFrequency() const override;
 
  private:
   struct Submission {

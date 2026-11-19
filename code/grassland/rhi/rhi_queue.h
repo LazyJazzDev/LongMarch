@@ -12,6 +12,12 @@ class IQueue : public IObject {
   virtual ICommandContext *CreateCommandContext() = 0;
   virtual QueueType GetType() const = 0;
 
+  // GPU timestamp ticks per second for this queue; zero means unsupported.
+  // Values from different queues must not be compared without calibration.
+  virtual uint64_t TimestampFrequency() const {
+    return 0;
+  }
+
  protected:
   ~IQueue() override;
 };

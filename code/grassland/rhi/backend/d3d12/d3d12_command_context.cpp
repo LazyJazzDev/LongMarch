@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <list>
@@ -246,6 +247,10 @@ bool D3D12CommandContextImpl::EndRecording() {
     return false;
   }
 #endif
+  for (UINT i = 0; i < timestamp_readbacks_.size(); i++) {
+    list_->ResolveQueryData(timestamp_heap_.Get(), D3D12_QUERY_TYPE_TIMESTAMP, i, 1,
+                            timestamp_readbacks_[i]->NativeBuffer(), 0);
+  }
   // Restore each resource to its own creation-time default, including non-presented images.
   for (auto &entry : resource_states_) {
     if (!TransitionResource(entry.first, entry.second.default_state, entry.second.default_state))
@@ -282,10 +287,16 @@ ID3D12CommandContext::SubmitResult D3D12CommandContextImpl::SubmitNative(const S
       entry.first->CommitDependencies(std::move(entry.second));
     as_dependencies_.clear();
     bool presented = true;
+    const auto present_start =
+        timestamp_heap_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     for (const auto &present : presents_) {
       if (!Check(present.second->Present(), "Swapchain::Present"))
         presented = false;
     }
+    if (timestamp_heap_)
+      cpu_timing_.present_ns =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - present_start)
+              .count();
     submission_failed_ =
         !Check(queue->NativeQueue()->Signal(queue->GetTimeline()->NativeFence(), signal.value), "Queue::Signal");
     if (!presented)
@@ -297,11 +308,49 @@ ID3D12CommandContext::SubmitResult D3D12CommandContextImpl::SubmitNative(const S
 }
 
 void D3D12CommandContextImpl::UpdatePresentedImages() {
+  const auto start = timestamp_heap_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   for (const auto &present : presents_) {
     if (!present.first->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next swapchain image after submission.");
     }
   }
+  if (timestamp_heap_)
+    cpu_timing_.next_image_ns =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+}
+
+bool D3D12CommandContextImpl::GetSubmissionCpuTiming(SubmissionCpuTiming &timing) const {
+  if (!timestamp_heap_ || !WasSubmitted())
+    return false;
+  timing = cpu_timing_;
+  return true;
+}
+
+IDownloadToken *D3D12CommandContextImpl::CmdWriteTimestamp() {
+  if (sealed_ || recording_failed_ || timestamp_readbacks_.size() >= 256) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  if (!timestamp_heap_) {
+    D3D12_QUERY_HEAP_DESC desc{};
+    desc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+    desc.Count = 256;
+    if (!Check(device_->NativeDevice()->CreateQueryHeap(&desc, IID_PPV_ARGS(&timestamp_heap_)),
+               "Create timestamp query heap")) {
+      recording_failed_ = true;
+      return nullptr;
+    }
+  }
+  auto lease = device_->DownloadPool().Acquire(sizeof(uint64_t));
+  if (!lease || !RetainResource(lease.Get()) ||
+      !TransitionResource(lease->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, lease->DefaultState())) {
+    recording_failed_ = true;
+    return nullptr;
+  }
+  list_->EndQuery(timestamp_heap_.Get(), D3D12_QUERY_TYPE_TIMESTAMP, UINT(timestamp_readbacks_.size()));
+  timestamp_readbacks_.push_back(lease);
+  return RegisterDownload(
+      ObjectPtr<ID3D12DownloadToken>::Adopt(CreateD3D12DownloadToken(std::move(lease), sizeof(uint64_t))));
 }
 
 SubmissionStatus D3D12CommandContextImpl::PollCompletion(Event signal, uint64_t completed, bool timeline_valid) {
