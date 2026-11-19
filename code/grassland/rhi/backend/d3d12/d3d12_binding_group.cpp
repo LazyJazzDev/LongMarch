@@ -181,9 +181,16 @@ bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
   }
   auto native = device_->NativeDevice();
   if (binding.type == BINDING_TEXTURE2D) {
-    for (size_t i = 0; i < images.size(); ++i)
-      native->CreateShaderResourceView(native_images[i]->NativeImage(), nullptr,
+    D3D12_SHADER_RESOURCE_VIEW_DESC depthView{};
+    depthView.Format = DXGI_FORMAT_R32_FLOAT;
+    depthView.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    depthView.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    for (size_t i = 0; i < images.size(); ++i) {
+      depthView.Texture2D.MipLevels = images[i]->GetDesc().mip_levels;
+      native->CreateShaderResourceView(native_images[i]->NativeImage(),
+                                       images[i]->GetDesc().sampled_depth ? &depthView : nullptr,
                                        resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
+    }
   } else {
     for (size_t i = 0; i < images.size(); ++i)
       native->CreateUnorderedAccessView(native_images[i]->NativeImage(), nullptr, nullptr,
@@ -420,7 +427,9 @@ bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
     return false;
   for (auto value : images) {
     auto image = rhi::QueryInterfacePtr<ID3D12Image>(value).Get();
-    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
+    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ ||
+        (IsDepthFormat(value->GetDesc().format) &&
+         (!value->GetDesc().sampled_depth || desc->type != BINDING_TEXTURE2D)))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;

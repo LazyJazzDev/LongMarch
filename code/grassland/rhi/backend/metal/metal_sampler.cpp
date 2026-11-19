@@ -21,6 +21,8 @@ rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc 
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto descriptor = NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
   descriptor->setSupportArgumentBuffers(true);
+  if (desc.comparison)
+    descriptor->setCompareFunction(static_cast<MTL::CompareFunction>(*desc.comparison));
   descriptor->setMinFilter(desc.filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
                                                                  : MTL::SamplerMinMagFilterLinear);
   descriptor->setMagFilter(descriptor->minFilter());

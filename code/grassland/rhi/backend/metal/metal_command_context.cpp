@@ -516,7 +516,7 @@ bool MetalCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
   };
 
   color_formats_.clear();
-  color_targets_.clear();
+  attachment_targets_.clear();
   for (size_t i = 0; i < info.color_attachments.size(); ++i) {
     auto &a = info.color_attachments[i];
     auto image = validate(a.color_attachment, a.load_op, a.store_op);
@@ -531,7 +531,7 @@ bool MetalCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
       }
     target = a.color_attachment;
     color_formats_.push_back(a.color_attachment->GetDesc().format);
-    color_targets_.push_back(a.color_attachment);
+    attachment_targets_.push_back(a.color_attachment);
     auto color = pass->colorAttachments()->object(i);
     color->setTexture(image->NativeImage());
     color->setLoadAction(loads[a.load_op]);
@@ -550,6 +550,7 @@ bool MetalCommandContextImpl::CmdBeginRendering(const RenderingInfo &info) {
       recording_failed_ = true;
       return false;
     }
+    attachment_targets_.push_back(ds.image);
     target = ds.image;
     depth_format_ = ds.image->GetDesc().format;
     auto depth = pass->depthAttachment();
@@ -589,7 +590,7 @@ bool MetalCommandContextImpl::CmdEndRendering() {
   encoder_->endEncoding();
   encoder_.reset();
   render_target_ = nullptr;
-  color_targets_.clear();
+  attachment_targets_.clear();
   return true;
 }
 
@@ -702,7 +703,7 @@ bool MetalCommandContextImpl::ValidateDraw(bool indexed) {
         if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
           continue;
         for (auto &image : groups_[i]->GetReferences()[b])
-          for (auto target : color_targets_)
+          for (auto target : attachment_targets_)
             if (image.Get() == target) {
               recording_failed_ = true;
               return false;

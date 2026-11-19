@@ -14,7 +14,8 @@ MetalAllocatedImageImpl::MetalAllocatedImageImpl(IMetalDevice *device,
 
 IImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &desc) {
   const auto format = NativeImageFormat(desc.format);
-  if (!desc.mip_levels || desc.mip_levels > MaxImageMipLevels(desc) || desc.width > 16384 || desc.height > 16384 ||
+  if ((desc.sampled_depth && desc.format != IMAGE_FORMAT_D32_SFLOAT) || !desc.mip_levels ||
+      desc.mip_levels > MaxImageMipLevels(desc) || desc.width > 16384 || desc.height > 16384 ||
       format == MTL::PixelFormatInvalid)
     return nullptr;
 

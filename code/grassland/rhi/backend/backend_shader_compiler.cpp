@@ -267,7 +267,13 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
       auto name = std::string(macro) + suffix;
       header += "#define RHI_" + name + "_I(G,B) RHI_" + name + "_##G##_##B\n";
       header += "#define RHI_" + name + "_D(G,B) RHI_" + name + "_I(G,B)\n";
-      bool untyped = std::string(macro) == "SAMPLER" || std::string(macro) == "ACCELERATION_STRUCTURE" ||
+      if (std::string(macro) == "SAMPLER") {
+        const auto dispatch = " RHI_" + name + "_D(G,B)";
+        header += "#define RHI_" + name + "(G,B,N)" + dispatch + "(SamplerState,N)\n";
+        header += "#define RHI_COMPARISON_" + name + "(G,B,N)" + dispatch + "(SamplerComparisonState,N)\n";
+        continue;
+      }
+      bool untyped = std::string(macro) == "ACCELERATION_STRUCTURE" ||
                      std::string(macro).find("BYTE_ADDRESS_BUFFER") != std::string::npos;
       header += "#define RHI_" + name + (untyped ? "(G,B,N) " : "(G,B,T,N) ") + "RHI_" + name + "_D(G,B)" +
                 (untyped ? "(N)\n" : "(T,N)\n");
@@ -281,13 +287,14 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
         continue;
       auto name = base + (array ? "_ARRAY" : "");
       header += "#define RHI_" + name + "_" + std::to_string(mapped.group) + "_" + std::to_string(b.binding) +
-                ((b.type == BINDING_ACCELERATION_STRUCTURE || b.type == BINDING_SAMPLER ||
-                  b.type == BINDING_BYTE_ADDRESS_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER)
+                ((b.type == BINDING_ACCELERATION_STRUCTURE || b.type == BINDING_BYTE_ADDRESS_BUFFER ||
+                  b.type == BINDING_RW_BYTE_ADDRESS_BUFFER)
                      ? "(N) "
                      : "(T,N) ");
       if (api == BACKEND_API_VULKAN)
         header += "[[vk::binding(" + std::to_string(b.binding) + "," + std::to_string(mapped.group) + ")]] ";
-      header += std::string(types[b.type]) + " N" + (array ? "[" + std::to_string(b.count) + "]" : "");
+      header += std::string(b.type == BINDING_SAMPLER ? "T" : types[b.type]) + " N" +
+                (array ? "[" + std::to_string(b.count) + "]" : "");
       if (api != BACKEND_API_VULKAN) {
         const char reg = b.type == BINDING_UNIFORM_BUFFER ? 'b'
                          : b.type == BINDING_SAMPLER      ? 's'

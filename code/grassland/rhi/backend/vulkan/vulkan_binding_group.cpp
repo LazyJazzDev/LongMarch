@@ -481,7 +481,9 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
     return false;
   for (auto value : images) {
     auto image = rhi::QueryInterfacePtr<IVulkanImage>(value).Get();
-    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
+    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ ||
+        (IsDepthFormat(value->GetDesc().format) &&
+         (!value->GetDesc().sampled_depth || desc->type != BINDING_TEXTURE2D)))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;

@@ -43,13 +43,20 @@ VkImage VulkanAllocatedImageImpl::NativeImage() const {
 }
 
 IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc &desc) {
-  if (!desc.mip_levels || desc.mip_levels > MaxImageMipLevels(desc))
+  if ((desc.sampled_depth && desc.format != IMAGE_FORMAT_D32_SFLOAT) || !desc.mip_levels ||
+      desc.mip_levels > MaxImageMipLevels(desc))
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (format == VK_FORMAT_UNDEFINED)
     return nullptr;
   // Color images must support the usage RHI exposes; do not let drivers silently
   // substitute unsupported three-channel formats.
+  if (desc.sampled_depth) {
+    VkFormatProperties properties{};
+    vkGetPhysicalDeviceFormatProperties(device->NativePhysicalDevice(), format, &properties);
+    if (!(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT))
+      return nullptr;
+  }
   if (IsColorFormat(desc.format)) {
     VkFormatProperties properties{};
     vkGetPhysicalDeviceFormatProperties(device->NativePhysicalDevice(), format, &properties);

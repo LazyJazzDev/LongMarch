@@ -16,6 +16,8 @@ struct SamplerDesc {
   // Values above one require linear filtering and device support; creation
   // returns null if the requested anisotropy cannot be represented.
   uint32_t max_anisotropy{1};
+  // Set for shader declarations using RHI_COMPARISON_SAMPLER.
+  std::optional<CompareOp> comparison;
 };
 
 // Immutable sampler state, reusable across binding groups.

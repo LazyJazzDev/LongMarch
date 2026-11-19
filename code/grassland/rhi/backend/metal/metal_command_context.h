@@ -112,7 +112,7 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IMetal
   IMetalProgramBase *native_program_{};
   IImage *render_target_{};
   std::vector<ImageFormat> color_formats_;
-  std::vector<IImage *> color_targets_;
+  std::vector<IImage *> attachment_targets_;
   ImageFormat depth_format_{IMAGE_FORMAT_UNKNOWN};
   std::vector<IMetalBindingVersion *> groups_;
   NS::SharedPtr<MTL::RenderCommandEncoder> encoder_;

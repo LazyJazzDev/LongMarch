@@ -315,6 +315,8 @@ struct ImageDesc {
   uint32_t height{};
   ImageFormat format{IMAGE_FORMAT_UNKNOWN};
   uint32_t mip_levels{1};
+  // Request a D32 attachment that can also be read through a sampled texture binding.
+  bool sampled_depth{};
 };
 
 // Maximum complete mip chain for a non-empty two-dimensional image.

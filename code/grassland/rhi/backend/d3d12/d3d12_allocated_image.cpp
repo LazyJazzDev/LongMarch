@@ -24,7 +24,8 @@ bool D3D12AllocatedImageImpl::IsValid() const {
 }
 
 IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &desc) {
-  if (!desc.mip_levels || desc.mip_levels > MaxImageMipLevels(desc))
+  if ((desc.sampled_depth && desc.format != IMAGE_FORMAT_D32_SFLOAT) || !desc.mip_levels ||
+      desc.mip_levels > MaxImageMipLevels(desc))
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (format == DXGI_FORMAT_UNKNOWN)
@@ -36,13 +37,19 @@ IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &d
       IsDepthFormat(desc.format) ? D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL : D3D12_FORMAT_SUPPORT1_RENDER_TARGET;
   if (!(support.Support1 & D3D12_FORMAT_SUPPORT1_TEXTURE2D) || !(support.Support1 & attachment_support))
     return nullptr;
+  if (desc.sampled_depth) {
+    D3D12_FEATURE_DATA_FORMAT_SUPPORT srv{DXGI_FORMAT_R32_FLOAT};
+    if (FAILED(device->NativeDevice()->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &srv, sizeof(srv))) ||
+        !(srv.Support1 & D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE_COMPARISON))
+      return nullptr;
+  }
   D3D12_RESOURCE_DESC info{};
   info.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
   info.Width = desc.width;
   info.Height = desc.height;
   info.DepthOrArraySize = 1;
   info.MipLevels = static_cast<UINT16>(desc.mip_levels);
-  info.Format = format;
+  info.Format = desc.sampled_depth ? DXGI_FORMAT_R32_TYPELESS : format;
   info.SampleDesc.Count = 1;
   info.Flags =
       IsDepthFormat(desc.format) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;

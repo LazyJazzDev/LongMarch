@@ -251,6 +251,77 @@ TEST_P(RhiRasterizer, ViewportRequiresPositiveExtents) {
 }
 #endif
 
+TEST_P(RhiRasterizer, SampledDepthComparisonFiltersFourTexels) {
+  ObjPtr<IImage> depth = device->CreateImage({2, 2, IMAGE_FORMAT_D32_SFLOAT, 1, true});
+  ObjPtr<IImage> color = device->CreateImage({3, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ASSERT_TRUE(depth && color);
+  BindingLayoutDesc layout{
+      {{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}};
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+  SamplerDesc samplerDesc;
+  samplerDesc.comparison = COMPARE_LESS_EQUAL;
+  samplerDesc.address_u = samplerDesc.address_v = SAMPLER_ADDRESS_CLAMP_TO_EDGE;
+  ObjPtr<ISampler> sampler = device->CreateSampler(samplerDesc);
+  ASSERT_TRUE(group && sampler);
+  ObjPtr<IImage> attachmentOnly = device->CreateImage({2, 2, IMAGE_FORMAT_D32_SFLOAT});
+  ASSERT_TRUE(attachmentOnly);
+  EXPECT_FALSE(group->BindResource(0, attachmentOnly.Get()));
+  ASSERT_TRUE(group->BindResource(0, depth.Get()) && group->BindResource(1, sampler.Get()));
+  const char *vertex = R"(
+    float4 vs(uint id:SV_VertexID):SV_Position {
+      return float4(id==2?3.:-1.,id==1?3.:-1.,.25,1);
+    }
+  )";
+  const char *fragment = R"(
+    RHI_TEXTURE2D(0,0,float,depth);
+    RHI_COMPARISON_SAMPLER(0,1,pcf);
+    float4 ps(float4 p:SV_Position):SV_Target0 {
+      float u=p.x<1.?.25:p.x<2.?.5:.75;
+      return float4(depth.SampleCmpLevelZero(pcf,float2(u,.5),.5),0,0,1);
+    }
+  )";
+  ObjPtr<IShader> vertexShader = device->CreateShaderFromSource(vertex, "vs", SHADER_STAGE_VERTEX);
+  ObjPtr<IShader> depthShader = device->CreateShaderFromSource("void ps(){}", "ps", SHADER_STAGE_FRAGMENT);
+  ObjPtr<IShader> readShader = device->CreateShaderFromSource(fragment, "ps", SHADER_STAGE_FRAGMENT);
+  ASSERT_TRUE(vertexShader && depthShader && readShader);
+  ProgramDesc caster;
+  caster.color_formats.clear();
+  caster.rasterizer.cull_mode = CULL_MODE_NONE;
+  caster.vertex_shader = vertexShader.Get();
+  caster.fragment_shader = depthShader.Get();
+  caster.depth_stencil.format = IMAGE_FORMAT_D32_SFLOAT;
+  caster.depth_stencil.depth_test = caster.depth_stencil.depth_write = true;
+  ProgramDesc sample;
+  sample.color_formats = {IMAGE_FORMAT_R8G8B8A8_UNORM};
+  sample.rasterizer.cull_mode = CULL_MODE_NONE;
+  sample.vertex_shader = vertexShader.Get();
+  sample.fragment_shader = readShader.Get();
+  sample.pipeline_layout.groups = {layout};
+  ObjPtr<IProgram> writeProgram = device->CreateProgram(caster), readProgram = device->CreateProgram(sample);
+  ASSERT_TRUE(writeProgram && readProgram);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<ICommandContext> c = queue->CreateCommandContext();
+  RenderingInfo pass;
+  pass.depth_stencil.image = depth.Get();
+  pass.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+  pass.depth_stencil.clear_value.depth = 1;
+  ASSERT_TRUE(c && c->CmdBindProgram(writeProgram.Get()) && c->CmdBeginRendering(pass));
+  ASSERT_TRUE(c->CmdSetViewport({0, 0, 2, 2, 0, 1}) && c->CmdSetScissor({0, 0, 1, 2}) && c->CmdDraw(3) &&
+              c->CmdEndRendering());
+  pass = {};
+  pass.color_attachments = {{color.Get(), ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE, {}}};
+  ASSERT_TRUE(c->CmdBindProgram(readProgram.Get()) && c->CmdBeginRendering(pass) && c->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(c->CmdSetViewport({0, 0, 3, 1, 0, 1}) && c->CmdSetScissor({0, 0, 3, 1}) && c->CmdDraw(3) &&
+              c->CmdEndRendering());
+  ObjPtr<IDownloadToken> download = c->CmdDownloadImage(color.Get());
+  ObjPtr<ISubmissionToken> done = c->Submit();
+  std::array<uint8_t, 12> pixels{};
+  ASSERT_TRUE(download && done && done->WaitHost() && download->CopyTo(pixels.data(), pixels.size()));
+  EXPECT_EQ(pixels[0], 0);
+  EXPECT_NEAR(pixels[4], 127.5, 1.);
+  EXPECT_EQ(pixels[8], 255);
+}
+
 const BackendAPI backends[] = {
 #if defined(LONGMARCH_VULKAN_ENABLED)
     BACKEND_API_VULKAN,

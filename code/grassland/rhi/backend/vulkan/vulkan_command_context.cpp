@@ -778,6 +778,12 @@ bool VulkanCommandContextImpl::CmdEndRendering() {
                          VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT))
       return false;
   }
+  if (auto *attachment = rendering_.depth_stencil.image; attachment && attachment->GetDesc().sampled_depth) {
+    auto image = rhi::QueryInterfacePtr<IVulkanImage>(attachment).Get();
+    if (!TransitionImage(image, image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT))
+      return false;
+  }
   rendering_ = {};
   return true;
 }
@@ -938,12 +944,17 @@ bool VulkanCommandContextImpl::ValidateGroups() {
         const auto type = layout.bindings[binding_index].type;
         if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
           continue;
-        for (const auto &reference : groups_[i]->GetReferences()[binding_index])
+        for (const auto &reference : groups_[i]->GetReferences()[binding_index]) {
+          if (rendering_.depth_stencil.image == reference.Get()) {
+            recording_failed_ = true;
+            return false;
+          }
           for (const auto &color : rendering_.color_attachments)
             if (color.color_attachment == reference.Get()) {
               recording_failed_ = true;
               return false;
             }
+        }
       }
     }
   }

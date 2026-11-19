@@ -31,6 +31,8 @@ rhi::ISampler *VulkanSamplerImpl::Create(IVulkanDevice *device, const SamplerDes
       desc.mip_filter == SAMPLER_FILTER_LINEAR ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
   create.anisotropyEnable = desc.max_anisotropy > 1;
   create.maxAnisotropy = float(desc.max_anisotropy);
+  create.compareEnable = desc.comparison.has_value();
+  create.compareOp = static_cast<VkCompareOp>(desc.comparison.value_or(COMPARE_ALWAYS));
   create.addressModeU = modes[desc.address_u];
   create.addressModeV = create.addressModeW = modes[desc.address_v];
   create.minLod = desc.min_lod;
