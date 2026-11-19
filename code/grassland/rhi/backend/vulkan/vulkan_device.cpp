@@ -69,7 +69,15 @@ void VulkanDeviceImpl::WaitForProgress(const std::vector<Event> &next) {
   info.semaphoreCount = static_cast<uint32_t>(count);
   info.pSemaphores = semaphores.data();
   info.pValues = values.data();
-  vkWaitSemaphores(device_, &info, UINT64_MAX);
+  // MoltenVK can leave a multi-semaphore wait asleep after a queue timeline
+  // has advanced. Periodically re-read the counters so completed submissions
+  // are retired even when no further work is submitted.
+#if defined(__APPLE__)
+  constexpr uint64_t collector_wait_ns = 250'000'000;
+#else
+  constexpr uint64_t collector_wait_ns = UINT64_MAX;
+#endif
+  vkWaitSemaphores(device_, &info, collector_wait_ns);
   // Consume the one-shot shutdown notification, then drain real GPU work.
   shutdown_consumed_ = stopping_;
 }
