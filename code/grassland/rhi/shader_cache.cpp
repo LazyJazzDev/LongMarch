@@ -2,13 +2,36 @@
 
 #include <algorithm>
 #include <fstream>
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/sha256.h"
 
 namespace grassland::rhi {
 namespace {
-thread_local ShaderCacheSettings settings;
+ShaderTargetPlatform HostPlatform() {
+#if defined(__OHOS__)
+  return ShaderTargetPlatform::OHOS;
+#elif defined(_WIN32)
+  return ShaderTargetPlatform::Windows;
+#elif defined(__APPLE__) && TARGET_OS_IPHONE
+  return ShaderTargetPlatform::IOS;
+#elif defined(__APPLE__)
+  return ShaderTargetPlatform::MacOS;
+#elif defined(__linux__)
+  return ShaderTargetPlatform::Linux;
+#endif
+  return ShaderTargetPlatform::Native;
+}
+
+thread_local ShaderCacheSettings settings = [] {
+  ShaderCacheSettings value;
+  value.target_platform = HostPlatform();
+  value.ios = value.target_platform == ShaderTargetPlatform::IOS;
+  return value;
+}();
 
 bool ValidKey(const std::string &key) {
   return !key.empty() && std::all_of(key.begin(), key.end(), [](unsigned char c) {
@@ -27,7 +50,21 @@ bool ConfigureShaderCache(const ShaderCacheSettings &value) {
       return false;
     }
   }
-  settings = value;
+  auto normalized = value;
+  if (value.ios && value.target_platform != ShaderTargetPlatform::Native &&
+      value.target_platform != ShaderTargetPlatform::IOS) {
+    backend::ReportError(-1, "Conflicting shader target and iOS policy");
+    return false;
+  }
+  if (normalized.target_platform == ShaderTargetPlatform::Native) {
+    if (normalized.ios)
+      normalized.target_platform = ShaderTargetPlatform::IOS;
+    else {
+      normalized.target_platform = HostPlatform();
+    }
+  }
+  normalized.ios = normalized.target_platform == ShaderTargetPlatform::IOS;
+  settings = normalized;
   return true;
 }
 

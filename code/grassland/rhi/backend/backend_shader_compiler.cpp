@@ -23,30 +23,12 @@
 namespace grassland::rhi::backend {
 namespace {
 std::vector<std::pair<std::string, std::string>> PlatformDefines() {
-  if (GetShaderCacheSettings().ios)
-    return {{"RHI_PLATFORM_WINDOWS", "0"},
-            {"RHI_PLATFORM_MACOS", "0"},
-            {"RHI_PLATFORM_LINUX", "0"},
-            {"RHI_PLATFORM_IOS", "1"}};
-#ifdef _WIN32
-  constexpr const char *host_windows = "1";
-#else
-  constexpr const char *host_windows = "0";
-#endif
-#if defined(__APPLE__) && TARGET_OS_OSX
-  constexpr const char *host_macos = "1";
-#else
-  constexpr const char *host_macos = "0";
-#endif
-#ifdef __linux__
-  constexpr const char *host_linux = "1";
-#else
-  constexpr const char *host_linux = "0";
-#endif
-  return {{"RHI_PLATFORM_WINDOWS", host_windows},
-          {"RHI_PLATFORM_MACOS", host_macos},
-          {"RHI_PLATFORM_LINUX", host_linux},
-          {"RHI_PLATFORM_IOS", "0"}};
+  const auto target = GetShaderCacheSettings().target_platform;
+  return {{"RHI_PLATFORM_WINDOWS", target == ShaderTargetPlatform::Windows ? "1" : "0"},
+          {"RHI_PLATFORM_MACOS", target == ShaderTargetPlatform::MacOS ? "1" : "0"},
+          {"RHI_PLATFORM_LINUX", target == ShaderTargetPlatform::Linux ? "1" : "0"},
+          {"RHI_PLATFORM_IOS", target == ShaderTargetPlatform::IOS ? "1" : "0"},
+          {"RHI_PLATFORM_OHOS", target == ShaderTargetPlatform::OHOS ? "1" : "0"}};
 }
 
 #ifndef LONGMARCH_OFFLINE_SHADERS
@@ -377,9 +359,11 @@ bool CompileSlang(const IShader *shader_object,
                   std::vector<uint8_t> &code,
                   const PipelineLayoutDesc *binding_layout,
                   std::array<uint32_t, 3> *thread_group_size) {
-  const std::string key = "slang-" + ShaderCacheKey({"rhi-spirv-v2", LONGMARCH_SHADER_CACHE_ABI, prefix,
-                                                     shader_object->GetPreprocessedCode(), shader_object->GetEntry(),
-                                                     std::to_string(shader_object->GetStage()), std::to_string(api)});
+  const std::string key =
+      "slang-" +
+      ShaderCacheKey({"rhi-spirv-v2", LONGMARCH_SHADER_CACHE_ABI, prefix, shader_object->GetPreprocessedCode(),
+                      shader_object->GetEntry(), std::to_string(shader_object->GetStage()), std::to_string(api),
+                      std::to_string(static_cast<int>(GetShaderCacheSettings().target_platform))});
   if (GetShaderCacheSettings().read_only && ReadShaderCache(key, code)) {
     if (!thread_group_size || ReadShaderThreadGroup(key, *thread_group_size))
       return true;

@@ -4,6 +4,7 @@
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
