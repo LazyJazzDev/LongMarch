@@ -7,7 +7,7 @@
 #endif
 
 #include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/sha256.h"
+#include "grassland/util/sha256.h"
 
 namespace grassland::rhi {
 namespace {
@@ -73,7 +73,7 @@ const ShaderCacheSettings &GetShaderCacheSettings() {
 }
 
 std::string ShaderCacheKey(const std::vector<std::string> &parts) {
-  detail::SHA256 hash;
+  SHA256 hash;
   for (auto &p : parts) {
     hash.Update(std::to_string(p.size()) + ":");
     hash.Update(p);

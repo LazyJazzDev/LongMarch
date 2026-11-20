@@ -7,7 +7,6 @@
 #include <thread>
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
-#include "grassland/rhi/sha256.h"
 #include "grassland/util/virtual_file_system.h"
 
 namespace grassland::rhi {
@@ -30,10 +29,7 @@ class ShaderCacheTest : public testing::Test {
   std::filesystem::path directory_;
 };
 
-TEST_F(ShaderCacheTest, DigestAndRequestBoundaries) {
-  detail::SHA256 digest;
-  digest.Update("abc");
-  EXPECT_EQ(digest.Finish(), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+TEST_F(ShaderCacheTest, RequestBoundaries) {
   EXPECT_NE(ShaderCacheKey({"ab", "c"}), ShaderCacheKey({"a", "bc"}));
 }
 

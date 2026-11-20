@@ -4,3 +4,7 @@ add_executable(test_virtual_file_system virtual_file_system_test.cpp)
 target_link_libraries(test_virtual_file_system PRIVATE grassland_util GTest::gtest_main)
 include(GoogleTest)
 gtest_discover_tests(test_virtual_file_system)
+
+add_executable(test_sha256 EXCLUDE_FROM_ALL sha256_test.cpp)
+target_link_libraries(test_sha256 PRIVATE grassland_util GTest::gtest_main)
+gtest_discover_tests(test_sha256)

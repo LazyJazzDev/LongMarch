@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace grassland::rhi::detail {
+namespace grassland {
 // Streaming SHA-256 for resource integrity, independent of platform crypto SDKs.
 class SHA256 {
  public:
@@ -99,4 +99,4 @@ class SHA256 {
   size_t used_ = 0;
   uint64_t length_ = 0;
 };
-}  // namespace grassland::rhi::detail
+}  // namespace grassland
