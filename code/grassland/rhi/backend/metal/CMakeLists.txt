@@ -1,7 +1,15 @@
 file(GLOB SOURCES CONFIGURE_DEPENDS "*.cpp" "*.h" "*.mm")
+if(LONGMARCH_HEADLESS)
+    list(FILTER SOURCES EXCLUDE REGEX "/metal_window\\.(cpp|mm)$")
+endif()
 target_sources(grassland_rhi PRIVATE ${SOURCES})
 target_include_directories(grassland_rhi PRIVATE ${LONGMARCH_METAL_CPP_DIR})
 target_compile_definitions(grassland_rhi PUBLIC LONGMARCH_METAL_ENABLED)
 target_link_libraries(grassland_rhi PRIVATE
-        spirv-cross-msl spirv-cross-glsl spirv-cross-core
-        "-framework Metal" "-framework Foundation" "-framework QuartzCore" "-framework Cocoa")
+        "-framework Metal" "-framework Foundation" "-framework QuartzCore")
+if(NOT LONGMARCH_OFFLINE_SHADERS)
+    target_link_libraries(grassland_rhi PRIVATE spirv-cross-msl spirv-cross-glsl spirv-cross-core)
+endif()
+if(NOT LONGMARCH_HEADLESS)
+    target_link_libraries(grassland_rhi PRIVATE "-framework Cocoa")
+endif()

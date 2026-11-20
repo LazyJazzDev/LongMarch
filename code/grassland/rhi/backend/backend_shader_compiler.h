@@ -11,8 +11,9 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
 std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                               BackendAPI api,
                               const std::vector<InputAttributeDesc> &attributes = {});
-// Defines RHI_PLATFORM_WINDOWS/MACOS/LINUX as 0 or 1 for the execution platform,
-// independently of api/output target. These macros are also visible to imports.
+// Defines RHI_PLATFORM_WINDOWS/MACOS/LINUX/IOS as 0 or 1, also for imports.
+// Normally follows the execution platform; ShaderCacheSettings::ios selects iOS
+// when preparing its bundle on a host. Independent of api/intermediate format.
 bool CompileSlang(const IShader *shader,
                   const std::string &prefix,
                   BackendAPI api,
