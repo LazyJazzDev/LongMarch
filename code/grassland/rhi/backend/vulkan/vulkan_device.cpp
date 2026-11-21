@@ -118,7 +118,8 @@ void VulkanDeviceImpl::RecycleCommandResources(QueueType type, VkCommandPool poo
 VulkanDeviceImpl::VulkanDeviceImpl(grassland::rhi::PhysicalDevice info, IVulkanCore *core)
     : upload_pool_(this, TEMPORAL_BUFFER_UPLOAD),
       download_pool_(this, TEMPORAL_BUFFER_DOWNLOAD),
-      scratch_pool_(this) {
+      scratch_pool_(this),
+      queues_{} {
   InitializeDevice(std::move(info), core, BACKEND_API_VULKAN);
 }
 
@@ -330,7 +331,12 @@ rhi::IProgram *VulkanDeviceImpl::CreateProgram(const ProgramDesc &desc) {
 }
 
 rhi::IWindow *VulkanDeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
+#ifdef LONGMARCH_HEADLESS
+  ReportError(-1, "GLFW windows are unavailable in this build");
+  return nullptr;
+#else
   return IVulkanWindow::Create(this, desc);
+#endif
 }
 
 VulkanScratchPool &VulkanDeviceImpl::ScratchPool() {
@@ -395,6 +401,15 @@ bool VulkanDeviceImpl::SupportRayQuery() const {
 
 bool VulkanDeviceImpl::SupportGeometryShader() const {
   return info_.geometry_shader_feature;
+}
+
+bool VulkanDeviceImpl::SupportComputeSubgroupVote() const {
+  VkPhysicalDeviceSubgroupProperties subgroup{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES};
+  VkPhysicalDeviceProperties2 properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+  properties.pNext = &subgroup;
+  vkGetPhysicalDeviceProperties2(physical_, &properties);
+  const auto needed = VK_SUBGROUP_FEATURE_BASIC_BIT | VK_SUBGROUP_FEATURE_VOTE_BIT;
+  return (subgroup.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) && (subgroup.supportedOperations & needed) == needed;
 }
 
 IVulkanQueue *VulkanDeviceImpl::GetNativeQueue(QueueType type) const {

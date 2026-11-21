@@ -81,7 +81,12 @@ MTL::Device *MetalDeviceImpl::NativeDevice() const noexcept {
 }
 
 rhi::IWindow *MetalDeviceImpl::CreateGLFWWindow(const WindowDesc &desc) {
+#ifdef LONGMARCH_HEADLESS
+  ReportError(-1, "GLFW windows are unavailable in this build");
+  return nullptr;
+#else
   return IMetalWindow::Create(this, desc);
+#endif
 }
 
 rhi::IBuffer *MetalDeviceImpl::CreateBuffer(const BufferDesc &desc) {
@@ -157,6 +162,10 @@ bool MetalDeviceImpl::SupportRayQuery() const {
 
 bool MetalDeviceImpl::SupportGeometryShader() const {
   return info_.geometry_shader_feature;
+}
+
+bool MetalDeviceImpl::SupportComputeSubgroupVote() const {
+  return device_->supportsFamily(MTL::GPUFamilyApple6) || device_->supportsFamily(MTL::GPUFamilyMac2);
 }
 
 IMetalQueue *MetalDeviceImpl::GetNativeQueue(QueueType type) const {
