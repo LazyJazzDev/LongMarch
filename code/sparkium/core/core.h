@@ -7,8 +7,6 @@ class Core : public Object {
  public:
   // Borrowed device; destroy scenes, resources and this Core before the device.
   static std::unique_ptr<Core> Create(rhi::IDevice *device);
-  // Copy caller-provided shader sources, for packaged or embedded resources.
-  static std::unique_ptr<Core> Create(rhi::IDevice *device, const VirtualFileSystem &shaders);
 
   bool IsValid() const;
   bool ReportFailure(const char *message);

@@ -13,19 +13,9 @@ Core::Core(rhi::IDevice *device) : device_(device) {
 }
 
 std::unique_ptr<Core> Core::Create(rhi::IDevice *device) {
-#ifdef LONGMARCH_SPARKIUM_SHADERS
-  return Create(device, VirtualFileSystem::LoadDirectory(LONGMARCH_SPARKIUM_SHADERS));
-#else
-  LogError("Sparkium: supply shader sources when no default shader directory is configured");
-  return {};
-#endif
-}
-
-std::unique_ptr<Core> Core::Create(rhi::IDevice *device, const VirtualFileSystem &shaders) {
   if (!device)
     return {};
   std::unique_ptr<Core> core(new Core(device));
-  core->shaders_vfs_ = shaders;
   if (!core->LoadPublicShaders() || !core->LoadPublicBuffers() || !core->LoadPublicImages())
     return {};
   return core;
@@ -164,6 +154,7 @@ bool Core::SetPublicResource(const std::string &name, rhi::ObjPtr<rhi::IImage> &
 }
 
 bool Core::LoadPublicShaders() {
+  shaders_vfs_ = VirtualFileSystem::LoadDirectory(LONGMARCH_SPARKIUM_SHADERS);
   rhi::ObjPtr<rhi::IShader> shader;
   rhi::ObjPtr<rhi::IComputeProgram> compute_program;
 
