@@ -1,6 +1,12 @@
 file(GLOB SOURCES CONFIGURE_DEPENDS "*.h" "*.cpp")
 
+if(LONGMARCH_HEADLESS AND NOT LONGMARCH_MOBILE_IMGUI)
+    list(FILTER SOURCES EXCLUDE REGEX "/rhi_imgui\\.cpp$")
+endif()
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
+if(LONGMARCH_MOBILE_IMGUI)
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC longmarch_mobile_imgui)
+endif()
 
 # Cache requests are tied to the RHI shader translation implementation. Both host
 # preparation and offline target builds derive the same identity from source.

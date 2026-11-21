@@ -61,6 +61,18 @@ if(NOT LONGMARCH_OFFLINE_SHADERS)
     endforeach()
 endif()
 
+option(LONGMARCH_MOBILE_IMGUI "Build the window-independent ImGui renderer" OFF)
+if(LONGMARCH_MOBILE_IMGUI)
+    set(LONGMARCH_IMGUI_SOURCE_DIR "${LONGMARCH_ROOT}/external/imgui" CACHE PATH "Dear ImGui sources")
+    add_library(longmarch_mobile_imgui STATIC
+        "${LONGMARCH_IMGUI_SOURCE_DIR}/imgui.cpp"
+        "${LONGMARCH_IMGUI_SOURCE_DIR}/imgui_draw.cpp"
+        "${LONGMARCH_IMGUI_SOURCE_DIR}/imgui_tables.cpp"
+        "${LONGMARCH_IMGUI_SOURCE_DIR}/imgui_widgets.cpp"
+        "${LONGMARCH_IMGUI_SOURCE_DIR}/imgui_demo.cpp")
+    target_include_directories(longmarch_mobile_imgui PUBLIC "${LONGMARCH_IMGUI_SOURCE_DIR}")
+endif()
+
 set(GRASSLAND_SUBLIB_NAME grassland_util)
 add_subdirectory("${LONGMARCH_ROOT}/code/grassland/util" util)
 set(GRASSLAND_SUBLIB_NAME grassland_rhi)
@@ -72,4 +84,9 @@ option(LONGMARCH_MOBILE_TESTS "Build host shader target tests" OFF)
 if(LONGMARCH_MOBILE_TESTS AND NOT LONGMARCH_OFFLINE_SHADERS)
     add_executable(longmarch_shader_target_test tests/shader_target.cpp)
     target_link_libraries(longmarch_shader_target_test PRIVATE LongMarch::Mobile)
+endif()
+
+if(LONGMARCH_MOBILE_TESTS AND LONGMARCH_MOBILE_IMGUI AND NOT LONGMARCH_OFFLINE_SHADERS)
+    add_executable(longmarch_imgui_test tests/imgui.cpp)
+    target_link_libraries(longmarch_imgui_test PRIVATE LongMarch::Mobile)
 endif()

@@ -301,6 +301,18 @@ TEST_F(SoftwareBVHTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {
   }
 }
 
+TEST_F(SoftwareBVHTest, CoreAcceptsOwnedShaderSources) {
+  auto shaders = core->GetShadersVFS();
+  shaders.WriteFile("host-marker.slang", "// packaged source");
+  auto hosted = sparkium::Core::Create(core->GetDevice(), shaders);
+  ASSERT_NE(hosted, nullptr);
+  shaders.WriteFile("host-marker.slang", "// caller changed its copy");
+  std::vector<uint8_t> bytes;
+  ASSERT_EQ(hosted->GetShadersVFS().ReadFile("host-marker.slang", bytes), 0);
+  EXPECT_EQ(std::string(bytes.begin(), bytes.end()), "// packaged source");
+  EXPECT_EQ(sparkium::Core::Create(nullptr, shaders), nullptr);
+}
+
 TEST_F(SoftwareBVHTest, JsonCameraTypesPreserveLegacyScenes) {
   const auto path = std::filesystem::temp_directory_path() /
                     ("sparkium-camera-" + std::to_string(reinterpret_cast<uintptr_t>(core.get())) + ".json");
@@ -314,14 +326,14 @@ TEST_F(SoftwareBVHTest, JsonCameraTypesPreserveLegacyScenes) {
     }
   } cleanup{path};
 
-  auto load = [&](const std::string &parameters, std::string *error) {
+  auto load = [&](const std::string &parameters, std::string *error, int max_dimension = 0, double aspect = 0.0) {
     std::ofstream file(path);
     file << R"({"format":"sparkium-scene","version":1,"renderer":{},
 "film":{"width":8,"height":8},"materials":{},"geometries":{},"entities":[],
 "camera":{"eye":[0,0,4],"target":[0,0,0])"
          << parameters << "}}";
     file.close();
-    return sparkium::JsonScene::Load(core.get(), path, error);
+    return sparkium::JsonScene::Load(core.get(), path, error, max_dimension, aspect);
   };
   std::string error;
   auto pinhole = load("", &error);
@@ -342,6 +354,20 @@ TEST_F(SoftwareBVHTest, JsonCameraTypesPreserveLegacyScenes) {
   EXPECT_NE(dynamic_cast<sparkium::CameraPinhole *>(explicit_pinhole->GetCamera()), nullptr);
   EXPECT_EQ(load(R"(,"type":"unknown")", &error), nullptr);
   EXPECT_NE(error.find("unknown camera type"), std::string::npos);
+  auto portrait = load("", &error, 12, 0.5);
+  ASSERT_NE(portrait, nullptr) << error;
+  EXPECT_EQ(portrait->GetFilm()->GetWidth(), 6);
+  EXPECT_EQ(portrait->GetFilm()->GetHeight(), 12);
+  auto *portrait_camera = dynamic_cast<sparkium::CameraPinhole *>(portrait->GetCamera());
+  ASSERT_NE(portrait_camera, nullptr);
+  EXPECT_FLOAT_EQ(portrait_camera->aspect, 0.5f);
+  EXPECT_FLOAT_EQ(portrait_camera->fovy, dynamic_cast<sparkium::CameraPinhole *>(pinhole->GetCamera())->fovy);
+  auto reduced = load("", &error, 4);
+  ASSERT_NE(reduced, nullptr) << error;
+  EXPECT_EQ(reduced->GetFilm()->GetWidth(), 4);
+  EXPECT_EQ(reduced->GetFilm()->GetHeight(), 4);
+  EXPECT_EQ(load("", &error, -1), nullptr);
+  EXPECT_EQ(load("", &error, 0, std::numeric_limits<double>::infinity()), nullptr);
 }
 
 TEST_F(SoftwareBVHTest, CameraModelsGeneratePinholeAndFocusedRays) {
