@@ -152,6 +152,13 @@ rhi::ICore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
         info.unified_memory += memory.memoryHeaps[i].size;
       }
     }
+    VkPhysicalDeviceSubgroupProperties subgroup{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES};
+    VkPhysicalDeviceProperties2 subgroup_properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+    subgroup_properties.pNext = &subgroup;
+    vkGetPhysicalDeviceProperties2(device, &subgroup_properties);
+    const auto needed = VK_SUBGROUP_FEATURE_BASIC_BIT | VK_SUBGROUP_FEATURE_VOTE_BIT;
+    info.compute_subgroup_vote_feature =
+        (subgroup.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) && (subgroup.supportedOperations & needed) == needed;
     info.geometry_shader_feature = features.Features().features.geometryShader == VK_TRUE;
     info.ray_tracing_pipeline_feature = features.RayTracingPipeline();
     info.ray_query_feature = features.RayQuery();
