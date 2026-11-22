@@ -35,6 +35,8 @@ rhi::ICore *MetalCoreImpl::CreateMetalCore(const CoreDesc &desc) {
     // DXR/Vulkan ray-generation/miss/hit pipeline stages or geometry shaders.
     info.ray_tracing_pipeline_feature = false;
     info.geometry_shader_feature = false;
+    info.compute_subgroup_vote_feature =
+        device->supportsFamily(MTL::GPUFamilyApple6) || device->supportsFamily(MTL::GPUFamilyMac2);
     core->adapters_.push_back({NS::RetainPtr(device), std::move(info)});
   };
 

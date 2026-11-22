@@ -165,7 +165,7 @@ bool MetalDeviceImpl::SupportGeometryShader() const {
 }
 
 bool MetalDeviceImpl::SupportComputeSubgroupVote() const {
-  return device_->supportsFamily(MTL::GPUFamilyApple6) || device_->supportsFamily(MTL::GPUFamilyMac2);
+  return info_.compute_subgroup_vote_feature;
 }
 
 IMetalQueue *MetalDeviceImpl::GetNativeQueue(QueueType type) const {

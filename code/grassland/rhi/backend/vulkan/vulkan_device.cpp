@@ -404,12 +404,7 @@ bool VulkanDeviceImpl::SupportGeometryShader() const {
 }
 
 bool VulkanDeviceImpl::SupportComputeSubgroupVote() const {
-  VkPhysicalDeviceSubgroupProperties subgroup{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES};
-  VkPhysicalDeviceProperties2 properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
-  properties.pNext = &subgroup;
-  vkGetPhysicalDeviceProperties2(physical_, &properties);
-  const auto needed = VK_SUBGROUP_FEATURE_BASIC_BIT | VK_SUBGROUP_FEATURE_VOTE_BIT;
-  return (subgroup.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) && (subgroup.supportedOperations & needed) == needed;
+  return info_.compute_subgroup_vote_feature;
 }
 
 IVulkanQueue *VulkanDeviceImpl::GetNativeQueue(QueueType type) const {

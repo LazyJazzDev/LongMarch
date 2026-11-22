@@ -344,7 +344,7 @@ bool D3D12DeviceImpl::SupportRayQuery() const {
 }
 
 bool D3D12DeviceImpl::SupportComputeSubgroupVote() const {
-  return false;
+  return info_.compute_subgroup_vote_feature;
 }
 
 bool D3D12DeviceImpl::SupportGeometryShader() const {
