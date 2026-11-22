@@ -5,10 +5,10 @@
 #ifndef LONGMARCH_OFFLINE_SHADERS
 #include <spirv_msl.hpp>
 #endif
+#include "grassland/rhi/backend/backend_shader_cache.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
-#include "grassland/rhi/backend/shader_cache.h"
 
 namespace grassland::rhi::backend::metal {
 // Both backends consume the same DX-layout SPIR-V. Argument IDs come from the
