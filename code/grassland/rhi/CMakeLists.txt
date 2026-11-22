@@ -41,3 +41,8 @@ if (LONGMARCH_CUDA_RUNTIME)
 endif ()
 
 add_subdirectory(backend)
+
+# Native interop is opt-in for consumers; do not add its headers to rhi.h.
+if(LONGMARCH_METAL_ENABLED)
+    target_sources(${GRASSLAND_SUBLIB_NAME} PRIVATE native/native_metal.h native/native_metal.mm)
+endif()

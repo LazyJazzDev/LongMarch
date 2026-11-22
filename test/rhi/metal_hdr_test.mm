@@ -47,7 +47,7 @@ TEST(RhiMetalHDR, LayerEncodingAndEDRFollowSwapchainTransitions) {
   }
 }
 
-#include "grassland/rhi/metal_bridge.h"
+#include "grassland/rhi/native/native_metal.h"
 
 TEST(RhiMetalHDR, DrawableBridgeWaitsForAssistQueueRendering) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))

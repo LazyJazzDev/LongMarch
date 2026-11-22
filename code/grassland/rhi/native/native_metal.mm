@@ -1,4 +1,4 @@
-#include "grassland/rhi/metal_bridge.h"
+#include "grassland/rhi/native/native_metal.h"
 
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
