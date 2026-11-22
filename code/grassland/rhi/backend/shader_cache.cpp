@@ -1,4 +1,4 @@
-#include "grassland/rhi/shader_cache.h"
+#include "grassland/rhi/backend/shader_cache.h"
 
 #include <algorithm>
 #include <fstream>
@@ -9,7 +9,7 @@
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/util/sha256.h"
 
-namespace grassland::rhi {
+namespace grassland::rhi::backend {
 namespace {
 ShaderTargetPlatform HostPlatform() {
 #if defined(__OHOS__)
@@ -46,14 +46,14 @@ bool ConfigureShaderCache(const ShaderCacheSettings &value) {
     if (!value.read_only)
       std::filesystem::create_directories(value.directory, error);
     if (error || !std::filesystem::is_directory(value.directory, error)) {
-      backend::ReportError(-1, "Shader cache directory is unavailable: " + value.directory.string());
+      ReportError(-1, "Shader cache directory is unavailable: " + value.directory.string());
       return false;
     }
   }
   auto normalized = value;
   if (value.ios && value.target_platform != ShaderTargetPlatform::Native &&
       value.target_platform != ShaderTargetPlatform::IOS) {
-    backend::ReportError(-1, "Conflicting shader target and iOS policy");
+    ReportError(-1, "Conflicting shader target and iOS policy");
     return false;
   }
   if (normalized.target_platform == ShaderTargetPlatform::Native) {
@@ -88,12 +88,12 @@ bool ReadShaderCache(const std::string &key, std::vector<uint8_t> &data) {
   std::ifstream file(settings.directory / key, std::ios::binary | std::ios::ate);
   if (!file) {
     if (settings.read_only)
-      backend::ReportError(-1, "Missing bundled shader " + key);
+      ReportError(-1, "Missing bundled shader " + key);
     return false;
   }
   auto n = file.tellg();
   if (n < 64 || n > 128 * 1024 * 1024) {
-    backend::ReportError(-1, "Invalid shader cache size: " + key);
+    ReportError(-1, "Invalid shader cache size: " + key);
     return false;
   }
   file.seekg(0);
@@ -102,7 +102,7 @@ bool ReadShaderCache(const std::string &key, std::vector<uint8_t> &data) {
   std::vector<uint8_t> bytes(static_cast<size_t>(n) - 64);
   file.read(reinterpret_cast<char *>(bytes.data()), bytes.size());
   if (!file || ShaderCacheKey({std::string(bytes.begin(), bytes.end())}) != digest) {
-    backend::ReportError(-1, "Corrupt shader cache: " + key);
+    ReportError(-1, "Corrupt shader cache: " + key);
     return false;
   }
   data = std::move(bytes);
@@ -121,13 +121,13 @@ bool WriteShaderCache(const std::string &key, const std::vector<uint8_t> &data) 
   file.write(reinterpret_cast<const char *>(data.data()), data.size());
   file.close();
   if (!file) {
-    backend::ReportError(-1, "Cannot write shader cache " + key);
+    ReportError(-1, "Cannot write shader cache " + key);
     return false;
   }
   std::error_code ec;
   std::filesystem::rename(temp, path, ec);
   if (ec)
-    backend::ReportError(-1, "Cannot finalize shader cache " + key + ": " + ec.message());
+    ReportError(-1, "Cannot finalize shader cache " + key + ": " + ec.message());
   return !ec;
 }
 
@@ -152,4 +152,4 @@ bool WriteShaderThreadGroup(const std::string &key, const std::array<uint32_t, 3
       bytes[i * 4 + j] = uint8_t(size[i] >> (j * 8));
   return WriteShaderCache("threads-" + key, bytes);
 }
-}  // namespace grassland::rhi
+}  // namespace grassland::rhi::backend

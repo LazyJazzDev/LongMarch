@@ -1,4 +1,4 @@
-#include "grassland/rhi/shader_cache.h"
+#include "grassland/rhi/backend/shader_cache.h"
 
 #include <gtest/gtest.h>
 
@@ -9,7 +9,7 @@
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/util/virtual_file_system.h"
 
-namespace grassland::rhi {
+namespace grassland::rhi::backend {
 class ShaderCacheTest : public testing::Test {
  protected:
   void SetUp() override {
@@ -108,4 +108,4 @@ float4 VSMain() : SV_Position { return float4(0, 0, 0, 1); }
   ASSERT_EQ(files.WriteFile("test.slang", "float4 VSMain():SV_Position { return 1; }"), 0);
   EXPECT_FALSE(backend::PreprocessShader(desc, BACKEND_API_METAL, replay));
 }
-}  // namespace grassland::rhi
+}  // namespace grassland::rhi::backend

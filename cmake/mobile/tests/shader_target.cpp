@@ -3,11 +3,12 @@
 #include <thread>
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
-#include "grassland/rhi/shader_cache.h"
+#include "grassland/rhi/backend/shader_cache.h"
 #include "grassland/util/virtual_file_system.h"
 
 using namespace grassland;
 using namespace grassland::rhi;
+using namespace grassland::rhi::backend;
 
 int main(int argc, char **argv) {
   if (argc != 2)

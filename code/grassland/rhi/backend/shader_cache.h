@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace grassland::rhi {
+namespace grassland::rhi::backend {
 enum class ShaderTargetPlatform { Native, Windows, MacOS, Linux, IOS, OHOS };
 
 // Per-thread offline bundle configuration. Prepare and replay must use the same
@@ -31,4 +31,4 @@ bool ReadShaderCache(const std::string &key, std::vector<uint8_t> &data);
 bool WriteShaderCache(const std::string &key, const std::vector<uint8_t> &data);
 bool ReadShaderThreadGroup(const std::string &key, std::array<uint32_t, 3> &size);
 bool WriteShaderThreadGroup(const std::string &key, const std::array<uint32_t, 3> &size);
-}  // namespace grassland::rhi
+}  // namespace grassland::rhi::backend
