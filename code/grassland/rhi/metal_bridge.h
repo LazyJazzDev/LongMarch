@@ -14,7 +14,8 @@ void *GetNativeMetalDevice(IDevice *device);
 // Copy without scaling or color conversion: both textures must have the same
 // size/format, and the drawable's layer must have framebufferOnly = false.
 // rendered must describe the last write to source. This synchronous operation
-// waits for rendering and presentation-copy completion before returning, so the
+// encodes a GPU timeline wait before copying, then waits for copy completion and
+// render-result publication before returning, so the
 // host may safely reuse/release source afterwards. Serialize calls with source
 // writes and device destruction. False means validation, render or copy failure.
 bool PresentMetalDrawable(IDevice *device, IImage *source, ISubmissionToken *rendered, void *drawable);

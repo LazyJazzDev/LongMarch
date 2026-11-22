@@ -27,7 +27,11 @@ bool PresentMetalDrawable(IDevice *device, IImage *source, ISubmissionToken *ren
         input.height != output.height || input.pixelFormat != output.pixelFormat || output.framebufferOnly ||
         input.sampleCount != 1 || output.sampleCount != 1)
       return false;
-    if (!rendered->WaitHost())
+    const auto event = rendered->GetEvent();
+    auto timeline = QueryInterfacePtr<backend::metal::IMetalTimeline>(event.timeline);
+    if (!timeline || timeline->Owner() != native.Get() || !timeline->NativeEvent() || !event.value)
+      return false;
+    if (rendered->GetStatus() == SUBMISSION_STATUS_FAILED || rendered->GetStatus() == SUBMISSION_STATUS_CANCELED)
       return false;
     auto queue = native->GetNativeQueue(QUEUE_TYPE_MAIN);
     NS::SharedPtr<MTL::CommandBuffer> commands;
@@ -37,6 +41,7 @@ bool PresentMetalDrawable(IDevice *device, IImage *source, ISubmissionToken *ren
       if (!commands)
         return false;
       id<MTLCommandBuffer> buffer = (__bridge id<MTLCommandBuffer>)commands.get();
+      commands->encodeWait(timeline->NativeEvent(), event.value);
       id<MTLBlitCommandEncoder> blit = [buffer blitCommandEncoder];
       if (!blit)
         return false;
@@ -54,7 +59,7 @@ bool PresentMetalDrawable(IDevice *device, IImage *source, ISubmissionToken *ren
       [buffer commit];
     }
     commands->waitUntilCompleted();
-    return commands->status() == MTL::CommandBufferStatusCompleted;
+    return commands->status() == MTL::CommandBufferStatusCompleted && rendered->WaitHost();
   }
 }
 }  // namespace grassland::rhi
