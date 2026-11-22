@@ -343,6 +343,10 @@ bool D3D12DeviceImpl::SupportRayQuery() const {
   return info_.ray_query_feature;
 }
 
+bool D3D12DeviceImpl::SupportComputeSubgroupVote() const {
+  return false;
+}
+
 bool D3D12DeviceImpl::SupportGeometryShader() const {
   return info_.geometry_shader_feature;
 }

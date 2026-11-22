@@ -126,6 +126,10 @@ class TestDevice final : public backend::Object<rhi::IDevice> {
     return info_.ray_query_feature;
   }
 
+  bool SupportComputeSubgroupVote() const override {
+    return false;
+  }
+
   bool SupportGeometryShader() const override {
     return info_.geometry_shader_feature;
   }
