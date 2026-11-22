@@ -61,6 +61,7 @@ TEST(RhiMetalHDR, DrawableBridgeWaitsForAssistQueueRendering) {
     ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Metal event bridge test"});
     ASSERT_TRUE(window);
     auto layer = (CAMetalLayer *)[glfwGetCocoaWindow(window->GLFWWindow()) contentView].layer;
+    EXPECT_EQ((__bridge id<MTLDevice>)GetNativeMetalDevice(device.Get()), layer.device);
     layer.framebufferOnly = NO;
     id<CAMetalDrawable> drawable = [layer nextDrawable];
     ASSERT_NE(drawable, nil);
@@ -71,8 +72,9 @@ TEST(RhiMetalHDR, DrawableBridgeWaitsForAssistQueueRendering) {
     ASSERT_TRUE(commands && commands->CmdClearImage(source.Get(), {1, 0, 0, 1}));
     ObjPtr<ISubmissionToken> rendered = commands->Submit();
     ASSERT_TRUE(rendered);
-    EXPECT_FALSE(PresentMetalDrawable(device.Get(), source.Get(), nullptr, (__bridge void *)drawable));
-    EXPECT_TRUE(PresentMetalDrawable(device.Get(), source.Get(), rendered.Get(), (__bridge void *)drawable));
+    EXPECT_FALSE(PresentMetalDrawable(device.Get(), source.Get(), nullptr, (__bridge CA::MetalDrawable *)drawable));
+    EXPECT_TRUE(
+        PresentMetalDrawable(device.Get(), source.Get(), rendered.Get(), (__bridge CA::MetalDrawable *)drawable));
     EXPECT_EQ(rendered->GetStatus(), SUBMISSION_STATUS_COMPLETED);
   }
 }

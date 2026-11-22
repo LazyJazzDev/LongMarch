@@ -9,12 +9,12 @@
 #include "grassland/rhi/rhi_submission_token.h"
 
 namespace grassland::rhi {
-void *GetNativeMetalDevice(IDevice *device) {
+MTL::Device *GetNativeMetalDevice(IDevice *device) {
   auto native = QueryInterfacePtr<backend::metal::IMetalDevice>(device);
   return native ? native->NativeDevice() : nullptr;
 }
 
-bool PresentMetalDrawable(IDevice *device, IImage *source, ISubmissionToken *rendered, void *drawable) {
+bool PresentMetalDrawable(IDevice *device, IImage *source, ISubmissionToken *rendered, CA::MetalDrawable *drawable) {
   @autoreleasepool {
     auto native = QueryInterfacePtr<backend::metal::IMetalDevice>(device);
     auto image = QueryInterfacePtr<backend::metal::IMetalImage>(source);

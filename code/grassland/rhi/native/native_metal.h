@@ -1,15 +1,18 @@
 #pragma once
 
+#include <Metal/Metal.hpp>
+#include <QuartzCore/CAMetalDrawable.hpp>
+
 namespace grassland::rhi {
 class IDevice;
 class IImage;
 class ISubmissionToken;
 
-// Available when the Metal backend is built. The borrowed id<MTLDevice> remains
+// Available when the Metal backend is built. The borrowed MTL::Device remains
 // valid until device destruction. nullptr for null or non-Metal devices.
-void *GetNativeMetalDevice(IDevice *device);
+MTL::Device *GetNativeMetalDevice(IDevice *device);
 
-// drawable is a borrowed id<CAMetalDrawable>. The host owns its view/layer and
+// drawable is a borrowed CA::MetalDrawable. The host owns its view/layer and
 // acquisition on the UI thread; no UIKit/SwiftUI type enters this interface.
 // Copy without scaling or color conversion: both textures must have the same
 // size/format, and the drawable's layer must have framebufferOnly = false.
@@ -18,5 +21,5 @@ void *GetNativeMetalDevice(IDevice *device);
 // render-result publication before returning, so the
 // host may safely reuse/release source afterwards. Serialize calls with source
 // writes and device destruction. False means validation, render or copy failure.
-bool PresentMetalDrawable(IDevice *device, IImage *source, ISubmissionToken *rendered, void *drawable);
+bool PresentMetalDrawable(IDevice *device, IImage *source, ISubmissionToken *rendered, CA::MetalDrawable *drawable);
 }  // namespace grassland::rhi
