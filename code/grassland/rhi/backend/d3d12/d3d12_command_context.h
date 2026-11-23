@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 #include <unordered_map>
 #include <vector>
@@ -68,7 +68,8 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
                      uint64_t destination_offset,
                      uint64_t size) override;
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
-  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
+  using ICommandContext::CmdUploadImage;
+  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) override;
   bool CmdBindComputeProgram(IComputeProgram *program) override;
   bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;
@@ -133,10 +134,14 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
   bool PrepareDrawBuffers(bool indexed);
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
   bool EndRecording();
-  bool TransitionResource(ID3D12Resource *resource, D3D12_RESOURCE_STATES state, D3D12_RESOURCE_STATES default_state);
+  bool TransitionResource(ID3D12Resource *resource,
+                          D3D12_RESOURCE_STATES state,
+                          D3D12_RESOURCE_STATES default_state,
+                          uint32_t first_mip = 0,
+                          uint32_t mip_count = 0);
 
   struct ResourceState {
-    D3D12_RESOURCE_STATES current;
+    std::vector<D3D12_RESOURCE_STATES> current;
     D3D12_RESOURCE_STATES default_state;
   };
 

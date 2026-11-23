@@ -335,7 +335,13 @@ struct ImageDesc {
   uint32_t width{};
   uint32_t height{};
   ImageFormat format{IMAGE_FORMAT_UNKNOWN};
+  // 0 requests the complete chain; GetDesc() always returns the resolved count.
+  uint32_t mip_levels{1};
 };
+
+uint32_t ImageMipLevelCount(uint32_t width, uint32_t height);
+bool NormalizeImageDesc(const ImageDesc &requested, ImageDesc &resolved);
+bool ImageMipDesc(const ImageDesc &image, uint32_t mip_level, ImageDesc &level);
 
 typedef enum {
   SHADER_STAGE_VERTEX,

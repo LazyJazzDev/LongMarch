@@ -24,6 +24,12 @@ class IComputeProgram;
 class IBindingGroup;
 class IImage;
 
+struct ImageUploadInfo {
+  const void *data{};
+  uint64_t row_pitch{};
+  uint32_t mip_level{};
+};
+
 struct ColorAttachmentInfo {
   IImage *color_attachment{};
   AttachmentLoadOp load_op{ATTACHMENT_LOAD_OP_LOAD};
@@ -103,7 +109,10 @@ class ICommandContext : public IObject {
                              uint64_t destination_offset,
                              uint64_t size) = 0;
   virtual bool CmdBindGroup(uint32_t index, IBindingGroup *group) = 0;
-  virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) = 0;
+  virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) = 0;
+  // All descriptions are validated before recording the batch. CPU rows are
+  // copied during this call, just as for the single-level upload.
+  bool CmdUploadImage(IImage *image, const std::vector<ImageUploadInfo> &levels);
   // One active graphics or compute program. Switching programs clears group bindings.
   // Dispatch requires no rendering scope; dependencies between dispatches are automatic.
   virtual bool CmdBindComputeProgram(IComputeProgram *program) = 0;

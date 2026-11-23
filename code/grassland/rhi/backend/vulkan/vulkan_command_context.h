@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 #include <unordered_map>
 #include <vector>
@@ -67,7 +67,8 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
                      uint64_t destination_offset,
                      uint64_t size) override;
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
-  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
+  using ICommandContext::CmdUploadImage;
+  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) override;
   bool CmdBindComputeProgram(IComputeProgram *program) override;
   bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;
@@ -127,7 +128,12 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
   };
 
   std::unordered_map<IVulkanBuffer *, BufferState> buffer_states_;
-  bool TransitionImage(IVulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
+  bool TransitionImage(IVulkanImage *image,
+                       VkImageLayout layout,
+                       VkPipelineStageFlags stages,
+                       VkAccessFlags access,
+                       uint32_t first_mip = 0,
+                       uint32_t mip_count = 0);
 
   struct ImageState {
     VkImageLayout layout;
@@ -135,7 +141,7 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
     VkAccessFlags access;
   };
 
-  std::unordered_map<IVulkanImage *, ImageState> image_states_;
+  std::unordered_map<IVulkanImage *, std::vector<ImageState>> image_states_;
   std::vector<IVulkanWindow *> presents_;
   IVulkanDevice *device_;
   VkCommandPool pool_{};

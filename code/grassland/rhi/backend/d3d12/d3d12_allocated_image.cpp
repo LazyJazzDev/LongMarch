@@ -23,7 +23,14 @@ bool D3D12AllocatedImageImpl::IsValid() const {
   return true;
 }
 
-IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &desc) {
+IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &requested) {
+  ImageDesc desc;
+  if (!NormalizeImageDesc(requested, desc))
+    return nullptr;
+  const auto &mip = device->GetPhysicalDevice().mip_feature;
+  if (desc.width > mip.max_image_dimension_2d || desc.height > mip.max_image_dimension_2d ||
+      desc.mip_levels > mip.formats[desc.format].max_mip_levels)
+    return nullptr;
   if (!desc.width || !desc.height)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
@@ -41,7 +48,7 @@ IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &d
   info.Width = desc.width;
   info.Height = desc.height;
   info.DepthOrArraySize = 1;
-  info.MipLevels = 1;
+  info.MipLevels = static_cast<UINT16>(desc.mip_levels);
   info.Format = format;
   info.SampleDesc.Count = 1;
   info.Flags =

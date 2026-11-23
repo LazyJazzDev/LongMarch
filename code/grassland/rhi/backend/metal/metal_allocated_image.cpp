@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/metal/metal_allocated_image.h"
+#include "grassland/rhi/backend/metal/metal_allocated_image.h"
 
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
@@ -12,13 +12,17 @@ MetalAllocatedImageImpl::MetalAllocatedImageImpl(IMetalDevice *device,
       device_(device) {
 }
 
-IImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &desc) {
+IImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &requested) {
+  ImageDesc desc;
+  if (!NormalizeImageDesc(requested, desc))
+    return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (!desc.width || !desc.height || desc.width > 16384 || desc.height > 16384 || format == MTL::PixelFormatInvalid)
     return nullptr;
 
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto descriptor = MTL::TextureDescriptor::texture2DDescriptor(format, desc.width, desc.height, false);
+  descriptor->setMipmapLevelCount(desc.mip_levels);
   descriptor->setStorageMode(MTL::StorageModePrivate);
   auto usage = MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead;
   if (SupportsImageStorage(desc.format))
