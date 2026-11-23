@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "grassland/rhi/backend/backend_download_token.h"
+#include "grassland/rhi/backend/backend_mip_generator.h"
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
@@ -21,6 +22,8 @@ class ID3D12CommandContext : public IObject {
   } SubmitResult;
 
  public:
+  // Initialize compression metadata before exposing a newly allocated image.
+  virtual bool InitializeImage(IImage *image) = 0;
   virtual void BindDownloads(rhi::ISubmissionToken *submission) = 0;
   virtual void ReleaseDownloads() = 0;
   virtual bool Seal() = 0;
@@ -42,6 +45,7 @@ LONGMARCH_RHI_INTERFACE(grassland::rhi::backend::d3d12::ID3D12CommandContext,
 namespace grassland::rhi::backend::d3d12 {
 class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12CommandContext> {
  public:
+  bool InitializeImage(IImage *image) override;
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
   bool CmdDispatchRays(uint32_t width,
                        uint32_t height,
@@ -70,6 +74,7 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
   using ICommandContext::CmdUploadImage;
   bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) override;
+  bool CmdGenerateMipmaps(IImage *image, uint32_t base_mip = 0, uint32_t mip_count = 0) override;
   bool CmdBindComputeProgram(IComputeProgram *program) override;
   bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;
@@ -194,6 +199,8 @@ class D3D12CommandContextImpl final : public Object<rhi::ICommandContext, ID3D12
 
  private:
   RenderingInfo rendering_{};
+  ObjectPtr<IComputeProgram> mip_program_;
+  ObjectPtr<ISampler> mip_sampler_;
   bool recording_failed_{};
   bool sealed_{};
   ID3D12Queue *queue_{};

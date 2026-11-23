@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 
 #include "grassland/rhi/rhi_acceleration_structure.h"
@@ -113,6 +113,11 @@ class ICommandContext : public IObject {
   // All descriptions are validated before recording the batch. CPU rows are
   // copied during this call, just as for the single-level upload.
   bool CmdUploadImage(IImage *image, const std::vector<ImageUploadInfo> &levels);
+  // Generate levels after base_mip by linear downsampling on the GPU. mip_count
+  // includes the source level; zero selects the remainder. The source must be
+  // initialized. Requires compute_generation for the format and no rendering scope.
+  // Rebind the caller's program/groups afterwards (generation binds its own compute program).
+  virtual bool CmdGenerateMipmaps(IImage *image, uint32_t base_mip = 0, uint32_t mip_count = 0) = 0;
   // One active graphics or compute program. Switching programs clears group bindings.
   // Dispatch requires no rendering scope; dependencies between dispatches are automatic.
   virtual bool CmdBindComputeProgram(IComputeProgram *program) = 0;

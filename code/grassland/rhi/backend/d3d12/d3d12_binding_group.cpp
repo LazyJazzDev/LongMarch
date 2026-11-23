@@ -65,6 +65,7 @@ ObjectPtr<ID3D12BindingVersion> D3D12BindingVersionImpl::Clone() const {
   if (!copy)
     return {};
   copy->references_ = references_;
+  copy->image_views_ = image_views_;
   copy->initialized_ = initialized_;
   auto native = device_->NativeDevice();
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
@@ -169,28 +170,33 @@ bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
 
 bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
                                                uint32_t first_element,
-                                               const std::vector<IImage *> &images) {
+                                               const std::vector<ImageView> &images) {
   const auto &binding = layout_.bindings[binding_index];
-  std::vector<ID3D12Image *> native_images;
-  native_images.reserve(images.size());
-  for (auto image : images) {
-    auto native_image = rhi::QueryInterfacePtr<ID3D12Image>(image);
-    if (!native_image || rhi::QueryInterfacePtr<ID3D12SwapChainImage>(image))
+  for (const auto &view : images)
+    if (rhi::QueryInterfacePtr<ID3D12SwapChainImage>(view.image))
       return false;
-    native_images.push_back(native_image.Get());
-  }
   auto native = device_->NativeDevice();
-  if (binding.type == BINDING_TEXTURE2D) {
-    for (size_t i = 0; i < images.size(); ++i)
-      native->CreateShaderResourceView(native_images[i]->NativeImage(), nullptr,
-                                       resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
-  } else {
-    for (size_t i = 0; i < images.size(); ++i)
-      native->CreateUnorderedAccessView(native_images[i]->NativeImage(), nullptr, nullptr,
-                                        resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
-  }
-  for (size_t i = 0; i < images.size(); ++i)
+  for (size_t i = 0; i < images.size(); ++i) {
+    const auto &view = images[i];
+    auto image = rhi::QueryInterfacePtr<ID3D12Image>(view.image);
+    auto target = resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i));
+    if (binding.type == BINDING_TEXTURE2D) {
+      D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
+      desc.Format = NativeImageFormat(view.image->GetDesc().format);
+      desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+      desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+      desc.Texture2D.MostDetailedMip = view.base_mip;
+      desc.Texture2D.MipLevels = view.mip_count;
+      native->CreateShaderResourceView(image->NativeImage(), &desc, target);
+    } else {
+      D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
+      desc.Format = NativeImageFormat(view.image->GetDesc().format);
+      desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+      desc.Texture2D.MipSlice = view.base_mip;
+      native->CreateUnorderedAccessView(image->NativeImage(), nullptr, &desc, target);
+    }
     initialized_[binding_index][first_element + i] = true;
+  }
   return true;
 }
 
@@ -261,6 +267,9 @@ void D3D12BindingVersionImpl::InitializeBindingVersion(const BindingLayoutDesc &
   layout_ = layout;
 
   std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
+  image_views_.resize(layout_.bindings.size());
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    image_views_[i].resize(layout_.bindings[i].count);
   references_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i)
     references_[i].resize(layout_.bindings[i].count);
@@ -272,6 +281,10 @@ const BindingLayoutDesc &D3D12BindingVersionImpl::GetLayout() const {
 
 const std::vector<std::vector<ObjectPtr<IObject>>> &D3D12BindingVersionImpl::GetReferences() const {
   return references_;
+}
+
+const ImageView &D3D12BindingVersionImpl::GetImageView(size_t binding, uint32_t element) const {
+  return image_views_[binding][element];
 }
 
 bool D3D12BindingVersionImpl::IsComplete() const {
@@ -297,16 +310,20 @@ bool D3D12BindingVersionImpl::Write(size_t binding_index,
   return true;
 }
 
-bool D3D12BindingVersionImpl::Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) {
+bool D3D12BindingVersionImpl::Write(size_t binding_index,
+                                    uint32_t first_element,
+                                    const std::vector<ImageView> &values) {
   // Retain the entire update before releasing old slots, including resource swaps.
   std::vector<ObjectPtr<IObject>> references;
   references.reserve(values.size());
   for (const auto &value : values)
-    references.push_back(ObjectPtr<IObject>::Retain(value));
+    references.push_back(ObjectPtr<IObject>::Retain(value.image));
   if (!WriteDescriptors(binding_index, first_element, values))
     return false;
   for (size_t i = 0; i < values.size(); ++i)
     references_[binding_index][first_element + i] = std::move(references[i]);
+  for (size_t i = 0; i < values.size(); ++i)
+    image_views_[binding_index][first_element + i] = values[i];
   return true;
 }
 
@@ -410,7 +427,7 @@ bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
 }
 
 bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
-                                         const std::vector<IImage *> &images,
+                                         const std::vector<ImageView> &images,
                                          uint32_t first_element) {
   size_t binding_index;
   const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
@@ -418,7 +435,11 @@ bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
     return false;
   if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
     return false;
-  for (auto value : images) {
+  auto values = images;
+  for (auto &view : values) {
+    if (!NormalizeImageView(view, desc->type))
+      return false;
+    auto value = view.image;
     auto image = rhi::QueryInterfacePtr<ID3D12Image>(value).Get();
     if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
       return false;
@@ -428,7 +449,7 @@ bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
   auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
   if (!next)
     return false;
-  if (!next->Write(binding_index, first_element, images))
+  if (!next->Write(binding_index, first_element, values))
     return false;
   version_ = std::move(next);
   return true;

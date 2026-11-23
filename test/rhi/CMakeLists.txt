@@ -37,3 +37,9 @@ if (LONGMARCH_CUDA_RUNTIME)
     endif ()
     gtest_discover_tests(test_rhi_cuda_buffer)
 endif ()
+
+# Exercise the exact mip demo renderer without requiring a desktop session.
+target_sources(test_rhi PRIVATE
+    ${PROJECT_SOURCE_DIR}/demo/rhi_hello/modules/mip/scene.cpp
+    ${PROJECT_BINARY_DIR}/demo/rhi_hello/modules/mip/shaders/mip.slang.h)
+target_include_directories(test_rhi PRIVATE ${PROJECT_BINARY_DIR}/demo/rhi_hello/modules/mip)

@@ -373,6 +373,12 @@ bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group)
   return true;
 }
 
+bool MetalCommandContextImpl::CmdGenerateMipmaps(IImage *, uint32_t, uint32_t) {
+  // No compute_generation capability is advertised by the Metal backend yet.
+  recording_failed_ = true;
+  return false;
+}
+
 bool MetalCommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
   auto native = rhi::QueryInterfacePtr<IMetalComputeProgram>(program).Get();
   if (sealed_ || encoder_ || !native || native->Owner() != device_) {

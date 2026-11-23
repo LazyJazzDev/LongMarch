@@ -1,4 +1,4 @@
-set(RHI_HELLO_MODULES window triangle cube texture blend nbody raytracing ray_query hdr imgui imgui_multi_window)
+set(RHI_HELLO_MODULES window triangle cube texture mip blend nbody raytracing ray_query hdr imgui imgui_multi_window)
 add_executable(${DEMO_NAME} main.cpp)
 target_link_libraries(${DEMO_NAME} PRIVATE grassland_rhi grassland_util snowberg_tui)
 
@@ -26,3 +26,7 @@ if (LONGMARCH_CUDA_ENABLED)
     target_compile_definitions(${DEMO_NAME} PRIVATE LONGMARCH_CUDA_ENABLED)
     target_sources(${DEMO_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/modules/nbody/cuda_simulation.cu)
 endif ()
+
+# The mip scene is shared only with its automated offscreen regression test.
+target_sources(${DEMO_NAME} PRIVATE modules/mip/scene.cpp)
+set_source_files_properties(modules/mip/scene.cpp PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR}/modules/mip)

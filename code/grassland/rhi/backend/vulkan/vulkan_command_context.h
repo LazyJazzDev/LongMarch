@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "grassland/rhi/backend/backend_download_token.h"
+#include "grassland/rhi/backend/backend_mip_generator.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
@@ -69,6 +70,7 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
   using ICommandContext::CmdUploadImage;
   bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) override;
+  bool CmdGenerateMipmaps(IImage *image, uint32_t base_mip = 0, uint32_t mip_count = 0) override;
   bool CmdBindComputeProgram(IComputeProgram *program) override;
   bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;
@@ -191,6 +193,8 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
 
  private:
   RenderingInfo rendering_{};
+  ObjectPtr<IComputeProgram> mip_program_;
+  ObjectPtr<ISampler> mip_sampler_;
   bool recording_failed_{};
   bool sealed_{};
   IVulkanQueue *queue_{};

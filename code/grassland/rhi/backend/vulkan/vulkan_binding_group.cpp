@@ -116,6 +116,8 @@ ObjectPtr<IVulkanBindingVersion> VulkanBindingVersionImpl::Clone() const {
   if (!copy)
     return {};
   copy->references_ = references_;
+  copy->image_views_ = image_views_;
+  copy->native_views_ = native_views_;
   copy->initialized_ = initialized_;
   std::vector<VkCopyDescriptorSet> copies;
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
@@ -178,21 +180,29 @@ bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
 
 bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
                                                 uint32_t first_element,
-                                                const std::vector<IImage *> &images) {
+                                                const std::vector<ImageView> &images) {
   const auto &binding = layout_.bindings[binding_index];
-  std::vector<IVulkanImage *> native_images;
-  native_images.reserve(images.size());
-  for (auto image : images) {
-    auto native_image = rhi::QueryInterfacePtr<IVulkanImage>(image);
-    if (!native_image || !native_image->BindingView())
+  auto device = device_->NativeDevice();
+  std::vector<std::shared_ptr<VkImageView>> views;
+  std::vector<VkDescriptorImageInfo> infos;
+  for (const auto &view : images) {
+    auto image = rhi::QueryInterfacePtr<IVulkanImage>(view.image);
+    if (!image->BindingView())
       return false;
-    native_images.push_back(native_image.Get());
-  }
-  auto native = device_->NativeDevice();
-  std::vector<VkDescriptorImageInfo> infos(images.size());
-  for (size_t i = 0; i < images.size(); ++i) {
-    infos[i].imageView = native_images[i]->BindingView();
-    infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    create.image = image->NativeImage();
+    create.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    create.format = NativeImageFormat(view.image->GetDesc().format);
+    create.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, view.base_mip, view.mip_count, 0, 1};
+    auto handle = std::shared_ptr<VkImageView>(new VkImageView{}, [device](VkImageView *p) {
+      if (*p)
+        vkDestroyImageView(device, *p, nullptr);
+      delete p;
+    });
+    if (!Check(vkCreateImageView(device, &create, nullptr, handle.get()), "Create mip binding view"))
+      return false;
+    infos.push_back({VK_NULL_HANDLE, *handle, VK_IMAGE_LAYOUT_GENERAL});
+    views.push_back(std::move(handle));
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
@@ -202,8 +212,9 @@ bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
   write.descriptorType =
       binding.type == BINDING_TEXTURE2D ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
   write.pImageInfo = infos.data();
-  vkUpdateDescriptorSets(native, 1, &write, 0, nullptr);
-  for (size_t i = 0; i < infos.size(); ++i) {
+  vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+  for (size_t i = 0; i < views.size(); ++i) {
+    native_views_[binding_index][first_element + i] = std::move(views[i]);
     initialized_[binding_index][first_element + i] = true;
   }
   return true;
@@ -319,6 +330,12 @@ void VulkanBindingVersionImpl::InitializeBindingVersion(const BindingLayoutDesc 
   layout_ = layout;
 
   std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
+  image_views_.resize(layout_.bindings.size());
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    image_views_[i].resize(layout_.bindings[i].count);
+  native_views_.resize(layout_.bindings.size());
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    native_views_[i].resize(layout_.bindings[i].count);
   references_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i)
     references_[i].resize(layout_.bindings[i].count);
@@ -330,6 +347,10 @@ const BindingLayoutDesc &VulkanBindingVersionImpl::GetLayout() const {
 
 const std::vector<std::vector<ObjectPtr<IObject>>> &VulkanBindingVersionImpl::GetReferences() const {
   return references_;
+}
+
+const ImageView &VulkanBindingVersionImpl::GetImageView(size_t binding, uint32_t element) const {
+  return image_views_[binding][element];
 }
 
 bool VulkanBindingVersionImpl::IsComplete() const {
@@ -357,16 +378,18 @@ bool VulkanBindingVersionImpl::Write(size_t binding_index,
 
 bool VulkanBindingVersionImpl::Write(size_t binding_index,
                                      uint32_t first_element,
-                                     const std::vector<IImage *> &values) {
+                                     const std::vector<ImageView> &values) {
   // Retain the entire update before releasing old slots, including resource swaps.
   std::vector<ObjectPtr<IObject>> references;
   references.reserve(values.size());
   for (const auto &value : values)
-    references.push_back(ObjectPtr<IObject>::Retain(value));
+    references.push_back(ObjectPtr<IObject>::Retain(value.image));
   if (!WriteDescriptors(binding_index, first_element, values))
     return false;
   for (size_t i = 0; i < values.size(); ++i)
     references_[binding_index][first_element + i] = std::move(references[i]);
+  for (size_t i = 0; i < values.size(); ++i)
+    image_views_[binding_index][first_element + i] = values[i];
   return true;
 }
 
@@ -470,7 +493,7 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
 }
 
 bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
-                                          const std::vector<IImage *> &images,
+                                          const std::vector<ImageView> &images,
                                           uint32_t first_element) {
   size_t binding_index;
   const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
@@ -478,7 +501,11 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
     return false;
   if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
     return false;
-  for (auto value : images) {
+  auto values = images;
+  for (auto &view : values) {
+    if (!NormalizeImageView(view, desc->type))
+      return false;
+    auto value = view.image;
     auto image = rhi::QueryInterfacePtr<IVulkanImage>(value).Get();
     if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
       return false;
@@ -488,7 +515,7 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
   auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
   if (!next)
     return false;
-  if (!next->Write(binding_index, first_element, images))
+  if (!next->Write(binding_index, first_element, values))
     return false;
   version_ = std::move(next);
   return true;

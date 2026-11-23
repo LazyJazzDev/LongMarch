@@ -12,10 +12,11 @@ class IVulkanBindingVersion : public IObject {
   virtual bool IsUniquelyOwned() const noexcept = 0;
   virtual const BindingLayoutDesc &GetLayout() const = 0;
   virtual const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const = 0;
+  virtual const ImageView &GetImageView(size_t binding, uint32_t element) const = 0;
   virtual bool IsComplete() const = 0;
   virtual ObjectPtr<IVulkanBindingVersion> Clone() const = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) = 0;
-  virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) = 0;
+  virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<ImageView> &values) = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) = 0;
   virtual bool Write(size_t binding_index,
                      uint32_t first_element,
@@ -61,7 +62,7 @@ class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
                         const std::vector<ITopLevelAccelerationStructure *> &values);
   VulkanBindingVersionImpl(IVulkanDevice *device, const BindingLayoutDesc &layout);
   bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values);
-  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values);
+  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ImageView> &values);
   bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values);
   VkDescriptorSetLayout native_layout_{};
   ObjectPtr<VulkanDescriptorPool::Lease> lease_;
@@ -74,11 +75,12 @@ class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
 
   const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const override;
 
+  const ImageView &GetImageView(size_t binding, uint32_t element) const override;
   bool IsComplete() const override;
 
   bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
 
-  bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
+  bool Write(size_t binding_index, uint32_t first_element, const std::vector<ImageView> &values) override;
 
   bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) override;
 
@@ -90,6 +92,8 @@ class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
   BindingLayoutDesc layout_;
   // Indexed by sorted layout binding, then array element.
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
+  std::vector<std::vector<ImageView>> image_views_;
+  std::vector<std::vector<std::shared_ptr<VkImageView>>> native_views_;
 };
 
 class VulkanBindingGroupImpl final : public Object<rhi::IBindingGroup, IVulkanBindingGroup> {
@@ -120,7 +124,7 @@ class VulkanBindingGroupImpl final : public Object<rhi::IBindingGroup, IVulkanBi
  public:
   bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override;
 
-  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override;
+  bool BindResource(uint32_t binding, const std::vector<ImageView> &images, uint32_t first_element = 0) override;
 
   bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override;
 

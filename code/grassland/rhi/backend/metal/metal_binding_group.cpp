@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/metal/metal_binding_group.h"
+#include "grassland/rhi/backend/metal/metal_binding_group.h"
 
 #include <algorithm>
 #include <array>
@@ -105,6 +105,8 @@ ObjectPtr<IMetalBindingVersion> MetalBindingVersionImpl::Clone() const {
   if (!copy)
     return {};
   copy->references_ = references_;
+  copy->image_views_ = image_views_;
+  copy->native_views_ = native_views_;
   copy->initialized_ = initialized_;
   std::memcpy(copy->arguments_->contents(), arguments_->contents(), arguments_->length());
   std::memcpy(copy->sizes_->contents(), sizes_->contents(), sizes_->length());
@@ -130,9 +132,20 @@ bool MetalBindingVersionImpl::WriteDescriptors(size_t b, uint32_t first, const s
   return true;
 }
 
-bool MetalBindingVersionImpl::WriteDescriptors(size_t b, uint32_t first, const std::vector<IImage *> &values) {
+bool MetalBindingVersionImpl::WriteDescriptors(size_t b, uint32_t first, const std::vector<ImageView> &values) {
+  std::vector<NS::SharedPtr<MTL::Texture>> views;
+  for (const auto &view : values) {
+    auto image = rhi::QueryInterfacePtr<IMetalImage>(view.image)->NativeImage();
+    auto texture =
+        NS::TransferPtr(image->newTextureView(image->pixelFormat(), MTL::TextureType2D,
+                                              NS::Range::Make(view.base_mip, view.mip_count), NS::Range::Make(0, 1)));
+    if (!texture)
+      return false;
+    views.push_back(std::move(texture));
+  }
   for (size_t i = 0; i < values.size(); ++i) {
-    encoder_->setTexture(rhi::QueryInterfacePtr<IMetalImage>(values[i]).Get()->NativeImage(), offsets_[b] + first + i);
+    encoder_->setTexture(views[i].get(), offsets_[b] + first + i);
+    native_views_[b][first + i] = std::move(views[i]);
     initialized_[b][first + i] = true;
   }
   return true;
@@ -195,6 +208,9 @@ void MetalBindingVersionImpl::Bind(MTL::RenderCommandEncoder *encoder, uint32_t 
               : static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<IMetalImage>(resource.Get()).Get()->NativeImage());
       encoder->useResource(native, usage, stages);
     }
+    for (const auto &view : native_views_[b])
+      if (view)
+        encoder->useResource(view.get(), usage, stages);
   }
 }
 
@@ -222,6 +238,9 @@ void MetalBindingVersionImpl::Bind(MTL::ComputeCommandEncoder *encoder, uint32_t
               : static_cast<MTL::Resource *>(rhi::QueryInterfacePtr<IMetalImage>(resource.Get()).Get()->NativeImage());
       encoder->useResource(native, usage);
     }
+    for (const auto &view : native_views_[b])
+      if (view)
+        encoder->useResource(view.get(), usage);
   }
 }
 
@@ -246,6 +265,12 @@ void MetalBindingVersionImpl::InitializeBindingVersion(const BindingLayoutDesc &
   layout_ = layout;
 
   std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
+  image_views_.resize(layout_.bindings.size());
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    image_views_[i].resize(layout_.bindings[i].count);
+  native_views_.resize(layout_.bindings.size());
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    native_views_[i].resize(layout_.bindings[i].count);
   references_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i)
     references_[i].resize(layout_.bindings[i].count);
@@ -257,6 +282,10 @@ const BindingLayoutDesc &MetalBindingVersionImpl::GetLayout() const {
 
 const std::vector<std::vector<ObjectPtr<IObject>>> &MetalBindingVersionImpl::GetReferences() const {
   return references_;
+}
+
+const ImageView &MetalBindingVersionImpl::GetImageView(size_t binding, uint32_t element) const {
+  return image_views_[binding][element];
 }
 
 bool MetalBindingVersionImpl::IsComplete() const {
@@ -282,16 +311,20 @@ bool MetalBindingVersionImpl::Write(size_t binding_index,
   return true;
 }
 
-bool MetalBindingVersionImpl::Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) {
+bool MetalBindingVersionImpl::Write(size_t binding_index,
+                                    uint32_t first_element,
+                                    const std::vector<ImageView> &values) {
   // Retain the entire update before releasing old slots, including resource swaps.
   std::vector<ObjectPtr<IObject>> references;
   references.reserve(values.size());
   for (const auto &value : values)
-    references.push_back(ObjectPtr<IObject>::Retain(value));
+    references.push_back(ObjectPtr<IObject>::Retain(value.image));
   if (!WriteDescriptors(binding_index, first_element, values))
     return false;
   for (size_t i = 0; i < values.size(); ++i)
     references_[binding_index][first_element + i] = std::move(references[i]);
+  for (size_t i = 0; i < values.size(); ++i)
+    image_views_[binding_index][first_element + i] = values[i];
   return true;
 }
 
@@ -395,7 +428,7 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
 }
 
 bool MetalBindingGroupImpl::BindResource(uint32_t binding,
-                                         const std::vector<IImage *> &images,
+                                         const std::vector<ImageView> &images,
                                          uint32_t first_element) {
   size_t binding_index;
   const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
@@ -403,7 +436,11 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
     return false;
   if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
     return false;
-  for (auto value : images) {
+  auto values = images;
+  for (auto &view : values) {
+    if (!NormalizeImageView(view, desc->type))
+      return false;
+    auto value = view.image;
     auto image = rhi::QueryInterfacePtr<IMetalImage>(value).Get();
     if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
       return false;
@@ -413,7 +450,7 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
   auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
   if (!next)
     return false;
-  if (!next->Write(binding_index, first_element, images))
+  if (!next->Write(binding_index, first_element, values))
     return false;
   version_ = std::move(next);
   return true;

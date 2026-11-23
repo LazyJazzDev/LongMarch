@@ -28,7 +28,7 @@ rhi::ISampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc 
   native.MinLOD = desc.min_lod;
   native.MaxLOD = desc.max_lod;
   native.MipLODBias = desc.mip_lod_bias;
-  native.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+  native.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
   native.MaxAnisotropy = desc.max_anisotropy;
   device->NativeDevice()->CreateSampler(&native, sampler->Descriptor());
   return sampler.Detach();

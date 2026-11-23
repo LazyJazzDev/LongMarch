@@ -448,6 +448,22 @@ bool VulkanCommandContextImpl::CopyBuffer(IVulkanBuffer *src,
   return true;
 }
 
+bool VulkanCommandContextImpl::CmdGenerateMipmaps(IImage *image, uint32_t base_mip, uint32_t mip_count) {
+  auto native = rhi::QueryInterfacePtr<IVulkanImage>(image);
+  if (sealed_ || render_target_ || recording_failed_ || !native || !image->IsValid() ||
+      native->DeviceIdentity() != device_ || !native->SupportsStorage() ||
+      !(device_->GetPhysicalDevice().mip_feature.formats[image->GetDesc().format].compute_generation)) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!GenerateMipChain(this, rhi::QueryInterfacePtr<IDevice>(device_).Get(), image, base_mip, mip_count, mip_program_,
+                        mip_sampler_)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return true;
+}
+
 bool VulkanCommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
   auto native = rhi::QueryInterfacePtr<IVulkanComputeProgram>(program).Get();
 #if !defined(NDEBUG)
@@ -913,6 +929,7 @@ bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, IVulkanBindingVe
       }
       if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
         auto image = rhi::QueryInterfacePtr<IVulkanImage>(native->GetReferences()[binding_index][i].Get()).Get();
+        const auto &view = native->GetImageView(binding_index, i);
         if (render_target_) {
           if (image->DefaultLayout() != VK_IMAGE_LAYOUT_GENERAL) {
             recording_failed_ = true;
@@ -922,7 +939,8 @@ bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, IVulkanBindingVe
           auto &states =
               image_states_.try_emplace(image, std::vector<ImageState>(levels, {VK_IMAGE_LAYOUT_GENERAL, 0, 0}))
                   .first->second;
-          for (auto &state : states) {
+          for (uint32_t mip = view.base_mip; mip < view.base_mip + view.mip_count; ++mip) {
+            auto &state = states[mip];
             if (state.layout != VK_IMAGE_LAYOUT_GENERAL) {
               recording_failed_ = true;
               return false;
@@ -930,7 +948,7 @@ bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, IVulkanBindingVe
             state.stages |= stages;
             state.access |= access;
           }
-        } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, stages, access))
+        } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, stages, access, view.base_mip, view.mip_count))
           return false;
       }
     }
@@ -946,6 +964,7 @@ bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, IVulkanBindingVe
 }
 
 bool VulkanCommandContextImpl::ValidateGroups() {
+  std::vector<BindingImageUse> image_uses;
   for (size_t i = 0; i < groups_.size(); ++i) {
     if (!groups_[i] && !binding_layout_->groups[i].bindings.empty()) {
       recording_failed_ = true;
@@ -957,6 +976,13 @@ bool VulkanCommandContextImpl::ValidateGroups() {
         const auto type = layout.bindings[binding_index].type;
         if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
           continue;
+        for (uint32_t element = 0; element < layout.bindings[binding_index].count; ++element) {
+          const auto &view = groups_[i]->GetImageView(binding_index, element);
+          if (!AddBindingImageUse(image_uses, view, type == BINDING_RW_TEXTURE2D)) {
+            recording_failed_ = true;
+            return false;
+          }
+        }
         for (const auto &reference : groups_[i]->GetReferences()[binding_index])
           for (const auto &color : rendering_.color_attachments)
             if (color.color_attachment == reference.Get()) {

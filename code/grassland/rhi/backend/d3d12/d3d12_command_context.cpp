@@ -64,6 +64,18 @@ ICommandContext *D3D12CommandContextImpl::Create(ID3D12Queue *queue) {
   return object.release();
 }
 
+bool D3D12CommandContextImpl::InitializeImage(IImage *image) {
+  auto native = rhi::QueryInterfacePtr<ID3D12Image>(image);
+  if (sealed_ || rendering_active_ || compute_queue_ || !native || native->DeviceIdentity() != device_)
+    return false;
+  const auto state =
+      IsDepthFormat(image->GetDesc().format) ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
+  if (!RetainResource(native.Get()) || !TransitionResource(native->NativeImage(), state, native->DefaultState()))
+    return false;
+  list_->DiscardResource(native->NativeImage(), nullptr);
+  return true;
+}
+
 bool D3D12CommandContextImpl::TransitionResource(ID3D12Resource *resource,
                                                  D3D12_RESOURCE_STATES state,
                                                  D3D12_RESOURCE_STATES default_state,
@@ -426,6 +438,22 @@ bool D3D12CommandContextImpl::CopyBuffer(ID3D12Buffer *src,
   return true;
 }
 
+bool D3D12CommandContextImpl::CmdGenerateMipmaps(IImage *image, uint32_t base_mip, uint32_t mip_count) {
+  auto native = rhi::QueryInterfacePtr<ID3D12Image>(image);
+  if (sealed_ || rendering_active_ || recording_failed_ || !native || !image->IsValid() ||
+      native->DeviceIdentity() != device_ || !native->SupportsStorage() ||
+      !(device_->GetPhysicalDevice().mip_feature.formats[image->GetDesc().format].compute_generation)) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!GenerateMipChain(this, rhi::QueryInterfacePtr<IDevice>(device_).Get(), image, base_mip, mip_count, mip_program_,
+                        mip_sampler_)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return true;
+}
+
 bool D3D12CommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
   auto native = rhi::QueryInterfacePtr<ID3D12ComputeProgram>(program).Get();
 #if !defined(NDEBUG)
@@ -772,6 +800,7 @@ bool D3D12CommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group)
 }
 
 bool D3D12CommandContextImpl::PrepareGroups() {
+  std::vector<BindingImageUse> image_uses;
   for (size_t i = 0; i < groups_.size(); ++i) {
     const auto version = groups_[i].version;
     if (!version) {
@@ -809,6 +838,11 @@ bool D3D12CommandContextImpl::PrepareGroups() {
             return false;
         } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
           auto image = rhi::QueryInterfacePtr<ID3D12Image>(version->GetReferences()[binding_index][j].Get()).Get();
+          const auto &view = version->GetImageView(binding_index, j);
+          if (!AddBindingImageUse(image_uses, view, type == BINDING_RW_TEXTURE2D)) {
+            recording_failed_ = true;
+            return false;
+          }
           resource = image->NativeImage();
           for (auto color : rendering_.color_attachments)
             if (color.color_attachment == rhi::QueryInterfacePtr<IImage>(image).Get()) {
@@ -821,7 +855,7 @@ bool D3D12CommandContextImpl::PrepareGroups() {
                                                         : D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
                                                               D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
                                       : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-                                  image->DefaultState()))
+                                  image->DefaultState(), view.base_mip, view.mip_count))
             return false;
         }
         if (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER ||

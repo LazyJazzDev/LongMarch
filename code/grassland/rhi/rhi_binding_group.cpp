@@ -10,7 +10,19 @@ bool IBindingGroup::BindResource(uint32_t binding, const BufferView &buffer) {
 }
 
 bool IBindingGroup::BindResource(uint32_t binding, IImage *image) {
-  return BindResource(binding, std::vector<IImage *>{image});
+  return BindResource(binding, ImageView{image});
+}
+
+bool IBindingGroup::BindResource(uint32_t binding, const ImageView &image) {
+  return BindResource(binding, std::vector<ImageView>{image});
+}
+
+bool IBindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element) {
+  std::vector<ImageView> views;
+  views.reserve(images.size());
+  for (auto image : images)
+    views.push_back({image});
+  return BindResource(binding, views, first_element);
 }
 
 bool IBindingGroup::BindResource(uint32_t binding, ISampler *sampler) {
