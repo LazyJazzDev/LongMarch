@@ -177,14 +177,14 @@ rhi::ICore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
               sampled ? VK_IMAGE_USAGE_SAMPLED_BIT : VK_IMAGE_USAGE_TRANSFER_SRC_BIT, 0,
               &image_properties) != VK_SUCCESS)
         continue;
-      auto &entry = mip.formats[index];
+      auto &entry = info.format_features[index];
       entry.max_mip_levels = image_properties.maxMipLevels;
       entry.sampled = sampled;
       entry.linear_filter = sampled && (flags & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT);
       entry.storage = (flags & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
       entry.linear_blit = entry.linear_filter && (flags & VK_FORMAT_FEATURE_BLIT_SRC_BIT) &&
                           (flags & VK_FORMAT_FEATURE_BLIT_DST_BIT) && IsColorFormat(format);
-      entry.compute_generation =
+      entry.mip_compute_generation =
           entry.max_mip_levels > 1 && entry.linear_filter && entry.storage && IsColorFormat(format);
     }
     core->adapters_.push_back({device, device_version, std::move(info)});

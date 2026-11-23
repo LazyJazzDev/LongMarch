@@ -52,14 +52,14 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ::ID3D12Device *device, PhysicalDevi
     if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support))) ||
         !(support.Support1 & D3D12_FORMAT_SUPPORT1_TEXTURE2D))
       continue;
-    auto &entry = mip.formats[index];
+    auto &entry = info.format_features[index];
     entry.max_mip_levels = (support.Support1 & D3D12_FORMAT_SUPPORT1_MIP) ? D3D12_REQ_MIP_LEVELS : 1;
     entry.sampled = (support.Support1 & (D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE | D3D12_FORMAT_SUPPORT1_SHADER_LOAD)) != 0;
     entry.linear_filter = (support.Support1 & D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE) != 0 &&
                           !IsSignedIntegerFormat(format) && !IsUnsignedIntegerFormat(format);
     entry.storage = (support.Support1 & D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW) &&
                     (support.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE);
-    entry.compute_generation =
+    entry.mip_compute_generation =
         entry.max_mip_levels > 1 && entry.linear_filter && entry.storage && IsColorFormat(format);
   }
   return true;

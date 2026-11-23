@@ -7,7 +7,7 @@
 
 int RunMip(grassland::rhi::IDevice *device) {
   using namespace grassland::rhi;
-  if (!device->GetPhysicalDevice().mip_feature.formats[IMAGE_FORMAT_R8G8B8A8_UNORM].compute_generation ||
+  if (!device->GetPhysicalDevice().format_features[IMAGE_FORMAT_R8G8B8A8_UNORM].mip_compute_generation ||
       device->GetPhysicalDevice().mip_feature.max_anisotropy < 2) {
     std::cerr << "The mip demo requires GPU mip generation and anisotropic filtering.\n";
     return 1;

@@ -24,7 +24,8 @@ using namespace grassland::rhi;
 bool Scene::Initialize(IDevice *device, ImageFormat target_format) {
   device_ = device;
   const auto &features = device->GetPhysicalDevice().mip_feature;
-  if (!features.formats[IMAGE_FORMAT_R8G8B8A8_UNORM].compute_generation || features.max_anisotropy < 2)
+  if (!device->GetPhysicalDevice().format_features[IMAGE_FORMAT_R8G8B8A8_UNORM].mip_compute_generation ||
+      features.max_anisotropy < 2)
     return false;
   anisotropy_ = std::min(16u, features.max_anisotropy);
   std::string source(reinterpret_cast<const char *>(shaders_mip_slang), shaders_mip_slang_len);

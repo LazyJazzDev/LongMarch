@@ -115,7 +115,7 @@ class ICommandContext : public IObject {
   bool CmdUploadImage(IImage *image, const std::vector<ImageUploadInfo> &levels);
   // Generate levels after base_mip by linear downsampling on the GPU. mip_count
   // includes the source level; zero selects the remainder. The source must be
-  // initialized. Requires compute_generation for the format and no rendering scope.
+  // initialized. Requires mip_compute_generation for the format and no rendering scope.
   // Rebind the caller's program/groups afterwards (generation binds its own compute program).
   virtual bool CmdGenerateMipmaps(IImage *image, uint32_t base_mip = 0, uint32_t mip_count = 0) = 0;
   // One active graphics or compute program. Switching programs clears group bindings.

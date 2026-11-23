@@ -374,7 +374,7 @@ bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group)
 }
 
 bool MetalCommandContextImpl::CmdGenerateMipmaps(IImage *, uint32_t, uint32_t) {
-  // No compute_generation capability is advertised by the Metal backend yet.
+  // No mip_compute_generation capability is advertised by the Metal backend yet.
   recording_failed_ = true;
   return false;
 }

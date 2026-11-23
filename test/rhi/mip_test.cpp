@@ -128,10 +128,10 @@ TEST_P(RhiMip, EnumeratedCapabilitiesAgreeWithNativeDevice) {
     const auto &mip = devices[i].mip_feature;
     EXPECT_GT(mip.max_image_dimension_2d, 0u);
     EXPECT_GE(mip.max_anisotropy, 1u);
-    EXPECT_GT(mip.formats[IMAGE_FORMAT_R8G8B8A8_UNORM].max_mip_levels, 1u);
-    EXPECT_TRUE(mip.formats[IMAGE_FORMAT_R8G8B8A8_UNORM].linear_filter);
-    EXPECT_FALSE(mip.formats[IMAGE_FORMAT_R32_UINT].linear_filter);
-    EXPECT_FALSE(mip.formats[IMAGE_FORMAT_UNKNOWN].sampled);
+    EXPECT_GT(devices[i].format_features[IMAGE_FORMAT_R8G8B8A8_UNORM].max_mip_levels, 1u);
+    EXPECT_TRUE(devices[i].format_features[IMAGE_FORMAT_R8G8B8A8_UNORM].linear_filter);
+    EXPECT_FALSE(devices[i].format_features[IMAGE_FORMAT_R32_UINT].linear_filter);
+    EXPECT_FALSE(devices[i].format_features[IMAGE_FORMAT_UNKNOWN].sampled);
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12) {
       auto native = QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get());
@@ -140,7 +140,7 @@ TEST_P(RhiMip, EnumeratedCapabilitiesAgreeWithNativeDevice) {
       for (int index = IMAGE_FORMAT_UNKNOWN + 1; index < IMAGE_FORMAT_COUNT; ++index) {
         auto format = backend::d3d12::NativeImageFormat(static_cast<ImageFormat>(index));
         if (format == DXGI_FORMAT_UNKNOWN) {
-          EXPECT_EQ(mip.formats[index].max_mip_levels, 0u);
+          EXPECT_EQ(devices[i].format_features[index].max_mip_levels, 0u);
           continue;
         }
         D3D12_FEATURE_DATA_FORMAT_SUPPORT support{format};
@@ -148,8 +148,9 @@ TEST_P(RhiMip, EnumeratedCapabilitiesAgreeWithNativeDevice) {
                 native->NativeDevice()->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support))))
           continue;
         if (support.Support1 & D3D12_FORMAT_SUPPORT1_TEXTURE2D) {
-          EXPECT_EQ(mip.formats[index].max_mip_levels > 1, (support.Support1 & D3D12_FORMAT_SUPPORT1_MIP) != 0);
-          EXPECT_EQ(mip.formats[index].storage,
+          EXPECT_EQ(devices[i].format_features[index].max_mip_levels > 1,
+                    (support.Support1 & D3D12_FORMAT_SUPPORT1_MIP) != 0);
+          EXPECT_EQ(devices[i].format_features[index].storage,
                     bool((support.Support1 & D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW) &&
                          (support.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE)));
         }
@@ -169,13 +170,13 @@ TEST_P(RhiMip, EnumeratedCapabilitiesAgreeWithNativeDevice) {
       EXPECT_EQ(mip.max_image_dimension_2d, properties.limits.maxImageDimension2D);
       for (int index = IMAGE_FORMAT_UNKNOWN + 1; index < IMAGE_FORMAT_COUNT; ++index) {
         auto format = backend::vulkan::NativeImageFormat(static_cast<ImageFormat>(index));
-        if (format == VK_FORMAT_UNDEFINED || !mip.formats[index].max_mip_levels)
+        if (format == VK_FORMAT_UNDEFINED || !devices[i].format_features[index].max_mip_levels)
           continue;
         VkFormatProperties format_properties{};
         vkGetPhysicalDeviceFormatProperties(native->NativePhysicalDevice(), format, &format_properties);
-        EXPECT_EQ(mip.formats[index].storage,
+        EXPECT_EQ(devices[i].format_features[index].storage,
                   (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0);
-        EXPECT_EQ(mip.formats[index].linear_filter,
+        EXPECT_EQ(devices[i].format_features[index].linear_filter,
                   bool((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) &&
                        (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)));
       }

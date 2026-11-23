@@ -452,7 +452,7 @@ bool VulkanCommandContextImpl::CmdGenerateMipmaps(IImage *image, uint32_t base_m
   auto native = rhi::QueryInterfacePtr<IVulkanImage>(image);
   if (sealed_ || render_target_ || recording_failed_ || !native || !image->IsValid() ||
       native->DeviceIdentity() != device_ || !native->SupportsStorage() ||
-      !(device_->GetPhysicalDevice().mip_feature.formats[image->GetDesc().format].compute_generation)) {
+      !(device_->GetPhysicalDevice().format_features[image->GetDesc().format].mip_compute_generation)) {
     recording_failed_ = true;
     return false;
   }

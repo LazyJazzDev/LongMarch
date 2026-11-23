@@ -47,7 +47,7 @@ demo_rhi_hello --backend vulkan --module mip --device auto
 
 ## MIPMAP 接口
 
-D3D12/Vulkan 的 `PhysicalDevice::mip_feature` 提供图像尺寸、各向异性、LOD bias 范围及逐格式的采样、线性过滤、存储、线性 blit 和计算生成能力。可通过 `ICore::GetPhysicalDevices()` 或 `IDevice::GetPhysicalDevice()` 查询。能力描述硬件支持，创建仍可能因资源组合或内存不足失败。
+D3D12/Vulkan 的 `PhysicalDevice::mip_feature` 提供图像尺寸、各向异性和 LOD bias 范围。独立的 `PhysicalDevice::format_features[IMAGE_FORMAT_COUNT]` 普通数组使用 `PhysicalDeviceFormatFeature` 描述逐格式的采样、线性过滤、存储、线性 blit、最大 MIP 级数和 MIP 计算生成能力。可通过 `ICore::GetPhysicalDevices()` 或 `IDevice::GetPhysicalDevice()` 查询。能力描述硬件支持，创建仍可能因资源组合或内存不足失败。
 
 ```cpp
 // 省略 mip_levels 时仍只创建一级；0 表示按尺寸创建完整链。
@@ -66,6 +66,6 @@ group->BindResource(0, ImageView{texture.Get(), 2, 3});                 // 采�
 
 采样器可独立设置 `min_filter`、`mag_filter`、`mip_filter`，`address_u/v/w`，`min_lod`、`max_lod`、`mip_lod_bias` 和 `max_anisotropy`。旧的构造方式和 `.filter` 赋值继续支持；未指定的独立过滤参数继承 `.filter`。各向异性大于 1 时三个过滤参数须为 LINEAR。
 
-GPU 生成采用逐级线性缩小，支持非二次幂尺寸；它不是离线纹理压缩器，也不执行 gamma 转换。格式须支持 `compute_generation`，源级必须已有有效数据。生成命令使用自己的计算程序和绑定，调用后应重新绑定应用程序的 Program/Group；只能在渲染作用域之外调用。Metal 暂不报告/提供 GPU 生成能力。
+GPU 生成采用逐级线性缩小，支持非二次幂尺寸；它不是离线纹理压缩器，也不执行 gamma 转换。格式须支持 `mip_compute_generation`，源级必须已有有效数据。生成命令使用自己的计算程序和绑定，调用后应重新绑定应用程序的 Program/Group；只能在渲染作用域之外调用。Metal 暂不报告/提供 GPU 生成能力。
 
 上下文按 mip 追踪资源状态和访问依赖，允许同一 dispatch 读取一个 mip 并写入另一个 mip，拒绝重叠范围的读写绑定。提交时恢复各级默认状态；跨队列仍须使用 `SubmitInfo::waits`，不能同时无依赖地访问同一资源。上传和读回的尺寸、行间距及区域均相对于所选 mip。现有渲染附件和 standalone clear 仍针对第 0 级。本轮不增加 TextureArray。

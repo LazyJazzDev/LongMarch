@@ -30,7 +30,7 @@ IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &r
     return nullptr;
   const auto &mip = device->GetPhysicalDevice().mip_feature;
   if (desc.width > mip.max_image_dimension_2d || desc.height > mip.max_image_dimension_2d ||
-      desc.mip_levels > mip.formats[desc.format].max_mip_levels)
+      desc.mip_levels > device->GetPhysicalDevice().format_features[desc.format].max_mip_levels)
     return nullptr;
   if (!desc.width || !desc.height)
     return nullptr;

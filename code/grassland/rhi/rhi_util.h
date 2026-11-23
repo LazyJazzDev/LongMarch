@@ -175,13 +175,13 @@ typedef enum {
 
 // Native optimal-tiled 2D image capabilities. Unsupported/query-failed formats
 // remain zero. These describe hardware support, not an initialized mip chain.
-struct PhysicalDeviceMipFormatFeature {
+struct PhysicalDeviceFormatFeature {
   uint32_t max_mip_levels{};
   bool sampled{};
   bool linear_filter{};
   bool storage{};
   bool linear_blit{};
-  bool compute_generation{};
+  bool mip_compute_generation{};
 };
 
 struct PhysicalDeviceMipFeature {
@@ -189,7 +189,6 @@ struct PhysicalDeviceMipFeature {
   uint32_t max_anisotropy{1};
   float min_lod_bias{};
   float max_lod_bias{};
-  PhysicalDeviceMipFormatFeature formats[IMAGE_FORMAT_COUNT]{};
 };
 
 struct PhysicalDevice {
@@ -204,6 +203,7 @@ struct PhysicalDevice {
   // Process-local CUDA ordinal; -1 when unavailable.
   int cuda_device{-1};
   PhysicalDeviceMipFeature mip_feature;
+  PhysicalDeviceFormatFeature format_features[IMAGE_FORMAT_COUNT]{};
 };
 
 std::string to_string(ImageFormat value);
