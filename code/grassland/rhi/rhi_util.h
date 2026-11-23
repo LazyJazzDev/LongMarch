@@ -109,19 +109,6 @@ typedef enum {
 std::string to_string(PhysicalDeviceType type);
 std::string PhysicalDeviceTypeName(PhysicalDeviceType type);
 
-struct PhysicalDevice {
-  std::string name;
-  // Bytes of host/shared memory accessible to the GPU (not additional VRAM).
-  uint64_t unified_memory{};
-  uint64_t dedicated_memory{};
-  PhysicalDeviceType type{PHYSICAL_DEVICE_TYPE_INTEGRATED};
-  bool ray_tracing_pipeline_feature{};
-  bool ray_query_feature{};
-  bool geometry_shader_feature{};
-  // Process-local CUDA ordinal; -1 when unavailable.
-  int cuda_device{-1};
-};
-
 typedef enum {
   PRESENT_MODE_VSYNC,
   PRESENT_MODE_CONTINUOUS,
@@ -183,7 +170,41 @@ typedef enum {
   IMAGE_FORMAT_D16_UNORM,
   IMAGE_FORMAT_D32_SFLOAT,
   IMAGE_FORMAT_D24_UNORM_S8_UINT,
+  IMAGE_FORMAT_COUNT,
 } ImageFormat;
+
+// Native optimal-tiled 2D image capabilities. Unsupported/query-failed formats
+// remain zero. These describe hardware support, not an initialized mip chain.
+struct PhysicalDeviceMipFormatFeature {
+  uint32_t max_mip_levels{};
+  bool sampled{};
+  bool linear_filter{};
+  bool storage{};
+  bool linear_blit{};
+  bool compute_generation{};
+};
+
+struct PhysicalDeviceMipFeature {
+  uint32_t max_image_dimension_2d{};
+  uint32_t max_anisotropy{1};
+  float min_lod_bias{};
+  float max_lod_bias{};
+  std::array<PhysicalDeviceMipFormatFeature, IMAGE_FORMAT_COUNT> formats{};
+};
+
+struct PhysicalDevice {
+  std::string name;
+  // Bytes of host/shared memory accessible to the GPU (not additional VRAM).
+  uint64_t unified_memory{};
+  uint64_t dedicated_memory{};
+  PhysicalDeviceType type{PHYSICAL_DEVICE_TYPE_INTEGRATED};
+  bool ray_tracing_pipeline_feature{};
+  bool ray_query_feature{};
+  bool geometry_shader_feature{};
+  // Process-local CUDA ordinal; -1 when unavailable.
+  int cuda_device{-1};
+  PhysicalDeviceMipFeature mip_feature;
+};
 
 std::string to_string(ImageFormat value);
 std::string ImageFormatName(ImageFormat value);

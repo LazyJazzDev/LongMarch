@@ -38,6 +38,30 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ::ID3D12Device *device, PhysicalDevi
   }
   // Geometry shaders are part of the feature-level 11_0 baseline used below.
   info.geometry_shader_feature = true;
+  auto &mip = info.mip_feature;
+  mip.max_image_dimension_2d = D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+  mip.max_anisotropy = D3D12_MAX_MAXANISOTROPY;
+  mip.min_lod_bias = D3D12_MIP_LOD_BIAS_MIN;
+  mip.max_lod_bias = D3D12_MIP_LOD_BIAS_MAX;
+  for (int index = IMAGE_FORMAT_UNKNOWN + 1; index < IMAGE_FORMAT_COUNT; ++index) {
+    const auto format = static_cast<ImageFormat>(index);
+    const auto native = NativeImageFormat(format);
+    if (native == DXGI_FORMAT_UNKNOWN)
+      continue;
+    D3D12_FEATURE_DATA_FORMAT_SUPPORT support{native};
+    if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support))) ||
+        !(support.Support1 & D3D12_FORMAT_SUPPORT1_TEXTURE2D))
+      continue;
+    auto &entry = mip.formats[index];
+    entry.max_mip_levels = (support.Support1 & D3D12_FORMAT_SUPPORT1_MIP) ? D3D12_REQ_MIP_LEVELS : 1;
+    entry.sampled = (support.Support1 & (D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE | D3D12_FORMAT_SUPPORT1_SHADER_LOAD)) != 0;
+    entry.linear_filter = (support.Support1 & D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE) != 0 &&
+                          !IsSignedIntegerFormat(format) && !IsUnsignedIntegerFormat(format);
+    entry.storage = (support.Support1 & D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW) &&
+                    (support.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE);
+    entry.compute_generation =
+        entry.max_mip_levels > 1 && entry.linear_filter && entry.storage && IsColorFormat(format);
+  }
   return true;
 }
 
