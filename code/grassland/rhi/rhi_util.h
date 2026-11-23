@@ -189,7 +189,7 @@ struct PhysicalDeviceMipFeature {
   uint32_t max_anisotropy{1};
   float min_lod_bias{};
   float max_lod_bias{};
-  std::array<PhysicalDeviceMipFormatFeature, IMAGE_FORMAT_COUNT> formats{};
+  PhysicalDeviceMipFormatFeature formats[IMAGE_FORMAT_COUNT]{};
 };
 
 struct PhysicalDevice {
