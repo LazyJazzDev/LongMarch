@@ -98,6 +98,7 @@ class MetalDeviceImpl final : public Object<rhi::IDevice, IMetalDevice> {
   bool SupportRayQuery() const override;
 
   bool SupportGeometryShader() const override;
+  bool SupportComputeSubgroupVote() const override;
 
   rhi::IQueue *GetQueue(QueueType type) override;
 

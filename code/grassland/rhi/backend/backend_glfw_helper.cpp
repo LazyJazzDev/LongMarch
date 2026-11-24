@@ -1,11 +1,27 @@
-﻿#include "grassland/rhi/backend/backend_glfw_helper.h"
+#ifdef LONGMARCH_HEADLESS
+#include "grassland/rhi/backend/backend_glfw_helper.h"
 
+namespace grassland::rhi::backend::glfw {
+bool Initialize() {
+  return false;
+}
+
+bool PollEvents() {
+  return false;
+}
+
+bool IsWindowThread() {
+  return false;
+}
+}  // namespace grassland::rhi::backend::glfw
+#else
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
 
+#include "grassland/rhi/backend/backend_glfw_helper.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/backend_window_imgui.h"
@@ -294,3 +310,5 @@ void DestroyWindow(GLFWwindow *window) {
 }  // namespace glfw
 
 }  // namespace grassland::rhi::backend
+
+#endif

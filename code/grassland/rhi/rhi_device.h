@@ -35,6 +35,10 @@ class IDevice : public IObject {
   virtual bool SupportRayTracingPipeline() const = 0;
   virtual bool SupportRayQuery() const = 0;
   virtual bool SupportGeometryShader() const = 0;
+
+  // Compute-stage subgroup vote and basic lane operations; portable code must have a fallback.
+  virtual bool SupportComputeSubgroupVote() const = 0;
+
   // Independent 2D color target, also usable for transfer/clear commands.
   virtual IImage *CreateImage(const ImageDesc &desc) = 0;
   virtual ISampler *CreateSampler(const SamplerDesc &desc = {}) = 0;

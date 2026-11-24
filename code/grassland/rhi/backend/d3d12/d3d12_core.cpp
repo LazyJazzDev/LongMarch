@@ -36,6 +36,13 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ::ID3D12Device *device, PhysicalDevi
     info.ray_tracing_pipeline_feature = options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
     info.ray_query_feature = options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
   }
+  D3D12_FEATURE_DATA_D3D12_OPTIONS1 wave_options{};
+  D3D12_FEATURE_DATA_SHADER_MODEL shader_model{D3D_SHADER_MODEL_6_0};
+  info.compute_subgroup_vote_feature =
+      SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &wave_options, sizeof(wave_options))) &&
+      wave_options.WaveOps &&
+      SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model))) &&
+      shader_model.HighestShaderModel >= D3D_SHADER_MODEL_6_0;
   // Geometry shaders are part of the feature-level 11_0 baseline used below.
   info.geometry_shader_feature = true;
   auto &mip = info.mip_feature;

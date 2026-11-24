@@ -137,6 +137,7 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
   bool SupportRayQuery() const override;
 
   bool SupportGeometryShader() const override;
+  bool SupportComputeSubgroupVote() const override;
 
   rhi::IQueue *GetQueue(QueueType type) override;
 
@@ -156,7 +157,7 @@ class VulkanDeviceImpl final : public Object<rhi::IDevice, IVulkanDevice> {
 
   void ShutdownQueues();
 
-  std::array<ObjectPtr<IVulkanQueue>, 3> queues_{};
+  std::array<ObjectPtr<IVulkanQueue>, 3> queues_;
   std::atomic<bool> stopping_{};
   BackendAPI api_{};
   IVulkanCore *core_{};

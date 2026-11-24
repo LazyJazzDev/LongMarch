@@ -200,6 +200,8 @@ struct PhysicalDevice {
   bool ray_tracing_pipeline_feature{};
   bool ray_query_feature{};
   bool geometry_shader_feature{};
+  // Compute-stage subgroup vote and basic lane operations; callers need a fallback.
+  bool compute_subgroup_vote_feature{};
   // Process-local CUDA ordinal; -1 when unavailable.
   int cuda_device{-1};
   PhysicalDeviceMipFeature mip_feature;

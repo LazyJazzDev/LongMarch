@@ -40,6 +40,67 @@ SamplerArray CreateSamplers(IDevice *device, std::initializer_list<SamplerDesc> 
 
 class RhiProgram : public testing::TestWithParam<BackendAPI> {};
 
+TEST_P(RhiProgram, AdvertisedComputeSubgroupVoteExecutes) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (GetParam() == BACKEND_API_D3D12) {
+    auto native = QueryInterfacePtr<backend::d3d12::ID3D12Device>(device.Get())->NativeDevice();
+    D3D12_FEATURE_DATA_D3D12_OPTIONS1 options{};
+    D3D12_FEATURE_DATA_SHADER_MODEL model{D3D_SHADER_MODEL_6_0};
+    const bool supported =
+        SUCCEEDED(native->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &options, sizeof(options))) &&
+        options.WaveOps && SUCCEEDED(native->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &model, sizeof(model))) &&
+        model.HighestShaderModel >= D3D_SHADER_MODEL_6_0;
+    ASSERT_EQ(device->SupportComputeSubgroupVote(), supported);
+  }
+#endif
+  if (!device->SupportComputeSubgroupVote())
+    GTEST_SKIP() << "Compute subgroup vote is unavailable";
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
+    RHI_RW_STRUCTURED_BUFFER(0, 0, uint, results);
+    [numthreads(64, 1, 1)] void CSMain(uint3 id : SV_DispatchThreadID) {
+      uint lane = WaveGetLaneIndex(), count = WaveGetLaneCount();
+      uint result = WaveActiveAllTrue(lane < count) ? 1 : 0;
+      result |= WaveActiveAnyTrue(lane == 0) ? 2 : 0;
+      result |= !WaveActiveAnyTrue(lane >= count) ? 4 : 0;
+      result |= !WaveActiveAllTrue(lane != 0) ? 8 : 0;
+      result |= WaveReadLaneFirst(lane) == 0 ? 16 : 0;
+      results[id.x] = result;
+    }
+  )",
+                                                          "CSMain", SHADER_STAGE_COMPUTE);
+  ASSERT_TRUE(shader);
+  ComputeProgramDesc desc;
+  desc.compute_shader = shader.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4}}}};
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  std::vector<uint32_t> output(128, 0);
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({output.size() * sizeof(uint32_t)});
+  ASSERT_TRUE(buffer);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, buffer.Get()));
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_COMPUTE);
+  ASSERT_TRUE(queue);
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, output.data(), output.size() * sizeof(uint32_t)));
+  ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdDispatch(2));
+  ObjPtr<IDownloadToken> download = commands->CmdDownloadBuffer(buffer.Get(), 0, output.size() * sizeof(uint32_t));
+  ASSERT_TRUE(download);
+  ObjPtr<ISubmissionToken> done = commands->Submit();
+  ASSERT_TRUE(done && done->WaitHost());
+  ASSERT_TRUE(download->CopyTo(output.data(), output.size() * sizeof(uint32_t)));
+  for (size_t i = 0; i < output.size(); ++i)
+    EXPECT_EQ(output[i], 31u) << "thread " << i;
+}
+
 TEST_P(RhiProgram, FileShadersOwnPreprocessedIncludesAndDeferLayoutMacros) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);

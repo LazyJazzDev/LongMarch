@@ -1,7 +1,6 @@
-﻿#include "grassland/rhi/backend/metal/metal_program.h"
+#include "grassland/rhi/backend/metal/metal_program.h"
 
 #include <cstring>
-#include <spirv_msl.hpp>
 #include <unordered_set>
 
 #include "grassland/rhi/backend/backend_binding_group.h"

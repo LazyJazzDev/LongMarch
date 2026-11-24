@@ -25,6 +25,6 @@ class IObject {
   virtual void Release() noexcept = 0;
 
  protected:
-  virtual ~IObject();
+  virtual ~IObject() = 0;
 };
 }  // namespace grassland::rhi

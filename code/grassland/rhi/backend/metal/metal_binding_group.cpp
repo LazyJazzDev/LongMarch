@@ -11,6 +11,7 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_sampler.h"
+#include "grassland/rhi/backend/backend_shader_cache.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
@@ -35,13 +36,23 @@ bool ValidateMetalBindingLayout(MTL::Device *device, const BindingLayoutDesc &la
       return false;
   auto count = MetalArgumentCount(layout);
   if (!ValidateBindingLayout(layout) || (!layout.bindings.empty() && !count) ||
-      device->argumentBuffersSupport() != MTL::ArgumentBuffersTier2 ||
       (uint64_t(count) + 1) * sizeof(uint64_t) > device->maxBufferLength())
     return false;
-  uint64_t samplers = 0;
-  for (auto b : layout.bindings)
+  uint64_t samplers = 0, buffers = 1, textures = 0;
+  for (auto b : layout.bindings) {
     if (b.type == BINDING_SAMPLER)
       samplers += b.count;
+    else if (b.type >= BINDING_TEXTURE2D)
+      textures += b.count;
+    else
+      buffers += b.count;
+  }
+  // Tier 1 includes the iOS simulator. Account for the generated size buffer.
+  if (device->argumentBuffersSupport() == MTL::ArgumentBuffersTier1 &&
+      (buffers > 31 || textures > 31 || samplers > 16)) {
+    ReportError(-1, "Binding layout exceeds Metal Tier 1 argument-buffer limits");
+    return false;
+  }
   return samplers <= device->maxArgumentBufferSamplerCount();
 }
 
@@ -184,6 +195,19 @@ void MetalBindingVersionImpl::Bind(MTL::RenderCommandEncoder *encoder, uint32_t 
   encoder->useResource(sizes_.get(), MTL::ResourceUsageRead, MTL::RenderStageVertex | MTL::RenderStageFragment);
   for (size_t b = 0; b < layout_.bindings.size(); ++b) {
     auto desc = layout_.bindings[b];
+    uint32_t writable_texture = offsets_[b];
+    if (desc.type == BINDING_RW_TEXTURE2D) {
+      const bool tier1 = GetShaderCacheSettings().ios ||
+                         device_->NativeDevice()->argumentBuffersSupport() == MTL::ArgumentBuffersTier1;
+      for (const auto &view : native_views_[b]) {
+        if (tier1) {
+          auto texture = view.get();
+          encoder->setVertexTexture(texture, writable_texture);
+          encoder->setFragmentTexture(texture, writable_texture);
+        }
+        ++writable_texture;
+      }
+    }
     if (desc.type == BINDING_SAMPLER)
       continue;  // Samplers are retained objects, not MTL::Resource residency entries.
     MTL::ResourceUsage usage = MTL::ResourceUsageRead;
@@ -219,6 +243,18 @@ void MetalBindingVersionImpl::Bind(MTL::ComputeCommandEncoder *encoder, uint32_t
   encoder->useResource(sizes_.get(), MTL::ResourceUsageRead);
   for (size_t b = 0; b < layout_.bindings.size(); ++b) {
     auto desc = layout_.bindings[b];
+    uint32_t writable_texture = offsets_[b];
+    if (desc.type == BINDING_RW_TEXTURE2D) {
+      const bool tier1 = GetShaderCacheSettings().ios ||
+                         device_->NativeDevice()->argumentBuffersSupport() == MTL::ArgumentBuffersTier1;
+      for (const auto &view : native_views_[b]) {
+        if (tier1) {
+          auto texture = view.get();
+          encoder->setTexture(texture, writable_texture);
+        }
+        ++writable_texture;
+      }
+    }
     if (desc.type == BINDING_SAMPLER)
       continue;  // Samplers are retained objects, not MTL::Resource residency entries.
     MTL::ResourceUsage usage = MTL::ResourceUsageRead;
