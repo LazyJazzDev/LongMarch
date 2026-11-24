@@ -16,7 +16,6 @@
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
-#include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_buffer.h"
 #include "grassland/rhi/rhi_device.h"
@@ -478,10 +477,6 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
     if (!NormalizeImageView(view, desc->type))
       return false;
     auto value = view.image;
-    // Window frames have presentation ownership and cannot be captured as
-    // texture bindings, matching the D3D12/Vulkan swapchain contract.
-    if (rhi::QueryInterfacePtr<IMetalSwapChainImage>(value))
-      return false;
     auto image = rhi::QueryInterfacePtr<IMetalImage>(value).Get();
     if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
       return false;

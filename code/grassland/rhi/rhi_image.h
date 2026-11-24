@@ -7,8 +7,7 @@ namespace grassland::rhi {
 class IImage : public IObject {
  public:
   virtual const ImageDesc &GetDesc() const = 0;
-  // Swapchain frames are single-use; they must not be held across resize
-  // or bound as sampled/storage textures in a binding group.
+  // Swapchain frames are single-use; they must not be held across resize.
   // Detecting reuse after Present is a Debug-only diagnostic.
   virtual bool IsValid() const = 0;
 
