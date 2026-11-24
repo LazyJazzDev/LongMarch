@@ -30,7 +30,7 @@ class ShaderCacheTest : public testing::Test {
   std::filesystem::path directory_;
 };
 
-TEST_F(ShaderCacheTest, RequestBoundaries) {
+TEST(ShaderCacheKeyTest, RequestBoundaries) {
   EXPECT_NE(ShaderCacheKey({"ab", "c"}), ShaderCacheKey({"a", "bc"}));
 }
 
@@ -110,7 +110,7 @@ float4 VSMain() : SV_Position { return float4(0, 0, 0, 1); }
   EXPECT_FALSE(backend::PreprocessShader(desc, BACKEND_API_METAL, replay));
 }
 
-TEST_F(ShaderCacheTest, LayoutIdentityIncludesEveryFieldAndGroupPosition) {
+TEST(ShaderCacheKeyTest, LayoutIdentityIncludesEveryFieldAndGroupPosition) {
   PipelineLayoutDesc layout{{{{{3, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4},
                                {7, BINDING_TEXTURE2D, 2, SHADER_VISIBILITY_FRAGMENT, 0}}},
                              {}}};
