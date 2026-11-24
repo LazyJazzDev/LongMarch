@@ -1,13 +1,18 @@
 ﻿#include "grassland/rhi/backend/backend_shader_compiler.h"
 
+#ifndef LONGMARCH_OFFLINE_SHADERS
 #include <slang-com-ptr.h>
 #include <slang-deprecated.h>
 #include <slang.h>
-
+#endif
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <sstream>
+
+#include "grassland/rhi/backend/backend_shader_cache.h"
 #ifdef __APPLE__
 #include <TargetConditionals.h>
 #endif
@@ -18,6 +23,16 @@
 
 namespace grassland::rhi::backend {
 namespace {
+std::vector<std::pair<std::string, std::string>> PlatformDefines() {
+  const auto target = GetShaderCacheSettings().target_platform;
+  return {{"RHI_PLATFORM_WINDOWS", target == ShaderTargetPlatform::Windows ? "1" : "0"},
+          {"RHI_PLATFORM_MACOS", target == ShaderTargetPlatform::MacOS ? "1" : "0"},
+          {"RHI_PLATFORM_LINUX", target == ShaderTargetPlatform::Linux ? "1" : "0"},
+          {"RHI_PLATFORM_IOS", target == ShaderTargetPlatform::IOS ? "1" : "0"},
+          {"RHI_PLATFORM_OHOS", target == ShaderTargetPlatform::OHOS ? "1" : "0"}};
+}
+
+#ifndef LONGMARCH_OFFLINE_SHADERS
 bool SameUUID(const SlangUUID &a, const SlangUUID &b) {
   return std::memcmp(&a, &b, sizeof(a)) == 0;
 }
@@ -167,9 +182,55 @@ class TextWriter final : public ISlangWriter {
   std::vector<char> buffer_;
   std::string text_;
 };
+#endif
 }  // namespace
 
 bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &source) {
+  std::vector<uint8_t> original;
+  std::string key;
+  if (!GetShaderCacheSettings().directory.empty()) {
+    // Bundle keys identify source requests; regenerate the bundle after changing includes.
+    if (desc.file_system) {
+      if (desc.file_system->ReadFile(desc.filename, original))
+        return false;
+    } else {
+      std::ifstream file(desc.filename, std::ios::binary);
+      if (!file)
+        return false;
+      original.assign(std::istreambuf_iterator<char>(file), {});
+      if (file.bad())
+        return false;
+    }
+    std::vector<std::string> parts{"rhi-preprocess-v2",
+                                   LONGMARCH_SHADER_CACHE_ABI,
+                                   std::to_string(api),
+                                   GetShaderCacheSettings().ios ? "ios" : "native",
+                                   desc.filename,
+                                   desc.entry_point,
+                                   std::to_string(desc.stage),
+                                   std::string(original.begin(), original.end())};
+    for (const auto &define : PlatformDefines()) {
+      parts.push_back(define.first);
+      parts.push_back(define.second);
+    }
+    parts.insert(parts.end(), desc.include_paths.begin(), desc.include_paths.end());
+    for (auto &d : desc.defines) {
+      parts.push_back(d.first);
+      parts.push_back(d.second);
+    }
+    key = "pre-" + ShaderCacheKey(parts);
+    if (GetShaderCacheSettings().read_only) {
+      std::vector<uint8_t> cached;
+      if (!ReadShaderCache(key, cached))
+        return false;
+      source.assign(cached.begin(), cached.end());
+      return true;
+    }
+  }
+#ifdef LONGMARCH_OFFLINE_SHADERS
+  ReportError(-1, "Offline shader preprocessing requires a prepared bundle");
+  return false;
+#else
   source.clear();
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
   if (!global && SLANG_FAILED(slang::createGlobalSession(global.writeRef())))
@@ -182,21 +243,8 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
                         desc.stage >= SHADER_STAGE_RAY_GENERATION ? "sm_6_5" : "sm_6_0"};
   if (SLANG_FAILED(request->processCommandLineArguments(args, 5)))
     return false;
-#ifdef _WIN32
-  request->addPreprocessorDefine("RHI_PLATFORM_WINDOWS", "1");
-#else
-  request->addPreprocessorDefine("RHI_PLATFORM_WINDOWS", "0");
-#endif
-#ifdef __APPLE__
-  request->addPreprocessorDefine("RHI_PLATFORM_MACOS", "1");
-#else
-  request->addPreprocessorDefine("RHI_PLATFORM_MACOS", "0");
-#endif
-#ifdef __linux__
-  request->addPreprocessorDefine("RHI_PLATFORM_LINUX", "1");
-#else
-  request->addPreprocessorDefine("RHI_PLATFORM_LINUX", "0");
-#endif
+  for (const auto &define : PlatformDefines())
+    request->addPreprocessorDefine(define.first.c_str(), define.second.c_str());
   for (const auto &define : desc.defines)
     request->addPreprocessorDefine(define.first.c_str(), define.second.c_str());
   for (const auto &path : desc.include_paths)
@@ -236,7 +284,8 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
   if (SLANG_FAILED(result) || diagnostic_error)
     return false;
   source = output->Text();
-  return true;
+  return key.empty() || WriteShaderCache(key, {source.begin(), source.end()});
+#endif
 }
 
 std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
@@ -305,12 +354,46 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
   return header;
 }
 
+std::string ShaderBindingLayoutKey(const PipelineLayoutDesc &layout) {
+  std::vector<std::string> parts{"rhi-binding-layout-v1", std::to_string(layout.groups.size())};
+  for (size_t group = 0; group < layout.groups.size(); ++group) {
+    auto bindings = layout.groups[group].bindings;
+    std::sort(bindings.begin(), bindings.end(), [](const auto &a, const auto &b) { return a.binding < b.binding; });
+    parts.push_back(std::to_string(group));
+    parts.push_back(std::to_string(bindings.size()));
+    for (const auto &binding : bindings) {
+      parts.push_back(std::to_string(binding.binding));
+      parts.push_back(std::to_string(binding.type));
+      parts.push_back(std::to_string(binding.count));
+      parts.push_back(std::to_string(binding.visibility));
+      parts.push_back(std::to_string(binding.stride));
+    }
+  }
+  return ShaderCacheKey(parts);
+}
+
 bool CompileSlang(const IShader *shader_object,
                   const std::string &prefix,
                   BackendAPI api,
                   std::vector<uint8_t> &code,
                   const PipelineLayoutDesc *binding_layout,
                   std::array<uint32_t, 3> *thread_group_size) {
+  const std::string key =
+      "slang-" + ShaderCacheKey({"rhi-spirv-v3", LONGMARCH_SHADER_CACHE_ABI, prefix,
+                                 ShaderBindingLayoutKey(binding_layout ? *binding_layout : PipelineLayoutDesc{}),
+                                 shader_object->GetPreprocessedCode(), shader_object->GetEntry(),
+                                 std::to_string(shader_object->GetStage()), std::to_string(api),
+                                 std::to_string(static_cast<int>(GetShaderCacheSettings().target_platform))});
+  if (GetShaderCacheSettings().read_only && ReadShaderCache(key, code)) {
+    if (!thread_group_size || ReadShaderThreadGroup(key, *thread_group_size))
+      return true;
+  }
+  if (!GetShaderCacheSettings().directory.empty() && GetShaderCacheSettings().read_only)
+    return false;
+#ifdef LONGMARCH_OFFLINE_SHADERS
+  ReportError(-1, "Offline compilation requires a prepared bundle");
+  return false;
+#else
   const auto &preprocessed = shader_object->GetPreprocessedCode();
   code.clear();
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
@@ -335,22 +418,11 @@ bool CompileSlang(const IShader *shader_object,
                                  : api == BACKEND_API_VULKAN ? "spirv"
                                                              : "dxil",
                                  "-fvk-use-entrypoint-name"};
-  // Execution platform, independent of the intermediate shader target (Metal uses SPIR-V).
-#ifdef _WIN32
-  args.push_back("-DRHI_PLATFORM_WINDOWS=1");
-#else
-  args.push_back("-DRHI_PLATFORM_WINDOWS=0");
-#endif
-#if defined(__APPLE__) && TARGET_OS_OSX
-  args.push_back("-DRHI_PLATFORM_MACOS=1");
-#else
-  args.push_back("-DRHI_PLATFORM_MACOS=0");
-#endif
-#ifdef __linux__
-  args.push_back("-DRHI_PLATFORM_LINUX=1");
-#else
-  args.push_back("-DRHI_PLATFORM_LINUX=0");
-#endif
+  std::vector<std::string> platform_args;
+  for (const auto &define : PlatformDefines())
+    platform_args.push_back("-D" + define.first + "=" + define.second);
+  for (const auto &arg : platform_args)
+    args.push_back(arg.c_str());
   if (api == BACKEND_API_VULKAN) {
     args.push_back("-emit-spirv-directly");
     args.push_back("-fvk-use-dx-layout");
@@ -483,14 +555,20 @@ bool CompileSlang(const IShader *shader_object,
     }
   }
 
-  if (thread_group_size) {
+  if (shader_object->GetStage() == SHADER_STAGE_COMPUTE) {
     SlangUInt sizes[3]{};
+    std::array<uint32_t, 3> group{};
     layout->getEntryPointByIndex(0)->getComputeThreadGroupSize(3, sizes);
     for (int i = 0; i < 3; ++i)
-      (*thread_group_size)[i] = uint32_t(sizes[i]);
+      group[i] = uint32_t(sizes[i]);
+    if (thread_group_size)
+      *thread_group_size = group;
+    if (!WriteShaderThreadGroup(key, group))
+      return false;
   }
   code.resize(blob->getBufferSize());
   std::memcpy(code.data(), blob->getBufferPointer(), code.size());
-  return true;
+  return WriteShaderCache(key, code);
+#endif
 }
 }  // namespace grassland::rhi::backend

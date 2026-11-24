@@ -5,6 +5,7 @@
 #define GLFW_EXPOSE_NATIVE_COCOA
 #import <Cocoa/Cocoa.h>
 #include <GLFW/glfw3native.h>
+#import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 
 TEST(RhiMetalHDR, LayerEncodingAndEDRFollowSwapchainTransitions) {
@@ -43,5 +44,37 @@ TEST(RhiMetalHDR, LayerEncodingAndEDRFollowSwapchainTransitions) {
     EXPECT_EQ(window->GetColorSpace(), space);
     EXPECT_TRUE(CFEqual(layer.colorspace, expected));
     CGColorSpaceRelease(expected);
+  }
+}
+
+#include "grassland/rhi/native/native_metal.h"
+
+TEST(RhiMetalHDR, DrawableBridgeWaitsForAssistQueueRendering) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  using namespace grassland::rhi;
+  @autoreleasepool {
+    ObjPtr<ICore> core = CreateCore(BACKEND_API_METAL);
+    ASSERT_TRUE(core);
+    ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+    ASSERT_TRUE(device);
+    ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "Metal event bridge test"});
+    ASSERT_TRUE(window);
+    auto layer = (CAMetalLayer *)[glfwGetCocoaWindow(window->GLFWWindow()) contentView].layer;
+    EXPECT_EQ((__bridge id<MTLDevice>)GetNativeMetalDevice(device.Get()), layer.device);
+    layer.framebufferOnly = NO;
+    id<CAMetalDrawable> drawable = [layer nextDrawable];
+    ASSERT_NE(drawable, nil);
+    ObjPtr<IImage> source = device->CreateImage(
+        {uint32_t(drawable.texture.width), uint32_t(drawable.texture.height), IMAGE_FORMAT_B8G8R8A8_UNORM});
+    ASSERT_TRUE(source);
+    ObjPtr<ICommandContext> commands = device->GetQueue(QUEUE_TYPE_ASSIST)->CreateCommandContext();
+    ASSERT_TRUE(commands && commands->CmdClearImage(source.Get(), {1, 0, 0, 1}));
+    ObjPtr<ISubmissionToken> rendered = commands->Submit();
+    ASSERT_TRUE(rendered);
+    EXPECT_FALSE(PresentMetalDrawable(device.Get(), source.Get(), nullptr, (__bridge CA::MetalDrawable *)drawable));
+    EXPECT_TRUE(
+        PresentMetalDrawable(device.Get(), source.Get(), rendered.Get(), (__bridge CA::MetalDrawable *)drawable));
+    EXPECT_EQ(rendered->GetStatus(), SUBMISSION_STATUS_COMPLETED);
   }
 }

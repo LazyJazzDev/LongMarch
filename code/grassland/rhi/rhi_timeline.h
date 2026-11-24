@@ -16,7 +16,7 @@ class ITimeline : public IObject {
   virtual bool WaitHost(uint64_t value) const = 0;
 
  protected:
-  virtual ~ITimeline() = default;
+  virtual ~ITimeline() = 0;
 };
 
 struct Event {

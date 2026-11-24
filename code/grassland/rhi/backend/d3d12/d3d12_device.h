@@ -137,6 +137,7 @@ class D3D12DeviceImpl final : public Object<rhi::IDevice, ID3D12Device> {
   bool SupportRayQuery() const override;
 
   bool SupportGeometryShader() const override;
+  bool SupportComputeSubgroupVote() const override;
 
   rhi::IQueue *GetQueue(QueueType type) override;
 

@@ -13,6 +13,15 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 - 不以公开字段、可变内部引用或无约束的 setter 代替友元。由拥有状态的类维护不变量；查询只暴露必要信息，修改通过语义明确的操作完成。
 - 确需友元时，将授权缩到必要的成员函数，避免授予整个类访问权限，并说明保留原因。
 
+## RHI 接口
+
+- 所有 RHI 接口均为纯虚接口，不提供虚函数的默认行为；每个后端必须显式实现能力查询等接口。纯虚析构函数所需的定义放在 `.cpp` 中。
+
+## 头文件与实现分离
+
+- `.h` 必须保持为精炼的声明目录，便于快速浏览类型、接口与必要的数据成员；不在头文件中堆放算法或业务实现。
+- 除简单返回逻辑（如直接返回成员值的 getter）外，函数实现必须放在 `.cpp` 中。分支、循环、状态修改、资源管理和计算流程等非简单实现均应移出头文件，不以 `inline` 或头文件专用实现为由省略声明与实现分离。
+
 ## 错误处理与异常
 
 - 可预期的运行失败优先通过返回值表达，不以抛异常作为常规控制流；创建失败返回空句柄/容器，句柄转换为 `bool` 应为 `false`，调用者判空后处理。
@@ -27,6 +36,7 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 - 常规工作区只使用 `cmake-build-release` 和 `cmake-build-debug`，分别对应 CLion 的 Release / Debug CMake 配置；配置由 CLion 管理，命令行构建沿用对应配置生成的目录，不另建临时 `cmake-build-*` 或 `build-*` 目录。
 - 特殊后端、交叉编译或其他独立构建需求，通过 CLion 添加 CMake 配置及其独立构建目录；不复用生成器、工具链或目标平台不兼容的缓存。特殊配置不再需要时清理其构建产物。
 - Ninja 下示例和测试通过 `EXCLUDE_FROM_ALL` 排除在默认目标外；用户要求全量编译时，也要显式构建这些目标。
+- macOS 上可以执行 Vulkan API 运行测试，但 MoltenVK 存在已知的多队列同步挂起问题；该环境的 Vulkan 测试失败或挂起不作为阻塞更新的依据。记录实际结果及限制，必要时在原生 Windows 或 HarmonyOS 设备上验证 Vulkan。离线 shader 编译/资源准备与 GPU 运行验证分开记录，不将前者算作 Vulkan 运行通过。
 - 默认不运行 WSL 测试；只有用户明确要求 WSL 测试时才执行。Windows 上的常规构建、功能验证和性能对比使用原生 Windows 环境。
 
 ## 更新与版本管理

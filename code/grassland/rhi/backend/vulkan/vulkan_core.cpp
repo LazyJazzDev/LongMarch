@@ -41,7 +41,7 @@ rhi::ICore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
   VkInstanceCreateFlags flags = 0;
   for (const auto &extension : available) {
     for (const auto name :
-         {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_xlib_surface", "VK_KHR_xcb_surface",
+         {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_xlib_surface", "VK_KHR_xcb_surface", "VK_OHOS_surface",
           "VK_KHR_wayland_surface", "VK_EXT_swapchain_colorspace", "VK_EXT_metal_surface", "VK_MVK_macos_surface"}) {
       if (std::strcmp(extension.extensionName, name) == 0)
         extensions.push_back(name);
@@ -152,6 +152,13 @@ rhi::ICore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
         info.unified_memory += memory.memoryHeaps[i].size;
       }
     }
+    VkPhysicalDeviceSubgroupProperties subgroup{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES};
+    VkPhysicalDeviceProperties2 subgroup_properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+    subgroup_properties.pNext = &subgroup;
+    vkGetPhysicalDeviceProperties2(device, &subgroup_properties);
+    const auto needed = VK_SUBGROUP_FEATURE_BASIC_BIT | VK_SUBGROUP_FEATURE_VOTE_BIT;
+    info.compute_subgroup_vote_feature =
+        (subgroup.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) && (subgroup.supportedOperations & needed) == needed;
     info.geometry_shader_feature = features.Features().features.geometryShader == VK_TRUE;
     info.ray_tracing_pipeline_feature = features.RayTracingPipeline();
     info.ray_query_feature = features.RayQuery();
