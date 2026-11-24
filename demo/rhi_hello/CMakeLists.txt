@@ -28,5 +28,7 @@ if (LONGMARCH_CUDA_ENABLED)
 endif ()
 
 # The mip scene is shared only with its automated offscreen regression test.
+# A target dependency carries the generated header across CMake directory scopes.
+add_custom_target(rhi_mip_shader_header DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/modules/mip/shaders/mip.slang.h)
 target_sources(${DEMO_NAME} PRIVATE modules/mip/scene.cpp)
 set_source_files_properties(modules/mip/scene.cpp PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR}/modules/mip)
