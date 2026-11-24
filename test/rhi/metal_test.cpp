@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <thread>
 
 #include "grassland/rhi/backend/backend_shader_cache.h"
@@ -222,6 +223,64 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     context.Release();
     ASSERT_TRUE(done);
     EXPECT_TRUE(done->WaitHost());
+  }
+}
+
+TEST(RhiMetal, EveryAdvertisedColorFormatTransfersMipsAndGeneratesWhenSupported) {
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_METAL, {true});
+  ASSERT_TRUE(core);
+  const auto devices = core->GetPhysicalDevices();
+  for (size_t adapter = 0; adapter < devices.size(); ++adapter) {
+    ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(adapter));
+    ASSERT_TRUE(device);
+    ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_COMPUTE);
+    ASSERT_TRUE(queue);
+    for (int index = IMAGE_FORMAT_UNKNOWN + 1; index < IMAGE_FORMAT_COUNT; ++index) {
+      const auto format = static_cast<ImageFormat>(index);
+      const auto &feature = devices[adapter].format_features[index];
+      if (!IsColorFormat(format) || !feature.sampled)
+        continue;
+      SCOPED_TRACE(testing::Message() << "adapter " << adapter << " format " << index);
+      ObjPtr<IImage> image = device->CreateImage({8, 8, format, 4});
+      ASSERT_TRUE(image);
+      const size_t pixel_size = ImageFormatSize(format);
+      std::vector<uint8_t> pixel(pixel_size, 64);
+      if (format == IMAGE_FORMAT_R32_SFLOAT || format == IMAGE_FORMAT_R32G32_SFLOAT ||
+          format == IMAGE_FORMAT_R32G32B32A32_SFLOAT) {
+        const float value = 0.5f;
+        for (size_t offset = 0; offset < pixel_size; offset += sizeof(value))
+          std::memcpy(pixel.data() + offset, &value, sizeof(value));
+      } else if (format == IMAGE_FORMAT_R16G16B16A16_SFLOAT) {
+        const uint16_t value = 0x3800;  // binary16 0.5
+        for (size_t offset = 0; offset < pixel_size; offset += sizeof(value))
+          std::memcpy(pixel.data() + offset, &value, sizeof(value));
+      }
+      std::vector<uint8_t> input(64 * pixel_size);
+      for (size_t offset = 0; offset < input.size(); offset += pixel_size)
+        std::copy(pixel.begin(), pixel.end(), input.begin() + offset);
+      ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+      ASSERT_TRUE(commands);
+      // All declared levels must support transfer, including integer and packed formats.
+      const std::vector<uint8_t> zeros(input.size(), 0);
+      for (uint32_t mip = 0; mip < 4; ++mip) {
+        const auto &upload = feature.mip_compute_generation && mip ? zeros : input;
+        ASSERT_TRUE(commands->CmdUploadImage(image.Get(), upload.data(), (8u >> mip) * pixel_size, mip));
+      }
+      if (feature.mip_compute_generation)
+        ASSERT_TRUE(commands->CmdGenerateMipmaps(image.Get()));
+      std::vector<ObjPtr<IDownloadToken>> downloads;
+      for (uint32_t mip = 0; mip < 4; ++mip) {
+        downloads.emplace_back(commands->CmdDownloadImage(image.Get(), {0, 0, 0, 0, mip}));
+        ASSERT_TRUE(downloads.back());
+      }
+      ObjPtr<ISubmissionToken> done = commands->Submit();
+      ASSERT_TRUE(done && done->WaitHost());
+      for (auto &download : downloads) {
+        std::vector<uint8_t> actual(download->GetSize());
+        ASSERT_TRUE(download->CopyTo(actual.data(), actual.size()));
+        EXPECT_TRUE(std::equal(actual.begin(), actual.end(), input.begin()));
+      }
+    }
   }
 }
 
