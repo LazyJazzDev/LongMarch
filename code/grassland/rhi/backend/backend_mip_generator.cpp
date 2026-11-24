@@ -3,6 +3,32 @@
 #include "grassland/rhi/rhi_image.h"
 
 namespace grassland::rhi::backend {
+ObjectPtr<IComputeProgram> CreateMipGenerationProgram(IDevice *device) {
+  if (!device)
+    return {};
+  static const char source[] = R"(
+      RHI_TEXTURE2D(0,0,float4,sourceImage);
+      RHI_RW_TEXTURE2D(0,1,float4,targetImage);
+      RHI_SAMPLER(0,2,linearSampler);
+      [numthreads(8,8,1)] void Generate(uint3 id : SV_DispatchThreadID) {
+        uint width,height;
+        targetImage.GetDimensions(width,height);
+        if (id.x < width && id.y < height)
+          targetImage[id.xy] = sourceImage.SampleLevel(linearSampler,
+                                  (float2(id.xy)+0.5)/float2(width,height),0.0);
+      }
+    )";
+  auto shader = ObjectPtr<IShader>::Adopt(device->CreateShaderFromSource(source, "Generate", SHADER_STAGE_COMPUTE));
+  if (!shader)
+    return {};
+  ComputeProgramDesc pipeline;
+  pipeline.compute_shader = shader.Get();
+  pipeline.pipeline_layout.groups = {{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
+                                       {1, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
+                                       {2, BINDING_SAMPLER, 1, SHADER_VISIBILITY_COMPUTE}}}};
+  return ObjectPtr<IComputeProgram>::Adopt(device->CreateComputeProgram(pipeline));
+}
+
 bool GenerateMipChain(ICommandContext *commands,
                       IDevice *device,
                       IImage *image,
@@ -19,31 +45,10 @@ bool GenerateMipChain(ICommandContext *commands,
     return false;
   if (mip_count == 1)
     return true;
-  if (!program) {
-    static const char source[] = R"(
-      RHI_TEXTURE2D(0,0,float4,sourceImage);
-      RHI_RW_TEXTURE2D(0,1,float4,targetImage);
-      RHI_SAMPLER(0,2,linearSampler);
-      [numthreads(8,8,1)] void Generate(uint3 id : SV_DispatchThreadID) {
-        uint width,height;
-        targetImage.GetDimensions(width,height);
-        if (id.x < width && id.y < height)
-          targetImage[id.xy] = sourceImage.SampleLevel(linearSampler,
-                                  (float2(id.xy)+0.5)/float2(width,height),0.0);
-      }
-    )";
-    auto shader = ObjectPtr<IShader>::Adopt(device->CreateShaderFromSource(source, "Generate", SHADER_STAGE_COMPUTE));
-    if (!shader)
-      return false;
-    ComputeProgramDesc pipeline;
-    pipeline.compute_shader = shader.Get();
-    pipeline.pipeline_layout.groups = {{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
-                                         {1, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
-                                         {2, BINDING_SAMPLER, 1, SHADER_VISIBILITY_COMPUTE}}}};
-    program = ObjectPtr<IComputeProgram>::Adopt(device->CreateComputeProgram(pipeline));
-    if (!program)
-      return false;
-  }
+  if (!program)
+    program = CreateMipGenerationProgram(device);
+  if (!program)
+    return false;
   if (!sampler) {
     SamplerDesc sampling{SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_CLAMP_TO_EDGE};
     sampling.max_lod = 0;

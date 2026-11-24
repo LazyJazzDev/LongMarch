@@ -5,6 +5,7 @@
 #include <fstream>
 #include <thread>
 
+#include "grassland/rhi/backend/backend_mip_generator.h"
 #include "grassland/rhi/backend/backend_shader_cache.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/rhi.h"
@@ -198,3 +199,33 @@ RHI_RW_STRUCTURED_BUFFER(0, 3, uint, output);
   }
 }
 }  // namespace grassland::rhi::backend
+
+#if defined(LONGMARCH_METAL_ENABLED)
+namespace grassland::rhi::backend {
+TEST_F(ShaderCacheTest, OfflineMipProgramReplaysAndGeneratesOnMetal) {
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_METAL);
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  // Prepare only the internal pipeline, as an offline bundle tool would.
+  ASSERT_TRUE(CreateMipGenerationProgram(device.Get()));
+  ASSERT_TRUE(ConfigureShaderCache({directory_, true, true}));
+  ObjPtr<IImage> image = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM, 4});
+  ASSERT_TRUE(image);
+  auto commands = ObjPtr<ICommandContext>(device->GetQueue(QUEUE_TYPE_MAIN)->CreateCommandContext());
+  ASSERT_TRUE(commands);
+  std::vector<uint8_t> input(8 * 8 * 4, 96);
+  ASSERT_TRUE(commands->CmdUploadImage(image.Get(), input.data(), 32));
+  ASSERT_TRUE(commands->CmdGenerateMipmaps(image.Get()));
+  ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(image.Get(), {0, 0, 0, 0, 3});
+  ASSERT_TRUE(download);
+  ObjPtr<ISubmissionToken> done = commands->Submit();
+  ASSERT_TRUE(done);
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> result{};
+  ASSERT_TRUE(download->CopyTo(result.data(), result.size()));
+  for (auto channel : result)
+    EXPECT_EQ(channel, 96);
+}
+}  // namespace grassland::rhi::backend
+#endif
