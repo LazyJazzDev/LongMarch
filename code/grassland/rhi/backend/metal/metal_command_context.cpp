@@ -1,4 +1,4 @@
-#include "grassland/rhi/backend/metal/metal_command_context.h"
+﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
 
 #include <array>
 #include <cassert>
@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include "grassland/rhi/backend/backend_download_token.h"
+#include "grassland/rhi/backend/backend_mip_generator.h"
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
@@ -373,10 +374,17 @@ bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group)
   return true;
 }
 
-bool MetalCommandContextImpl::CmdGenerateMipmaps(IImage *, uint32_t, uint32_t) {
-  // No mip_compute_generation capability is advertised by the Metal backend yet.
-  recording_failed_ = true;
-  return false;
+bool MetalCommandContextImpl::CmdGenerateMipmaps(IImage *image, uint32_t base_mip, uint32_t mip_count) {
+  auto native = rhi::QueryInterfacePtr<IMetalImage>(image);
+  if (sealed_ || render_target_ || recording_failed_ || !native || !image->IsValid() ||
+      native->DeviceIdentity() != device_ || !native->SupportsStorage() ||
+      !device_->GetPhysicalDevice().format_features[image->GetDesc().format].mip_compute_generation ||
+      !GenerateMipChain(this, rhi::QueryInterfacePtr<IDevice>(device_).Get(), image, base_mip, mip_count, mip_program_,
+                        mip_sampler_)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return true;
 }
 
 bool MetalCommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
@@ -399,11 +407,8 @@ bool MetalCommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
     recording_failed_ = true;
     return false;
   }
-  for (size_t i = 0; i < groups_.size(); ++i)
-    if (!groups_[i] && !native_program_->BindingLayout().groups[i].bindings.empty()) {
-      recording_failed_ = true;
-      return false;
-    }
+  if (!ValidateGroups())
+    return false;
   if (!x || !y || !z)
     return true;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
@@ -681,6 +686,38 @@ bool MetalCommandContextImpl::CmdSetScissor(const Scissor &scissor) {
   return true;
 }
 
+bool MetalCommandContextImpl::ValidateGroups() {
+  std::vector<BindingImageUse> image_uses;
+  for (size_t i = 0; i < groups_.size(); ++i) {
+    if (!groups_[i] && !native_program_->BindingLayout().groups[i].bindings.empty()) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (!groups_[i])
+      continue;
+    const auto &layout = groups_[i]->GetLayout();
+    for (size_t b = 0; b < layout.bindings.size(); ++b) {
+      const auto type = layout.bindings[b].type;
+      if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
+        continue;
+      for (uint32_t element = 0; element < layout.bindings[b].count; ++element) {
+        const auto &view = groups_[i]->GetImageView(b, element);
+        if (!AddBindingImageUse(image_uses, view, type == BINDING_RW_TEXTURE2D)) {
+          recording_failed_ = true;
+          return false;
+        }
+      }
+      for (const auto &reference : groups_[i]->GetReferences()[b])
+        for (auto target : color_targets_)
+          if (reference.Get() == target) {
+            recording_failed_ = true;
+            return false;
+          }
+    }
+  }
+  return !recording_failed_;
+}
+
 bool MetalCommandContextImpl::ValidateDraw(bool indexed) {
 #if !defined(NDEBUG)
   if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_ || (indexed && !index_)) {
@@ -694,26 +731,8 @@ bool MetalCommandContextImpl::ValidateDraw(bool indexed) {
     return false;
   }
 #endif
-  for (size_t i = 0; i < groups_.size(); ++i) {
-    if (!groups_[i] && !program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
-      recording_failed_ = true;
-      return false;
-    }
-    if (groups_[i]) {
-      auto &layout = groups_[i]->GetLayout();
-      for (size_t b = 0; b < layout.bindings.size(); ++b) {
-        auto type = layout.bindings[b].type;
-        if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
-          continue;
-        for (auto &image : groups_[i]->GetReferences()[b])
-          for (auto target : color_targets_)
-            if (image.Get() == target) {
-              recording_failed_ = true;
-              return false;
-            }
-      }
-    }
-  }
+  if (!ValidateGroups())
+    return false;
   for (auto resource : AccelerationResources())
     encoder_->useResource(resource, MTL::ResourceUsageRead, MTL::RenderStageVertex | MTL::RenderStageFragment);
   return !recording_failed_;

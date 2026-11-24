@@ -25,6 +25,9 @@ std::vector<BackendAPI> MipBackends() {
 #if defined(LONGMARCH_VULKAN_ENABLED)
   result.push_back(BACKEND_API_VULKAN);
 #endif
+#if defined(LONGMARCH_METAL_ENABLED)
+  result.push_back(BACKEND_API_METAL);
+#endif
   return result;
 }
 }  // namespace

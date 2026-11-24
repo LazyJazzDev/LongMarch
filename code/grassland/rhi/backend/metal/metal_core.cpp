@@ -4,6 +4,7 @@
 #include <sys/sysctl.h>
 
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
 
@@ -37,6 +38,34 @@ rhi::ICore *MetalCoreImpl::CreateMetalCore(const CoreDesc &desc) {
     info.geometry_shader_feature = false;
     info.compute_subgroup_vote_feature =
         device->supportsFamily(MTL::GPUFamilyApple6) || device->supportsFamily(MTL::GPUFamilyMac2);
+    info.mip_feature.max_image_dimension_2d =
+        device->supportsFamily(MTL::GPUFamilyApple3) || device->supportsFamily(MTL::GPUFamilyMac1) ? 16384 : 8192;
+    info.mip_feature.max_anisotropy = 16;
+    // Metal provides bias per sampling operation, not as sampler state.
+    info.mip_feature.min_lod_bias = info.mip_feature.max_lod_bias = 0;
+    for (int index = IMAGE_FORMAT_UNKNOWN + 1; index < IMAGE_FORMAT_COUNT; ++index) {
+      const auto format = static_cast<ImageFormat>(index);
+      const auto native = NativeImageFormat(format);
+      if (native == MTL::PixelFormatInvalid)
+        continue;
+      auto descriptor = MTL::TextureDescriptor::texture2DDescriptor(native, 4, 4, true);
+      descriptor->setStorageMode(MTL::StorageModePrivate);
+      descriptor->setUsage(MTL::TextureUsageShaderRead);
+      auto texture = NS::TransferPtr(device->newTexture(descriptor));
+      if (!texture)
+        continue;
+      auto &feature = info.format_features[index];
+      feature.max_mip_levels =
+          ImageMipLevelCount(info.mip_feature.max_image_dimension_2d, info.mip_feature.max_image_dimension_2d);
+      feature.sampled = true;
+      const bool float32 = format == IMAGE_FORMAT_R32_SFLOAT || format == IMAGE_FORMAT_R32G32_SFLOAT ||
+                           format == IMAGE_FORMAT_R32G32B32A32_SFLOAT;
+      feature.linear_filter = !IsSignedIntegerFormat(format) && !IsUnsignedIntegerFormat(format) &&
+                              (!float32 || device->supports32BitFloatFiltering());
+      feature.storage = SupportsImageStorage(format);
+      feature.linear_blit = false;  // Metal blit encoders do not expose filtered image blits.
+      feature.mip_compute_generation = feature.linear_filter && feature.storage && IsColorFormat(format);
+    }
     core->adapters_.push_back({NS::RetainPtr(device), std::move(info)});
   };
 

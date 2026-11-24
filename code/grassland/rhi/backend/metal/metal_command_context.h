@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <array>
 #include <unordered_map>
 
@@ -109,6 +109,9 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IMetal
   void ApplyBindings();
   void ApplyScissor();
   bool ValidateDraw(bool indexed);
+  bool ValidateGroups();
+  ObjectPtr<IComputeProgram> mip_program_;
+  ObjectPtr<ISampler> mip_sampler_;
   IProgram *program_{};
   IMetalComputeProgram *compute_program_{};
   IMetalProgramBase *native_program_{};
