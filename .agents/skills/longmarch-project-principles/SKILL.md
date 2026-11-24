@@ -36,6 +36,7 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 - 常规工作区只使用 `cmake-build-release` 和 `cmake-build-debug`，分别对应 CLion 的 Release / Debug CMake 配置；配置由 CLion 管理，命令行构建沿用对应配置生成的目录，不另建临时 `cmake-build-*` 或 `build-*` 目录。
 - 特殊后端、交叉编译或其他独立构建需求，通过 CLion 添加 CMake 配置及其独立构建目录；不复用生成器、工具链或目标平台不兼容的缓存。特殊配置不再需要时清理其构建产物。
 - Ninja 下示例和测试通过 `EXCLUDE_FROM_ALL` 排除在默认目标外；用户要求全量编译时，也要显式构建这些目标。
+- macOS 上不执行 Vulkan API 运行测试；MoltenVK 存在已知的多队列同步挂起问题，不以该环境的 Vulkan 挂起作为 LongMarch 回归判据。macOS GPU 运行验证使用 Metal，Vulkan 运行验证使用原生 Windows 或 HarmonyOS 设备。离线 shader 编译/资源准备与 GPU 运行验证分开记录，不将前者算作 Vulkan 运行通过。
 - 默认不运行 WSL 测试；只有用户明确要求 WSL 测试时才执行。Windows 上的常规构建、功能验证和性能对比使用原生 Windows 环境。
 
 ## 更新与版本管理
