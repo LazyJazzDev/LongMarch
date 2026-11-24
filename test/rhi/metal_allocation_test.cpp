@@ -69,7 +69,7 @@ TEST(RhiMetalAllocation, FactoriesPropagateCpuAllocationFailures) {
   ASSERT_TRUE(device);
   bool propagated = false;
   {
-    FailAllocation fail(sizeof(IMetalAllocatedBuffer));
+    FailAllocation fail(sizeof(MetalAllocatedBufferImpl));
     try {
       ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
     } catch (const std::bad_alloc &) {
@@ -82,7 +82,7 @@ TEST(RhiMetalAllocation, FactoriesPropagateCpuAllocationFailures) {
   {
     // Native sampler creation precedes the wrapper allocation; RAII must release
     // that state when wrapper allocation fails.
-    FailAllocation fail(sizeof(IMetalSampler));
+    FailAllocation fail(sizeof(MetalSamplerImpl));
     try {
       ObjPtr<ISampler> sampler = device->CreateSampler();
     } catch (const std::bad_alloc &) {
@@ -111,7 +111,7 @@ TEST(RhiMetalAllocation, FailedLeaseConstructionReturnsBorrowedUploadBuffer) {
   warm.Reset();
   bool propagated = false;
   {
-    FailAllocation fail(sizeof(MetalTemporalBufferPool::Lease));
+    FailAllocation fail(sizeof(MetalTemporalBufferLeaseImpl));
     try {
       auto lease = pool.Acquire(256);
     } catch (const std::bad_alloc &) {
