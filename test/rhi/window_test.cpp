@@ -505,8 +505,6 @@ TEST_P(RhiWindow, ImGuiButtonReceivesWindowInputCallbacks) {
 TEST_P(RhiWindow, SwapchainImagesCannotBeBoundAsTextures) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 on a desktop.";
-  if (GetParam() != BACKEND_API_VULKAN && GetParam() != BACKEND_API_D3D12)
-    GTEST_SKIP();
   ObjPtr<ICore> core = rhi::CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
