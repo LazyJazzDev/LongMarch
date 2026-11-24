@@ -5,6 +5,7 @@
 #include <slang-deprecated.h>
 #include <slang.h>
 #endif
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <filesystem>
@@ -353,6 +354,24 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
   return header;
 }
 
+std::string ShaderBindingLayoutKey(const PipelineLayoutDesc &layout) {
+  std::vector<std::string> parts{"rhi-binding-layout-v1", std::to_string(layout.groups.size())};
+  for (size_t group = 0; group < layout.groups.size(); ++group) {
+    auto bindings = layout.groups[group].bindings;
+    std::sort(bindings.begin(), bindings.end(), [](const auto &a, const auto &b) { return a.binding < b.binding; });
+    parts.push_back(std::to_string(group));
+    parts.push_back(std::to_string(bindings.size()));
+    for (const auto &binding : bindings) {
+      parts.push_back(std::to_string(binding.binding));
+      parts.push_back(std::to_string(binding.type));
+      parts.push_back(std::to_string(binding.count));
+      parts.push_back(std::to_string(binding.visibility));
+      parts.push_back(std::to_string(binding.stride));
+    }
+  }
+  return ShaderCacheKey(parts);
+}
+
 bool CompileSlang(const IShader *shader_object,
                   const std::string &prefix,
                   BackendAPI api,
@@ -360,10 +379,11 @@ bool CompileSlang(const IShader *shader_object,
                   const PipelineLayoutDesc *binding_layout,
                   std::array<uint32_t, 3> *thread_group_size) {
   const std::string key =
-      "slang-" +
-      ShaderCacheKey({"rhi-spirv-v2", LONGMARCH_SHADER_CACHE_ABI, prefix, shader_object->GetPreprocessedCode(),
-                      shader_object->GetEntry(), std::to_string(shader_object->GetStage()), std::to_string(api),
-                      std::to_string(static_cast<int>(GetShaderCacheSettings().target_platform))});
+      "slang-" + ShaderCacheKey({"rhi-spirv-v3", LONGMARCH_SHADER_CACHE_ABI, prefix,
+                                 ShaderBindingLayoutKey(binding_layout ? *binding_layout : PipelineLayoutDesc{}),
+                                 shader_object->GetPreprocessedCode(), shader_object->GetEntry(),
+                                 std::to_string(shader_object->GetStage()), std::to_string(api),
+                                 std::to_string(static_cast<int>(GetShaderCacheSettings().target_platform))});
   if (GetShaderCacheSettings().read_only && ReadShaderCache(key, code)) {
     if (!thread_group_size || ReadShaderThreadGroup(key, *thread_group_size))
       return true;

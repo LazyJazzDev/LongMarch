@@ -11,6 +11,9 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
 std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                               BackendAPI api,
                               const std::vector<InputAttributeDesc> &attributes = {});
+// Stable identity of every group and binding, independent of binding declaration order.
+std::string ShaderBindingLayoutKey(const PipelineLayoutDesc &layout);
+
 // Defines RHI_PLATFORM_WINDOWS/MACOS/LINUX/IOS/OHOS as 0 or 1, also for imports.
 // ShaderCacheSettings selects the target independently of the host and backend.
 bool CompileSlang(const IShader *shader,

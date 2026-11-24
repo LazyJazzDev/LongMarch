@@ -22,8 +22,9 @@ static bool CompileMetal(const IShader *shader,
                          bool tier1) {
   const std::string key =
       "msl-" +
-      ShaderCacheKey({"rhi-msl-v5", LONGMARCH_SHADER_CACHE_ABI, shader->GetPreprocessedCode(), shader->GetEntry(),
+      ShaderCacheKey({"rhi-msl-v6", LONGMARCH_SHADER_CACHE_ABI, shader->GetPreprocessedCode(), shader->GetEntry(),
                       std::to_string(shader->GetStage()), ShaderMacroHeader(layout, BACKEND_API_VULKAN, attributes),
+                      ShaderBindingLayoutKey(layout),
                       GetShaderCacheSettings().ios ? "ios-simdgroup" : (tier1 ? "macos-tier1" : "macos")});
   std::vector<uint8_t> cached;
   if (GetShaderCacheSettings().read_only && ReadShaderCache(key, cached)) {

@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <thread>
 
 #include "grassland/rhi/backend/backend_shader_cache.h"
 #include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/rhi.h"
 #include "grassland/util/virtual_file_system.h"
 
 namespace grassland::rhi::backend {
@@ -106,5 +108,93 @@ float4 VSMain() : SV_Position { return float4(0, 0, 0, 1); }
   EXPECT_FALSE(backend::PreprocessShader(desc, BACKEND_API_VULKAN, replay));
   ASSERT_EQ(files.WriteFile("test.slang", "float4 VSMain():SV_Position { return 1; }"), 0);
   EXPECT_FALSE(backend::PreprocessShader(desc, BACKEND_API_METAL, replay));
+}
+
+TEST_F(ShaderCacheTest, LayoutIdentityIncludesEveryFieldAndGroupPosition) {
+  PipelineLayoutDesc layout{{{{{3, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4},
+                               {7, BINDING_TEXTURE2D, 2, SHADER_VISIBILITY_FRAGMENT, 0}}},
+                             {}}};
+  const auto key = ShaderBindingLayoutKey(layout);
+  auto reordered = layout;
+  std::reverse(reordered.groups[0].bindings.begin(), reordered.groups[0].bindings.end());
+  EXPECT_EQ(key, ShaderBindingLayoutKey(reordered));
+  for (int field = 0; field < 5; ++field) {
+    auto changed = layout;
+    auto &binding = changed.groups[0].bindings[0];
+    switch (field) {
+      case 0:
+        ++binding.binding;
+        break;
+      case 1:
+        binding.type = BINDING_STRUCTURED_BUFFER;
+        break;
+      case 2:
+        ++binding.count;
+        break;
+      case 3:
+        binding.visibility = SHADER_VISIBILITY_ALL;
+        break;
+      case 4:
+        binding.stride = 8;
+        break;
+    }
+    EXPECT_NE(key, ShaderBindingLayoutKey(changed)) << "field " << field;
+  }
+  auto relocated = layout;
+  std::swap(relocated.groups[0], relocated.groups[1]);
+  EXPECT_NE(key, ShaderBindingLayoutKey(relocated));
+  layout.groups.pop_back();
+  EXPECT_NE(key, ShaderBindingLayoutKey(layout));
+}
+
+TEST_F(ShaderCacheTest, ProgramReplayRejectsChangedStrideAndVisibility) {
+  const std::vector<BackendAPI> apis{
+#ifdef LONGMARCH_METAL_ENABLED
+      BACKEND_API_METAL,
+#endif
+#ifdef LONGMARCH_VULKAN_ENABLED
+      BACKEND_API_VULKAN,
+#endif
+#ifdef LONGMARCH_D3D12_ENABLED
+      BACKEND_API_D3D12,
+#endif
+  };
+  for (const auto api : apis) {
+    SCOPED_TRACE(std::to_string(api));
+    const auto directory = directory_ / std::to_string(api);
+    ASSERT_TRUE(ConfigureShaderCache({directory, false, false}));
+    ObjPtr<ICore> core = CreateCore(api);
+    ASSERT_TRUE(core);
+    ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+    ASSERT_TRUE(device);
+    ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
+RHI_RW_STRUCTURED_BUFFER(0, 3, uint, output);
+[numthreads(1, 1, 1)] void CSMain(uint3 id : SV_DispatchThreadID) { output[id.x] = 42; }
+)",
+                                                            "CSMain", SHADER_STAGE_COMPUTE);
+    ASSERT_TRUE(shader);
+    ComputeProgramDesc desc;
+    desc.compute_shader = shader.Get();
+    desc.pipeline_layout.groups = {{{{3, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4},
+                                     {7, BINDING_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 0}}}};
+    ObjPtr<IComputeProgram> prepared = device->CreateComputeProgram(desc);
+    ASSERT_TRUE(prepared);
+    for (bool read_only : {false, true}) {
+      SCOPED_TRACE(read_only ? "replay" : "online");
+      ASSERT_TRUE(ConfigureShaderCache({directory, read_only, false}));
+      auto wrong_stride = desc;
+      wrong_stride.pipeline_layout.groups[0].bindings[0].stride = 8;
+      ObjPtr<IComputeProgram> stride_program = device->CreateComputeProgram(wrong_stride);
+      EXPECT_FALSE(stride_program);
+      auto wrong_visibility = desc;
+      wrong_visibility.pipeline_layout.groups[0].bindings[0].visibility = SHADER_VISIBILITY_FRAGMENT;
+      ObjPtr<IComputeProgram> visibility_program = device->CreateComputeProgram(wrong_visibility);
+      EXPECT_FALSE(visibility_program);
+    }
+    // Equivalent declaration order must still find the prepared bundle.
+    std::reverse(desc.pipeline_layout.groups[0].bindings.begin(), desc.pipeline_layout.groups[0].bindings.end());
+    ObjPtr<IComputeProgram> replay = device->CreateComputeProgram(desc);
+    EXPECT_TRUE(replay);
+  }
 }
 }  // namespace grassland::rhi::backend
