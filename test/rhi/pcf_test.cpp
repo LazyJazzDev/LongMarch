@@ -84,11 +84,16 @@ TEST_P(RhiPCF, ComparisonOperatorsUseReferenceAgainstDepth) {
   ObjPtr<IBuffer> output = device_->CreateBuffer({3 * 4 * sizeof(float)});
   ASSERT_TRUE(depth && output);
   ObjPtr<IShader> shader = device_->CreateShaderFromSource(R"(
-    RHI_TEXTURE2D(0,0,float,depth);
-    RHI_COMPARISON_SAMPLER(0,1,comparison);
-    RHI_SAMPLER(0,2,ordinary);
+    #define GROUP_INDEX 0
+    #define DEPTH_BINDING 0
+    #define COMPARISON_BINDING 1
+    #define ORDINARY_BINDING 2
+    #define ARRAY_BINDING 4
+    RHI_TEXTURE2D(GROUP_INDEX,DEPTH_BINDING,float,depth);
+    RHI_COMPARISON_SAMPLER(GROUP_INDEX,COMPARISON_BINDING,comparison);
+    RHI_SAMPLER(GROUP_INDEX,ORDINARY_BINDING,ordinary);
     RHI_RW_STRUCTURED_BUFFER(0,3,float4,results);
-    RHI_COMPARISON_SAMPLER_ARRAY(0,4,comparisons);
+    RHI_COMPARISON_SAMPLER_ARRAY(GROUP_INDEX,ARRAY_BINDING,comparisons);
     [numthreads(1,1,1)] void Main(uint3 id:SV_DispatchThreadID) {
       float reference = .25 * (id.x + 1);
       results[id.x] = float4(depth.SampleCmpLevelZero(comparison,float2(.5,.5),reference),

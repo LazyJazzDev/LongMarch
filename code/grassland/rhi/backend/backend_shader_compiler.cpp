@@ -323,8 +323,7 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
     for (bool array : {false, true}) {
       const auto name = std::string(macro.name) + (array ? "_ARRAY" : "");
       header += "#define RHI_" + name + "_I(G,B) RHI_" + name + "_##G##_##B\n";
-      header += "#define RHI_" + name + "_D(G,B) RHI_" + name + "_I(G,B)\n";
-      header += "#define RHI_" + name + (macro.typed ? "(G,B,T,N) " : "(G,B,N) ") + "RHI_" + name + "_D(G,B)" +
+      header += "#define RHI_" + name + (macro.typed ? "(G,B,T,N) " : "(G,B,N) ") + "RHI_" + name + "_I(G,B)" +
                 (macro.typed ? "(T,N)\n" : "(N)\n");
     }
   }
