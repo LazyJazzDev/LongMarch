@@ -88,10 +88,13 @@ TEST_P(RhiPCF, ComparisonOperatorsUseReferenceAgainstDepth) {
     RHI_COMPARISON_SAMPLER(0,1,comparison);
     RHI_SAMPLER(0,2,ordinary);
     RHI_RW_STRUCTURED_BUFFER(0,3,float4,results);
+    RHI_COMPARISON_SAMPLER_ARRAY(0,4,comparisons);
     [numthreads(1,1,1)] void Main(uint3 id:SV_DispatchThreadID) {
       float reference = .25 * (id.x + 1);
       results[id.x] = float4(depth.SampleCmpLevelZero(comparison,float2(.5,.5),reference),
-                             depth.SampleLevel(ordinary,float2(.5,.5),0), 0, 1);
+                             depth.SampleLevel(ordinary,float2(.5,.5),0),
+                             depth.SampleCmpLevelZero(comparisons[0],float2(.5,.5),.75),
+                             depth.SampleCmpLevelZero(comparisons[1],float2(.5,.5),.25));
     }
   )",
                                                            "Main", SHADER_STAGE_COMPUTE);
@@ -99,7 +102,8 @@ TEST_P(RhiPCF, ComparisonOperatorsUseReferenceAgainstDepth) {
   BindingLayoutDesc layout{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
                             {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_COMPUTE},
                             {2, BINDING_SAMPLER, 1, SHADER_VISIBILITY_COMPUTE},
-                            {3, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 16}}};
+                            {3, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 16},
+                            {4, BINDING_SAMPLER, 2, SHADER_VISIBILITY_COMPUTE}}};
   ObjPtr<IComputeProgram> program = device_->CreateComputeProgram({shader.Get(), {{layout}}});
   ObjPtr<IBindingGroup> group = device_->CreateBindingGroup(layout);
   ObjPtr<ISampler> ordinary = device_->CreateSampler({SAMPLER_FILTER_NEAREST});
@@ -119,6 +123,7 @@ TEST_P(RhiPCF, ComparisonOperatorsUseReferenceAgainstDepth) {
     ObjPtr<ISampler> sampler = device_->CreateSampler(desc);
     ASSERT_TRUE(sampler);
     ASSERT_TRUE(group->BindResource(1, sampler.Get()));
+    ASSERT_TRUE(group->BindResource(4, std::vector<ISampler *>{sampler.Get(), sampler.Get()}));
     ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     ASSERT_TRUE(commands);
     RenderingInfo clear;
@@ -139,6 +144,8 @@ TEST_P(RhiPCF, ComparisonOperatorsUseReferenceAgainstDepth) {
     for (int i = 0; i < 3; ++i) {
       EXPECT_FLOAT_EQ(values[i][0], expected[op][i]) << "op " << op << ", reference index " << i;
       EXPECT_FLOAT_EQ(values[i][1], .5f);
+      EXPECT_FLOAT_EQ(values[i][2], expected[op][2]);
+      EXPECT_FLOAT_EQ(values[i][3], expected[op][0]);
     }
   }
 }
