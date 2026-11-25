@@ -23,6 +23,21 @@
 
 namespace grassland::rhi::backend {
 namespace {
+char ShaderRegisterPrefix(BindingType type) {
+  switch (type) {
+    case BINDING_UNIFORM_BUFFER:
+      return 'b';
+    case BINDING_SAMPLER:
+      return 's';
+    case BINDING_RW_STRUCTURED_BUFFER:
+    case BINDING_RW_BYTE_ADDRESS_BUFFER:
+    case BINDING_RW_TEXTURE2D:
+      return 'u';
+    default:
+      return 't';
+  }
+}
+
 std::vector<std::pair<std::string, std::string>> PlatformDefines() {
   const auto target = GetShaderCacheSettings().target_platform;
   return {{"RHI_PLATFORM_WINDOWS", target == ShaderTargetPlatform::Windows ? "1" : "0"},
@@ -342,12 +357,7 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
           header += "[[vk::binding(" + std::to_string(b.binding) + "," + std::to_string(mapped.group) + ")]] ";
         header += std::string(macro.shader_type) + " N" + (array ? "[" + std::to_string(b.count) + "]" : "");
         if (api != BACKEND_API_VULKAN) {
-          const char reg = b.type == BINDING_UNIFORM_BUFFER ? 'b'
-                           : b.type == BINDING_SAMPLER      ? 's'
-                           : (b.type == BINDING_RW_STRUCTURED_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
-                              b.type == BINDING_RW_TEXTURE2D)
-                               ? 'u'
-                               : 't';
+          const char reg = ShaderRegisterPrefix(b.type);
           header += " : register(" + std::string(1, reg) + std::to_string(mapped.shader_register) + ", space" +
                     std::to_string(api == BACKEND_API_METAL ? 0 : mapped.group) + ")";
         }
