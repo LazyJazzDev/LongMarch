@@ -41,7 +41,6 @@ int RunPCF(grassland::rhi::IDevice *device) {
           draw->AddText(
               {18, 44}, IM_COL32(170, 185, 205, 255),
               "Same light, geometry, 512 x 512 depth map and bias | Space: shadow visibility | Escape: close");
-          draw->AddLine({size.x / 2, 72}, {size.x / 2, size.y}, IM_COL32(110, 125, 145, 255), 2);
         }))
       return 1;
     if (window->IsSwapChainInvalid() && !window->RebuildSwapChain())
