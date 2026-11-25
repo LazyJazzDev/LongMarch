@@ -35,11 +35,12 @@ struct SamplerDesc {
               SamplerAddressMode address_v = SAMPLER_ADDRESS_REPEAT,
               SamplerAddressMode address_w = SAMPLER_ADDRESS_REPEAT);
 
-  SamplerAddressMode address_u{SAMPLER_ADDRESS_REPEAT}, address_v{SAMPLER_ADDRESS_REPEAT};
+  SamplerAddressMode address_u{SAMPLER_ADDRESS_REPEAT};
+  SamplerAddressMode address_v{SAMPLER_ADDRESS_REPEAT};
+  SamplerAddressMode address_w{SAMPLER_ADDRESS_REPEAT};
   SamplerFilter min_filter{SAMPLER_FILTER_LINEAR};
   SamplerFilter mag_filter{SAMPLER_FILTER_LINEAR};
   SamplerFilter mip_filter{SAMPLER_FILTER_LINEAR};
-  SamplerAddressMode address_w{SAMPLER_ADDRESS_REPEAT};
   // Used by CLAMP_TO_BORDER addressing: (0,0,0,0), (0,0,0,1), or (1,1,1,1).
   SamplerBorderColor border_color{SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK};
   // Comparison samplers are used with RHI_COMPARISON_SAMPLER and SampleCmp*.
