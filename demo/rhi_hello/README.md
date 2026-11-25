@@ -56,7 +56,7 @@ ObjPtr<IImage> texture = device->CreateImage({1024, 512, IMAGE_FORMAT_R8G8B8A8_U
 // 以下调用均应检查返回值。
 commands->CmdUploadImage(texture.Get(), pixels, row_pitch);           // 第 0 级
 commands->CmdUploadImage(texture.Get(), level2, level2_pitch, 2);     // 单级
-commands->CmdUploadImage(texture.Get(), {{level0, pitch0, 0}, {level1, pitch1, 1}});
+// 多级上传由调用方循环调用单级接口，或自行封装辅助函数。
 commands->CmdGenerateMipmaps(texture.Get());                          // 从第 0 级生成后续全部级别
 commands->CmdGenerateMipmaps(texture.Get(), 2, 3);                    // 读取第 2 级，生成第 3、4 级
 ObjPtr<IDownloadToken> result = commands->CmdDownloadImage(texture.Get(), {0, 0, 0, 0, 3});

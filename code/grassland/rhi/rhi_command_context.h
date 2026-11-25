@@ -24,12 +24,6 @@ class IComputeProgram;
 class IBindingGroup;
 class IImage;
 
-struct ImageUploadInfo {
-  const void *data{};
-  uint64_t row_pitch{};
-  uint32_t mip_level{};
-};
-
 struct ColorAttachmentInfo {
   IImage *color_attachment{};
   AttachmentLoadOp load_op{ATTACHMENT_LOAD_OP_LOAD};
@@ -110,9 +104,6 @@ class ICommandContext : public IObject {
                              uint64_t size) = 0;
   virtual bool CmdBindGroup(uint32_t index, IBindingGroup *group) = 0;
   virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) = 0;
-  // All descriptions are validated before recording the batch. CPU rows are
-  // copied during this call, just as for the single-level upload.
-  bool CmdUploadImage(IImage *image, const std::vector<ImageUploadInfo> &levels);
   // Generate levels after base_mip by linear downsampling on the GPU. mip_count
   // includes the source level; zero selects the remainder. The source must be
   // initialized. Requires mip_compute_generation for the format and no rendering scope.

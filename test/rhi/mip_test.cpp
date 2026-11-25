@@ -349,7 +349,7 @@ TEST_P(RhiMip, CreationResolvesChainsAndRejectsInvalidLevels) {
   EXPECT_FALSE(device->CreateImage({1, 1, static_cast<ImageFormat>(-1), 1}));
 }
 
-TEST_P(RhiMip, PaddedBatchUploadsSnapshotEveryLevelAndSingleUpdatesAreIsolated) {
+TEST_P(RhiMip, PaddedMipUploadsSnapshotEveryLevelAndSingleUpdatesAreIsolated) {
   ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -363,7 +363,6 @@ TEST_P(RhiMip, PaddedBatchUploadsSnapshotEveryLevelAndSingleUpdatesAreIsolated) 
     ASSERT_TRUE(image);
     const auto levels = image->GetDesc().mip_levels;
     std::vector<std::vector<uint8_t>> padded(levels), expected(levels);
-    std::vector<ImageUploadInfo> uploads;
     for (uint32_t mip = 0; mip < levels; ++mip) {
       ImageDesc level;
       ASSERT_TRUE(ImageMipDesc(image->GetDesc(), mip, level));
@@ -376,11 +375,20 @@ TEST_P(RhiMip, PaddedBatchUploadsSnapshotEveryLevelAndSingleUpdatesAreIsolated) 
           padded[mip][y * (row + 12) + x] = value;
           expected[mip][y * row + x] = value;
         }
-      uploads.push_back({padded[mip].data(), row + 12, mip});
     }
     ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     ASSERT_TRUE(commands);
-    ASSERT_TRUE(commands->CmdUploadImage(image.Get(), uploads));
+    // Batch policy belongs to the caller; the RHI only records single-level uploads.
+    const auto upload_levels = [&] {
+      for (uint32_t mip = 0; mip < levels; ++mip) {
+        ImageDesc level;
+        if (!ImageMipDesc(image->GetDesc(), mip, level) ||
+            !commands->CmdUploadImage(image.Get(), padded[mip].data(), level.width * 4 + 12, mip))
+          return false;
+      }
+      return true;
+    };
+    ASSERT_TRUE(upload_levels());
     for (auto &bytes : padded)
       std::fill(bytes.begin(), bytes.end(), 0);
     std::vector<ObjPtr<IDownloadToken>> downloads;
@@ -431,7 +439,7 @@ TEST_P(RhiMip, PaddedBatchUploadsSnapshotEveryLevelAndSingleUpdatesAreIsolated) 
   }
 }
 
-TEST_P(RhiMip, InvalidBatchIsRejectedBeforeAnyUpload) {
+TEST_P(RhiMip, InvalidMipTransfersInvalidateRecording) {
   ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -442,23 +450,14 @@ TEST_P(RhiMip, InvalidBatchIsRejectedBeforeAnyUpload) {
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
-  std::vector<uint8_t> before(64, 12), after(64, 33);
-  ASSERT_TRUE(commands->CmdUploadImage(image.Get(), before.data(), 16));
-  EXPECT_FALSE(commands->CmdUploadImage(image.Get(), {{after.data(), 16, 0}, {after.data(), 4, 3}}));
-  EXPECT_FALSE(commands->CmdUploadImage(image.Get(), std::vector<ImageUploadInfo>{}));
-  EXPECT_FALSE(commands->CmdUploadImage(image.Get(), {{after.data(), 7, 1}}));
-  ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(image.Get());
-  ASSERT_TRUE(download);
-  ObjPtr<ISubmissionToken> done = commands->Submit();
-  ASSERT_TRUE(done && done->WaitHost());
-  std::vector<uint8_t> actual(64);
-  ASSERT_TRUE(download->CopyTo(actual.data(), actual.size()));
-  EXPECT_EQ(actual, before);
-  commands = queue->CreateCommandContext();
+  std::vector<uint8_t> before(64, 12);
   EXPECT_FALSE(commands->CmdUploadImage(image.Get(), before.data(), 16, 3));
   EXPECT_FALSE(commands->Submit());
   commands = queue->CreateCommandContext();
   EXPECT_FALSE(commands->CmdDownloadImage(image.Get(), {0, 0, 0, 0, 3}));
+  EXPECT_FALSE(commands->Submit());
+  commands = queue->CreateCommandContext();
+  EXPECT_FALSE(commands->CmdUploadImage(image.Get(), before.data(), 7, 1));
   EXPECT_FALSE(commands->Submit());
 }
 

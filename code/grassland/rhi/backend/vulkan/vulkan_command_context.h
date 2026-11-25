@@ -68,7 +68,6 @@ class VulkanCommandContextImpl final : public Object<rhi::ICommandContext, IVulk
                      uint64_t destination_offset,
                      uint64_t size) override;
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
-  using ICommandContext::CmdUploadImage;
   bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) override;
   bool CmdGenerateMipmaps(IImage *image, uint32_t base_mip = 0, uint32_t mip_count = 0) override;
   bool CmdBindComputeProgram(IComputeProgram *program) override;

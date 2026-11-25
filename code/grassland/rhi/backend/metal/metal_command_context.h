@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 #include <unordered_map>
 
@@ -67,7 +67,6 @@ class MetalCommandContextImpl final : public Object<rhi::ICommandContext, IMetal
   bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
-  using ICommandContext::CmdUploadImage;
   bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) override;
   bool CmdBeginRendering(const RenderingInfo &info) override;
   bool CmdEndRendering() override;
