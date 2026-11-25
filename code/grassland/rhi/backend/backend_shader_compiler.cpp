@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <unordered_set>
 
 #include "grassland/rhi/backend/backend_shader_cache.h"
 #ifdef __APPLE__
@@ -23,6 +24,43 @@
 
 namespace grassland::rhi::backend {
 namespace {
+#ifndef LONGMARCH_OFFLINE_SHADERS
+bool ValidateVulkanIntegerSampling(ISlangBlob *blob) {
+  // Inspect SPIR-V types rather than source spelling, so aliases, arrays and
+  // helper functions follow the same rule. Load/storage accesses do not create
+  // an OpSampledImage and remain supported. These are core SPIR-V opcodes.
+  constexpr uint16_t op_type_int = 21, op_type_image = 25, op_type_sampled_image = 27, op_sampled_image = 86;
+  if (blob->getBufferSize() % sizeof(uint32_t))
+    return false;
+  std::vector<uint32_t> words(blob->getBufferSize() / sizeof(uint32_t));
+  std::memcpy(words.data(), blob->getBufferPointer(), blob->getBufferSize());
+  if (words.size() < 5 || words[0] != 0x07230203)
+    return false;
+  std::unordered_set<uint32_t> integer_types, integer_images, integer_sampled_images;
+  for (size_t offset = 5; offset < words.size();) {
+    const uint32_t count = words[offset] >> 16;
+    const uint16_t op = static_cast<uint16_t>(words[offset]);
+    if (!count || count > words.size() - offset)
+      return false;
+    if (count >= 3) {
+      const auto result = words[offset + 1], operand = words[offset + 2];
+      if (op == op_type_int)
+        integer_types.insert(result);
+      else if (op == op_type_image && integer_types.count(operand))
+        integer_images.insert(result);
+      else if (op == op_type_sampled_image && integer_images.count(operand))
+        integer_sampled_images.insert(result);
+      else if (op == op_sampled_image && integer_sampled_images.count(result)) {
+        ReportError(-1, "Integer texture sampling is unsupported; use Load or storage image access instead.");
+        return false;
+      }
+    }
+    offset += count;
+  }
+  return true;
+}
+#endif
+
 char ShaderRegisterPrefix(BindingType type) {
   switch (type) {
     case BINDING_UNIFORM_BUFFER:
@@ -499,6 +537,8 @@ bool CompileSlang(const IShader *shader_object,
     report();
     return false;
   }
+  if (api == BACKEND_API_VULKAN && !ValidateVulkanIntegerSampling(blob.get()))
+    return false;
 
   Slang::ComPtr<slang::IMetadata> metadata;
   if (SLANG_FAILED(linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef()))) {

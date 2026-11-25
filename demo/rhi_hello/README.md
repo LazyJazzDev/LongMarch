@@ -75,6 +75,8 @@ GPU 生成采用逐级线性缩小，支持非二次幂尺寸；它不是离线�
 
 ## PCF 阴影示例
 
+Vulkan 当前不支持整数纹理的采样器访问（包括 `SampleLevel`、`Gather`）；在创建 Program 时拒绝这类 shader。整数纹理仍支持 `Load` 和存储读写，也可以与普通浮点纹理采样共存。Vulkan 的 BorderColor 用于浮点、归一化颜色和受支持的深度采样。D3D12 当前编译路径同样拒绝整数 `SampleLevel`，但其既有整数 `Gather` 路径不在本次限制范围内。
+
 ```sh
 demo_rhi_hello --backend d3d12 --module pcf --device auto
 demo_rhi_hello --backend vulkan --module pcf --device auto
