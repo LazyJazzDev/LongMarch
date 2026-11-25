@@ -71,6 +71,8 @@ struct ImageView {
 // Creation allocates the layout without populating resources. BindResource writes
 // slots and retains resources. CmdBindGroup captures the current version; later
 // writes never change recorded commands. CPU access to a group is externally synchronized.
+// BindResource calls using the same image must also be serialized across groups,
+// because obtaining a binding view may update the image's view cache.
 class IBindingGroup : public IObject {
  public:
   virtual const BindingLayoutDesc &GetLayout() const = 0;

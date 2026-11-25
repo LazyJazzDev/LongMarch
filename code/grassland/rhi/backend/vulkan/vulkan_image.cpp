@@ -55,7 +55,6 @@ VkImageView VulkanImageViews::Binding(uint32_t base_mip, uint32_t mip_count) con
     return binding_;
   if (!base_mip && mip_count == 1 && !(ImageAspect(format_) & VK_IMAGE_ASPECT_STENCIL_BIT))
     return attachment_;
-  std::lock_guard<std::mutex> lock(mutex_);
   const auto key = std::make_pair(base_mip, mip_count);
   if (auto found = binding_views_.find(key); found != binding_views_.end())
     return found->second;

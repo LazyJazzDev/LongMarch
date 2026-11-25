@@ -1,6 +1,5 @@
 #pragma once
 #include <map>
-#include <mutex>
 
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
@@ -16,6 +15,7 @@ class VulkanImageViews final {
   VulkanImageViews &operator=(const VulkanImageViews &) = delete;
   void Reset();
   VkImageView Attachment() const;
+  // Callers serialize binding view access for the same image, including across groups.
   VkImageView Binding(uint32_t base_mip = 0, uint32_t mip_count = 0) const;
 
  private:
@@ -24,7 +24,6 @@ class VulkanImageViews final {
   ImageFormat format_{};
   uint32_t mip_levels_{};
   // Shared by binding groups; entries live until the owning image is destroyed.
-  mutable std::mutex mutex_;
   mutable std::map<std::pair<uint32_t, uint32_t>, VkImageView> binding_views_;
   VkImageView attachment_{}, binding_{};
 };
