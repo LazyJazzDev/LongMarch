@@ -2,12 +2,12 @@
 
 namespace grassland::rhi {
 SamplerDesc::SamplerDesc(SamplerFilter value, SamplerAddressMode u, SamplerAddressMode v)
-    : address_u(u),
-      address_v(v),
-      address_w(v),
-      min_filter(value),
+    : min_filter(value),
       mag_filter(value),
-      mip_filter(value) {
+      mip_filter(value),
+      address_u(u),
+      address_v(v),
+      address_w(v) {
 }
 
 SamplerDesc::SamplerDesc(SamplerFilter min,
@@ -16,12 +16,12 @@ SamplerDesc::SamplerDesc(SamplerFilter min,
                          SamplerAddressMode u,
                          SamplerAddressMode v,
                          SamplerAddressMode w)
-    : address_u(u),
-      address_v(v),
-      address_w(w),
-      min_filter(min),
+    : min_filter(min),
       mag_filter(mag),
-      mip_filter(mip) {
+      mip_filter(mip),
+      address_u(u),
+      address_v(v),
+      address_w(w) {
 }
 
 SamplerFilter SamplerDesc::MinFilter() const {
