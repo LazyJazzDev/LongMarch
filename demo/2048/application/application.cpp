@@ -1,4 +1,4 @@
-﻿#include "application.h"
+#include "application.h"
 
 #include <algorithm>
 #include <map>
@@ -241,9 +241,9 @@ bool Application::OnRender() {
   if (!UploadBuffer(resolve_uniform_buffer_, &params, sizeof(params)))
     return false;
   auto *second_image = use_second_frame ? second_frame_.color_image.Get() : main_frame_.color_image.Get();
-  if (!Check(resolve_group_->BindResource(0, resolve_uniform_buffer_.Get()) &&
-                 resolve_group_->BindResource(1, main_frame_.color_image.Get()) &&
-                 resolve_group_->BindResource(2, second_image),
+  if (!Check(resolve_group_.BindResource(0, resolve_uniform_buffer_.Get()) &&
+                 resolve_group_.BindResource(1, main_frame_.color_image.Get()) &&
+                 resolve_group_.BindResource(2, second_image),
              "Bind resolve resources"))
     return false;
   rhi::RenderingInfo rendering;
@@ -282,8 +282,8 @@ bool Application::RenderFrameTarget(rhi::ICommandContext *context, FrameTarget &
   }
 
   const auto extent = target.color_image->GetDesc();
-  if (!Check(draw_group_->BindResource(0, target.instance_buffer.Get()) &&
-                 draw_group_->BindResource(1, global_uniform_buffer_.Get()),
+  if (!Check(draw_group_.BindResource(0, target.instance_buffer.Get()) &&
+                 draw_group_.BindResource(1, global_uniform_buffer_.Get()),
              "Bind scene resources"))
     return false;
   rhi::RenderingInfo rendering;

@@ -56,8 +56,8 @@ int RunHDR(grassland::rhi::IDevice *device) {
   std::map<std::pair<ImageFormat, ColorSpace>, ObjPtr<IProgram>> programs;
   const BindingLayoutDesc settings_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}};
   ObjPtr<IBuffer> settings_buffer = device->CreateBuffer({256});
-  ObjPtr<IBindingGroup> settings_group = device->CreateBindingGroup(settings_layout);
-  if (!settings_buffer || !settings_group || !settings_group->BindResource(0, settings_buffer.Get()))
+  BindingGroup settings_group = device->CreateBindingGroup(settings_layout);
+  if (!settings_buffer || !settings_group || !settings_group.BindResource(0, settings_buffer.Get()))
     return 1;
   float previous_scale = -1.0f;
   float previous_headroom = -1.0f;

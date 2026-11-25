@@ -118,10 +118,10 @@ bool ImagePresenter::Record(ICommandContext *commands,
   if (!sampler_)
     sampler_ =
         device_->CreateSampler({SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_CLAMP_TO_EDGE});
-  ObjPtr<IBindingGroup> group = device_->CreateBindingGroup(program->GetDesc().pipeline_layout.groups[0]);
+  BindingGroup group = device_->CreateBindingGroup(program->GetDesc().pipeline_layout.groups[0]);
   const float settings[] = {white_scale, 0, 0, 0};
-  return settings_ && sampler_ && group && group->BindResource(0, settings_.Get()) && group->BindResource(1, source) &&
-         group->BindResource(2, sampler_.Get()) &&
+  return settings_ && sampler_ && group && group.BindResource(0, settings_.Get()) && group.BindResource(1, source) &&
+         group.BindResource(2, sampler_.Get()) &&
          commands->CmdUploadBuffer(settings_.Get(), 0, settings, sizeof(settings)) &&
          commands->CmdBindProgram(program.Get()) && commands->CmdBindGroup(0, group.Get()) &&
          commands->CmdBeginRendering({{{target, ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE}}}) &&

@@ -28,7 +28,7 @@ glm::vec3 MaterialLight::Emission() const {
 }
 
 bool MaterialLight::BindMaterialResources(rhi::IBindingGroup *group) {
-  return group && group->BindResource(2, material_buffer_.Get());
+  return group && group->BindResource(2, std::vector<rhi::BufferView>{{material_buffer_.Get()}});
 }
 
 }  // namespace sparkium::raster

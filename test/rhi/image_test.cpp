@@ -377,9 +377,9 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
     if (IsDepthFormat(format))
       EXPECT_FALSE(supported);
     BindingLayoutDesc layout{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}};
-    ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+    BindingGroup group = device->CreateBindingGroup(layout);
     ASSERT_TRUE(group);
-    EXPECT_EQ(group->BindResource(0, image.Get()), supported);
+    EXPECT_EQ(group.BindResource(0, image.Get()), supported);
   }
 }
 
@@ -1108,9 +1108,9 @@ float4 PSMain():SV_Target0 {
   desc.pipeline_layout.groups = {{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
-  ASSERT_TRUE(group->BindResource(0, tlas.Get()));
+  ASSERT_TRUE(group.BindResource(0, tlas.Get()));
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -1171,11 +1171,11 @@ TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
   ASSERT_TRUE(commands->CmdBindVertexBuffer(0, vertex.Get()));
   for (uint32_t i = 0; i < 8; ++i) {
     ObjPtr<IBuffer> color = device->CreateBuffer({16});
-    ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[i]);
+    BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[i]);
     ASSERT_TRUE(color && group);
     const float value[] = {0.125f, 0, 0.125f, 0.125f};
     ASSERT_TRUE(commands->CmdUploadBuffer(color.Get(), 0, value, sizeof(value)));
-    ASSERT_TRUE(group->BindResource(0, color.Get()));
+    ASSERT_TRUE(group.BindResource(0, color.Get()));
     ASSERT_TRUE(commands->CmdBindGroup(i, group.Get()));
   }
   ASSERT_TRUE(commands->CmdBeginRendering(
@@ -1353,20 +1353,20 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
                                  {{{1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ObjPtr<IBindingGroup> selection = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
-  ObjPtr<IBindingGroup> material = device->CreateBindingGroup(desc.pipeline_layout.groups[1]);
-  ObjPtr<IBindingGroup> sampling = device->CreateBindingGroup(desc.pipeline_layout.groups[2]);
+  BindingGroup selection = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  BindingGroup material = device->CreateBindingGroup(desc.pipeline_layout.groups[1]);
+  BindingGroup sampling = device->CreateBindingGroup(desc.pipeline_layout.groups[2]);
   ASSERT_TRUE(sampling);
   ASSERT_TRUE(selection);
   ASSERT_TRUE(material);
-  ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{red.Get(), green.Get()}));
-  ASSERT_TRUE(material->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
-  ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 16, 16}}));
+  ASSERT_TRUE(material.BindResource(7, std::vector<IImage *>{red.Get(), green.Get()}));
+  ASSERT_TRUE(material.BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
+  ASSERT_TRUE(material.BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 16, 16}}));
   // Fork only the buffer binding, then destroy the source version. Copied image
   // and sampler descriptors must keep their native handles valid for GPU use.
   WithNativeBindingGroup(material.Get(), [&](auto *native) {
     auto original = RetainBindingVersion(native->CurrentVersion());
-    ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}}, 0));
+    ASSERT_TRUE(material.BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}}, 0));
     EXPECT_NE(native->CurrentVersion(), original.Get());
     original.Reset();
   });
@@ -1382,10 +1382,10 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(1, material.Get()));
   // Changes after binding must not affect this context, including render-pass restarts.
-  ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{green.Get(), red.Get()}));
+  ASSERT_TRUE(material.BindResource(7, std::vector<IImage *>{green.Get(), red.Get()}));
   ASSERT_TRUE(
-      material->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{SAMPLER_FILTER_NEAREST})).Get()));
-  ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 0, 16}}));
+      material.BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{SAMPLER_FILTER_NEAREST})).Get()));
+  ASSERT_TRUE(material.BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 0, 16}}));
   ASSERT_TRUE(commands->CmdBeginRendering(
       {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
   ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
@@ -1395,14 +1395,14 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   for (int i = 0; i < draws; ++i) {
     if (i < 300) {
       SamplerDesc sampler{i % 2 ? SAMPLER_FILTER_LINEAR : SAMPLER_FILTER_NEAREST};
-      ASSERT_TRUE(sampling->BindResource(1, ObjPtr<ISampler>(device->CreateSampler(sampler)).Get()));
+      ASSERT_TRUE(sampling.BindResource(1, ObjPtr<ISampler>(device->CreateSampler(sampler)).Get()));
       ASSERT_TRUE(commands->CmdBindGroup(2, sampling.Get()));
     }
-    ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), uint64_t(i % 2 ? 256 : 0), 256}));
+    ASSERT_TRUE(selection.BindResource(3, BufferView{uniform.Get(), uint64_t(i % 2 ? 256 : 0), 256}));
     ASSERT_TRUE(commands->CmdBindGroup(0, selection.Get()));
     // D3D12 builds tables at Draw, but must use the version captured at BindGroup.
     if (i != draws - 1)
-      ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), uint64_t(i % 2 ? 0 : 256), 256}));
+      ASSERT_TRUE(selection.BindResource(3, BufferView{uniform.Get(), uint64_t(i % 2 ? 0 : 256), 256}));
     ASSERT_TRUE(commands->CmdSetScissor({i % 2 ? 32 : 0, 0, 32, 64}));
     ASSERT_TRUE(commands->CmdDraw(3));
   }
@@ -1502,7 +1502,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ObjPtr<ISubmissionToken> done = commands->Submit();
   ASSERT_TRUE(done);
   EXPECT_EQ(done->GetStatus(), SUBMISSION_STATUS_PENDING);
-  ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), 0, 256}));
+  ASSERT_TRUE(selection.BindResource(3, BufferView{uniform.Get(), 0, 256}));
   selection.Release();
   uniform.Release();
   commands.Release();
@@ -1571,13 +1571,13 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
   std::array<uint8_t, 256> data{};
   const float value[] = {1, 0, 0, 1, 1};
   std::memcpy(data.data() + stride, value, sizeof(value));
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
-  ASSERT_TRUE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2}));
-  EXPECT_FALSE(group->BindResource(1, BufferView{buffer.Get(), 0, 3}));
-  ASSERT_TRUE(group->BindResource(1, buffer.Get()));
-  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
-  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2 - 1}));
+  ASSERT_TRUE(group.BindResource(0, BufferView{buffer.Get(), 0, stride * 2}));
+  EXPECT_FALSE(group.BindResource(1, BufferView{buffer.Get(), 0, 3}));
+  ASSERT_TRUE(group.BindResource(1, buffer.Get()));
+  EXPECT_FALSE(group.BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
+  EXPECT_FALSE(group.BindResource(0, BufferView{buffer.Get(), 0, stride * 2 - 1}));
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, data.data(), data.size()));
@@ -1647,13 +1647,13 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
   data[1].scale = 1;
   data[1].samples[1] = {{1, 0, 0}, 1};
   data[1].tail[2] = 1;
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
-  ASSERT_TRUE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2}));
-  EXPECT_FALSE(group->BindResource(1, BufferView{buffer.Get(), 0, 3}));
-  ASSERT_TRUE(group->BindResource(1, buffer.Get()));
-  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
-  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2 - 1}));
+  ASSERT_TRUE(group.BindResource(0, BufferView{buffer.Get(), 0, stride * 2}));
+  EXPECT_FALSE(group.BindResource(1, BufferView{buffer.Get(), 0, 3}));
+  ASSERT_TRUE(group.BindResource(1, buffer.Get()));
+  EXPECT_FALSE(group.BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
+  EXPECT_FALSE(group.BindResource(0, BufferView{buffer.Get(), 0, stride * 2 - 1}));
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, data.data(), sizeof(data)));
@@ -1722,13 +1722,13 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   desc.pipeline_layout.groups = {read_layout};
   ObjPtr<IProgram> reader = device->CreateProgram(desc);
   ASSERT_TRUE(writer && reader);
-  ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout);
-  ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout);
+  BindingGroup wg = device->CreateBindingGroup(write_layout);
+  BindingGroup rg = device->CreateBindingGroup(read_layout);
   ASSERT_TRUE(wg);
   ASSERT_TRUE(rg);
-  for (auto group : {wg.Get(), rg.Get()}) {
-    ASSERT_TRUE(group->BindResource(0, storage.Get()));
-    ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get()}));
+  for (const auto &group : {wg, rg}) {
+    ASSERT_TRUE(group.BindResource(0, storage.Get()));
+    ASSERT_TRUE(group.BindResource(1, BufferView{buffer.Get()}));
   }
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   for (auto program : {writer.Get(), reader.Get()}) {
@@ -1799,13 +1799,13 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
   desc.pipeline_layout.groups = {read_layout};
   ObjPtr<IProgram> reader = device->CreateProgram(desc);
   ASSERT_TRUE(writer && reader);
-  ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout);
-  ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout);
+  BindingGroup wg = device->CreateBindingGroup(write_layout);
+  BindingGroup rg = device->CreateBindingGroup(read_layout);
   ASSERT_TRUE(wg);
   ASSERT_TRUE(rg);
-  for (auto group : {wg.Get(), rg.Get()}) {
-    ASSERT_TRUE(group->BindResource(0, storage.Get()));
-    ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get()}));
+  for (const auto &group : {wg, rg}) {
+    ASSERT_TRUE(group.BindResource(0, storage.Get()));
+    ASSERT_TRUE(group.BindResource(1, BufferView{buffer.Get()}));
   }
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   for (auto program : {writer.Get(), reader.Get()}) {
@@ -1859,10 +1859,10 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
       {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {3, BINDING_SAMPLER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
-  ASSERT_TRUE(group->BindResource(0, texture.Get()));
-  ASSERT_TRUE(group->BindResource(3, std::vector<ISampler *>{linear.Get(), nearest.Get()}));
+  ASSERT_TRUE(group.BindResource(0, texture.Get()));
+  ASSERT_TRUE(group.BindResource(3, std::vector<ISampler *>{linear.Get(), nearest.Get()}));
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   const std::array<uint8_t, 8> pixels{255, 0, 0, 255, 0, 0, 255, 255};
@@ -1870,7 +1870,7 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
   // The first draw must still use nearest; the second captures the partial update.
-  ASSERT_TRUE(group->BindResource(3, std::vector<ISampler *>{linear.Get()}, 1));
+  ASSERT_TRUE(group.BindResource(3, std::vector<ISampler *>{linear.Get()}, 1));
   nearest.Release();
   linear.Release();
   ASSERT_TRUE(commands->CmdBeginRendering(
@@ -1934,11 +1934,11 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
                                    {9, BINDING_BYTE_ADDRESS_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
-  ASSERT_TRUE(group->BindResource(7, std::vector<BufferView>{{buffer.Get(), 0, 256}, {buffer.Get(), 256, 256}}));
-  ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 512, 16}, {buffer.Get(), 528, 32}}));
-  ASSERT_TRUE(group->BindResource(9, std::vector<BufferView>{{buffer.Get(), 768, 4}, {buffer.Get(), 784, 8}}));
+  ASSERT_TRUE(group.BindResource(7, std::vector<BufferView>{{buffer.Get(), 0, 256}, {buffer.Get(), 256, 256}}));
+  ASSERT_TRUE(group.BindResource(2, std::vector<BufferView>{{buffer.Get(), 512, 16}, {buffer.Get(), 528, 32}}));
+  ASSERT_TRUE(group.BindResource(9, std::vector<BufferView>{{buffer.Get(), 768, 4}, {buffer.Get(), 784, 8}}));
   std::array<float, 256> data{};
   data[64] = data[67] = 1;
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
@@ -1947,9 +1947,9 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
   // Both the size table and uniform array must remain those captured at BindGroup.
-  ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 512, 32}, {buffer.Get(), 528, 16}}));
-  ASSERT_TRUE(group->BindResource(9, std::vector<BufferView>{{buffer.Get(), 768, 8}, {buffer.Get(), 784, 4}}));
-  ASSERT_TRUE(group->BindResource(7, std::vector<BufferView>{{buffer.Get(), 256, 256}, {buffer.Get(), 0, 256}}));
+  ASSERT_TRUE(group.BindResource(2, std::vector<BufferView>{{buffer.Get(), 512, 32}, {buffer.Get(), 528, 16}}));
+  ASSERT_TRUE(group.BindResource(9, std::vector<BufferView>{{buffer.Get(), 768, 8}, {buffer.Get(), 784, 4}}));
+  ASSERT_TRUE(group.BindResource(7, std::vector<BufferView>{{buffer.Get(), 256, 256}, {buffer.Get(), 0, 256}}));
   group.Release();
   ASSERT_TRUE(commands->CmdBeginRendering(
       {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
@@ -2181,15 +2181,15 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   gd.pipeline_layout.groups = {{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> graphics = device->CreateProgram(gd);
   ASSERT_TRUE(graphics);
-  ObjPtr<IBindingGroup> ca = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
+  BindingGroup ca = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
   ASSERT_TRUE(ca);
-  ObjPtr<IBindingGroup> cb = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
+  BindingGroup cb = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
   ASSERT_TRUE(cb);
-  ObjPtr<IBindingGroup> ga = device->CreateBindingGroup(gd.pipeline_layout.groups[0]);
+  BindingGroup ga = device->CreateBindingGroup(gd.pipeline_layout.groups[0]);
   ASSERT_TRUE(ga);
-  ASSERT_TRUE(ca->BindResource(0, a.Get()));
-  ASSERT_TRUE(cb->BindResource(0, b.Get()));
-  ASSERT_TRUE(ga->BindResource(0, a.Get()));
+  ASSERT_TRUE(ca.BindResource(0, a.Get()));
+  ASSERT_TRUE(cb.BindResource(0, b.Get()));
+  ASSERT_TRUE(ga.BindResource(0, a.Get()));
   ObjPtr<ICommandContext> ctx = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(ctx);
   ASSERT_TRUE(ctx->CmdClearImage(a.Get(), {0.0f, 0.0f, 0.0f, 1.0f}));

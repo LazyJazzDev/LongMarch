@@ -119,12 +119,12 @@ TEST_P(RhiRaw, ComputeQueueClearsAndDispatchesAcrossMainQueueDependencies) {
                                    {1, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
                                    {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}};
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(program);
   ASSERT_TRUE(group);
-  ASSERT_TRUE(group->BindResource(0, values.Get()));
-  ASSERT_TRUE(group->BindResource(1, source.Get()));
-  ASSERT_TRUE(group->BindResource(2, parameters.Get()));
+  ASSERT_TRUE(group.BindResource(0, values.Get()));
+  ASSERT_TRUE(group.BindResource(1, source.Get()));
+  ASSERT_TRUE(group.BindResource(2, parameters.Get()));
   ObjPtr<ISubmissionToken> previous;
   for (uint32_t round = 0; round < 2; ++round) {
     uint32_t initial[4] = {round, round + 1, round + 2, round + 3};

@@ -56,14 +56,13 @@ bool GenerateMipChain(ICommandContext *commands,
     if (!sampler)
       return false;
   }
-  auto group =
-      ObjectPtr<IBindingGroup>::Adopt(device->CreateBindingGroup(program->GetDesc().pipeline_layout.groups[0]));
-  if (!group || !group->BindResource(2, sampler.Get()) || !commands->CmdBindComputeProgram(program.Get()))
+  auto group = BindingGroup(device->CreateBindingGroup(program->GetDesc().pipeline_layout.groups[0]));
+  if (!group || !group.BindResource(2, sampler.Get()) || !commands->CmdBindComputeProgram(program.Get()))
     return false;
   for (uint32_t mip = base_mip + 1; mip < base_mip + mip_count; ++mip) {
     ImageDesc level;
-    if (!ImageMipDesc(desc, mip, level) || !group->BindResource(0, ImageView{image, mip - 1, 1}) ||
-        !group->BindResource(1, ImageView{image, mip, 1}) || !commands->CmdBindGroup(0, group.Get()) ||
+    if (!ImageMipDesc(desc, mip, level) || !group.BindResource(0, ImageView{image, mip - 1, 1}) ||
+        !group.BindResource(1, ImageView{image, mip, 1}) || !commands->CmdBindGroup(0, group.Get()) ||
         !commands->CmdDispatch((level.width + 7) / 8, (level.height + 7) / 8, 1))
       return false;
   }

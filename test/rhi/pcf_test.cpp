@@ -101,12 +101,12 @@ TEST_P(RhiPCF, ComparisonOperatorsUseReferenceAgainstDepth) {
                             {2, BINDING_SAMPLER, 1, SHADER_VISIBILITY_COMPUTE},
                             {3, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 16}}};
   ObjPtr<IComputeProgram> program = device_->CreateComputeProgram({shader.Get(), {{layout}}});
-  ObjPtr<IBindingGroup> group = device_->CreateBindingGroup(layout);
+  BindingGroup group = device_->CreateBindingGroup(layout);
   ObjPtr<ISampler> ordinary = device_->CreateSampler({SAMPLER_FILTER_NEAREST});
   ASSERT_TRUE(program && group && ordinary);
-  ASSERT_TRUE(group->BindResource(0, depth.Get()));
-  ASSERT_TRUE(group->BindResource(2, ordinary.Get()));
-  ASSERT_TRUE(group->BindResource(3, output.Get()));
+  ASSERT_TRUE(group.BindResource(0, depth.Get()));
+  ASSERT_TRUE(group.BindResource(2, ordinary.Get()));
+  ASSERT_TRUE(group.BindResource(3, output.Get()));
   ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   SamplerDesc desc{SAMPLER_FILTER_NEAREST};
@@ -118,7 +118,7 @@ TEST_P(RhiPCF, ComparisonOperatorsUseReferenceAgainstDepth) {
     desc.compare_op = static_cast<CompareOp>(op);
     ObjPtr<ISampler> sampler = device_->CreateSampler(desc);
     ASSERT_TRUE(sampler);
-    ASSERT_TRUE(group->BindResource(1, sampler.Get()));
+    ASSERT_TRUE(group.BindResource(1, sampler.Get()));
     ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
     ASSERT_TRUE(commands);
     RenderingInfo clear;
@@ -167,13 +167,13 @@ TEST_P(RhiPCF, RejectsSamplingTheActiveDepthAttachment) {
   desc.pipeline_layout.groups = {
       {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device_->CreateProgram(desc);
-  ObjPtr<IBindingGroup> group = device_->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  BindingGroup group = device_->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   SamplerDesc sampling{SAMPLER_FILTER_NEAREST};
   sampling.compare_enable = true;
   ObjPtr<ISampler> sampler = device_->CreateSampler(sampling);
   ASSERT_TRUE(program && group && sampler);
-  ASSERT_TRUE(group->BindResource(0, depth.Get()));
-  ASSERT_TRUE(group->BindResource(1, sampler.Get()));
+  ASSERT_TRUE(group.BindResource(0, depth.Get()));
+  ASSERT_TRUE(group.BindResource(1, sampler.Get()));
   ObjPtr<IQueue> queue = device_->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
   ObjPtr<ICommandContext> commands = queue->CreateCommandContext();

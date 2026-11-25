@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <array>
 #include <glm/gtc/matrix_transform.hpp>
@@ -142,7 +142,7 @@ class Application {
   rhi::ObjPtr<rhi::ICommandContext> upload_context_;
   std::array<rhi::ObjPtr<rhi::ISubmissionToken>, 2> submissions_;
   size_t submission_index_{};
-  rhi::ObjPtr<rhi::IBindingGroup> draw_group_, resolve_group_;
+  rhi::BindingGroup draw_group_, resolve_group_;
 
   rhi::ObjPtr<rhi::IShader> vertex_shader_;
   rhi::ObjPtr<rhi::IShader> pixel_shader_;

@@ -517,11 +517,11 @@ TEST_P(RhiWindow, SwapchainImagesCannotBeBoundAsTextures) {
   ASSERT_TRUE(frame);
   ObjPtr<IImage> texture = device->CreateImage({4, 4, IMAGE_FORMAT_R8G8B8A8_UNORM});
   ASSERT_TRUE(texture);
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup({{{0, BINDING_TEXTURE2D, 2}}});
+  BindingGroup group = device->CreateBindingGroup({{{0, BINDING_TEXTURE2D, 2}}});
   ASSERT_TRUE(group);
-  EXPECT_FALSE(group->BindResource(0, std::vector<IImage *>{texture.Get(), frame.Get()}));
-  EXPECT_TRUE(group->BindResource(0, std::vector<IImage *>{texture.Get(), texture.Get()}));
-  EXPECT_FALSE(group->BindResource(0, frame.Get()));
+  EXPECT_FALSE(group.BindResource(0, std::vector<IImage *>{texture.Get(), frame.Get()}));
+  EXPECT_TRUE(group.BindResource(0, std::vector<IImage *>{texture.Get(), texture.Get()}));
+  EXPECT_FALSE(group.BindResource(0, frame.Get()));
 }
 
 TEST_P(RhiWindow, SwapchainRejectsAssistQueueDuringRecording) {

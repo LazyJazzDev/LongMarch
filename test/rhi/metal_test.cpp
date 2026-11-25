@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -86,17 +86,17 @@ TEST(RhiMetal, TierOneStorageBindingWritesSelectedMip) {
   ASSERT_TRUE(shader);
   BindingLayoutDesc layout{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}};
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), {{layout}}});
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+  BindingGroup group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(program && group);
   auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
   std::vector<uint8_t> zero(8 * 8 * 4, 0);
   ASSERT_TRUE(commands->CmdUploadImage(image.Get(), zero.data(), 32));
-  ASSERT_TRUE(group->BindResource(0, ImageView{image.Get(), 1, 1}));
+  ASSERT_TRUE(group.BindResource(0, ImageView{image.Get(), 1, 1}));
   ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
   // Recorded bindings must retain the view even after the group changes.
-  ASSERT_TRUE(group->BindResource(0, ImageView{image.Get(), 0, 1}));
+  ASSERT_TRUE(group.BindResource(0, ImageView{image.Get(), 0, 1}));
   ASSERT_TRUE(commands->CmdDispatch(1, 1, 1));
   ObjPtr<IDownloadToken> base = commands->CmdDownloadImage(image.Get(), {0, 0, 0, 0, 0});
   ObjPtr<IDownloadToken> mip = commands->CmdDownloadImage(image.Get(), {0, 0, 0, 0, 1});

@@ -87,7 +87,7 @@ void EntityGeometryMaterial::Update(Scene *scene) {
           return false;
         if (!cmd_ctx->CmdBindGroup(2, camera_bindings))
           return false;
-        if (!render_group_ || !render_group_->BindResource(1, instance_buffer_.Get()))
+        if (!render_group_ || !render_group_.BindResource(1, instance_buffer_.Get()))
           return false;
         if (!material_->BindMaterialResources(render_group_.Get()))
           return false;
@@ -110,7 +110,7 @@ void EntityGeometryMaterial::Update(Scene *scene) {
 
             if (!cmd_ctx->CmdBindGroup(2, camera->NearFieldBindings()))
               return false;
-            if (!point_light_group_ || !point_light_group_->BindResource(4, point_light_buffer_.Get()))
+            if (!point_light_group_ || !point_light_group_.BindResource(4, point_light_buffer_.Get()))
               return false;
             if (!cmd_ctx->CmdBindGroup(0, film->LightingBindings()))
               return false;

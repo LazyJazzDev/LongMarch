@@ -24,8 +24,8 @@ class Camera : public Object {
   Core *core_{};
   rhi::ObjPtr<rhi::IBuffer> near_field_buffer_;
   rhi::ObjPtr<rhi::IBuffer> far_field_buffer_;
-  rhi::ObjPtr<rhi::IBindingGroup> near_field_bindings_;
-  rhi::ObjPtr<rhi::IBindingGroup> far_field_bindings_;
+  rhi::BindingGroup near_field_bindings_;
+  rhi::BindingGroup far_field_bindings_;
   CameraData data_{};
 };
 

@@ -81,8 +81,8 @@ bool Scene::Initialize(IDevice *device, ImageFormat target_format) {
     for (uint32_t row = 0; row < 3; ++row) {
       const uint32_t index = row * 3 + col;
       groups_[index] = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
-      if (!groups_[index] || !groups_[index]->BindResource(0, BufferView{uniforms_.Get(), index * 256, 256}) ||
-          !groups_[index]->BindResource(1, texture_.Get()) || !groups_[index]->BindResource(2, samplers_[col].Get()))
+      if (!groups_[index] || !groups_[index].BindResource(0, BufferView{uniforms_.Get(), index * 256, 256}) ||
+          !groups_[index].BindResource(1, texture_.Get()) || !groups_[index].BindResource(2, samplers_[col].Get()))
         return false;
     }
   }

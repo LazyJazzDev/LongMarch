@@ -42,7 +42,7 @@ class Scene : public Object {
   rhi::ObjPtr<rhi::IShader> ambient_light_vs_;
   rhi::ObjPtr<rhi::IShader> ambient_light_ps_;
   std::shared_ptr<const rhi::ProgramDesc> ambient_light_description_;
-  rhi::ObjPtr<rhi::IBindingGroup> ambient_light_group_;
+  rhi::BindingGroup ambient_light_group_;
   rhi::ObjPtr<rhi::IBuffer> ambient_light_buffer_;
 };
 

@@ -101,8 +101,8 @@ int RunNBody(grassland::rhi::IDevice *device) {
   const BindingLayoutDesc output_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
                                          {1, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}};
   ObjPtr<IBuffer> output_uniform = device->CreateBuffer({256});
-  ObjPtr<IBindingGroup> output_group = device->CreateBindingGroup(output_layout);
-  if (!output_uniform || !output_group || !output_group->BindResource(0, output_uniform.Get()))
+  BindingGroup output_group = device->CreateBindingGroup(output_layout);
+  if (!output_uniform || !output_group || !output_group.BindResource(0, output_uniform.Get()))
     return 1;
   ObjPtr<IProgram> output_program;
   ObjPtr<IShader> compute_shader = device->CreateShaderFromSource(
@@ -151,21 +151,21 @@ int RunNBody(grassland::rhi::IDevice *device) {
   ObjPtr<IBuffer> camera_uniform = device->CreateBuffer({256});
   if (!camera_uniform)
     return 1;
-  ObjPtr<IBindingGroup> simulation_group = device->CreateBindingGroup(compute_desc.pipeline_layout.groups[0]);
+  BindingGroup simulation_group = device->CreateBindingGroup(compute_desc.pipeline_layout.groups[0]);
   if (!simulation_group)
     return 1;
-  if (!simulation_group->BindResource(0, positions.Get()))
+  if (!simulation_group.BindResource(0, positions.Get()))
     return 1;
-  if (!simulation_group->BindResource(1, velocities.Get()))
+  if (!simulation_group.BindResource(1, velocities.Get()))
     return 1;
-  if (!simulation_group->BindResource(2, next_positions.Get()))
+  if (!simulation_group.BindResource(2, next_positions.Get()))
     return 1;
-  if (!simulation_group->BindResource(3, simulation_uniform.Get()))
+  if (!simulation_group.BindResource(3, simulation_uniform.Get()))
     return 1;
-  ObjPtr<IBindingGroup> camera_group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  BindingGroup camera_group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   if (!camera_group)
     return 1;
-  if (!camera_group->BindResource(0, camera_uniform.Get()))
+  if (!camera_group.BindResource(0, camera_uniform.Get()))
     return 1;
   std::mt19937 random(42);
   auto reset_particles = [&](ICommandContext *upload) {
@@ -409,7 +409,7 @@ int RunNBody(grassland::rhi::IDevice *device) {
     auto extent = image->GetDesc();
     if (!radiance || radiance->GetDesc().width != extent.width || radiance->GetDesc().height != extent.height) {
       radiance = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_R32G32B32A32_SFLOAT});
-      if (!radiance || !output_group->BindResource(1, radiance.Get()))
+      if (!radiance || !output_group.BindResource(1, radiance.Get()))
         return 1;
     }
     if (!frame_image || frame_image->GetDesc().width != extent.width ||

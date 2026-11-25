@@ -19,7 +19,7 @@ class Film : public Object {
   sparkium::Film &film_;
   Core *core_;
 
-  rhi::ObjPtr<rhi::IBindingGroup> lighting_bindings_;
+  rhi::BindingGroup lighting_bindings_;
   rhi::ObjPtr<rhi::IImage> albedo_roughness_buffer_;
   rhi::ObjPtr<rhi::IImage> position_specular_buffer_;
   rhi::ObjPtr<rhi::IImage> normal_metallic_buffer_;

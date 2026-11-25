@@ -87,8 +87,8 @@ rhi::IBindingGroup *Renderer::RecordParameters(rhi::ICommandContext *commands, c
   if (!bindings_)
     bindings_ =
         core_->GetDevice()->CreateBindingGroup(RayTracingLayout(false, 1, 1, 1).groups[SPARKIUM_GROUP_RENDERER]);
-  if (!parameters_ || !bindings_ || !bindings_->BindResource(SPARKIUM_RENDERER_SETTINGS, parameters_.Get()) ||
-      !bindings_->BindResource(SPARKIUM_RENDERER_SOBOL, core_->GetBuffer("sobol")) ||
+  if (!parameters_ || !bindings_ || !bindings_.BindResource(SPARKIUM_RENDERER_SETTINGS, parameters_.Get()) ||
+      !bindings_.BindResource(SPARKIUM_RENDERER_SOBOL, core_->GetBuffer("sobol")) ||
       !commands->CmdUploadBuffer(parameters_.Get(), 0, &scene->settings.raytracing,
                                  sizeof(Scene::Settings::RayTracing)) ||
       !commands->CmdUploadBuffer(parameters_.Get(), sizeof(Scene::Settings::RayTracing), &film->info,

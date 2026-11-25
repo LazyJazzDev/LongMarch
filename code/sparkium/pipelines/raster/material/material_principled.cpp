@@ -58,7 +58,7 @@ void MaterialPrincipled::SetupProgram(rhi::ProgramDesc &program) {
 }
 
 bool MaterialPrincipled::BindMaterialResources(rhi::IBindingGroup *group) {
-  if (!group || !group->BindResource(2, material_buffer_.Get()))
+  if (!group || !group->BindResource(2, std::vector<rhi::BufferView>{{material_buffer_.Get()}}))
     return false;
   std::vector<rhi::IImage *> textures(6);
   textures[0] = material_.textures.base_color;
@@ -80,7 +80,8 @@ bool MaterialPrincipled::BindMaterialResources(rhi::IBindingGroup *group) {
   textures[5] = material_.textures.emission;
   if (!textures[5])
     textures[5] = core_->GetImage("white");
-  return group->BindResource(3, textures) && group->BindResource(4, sampler_.Get());
+  return rhi::BindingGroup::Retain(group).BindResource(3, textures) &&
+         group->BindResource(4, std::vector<rhi::ISampler *>{sampler_.Get()});
 }
 
 }  // namespace sparkium::raster

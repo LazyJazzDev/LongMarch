@@ -19,7 +19,7 @@ class Camera : public Object {
   std::string shader_file_;
   std::string entry_point_;
   rhi::ObjPtr<rhi::IShader> camera_shader_;
-  rhi::ObjPtr<rhi::IBindingGroup> bindings_;
+  rhi::BindingGroup bindings_;
 };
 
 Camera *DedicatedCast(sparkium::Camera *camera);

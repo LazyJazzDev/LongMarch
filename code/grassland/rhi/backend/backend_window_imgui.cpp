@@ -334,10 +334,10 @@ bool WindowImGui::Render(ICommandContext *commands,
         if (right <= x || bottom <= y || !draw.ElemCount)
           continue;
         auto texture = reinterpret_cast<IImage *>(static_cast<uintptr_t>(draw.GetTexID()));
-        ObjPtr<IBindingGroup> group = device_->CreateBindingGroup(program_->GetDesc().pipeline_layout.groups[0]);
+        BindingGroup group = device_->CreateBindingGroup(program_->GetDesc().pipeline_layout.groups[0]);
         success =
-            texture && group && group->BindResource(0, texture) && group->BindResource(1, sampler_.Get()) &&
-            (color_space == COLOR_SPACE_SRGB_NONLINEAR || group->BindResource(2, display_settings_.Get())) &&
+            texture && group && group.BindResource(0, texture) && group.BindResource(1, sampler_.Get()) &&
+            (color_space == COLOR_SPACE_SRGB_NONLINEAR || group.BindResource(2, display_settings_.Get())) &&
             commands->CmdBindGroup(0, group.Get()) &&
             commands->CmdSetScissor({x, y, uint32_t(right - x), uint32_t(bottom - y)}) &&
             commands->CmdDrawIndexed(draw.ElemCount, 1, index_offset + draw.IdxOffset, vertex_offset + draw.VtxOffset);
