@@ -7,16 +7,17 @@ bool ValidateSamplerDesc(const SamplerDesc &desc) {
   const auto valid_filter = [](SamplerFilter value) {
     return value == SAMPLER_FILTER_NEAREST || value == SAMPLER_FILTER_LINEAR;
   };
-  return valid_filter(desc.filter) && valid_filter(desc.MinFilter()) && valid_filter(desc.MagFilter()) &&
-         valid_filter(desc.MipFilter()) && std::isfinite(desc.min_lod) && std::isfinite(desc.max_lod) &&
-         std::isfinite(desc.mip_lod_bias) && desc.min_lod >= 0.0f && desc.max_lod >= desc.min_lod &&
-         desc.max_anisotropy >= 1 &&
+  return valid_filter(desc.MinFilter()) && valid_filter(desc.MagFilter()) && valid_filter(desc.MipFilter()) &&
+         std::isfinite(desc.min_lod) && std::isfinite(desc.max_lod) && std::isfinite(desc.mip_lod_bias) &&
+         desc.min_lod >= 0.0f && desc.max_lod >= desc.min_lod && desc.max_anisotropy >= 1 &&
          (desc.max_anisotropy == 1 ||
           (desc.MinFilter() == SAMPLER_FILTER_LINEAR && desc.MagFilter() == SAMPLER_FILTER_LINEAR &&
            desc.MipFilter() == SAMPLER_FILTER_LINEAR)) &&
-         desc.address_w >= SAMPLER_ADDRESS_REPEAT && desc.address_w <= SAMPLER_ADDRESS_MIRRORED_REPEAT &&
-         desc.address_u >= SAMPLER_ADDRESS_REPEAT && desc.address_u <= SAMPLER_ADDRESS_MIRRORED_REPEAT &&
-         desc.address_v >= SAMPLER_ADDRESS_REPEAT && desc.address_v <= SAMPLER_ADDRESS_MIRRORED_REPEAT;
+         desc.address_w >= SAMPLER_ADDRESS_REPEAT && desc.address_w <= SAMPLER_ADDRESS_CLAMP_TO_BORDER &&
+         desc.address_u >= SAMPLER_ADDRESS_REPEAT && desc.address_u <= SAMPLER_ADDRESS_CLAMP_TO_BORDER &&
+         desc.address_v >= SAMPLER_ADDRESS_REPEAT && desc.address_v <= SAMPLER_ADDRESS_CLAMP_TO_BORDER &&
+         desc.border_color >= SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK &&
+         desc.border_color <= SAMPLER_BORDER_COLOR_OPAQUE_WHITE;
 }
 
 bool ValidateSamplerFeatures(const SamplerDesc &desc, const PhysicalDeviceMipFeature &features) {

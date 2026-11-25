@@ -257,8 +257,8 @@ TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
   ObjPtr<ISampler> second = device->CreateSampler({SAMPLER_FILTER_NEAREST});
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
-  desc.filter = SAMPLER_FILTER_NEAREST;
-  EXPECT_EQ(first->GetDesc().filter, SAMPLER_FILTER_LINEAR);
+  desc.min_filter = desc.mag_filter = desc.mip_filter = SAMPLER_FILTER_NEAREST;
+  EXPECT_EQ(first->GetDesc().min_filter, SAMPLER_FILTER_LINEAR);
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup({{{0, BINDING_SAMPLER, 2}}});
   ObjPtr<IBindingGroup> other = device->CreateBindingGroup({{{0, BINDING_SAMPLER}}});
   ASSERT_TRUE(group);
@@ -284,8 +284,10 @@ TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
     EXPECT_FALSE(group->BindResource(0, foreign_sampler.Get()));
     group.Release();
     other.Release();
-    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
-    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][1].Get())->GetDesc().filter, SAMPLER_FILTER_NEAREST);
+    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][0].Get())->GetDesc().min_filter,
+              SAMPLER_FILTER_LINEAR);
+    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][1].Get())->GetDesc().min_filter,
+              SAMPLER_FILTER_NEAREST);
   });
 }
 
@@ -628,7 +630,8 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
     EXPECT_EQ(native->CurrentVersion(), next);
     EXPECT_TRUE(bool(captured->GetReferences()[2][0]));
     ASSERT_EQ(captured->GetReferences()[2].size(), 1u);
-    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[2][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
+    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[2][0].Get())->GetDesc().min_filter,
+              SAMPLER_FILTER_LINEAR);
     // Capture of the unchanged version shares all descriptors and resources.
     auto again = RetainBindingVersion(next);
     EXPECT_EQ(again.Get(), next);

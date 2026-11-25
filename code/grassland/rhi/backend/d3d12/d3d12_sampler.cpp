@@ -15,7 +15,7 @@ rhi::ISampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc 
   if (!sampler->descriptor_)
     return nullptr;
   const D3D12_TEXTURE_ADDRESS_MODE modes[] = {D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-                                              D3D12_TEXTURE_ADDRESS_MODE_MIRROR};
+                                              D3D12_TEXTURE_ADDRESS_MODE_MIRROR, D3D12_TEXTURE_ADDRESS_MODE_BORDER};
   auto &native = sampler->native_desc_;
   native.Filter = desc.max_anisotropy > 1 ? D3D12_FILTER_ANISOTROPIC
                                           : D3D12_ENCODE_BASIC_FILTER(static_cast<D3D12_FILTER_TYPE>(desc.MinFilter()),
@@ -25,6 +25,9 @@ rhi::ISampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc 
   native.AddressU = modes[desc.address_u];
   native.AddressV = modes[desc.address_v];
   native.AddressW = modes[desc.address_w];
+  const float colors[][4] = {{0, 0, 0, 0}, {0, 0, 0, 1}, {1, 1, 1, 1}};
+  for (int i = 0; i < 4; ++i)
+    native.BorderColor[i] = colors[desc.border_color][i];
   native.MinLOD = desc.min_lod;
   native.MaxLOD = desc.max_lod;
   native.MipLODBias = desc.mip_lod_bias;

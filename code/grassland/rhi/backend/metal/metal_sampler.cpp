@@ -20,6 +20,14 @@ rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc 
   if (!ValidateSamplerDesc(desc) || desc.max_anisotropy > limits.max_anisotropy ||
       desc.mip_lod_bias < limits.min_lod_bias || desc.mip_lod_bias > limits.max_lod_bias)
     return nullptr;
+  const bool uses_border = desc.address_u == SAMPLER_ADDRESS_CLAMP_TO_BORDER ||
+                           desc.address_v == SAMPLER_ADDRESS_CLAMP_TO_BORDER ||
+                           desc.address_w == SAMPLER_ADDRESS_CLAMP_TO_BORDER;
+  if (uses_border && !device->NativeDevice()->supportsFamily(MTL::GPUFamilyApple7) &&
+      !device->NativeDevice()->supportsFamily(MTL::GPUFamilyMac2)) {
+    ReportError(-1, "Metal border-color sampling requires Apple7 or Mac2 GPU support.");
+    return nullptr;
+  }
 
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto descriptor = NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
@@ -34,10 +42,15 @@ rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc 
   descriptor->setLodMaxClamp(desc.max_lod);
   descriptor->setMaxAnisotropy(desc.max_anisotropy);
   const MTL::SamplerAddressMode modes[] = {MTL::SamplerAddressModeRepeat, MTL::SamplerAddressModeClampToEdge,
-                                           MTL::SamplerAddressModeMirrorRepeat};
+                                           MTL::SamplerAddressModeMirrorRepeat,
+                                           MTL::SamplerAddressModeClampToBorderColor};
   descriptor->setSAddressMode(modes[desc.address_u]);
   descriptor->setTAddressMode(modes[desc.address_v]);
   descriptor->setRAddressMode(modes[desc.address_w]);
+  const MTL::SamplerBorderColor colors[] = {MTL::SamplerBorderColorTransparentBlack, MTL::SamplerBorderColorOpaqueBlack,
+                                            MTL::SamplerBorderColorOpaqueWhite};
+  if (uses_border)
+    descriptor->setBorderColor(colors[desc.border_color]);
   auto sampler = NS::TransferPtr(device->NativeDevice()->newSamplerState(descriptor.get()));
   if (!sampler) {
     ReportError(-1, "Metal sampler creation failed.");

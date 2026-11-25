@@ -2,9 +2,11 @@
 
 namespace grassland::rhi {
 SamplerDesc::SamplerDesc(SamplerFilter value, SamplerAddressMode u, SamplerAddressMode v)
-    : filter(value),
-      address_u(u),
+    : address_u(u),
       address_v(v),
+      min_filter(value),
+      mag_filter(value),
+      mip_filter(value),
       address_w(v) {
 }
 
@@ -23,14 +25,14 @@ SamplerDesc::SamplerDesc(SamplerFilter min,
 }
 
 SamplerFilter SamplerDesc::MinFilter() const {
-  return min_filter == SAMPLER_FILTER_INHERIT ? filter : min_filter;
+  return min_filter;
 }
 
 SamplerFilter SamplerDesc::MagFilter() const {
-  return mag_filter == SAMPLER_FILTER_INHERIT ? filter : mag_filter;
+  return mag_filter;
 }
 
 SamplerFilter SamplerDesc::MipFilter() const {
-  return mip_filter == SAMPLER_FILTER_INHERIT ? filter : mip_filter;
+  return mip_filter;
 }
 }  // namespace grassland::rhi

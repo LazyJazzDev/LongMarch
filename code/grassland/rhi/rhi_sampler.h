@@ -6,14 +6,24 @@
 LONGMARCH_RHI_INTERFACE(grassland::rhi::ISampler, grassland::rhi::IObject, "1686d5c9-e228-4896-a8db-fd1ee89e98d2")
 
 namespace grassland::rhi {
-enum SamplerFilter { SAMPLER_FILTER_INHERIT = -1, SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR };
+enum SamplerFilter { SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR };
 
-enum SamplerAddressMode { SAMPLER_ADDRESS_REPEAT, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_MIRRORED_REPEAT };
+enum SamplerAddressMode {
+  SAMPLER_ADDRESS_REPEAT,
+  SAMPLER_ADDRESS_CLAMP_TO_EDGE,
+  SAMPLER_ADDRESS_MIRRORED_REPEAT,
+  SAMPLER_ADDRESS_CLAMP_TO_BORDER
+};
+
+enum SamplerBorderColor {
+  SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK,
+  SAMPLER_BORDER_COLOR_OPAQUE_BLACK,
+  SAMPLER_BORDER_COLOR_OPAQUE_WHITE
+};
 
 struct SamplerDesc {
   SamplerDesc() = default;
-  // Legacy construction and writes to filter remain supported. Independent
-  // filters override it when they are not INHERIT.
+  // Set all three filters to the same value.
   SamplerDesc(SamplerFilter filter,
               SamplerAddressMode address_u = SAMPLER_ADDRESS_REPEAT,
               SamplerAddressMode address_v = SAMPLER_ADDRESS_REPEAT);
@@ -24,12 +34,13 @@ struct SamplerDesc {
               SamplerAddressMode address_v = SAMPLER_ADDRESS_REPEAT,
               SamplerAddressMode address_w = SAMPLER_ADDRESS_REPEAT);
 
-  SamplerFilter filter{SAMPLER_FILTER_LINEAR};
   SamplerAddressMode address_u{SAMPLER_ADDRESS_REPEAT}, address_v{SAMPLER_ADDRESS_REPEAT};
-  SamplerFilter min_filter{SAMPLER_FILTER_INHERIT};
-  SamplerFilter mag_filter{SAMPLER_FILTER_INHERIT};
-  SamplerFilter mip_filter{SAMPLER_FILTER_INHERIT};
+  SamplerFilter min_filter{SAMPLER_FILTER_LINEAR};
+  SamplerFilter mag_filter{SAMPLER_FILTER_LINEAR};
+  SamplerFilter mip_filter{SAMPLER_FILTER_LINEAR};
   SamplerAddressMode address_w{SAMPLER_ADDRESS_REPEAT};
+  // Used by CLAMP_TO_BORDER addressing: (0,0,0,0), (0,0,0,1), or (1,1,1,1).
+  SamplerBorderColor border_color{SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK};
   float min_lod{0.0f};
   float max_lod{(std::numeric_limits<float>::max)()};
   float mip_lod_bias{0.0f};

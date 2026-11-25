@@ -64,7 +64,9 @@ group->BindResource(0, ImageView{texture.Get(), 2, 3});                 // 采�
 
 `ImageView::mip_count = 0` 对采样绑定表示剩余全部级别，对存储绑定表示单级；存储绑定只能选择一级。旧的 `IImage*` 绑定继续有效，采样时可见整条链，存储时选择第 0 级。着色器 LOD 0 相对于视图的 `base_mip`。绑定组保存已解析范围，修改绑定组不会改变已录制命令。
 
-采样器可独立设置 `min_filter`、`mag_filter`、`mip_filter`，`address_u/v/w`，`min_lod`、`max_lod`、`mip_lod_bias` 和 `max_anisotropy`。旧的构造方式和 `.filter` 赋值继续支持；未指定的独立过滤参数继承 `.filter`。各向异性大于 1 时三个过滤参数须为 LINEAR。
+采样器可独立设置 `min_filter`、`mag_filter`、`mip_filter`，`address_u/v/w`，`min_lod`、`max_lod`、`mip_lod_bias` 和 `max_anisotropy`。单个 filter 参数的构造函数直接设置三项过滤字段；默认均为 LINEAR，不再提供 `.filter` 字段或 INHERIT 值。各向异性大于 1 时三个过滤参数须为 LINEAR。
+
+`SAMPLER_ADDRESS_CLAMP_TO_BORDER` 使用 `border_color` 指定的透明黑 `(0,0,0,0)`、不透明黑 `(0,0,0,1)` 或不透明白 `(1,1,1,1)`，默认透明黑。其他寻址模式不使用边界颜色。Metal 的边界颜色采样要求 Apple7 或 Mac2 GPU family，不支持的设备创建该模式的采样器时返回空句柄。
 
 GPU 生成采用逐级线性缩小，支持非二次幂尺寸；它不是离线纹理压缩器，也不执行 gamma 转换。格式须支持 `mip_compute_generation`，源级必须已有有效数据。生成命令使用自己的计算程序和绑定，调用后应重新绑定应用程序的 Program/Group；只能在渲染作用域之外调用。Metal 暂不报告/提供 GPU 生成能力。
 

@@ -14,6 +14,9 @@
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #endif
+#if defined(LONGMARCH_METAL_ENABLED)
+#include "grassland/rhi/backend/metal/metal_device.h"
+#endif
 
 namespace grassland::rhi {
 namespace {
@@ -102,17 +105,20 @@ class RhiMip : public testing::TestWithParam<BackendAPI> {
   ObjPtr<ICore> validation_core_;
 };
 
-TEST(RhiMipDescription, LegacySamplerConstructionAndIndependentOverrides) {
-  SamplerDesc legacy{SAMPLER_FILTER_NEAREST, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_MIRRORED_REPEAT};
-  EXPECT_EQ(legacy.MinFilter(), SAMPLER_FILTER_NEAREST);
-  EXPECT_EQ(legacy.MagFilter(), SAMPLER_FILTER_NEAREST);
-  EXPECT_EQ(legacy.MipFilter(), SAMPLER_FILTER_NEAREST);
-  EXPECT_EQ(legacy.address_w, SAMPLER_ADDRESS_MIRRORED_REPEAT);
-  legacy.filter = SAMPLER_FILTER_LINEAR;
-  EXPECT_EQ(legacy.MinFilter(), SAMPLER_FILTER_LINEAR);
-  legacy.min_filter = SAMPLER_FILTER_NEAREST;
-  EXPECT_EQ(legacy.MinFilter(), SAMPLER_FILTER_NEAREST);
-  EXPECT_EQ(legacy.MagFilter(), SAMPLER_FILTER_LINEAR);
+TEST(RhiMipDescription, SamplerConstructionSetsIndependentFilters) {
+  SamplerDesc defaults;
+  EXPECT_EQ(defaults.min_filter, SAMPLER_FILTER_LINEAR);
+  EXPECT_EQ(defaults.mag_filter, SAMPLER_FILTER_LINEAR);
+  EXPECT_EQ(defaults.mip_filter, SAMPLER_FILTER_LINEAR);
+  SamplerDesc uniform{SAMPLER_FILTER_NEAREST, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_MIRRORED_REPEAT};
+  EXPECT_EQ(uniform.min_filter, SAMPLER_FILTER_NEAREST);
+  EXPECT_EQ(uniform.mag_filter, SAMPLER_FILTER_NEAREST);
+  EXPECT_EQ(uniform.mip_filter, SAMPLER_FILTER_NEAREST);
+  EXPECT_EQ(uniform.address_w, SAMPLER_ADDRESS_MIRRORED_REPEAT);
+  uniform.min_filter = SAMPLER_FILTER_LINEAR;
+  EXPECT_EQ(uniform.MinFilter(), SAMPLER_FILTER_LINEAR);
+  EXPECT_EQ(uniform.MagFilter(), SAMPLER_FILTER_NEAREST);
+  EXPECT_EQ(uniform.MipFilter(), SAMPLER_FILTER_NEAREST);
   SamplerDesc detailed{SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR, SAMPLER_FILTER_NEAREST};
   EXPECT_EQ(detailed.MinFilter(), SAMPLER_FILTER_NEAREST);
   EXPECT_EQ(detailed.MagFilter(), SAMPLER_FILTER_LINEAR);
@@ -227,6 +233,9 @@ TEST_P(RhiMip, SamplerLimitsAndInvalidDescriptionsAreRejected) {
   desc.address_w = static_cast<SamplerAddressMode>(99);
   EXPECT_FALSE(device->CreateSampler(desc));
   desc.address_w = SAMPLER_ADDRESS_CLAMP_TO_EDGE;
+  desc.border_color = static_cast<SamplerBorderColor>(-1);
+  EXPECT_FALSE(device->CreateSampler(desc));
+  desc.border_color = SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK;
   desc.mag_filter = SAMPLER_FILTER_NEAREST;
   desc.mip_filter = SAMPLER_FILTER_LINEAR;
   sampler = device->CreateSampler(desc);
@@ -234,6 +243,87 @@ TEST_P(RhiMip, SamplerLimitsAndInvalidDescriptionsAreRejected) {
   if (features.max_anisotropy > 1) {
     desc.max_anisotropy = 2;
     EXPECT_FALSE(device->CreateSampler(desc));
+  }
+}
+
+TEST_P(RhiMip, BorderColorsAreSampledAndFilteredOutsideTexture) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (GetParam() == BACKEND_API_METAL) {
+    auto native = QueryInterfacePtr<backend::metal::IMetalDevice>(device.Get())->NativeDevice();
+    if (!native->supportsFamily(MTL::GPUFamilyApple7) && !native->supportsFamily(MTL::GPUFamilyMac2)) {
+      EXPECT_FALSE(device->CreateSampler({SAMPLER_FILTER_LINEAR, SAMPLER_ADDRESS_CLAMP_TO_BORDER}));
+      return;
+    }
+  }
+#endif
+  ObjPtr<IImage> image = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IBuffer> output = device->CreateBuffer({6 * 4 * sizeof(float)});
+  ASSERT_TRUE(image && output);
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
+    RHI_TEXTURE2D(0,0,float4,image);
+    RHI_SAMPLER(0,1,sampling);
+    RHI_RW_STRUCTURED_BUFFER(0,2,float4,output);
+    [numthreads(1,1,1)] void Main(uint3 id:SV_DispatchThreadID) {
+      float2 uv[6] = {float2(.5,.5), float2(-1,.5), float2(2,.5),
+                      float2(.5,-1), float2(.5,2), float2(0,.5)};
+      output[id.x] = image.SampleLevel(sampling, uv[id.x], 0);
+    }
+  )",
+                                                          "Main", SHADER_STAGE_COMPUTE);
+  ASSERT_TRUE(shader);
+  BindingLayoutDesc layout{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
+                            {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_COMPUTE},
+                            {2, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 16}}};
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), {{layout}}});
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+  ASSERT_TRUE(program && group);
+  ASSERT_TRUE(group->BindResource(0, image.Get()));
+  ASSERT_TRUE(group->BindResource(2, output.Get()));
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_COMPUTE);
+  ASSERT_TRUE(queue);
+  const uint8_t pixel[]{64, 128, 192, 255};
+  const float colors[][4] = {{0, 0, 0, 0}, {0, 0, 0, 1}, {1, 1, 1, 1}};
+  for (auto mode : {SAMPLER_ADDRESS_CLAMP_TO_BORDER, SAMPLER_ADDRESS_CLAMP_TO_EDGE}) {
+    for (auto filter : {SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR}) {
+      for (auto color : {SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK, SAMPLER_BORDER_COLOR_OPAQUE_BLACK,
+                         SAMPLER_BORDER_COLOR_OPAQUE_WHITE}) {
+        SCOPED_TRACE(testing::Message() << "mode " << mode << ", filter " << filter << ", color " << color);
+        SamplerDesc desc{filter, mode, mode};
+        desc.border_color = color;
+        ObjPtr<ISampler> sampler = device->CreateSampler(desc);
+        ASSERT_TRUE(sampler);
+        ASSERT_TRUE(group->BindResource(1, sampler.Get()));
+        ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+        ASSERT_TRUE(commands);
+        ASSERT_TRUE(commands->CmdUploadImage(image.Get(), pixel, sizeof(pixel)));
+        ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+        ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+        ASSERT_TRUE(commands->CmdDispatch(6));
+        ObjPtr<IDownloadToken> download = commands->CmdDownloadBuffer(output.Get(), 0, 6 * 4 * sizeof(float));
+        ASSERT_TRUE(download);
+        ObjPtr<ISubmissionToken> done = commands->Submit();
+        ASSERT_TRUE(done && done->WaitHost());
+        float actual[6][4]{};
+        ASSERT_TRUE(download->CopyTo(actual, sizeof(actual)));
+        for (int sample = 0; sample < 6; ++sample) {
+          for (int channel = 0; channel < 4; ++channel) {
+            float expected = pixel[channel] / 255.0f;
+            if (mode == SAMPLER_ADDRESS_CLAMP_TO_BORDER) {
+              if (sample >= 1 && sample <= 4)
+                expected = colors[color][channel];
+              else if (sample == 5 && filter == SAMPLER_FILTER_LINEAR)
+                expected = (expected + colors[color][channel]) * 0.5f;
+            }
+            EXPECT_NEAR(actual[sample][channel], expected, 0.002f) << "sample " << sample << ", channel " << channel;
+          }
+        }
+      }
+    }
   }
 }
 
