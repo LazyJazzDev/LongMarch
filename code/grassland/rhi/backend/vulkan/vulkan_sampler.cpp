@@ -20,10 +20,10 @@ rhi::ISampler *VulkanSamplerImpl::Create(IVulkanDevice *device, const SamplerDes
                                         VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
                                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER};
   VkSamplerCreateInfo create{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-  create.minFilter = desc.MinFilter() == SAMPLER_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-  create.magFilter = desc.MagFilter() == SAMPLER_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+  create.minFilter = desc.min_filter == SAMPLER_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+  create.magFilter = desc.mag_filter == SAMPLER_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
   create.mipmapMode =
-      desc.MipFilter() == SAMPLER_FILTER_LINEAR ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+      desc.mip_filter == SAMPLER_FILTER_LINEAR ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
   create.addressModeU = modes[desc.address_u];
   create.addressModeV = modes[desc.address_v];
   create.addressModeW = modes[desc.address_w];

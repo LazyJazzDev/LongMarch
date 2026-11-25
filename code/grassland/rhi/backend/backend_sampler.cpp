@@ -7,13 +7,13 @@ bool ValidateSamplerDesc(const SamplerDesc &desc) {
   const auto valid_filter = [](SamplerFilter value) {
     return value == SAMPLER_FILTER_NEAREST || value == SAMPLER_FILTER_LINEAR;
   };
-  return valid_filter(desc.MinFilter()) && valid_filter(desc.MagFilter()) && valid_filter(desc.MipFilter()) &&
+  return valid_filter(desc.min_filter) && valid_filter(desc.mag_filter) && valid_filter(desc.mip_filter) &&
          desc.compare_op >= COMPARE_NEVER && desc.compare_op <= COMPARE_ALWAYS && std::isfinite(desc.min_lod) &&
          std::isfinite(desc.max_lod) && std::isfinite(desc.mip_lod_bias) && desc.min_lod >= 0.0f &&
          desc.max_lod >= desc.min_lod && desc.max_anisotropy >= 1 &&
          (desc.max_anisotropy == 1 ||
-          (desc.MinFilter() == SAMPLER_FILTER_LINEAR && desc.MagFilter() == SAMPLER_FILTER_LINEAR &&
-           desc.MipFilter() == SAMPLER_FILTER_LINEAR)) &&
+          (desc.min_filter == SAMPLER_FILTER_LINEAR && desc.mag_filter == SAMPLER_FILTER_LINEAR &&
+           desc.mip_filter == SAMPLER_FILTER_LINEAR)) &&
          desc.address_w >= SAMPLER_ADDRESS_REPEAT && desc.address_w <= SAMPLER_ADDRESS_CLAMP_TO_BORDER &&
          desc.address_u >= SAMPLER_ADDRESS_REPEAT && desc.address_u <= SAMPLER_ADDRESS_CLAMP_TO_BORDER &&
          desc.address_v >= SAMPLER_ADDRESS_REPEAT && desc.address_v <= SAMPLER_ADDRESS_CLAMP_TO_BORDER &&

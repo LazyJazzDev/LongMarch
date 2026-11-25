@@ -51,10 +51,6 @@ struct SamplerDesc {
   float mip_lod_bias{0.0f};
   // 1 disables anisotropic filtering. Larger values require linear filters.
   uint32_t max_anisotropy{1};
-
-  SamplerFilter MinFilter() const;
-  SamplerFilter MagFilter() const;
-  SamplerFilter MipFilter() const;
 };
 
 // Immutable sampler state, reusable across binding groups.

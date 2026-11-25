@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/metal/metal_sampler.h"
+#include "grassland/rhi/backend/metal/metal_sampler.h"
 
 #include "grassland/rhi/backend/metal/metal_device.h"
 
@@ -39,12 +39,12 @@ rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc 
   descriptor->setSupportArgumentBuffers(true);
   descriptor->setCompareFunction(desc.compare_enable ? static_cast<MTL::CompareFunction>(desc.compare_op)
                                                      : MTL::CompareFunctionNever);
-  descriptor->setMinFilter(desc.MinFilter() == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
-                                                                      : MTL::SamplerMinMagFilterLinear);
-  descriptor->setMagFilter(desc.MagFilter() == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
-                                                                      : MTL::SamplerMinMagFilterLinear);
-  descriptor->setMipFilter(desc.MipFilter() == SAMPLER_FILTER_NEAREST ? MTL::SamplerMipFilterNearest
-                                                                      : MTL::SamplerMipFilterLinear);
+  descriptor->setMinFilter(desc.min_filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
+                                                                     : MTL::SamplerMinMagFilterLinear);
+  descriptor->setMagFilter(desc.mag_filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
+                                                                     : MTL::SamplerMinMagFilterLinear);
+  descriptor->setMipFilter(desc.mip_filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMipFilterNearest
+                                                                     : MTL::SamplerMipFilterLinear);
   descriptor->setLodMinClamp(desc.min_lod);
   descriptor->setLodMaxClamp(desc.max_lod);
   descriptor->setMaxAnisotropy(desc.max_anisotropy);

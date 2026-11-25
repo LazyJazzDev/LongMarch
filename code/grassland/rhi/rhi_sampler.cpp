@@ -24,15 +24,4 @@ SamplerDesc::SamplerDesc(SamplerFilter min,
       address_w(w) {
 }
 
-SamplerFilter SamplerDesc::MinFilter() const {
-  return min_filter;
-}
-
-SamplerFilter SamplerDesc::MagFilter() const {
-  return mag_filter;
-}
-
-SamplerFilter SamplerDesc::MipFilter() const {
-  return mip_filter;
-}
 }  // namespace grassland::rhi

@@ -117,13 +117,13 @@ TEST(RhiMipDescription, SamplerConstructionSetsIndependentFilters) {
   EXPECT_EQ(uniform.mip_filter, SAMPLER_FILTER_NEAREST);
   EXPECT_EQ(uniform.address_w, SAMPLER_ADDRESS_MIRRORED_REPEAT);
   uniform.min_filter = SAMPLER_FILTER_LINEAR;
-  EXPECT_EQ(uniform.MinFilter(), SAMPLER_FILTER_LINEAR);
-  EXPECT_EQ(uniform.MagFilter(), SAMPLER_FILTER_NEAREST);
-  EXPECT_EQ(uniform.MipFilter(), SAMPLER_FILTER_NEAREST);
+  EXPECT_EQ(uniform.min_filter, SAMPLER_FILTER_LINEAR);
+  EXPECT_EQ(uniform.mag_filter, SAMPLER_FILTER_NEAREST);
+  EXPECT_EQ(uniform.mip_filter, SAMPLER_FILTER_NEAREST);
   SamplerDesc detailed{SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR, SAMPLER_FILTER_NEAREST};
-  EXPECT_EQ(detailed.MinFilter(), SAMPLER_FILTER_NEAREST);
-  EXPECT_EQ(detailed.MagFilter(), SAMPLER_FILTER_LINEAR);
-  EXPECT_EQ(detailed.MipFilter(), SAMPLER_FILTER_NEAREST);
+  EXPECT_EQ(detailed.min_filter, SAMPLER_FILTER_NEAREST);
+  EXPECT_EQ(detailed.mag_filter, SAMPLER_FILTER_LINEAR);
+  EXPECT_EQ(detailed.mip_filter, SAMPLER_FILTER_NEAREST);
 }
 
 TEST_P(RhiMip, EnumeratedCapabilitiesAgreeWithNativeDevice) {
