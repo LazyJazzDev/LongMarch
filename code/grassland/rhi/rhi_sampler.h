@@ -7,20 +7,20 @@
 LONGMARCH_RHI_INTERFACE(grassland::rhi::ISampler, grassland::rhi::IObject, "1686d5c9-e228-4896-a8db-fd1ee89e98d2")
 
 namespace grassland::rhi {
-enum SamplerFilter { SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR };
+typedef enum { SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR } SamplerFilter;
 
-enum SamplerAddressMode {
+typedef enum {
   SAMPLER_ADDRESS_REPEAT,
   SAMPLER_ADDRESS_CLAMP_TO_EDGE,
   SAMPLER_ADDRESS_MIRRORED_REPEAT,
   SAMPLER_ADDRESS_CLAMP_TO_BORDER
-};
+} SamplerAddressMode;
 
-enum SamplerBorderColor {
+typedef enum {
   SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK,
   SAMPLER_BORDER_COLOR_OPAQUE_BLACK,
   SAMPLER_BORDER_COLOR_OPAQUE_WHITE
-};
+} SamplerBorderColor;
 
 struct SamplerDesc {
   SamplerDesc() = default;

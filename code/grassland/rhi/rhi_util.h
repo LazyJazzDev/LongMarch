@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -244,22 +244,22 @@ union ClearValue {
   ClearValue(const ClearDepthStencilValue &value);
 };
 
-enum PrimitiveTopology {
+typedef enum {
   PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
   PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
   PRIMITIVE_TOPOLOGY_LINE_LIST,
   PRIMITIVE_TOPOLOGY_LINE_STRIP,
   PRIMITIVE_TOPOLOGY_POINT_LIST,
-};
+} PrimitiveTopology;
 
-enum CullMode { CULL_MODE_NONE, CULL_MODE_FRONT, CULL_MODE_BACK };
+typedef enum { CULL_MODE_NONE, CULL_MODE_FRONT, CULL_MODE_BACK } CullMode;
 
 // Winding in NDC (+X right, +Y up), before the viewport Y transform.
 // Matches graphics: Vulkan CCW + negative-height viewport; D3D12
 // FrontCounterClockwise=TRUE and Metal CCW + positive-height viewport.
-enum FrontFace { FRONT_FACE_COUNTER_CLOCKWISE, FRONT_FACE_CLOCKWISE };
+typedef enum { FRONT_FACE_COUNTER_CLOCKWISE, FRONT_FACE_CLOCKWISE } FrontFace;
 
-enum FillMode { FILL_MODE_SOLID, FILL_MODE_WIREFRAME };
+typedef enum { FILL_MODE_SOLID, FILL_MODE_WIREFRAME } FillMode;
 
 struct RasterizerDesc {
   CullMode cull_mode{CULL_MODE_NONE};
@@ -267,7 +267,7 @@ struct RasterizerDesc {
   FillMode fill_mode{FILL_MODE_SOLID};
 };
 
-enum CompareOp {
+typedef enum {
   COMPARE_NEVER,
   COMPARE_LESS,
   COMPARE_EQUAL,
@@ -276,9 +276,9 @@ enum CompareOp {
   COMPARE_NOT_EQUAL,
   COMPARE_GREATER_EQUAL,
   COMPARE_ALWAYS
-};
+} CompareOp;
 
-enum StencilOp {
+typedef enum {
   STENCIL_KEEP,
   STENCIL_ZERO,
   STENCIL_REPLACE,
@@ -287,7 +287,7 @@ enum StencilOp {
   STENCIL_INVERT,
   STENCIL_INCREMENT_WRAP,
   STENCIL_DECREMENT_WRAP
-};
+} StencilOp;
 
 struct StencilFaceDesc {
   StencilOp fail_op{STENCIL_KEEP}, depth_fail_op{STENCIL_KEEP}, pass_op{STENCIL_KEEP};
@@ -306,7 +306,7 @@ struct DepthStencilDesc {
 // Values written to a swapchain must use its declared encoding. No implicit
 // tonemapping or color conversion is performed by CmdPresent; CmdPresentImage
 // explicitly converts from the supplied source encoding.
-enum ColorSpace {
+typedef enum {
   COLOR_SPACE_SRGB_NONLINEAR,
   // Linear Rec.709/scRGB: 1.0 corresponds to 80 cd/m^2; values may exceed 1.
   COLOR_SPACE_EXTENDED_SRGB_LINEAR,
@@ -314,7 +314,7 @@ enum ColorSpace {
   COLOR_SPACE_HDR10_ST2084,
   // Linear Rec.709 with platform-defined luminance mapping; not the scRGB contract.
   COLOR_SPACE_BT709_LINEAR,
-};
+} ColorSpace;
 
 std::string to_string(ColorSpace value);
 std::string ColorSpaceName(ColorSpace value);

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #ifndef GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_NONE
@@ -13,7 +13,7 @@
 LONGMARCH_RHI_INTERFACE(grassland::rhi::IWindow, grassland::rhi::IObject, "49b2b063-75db-4ba6-96ae-48d94b3a2022")
 
 namespace grassland::rhi {
-enum class MagnifyPhase { kBegin, kUpdate, kEnd, kCancel };
+typedef enum { kBegin, kUpdate, kEnd, kCancel } MagnifyPhase;
 
 // Incremental scale (1 means unchanged), with a focal point in window content
 // coordinates: logical units, origin at the top left, like MouseMoveEvent.
