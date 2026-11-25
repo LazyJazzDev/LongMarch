@@ -20,7 +20,7 @@ class Scene {
   grassland::rhi::ObjPtr<grassland::rhi::IBuffer> vertices_, indices_, uniforms_;
   grassland::rhi::ObjPtr<grassland::rhi::IImage> texture_, depth_;
   std::array<grassland::rhi::ObjPtr<grassland::rhi::ISampler>, 3> samplers_;
-  std::array<grassland::rhi::BindingGroup, 9> groups_;
+  std::array<grassland::rhi::ObjPtr<grassland::rhi::IBindingGroup>, 9> groups_;
   uint32_t anisotropy_{};
 };
 }  // namespace rhi_mip_demo

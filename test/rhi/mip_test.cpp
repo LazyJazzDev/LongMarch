@@ -281,10 +281,10 @@ TEST_P(RhiMip, BorderColorsAreSampledAndFilteredOutsideTexture) {
                             {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_COMPUTE},
                             {2, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 16}}};
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), {{layout}}});
-  BindingGroup group = device->CreateBindingGroup(layout);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(program && group);
-  ASSERT_TRUE(group.BindResource(0, image.Get()));
-  ASSERT_TRUE(group.BindResource(2, output.Get()));
+  ASSERT_TRUE(group->BindResource(0, image.Get()));
+  ASSERT_TRUE(group->BindResource(2, output.Get()));
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_COMPUTE);
   ASSERT_TRUE(queue);
   const uint8_t pixel[]{64, 128, 192, 255};
@@ -298,7 +298,7 @@ TEST_P(RhiMip, BorderColorsAreSampledAndFilteredOutsideTexture) {
         desc.border_color = color;
         ObjPtr<ISampler> sampler = device->CreateSampler(desc);
         ASSERT_TRUE(sampler);
-        ASSERT_TRUE(group.BindResource(1, sampler.Get()));
+        ASSERT_TRUE(group->BindResource(1, sampler.Get()));
         ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
         ASSERT_TRUE(commands);
         ASSERT_TRUE(commands->CmdUploadImage(image.Get(), pixel, sizeof(pixel)));
@@ -483,12 +483,12 @@ TEST_P(RhiMip, MipViewsCaptureRangesAndSynchronizeDisjointReadWrites) {
   BindingLayoutDesc layout{
       {{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}, {1, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}};
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), {{layout}}});
-  BindingGroup group = device->CreateBindingGroup(layout);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(program && group);
-  EXPECT_FALSE(group.BindResource(0, ImageView{image.Get(), 4, 1}));
-  EXPECT_FALSE(group.BindResource(0, ImageView{image.Get(), 2, 3}));
-  EXPECT_FALSE(group.BindResource(1, ImageView{image.Get(), 0, 2}));
-  EXPECT_FALSE(group.BindResource(0, ImageView{nullptr}));
+  EXPECT_FALSE(group->BindResource(0, ImageView{image.Get(), 4, 1}));
+  EXPECT_FALSE(group->BindResource(0, ImageView{image.Get(), 2, 3}));
+  EXPECT_FALSE(group->BindResource(1, ImageView{image.Get(), 0, 2}));
+  EXPECT_FALSE(group->BindResource(0, ImageView{nullptr}));
   for (auto role : {QUEUE_TYPE_MAIN, QUEUE_TYPE_COMPUTE}) {
     ObjPtr<IQueue> queue = device->GetQueue(role);
     ASSERT_TRUE(queue);
@@ -497,12 +497,12 @@ TEST_P(RhiMip, MipViewsCaptureRangesAndSynchronizeDisjointReadWrites) {
     ASSERT_TRUE(commands->CmdUploadImage(image.Get(), pixels.data(), 32));
     ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
     for (uint32_t mip = 1; mip < 4; ++mip) {
-      ASSERT_TRUE(group.BindResource(0, ImageView{image.Get(), mip - 1, 1}));
-      ASSERT_TRUE(group.BindResource(1, ImageView{image.Get(), mip, 0}));
+      ASSERT_TRUE(group->BindResource(0, ImageView{image.Get(), mip - 1, 1}));
+      ASSERT_TRUE(group->BindResource(1, ImageView{image.Get(), mip, 0}));
       ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
       // Changing both ranges after capture must not change the pending dispatch.
-      ASSERT_TRUE(group.BindResource(0, ImageView{image.Get(), mip, 1}));
-      ASSERT_TRUE(group.BindResource(1, ImageView{image.Get(), mip - 1, 1}));
+      ASSERT_TRUE(group->BindResource(0, ImageView{image.Get(), mip, 1}));
+      ASSERT_TRUE(group->BindResource(1, ImageView{image.Get(), mip - 1, 1}));
       ASSERT_TRUE(commands->CmdDispatch(1, 1, 1));
     }
     std::vector<ObjPtr<IDownloadToken>> downloads;
@@ -519,8 +519,8 @@ TEST_P(RhiMip, MipViewsCaptureRangesAndSynchronizeDisjointReadWrites) {
     }
     commands = queue->CreateCommandContext();
     ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
-    ASSERT_TRUE(group.BindResource(0, image.Get()));  // Full chain overlaps mip 1.
-    ASSERT_TRUE(group.BindResource(1, ImageView{image.Get(), 1, 1}));
+    ASSERT_TRUE(group->BindResource(0, image.Get()));  // Full chain overlaps mip 1.
+    ASSERT_TRUE(group->BindResource(1, ImageView{image.Get(), 1, 1}));
     ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
     EXPECT_FALSE(commands->CmdDispatch(1, 1, 1));
     EXPECT_FALSE(commands->Submit());
@@ -696,11 +696,11 @@ TEST(RhiVulkanImageView, ReusesDefaultAndMipViewsAcrossBindingGroups) {
     auto selected = native->BindingView(levels - 1, 1);
     ASSERT_NE(selected, VK_NULL_HANDLE);
     for (int iteration = 0; iteration < 3; ++iteration) {
-      BindingGroup group = device->CreateBindingGroup(layout);
+      ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
       ASSERT_TRUE(group);
-      ASSERT_TRUE(group.BindResource(0, ImageView{image.Get(), levels - 1, 1}));
+      ASSERT_TRUE(group->BindResource(0, ImageView{image.Get(), levels - 1, 1}));
       EXPECT_EQ(selected, native->BindingView(levels - 1, 1));
-      ASSERT_TRUE(group.BindResource(0, image.Get()));
+      ASSERT_TRUE(group->BindResource(0, image.Get()));
       EXPECT_EQ(full, native->BindingView());
     }
     // Releasing or rewriting groups must not discard the image's cached views.

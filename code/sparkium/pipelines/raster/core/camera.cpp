@@ -17,8 +17,8 @@ Camera::Camera(sparkium::Camera &camera) : camera_(camera) {
     near_field_bindings_ = core_->GetDevice()->CreateBindingGroup(layout);
     far_field_bindings_ = core_->GetDevice()->CreateBindingGroup(layout);
     if (!near_field_buffer_ || !far_field_buffer_ || !near_field_bindings_ || !far_field_bindings_ ||
-        !near_field_bindings_.BindResource(0, near_field_buffer_.Get()) ||
-        !far_field_bindings_.BindResource(0, far_field_buffer_.Get())) {
+        !near_field_bindings_->BindResource(0, near_field_buffer_.Get()) ||
+        !far_field_bindings_->BindResource(0, far_field_buffer_.Get())) {
       core_->ReportFailure("Failed to create raster camera resources");
       return;
     }

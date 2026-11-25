@@ -106,6 +106,6 @@ class SoftwarePipeline {
   std::vector<rhi::ObjPtr<rhi::IComputeProgram>> builders_;
   rhi::ObjPtr<rhi::IShader> render_shader_;
   std::shared_ptr<const rhi::ComputeProgramDesc> render_description_;
-  rhi::BindingGroup render_group_, build_group_;
+  rhi::ObjPtr<rhi::IBindingGroup> render_group_, build_group_;
 };
 }  // namespace sparkium::raytracing

@@ -98,11 +98,11 @@ bool LightGeometryMaterial::RecordPreprocess(rhi::ICommandContext *cmd_context) 
   uint32_t group_size = 64;
   if (!cmd_context->CmdBindComputeProgram(gather_primitive_power_program_))
     return false;
-  if (!gather_group_.BindResource(0, geometry_->Buffer()))
+  if (!gather_group_->BindResource(0, geometry_->Buffer()))
     return false;
-  if (!gather_group_.BindResource(1, material_->Buffer()))
+  if (!gather_group_->BindResource(1, material_->Buffer()))
     return false;
-  if (!gather_group_.BindResource(2, direct_lighting_sampler_data_.Get()))
+  if (!gather_group_->BindResource(2, direct_lighting_sampler_data_.Get()))
     return false;
   if (!cmd_context->CmdBindGroup(0, gather_group_.Get()))
     return false;
@@ -110,11 +110,11 @@ bool LightGeometryMaterial::RecordPreprocess(rhi::ICommandContext *cmd_context) 
     return false;
   if (!cmd_context->CmdBindComputeProgram(blelloch_scan_up_program_))
     return false;
-  if (!scan_group_.BindResource(0, direct_lighting_sampler_data_.Get()))
+  if (!scan_group_->BindResource(0, direct_lighting_sampler_data_.Get()))
     return false;
 
   for (size_t i = 1; i < metadatas_.size(); i++) {
-    if (!scan_group_.BindResource(
+    if (!scan_group_->BindResource(
             1, rhi::BufferView{metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i, sizeof(BlellochScanMetadata)}))
       return false;
     if (!cmd_context->CmdBindGroup(0, scan_group_.Get()))
@@ -130,7 +130,7 @@ bool LightGeometryMaterial::RecordPreprocess(rhi::ICommandContext *cmd_context) 
     if (metadatas_[i].element_count < group_size) {
       continue;
     }
-    if (!scan_group_.BindResource(
+    if (!scan_group_->BindResource(
             1, rhi::BufferView{metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i, sizeof(BlellochScanMetadata)}))
       return false;
     if (!cmd_context->CmdBindGroup(0, scan_group_.Get()))

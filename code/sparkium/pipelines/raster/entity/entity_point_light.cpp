@@ -52,7 +52,7 @@ void EntityPointLight::Update(Scene *scene) {
 
         if (!cmd_ctx->CmdBindGroup(2, camera->NearFieldBindings()))
           return false;
-        if (!point_light_group_ || !point_light_group_.BindResource(4, point_light_buffer_.Get()))
+        if (!point_light_group_ || !point_light_group_->BindResource(4, point_light_buffer_.Get()))
           return false;
         if (!cmd_ctx->CmdBindGroup(0, film->LightingBindings()))
           return false;

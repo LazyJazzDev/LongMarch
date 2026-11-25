@@ -1,5 +1,4 @@
-#pragma once
-#include "grassland/rhi/rhi_obj_ptr.h"
+﻿#pragma once
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_sampler.h"
 
@@ -82,35 +81,17 @@ class IBindingGroup : public IObject {
   virtual bool BindResource(uint32_t binding, const std::vector<ImageView> &images, uint32_t first_element = 0) = 0;
   virtual bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) = 0;
 
+  // Convenience overloads forward to the virtual array operations above.
+  bool BindResource(uint32_t binding, IBuffer *buffer);
+  bool BindResource(uint32_t binding, const BufferView &buffer);
+  bool BindResource(uint32_t binding, IImage *image);
+  bool BindResource(uint32_t binding, const ImageView &image);
+  bool BindResource(uint32_t binding, ISampler *sampler);
+  bool BindResource(uint32_t binding, ITopLevelAccelerationStructure *structure);
+  bool BindResource(uint32_t binding, const std::vector<IBuffer *> &buffers, uint32_t first_element = 0);
+  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0);
+
  protected:
-  ~IBindingGroup() override = 0;
-};
-
-// Owning convenience handle. The backend-facing interface stays purely virtual.
-// Use BindResource on the handle; Get() and operator-> expose IBindingGroup.
-class BindingGroup : public ObjPtr<IBindingGroup> {
- public:
-  using ObjPtr<IBindingGroup>::ObjPtr;
-  BindingGroup() noexcept = default;
-  BindingGroup(const BindingGroup &) noexcept = default;
-  BindingGroup(BindingGroup &&) noexcept = default;
-  BindingGroup(ObjPtr<IBindingGroup> group) noexcept;
-  BindingGroup &operator=(BindingGroup group) noexcept;
-  static BindingGroup Retain(IBindingGroup *group) noexcept;
-
-  bool BindResource(uint32_t binding, IBuffer *buffer) const;
-  bool BindResource(uint32_t binding, const BufferView &buffer) const;
-  bool BindResource(uint32_t binding, IImage *image) const;
-  bool BindResource(uint32_t binding, const ImageView &image) const;
-  bool BindResource(uint32_t binding, ISampler *sampler) const;
-  bool BindResource(uint32_t binding, ITopLevelAccelerationStructure *structure) const;
-  bool BindResource(uint32_t binding,
-                    const std::vector<ITopLevelAccelerationStructure *> &structures,
-                    uint32_t first_element = 0) const;
-  bool BindResource(uint32_t binding, const std::vector<IBuffer *> &buffers, uint32_t first_element = 0) const;
-  bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) const;
-  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) const;
-  bool BindResource(uint32_t binding, const std::vector<ImageView> &images, uint32_t first_element = 0) const;
-  bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) const;
+  ~IBindingGroup() override = default;
 };
 }  // namespace grassland::rhi

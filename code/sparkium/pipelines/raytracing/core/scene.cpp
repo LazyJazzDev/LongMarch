@@ -75,34 +75,34 @@ bool Scene::RecordRender(sparkium::Renderer &renderer,
   if (!film->PrepareAccumulation() || !RecordPrepare(commands, updates, camera))
     return false;
   auto *renderer_group = renderer.RecordParameters(commands, &scene_, film);
-  auto scene_group = rhi::BindingGroup::Retain(software ? software_pipeline_->Bindings() : render_group_.Get());
+  auto *scene_group = software ? software_pipeline_->Bindings() : render_group_.Get();
   auto *camera_group = camera->Bindings();
   if (!scene_group || !camera_group || !renderer_group)
     return false;
   if (software) {
     if (ray_query_) {
-      if (!scene_group.BindResource(SPARKIUM_SCENE_TRAVERSAL, software_pipeline_->AccelerationStructure()))
+      if (!scene_group->BindResource(SPARKIUM_SCENE_TRAVERSAL, software_pipeline_->AccelerationStructure()))
         return false;
-    } else if (!scene_group.BindResource(SPARKIUM_SCENE_TRAVERSAL, software_pipeline_->Nodes()))
+    } else if (!scene_group->BindResource(SPARKIUM_SCENE_TRAVERSAL, software_pipeline_->Nodes()))
       return false;
-  } else if (!scene_group.BindResource(SPARKIUM_SCENE_TRAVERSAL, tlas_.Get()))
+  } else if (!scene_group->BindResource(SPARKIUM_SCENE_TRAVERSAL, tlas_.Get()))
     return false;
-  if (!scene_group.BindResource(SPARKIUM_SCENE_BUFFERS, buffers_) ||
-      !scene_group.BindResource(SPARKIUM_SCENE_INSTANCES, instance_metadata_buffer_.Get()) ||
-      !scene_group.BindResource(SPARKIUM_SCENE_LIGHT_SELECTOR, light_selector_buffer_.Get()) ||
-      !scene_group.BindResource(SPARKIUM_SCENE_LIGHT_METADATA, light_metadatas_buffer_.Get()) ||
-      !scene_group.BindResource(SPARKIUM_SCENE_SOFTWARE_INSTANCES,
-                                software ? software_pipeline_->Instances() : instance_metadata_buffer_.Get()) ||
-      !scene_group.BindResource(SPARKIUM_SCENE_SDR_TEXTURES, sdr_images_) ||
-      !scene_group.BindResource(SPARKIUM_SCENE_HDR_TEXTURES, hdr_images_) ||
-      !scene_group.BindResource(SPARKIUM_SCENE_SAMPLERS, std::vector{linear_sampler_.Get(), nearest_sampler_.Get()}) ||
+  if (!scene_group->BindResource(SPARKIUM_SCENE_BUFFERS, buffers_) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_INSTANCES, instance_metadata_buffer_.Get()) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_LIGHT_SELECTOR, light_selector_buffer_.Get()) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_LIGHT_METADATA, light_metadatas_buffer_.Get()) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_SOFTWARE_INSTANCES,
+                                 software ? software_pipeline_->Instances() : instance_metadata_buffer_.Get()) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_SDR_TEXTURES, sdr_images_) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_HDR_TEXTURES, hdr_images_) ||
+      !scene_group->BindResource(SPARKIUM_SCENE_SAMPLERS, std::vector{linear_sampler_.Get(), nearest_sampler_.Get()}) ||
       !core_->RecordUpdates(commands, updates) || !film->RecordReset(commands))
     return false;
   if (!(software ? renderer.RecordProgram(commands, software_pipeline_->RenderDescription())
                  : renderer.RecordProgram(commands, render_description_)))
     return false;
   if (!commands->CmdBindGroup(SPARKIUM_GROUP_FILM, film->AccumulationGroup()) ||
-      !commands->CmdBindGroup(SPARKIUM_GROUP_SCENE, scene_group.Get()) ||
+      !commands->CmdBindGroup(SPARKIUM_GROUP_SCENE, scene_group) ||
       !commands->CmdBindGroup(SPARKIUM_GROUP_CAMERA, camera_group) ||
       !commands->CmdBindGroup(SPARKIUM_GROUP_RENDERER, renderer_group))
     return false;
@@ -398,8 +398,8 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
 
   if (!light_metadatas_.empty()) {
     if (!commands->CmdBindComputeProgram(gather_light_power_program_.Get()) ||
-        !light_group_.BindResource(0, light_metadatas_buffer_.Get()) ||
-        !light_group_.BindResource(1, light_selector_buffer_.Get()) || !light_group_.BindResource(2, buffers_) ||
+        !light_group_->BindResource(0, light_metadatas_buffer_.Get()) ||
+        !light_group_->BindResource(1, light_selector_buffer_.Get()) || !light_group_->BindResource(2, buffers_) ||
         !commands->CmdBindGroup(0, light_group_.Get()) ||
         !commands->CmdDispatch((light_metadatas_.size() + 63) / 64, 1, 1))
       return core_->ReportFailure("failed to record light power gathering");
@@ -427,12 +427,12 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
       return false;
     if (!blelloch_scan_up_program || !blelloch_scan_down_program ||
         !commands->CmdBindComputeProgram(blelloch_scan_up_program) ||
-        !scan_group_.BindResource(0, light_selector_buffer_.Get()))
+        !scan_group_->BindResource(0, light_selector_buffer_.Get()))
       return core_->ReportFailure("failed to bind light scan pipeline");
     for (size_t i = 1; i < blelloch_metadatas_.size(); i++) {
-      if (!scan_group_.BindResource(1,
-                                    rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
-                                                    sizeof(BlellochScanMetadata)}) ||
+      if (!scan_group_->BindResource(1,
+                                     rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
+                                                     sizeof(BlellochScanMetadata)}) ||
           !commands->CmdBindGroup(0, scan_group_.Get()) ||
           !commands->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1))
         return core_->ReportFailure("failed to record light scan dispatch");
@@ -443,9 +443,9 @@ bool Scene::RecordPrepare(rhi::ICommandContext *commands, ResourceUpdates::Curso
       if (blelloch_metadatas_[i].element_count <= group_size) {
         continue;
       }
-      if (!scan_group_.BindResource(1,
-                                    rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
-                                                    sizeof(BlellochScanMetadata)}) ||
+      if (!scan_group_->BindResource(1,
+                                     rhi::BufferView{blelloch_metadata_buffer_.Get(), sizeof(BlellochScanMetadata) * i,
+                                                     sizeof(BlellochScanMetadata)}) ||
           !commands->CmdBindGroup(0, scan_group_.Get()) ||
           !commands->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1))
         return core_->ReportFailure("failed to record light scan dispatch");

@@ -27,14 +27,14 @@ class EntityGeometryMaterial : public Entity {
   Geometry *geometry_{};
   Material *material_{};
   std::shared_ptr<const rhi::ProgramDesc> render_description_;
-  rhi::BindingGroup render_group_;
+  rhi::ObjPtr<rhi::IBindingGroup> render_group_;
   rhi::ObjPtr<rhi::IBuffer> instance_buffer_;
 
   rhi::ObjPtr<rhi::IBuffer> point_light_buffer_;
   rhi::ObjPtr<rhi::IShader> point_light_vs_;
   rhi::ObjPtr<rhi::IShader> point_light_ps_;
   std::shared_ptr<const rhi::ProgramDesc> point_light_description_;
-  rhi::BindingGroup point_light_group_;
+  rhi::ObjPtr<rhi::IBindingGroup> point_light_group_;
 };
 
 }  // namespace sparkium::raster

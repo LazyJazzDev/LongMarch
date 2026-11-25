@@ -194,11 +194,11 @@ RHI_RW_STRUCTURED_BUFFER(0, 0, float4, output);
   rhi::PipelineLayoutDesc layout;
   layout.groups = {{{{0, rhi::BINDING_RW_STRUCTURED_BUFFER, 1, rhi::SHADER_VISIBILITY_ALL, sizeof(glm::vec4)}}}};
   rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
-  rhi::BindingGroup group = device->CreateBindingGroup(layout.groups[0]);
+  rhi::ObjPtr<rhi::IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
   std::array<glm::vec4, 5> values;
   rhi::ObjPtr<rhi::IBuffer> output = device->CreateBuffer({sizeof(values)});
   ASSERT_TRUE(program && group && output);
-  ASSERT_TRUE(group.BindResource(0, output.Get()));
+  ASSERT_TRUE(group->BindResource(0, output.Get()));
   rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
@@ -262,7 +262,7 @@ TEST_F(SoftwareBVHTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {
                      {1, rhi::BINDING_RW_BYTE_ADDRESS_BUFFER},
                      {2, rhi::BINDING_BYTE_ADDRESS_BUFFER, 1}}}};
   rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
-  rhi::BindingGroup group = device->CreateBindingGroup(layout.groups[0]);
+  rhi::ObjPtr<rhi::IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
   ASSERT_TRUE(program && group);
   for (uint32_t count : {1u, 65u}) {
     SCOPED_TRACE(count);
@@ -278,9 +278,9 @@ TEST_F(SoftwareBVHTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {
     ASSERT_TRUE(commands->CmdUploadBuffer(metadata.Get(), 0, records.data(), records.size() * 4));
     ASSERT_TRUE(commands->CmdUploadBuffer(power.Get(), 0, &one, 4));
     ASSERT_TRUE(commands->CmdUploadBuffer(selector.Get(), 0, actual.data(), actual.size() * 4));
-    ASSERT_TRUE(group.BindResource(0, metadata.Get()));
-    ASSERT_TRUE(group.BindResource(1, selector.Get()));
-    ASSERT_TRUE(group.BindResource(2, power.Get()));
+    ASSERT_TRUE(group->BindResource(0, metadata.Get()));
+    ASSERT_TRUE(group->BindResource(1, selector.Get()));
+    ASSERT_TRUE(group->BindResource(2, power.Get()));
     ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
     ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
     ASSERT_TRUE(commands->CmdDispatch((count + 63) / 64, 1, 1));
@@ -371,13 +371,13 @@ RHI_BYTE_ADDRESS_BUFFER(0, 0, camera_data);
     layout.groups = {{{{0, rhi::BINDING_BYTE_ADDRESS_BUFFER}}}, {{{0, rhi::BINDING_RW_BYTE_ADDRESS_BUFFER}}}};
     rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
     rhi::ObjPtr<rhi::IBuffer> output = device->CreateBuffer({sizeof(result)});
-    rhi::BindingGroup camera_group = device->CreateBindingGroup(layout.groups[0]);
-    rhi::BindingGroup output_group = device->CreateBindingGroup(layout.groups[1]);
+    rhi::ObjPtr<rhi::IBindingGroup> camera_group = device->CreateBindingGroup(layout.groups[0]);
+    rhi::ObjPtr<rhi::IBindingGroup> output_group = device->CreateBindingGroup(layout.groups[1]);
     EXPECT_TRUE(shader && program && output && camera_group && output_group);
     if (!shader || !program || !output || !camera_group || !output_group)
       return result;
-    EXPECT_TRUE(camera_group.BindResource(0, adapter->Buffer()));
-    EXPECT_TRUE(output_group.BindResource(0, output.Get()));
+    EXPECT_TRUE(camera_group->BindResource(0, adapter->Buffer()));
+    EXPECT_TRUE(output_group->BindResource(0, output.Get()));
     auto updates = core->BeginUpdates();
     rhi::ObjPtr<rhi::ICommandContext> commands = queue->CreateCommandContext();
     EXPECT_TRUE(commands);
@@ -968,7 +968,7 @@ RHI_RW_BYTE_ADDRESS_BUFFER(4, 0, results);
                    : (i == 0 && ray_query ? rhi::BINDING_ACCELERATION_STRUCTURE : rhi::BINDING_BYTE_ADDRESS_BUFFER)}};
   rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
   ASSERT_TRUE(program);
-  std::array<rhi::BindingGroup, 5> groups;
+  std::array<rhi::ObjPtr<rhi::IBindingGroup>, 5> groups;
   for (int i = 0; i < 5; ++i) {
     groups[i] = device->CreateBindingGroup(layout.groups[i]);
     ASSERT_TRUE(groups[i]);
@@ -1019,13 +1019,13 @@ RHI_RW_BYTE_ADDRESS_BUFFER(4, 0, results);
     ASSERT_TRUE(core->RecordUpdates(commands.Get(), updates));
     ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
     if (ray_query)
-      ASSERT_TRUE(groups[0].BindResource(0, pipeline.AccelerationStructure()));
+      ASSERT_TRUE(groups[0]->BindResource(0, pipeline.AccelerationStructure()));
     else
-      ASSERT_TRUE(groups[0].BindResource(0, pipeline.Nodes()));
-    ASSERT_TRUE(groups[1].BindResource(0, pipeline.Instances()));
-    ASSERT_TRUE(groups[2].BindResource(0, buffers[0]));
-    ASSERT_TRUE(groups[3].BindResource(0, ray_buffer.Get()));
-    ASSERT_TRUE(groups[4].BindResource(0, output.Get()));
+      ASSERT_TRUE(groups[0]->BindResource(0, pipeline.Nodes()));
+    ASSERT_TRUE(groups[1]->BindResource(0, pipeline.Instances()));
+    ASSERT_TRUE(groups[2]->BindResource(0, buffers[0]));
+    ASSERT_TRUE(groups[3]->BindResource(0, ray_buffer.Get()));
+    ASSERT_TRUE(groups[4]->BindResource(0, output.Get()));
     for (uint32_t i = 0; i < groups.size(); ++i)
       ASSERT_TRUE(commands->CmdBindGroup(i, groups[i].Get()));
     ASSERT_TRUE(commands->CmdDispatch((rays.size() + 63) / 64, 1, 1));
@@ -1174,7 +1174,7 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
                    : (i == 0 && ray_query ? rhi::BINDING_ACCELERATION_STRUCTURE : rhi::BINDING_BYTE_ADDRESS_BUFFER)}};
   rhi::ObjPtr<rhi::IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
   ASSERT_TRUE(program);
-  std::array<rhi::BindingGroup, 4> groups;
+  std::array<rhi::ObjPtr<rhi::IBindingGroup>, 4> groups;
   for (int i = 0; i < 4; ++i) {
     groups[i] = device->CreateBindingGroup(layout.groups[i]);
     ASSERT_TRUE(groups[i]);
@@ -1190,12 +1190,12 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   ASSERT_TRUE(core->RecordUpdates(commands.Get(), updates));
   ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
   if (ray_query)
-    ASSERT_TRUE(groups[0].BindResource(0, pipeline.AccelerationStructure()));
+    ASSERT_TRUE(groups[0]->BindResource(0, pipeline.AccelerationStructure()));
   else
-    ASSERT_TRUE(groups[0].BindResource(0, pipeline.Nodes()));
-  ASSERT_TRUE(groups[1].BindResource(0, pipeline.Instances()));
-  ASSERT_TRUE(groups[2].BindResource(0, rt_geometry.Buffer()));
-  ASSERT_TRUE(groups[3].BindResource(0, output.Get()));
+    ASSERT_TRUE(groups[0]->BindResource(0, pipeline.Nodes()));
+  ASSERT_TRUE(groups[1]->BindResource(0, pipeline.Instances()));
+  ASSERT_TRUE(groups[2]->BindResource(0, rt_geometry.Buffer()));
+  ASSERT_TRUE(groups[3]->BindResource(0, output.Get()));
   for (uint32_t i = 0; i < groups.size(); ++i)
     ASSERT_TRUE(commands->CmdBindGroup(i, groups[i].Get()));
   ASSERT_TRUE(commands->CmdDispatch(1, 1, 1));

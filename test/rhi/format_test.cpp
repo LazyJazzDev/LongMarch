@@ -296,8 +296,8 @@ TEST_P(RhiFormats, IntegerStorageWritesAndRenderTargetsPreserveValues) {
     cd.pipeline_layout.groups = {{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}}};
     ObjPtr<IComputeProgram> compute = device->CreateComputeProgram(cd);
     ASSERT_TRUE(compute);
-    BindingGroup group = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
-    ASSERT_TRUE(group && group.BindResource(0, image.Get()));
+    ObjPtr<IBindingGroup> group = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
+    ASSERT_TRUE(group && group->BindResource(0, image.Get()));
     ObjPtr<IShader> vs =
         device->CreateShaderFromSource(source.substr(source.find("float4 VSMain")), "VSMain", SHADER_STAGE_VERTEX);
     ObjPtr<IShader> ps =
@@ -414,8 +414,8 @@ TEST_P(RhiFormats, IntegerClearsPreserveBoundDescriptorTablesAndOrderWrites) {
   desc.pipeline_layout.groups = {{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}}};
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
   ASSERT_TRUE(program);
-  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
-  ASSERT_TRUE(group && group.BindResource(0, image.Get()));
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group && group->BindResource(0, image.Get()));
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));

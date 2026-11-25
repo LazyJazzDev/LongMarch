@@ -30,7 +30,7 @@ class LightGeometryMaterial : public Light {
   // float3x4 transform
   // uint num_primitive
   // uint cdf[num_primitive];
-  rhi::BindingGroup gather_group_, scan_group_;
+  rhi::ObjPtr<rhi::IBindingGroup> gather_group_, scan_group_;
 };
 
 }  // namespace sparkium::raytracing

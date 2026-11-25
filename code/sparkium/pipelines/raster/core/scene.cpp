@@ -166,7 +166,7 @@ bool Scene::RecordRender(sparkium::Renderer &renderer,
 
   if (!commands->CmdBindGroup(2, camera->NearFieldBindings()))
     return false;
-  if (!ambient_light_group_ || !ambient_light_group_.BindResource(4, ambient_light_buffer_.Get()))
+  if (!ambient_light_group_ || !ambient_light_group_->BindResource(4, ambient_light_buffer_.Get()))
     return false;
   if (!commands->CmdBindGroup(0, film->LightingBindings()))
     return false;

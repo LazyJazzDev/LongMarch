@@ -43,8 +43,8 @@ bool Run(IDevice *device, bool synchronize) {
   desc.compute_shader = shader.Get();
   desc.pipeline_layout.groups = {layout};
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
-  BindingGroup group = device->CreateBindingGroup(layout);
-  if (!program || !group || !group.BindResource(0, input.Get()) || !group.BindResource(1, output.Get()))
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+  if (!program || !group || !group->BindResource(0, input.Get()) || !group->BindResource(1, output.Get()))
     return false;
 
   std::vector<uint32_t> data(count, 0), actual(count);

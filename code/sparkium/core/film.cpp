@@ -53,16 +53,17 @@ bool Film::PrepareAccumulation() {
   auto *device = core_->GetDevice();
   rhi::ObjPtr<rhi::IImage> color = device->CreateImage({extent_.x, extent_.y, rhi::IMAGE_FORMAT_R32G32B32A32_SFLOAT});
   rhi::ObjPtr<rhi::IImage> samples = device->CreateImage({extent_.x, extent_.y, rhi::IMAGE_FORMAT_R32_SFLOAT});
-  rhi::BindingGroup group = device->CreateBindingGroup(RayTracingLayout(false, 1, 1, 1).groups[SPARKIUM_GROUP_FILM]);
-  if (!color || !samples || !group || !group.BindResource(SPARKIUM_FILM_COLOR, color.Get()) ||
-      !group.BindResource(SPARKIUM_FILM_SAMPLES, samples.Get()))
+  rhi::ObjPtr<rhi::IBindingGroup> group =
+      device->CreateBindingGroup(RayTracingLayout(false, 1, 1, 1).groups[SPARKIUM_GROUP_FILM]);
+  if (!color || !samples || !group || !group->BindResource(SPARKIUM_FILM_COLOR, color.Get()) ||
+      !group->BindResource(SPARKIUM_FILM_SAMPLES, samples.Get()))
     return false;
   auto *program = core_->GetComputeProgram("film2img");
   if (!program)
     return false;
-  rhi::BindingGroup resolve = device->CreateBindingGroup(program->GetDesc().pipeline_layout.groups[0]);
-  if (!resolve || !resolve.BindResource(0, color.Get()) || !resolve.BindResource(1, samples.Get()) ||
-      !resolve.BindResource(2, raw_image_.Get()))
+  rhi::ObjPtr<rhi::IBindingGroup> resolve = device->CreateBindingGroup(program->GetDesc().pipeline_layout.groups[0]);
+  if (!resolve || !resolve->BindResource(0, color.Get()) || !resolve->BindResource(1, samples.Get()) ||
+      !resolve->BindResource(2, raw_image_.Get()))
     return false;
   accumulated_color_ = std::move(color);
   accumulated_samples_ = std::move(samples);
@@ -108,8 +109,8 @@ bool Film::RecordDevelop(rhi::ICommandContext *commands, rhi::IImage *target, bo
         return false;
   return commands->CmdUploadBuffer(tone_mapping_buffer_.Get(), 0, &info.view_transform,
                                    sizeof(int) + sizeof(float) * 3) &&
-         tone_mapping_group_.BindResource(0, raw_image_.Get()) && tone_mapping_group_.BindResource(1, target) &&
-         tone_mapping_group_.BindResource(2, tone_mapping_buffer_.Get()) &&
+         tone_mapping_group_->BindResource(0, raw_image_.Get()) && tone_mapping_group_->BindResource(1, target) &&
+         tone_mapping_group_->BindResource(2, tone_mapping_buffer_.Get()) &&
          commands->CmdBindComputeProgram(core_->GetComputeProgram(linear_hdr ? "tone_mapping_hdr" : "tone_mapping")) &&
          commands->CmdBindGroup(0, tone_mapping_group_.Get()) &&
          commands->CmdDispatch((extent_.x + 7) / 8, (extent_.y + 7) / 8, 1);

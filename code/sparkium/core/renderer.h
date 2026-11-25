@@ -50,7 +50,7 @@ class Renderer {
   rhi::ObjPtr<rhi::ISubmissionToken> last_submission_;
   rhi::IQueue *last_queue_ = nullptr;
   rhi::ObjPtr<rhi::IBuffer> parameters_;
-  rhi::BindingGroup bindings_;
+  rhi::ObjPtr<rhi::IBindingGroup> bindings_;
 };
 
 }  // namespace sparkium

@@ -32,7 +32,7 @@ rhi::IShader *Camera::Shader() {
 rhi::IBindingGroup *Camera::Bindings() {
   if (!bindings_)
     bindings_ = core_->GetDevice()->CreateBindingGroup(RayTracingLayout(false, 1, 1, 1).groups[SPARKIUM_GROUP_CAMERA]);
-  return bindings_ && bindings_.BindResource(SPARKIUM_CAMERA_DATA, Buffer()) ? bindings_.Get() : nullptr;
+  return bindings_ && bindings_->BindResource(SPARKIUM_CAMERA_DATA, Buffer()) ? bindings_.Get() : nullptr;
 }
 
 const std::string &Camera::ShaderFile() const {

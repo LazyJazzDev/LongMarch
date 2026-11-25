@@ -304,7 +304,7 @@ TEST(VulkanDescriptorPool, GroupsReleaseSetsAndTrimIdlePages) {
   ASSERT_TRUE(device);
   auto native = rhi::QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get()).Get();
   BindingLayoutDesc layout{{{0, BINDING_UNIFORM_BUFFER}}};
-  std::vector<BindingGroup> groups;
+  std::vector<ObjPtr<IBindingGroup>> groups;
   for (int i = 0; i < 130; ++i) {
     groups.emplace_back(device->CreateBindingGroup(layout));
     ASSERT_TRUE(groups.back());
@@ -315,7 +315,7 @@ TEST(VulkanDescriptorPool, GroupsReleaseSetsAndTrimIdlePages) {
   EXPECT_EQ(native->DescriptorPool().GetPageCounts(), (std::pair<size_t, size_t>{3, 2}));
   groups.clear();
   EXPECT_EQ(native->DescriptorPool().GetPageCounts(), (std::pair<size_t, size_t>{1, 0}));
-  BindingGroup reused = device->CreateBindingGroup(layout);
+  ObjPtr<IBindingGroup> reused = device->CreateBindingGroup(layout);
   ASSERT_TRUE(reused);
   EXPECT_EQ(native->DescriptorPool().GetPageCounts(), (std::pair<size_t, size_t>{1, 1}));
 }
@@ -330,7 +330,7 @@ TEST(VulkanDescriptorPool, EqualNativeTypeCountsSharePagesAndDifferentPatternsSt
   BindingLayoutDesc split{{{7, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16},
                            {3, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}};
   BindingLayoutDesc single{{{0, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_VERTEX, 16}}};
-  std::vector<BindingGroup> groups;
+  std::vector<ObjPtr<IBindingGroup>> groups;
   for (int i = 0; i < 65; ++i) {
     if (i % 2)
       groups.emplace_back(device->CreateBindingGroup(split));
@@ -340,7 +340,7 @@ TEST(VulkanDescriptorPool, EqualNativeTypeCountsSharePagesAndDifferentPatternsSt
   }
   auto &pool = native->DescriptorPool();
   EXPECT_EQ(pool.GetPageCounts(), (std::pair<size_t, size_t>{2, 2}));
-  BindingGroup other = device->CreateBindingGroup(single);
+  ObjPtr<IBindingGroup> other = device->CreateBindingGroup(single);
   ASSERT_TRUE(other);
   EXPECT_EQ(pool.GetPageCounts(), (std::pair<size_t, size_t>{3, 3}));
   // Reuse holes without resetting a page whose other sets are still alive.
@@ -368,7 +368,7 @@ TEST(VulkanDescriptorPool, LargeDescriptorArraysUseFullPageCapacity) {
   ASSERT_TRUE(backend::ValidateBindingLayout(layout));
   if (!backend::vulkan::ValidatePipelineBindings(native->NativePhysicalDevice(), {{layout}}))
     GTEST_SKIP() << "Device does not support 1025 storage descriptors in one set/stage.";
-  std::vector<BindingGroup> groups;
+  std::vector<ObjPtr<IBindingGroup>> groups;
   for (int i = 0; i < 65; ++i) {
     groups.emplace_back(device->CreateBindingGroup(layout));
     ASSERT_TRUE(groups.back());

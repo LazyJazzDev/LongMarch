@@ -60,10 +60,10 @@ commands->CmdUploadImage(texture.Get(), level2, level2_pitch, 2);     // 单级
 commands->CmdGenerateMipmaps(texture.Get());                          // 从第 0 级生成后续全部级别
 commands->CmdGenerateMipmaps(texture.Get(), 2, 3);                    // 读取第 2 级，生成第 3、4 级
 ObjPtr<IDownloadToken> result = commands->CmdDownloadImage(texture.Get(), {0, 0, 0, 0, 3});
-group.BindResource(0, ImageView{texture.Get(), 2, 3});                 // 采样第 2～4 级
+group->BindResource(0, ImageView{texture.Get(), 2, 3});                 // 采样第 2～4 级
 ```
 
-`ImageView::mip_count = 0` 对采样绑定表示剩余全部级别，对存储绑定表示单级；存储绑定只能选择一级。`BindingGroup` 便捷类的 `IImage*` 绑定继续有效，采样时可见整条链，存储时选择第 0 级。着色器 LOD 0 相对于视图的 `base_mip`。绑定组保存已解析范围，修改绑定组不会改变已录制命令。
+`ImageView::mip_count = 0` 对采样绑定表示剩余全部级别，对存储绑定表示单级；存储绑定只能选择一级。旧的 `IImage*` 绑定继续有效，采样时可见整条链，存储时选择第 0 级。着色器 LOD 0 相对于视图的 `base_mip`。绑定组保存已解析范围，修改绑定组不会改变已录制命令。
 
 采样器可独立设置 `min_filter`、`mag_filter`、`mip_filter`，`address_u/v/w`，`min_lod`、`max_lod`、`mip_lod_bias` 和 `max_anisotropy`。单个 filter 参数的构造函数直接设置三项过滤字段；默认均为 LINEAR，不再提供 `.filter` 字段或 INHERIT 值。各向异性大于 1 时三个过滤参数须为 LINEAR。
 
@@ -97,14 +97,3 @@ sampling.compare_op = COMPARE_LESS_EQUAL;
 本次深度采样路径支持 `IMAGE_FORMAT_D32_SFLOAT` 作为 `BINDING_TEXTURE2D`。它仍不能作为存储纹理，也不能在作为当前深度附件写入时同时采样。先结束深度 pass，再绑定采样，RHI 处理状态转换。Metal 比较采样要求 Apple3 或 Mac2 GPU family；Windows 构建不能替代 Metal 运行验证。Shader 翻译代码变化会更新离线缓存 ABI，外部移动应用需要重新准备 shader bundle。
 
 Vulkan 的绑定视图由图像自身缓存：默认完整 mip 范围复用已有视图，自定义范围按 `(base_mip, mip_count)` 延迟创建并复用，直到图像销毁时统一释放。BindingVersion 保留图像引用，因此已录制命令不会因绑定更新而失去原有视图。
-
-
-`IBindingGroup` 仅提供纯虚的数组绑定接口。需要单个资源、裸资源数组等便捷重载时，使用同一头文件中的 `BindingGroup`（派生自 `ObjPtr<IBindingGroup>`）：
-
-```cpp
-BindingGroup group = device->CreateBindingGroup(layout);
-group.BindResource(0, texture.Get());
-commands->CmdBindGroup(0, group.Get());
-```
-
-`BindingGroup` 沿用 `ObjPtr` 的所有权规则：工厂裸指针转入所有权，复制保留引用，移动转移引用；借用的接口指针通过 `BindingGroup::Retain(pointer)` 包装。`group->` 仍访问纯虚接口，便捷重载使用 `group.BindResource(...)`。

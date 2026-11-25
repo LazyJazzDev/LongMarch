@@ -149,16 +149,16 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
   ObjPtr<IBuffer> camera_buffer = device->CreateBuffer({256});
   if (!camera_buffer)
     return 1;
-  BindingGroup trace_group = device->CreateBindingGroup(trace_layout.groups[0]);
+  ObjPtr<IBindingGroup> trace_group = device->CreateBindingGroup(trace_layout.groups[0]);
   if (!trace_group)
     return 1;
-  if (!trace_group.BindResource(0, tlas.Get()))
+  if (!trace_group->BindResource(0, tlas.Get()))
     return 1;
-  BindingGroup display_group = device->CreateBindingGroup(graphics.pipeline_layout.groups[0]);
+  ObjPtr<IBindingGroup> display_group = device->CreateBindingGroup(graphics.pipeline_layout.groups[0]);
   if (!display_group)
     return 1;
   ObjPtr<IImage> output;
-  if (!trace_group.BindResource(2, camera_buffer.Get()))
+  if (!trace_group->BindResource(2, camera_buffer.Get()))
     return 1;
 
   window->KeyEvent().RegisterCallback([&](int key, int, int action, int) {
@@ -204,9 +204,9 @@ int RunRayQuery(grassland::rhi::IDevice *device) {
       output = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_R8G8B8A8_UNORM});
       if (!output)
         return 1;
-      if (!trace_group.BindResource(1, output.Get()))
+      if (!trace_group->BindResource(1, output.Get()))
         return 1;
-      if (!display_group.BindResource(0, output.Get()))
+      if (!display_group->BindResource(0, output.Get()))
         return 1;
       CameraInfo camera{
           glm::inverse(glm::perspective(glm::radians(60.0f), float(extent.width) / float(extent.height), 0.1f, 10.0f)),

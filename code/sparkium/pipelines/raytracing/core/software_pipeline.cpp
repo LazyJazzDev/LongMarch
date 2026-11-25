@@ -383,10 +383,10 @@ bool SoftwarePipeline::RecordPrepare(rhi::ICommandContext *commands,
     return false;
   for (size_t i = 0; i < passes.size(); ++i) {
     if (!commands->CmdBindComputeProgram(builders_[passes[i].kernel].Get()) ||
-        !build_group_.BindResource(0, nodes_.Get()) || !build_group_.BindResource(1, buffers) ||
-        !build_group_.BindResource(
+        !build_group_->BindResource(0, nodes_.Get()) || !build_group_->BindResource(1, buffers) ||
+        !build_group_->BindResource(
             2, rhi::BufferView{parameters_buffer_.Get(), i * sizeof(BuildParameters), sizeof(BuildParameters)}) ||
-        !build_group_.BindResource(3, keys_.Get()) || !build_group_.BindResource(4, instances_buffer_.Get()) ||
+        !build_group_->BindResource(3, keys_.Get()) || !build_group_->BindResource(4, instances_buffer_.Get()) ||
         !commands->CmdBindGroup(0, build_group_.Get()) || !commands->CmdDispatch((passes[i].count + 63) / 64, 1, 1))
       return core_->ReportFailure("failed to record software BVH construction");
   }

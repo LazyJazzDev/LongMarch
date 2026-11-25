@@ -78,7 +78,7 @@ class Film : public Object {
   bool reset_pending_{true};
   uint64_t accepted_sample_count_{};
   rhi::ObjPtr<rhi::IImage> accumulated_color_, accumulated_samples_;
-  rhi::BindingGroup accumulation_group_, resolve_group_;
+  rhi::ObjPtr<rhi::IBindingGroup> accumulation_group_, resolve_group_;
 
   glm::uvec2 extent_;
   rhi::ObjPtr<rhi::IImage> raw_image_;
@@ -87,7 +87,7 @@ class Film : public Object {
   rhi::ObjPtr<rhi::IBuffer> tone_mapping_buffer_;
 
   std::vector<std::function<void()>> reset_callbacks_;
-  rhi::BindingGroup tone_mapping_group_;
+  rhi::ObjPtr<rhi::IBindingGroup> tone_mapping_group_;
 };
 
 }  // namespace sparkium

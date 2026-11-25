@@ -117,7 +117,7 @@ class Scene : public Object {
 
   rhi::ObjPtr<rhi::ISampler> linear_sampler_;
   rhi::ObjPtr<rhi::ISampler> nearest_sampler_;
-  rhi::BindingGroup render_group_, light_group_, scan_group_;
+  rhi::ObjPtr<rhi::IBindingGroup> render_group_, light_group_, scan_group_;
 };
 
 Scene *DedicatedCast(sparkium::Scene *scene);

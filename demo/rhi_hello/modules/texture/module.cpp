@@ -66,13 +66,13 @@ int RunTexture(grassland::rhi::IDevice *device) {
   ObjPtr<IImage> texture = device->CreateImage({256, 256, IMAGE_FORMAT_R8G8B8A8_UNORM});
   if (!texture)
     return 1;
-  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   if (!group)
     return 1;
-  if (!group.BindResource(0, texture.Get()))
+  if (!group->BindResource(0, texture.Get()))
     return 1;
   ObjPtr<ISampler> sampler = device->CreateSampler();
-  if (!sampler || !group.BindResource(1, sampler.Get()))
+  if (!sampler || !group->BindResource(1, sampler.Get()))
     return 1;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {

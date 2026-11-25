@@ -73,12 +73,12 @@ bool Scene::Initialize(IDevice *device, ImageFormat target_format) {
   sampler.compare_op = COMPARE_LESS_EQUAL;
   pcf_sampler_ = device->CreateSampler(sampler);
   if (!shadow_program_ || !scene_program_ || !shadow_group_ || !shadow_ || !uniforms_ || !hard_sampler_ ||
-      !pcf_sampler_ || !shadow_group_.BindResource(0, BufferView{uniforms_.Get(), 0, 256}))
+      !pcf_sampler_ || !shadow_group_->BindResource(0, BufferView{uniforms_.Get(), 0, 256}))
     return false;
   scene_group_ = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
-  if (!scene_group_ || !scene_group_.BindResource(0, BufferView{uniforms_.Get(), 0, 256}) ||
-      !scene_group_.BindResource(1, shadow_.Get()) || !scene_group_.BindResource(2, hard_sampler_.Get()) ||
-      !scene_group_.BindResource(3, pcf_sampler_.Get()))
+  if (!scene_group_ || !scene_group_->BindResource(0, BufferView{uniforms_.Get(), 0, 256}) ||
+      !scene_group_->BindResource(1, shadow_.Get()) || !scene_group_->BindResource(2, hard_sampler_.Get()) ||
+      !scene_group_->BindResource(3, pcf_sampler_.Get()))
     return false;
   std::vector<Vertex> vertices;
   AddBox(vertices, {0, -.15f, 0}, {14, .3f, 18}, {.38f, .43f, .48f, 0});

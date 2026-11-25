@@ -13,8 +13,8 @@ class Scene {
   grassland::rhi::ObjPtr<grassland::rhi::IBuffer> vertices_, uniforms_;
   grassland::rhi::ObjPtr<grassland::rhi::IImage> shadow_, depth_;
   grassland::rhi::ObjPtr<grassland::rhi::ISampler> hard_sampler_, pcf_sampler_;
-  grassland::rhi::BindingGroup shadow_group_;
-  grassland::rhi::BindingGroup scene_group_;
+  grassland::rhi::ObjPtr<grassland::rhi::IBindingGroup> shadow_group_;
+  grassland::rhi::ObjPtr<grassland::rhi::IBindingGroup> scene_group_;
   uint32_t shadow_vertices_{}, scene_vertices_{};
 };
 }  // namespace rhi_pcf_demo

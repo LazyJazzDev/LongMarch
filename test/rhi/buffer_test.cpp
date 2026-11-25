@@ -434,9 +434,9 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
   for (uint32_t i = 0; i < buffers.size(); ++i) {
     buffers[i] = device->CreateBuffer({4});
     ASSERT_TRUE(buffers[i]);
-    BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[i]);
+    ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[i]);
     ASSERT_TRUE(group);
-    ASSERT_TRUE(group.BindResource(0, buffers[i].Get()));
+    ASSERT_TRUE(group->BindResource(0, buffers[i].Get()));
     ASSERT_TRUE(context->CmdBindGroup(i, group.Get()));
   }
   ASSERT_TRUE(context->CmdDispatch(1));
@@ -480,9 +480,9 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
   ASSERT_TRUE(output);
-  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
-  ASSERT_TRUE(group.BindResource(0, first.Get()));
+  ASSERT_TRUE(group->BindResource(0, first.Get()));
   std::array<uint32_t, 16> input{};
   for (uint32_t i = 0; i < 16; ++i)
     input[i] = i;
@@ -493,7 +493,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   ASSERT_TRUE(ctx->CmdBindComputeProgram(program.Get()));
   ASSERT_TRUE(ctx->CmdBindGroup(0, group.Get()));
   // The captured first version must remain bound even if the frontend group changes.
-  ASSERT_TRUE(group.BindResource(0, second.Get()));
+  ASSERT_TRUE(group->BindResource(0, second.Get()));
   ASSERT_TRUE(ctx->CmdDispatch(4));
   ASSERT_TRUE(ctx->CmdDispatch(4));
   ASSERT_TRUE(ctx->CmdCopyBuffer(first.Get(), 0, output.Get(), 0, 64));
@@ -519,7 +519,7 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   ASSERT_TRUE(program);
   group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
-  ASSERT_TRUE(group.BindResource(0, second.Get()));
+  ASSERT_TRUE(group->BindResource(0, second.Get()));
   ctx = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(ctx);
   ASSERT_TRUE(ctx->CmdBindComputeProgram(program.Get()));
@@ -556,9 +556,9 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
   std::array<uint32_t, 96> values{};
   ObjPtr<IBuffer> buffer = device->CreateBuffer({sizeof(values)});
   ASSERT_TRUE(buffer);
-  BindingGroup group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
-  ASSERT_TRUE(group.BindResource(0, buffer.Get()));
+  ASSERT_TRUE(group->BindResource(0, buffer.Get()));
   ObjPtr<ICommandContext> commands = ObjPtr<IQueue>(device->GetQueue(QUEUE_TYPE_MAIN))->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, values.data(), sizeof(values)));
