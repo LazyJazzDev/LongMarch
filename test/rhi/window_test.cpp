@@ -53,10 +53,10 @@ TEST_P(RhiWindow, MagnifyDispatchRetainsWindowAndIsolatesCallbacks) {
         EXPECT_DOUBLE_EQ(event.scale, 1.25);
         EXPECT_DOUBLE_EQ(event.x, 40.0);
         EXPECT_DOUBLE_EQ(event.y, 60.0);
-        EXPECT_EQ(event.phase, MagnifyPhase::kBegin);
+        EXPECT_EQ(event.phase, MAGNIFY_PHASE_BEGIN);
       },
       100);
-  backend::glfw::DispatchMagnifyEvent(native, {1.25, 40.0, 60.0, MagnifyPhase::kBegin});
+  backend::glfw::DispatchMagnifyEvent(native, {1.25, 40.0, 60.0, MAGNIFY_PHASE_BEGIN});
   EXPECT_FALSE(window);
   EXPECT_EQ(calls, 1);
   EXPECT_EQ(other_calls, 0);

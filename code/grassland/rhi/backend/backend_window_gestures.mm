@@ -18,15 +18,15 @@ void DispatchCocoaMagnifyEvent(GLFWwindow *window, NSEvent *event) {
   NSView *view = native_window.contentView;
   const NSPoint point = [view convertPoint:event.locationInWindow fromView:nil];
   const NSRect bounds = view.bounds;
-  MagnifyPhase phase = MagnifyPhase::kUpdate;
+  MagnifyPhase phase = MAGNIFY_PHASE_UPDATE;
   if (event.phase & NSEventPhaseCancelled)
-    phase = MagnifyPhase::kCancel;
+    phase = MAGNIFY_PHASE_CANCEL;
   else if (event.phase & NSEventPhaseEnded)
-    phase = MagnifyPhase::kEnd;
+    phase = MAGNIFY_PHASE_END;
   else if (event.phase & NSEventPhaseBegan)
-    phase = MagnifyPhase::kBegin;
+    phase = MAGNIFY_PHASE_BEGIN;
   // Cocoa reports an incremental fractional change, not a cumulative scale.
-  const double scale = phase == MagnifyPhase::kCancel ? 1.0 : std::max(0.001, 1.0 + double(event.magnification));
+  const double scale = phase == MAGNIFY_PHASE_CANCEL ? 1.0 : std::max(0.001, 1.0 + double(event.magnification));
   DispatchMagnifyEvent(window,
                        MagnifyGesture{scale, point.x - bounds.origin.x,
                                       view.isFlipped ? point.y - bounds.origin.y : NSMaxY(bounds) - point.y, phase});

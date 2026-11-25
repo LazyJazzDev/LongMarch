@@ -13,14 +13,14 @@
 LONGMARCH_RHI_INTERFACE(grassland::rhi::IWindow, grassland::rhi::IObject, "49b2b063-75db-4ba6-96ae-48d94b3a2022")
 
 namespace grassland::rhi {
-typedef enum { kBegin, kUpdate, kEnd, kCancel } MagnifyPhase;
+typedef enum { MAGNIFY_PHASE_BEGIN, MAGNIFY_PHASE_UPDATE, MAGNIFY_PHASE_END, MAGNIFY_PHASE_CANCEL } MagnifyPhase;
 
 // Incremental scale (1 means unchanged), with a focal point in window content
 // coordinates: logical units, origin at the top left, like MouseMoveEvent.
 // Cancel reports scale 1; it does not undo previously delivered updates.
 struct MagnifyGesture {
   double scale{1.0}, x{}, y{};
-  MagnifyPhase phase{MagnifyPhase::kUpdate};
+  MagnifyPhase phase{MAGNIFY_PHASE_UPDATE};
 };
 
 class IImage;
