@@ -978,6 +978,10 @@ bool VulkanCommandContextImpl::ValidateGroups() {
           continue;
         for (uint32_t element = 0; element < layout.bindings[binding_index].count; ++element) {
           const auto &view = groups_[i]->GetImageView(binding_index, element);
+          if (view.image == rendering_.depth_stencil.image) {
+            recording_failed_ = true;
+            return false;
+          }
           if (!AddBindingImageUse(image_uses, view, type == BINDING_RW_TEXTURE2D)) {
             recording_failed_ = true;
             return false;

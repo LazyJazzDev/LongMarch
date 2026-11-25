@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
+#include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 
 #include <algorithm>
 #include <array>
@@ -182,7 +182,9 @@ bool D3D12BindingVersionImpl::WriteDescriptors(size_t binding_index,
     auto target = resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i));
     if (binding.type == BINDING_TEXTURE2D) {
       D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
-      desc.Format = NativeImageFormat(view.image->GetDesc().format);
+      desc.Format = view.image->GetDesc().format == IMAGE_FORMAT_D32_SFLOAT
+                        ? DXGI_FORMAT_R32_FLOAT
+                        : NativeImageFormat(view.image->GetDesc().format);
       desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
       desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
       desc.Texture2D.MostDetailedMip = view.base_mip;
@@ -441,7 +443,8 @@ bool D3D12BindingGroupImpl::BindResource(uint32_t binding,
       return false;
     auto value = view.image;
     auto image = rhi::QueryInterfacePtr<ID3D12Image>(value).Get();
-    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
+    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ ||
+        (IsDepthFormat(value->GetDesc().format) && value->GetDesc().format != IMAGE_FORMAT_D32_SFLOAT))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;

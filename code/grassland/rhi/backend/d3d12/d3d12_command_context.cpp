@@ -839,6 +839,10 @@ bool D3D12CommandContextImpl::PrepareGroups() {
         } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
           auto image = rhi::QueryInterfacePtr<ID3D12Image>(version->GetReferences()[binding_index][j].Get()).Get();
           const auto &view = version->GetImageView(binding_index, j);
+          if (view.image == rendering_.depth_stencil.image) {
+            recording_failed_ = true;
+            return false;
+          }
           if (!AddBindingImageUse(image_uses, view, type == BINDING_RW_TEXTURE2D)) {
             recording_failed_ = true;
             return false;

@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
       {{"triangle", "Colored indexed triangle"}, RunTriangle},
       {{"cube", "Rotating cube with depth and uniform binding"}, RunCube},
       {{"mip", "Mipmap and anisotropic filtering on nine rotating cubes"}, RunMip},
+      {{"pcf", "Hard shadows versus PCF on two parallel pillars"}, RunPCF},
       {{"texture", "Sampled XOR texture triangle"}, RunTexture},
       {{"blend", "Source-alpha blended triangles"}, RunBlend},
       {{"nbody", "Compute simulation and particle rendering"}, RunNBody},

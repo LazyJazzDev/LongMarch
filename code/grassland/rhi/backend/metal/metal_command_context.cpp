@@ -702,6 +702,10 @@ bool MetalCommandContextImpl::ValidateGroups() {
         continue;
       for (uint32_t element = 0; element < layout.bindings[b].count; ++element) {
         const auto &view = groups_[i]->GetImageView(b, element);
+        if (view.image == render_target_) {
+          recording_failed_ = true;
+          return false;
+        }
         if (!AddBindingImageUse(image_uses, view, type == BINDING_RW_TEXTURE2D)) {
           recording_failed_ = true;
           return false;

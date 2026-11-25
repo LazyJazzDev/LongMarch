@@ -478,7 +478,8 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
       return false;
     auto value = view.image;
     auto image = rhi::QueryInterfacePtr<IMetalImage>(value).Get();
-    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
+    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ ||
+        (IsDepthFormat(value->GetDesc().format) && value->GetDesc().format != IMAGE_FORMAT_D32_SFLOAT))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;

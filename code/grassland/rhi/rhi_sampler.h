@@ -2,6 +2,7 @@
 #include <limits>
 
 #include "grassland/rhi/rhi_object.h"
+#include "grassland/rhi/rhi_util.h"
 
 LONGMARCH_RHI_INTERFACE(grassland::rhi::ISampler, grassland::rhi::IObject, "1686d5c9-e228-4896-a8db-fd1ee89e98d2")
 
@@ -41,6 +42,9 @@ struct SamplerDesc {
   SamplerAddressMode address_w{SAMPLER_ADDRESS_REPEAT};
   // Used by CLAMP_TO_BORDER addressing: (0,0,0,0), (0,0,0,1), or (1,1,1,1).
   SamplerBorderColor border_color{SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK};
+  // Comparison samplers are used with RHI_COMPARISON_SAMPLER and SampleCmp*.
+  bool compare_enable{false};
+  CompareOp compare_op{COMPARE_LESS_EQUAL};
   float min_lod{0.0f};
   float max_lod{(std::numeric_limits<float>::max)()};
   float mip_lod_bias{0.0f};

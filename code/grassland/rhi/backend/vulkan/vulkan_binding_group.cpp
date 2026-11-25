@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
+#include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 
 #include <algorithm>
 #include <array>
@@ -193,7 +193,10 @@ bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
     create.image = image->NativeImage();
     create.viewType = VK_IMAGE_VIEW_TYPE_2D;
     create.format = NativeImageFormat(view.image->GetDesc().format);
-    create.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, view.base_mip, view.mip_count, 0, 1};
+    create.subresourceRange = {
+        VkImageAspectFlags(IsDepthFormat(view.image->GetDesc().format) ? VK_IMAGE_ASPECT_DEPTH_BIT
+                                                                       : VK_IMAGE_ASPECT_COLOR_BIT),
+        view.base_mip, view.mip_count, 0, 1};
     auto handle = std::shared_ptr<VkImageView>(new VkImageView{}, [device](VkImageView *p) {
       if (*p)
         vkDestroyImageView(device, *p, nullptr);
@@ -507,7 +510,8 @@ bool VulkanBindingGroupImpl::BindResource(uint32_t binding,
       return false;
     auto value = view.image;
     auto image = rhi::QueryInterfacePtr<IVulkanImage>(value).Get();
-    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ || IsDepthFormat(value->GetDesc().format))
+    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ ||
+        (IsDepthFormat(value->GetDesc().format) && value->GetDesc().format != IMAGE_FORMAT_D32_SFLOAT))
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;

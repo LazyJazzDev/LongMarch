@@ -308,9 +308,15 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                           "RW_TEXTURE2D",
                           "SAMPLER",
                           "ACCELERATION_STRUCTURE"};
-  const char *types[] = {"ConstantBuffer<T>", "StructuredBuffer<T>", "RWStructuredBuffer<T>",
-                         "ByteAddressBuffer", "RWByteAddressBuffer", "Texture2D<T>",
-                         "RWTexture2D<T>",    "SamplerState",        "RaytracingAccelerationStructure"};
+  const char *types[] = {"ConstantBuffer<T>",
+                         "StructuredBuffer<T>",
+                         "RWStructuredBuffer<T>",
+                         "ByteAddressBuffer",
+                         "RWByteAddressBuffer",
+                         "Texture2D<T>",
+                         "RWTexture2D<T>",
+                         "T",
+                         "RaytracingAccelerationStructure"};
   for (auto macro : macros) {
     for (const auto &suffix : {std::string{}, std::string{"_ARRAY"}}) {
       auto name = std::string(macro) + suffix;
@@ -319,9 +325,14 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
       bool untyped = std::string(macro) == "SAMPLER" || std::string(macro) == "ACCELERATION_STRUCTURE" ||
                      std::string(macro).find("BYTE_ADDRESS_BUFFER") != std::string::npos;
       header += "#define RHI_" + name + (untyped ? "(G,B,N) " : "(G,B,T,N) ") + "RHI_" + name + "_D(G,B)" +
-                (untyped ? "(N)\n" : "(T,N)\n");
+                (std::string(macro) == "SAMPLER" ? "(SamplerState,N)\n"
+                 : untyped                       ? "(N)\n"
+                                                 : "(T,N)\n");
     }
   }
+  header +=
+      "#define RHI_COMPARISON_SAMPLER(G,B,N) RHI_SAMPLER_D(G,B)(SamplerComparisonState,N)\n"
+      "#define RHI_COMPARISON_SAMPLER_ARRAY(G,B,N) RHI_SAMPLER_ARRAY_D(G,B)(SamplerComparisonState,N)\n";
   for (auto mapped : MapBindings(layout, api)) {
     auto b = mapped.desc;
     std::string base = macros[b.type];
@@ -330,8 +341,8 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
         continue;
       auto name = base + (array ? "_ARRAY" : "");
       header += "#define RHI_" + name + "_" + std::to_string(mapped.group) + "_" + std::to_string(b.binding) +
-                ((b.type == BINDING_ACCELERATION_STRUCTURE || b.type == BINDING_SAMPLER ||
-                  b.type == BINDING_BYTE_ADDRESS_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER)
+                ((b.type == BINDING_ACCELERATION_STRUCTURE || b.type == BINDING_BYTE_ADDRESS_BUFFER ||
+                  b.type == BINDING_RW_BYTE_ADDRESS_BUFFER)
                      ? "(N) "
                      : "(T,N) ");
       if (api == BACKEND_API_VULKAN)

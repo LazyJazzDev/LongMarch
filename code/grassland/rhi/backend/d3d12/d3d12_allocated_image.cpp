@@ -50,7 +50,8 @@ IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &r
   info.Height = desc.height;
   info.DepthOrArraySize = 1;
   info.MipLevels = static_cast<UINT16>(desc.mip_levels);
-  info.Format = format;
+  // D32 shadow maps need both a DSV (D32_FLOAT) and an SRV (R32_FLOAT).
+  info.Format = desc.format == IMAGE_FORMAT_D32_SFLOAT ? DXGI_FORMAT_R32_TYPELESS : format;
   info.SampleDesc.Count = 1;
   info.Flags =
       IsDepthFormat(desc.format) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;

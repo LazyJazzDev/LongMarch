@@ -8,8 +8,9 @@ bool ValidateSamplerDesc(const SamplerDesc &desc) {
     return value == SAMPLER_FILTER_NEAREST || value == SAMPLER_FILTER_LINEAR;
   };
   return valid_filter(desc.MinFilter()) && valid_filter(desc.MagFilter()) && valid_filter(desc.MipFilter()) &&
-         std::isfinite(desc.min_lod) && std::isfinite(desc.max_lod) && std::isfinite(desc.mip_lod_bias) &&
-         desc.min_lod >= 0.0f && desc.max_lod >= desc.min_lod && desc.max_anisotropy >= 1 &&
+         desc.compare_op >= COMPARE_NEVER && desc.compare_op <= COMPARE_ALWAYS && std::isfinite(desc.min_lod) &&
+         std::isfinite(desc.max_lod) && std::isfinite(desc.mip_lod_bias) && desc.min_lod >= 0.0f &&
+         desc.max_lod >= desc.min_lod && desc.max_anisotropy >= 1 &&
          (desc.max_anisotropy == 1 ||
           (desc.MinFilter() == SAMPLER_FILTER_LINEAR && desc.MagFilter() == SAMPLER_FILTER_LINEAR &&
            desc.MipFilter() == SAMPLER_FILTER_LINEAR)) &&

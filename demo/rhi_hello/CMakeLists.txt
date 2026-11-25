@@ -1,4 +1,4 @@
-set(RHI_HELLO_MODULES window triangle cube texture mip blend nbody raytracing ray_query hdr imgui imgui_multi_window)
+set(RHI_HELLO_MODULES window triangle cube texture mip pcf blend nbody raytracing ray_query hdr imgui imgui_multi_window)
 add_executable(${DEMO_NAME} main.cpp)
 target_link_libraries(${DEMO_NAME} PRIVATE grassland_rhi grassland_util snowberg_tui)
 
@@ -32,3 +32,7 @@ endif ()
 add_custom_target(rhi_mip_shader_header DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/modules/mip/shaders/mip.slang.h)
 target_sources(${DEMO_NAME} PRIVATE modules/mip/scene.cpp)
 set_source_files_properties(modules/mip/scene.cpp PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR}/modules/mip)
+
+add_custom_target(rhi_pcf_shader_header DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/modules/pcf/shaders/pcf_shader.slang.h)
+target_sources(${DEMO_NAME} PRIVATE modules/pcf/scene.cpp)
+set_source_files_properties(modules/pcf/scene.cpp PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR}/modules/pcf)

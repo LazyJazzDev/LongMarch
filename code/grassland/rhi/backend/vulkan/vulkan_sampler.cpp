@@ -30,6 +30,8 @@ rhi::ISampler *VulkanSamplerImpl::Create(IVulkanDevice *device, const SamplerDes
   const VkBorderColor colors[] = {VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK, VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK,
                                   VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE};
   create.borderColor = colors[desc.border_color];
+  create.compareEnable = desc.compare_enable;
+  create.compareOp = static_cast<VkCompareOp>(desc.compare_op);
   create.minLod = desc.min_lod;
   create.maxLod = desc.max_lod;
   create.mipLodBias = desc.mip_lod_bias;

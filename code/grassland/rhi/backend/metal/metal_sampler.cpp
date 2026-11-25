@@ -20,6 +20,11 @@ rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc 
   if (!ValidateSamplerDesc(desc) || desc.max_anisotropy > limits.max_anisotropy ||
       desc.mip_lod_bias < limits.min_lod_bias || desc.mip_lod_bias > limits.max_lod_bias)
     return nullptr;
+  if (desc.compare_enable && !device->NativeDevice()->supportsFamily(MTL::GPUFamilyApple3) &&
+      !device->NativeDevice()->supportsFamily(MTL::GPUFamilyMac2)) {
+    ReportError(-1, "Metal comparison sampling requires Apple3 or Mac2 GPU support.");
+    return nullptr;
+  }
   const bool uses_border = desc.address_u == SAMPLER_ADDRESS_CLAMP_TO_BORDER ||
                            desc.address_v == SAMPLER_ADDRESS_CLAMP_TO_BORDER ||
                            desc.address_w == SAMPLER_ADDRESS_CLAMP_TO_BORDER;
@@ -32,6 +37,8 @@ rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc 
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto descriptor = NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
   descriptor->setSupportArgumentBuffers(true);
+  descriptor->setCompareFunction(desc.compare_enable ? static_cast<MTL::CompareFunction>(desc.compare_op)
+                                                     : MTL::CompareFunctionNever);
   descriptor->setMinFilter(desc.MinFilter() == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
                                                                       : MTL::SamplerMinMagFilterLinear);
   descriptor->setMagFilter(desc.MagFilter() == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest

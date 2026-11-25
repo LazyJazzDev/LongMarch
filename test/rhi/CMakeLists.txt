@@ -45,3 +45,9 @@ target_sources(test_rhi PRIVATE
 target_include_directories(test_rhi PRIVATE ${PROJECT_BINARY_DIR}/demo/rhi_hello/modules/mip)
 
 add_dependencies(test_rhi rhi_mip_shader_header)
+
+target_sources(test_rhi PRIVATE pcf_test.cpp
+    ${PROJECT_SOURCE_DIR}/demo/rhi_hello/modules/pcf/scene.cpp
+    ${PROJECT_BINARY_DIR}/demo/rhi_hello/modules/pcf/shaders/pcf_shader.slang.h)
+target_include_directories(test_rhi PRIVATE ${PROJECT_BINARY_DIR}/demo/rhi_hello/modules/pcf)
+add_dependencies(test_rhi rhi_pcf_shader_header)

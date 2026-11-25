@@ -18,6 +18,7 @@ demo_rhi_hello --backend vulkan --module cube --device 1
 | cube | Uniform、旋转变换、深度附件及窗口缩放 |
 | texture | 上传图片、纹理和采样器绑定 |
 | mip | GPU MIP 链、三线性和各向异性过滤、九个旋转纹理立方体 |
+| pcf | 同一场景左半屏硬阴影、右半屏 PCF；深度纹理和比较采样 |
 | blend | Alpha 混合 |
 | nbody | Compute、粒子绘制、异步速度读回和交互 |
 | raytracing | BLAS/TLAS、压缩、更新及光追管线 |
@@ -68,6 +69,29 @@ group->BindResource(0, ImageView{texture.Get(), 2, 3});                 // 采�
 
 `SAMPLER_ADDRESS_CLAMP_TO_BORDER` 使用 `border_color` 指定的透明黑 `(0,0,0,0)`、不透明黑 `(0,0,0,1)` 或不透明白 `(1,1,1,1)`，默认透明黑。其他寻址模式不使用边界颜色。Metal 的边界颜色采样要求 Apple7 或 Mac2 GPU family，不支持的设备创建该模式的采样器时返回空句柄。
 
-GPU 生成采用逐级线性缩小，支持非二次幂尺寸；它不是离线纹理压缩器，也不执行 gamma 转换。格式须支持 `mip_compute_generation`，源级必须已有有效数据。生成命令使用自己的计算程序和绑定，调用后应重新绑定应用程序的 Program/Group；只能在渲染作用域之外调用。Metal 暂不报告/提供 GPU 生成能力。
+GPU 生成采用逐级线性缩小，支持非二次幂尺寸；它不是离线纹理压缩器，也不执行 gamma 转换。格式须支持 `mip_compute_generation`，源级必须已有有效数据。生成命令使用自己的计算程序和绑定，调用后应重新绑定应用程序的 Program/Group；只能在渲染作用域之外调用。Metal 已接入相同的逐级 GPU 生成流程。
 
 上下文按 mip 追踪资源状态和访问依赖，允许同一 dispatch 读取一个 mip 并写入另一个 mip，拒绝重叠范围的读写绑定。提交时恢复各级默认状态；跨队列仍须使用 `SubmitInfo::waits`，不能同时无依赖地访问同一资源。上传和读回的尺寸、行间距及区域均相对于所选 mip。现有渲染附件和 standalone clear 仍针对第 0 级。本轮不增加 TextureArray。
+
+## PCF 阴影示例
+
+```sh
+demo_rhi_hello --backend d3d12 --module pcf --device auto
+demo_rhi_hello --backend vulkan --module pcf --device auto
+```
+
+场景中只有两根平行、间隔放置的长方体柱子和一个远处居中的光源。先从光源视角生成 512×512 的 D32 shadow map，再用一个相机、一个完整视口绘制场景。片元着色器按屏幕中线选择算法：左半屏读取最近邻深度并做单次比较，右半屏使用 5×5 核的比较采样 PCF，每个 tap 使用硬件线性比较过滤。两侧共用光源、几何体、shadow map 和基础 bias；PCF 使用接收平面深度修正，避免宽核导致斜面自阴影。这里演示的是阴影过滤，不是面积光源的物理软阴影。
+
+空格键切换灰度阴影可见度，Escape 返回菜单。`pcf_shader.slang` 包含深度 pass 和场景 pass；场景代码也用于离屏渲染回归。
+
+比较采样使用已有的 `CompareOp`：
+
+```cpp
+SamplerDesc sampling{SAMPLER_FILTER_LINEAR};
+sampling.compare_enable = true;
+sampling.compare_op = COMPARE_LESS_EQUAL;
+```
+
+`compare_enable` 默认为 false；`compare_op` 默认为 LESS_EQUAL。比较方向为 shader 参考值与纹理深度的比较，八种运算（包括 NEVER / ALWAYS）均可显式选择。Shader 使用 `RHI_COMPARISON_SAMPLER(group, binding, name)` 或其 `_ARRAY` 版本声明 `SamplerComparisonState`，配合 `SampleCmpLevelZero`；C++ 绑定仍为 `BINDING_SAMPLER`。普通 `RHI_SAMPLER` 配合关闭比较的采样器，比较声明配合开启比较的采样器，调用方应保持一致。
+
+本次深度采样路径支持 `IMAGE_FORMAT_D32_SFLOAT` 作为 `BINDING_TEXTURE2D`。它仍不能作为存储纹理，也不能在作为当前深度附件写入时同时采样。先结束深度 pass，再绑定采样，RHI 处理状态转换。Metal 比较采样要求 Apple3 或 Mac2 GPU family；Windows 构建不能替代 Metal 运行验证。Shader 翻译代码变化会更新离线缓存 ABI，外部移动应用需要重新准备 shader bundle。

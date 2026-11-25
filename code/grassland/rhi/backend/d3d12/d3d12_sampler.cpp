@@ -17,11 +17,13 @@ rhi::ISampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc 
   const D3D12_TEXTURE_ADDRESS_MODE modes[] = {D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
                                               D3D12_TEXTURE_ADDRESS_MODE_MIRROR, D3D12_TEXTURE_ADDRESS_MODE_BORDER};
   auto &native = sampler->native_desc_;
-  native.Filter = desc.max_anisotropy > 1 ? D3D12_FILTER_ANISOTROPIC
-                                          : D3D12_ENCODE_BASIC_FILTER(static_cast<D3D12_FILTER_TYPE>(desc.MinFilter()),
-                                                                      static_cast<D3D12_FILTER_TYPE>(desc.MagFilter()),
-                                                                      static_cast<D3D12_FILTER_TYPE>(desc.MipFilter()),
-                                                                      D3D12_FILTER_REDUCTION_TYPE_STANDARD);
+  native.Filter =
+      desc.max_anisotropy > 1
+          ? (desc.compare_enable ? D3D12_FILTER_COMPARISON_ANISOTROPIC : D3D12_FILTER_ANISOTROPIC)
+          : D3D12_ENCODE_BASIC_FILTER(
+                static_cast<D3D12_FILTER_TYPE>(desc.MinFilter()), static_cast<D3D12_FILTER_TYPE>(desc.MagFilter()),
+                static_cast<D3D12_FILTER_TYPE>(desc.MipFilter()),
+                desc.compare_enable ? D3D12_FILTER_REDUCTION_TYPE_COMPARISON : D3D12_FILTER_REDUCTION_TYPE_STANDARD);
   native.AddressU = modes[desc.address_u];
   native.AddressV = modes[desc.address_v];
   native.AddressW = modes[desc.address_w];
@@ -31,7 +33,8 @@ rhi::ISampler *D3D12SamplerImpl::Create(ID3D12Device *device, const SamplerDesc 
   native.MinLOD = desc.min_lod;
   native.MaxLOD = desc.max_lod;
   native.MipLODBias = desc.mip_lod_bias;
-  native.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+  native.ComparisonFunc =
+      desc.compare_enable ? static_cast<D3D12_COMPARISON_FUNC>(desc.compare_op + 1) : D3D12_COMPARISON_FUNC_NEVER;
   native.MaxAnisotropy = desc.max_anisotropy;
   device->NativeDevice()->CreateSampler(&native, sampler->Descriptor());
   return sampler.Detach();
