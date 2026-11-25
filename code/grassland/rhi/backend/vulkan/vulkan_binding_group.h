@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/vulkan/vulkan_descriptor_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
@@ -93,7 +93,6 @@ class VulkanBindingVersionImpl final : public Object<IVulkanBindingVersion> {
   // Indexed by sorted layout binding, then array element.
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
   std::vector<std::vector<ImageView>> image_views_;
-  std::vector<std::vector<std::shared_ptr<VkImageView>>> native_views_;
 };
 
 class VulkanBindingGroupImpl final : public Object<rhi::IBindingGroup, IVulkanBindingGroup> {

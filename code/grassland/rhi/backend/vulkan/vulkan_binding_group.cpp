@@ -117,7 +117,6 @@ ObjectPtr<IVulkanBindingVersion> VulkanBindingVersionImpl::Clone() const {
     return {};
   copy->references_ = references_;
   copy->image_views_ = image_views_;
-  copy->native_views_ = native_views_;
   copy->initialized_ = initialized_;
   std::vector<VkCopyDescriptorSet> copies;
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
@@ -183,29 +182,13 @@ bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
                                                 const std::vector<ImageView> &images) {
   const auto &binding = layout_.bindings[binding_index];
   auto device = device_->NativeDevice();
-  std::vector<std::shared_ptr<VkImageView>> views;
   std::vector<VkDescriptorImageInfo> infos;
   for (const auto &view : images) {
     auto image = rhi::QueryInterfacePtr<IVulkanImage>(view.image);
-    if (!image->BindingView())
+    auto handle = image->BindingView(view.base_mip, view.mip_count);
+    if (!handle)
       return false;
-    VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    create.image = image->NativeImage();
-    create.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    create.format = NativeImageFormat(view.image->GetDesc().format);
-    create.subresourceRange = {
-        VkImageAspectFlags(IsDepthFormat(view.image->GetDesc().format) ? VK_IMAGE_ASPECT_DEPTH_BIT
-                                                                       : VK_IMAGE_ASPECT_COLOR_BIT),
-        view.base_mip, view.mip_count, 0, 1};
-    auto handle = std::shared_ptr<VkImageView>(new VkImageView{}, [device](VkImageView *p) {
-      if (*p)
-        vkDestroyImageView(device, *p, nullptr);
-      delete p;
-    });
-    if (!Check(vkCreateImageView(device, &create, nullptr, handle.get()), "Create mip binding view"))
-      return false;
-    infos.push_back({VK_NULL_HANDLE, *handle, VK_IMAGE_LAYOUT_GENERAL});
-    views.push_back(std::move(handle));
+    infos.push_back({VK_NULL_HANDLE, handle, VK_IMAGE_LAYOUT_GENERAL});
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
@@ -216,10 +199,8 @@ bool VulkanBindingVersionImpl::WriteDescriptors(size_t binding_index,
       binding.type == BINDING_TEXTURE2D ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
   write.pImageInfo = infos.data();
   vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
-  for (size_t i = 0; i < views.size(); ++i) {
-    native_views_[binding_index][first_element + i] = std::move(views[i]);
+  for (size_t i = 0; i < images.size(); ++i)
     initialized_[binding_index][first_element + i] = true;
-  }
   return true;
 }
 
@@ -336,9 +317,6 @@ void VulkanBindingVersionImpl::InitializeBindingVersion(const BindingLayoutDesc 
   image_views_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i)
     image_views_[i].resize(layout_.bindings[i].count);
-  native_views_.resize(layout_.bindings.size());
-  for (size_t i = 0; i < layout_.bindings.size(); ++i)
-    native_views_[i].resize(layout_.bindings[i].count);
   references_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i)
     references_[i].resize(layout_.bindings[i].count);

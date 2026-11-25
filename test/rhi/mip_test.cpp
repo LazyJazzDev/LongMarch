@@ -13,6 +13,7 @@
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_image.h"
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
@@ -673,3 +674,43 @@ TEST_P(RhiMip, DemoDrawsNineAnimatedCubesWithDistinctFiltering) {
 
 INSTANTIATE_TEST_SUITE_P(Backends, RhiMip, testing::ValuesIn(MipBackends()));
 }  // namespace grassland::rhi
+#if defined(LONGMARCH_VULKAN_ENABLED)
+
+namespace grassland::rhi {
+TEST(RhiVulkanImageView, ReusesDefaultAndMipViewsAcrossBindingGroups) {
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_VULKAN, {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  for (uint32_t levels : {1u, 4u}) {
+    ObjPtr<IImage> image = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM, levels});
+    ASSERT_TRUE(image);
+    auto native = QueryInterfacePtr<backend::vulkan::IVulkanImage>(image.Get());
+    ASSERT_TRUE(native);
+    auto full = native->BindingView();
+    ASSERT_NE(full, VK_NULL_HANDLE);
+    EXPECT_EQ(full, native->BindingView(0, levels));
+    EXPECT_EQ(native->AttachmentView(), native->BindingView(0, 1));
+    EXPECT_EQ(native->BindingView(levels, 1), VK_NULL_HANDLE);
+    EXPECT_EQ(native->BindingView(0, levels + 1), VK_NULL_HANDLE);
+    BindingLayoutDesc layout{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}};
+    auto selected = native->BindingView(levels - 1, 1);
+    ASSERT_NE(selected, VK_NULL_HANDLE);
+    for (int iteration = 0; iteration < 3; ++iteration) {
+      ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+      ASSERT_TRUE(group);
+      ASSERT_TRUE(group->BindResource(0, ImageView{image.Get(), levels - 1, 1}));
+      EXPECT_EQ(selected, native->BindingView(levels - 1, 1));
+      ASSERT_TRUE(group->BindResource(0, image.Get()));
+      EXPECT_EQ(full, native->BindingView());
+    }
+    // Releasing or rewriting groups must not discard the image's cached views.
+    EXPECT_EQ(selected, native->BindingView(levels - 1, 0));
+    if (levels > 1) {
+      EXPECT_NE(full, selected);
+      EXPECT_NE(native->BindingView(1, 1), native->BindingView(1, 2));
+    }
+  }
+}
+}  // namespace grassland::rhi
+#endif

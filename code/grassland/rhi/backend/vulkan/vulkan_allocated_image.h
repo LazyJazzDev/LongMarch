@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
@@ -18,7 +18,7 @@ class VulkanAllocatedImageImpl final : public Object<rhi::IImage, IVulkanImage> 
   bool SupportsStorage() const override;
   VkImage NativeImage() const override;
   VkImageView AttachmentView() const override;
-  VkImageView BindingView() const override;
+  VkImageView BindingView(uint32_t base_mip = 0, uint32_t mip_count = 0) const override;
 
  private:
   VulkanAllocatedImageImpl(IVulkanDevice *device, ImageDesc desc);

@@ -95,3 +95,5 @@ sampling.compare_op = COMPARE_LESS_EQUAL;
 `compare_enable` 默认为 false；`compare_op` 默认为 LESS_EQUAL。比较方向为 shader 参考值与纹理深度的比较，八种运算（包括 NEVER / ALWAYS）均可显式选择。Shader 使用 `RHI_COMPARISON_SAMPLER(group, binding, name)` 或其 `_ARRAY` 版本声明 `SamplerComparisonState`，配合 `SampleCmpLevelZero`；C++ 绑定仍为 `BINDING_SAMPLER`。普通 `RHI_SAMPLER` 配合关闭比较的采样器，比较声明配合开启比较的采样器，调用方应保持一致。
 
 本次深度采样路径支持 `IMAGE_FORMAT_D32_SFLOAT` 作为 `BINDING_TEXTURE2D`。它仍不能作为存储纹理，也不能在作为当前深度附件写入时同时采样。先结束深度 pass，再绑定采样，RHI 处理状态转换。Metal 比较采样要求 Apple3 或 Mac2 GPU family；Windows 构建不能替代 Metal 运行验证。Shader 翻译代码变化会更新离线缓存 ABI，外部移动应用需要重新准备 shader bundle。
+
+Vulkan 的绑定视图由图像自身缓存：默认完整 mip 范围复用已有视图，自定义范围按 `(base_mip, mip_count)` 延迟创建并复用，直到图像销毁时统一释放。BindingVersion 保留图像引用，因此已录制命令不会因绑定更新而失去原有视图。
