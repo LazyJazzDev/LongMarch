@@ -14,15 +14,6 @@
 #include "grassland/rhi/rhi_image.h"
 
 namespace grassland::rhi::backend {
-bool AddBindingImageUse(std::vector<BindingImageUse> &uses, const ImageView &view, bool writable) {
-  for (const auto &use : uses)
-    if (use.view.image == view.image && (writable || use.writable) &&
-        view.base_mip < use.view.base_mip + use.view.mip_count && use.view.base_mip < view.base_mip + view.mip_count)
-      return false;
-  uses.push_back({view, writable});
-  return true;
-}
-
 bool NormalizeImageView(ImageView &view, BindingType type) {
   if (!view.image || !view.image->IsValid() || (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D))
     return false;

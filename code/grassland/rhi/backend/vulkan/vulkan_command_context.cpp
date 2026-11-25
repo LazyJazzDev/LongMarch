@@ -964,7 +964,6 @@ bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, IVulkanBindingVe
 }
 
 bool VulkanCommandContextImpl::ValidateGroups() {
-  std::vector<BindingImageUse> image_uses;
   for (size_t i = 0; i < groups_.size(); ++i) {
     if (!groups_[i] && !binding_layout_->groups[i].bindings.empty()) {
       recording_failed_ = true;
@@ -979,10 +978,6 @@ bool VulkanCommandContextImpl::ValidateGroups() {
         for (uint32_t element = 0; element < layout.bindings[binding_index].count; ++element) {
           const auto &view = groups_[i]->GetImageView(binding_index, element);
           if (view.image == rendering_.depth_stencil.image) {
-            recording_failed_ = true;
-            return false;
-          }
-          if (!AddBindingImageUse(image_uses, view, type == BINDING_RW_TEXTURE2D)) {
             recording_failed_ = true;
             return false;
           }

@@ -800,7 +800,6 @@ bool D3D12CommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group)
 }
 
 bool D3D12CommandContextImpl::PrepareGroups() {
-  std::vector<BindingImageUse> image_uses;
   for (size_t i = 0; i < groups_.size(); ++i) {
     const auto version = groups_[i].version;
     if (!version) {
@@ -840,10 +839,6 @@ bool D3D12CommandContextImpl::PrepareGroups() {
           auto image = rhi::QueryInterfacePtr<ID3D12Image>(version->GetReferences()[binding_index][j].Get()).Get();
           const auto &view = version->GetImageView(binding_index, j);
           if (view.image == rendering_.depth_stencil.image) {
-            recording_failed_ = true;
-            return false;
-          }
-          if (!AddBindingImageUse(image_uses, view, type == BINDING_RW_TEXTURE2D)) {
             recording_failed_ = true;
             return false;
           }

@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
+#include "grassland/rhi/backend/metal/metal_command_context.h"
 
 #include <array>
 #include <cassert>
@@ -687,7 +687,6 @@ bool MetalCommandContextImpl::CmdSetScissor(const Scissor &scissor) {
 }
 
 bool MetalCommandContextImpl::ValidateGroups() {
-  std::vector<BindingImageUse> image_uses;
   for (size_t i = 0; i < groups_.size(); ++i) {
     if (!groups_[i] && !native_program_->BindingLayout().groups[i].bindings.empty()) {
       recording_failed_ = true;
@@ -703,10 +702,6 @@ bool MetalCommandContextImpl::ValidateGroups() {
       for (uint32_t element = 0; element < layout.bindings[b].count; ++element) {
         const auto &view = groups_[i]->GetImageView(b, element);
         if (view.image == render_target_) {
-          recording_failed_ = true;
-          return false;
-        }
-        if (!AddBindingImageUse(image_uses, view, type == BINDING_RW_TEXTURE2D)) {
           recording_failed_ = true;
           return false;
         }

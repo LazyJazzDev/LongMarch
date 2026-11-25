@@ -517,13 +517,6 @@ TEST_P(RhiMip, MipViewsCaptureRangesAndSynchronizeDisjointReadWrites) {
       for (auto value : actual)
         EXPECT_NEAR(int(value), 32 * (mip + 1), 1) << "mip " << mip;
     }
-    commands = queue->CreateCommandContext();
-    ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
-    ASSERT_TRUE(group->BindResource(0, image.Get()));  // Full chain overlaps mip 1.
-    ASSERT_TRUE(group->BindResource(1, ImageView{image.Get(), 1, 1}));
-    ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
-    EXPECT_FALSE(commands->CmdDispatch(1, 1, 1));
-    EXPECT_FALSE(commands->Submit());
   }
 }
 

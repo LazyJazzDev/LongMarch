@@ -71,7 +71,7 @@ group->BindResource(0, ImageView{texture.Get(), 2, 3});                 // 采�
 
 GPU 生成采用逐级线性缩小，支持非二次幂尺寸；它不是离线纹理压缩器，也不执行 gamma 转换。格式须支持 `mip_compute_generation`，源级必须已有有效数据。生成命令使用自己的计算程序和绑定，调用后应重新绑定应用程序的 Program/Group；只能在渲染作用域之外调用。Metal 已接入相同的逐级 GPU 生成流程。
 
-上下文按 mip 追踪资源状态和访问依赖，允许同一 dispatch 读取一个 mip 并写入另一个 mip，拒绝重叠范围的读写绑定。提交时恢复各级默认状态；跨队列仍须使用 `SubmitInfo::waits`，不能同时无依赖地访问同一资源。上传和读回的尺寸、行间距及区域均相对于所选 mip。现有渲染附件和 standalone clear 仍针对第 0 级。本轮不增加 TextureArray。
+上下文按 mip 追踪资源状态和访问依赖，允许同一 dispatch 读取一个 mip 并写入另一个 mip；不再检查不同绑定之间的 mip 读写范围重叠，调用方负责保证访问合法且不存在数据竞争。提交时恢复各级默认状态；跨队列仍须使用 `SubmitInfo::waits`，不能同时无依赖地访问同一资源。上传和读回的尺寸、行间距及区域均相对于所选 mip。现有渲染附件和 standalone clear 仍针对第 0 级。本轮不增加 TextureArray。
 
 ## PCF 阴影示例
 
