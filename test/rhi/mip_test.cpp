@@ -14,6 +14,7 @@
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_image_views.h"
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
@@ -719,6 +720,31 @@ TEST(RhiVulkanImageView, ReusesDefaultAndMipViewsAcrossBindingGroups) {
       EXPECT_NE(full, selected);
       EXPECT_NE(native->BindingView(1, 1), native->BindingView(1, 2));
     }
+    // All cache paths retain their handles across ownership transfer and reset.
+    backend::vulkan::VulkanImageViews views;
+    auto device_native = QueryInterfacePtr<backend::vulkan::IVulkanDevice>(device.Get());
+    ASSERT_TRUE(
+        views.Initialize(device_native->NativeDevice(), native->NativeImage(), image->GetDesc().format, true, levels));
+    auto attachment = views.Attachment();
+    auto complete = views.Binding();
+    std::vector<VkImageView> singles;
+    for (uint32_t mip = 0; mip < levels; ++mip)
+      singles.push_back(views.Binding(mip, 1));
+    auto range = levels > 1 ? views.Binding(1, 2) : complete;
+    backend::vulkan::VulkanImageViews moved(std::move(views));
+    views = std::move(moved);
+    moved.Reset();
+    EXPECT_EQ(views.Attachment(), attachment);
+    EXPECT_EQ(views.Binding(), complete);
+    for (uint32_t mip = 0; mip < levels; ++mip) {
+      ASSERT_NE(singles[mip], VK_NULL_HANDLE);
+      EXPECT_EQ(views.Binding(mip, 1), singles[mip]);
+    }
+    if (levels > 1)
+      EXPECT_EQ(views.Binding(1, 2), range);
+    views.Reset();
+    EXPECT_EQ(views.Attachment(), VK_NULL_HANDLE);
+    EXPECT_EQ(views.Binding(), VK_NULL_HANDLE);
   }
 }
 }  // namespace grassland::rhi

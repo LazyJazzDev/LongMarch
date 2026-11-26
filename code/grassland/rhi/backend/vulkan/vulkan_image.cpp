@@ -21,6 +21,8 @@ VulkanImageViews &VulkanImageViews::operator=(VulkanImageViews &&other) noexcept
     attachment_ = std::exchange(other.attachment_, VK_NULL_HANDLE);
     sampled_ = std::exchange(other.sampled_, false);
     binding_views_.swap(other.binding_views_);
+    mip_views_.swap(other.mip_views_);
+    full_view_ = std::exchange(other.full_view_, VK_NULL_HANDLE);
   }
   return *this;
 }
@@ -33,6 +35,13 @@ void VulkanImageViews::Reset() {
   for (const auto &[range, view] : binding_views_)
     vkDestroyImageView(device_, view, nullptr);
   binding_views_.clear();
+  for (auto view : mip_views_)
+    if (view)
+      vkDestroyImageView(device_, view, nullptr);
+  mip_views_.clear();
+  if (full_view_)
+    vkDestroyImageView(device_, full_view_, nullptr);
+  full_view_ = VK_NULL_HANDLE;
   if (attachment_)
     vkDestroyImageView(device_, attachment_, nullptr);
   attachment_ = VK_NULL_HANDLE;
@@ -58,9 +67,28 @@ VkImageView VulkanImageViews::Binding(uint32_t base_mip, uint32_t mip_count) {
 #endif
   if (!base_mip && mip_count == 1 && !(ImageAspect(format_) & VK_IMAGE_ASPECT_STENCIL_BIT))
     return attachment_;
+  // These slots own only separately created views, never attachment_ or each other.
+  if (!base_mip && mip_count == mip_levels_) {
+    if (!full_view_)
+      full_view_ = CreateBindingView(base_mip, mip_count);
+    return full_view_;
+  }
+  if (mip_count == 1) {
+    auto &view = mip_views_[base_mip];
+    if (!view)
+      view = CreateBindingView(base_mip, mip_count);
+    return view;
+  }
   const auto key = std::make_pair(base_mip, mip_count);
   if (auto found = binding_views_.find(key); found != binding_views_.end())
     return found->second;
+  auto view = CreateBindingView(base_mip, mip_count);
+  if (view)
+    binding_views_.emplace(key, view);
+  return view;
+}
+
+VkImageView VulkanImageViews::CreateBindingView(uint32_t base_mip, uint32_t mip_count) {
   VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
   create.image = image_;
   create.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -71,7 +99,6 @@ VkImageView VulkanImageViews::Binding(uint32_t base_mip, uint32_t mip_count) {
   VkImageView view{};
   if (!Check(vkCreateImageView(device_, &create, nullptr, &view), "Create cached mip binding view"))
     return VK_NULL_HANDLE;
-  binding_views_.emplace(key, view);
   return view;
 }
 
@@ -93,6 +120,8 @@ bool VulkanImageViews::Initialize(VkDevice device,
   if (!Check(vkCreateImageView(device, &create, nullptr, &attachment_), "Create attachment view"))
     return false;
   sampled_ = sampled;
+  if (sampled && mip_levels > 1)
+    mip_views_.resize(mip_levels);
   return true;
 }
 

@@ -98,6 +98,6 @@ sampling.compare_op = COMPARE_LESS_EQUAL;
 
 本次深度采样路径支持 `IMAGE_FORMAT_D32_SFLOAT` 作为 `BINDING_TEXTURE2D`。它仍不能作为存储纹理，也不能在作为当前深度附件写入时同时采样。先结束深度 pass，再绑定采样，RHI 处理状态转换。Metal 比较采样要求 Apple3 或 Mac2 GPU family；Windows 构建不能替代 Metal 运行验证。Shader 翻译代码变化会更新离线缓存 ABI，外部移动应用需要重新准备 shader bundle。
 
-Vulkan 的绑定视图由图像自身缓存：兼容的单层 mip 0 视图复用附件视图，其余范围（包括完整 mip 链）按 `(base_mip, mip_count)` 延迟创建并复用，直到图像销毁时统一释放。BindingVersion 保留图像引用，因此已录制命令不会因绑定更新而失去原有视图。同一图像的绑定视图访问由调用方串行化，包括不同 BindingGroup 对该图像的 BindResource 调用；缓存内部不加锁。
+Vulkan 的绑定视图由图像自身缓存：兼容的单层 mip 0 视图复用附件视图；其他单层视图直接按 mip 索引数组，完整 mip 链使用独立槽位，其余连续范围使用 `(base_mip, mip_count)` map。所有原生绑定视图都在首次访问时创建，直到图像销毁时统一释放；无 mip 的普通纹理不额外分配单层视图数组。BindingVersion 保留图像引用，因此已录制命令不会因绑定更新而失去原有视图。同一图像的绑定视图访问由调用方串行化，包括不同 BindingGroup 对该图像的 BindResource 调用；缓存内部不加锁。
 
 本 PR 的 mip、图像视图和采样器参数合法性检查，以及附件同时采样的诊断，仅在 Debug 编译。Release 调用方须保证参数、设备归属和调用顺序正确；默认 mip 范围归一化、设备和格式能力限制、原生资源创建失败处理仍在所有配置中执行。

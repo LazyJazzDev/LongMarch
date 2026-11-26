@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include <vector>
 
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
@@ -19,12 +20,15 @@ class VulkanImageViews final {
   VkImageView Binding(uint32_t base_mip = 0, uint32_t mip_count = 0);
 
  private:
+  VkImageView CreateBindingView(uint32_t base_mip, uint32_t mip_count);
   VkDevice device_{};
   VkImage image_{};
   ImageFormat format_{};
   uint32_t mip_levels_{};
   // Shared by binding groups; entries live until the owning image is destroyed.
   std::map<std::pair<uint32_t, uint32_t>, VkImageView> binding_views_;
+  std::vector<VkImageView> mip_views_;
+  VkImageView full_view_{};
   VkImageView attachment_{};
   bool sampled_{};
 };
