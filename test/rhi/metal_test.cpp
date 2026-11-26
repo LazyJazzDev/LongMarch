@@ -88,8 +88,10 @@ TEST(RhiMetal, TierOneStorageBindingWritesSelectedMip) {
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), {{layout}}});
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(program && group);
-  auto queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ASSERT_TRUE(queue);
   ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ASSERT_TRUE(commands);
   std::vector<uint8_t> zero(8 * 8 * 4, 0);
   ASSERT_TRUE(commands->CmdUploadImage(image.Get(), zero.data(), 32));
   ASSERT_TRUE(group->BindResource(0, ImageView{image.Get(), 1, 1}));

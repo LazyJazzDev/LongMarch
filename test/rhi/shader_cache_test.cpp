@@ -212,7 +212,9 @@ TEST_F(ShaderCacheTest, OfflineMipProgramReplaysAndGeneratesOnMetal) {
   ASSERT_TRUE(ConfigureShaderCache({directory_, true, true}));
   ObjPtr<IImage> image = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM, 4});
   ASSERT_TRUE(image);
-  auto commands = ObjPtr<ICommandContext>(device->GetQueue(QUEUE_TYPE_MAIN)->CreateCommandContext());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ASSERT_TRUE(queue);
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
   ASSERT_TRUE(commands);
   std::vector<uint8_t> input(8 * 8 * 4, 96);
   ASSERT_TRUE(commands->CmdUploadImage(image.Get(), input.data(), 32));
