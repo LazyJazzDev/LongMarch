@@ -89,16 +89,18 @@ bool VulkanCommandContextImpl::TransitionImage(IVulkanImage *image,
                                   ? VkAccessFlags{0}
                                   : VkAccessFlags{VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
   const auto levels = rhi::QueryInterfacePtr<IImage>(image)->GetDesc().mip_levels;
+#if !defined(NDEBUG)
   if (first_mip >= levels || mip_count > levels - first_mip) {
     recording_failed_ = true;
     return false;
   }
+#endif
   if (!mip_count)
     mip_count = levels - first_mip;
   auto &states =
       image_states_
-          .try_emplace(image, std::vector<ImageState>(
-                                  levels, {image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, default_access}))
+          .try_emplace(image, levels,
+                       ImageState{image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, default_access})
           .first->second;
   for (uint32_t mip = first_mip; mip < first_mip + mip_count; ++mip) {
     auto &current = states[mip];
@@ -450,9 +452,14 @@ bool VulkanCommandContextImpl::CopyBuffer(IVulkanBuffer *src,
 
 bool VulkanCommandContextImpl::CmdGenerateMipmaps(IImage *image, uint32_t base_mip, uint32_t mip_count) {
   auto native = rhi::QueryInterfacePtr<IVulkanImage>(image);
-  if (sealed_ || render_target_ || recording_failed_ || !native || !image->IsValid() ||
-      native->DeviceIdentity() != device_ || !native->SupportsStorage() ||
-      !(device_->GetPhysicalDevice().format_features[image->GetDesc().format].mip_compute_generation)) {
+#if !defined(NDEBUG)
+  if (sealed_ || render_target_ || !native || !image->IsValid() || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_ || !native->SupportsStorage() ||
+      !device_->GetPhysicalDevice().format_features[image->GetDesc().format].mip_compute_generation) {
     recording_failed_ = true;
     return false;
   }
@@ -847,12 +854,19 @@ bool VulkanCommandContextImpl::TransitionBuffer(IVulkanBuffer *buffer,
 }
 
 bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level) {
+#if !defined(NDEBUG)
+  if (!image) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
   ImageDesc level;
-  if (!image || !ImageMipDesc(image->GetDesc(), mip_level, level)) {
+  if (!ImageMipDesc(image->GetDesc(), mip_level, level)) {
     recording_failed_ = true;
     return false;
   }
   auto native = rhi::QueryInterfacePtr<IVulkanImage>(image).Get();
+#if !defined(NDEBUG)
   if (sealed_ || render_target_ || !native || !image->IsValid() ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
       IsDepthFormat(level.format) || row_pitch < uint64_t(level.width) * ImageFormatSize(level.format) ||
@@ -860,6 +874,7 @@ bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, u
     recording_failed_ = true;
     return false;
   }
+#endif
   const auto desc = level;
   const uint64_t packed = uint64_t(desc.width) * ImageFormatSize(desc.format);
   std::vector<uint8_t> pixels(packed * desc.height);
@@ -937,8 +952,7 @@ bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, IVulkanBindingVe
           }
           const auto levels = rhi::QueryInterfacePtr<IImage>(image)->GetDesc().mip_levels;
           auto &states =
-              image_states_.try_emplace(image, std::vector<ImageState>(levels, {VK_IMAGE_LAYOUT_GENERAL, 0, 0}))
-                  .first->second;
+              image_states_.try_emplace(image, levels, ImageState{VK_IMAGE_LAYOUT_GENERAL, 0, 0}).first->second;
           for (uint32_t mip = view.base_mip; mip < view.base_mip + view.mip_count; ++mip) {
             auto &state = states[mip];
             if (state.layout != VK_IMAGE_LAYOUT_GENERAL) {
@@ -970,6 +984,7 @@ bool VulkanCommandContextImpl::ValidateGroups() {
       return false;
     }
     if (groups_[i]) {
+#if !defined(NDEBUG)
       const auto &layout = groups_[i]->GetLayout();
       for (size_t binding_index = 0; binding_index < layout.bindings.size(); ++binding_index) {
         const auto type = layout.bindings[binding_index].type;
@@ -989,6 +1004,7 @@ bool VulkanCommandContextImpl::ValidateGroups() {
               return false;
             }
       }
+#endif
     }
   }
   return !recording_failed_;

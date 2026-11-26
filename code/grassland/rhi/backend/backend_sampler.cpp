@@ -3,6 +3,8 @@
 #include <cmath>
 
 namespace grassland::rhi::backend {
+#if !defined(NDEBUG)
+namespace {
 bool ValidateSamplerDesc(const SamplerDesc &desc) {
   const auto valid_filter = [](SamplerFilter value) {
     return value == SAMPLER_FILTER_NEAREST || value == SAMPLER_FILTER_LINEAR;
@@ -20,9 +22,15 @@ bool ValidateSamplerDesc(const SamplerDesc &desc) {
          desc.border_color >= SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK &&
          desc.border_color <= SAMPLER_BORDER_COLOR_OPAQUE_WHITE;
 }
+}  // namespace
+#endif
 
 bool ValidateSamplerFeatures(const SamplerDesc &desc, const PhysicalDeviceMipFeature &features) {
-  return ValidateSamplerDesc(desc) && desc.max_anisotropy <= features.max_anisotropy &&
-         desc.mip_lod_bias >= features.min_lod_bias && desc.mip_lod_bias <= features.max_lod_bias;
+#if !defined(NDEBUG)
+  if (!ValidateSamplerDesc(desc))
+    return false;
+#endif
+  return desc.max_anisotropy <= features.max_anisotropy && desc.mip_lod_bias >= features.min_lod_bias &&
+         desc.mip_lod_bias <= features.max_lod_bias;
 }
 }  // namespace grassland::rhi::backend

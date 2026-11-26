@@ -25,6 +25,7 @@ class VulkanImageViews final {
   uint32_t mip_levels_{};
   // Shared by binding groups; entries live until the owning image is destroyed.
   std::map<std::pair<uint32_t, uint32_t>, VkImageView> binding_views_;
-  VkImageView attachment_{}, binding_{};
+  VkImageView attachment_{};
+  bool sampled_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

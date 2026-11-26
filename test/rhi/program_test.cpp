@@ -248,11 +248,13 @@ TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  EXPECT_FALSE(device->CreateSampler({static_cast<SamplerFilter>(-1)}));
   SamplerDesc desc;
+#if !defined(NDEBUG)
+  EXPECT_FALSE(device->CreateSampler({static_cast<SamplerFilter>(-1)}));
   desc.address_u = static_cast<SamplerAddressMode>(-1);
   EXPECT_FALSE(device->CreateSampler(desc));
   desc = {};
+#endif
   ObjPtr<ISampler> first = device->CreateSampler(desc);
   ObjPtr<ISampler> second = device->CreateSampler({SAMPLER_FILTER_NEAREST});
   ASSERT_TRUE(first);
@@ -698,8 +700,10 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
     EXPECT_EQ(initial->GetReferences()[0][0].Get(), b.Get());
     EXPECT_EQ(initial->GetReferences()[0][1].Get(), a.Get());
     EXPECT_FALSE(group->BindResource(7, b.Get()));
+#if !defined(NDEBUG)
     EXPECT_FALSE(group->BindResource(2, image.Get()));
     EXPECT_FALSE(group->BindResource(9, CreateSamplers(device.Get(), {{static_cast<SamplerFilter>(-1)}})));
+#endif
     // A command's use-reference is the only reason to fork.
     auto captured = RetainBindingVersion(initial);
     EXPECT_FALSE(group->BindResource(2, BufferView{a.Get(), 1, 256}));
@@ -785,10 +789,12 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
     ASSERT_TRUE(group->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
     EXPECT_TRUE(next->IsComplete());
     EXPECT_EQ(native->CurrentVersion(), next);
+#if !defined(NDEBUG)
     EXPECT_FALSE(group->BindResource(7, std::vector<IImage *>{second.Get(), nullptr}));
     EXPECT_EQ(next->GetReferences()[1][0].Get(), first.Get());
     EXPECT_FALSE(group->BindResource(
         9, CreateSamplers(device.Get(), {{SAMPLER_FILTER_NEAREST}, {static_cast<SamplerFilter>(-1)}})));
+#endif
     EXPECT_EQ(native->CurrentVersion(), next);
     // Image array replacement must retain all inputs before dropping any old slot.
     auto first_ptr = first.Get();

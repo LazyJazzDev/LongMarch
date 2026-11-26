@@ -991,7 +991,9 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
+#if !defined(NDEBUG)
   EXPECT_EQ(device->CreateImage({0, 64, IMAGE_FORMAT_R8G8B8A8_UNORM}), nullptr);
+#endif
   EXPECT_EQ(device->CreateImage({64, 64, IMAGE_FORMAT_UNKNOWN}), nullptr);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);

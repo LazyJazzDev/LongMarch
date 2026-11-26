@@ -37,12 +37,16 @@ bool GenerateMipChain(ICommandContext *commands,
                       ObjectPtr<IComputeProgram> &program,
                       ObjectPtr<ISampler> &sampler) {
   const auto &desc = image->GetDesc();
+#if !defined(NDEBUG)
   if (base_mip >= desc.mip_levels)
     return false;
+#endif
   if (!mip_count)
     mip_count = desc.mip_levels - base_mip;
+#if !defined(NDEBUG)
   if (mip_count > desc.mip_levels - base_mip)
     return false;
+#endif
   if (mip_count == 1)
     return true;
   if (!program)

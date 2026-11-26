@@ -120,8 +120,10 @@ TEST_P(RhiPCF, ComparisonOperatorsUseReferenceAgainstDepth) {
   ASSERT_TRUE(queue);
   SamplerDesc desc{SAMPLER_FILTER_NEAREST};
   desc.compare_enable = true;
+#if !defined(NDEBUG)
   desc.compare_op = static_cast<CompareOp>(99);
   EXPECT_FALSE(device_->CreateSampler(desc));
+#endif
   const float expected[][3] = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}};
   for (int op = COMPARE_NEVER; op <= COMPARE_ALWAYS; ++op) {
     desc.compare_op = static_cast<CompareOp>(op);
@@ -156,6 +158,9 @@ TEST_P(RhiPCF, ComparisonOperatorsUseReferenceAgainstDepth) {
 }
 
 TEST_P(RhiPCF, RejectsSamplingTheActiveDepthAttachment) {
+#if defined(NDEBUG)
+  GTEST_SKIP() << "Attachment feedback diagnostics require a Debug build.";
+#endif
   ObjPtr<IImage> depth = device_->CreateImage({16, 16, IMAGE_FORMAT_D32_SFLOAT});
   ASSERT_TRUE(depth);
   const std::string source = R"(

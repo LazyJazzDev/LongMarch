@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/rhi_util.h"
+#include "grassland/rhi/rhi_util.h"
 
 #include "grassland/rhi/backend/backend_util.h"
 
@@ -17,9 +17,11 @@ uint32_t ImageMipLevelCount(uint32_t width, uint32_t height) {
 
 bool NormalizeImageDesc(const ImageDesc &requested, ImageDesc &resolved) {
   const uint32_t maximum = ImageMipLevelCount(requested.width, requested.height);
+#if !defined(NDEBUG)
   if (!maximum || requested.mip_levels > maximum || requested.format <= IMAGE_FORMAT_UNKNOWN ||
       requested.format >= IMAGE_FORMAT_COUNT)
     return false;
+#endif
   resolved = requested;
   if (!resolved.mip_levels)
     resolved.mip_levels = maximum;
@@ -27,8 +29,10 @@ bool NormalizeImageDesc(const ImageDesc &requested, ImageDesc &resolved) {
 }
 
 bool ImageMipDesc(const ImageDesc &image, uint32_t mip_level, ImageDesc &level) {
+#if !defined(NDEBUG)
   if (!image.width || !image.height || mip_level >= image.mip_levels || mip_level >= 32)
     return false;
+#endif
   level = image;
   level.width = image.width >> mip_level;
   level.height = image.height >> mip_level;

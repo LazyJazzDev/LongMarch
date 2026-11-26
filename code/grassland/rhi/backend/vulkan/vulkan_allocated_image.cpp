@@ -50,8 +50,6 @@ IImage *VulkanAllocatedImageImpl::Create(IVulkanDevice *device, const ImageDesc 
   if (desc.width > mip.max_image_dimension_2d || desc.height > mip.max_image_dimension_2d ||
       desc.mip_levels > device->GetPhysicalDevice().format_features[desc.format].max_mip_levels)
     return nullptr;
-  if (!desc.width || !desc.height)
-    return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (format == VK_FORMAT_UNDEFINED)
     return nullptr;

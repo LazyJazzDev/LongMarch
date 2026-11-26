@@ -116,7 +116,6 @@ ObjectPtr<IMetalBindingVersion> MetalBindingVersionImpl::Clone() const {
   if (!copy)
     return {};
   copy->references_ = references_;
-  copy->image_views_ = image_views_;
   copy->native_views_ = native_views_;
   copy->initialized_ = initialized_;
   std::memcpy(copy->arguments_->contents(), arguments_->contents(), arguments_->length());
@@ -147,9 +146,11 @@ bool MetalBindingVersionImpl::WriteDescriptors(size_t b, uint32_t first, const s
   std::vector<NS::SharedPtr<MTL::Texture>> views;
   for (const auto &view : values) {
     auto image = rhi::QueryInterfacePtr<IMetalImage>(view.image)->NativeImage();
-    auto texture =
-        NS::TransferPtr(image->newTextureView(image->pixelFormat(), MTL::TextureType2D,
-                                              NS::Range::Make(view.base_mip, view.mip_count), NS::Range::Make(0, 1)));
+    auto texture = !view.base_mip && view.mip_count == image->mipmapLevelCount()
+                       ? NS::RetainPtr(image)
+                       : NS::TransferPtr(image->newTextureView(image->pixelFormat(), MTL::TextureType2D,
+                                                               NS::Range::Make(view.base_mip, view.mip_count),
+                                                               NS::Range::Make(0, 1)));
     if (!texture)
       return false;
     views.push_back(std::move(texture));
@@ -301,12 +302,10 @@ void MetalBindingVersionImpl::InitializeBindingVersion(const BindingLayoutDesc &
   layout_ = layout;
 
   std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
-  image_views_.resize(layout_.bindings.size());
-  for (size_t i = 0; i < layout_.bindings.size(); ++i)
-    image_views_[i].resize(layout_.bindings[i].count);
   native_views_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i)
-    native_views_[i].resize(layout_.bindings[i].count);
+    if (layout_.bindings[i].type == BINDING_TEXTURE2D || layout_.bindings[i].type == BINDING_RW_TEXTURE2D)
+      native_views_[i].resize(layout_.bindings[i].count);
   references_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i)
     references_[i].resize(layout_.bindings[i].count);
@@ -318,10 +317,6 @@ const BindingLayoutDesc &MetalBindingVersionImpl::GetLayout() const {
 
 const std::vector<std::vector<ObjectPtr<IObject>>> &MetalBindingVersionImpl::GetReferences() const {
   return references_;
-}
-
-const ImageView &MetalBindingVersionImpl::GetImageView(size_t binding, uint32_t element) const {
-  return image_views_[binding][element];
 }
 
 bool MetalBindingVersionImpl::IsComplete() const {
@@ -359,8 +354,6 @@ bool MetalBindingVersionImpl::Write(size_t binding_index,
     return false;
   for (size_t i = 0; i < values.size(); ++i)
     references_[binding_index][first_element + i] = std::move(references[i]);
-  for (size_t i = 0; i < values.size(); ++i)
-    image_views_[binding_index][first_element + i] = values[i];
   return true;
 }
 
@@ -468,18 +461,23 @@ bool MetalBindingGroupImpl::BindResource(uint32_t binding,
                                          uint32_t first_element) {
   size_t binding_index;
   const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
+#if !defined(NDEBUG)
   if (!desc)
     return false;
   if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
     return false;
+#endif
   auto values = images;
   for (auto &view : values) {
     if (!NormalizeImageView(view, desc->type))
       return false;
     auto value = view.image;
     auto image = rhi::QueryInterfacePtr<IMetalImage>(value).Get();
-    if (!image || !value->IsValid() || image->DeviceIdentity() != device_ ||
-        (IsDepthFormat(value->GetDesc().format) && value->GetDesc().format != IMAGE_FORMAT_D32_SFLOAT))
+#if !defined(NDEBUG)
+    if (!image || image->DeviceIdentity() != device_)
+      return false;
+#endif
+    if (IsDepthFormat(value->GetDesc().format) && value->GetDesc().format != IMAGE_FORMAT_D32_SFLOAT)
       return false;
     if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
       return false;

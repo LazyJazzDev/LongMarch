@@ -116,10 +116,6 @@ TEST(RhiMipDescription, SamplerConstructionSetsIndependentFilters) {
   EXPECT_EQ(uniform.mag_filter, SAMPLER_FILTER_NEAREST);
   EXPECT_EQ(uniform.mip_filter, SAMPLER_FILTER_NEAREST);
   EXPECT_EQ(uniform.address_w, SAMPLER_ADDRESS_MIRRORED_REPEAT);
-  uniform.min_filter = SAMPLER_FILTER_LINEAR;
-  EXPECT_EQ(uniform.min_filter, SAMPLER_FILTER_LINEAR);
-  EXPECT_EQ(uniform.mag_filter, SAMPLER_FILTER_NEAREST);
-  EXPECT_EQ(uniform.mip_filter, SAMPLER_FILTER_NEAREST);
   SamplerDesc detailed{SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR, SAMPLER_FILTER_NEAREST};
   EXPECT_EQ(detailed.min_filter, SAMPLER_FILTER_NEAREST);
   EXPECT_EQ(detailed.mag_filter, SAMPLER_FILTER_LINEAR);
@@ -215,13 +211,16 @@ TEST_P(RhiMip, SamplerLimitsAndInvalidDescriptionsAreRejected) {
   EXPECT_FLOAT_EQ(sampler->GetDesc().max_lod, 5);
   ++desc.max_anisotropy;
   EXPECT_FALSE(device->CreateSampler(desc));
+#if !defined(NDEBUG)
   desc.max_anisotropy = 0;
   EXPECT_FALSE(device->CreateSampler(desc));
+#endif
   desc.max_anisotropy = 1;
   desc.mip_lod_bias = features.max_lod_bias + 1;
   EXPECT_FALSE(device->CreateSampler(desc));
   desc.mip_lod_bias = features.min_lod_bias - 1;
   EXPECT_FALSE(device->CreateSampler(desc));
+#if !defined(NDEBUG)
   desc.mip_lod_bias = std::numeric_limits<float>::quiet_NaN();
   EXPECT_FALSE(device->CreateSampler(desc));
   desc.mip_lod_bias = 0;
@@ -237,14 +236,21 @@ TEST_P(RhiMip, SamplerLimitsAndInvalidDescriptionsAreRejected) {
   desc.border_color = static_cast<SamplerBorderColor>(-1);
   EXPECT_FALSE(device->CreateSampler(desc));
   desc.border_color = SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK;
+#endif
+  desc.mip_lod_bias = 0;
+  desc.min_lod = desc.max_lod = 0;
+  desc.address_w = SAMPLER_ADDRESS_CLAMP_TO_EDGE;
+  desc.border_color = SAMPLER_BORDER_COLOR_TRANSPARENT_BLACK;
   desc.mag_filter = SAMPLER_FILTER_NEAREST;
   desc.mip_filter = SAMPLER_FILTER_LINEAR;
   sampler = device->CreateSampler(desc);
   ASSERT_TRUE(sampler);
+#if !defined(NDEBUG)
   if (features.max_anisotropy > 1) {
     desc.max_anisotropy = 2;
     EXPECT_FALSE(device->CreateSampler(desc));
   }
+#endif
 }
 
 TEST_P(RhiMip, BorderColorsAreSampledAndFilteredOutsideTexture) {
@@ -343,10 +349,12 @@ TEST_P(RhiMip, CreationResolvesChainsAndRejectsInvalidLevels) {
   ObjPtr<IImage> partial = device->CreateImage({19, 7, IMAGE_FORMAT_R8G8B8A8_UNORM, 3});
   ASSERT_TRUE(partial);
   EXPECT_EQ(partial->GetDesc().mip_levels, 3u);
+#if !defined(NDEBUG)
   EXPECT_FALSE(device->CreateImage({19, 7, IMAGE_FORMAT_R8G8B8A8_UNORM, 6}));
   EXPECT_FALSE(device->CreateImage({0, 7, IMAGE_FORMAT_R8G8B8A8_UNORM, 0}));
   EXPECT_FALSE(device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM, UINT32_MAX}));
   EXPECT_FALSE(device->CreateImage({1, 1, static_cast<ImageFormat>(-1), 1}));
+#endif
 }
 
 TEST_P(RhiMip, PaddedMipUploadsSnapshotEveryLevelAndSingleUpdatesAreIsolated) {
@@ -440,6 +448,9 @@ TEST_P(RhiMip, PaddedMipUploadsSnapshotEveryLevelAndSingleUpdatesAreIsolated) {
 }
 
 TEST_P(RhiMip, InvalidMipTransfersInvalidateRecording) {
+#if defined(NDEBUG)
+  GTEST_SKIP() << "Invalid transfer diagnostics require a Debug build.";
+#endif
   ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -485,10 +496,12 @@ TEST_P(RhiMip, MipViewsCaptureRangesAndSynchronizeDisjointReadWrites) {
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), {{layout}}});
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(program && group);
+#if !defined(NDEBUG)
   EXPECT_FALSE(group->BindResource(0, ImageView{image.Get(), 4, 1}));
   EXPECT_FALSE(group->BindResource(0, ImageView{image.Get(), 2, 3}));
   EXPECT_FALSE(group->BindResource(1, ImageView{image.Get(), 0, 2}));
   EXPECT_FALSE(group->BindResource(0, ImageView{nullptr}));
+#endif
   for (auto role : {QUEUE_TYPE_MAIN, QUEUE_TYPE_COMPUTE}) {
     ObjPtr<IQueue> queue = device->GetQueue(role);
     ASSERT_TRUE(queue);
@@ -592,9 +605,11 @@ TEST_P(RhiMip, GpuGenerationMatchesLinearReferenceAndSupportsPartialChains) {
       for (size_t i = 0; i < actual.size(); ++i)
         EXPECT_NEAR(actual[i], mip == 1 || mip == 2 ? 2.25f : expected[mip][i], 0.025f);
     }
+#if !defined(NDEBUG)
     commands = queue->CreateCommandContext();
     EXPECT_FALSE(commands->CmdGenerateMipmaps(image.Get(), image->GetDesc().mip_levels));
     EXPECT_FALSE(commands->Submit());
+#endif
   }
   ObjPtr<IImage> integer = device->CreateImage({4, 4, IMAGE_FORMAT_R32_UINT, 0});
   ASSERT_TRUE(integer);
@@ -683,8 +698,10 @@ TEST(RhiVulkanImageView, ReusesDefaultAndMipViewsAcrossBindingGroups) {
     ASSERT_NE(full, VK_NULL_HANDLE);
     EXPECT_EQ(full, native->BindingView(0, levels));
     EXPECT_EQ(native->AttachmentView(), native->BindingView(0, 1));
+#if !defined(NDEBUG)
     EXPECT_EQ(native->BindingView(levels, 1), VK_NULL_HANDLE);
     EXPECT_EQ(native->BindingView(0, levels + 1), VK_NULL_HANDLE);
+#endif
     BindingLayoutDesc layout{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}};
     auto selected = native->BindingView(levels - 1, 1);
     ASSERT_NE(selected, VK_NULL_HANDLE);

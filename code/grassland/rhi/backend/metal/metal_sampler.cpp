@@ -17,8 +17,7 @@ MTL::SamplerState *MetalSamplerImpl::NativeSampler() const {
 rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc &desc) {
   // Metal has no sampler-level LOD bias; do not silently ignore it.
   const auto &limits = device->GetPhysicalDevice().mip_feature;
-  if (!ValidateSamplerDesc(desc) || desc.max_anisotropy > limits.max_anisotropy ||
-      desc.mip_lod_bias < limits.min_lod_bias || desc.mip_lod_bias > limits.max_lod_bias)
+  if (!ValidateSamplerFeatures(desc, limits))
     return nullptr;
   if (desc.compare_enable && !device->NativeDevice()->supportsFamily(MTL::GPUFamilyApple3) &&
       !device->NativeDevice()->supportsFamily(MTL::GPUFamilyMac2)) {

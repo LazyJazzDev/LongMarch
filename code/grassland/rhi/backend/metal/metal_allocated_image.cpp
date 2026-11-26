@@ -19,7 +19,7 @@ IImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &r
   const auto format = NativeImageFormat(desc.format);
   const auto &capabilities = device->GetPhysicalDevice();
   const auto &feature = capabilities.format_features[desc.format];
-  if (!desc.width || !desc.height || desc.width > capabilities.mip_feature.max_image_dimension_2d ||
+  if (desc.width > capabilities.mip_feature.max_image_dimension_2d ||
       desc.height > capabilities.mip_feature.max_image_dimension_2d || desc.mip_levels > feature.max_mip_levels ||
       format == MTL::PixelFormatInvalid)
     return nullptr;

@@ -32,8 +32,6 @@ IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &r
   if (desc.width > mip.max_image_dimension_2d || desc.height > mip.max_image_dimension_2d ||
       desc.mip_levels > device->GetPhysicalDevice().format_features[desc.format].max_mip_levels)
     return nullptr;
-  if (!desc.width || !desc.height)
-    return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (format == DXGI_FORMAT_UNKNOWN)
     return nullptr;

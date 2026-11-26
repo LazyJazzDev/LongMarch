@@ -306,13 +306,20 @@ bool MetalCommandContextImpl::CopyBuffer(IMetalBuffer *src,
 }
 
 bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level) {
+#if !defined(NDEBUG)
+  if (!image) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
   ImageDesc level;
-  if (!image || !ImageMipDesc(image->GetDesc(), mip_level, level)) {
+  if (!ImageMipDesc(image->GetDesc(), mip_level, level)) {
     recording_failed_ = true;
     return false;
   }
   auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
   const uint64_t pitch = native ? uint64_t(level.width) * ImageFormatSize(level.format) : 0;
+#if !defined(NDEBUG)
   if (sealed_ || encoder_ || !native || !image->IsValid() ||
       (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
       !IsColorFormat(level.format) || !pitch || row_pitch < pitch ||
@@ -320,7 +327,7 @@ bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
     recording_failed_ = true;
     return false;
   }
-
+#endif
   const auto desc = level;
   const uint64_t size = pitch * desc.height;
   auto upload = device_->UploadPool().Acquire(size);
@@ -376,10 +383,18 @@ bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group)
 
 bool MetalCommandContextImpl::CmdGenerateMipmaps(IImage *image, uint32_t base_mip, uint32_t mip_count) {
   auto native = rhi::QueryInterfacePtr<IMetalImage>(image);
-  if (sealed_ || render_target_ || recording_failed_ || !native || !image->IsValid() ||
-      native->DeviceIdentity() != device_ || !native->SupportsStorage() ||
-      !device_->GetPhysicalDevice().format_features[image->GetDesc().format].mip_compute_generation ||
-      !GenerateMipChain(this, rhi::QueryInterfacePtr<IDevice>(device_).Get(), image, base_mip, mip_count, mip_program_,
+#if !defined(NDEBUG)
+  if (sealed_ || render_target_ || !native || !image->IsValid() || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_ || !native->SupportsStorage() ||
+      !device_->GetPhysicalDevice().format_features[image->GetDesc().format].mip_compute_generation) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!GenerateMipChain(this, rhi::QueryInterfacePtr<IDevice>(device_).Get(), image, base_mip, mip_count, mip_program_,
                         mip_sampler_)) {
     recording_failed_ = true;
     return false;
@@ -694,25 +709,25 @@ bool MetalCommandContextImpl::ValidateGroups() {
     }
     if (!groups_[i])
       continue;
+#if !defined(NDEBUG)
     const auto &layout = groups_[i]->GetLayout();
     for (size_t b = 0; b < layout.bindings.size(); ++b) {
       const auto type = layout.bindings[b].type;
       if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
         continue;
-      for (uint32_t element = 0; element < layout.bindings[b].count; ++element) {
-        const auto &view = groups_[i]->GetImageView(b, element);
-        if (view.image == render_target_) {
+      for (const auto &reference : groups_[i]->GetReferences()[b]) {
+        if (reference.Get() == render_target_) {
           recording_failed_ = true;
           return false;
         }
-      }
-      for (const auto &reference : groups_[i]->GetReferences()[b])
         for (auto target : color_targets_)
           if (reference.Get() == target) {
             recording_failed_ = true;
             return false;
           }
+      }
     }
+#endif
   }
   return !recording_failed_;
 }

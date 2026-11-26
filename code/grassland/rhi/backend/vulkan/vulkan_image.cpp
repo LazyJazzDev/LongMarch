@@ -19,7 +19,7 @@ VulkanImageViews &VulkanImageViews::operator=(VulkanImageViews &&other) noexcept
     format_ = other.format_;
     mip_levels_ = other.mip_levels_;
     attachment_ = std::exchange(other.attachment_, VK_NULL_HANDLE);
-    binding_ = std::exchange(other.binding_, VK_NULL_HANDLE);
+    sampled_ = std::exchange(other.sampled_, false);
     binding_views_.swap(other.binding_views_);
   }
   return *this;
@@ -33,11 +33,10 @@ void VulkanImageViews::Reset() {
   for (const auto &[range, view] : binding_views_)
     vkDestroyImageView(device_, view, nullptr);
   binding_views_.clear();
-  if (binding_ && binding_ != attachment_)
-    vkDestroyImageView(device_, binding_, nullptr);
   if (attachment_)
     vkDestroyImageView(device_, attachment_, nullptr);
-  attachment_ = binding_ = VK_NULL_HANDLE;
+  attachment_ = VK_NULL_HANDLE;
+  sampled_ = false;
 }
 
 VkImageView VulkanImageViews::Attachment() const {
@@ -45,14 +44,18 @@ VkImageView VulkanImageViews::Attachment() const {
 }
 
 VkImageView VulkanImageViews::Binding(uint32_t base_mip, uint32_t mip_count) {
-  if (!binding_ || base_mip >= mip_levels_)
+  if (!attachment_ || !sampled_)
     return VK_NULL_HANDLE;
+#if !defined(NDEBUG)
+  if (base_mip >= mip_levels_)
+    return VK_NULL_HANDLE;
+#endif
   if (!mip_count)
     mip_count = mip_levels_ - base_mip;
+#if !defined(NDEBUG)
   if (mip_count > mip_levels_ - base_mip)
     return VK_NULL_HANDLE;
-  if (!base_mip && mip_count == mip_levels_)
-    return binding_;
+#endif
   if (!base_mip && mip_count == 1 && !(ImageAspect(format_) & VK_IMAGE_ASPECT_STENCIL_BIT))
     return attachment_;
   const auto key = std::make_pair(base_mip, mip_count);
@@ -89,20 +92,7 @@ bool VulkanImageViews::Initialize(VkDevice device,
   create.subresourceRange = {ImageAspect(format), 0, 1, 0, 1};
   if (!Check(vkCreateImageView(device, &create, nullptr, &attachment_), "Create attachment view"))
     return false;
-  if (sampled) {
-    if (mip_levels > 1 ||
-        (IsDepthFormat(format) && (create.subresourceRange.aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT))) {
-      if (IsDepthFormat(format))
-        create.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-      create.subresourceRange.levelCount = mip_levels;
-      if (!Check(vkCreateImageView(device, &create, nullptr, &binding_), "Create depth binding view")) {
-        Reset();
-        return false;
-      }
-    } else {
-      binding_ = attachment_;
-    }
-  }
+  sampled_ = sampled;
   return true;
 }
 

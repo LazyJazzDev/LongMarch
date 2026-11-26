@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
@@ -14,7 +14,6 @@ class IMetalBindingVersion : public IObject {
   virtual bool IsUniquelyOwned() const noexcept = 0;
   virtual const BindingLayoutDesc &GetLayout() const = 0;
   virtual const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const = 0;
-  virtual const ImageView &GetImageView(size_t binding, uint32_t element) const = 0;
   virtual bool IsComplete() const = 0;
   virtual ObjectPtr<IMetalBindingVersion> Clone() const = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) = 0;
@@ -80,7 +79,6 @@ class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
 
   const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const override;
 
-  const ImageView &GetImageView(size_t binding, uint32_t element) const override;
   bool IsComplete() const override;
 
   bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
@@ -97,7 +95,6 @@ class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
   BindingLayoutDesc layout_;
   // Indexed by sorted layout binding, then array element.
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
-  std::vector<std::vector<ImageView>> image_views_;
   std::vector<std::vector<NS::SharedPtr<MTL::Texture>>> native_views_;
 };
 
