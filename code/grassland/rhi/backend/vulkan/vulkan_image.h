@@ -15,7 +15,7 @@ class IVulkanImage : public IObject {
   virtual bool SupportsStorage() const = 0;
   virtual const void *DeviceIdentity() const = 0;
   virtual VkImageView AttachmentView() const = 0;
-  virtual VkImageView BindingView(uint32_t base_mip = 0, uint32_t mip_count = 0) const = 0;
+  virtual VkImageView BindingView(uint32_t base_mip = 0, uint32_t mip_count = 0) = 0;
   virtual VkImage NativeImage() const = 0;
   virtual VkImageAspectFlags Aspect() const = 0;
   virtual VkImageLayout DefaultLayout() const = 0;

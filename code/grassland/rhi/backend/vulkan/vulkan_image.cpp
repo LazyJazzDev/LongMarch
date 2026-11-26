@@ -44,7 +44,7 @@ VkImageView VulkanImageViews::Attachment() const {
   return attachment_;
 }
 
-VkImageView VulkanImageViews::Binding(uint32_t base_mip, uint32_t mip_count) const {
+VkImageView VulkanImageViews::Binding(uint32_t base_mip, uint32_t mip_count) {
   if (!binding_ || base_mip >= mip_levels_)
     return VK_NULL_HANDLE;
   if (!mip_count)

@@ -26,7 +26,7 @@ VkImageView VulkanAllocatedImageImpl::AttachmentView() const {
   return views_.Attachment();
 }
 
-VkImageView VulkanAllocatedImageImpl::BindingView(uint32_t base_mip, uint32_t mip_count) const {
+VkImageView VulkanAllocatedImageImpl::BindingView(uint32_t base_mip, uint32_t mip_count) {
   return views_.Binding(base_mip, mip_count);
 }
 

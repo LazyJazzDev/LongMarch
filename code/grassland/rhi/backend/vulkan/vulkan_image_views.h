@@ -16,7 +16,7 @@ class VulkanImageViews final {
   void Reset();
   VkImageView Attachment() const;
   // Callers serialize binding view access for the same image, including across groups.
-  VkImageView Binding(uint32_t base_mip = 0, uint32_t mip_count = 0) const;
+  VkImageView Binding(uint32_t base_mip = 0, uint32_t mip_count = 0);
 
  private:
   VkDevice device_{};
@@ -24,7 +24,7 @@ class VulkanImageViews final {
   ImageFormat format_{};
   uint32_t mip_levels_{};
   // Shared by binding groups; entries live until the owning image is destroyed.
-  mutable std::map<std::pair<uint32_t, uint32_t>, VkImageView> binding_views_;
+  std::map<std::pair<uint32_t, uint32_t>, VkImageView> binding_views_;
   VkImageView attachment_{}, binding_{};
 };
 }  // namespace grassland::rhi::backend::vulkan
