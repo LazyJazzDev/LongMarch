@@ -1,13 +1,19 @@
-﻿#include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/rhi/backend/backend_shader_compiler.h"
 
+#ifndef LONGMARCH_OFFLINE_SHADERS
 #include <slang-com-ptr.h>
 #include <slang-deprecated.h>
 #include <slang.h>
-
+#endif
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <sstream>
+#include <unordered_set>
+
+#include "grassland/rhi/backend/backend_shader_cache.h"
 #ifdef __APPLE__
 #include <TargetConditionals.h>
 #endif
@@ -18,6 +24,68 @@
 
 namespace grassland::rhi::backend {
 namespace {
+#ifndef LONGMARCH_OFFLINE_SHADERS
+bool ValidateVulkanIntegerSampling(ISlangBlob *blob) {
+  // Inspect SPIR-V types rather than source spelling, so aliases, arrays and
+  // helper functions follow the same rule. Load/storage accesses do not create
+  // an OpSampledImage and remain supported. These are core SPIR-V opcodes.
+  constexpr uint16_t op_type_int = 21, op_type_image = 25, op_type_sampled_image = 27, op_sampled_image = 86;
+  if (blob->getBufferSize() % sizeof(uint32_t))
+    return false;
+  std::vector<uint32_t> words(blob->getBufferSize() / sizeof(uint32_t));
+  std::memcpy(words.data(), blob->getBufferPointer(), blob->getBufferSize());
+  if (words.size() < 5 || words[0] != 0x07230203)
+    return false;
+  std::unordered_set<uint32_t> integer_types, integer_images, integer_sampled_images;
+  for (size_t offset = 5; offset < words.size();) {
+    const uint32_t count = words[offset] >> 16;
+    const uint16_t op = static_cast<uint16_t>(words[offset]);
+    if (!count || count > words.size() - offset)
+      return false;
+    if (count >= 3) {
+      const auto result = words[offset + 1], operand = words[offset + 2];
+      if (op == op_type_int)
+        integer_types.insert(result);
+      else if (op == op_type_image && integer_types.count(operand))
+        integer_images.insert(result);
+      else if (op == op_type_sampled_image && integer_images.count(operand))
+        integer_sampled_images.insert(result);
+      else if (op == op_sampled_image && integer_sampled_images.count(result)) {
+        ReportError(-1, "Integer texture sampling is unsupported; use Load or storage image access instead.");
+        return false;
+      }
+    }
+    offset += count;
+  }
+  return true;
+}
+#endif
+
+char ShaderRegisterPrefix(BindingType type) {
+  switch (type) {
+    case BINDING_UNIFORM_BUFFER:
+      return 'b';
+    case BINDING_SAMPLER:
+      return 's';
+    case BINDING_RW_STRUCTURED_BUFFER:
+    case BINDING_RW_BYTE_ADDRESS_BUFFER:
+    case BINDING_RW_TEXTURE2D:
+      return 'u';
+    default:
+      return 't';
+  }
+}
+
+std::vector<std::pair<std::string, std::string>> PlatformDefines() {
+  const auto target = GetShaderCacheSettings().target_platform;
+  return {{"RHI_PLATFORM_WINDOWS", target == ShaderTargetPlatform::Windows ? "1" : "0"},
+          {"RHI_PLATFORM_MACOS", target == ShaderTargetPlatform::MacOS ? "1" : "0"},
+          {"RHI_PLATFORM_LINUX", target == ShaderTargetPlatform::Linux ? "1" : "0"},
+          {"RHI_PLATFORM_IOS", target == ShaderTargetPlatform::IOS ? "1" : "0"},
+          {"RHI_PLATFORM_OHOS", target == ShaderTargetPlatform::OHOS ? "1" : "0"}};
+}
+
+#ifndef LONGMARCH_OFFLINE_SHADERS
 bool SameUUID(const SlangUUID &a, const SlangUUID &b) {
   return std::memcmp(&a, &b, sizeof(a)) == 0;
 }
@@ -167,9 +235,55 @@ class TextWriter final : public ISlangWriter {
   std::vector<char> buffer_;
   std::string text_;
 };
+#endif
 }  // namespace
 
 bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &source) {
+  std::vector<uint8_t> original;
+  std::string key;
+  if (!GetShaderCacheSettings().directory.empty()) {
+    // Bundle keys identify source requests; regenerate the bundle after changing includes.
+    if (desc.file_system) {
+      if (desc.file_system->ReadFile(desc.filename, original))
+        return false;
+    } else {
+      std::ifstream file(desc.filename, std::ios::binary);
+      if (!file)
+        return false;
+      original.assign(std::istreambuf_iterator<char>(file), {});
+      if (file.bad())
+        return false;
+    }
+    std::vector<std::string> parts{"rhi-preprocess-v2",
+                                   LONGMARCH_SHADER_CACHE_ABI,
+                                   std::to_string(api),
+                                   GetShaderCacheSettings().ios ? "ios" : "native",
+                                   desc.filename,
+                                   desc.entry_point,
+                                   std::to_string(desc.stage),
+                                   std::string(original.begin(), original.end())};
+    for (const auto &define : PlatformDefines()) {
+      parts.push_back(define.first);
+      parts.push_back(define.second);
+    }
+    parts.insert(parts.end(), desc.include_paths.begin(), desc.include_paths.end());
+    for (auto &d : desc.defines) {
+      parts.push_back(d.first);
+      parts.push_back(d.second);
+    }
+    key = "pre-" + ShaderCacheKey(parts);
+    if (GetShaderCacheSettings().read_only) {
+      std::vector<uint8_t> cached;
+      if (!ReadShaderCache(key, cached))
+        return false;
+      source.assign(cached.begin(), cached.end());
+      return true;
+    }
+  }
+#ifdef LONGMARCH_OFFLINE_SHADERS
+  ReportError(-1, "Offline shader preprocessing requires a prepared bundle");
+  return false;
+#else
   source.clear();
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
   if (!global && SLANG_FAILED(slang::createGlobalSession(global.writeRef())))
@@ -182,21 +296,8 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
                         desc.stage >= SHADER_STAGE_RAY_GENERATION ? "sm_6_5" : "sm_6_0"};
   if (SLANG_FAILED(request->processCommandLineArguments(args, 5)))
     return false;
-#ifdef _WIN32
-  request->addPreprocessorDefine("RHI_PLATFORM_WINDOWS", "1");
-#else
-  request->addPreprocessorDefine("RHI_PLATFORM_WINDOWS", "0");
-#endif
-#ifdef __APPLE__
-  request->addPreprocessorDefine("RHI_PLATFORM_MACOS", "1");
-#else
-  request->addPreprocessorDefine("RHI_PLATFORM_MACOS", "0");
-#endif
-#ifdef __linux__
-  request->addPreprocessorDefine("RHI_PLATFORM_LINUX", "1");
-#else
-  request->addPreprocessorDefine("RHI_PLATFORM_LINUX", "0");
-#endif
+  for (const auto &define : PlatformDefines())
+    request->addPreprocessorDefine(define.first.c_str(), define.second.c_str());
   for (const auto &define : desc.defines)
     request->addPreprocessorDefine(define.first.c_str(), define.second.c_str());
   for (const auto &path : desc.include_paths)
@@ -236,7 +337,8 @@ bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &sourc
   if (SLANG_FAILED(result) || diagnostic_error)
     return false;
   source = output->Text();
-  return true;
+  return key.empty() || WriteShaderCache(key, {source.begin(), source.end()});
+#endif
 }
 
 std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
@@ -250,59 +352,77 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
       header += "[[vk::location(" + location + ")]] ";
     header += "T N : TEXCOORD" + location + "\n";
   }
-  const char *macros[] = {"UNIFORM",
-                          "STRUCTURED_BUFFER",
-                          "RW_STRUCTURED_BUFFER",
-                          "BYTE_ADDRESS_BUFFER",
-                          "RW_BYTE_ADDRESS_BUFFER",
-                          "TEXTURE2D",
-                          "RW_TEXTURE2D",
-                          "SAMPLER",
-                          "ACCELERATION_STRUCTURE"};
-  const char *types[] = {"ConstantBuffer<T>", "StructuredBuffer<T>", "RWStructuredBuffer<T>",
-                         "ByteAddressBuffer", "RWByteAddressBuffer", "Texture2D<T>",
-                         "RWTexture2D<T>",    "SamplerState",        "RaytracingAccelerationStructure"};
-  for (auto macro : macros) {
-    for (const auto &suffix : {std::string{}, std::string{"_ARRAY"}}) {
-      auto name = std::string(macro) + suffix;
+
+  struct ResourceMacro {
+    BindingType binding_type;
+    const char *name;
+    const char *shader_type;
+    bool typed;
+  };
+
+  // Both sampler declarations use the same binding type and generation path.
+  const ResourceMacro macros[] = {
+      {BINDING_UNIFORM_BUFFER, "UNIFORM", "ConstantBuffer<T>", true},
+      {BINDING_STRUCTURED_BUFFER, "STRUCTURED_BUFFER", "StructuredBuffer<T>", true},
+      {BINDING_RW_STRUCTURED_BUFFER, "RW_STRUCTURED_BUFFER", "RWStructuredBuffer<T>", true},
+      {BINDING_BYTE_ADDRESS_BUFFER, "BYTE_ADDRESS_BUFFER", "ByteAddressBuffer", false},
+      {BINDING_RW_BYTE_ADDRESS_BUFFER, "RW_BYTE_ADDRESS_BUFFER", "RWByteAddressBuffer", false},
+      {BINDING_TEXTURE2D, "TEXTURE2D", "Texture2D<T>", true},
+      {BINDING_RW_TEXTURE2D, "RW_TEXTURE2D", "RWTexture2D<T>", true},
+      {BINDING_SAMPLER, "SAMPLER", "SamplerState", false},
+      {BINDING_SAMPLER, "COMPARISON_SAMPLER", "SamplerComparisonState", false},
+      {BINDING_ACCELERATION_STRUCTURE, "ACCELERATION_STRUCTURE", "RaytracingAccelerationStructure", false}};
+  for (const auto &macro : macros) {
+    for (bool array : {false, true}) {
+      const auto name = std::string(macro.name) + (array ? "_ARRAY" : "");
       header += "#define RHI_" + name + "_I(G,B) RHI_" + name + "_##G##_##B\n";
-      header += "#define RHI_" + name + "_D(G,B) RHI_" + name + "_I(G,B)\n";
-      bool untyped = std::string(macro) == "SAMPLER" || std::string(macro) == "ACCELERATION_STRUCTURE" ||
-                     std::string(macro).find("BYTE_ADDRESS_BUFFER") != std::string::npos;
-      header += "#define RHI_" + name + (untyped ? "(G,B,N) " : "(G,B,T,N) ") + "RHI_" + name + "_D(G,B)" +
-                (untyped ? "(N)\n" : "(T,N)\n");
+      header += "#define RHI_" + name + (macro.typed ? "(G,B,T,N) " : "(G,B,N) ") + "RHI_" + name + "_I(G,B)" +
+                (macro.typed ? "(T,N)\n" : "(N)\n");
     }
   }
   for (auto mapped : MapBindings(layout, api)) {
-    auto b = mapped.desc;
-    std::string base = macros[b.type];
-    for (bool array : {false, true}) {
-      if (!array && b.count != 1)
+    const auto &b = mapped.desc;
+    for (const auto &macro : macros) {
+      if (macro.binding_type != b.type)
         continue;
-      auto name = base + (array ? "_ARRAY" : "");
-      header += "#define RHI_" + name + "_" + std::to_string(mapped.group) + "_" + std::to_string(b.binding) +
-                ((b.type == BINDING_ACCELERATION_STRUCTURE || b.type == BINDING_SAMPLER ||
-                  b.type == BINDING_BYTE_ADDRESS_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER)
-                     ? "(N) "
-                     : "(T,N) ");
-      if (api == BACKEND_API_VULKAN)
-        header += "[[vk::binding(" + std::to_string(b.binding) + "," + std::to_string(mapped.group) + ")]] ";
-      header += std::string(types[b.type]) + " N" + (array ? "[" + std::to_string(b.count) + "]" : "");
-      if (api != BACKEND_API_VULKAN) {
-        const char reg = b.type == BINDING_UNIFORM_BUFFER ? 'b'
-                         : b.type == BINDING_SAMPLER      ? 's'
-                         : (b.type == BINDING_RW_STRUCTURED_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
-                            b.type == BINDING_RW_TEXTURE2D)
-                             ? 'u'
-                             : 't';
-        header += " : register(" + std::string(1, reg) + std::to_string(mapped.shader_register) + ", space" +
-                  std::to_string(api == BACKEND_API_METAL ? 0 : mapped.group) + ")";
+      for (bool array : {false, true}) {
+        if (!array && b.count != 1)
+          continue;
+        const auto name = std::string(macro.name) + (array ? "_ARRAY" : "");
+        header += "#define RHI_" + name + "_" + std::to_string(mapped.group) + "_" + std::to_string(b.binding) +
+                  (macro.typed ? "(T,N) " : "(N) ");
+        if (api == BACKEND_API_VULKAN)
+          header += "[[vk::binding(" + std::to_string(b.binding) + "," + std::to_string(mapped.group) + ")]] ";
+        header += std::string(macro.shader_type) + " N" + (array ? "[" + std::to_string(b.count) + "]" : "");
+        if (api != BACKEND_API_VULKAN) {
+          const char reg = ShaderRegisterPrefix(b.type);
+          header += " : register(" + std::string(1, reg) + std::to_string(mapped.shader_register) + ", space" +
+                    std::to_string(api == BACKEND_API_METAL ? 0 : mapped.group) + ")";
+        }
+        header += "\n";
       }
-      header += "\n";
     }
   }
   header += "#line 1 \"shader.slang\"\n";
   return header;
+}
+
+std::string ShaderBindingLayoutKey(const PipelineLayoutDesc &layout) {
+  std::vector<std::string> parts{"rhi-binding-layout-v1", std::to_string(layout.groups.size())};
+  for (size_t group = 0; group < layout.groups.size(); ++group) {
+    auto bindings = layout.groups[group].bindings;
+    std::sort(bindings.begin(), bindings.end(), [](const auto &a, const auto &b) { return a.binding < b.binding; });
+    parts.push_back(std::to_string(group));
+    parts.push_back(std::to_string(bindings.size()));
+    for (const auto &binding : bindings) {
+      parts.push_back(std::to_string(binding.binding));
+      parts.push_back(std::to_string(binding.type));
+      parts.push_back(std::to_string(binding.count));
+      parts.push_back(std::to_string(binding.visibility));
+      parts.push_back(std::to_string(binding.stride));
+    }
+  }
+  return ShaderCacheKey(parts);
 }
 
 bool CompileSlang(const IShader *shader_object,
@@ -311,6 +431,22 @@ bool CompileSlang(const IShader *shader_object,
                   std::vector<uint8_t> &code,
                   const PipelineLayoutDesc *binding_layout,
                   std::array<uint32_t, 3> *thread_group_size) {
+  const std::string key =
+      "slang-" + ShaderCacheKey({"rhi-spirv-v3", LONGMARCH_SHADER_CACHE_ABI, prefix,
+                                 ShaderBindingLayoutKey(binding_layout ? *binding_layout : PipelineLayoutDesc{}),
+                                 shader_object->GetPreprocessedCode(), shader_object->GetEntry(),
+                                 std::to_string(shader_object->GetStage()), std::to_string(api),
+                                 std::to_string(static_cast<int>(GetShaderCacheSettings().target_platform))});
+  if (GetShaderCacheSettings().read_only && ReadShaderCache(key, code)) {
+    if (!thread_group_size || ReadShaderThreadGroup(key, *thread_group_size))
+      return true;
+  }
+  if (!GetShaderCacheSettings().directory.empty() && GetShaderCacheSettings().read_only)
+    return false;
+#ifdef LONGMARCH_OFFLINE_SHADERS
+  ReportError(-1, "Offline compilation requires a prepared bundle");
+  return false;
+#else
   const auto &preprocessed = shader_object->GetPreprocessedCode();
   code.clear();
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
@@ -335,22 +471,11 @@ bool CompileSlang(const IShader *shader_object,
                                  : api == BACKEND_API_VULKAN ? "spirv"
                                                              : "dxil",
                                  "-fvk-use-entrypoint-name"};
-  // Execution platform, independent of the intermediate shader target (Metal uses SPIR-V).
-#ifdef _WIN32
-  args.push_back("-DRHI_PLATFORM_WINDOWS=1");
-#else
-  args.push_back("-DRHI_PLATFORM_WINDOWS=0");
-#endif
-#if defined(__APPLE__) && TARGET_OS_OSX
-  args.push_back("-DRHI_PLATFORM_MACOS=1");
-#else
-  args.push_back("-DRHI_PLATFORM_MACOS=0");
-#endif
-#ifdef __linux__
-  args.push_back("-DRHI_PLATFORM_LINUX=1");
-#else
-  args.push_back("-DRHI_PLATFORM_LINUX=0");
-#endif
+  std::vector<std::string> platform_args;
+  for (const auto &define : PlatformDefines())
+    platform_args.push_back("-D" + define.first + "=" + define.second);
+  for (const auto &arg : platform_args)
+    args.push_back(arg.c_str());
   if (api == BACKEND_API_VULKAN) {
     args.push_back("-emit-spirv-directly");
     args.push_back("-fvk-use-dx-layout");
@@ -412,6 +537,8 @@ bool CompileSlang(const IShader *shader_object,
     report();
     return false;
   }
+  if (api == BACKEND_API_VULKAN && !ValidateVulkanIntegerSampling(blob.get()))
+    return false;
 
   Slang::ComPtr<slang::IMetadata> metadata;
   if (SLANG_FAILED(linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef()))) {
@@ -483,14 +610,20 @@ bool CompileSlang(const IShader *shader_object,
     }
   }
 
-  if (thread_group_size) {
+  if (shader_object->GetStage() == SHADER_STAGE_COMPUTE) {
     SlangUInt sizes[3]{};
+    std::array<uint32_t, 3> group{};
     layout->getEntryPointByIndex(0)->getComputeThreadGroupSize(3, sizes);
     for (int i = 0; i < 3; ++i)
-      (*thread_group_size)[i] = uint32_t(sizes[i]);
+      group[i] = uint32_t(sizes[i]);
+    if (thread_group_size)
+      *thread_group_size = group;
+    if (!WriteShaderThreadGroup(key, group))
+      return false;
   }
   code.resize(blob->getBufferSize());
   std::memcpy(code.data(), blob->getBufferPointer(), code.size());
-  return true;
+  return WriteShaderCache(key, code);
+#endif
 }
 }  // namespace grassland::rhi::backend

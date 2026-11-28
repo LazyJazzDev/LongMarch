@@ -1,5 +1,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 
+#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #define D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 #include <D3D12MemAlloc.h>
@@ -23,8 +24,13 @@ bool D3D12AllocatedImageImpl::IsValid() const {
   return true;
 }
 
-IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &desc) {
-  if (!desc.width || !desc.height)
+IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &requested) {
+  ImageDesc desc;
+  if (!NormalizeImageDesc(requested, desc))
+    return nullptr;
+  const auto &mip = device->GetPhysicalDevice().mip_feature;
+  if (desc.width > mip.max_image_dimension_2d || desc.height > mip.max_image_dimension_2d ||
+      desc.mip_levels > device->GetPhysicalDevice().format_features[desc.format].max_mip_levels)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (format == DXGI_FORMAT_UNKNOWN)
@@ -41,8 +47,9 @@ IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &d
   info.Width = desc.width;
   info.Height = desc.height;
   info.DepthOrArraySize = 1;
-  info.MipLevels = 1;
-  info.Format = format;
+  info.MipLevels = static_cast<UINT16>(desc.mip_levels);
+  // D32 shadow maps need both a DSV (D32_FLOAT) and an SRV (R32_FLOAT).
+  info.Format = desc.format == IMAGE_FORMAT_D32_SFLOAT ? DXGI_FORMAT_R32_TYPELESS : format;
   info.SampleDesc.Count = 1;
   info.Flags =
       IsDepthFormat(desc.format) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
@@ -59,7 +66,17 @@ IImage *D3D12AllocatedImageImpl::Create(ID3D12Device *device, const ImageDesc &d
   auto attachment = CreateAttachmentView(device, image.Get());
   if (!attachment)
     return nullptr;
-  return new D3D12AllocatedImageImpl(device, desc, std::move(image), std::move(allocation), std::move(attachment));
+  auto result = ObjectPtr<D3D12AllocatedImageImpl>::Adopt(
+      new D3D12AllocatedImageImpl(device, desc, std::move(image), std::move(allocation), std::move(attachment)));
+  // Placed render/depth textures require Clear/Copy/Discard initialization even
+  // when their first user is a UAV. Initialize every mip once on a direct queue.
+  auto commands = ObjectPtr<ICommandContext>::Adopt(CreateD3D12CommandContext(device->GetNativeQueue(QUEUE_TYPE_MAIN)));
+  if (!commands || !rhi::QueryInterfacePtr<ID3D12CommandContext>(commands.Get())->InitializeImage(result.Get()))
+    return nullptr;
+  auto completion = ObjectPtr<ISubmissionToken>::Adopt(commands->Submit());
+  if (!completion || !completion->WaitHost())
+    return nullptr;
+  return result.Detach();
 }
 
 IImage *CreateD3D12AllocatedImage(ID3D12Device *device, const ImageDesc &desc) {

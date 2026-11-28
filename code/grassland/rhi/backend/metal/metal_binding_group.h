@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
@@ -17,7 +17,7 @@ class IMetalBindingVersion : public IObject {
   virtual bool IsComplete() const = 0;
   virtual ObjectPtr<IMetalBindingVersion> Clone() const = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) = 0;
-  virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) = 0;
+  virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<ImageView> &values) = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) = 0;
   virtual bool Write(size_t binding_index,
                      uint32_t first_element,
@@ -60,7 +60,7 @@ class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
   IMetalDevice *device_;
   MetalBindingVersionImpl(IMetalDevice *device, const BindingLayoutDesc &layout);
   bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<BufferView> &values);
-  bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<IImage *> &values);
+  bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<ImageView> &values);
   bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<ISampler *> &values);
   bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<ITopLevelAccelerationStructure *> &values);
   std::vector<uint32_t> offsets_;
@@ -83,7 +83,7 @@ class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
 
   bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
 
-  bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
+  bool Write(size_t binding_index, uint32_t first_element, const std::vector<ImageView> &values) override;
 
   bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) override;
 
@@ -95,6 +95,7 @@ class MetalBindingVersionImpl final : public Object<IMetalBindingVersion> {
   BindingLayoutDesc layout_;
   // Indexed by sorted layout binding, then array element.
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
+  std::vector<std::vector<NS::SharedPtr<MTL::Texture>>> native_views_;
 };
 
 class MetalBindingGroupImpl final : public Object<rhi::IBindingGroup, IMetalBindingGroup> {
@@ -125,7 +126,7 @@ class MetalBindingGroupImpl final : public Object<rhi::IBindingGroup, IMetalBind
  public:
   bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override;
 
-  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override;
+  bool BindResource(uint32_t binding, const std::vector<ImageView> &images, uint32_t first_element = 0) override;
 
   bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override;
 

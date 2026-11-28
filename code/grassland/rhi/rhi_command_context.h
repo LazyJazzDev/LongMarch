@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 
 #include "grassland/rhi/rhi_acceleration_structure.h"
@@ -103,7 +103,12 @@ class ICommandContext : public IObject {
                              uint64_t destination_offset,
                              uint64_t size) = 0;
   virtual bool CmdBindGroup(uint32_t index, IBindingGroup *group) = 0;
-  virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) = 0;
+  virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level = 0) = 0;
+  // Generate levels after base_mip by linear downsampling on the GPU. mip_count
+  // includes the source level; zero selects the remainder. The source must be
+  // initialized. Requires mip_compute_generation for the format and no rendering scope.
+  // Rebind the caller's program/groups afterwards (generation binds its own compute program).
+  virtual bool CmdGenerateMipmaps(IImage *image, uint32_t base_mip = 0, uint32_t mip_count = 0) = 0;
   // One active graphics or compute program. Switching programs clears group bindings.
   // Dispatch requires no rendering scope; dependencies between dispatches are automatic.
   virtual bool CmdBindComputeProgram(IComputeProgram *program) = 0;

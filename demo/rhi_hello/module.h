@@ -8,6 +8,8 @@ class IDevice;
 int RunWindow(grassland::rhi::IDevice *device);
 int RunTriangle(grassland::rhi::IDevice *device);
 int RunCube(grassland::rhi::IDevice *device);
+int RunMip(grassland::rhi::IDevice *device);
+int RunPCF(grassland::rhi::IDevice *device);
 int RunTexture(grassland::rhi::IDevice *device);
 int RunBlend(grassland::rhi::IDevice *device);
 int RunNBody(grassland::rhi::IDevice *device);

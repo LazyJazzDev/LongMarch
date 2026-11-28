@@ -24,7 +24,7 @@ class LauncherTests(unittest.TestCase):
 
     def test_list_and_help(self):
         self.assertEqual(self.run_demo("--list").splitlines(), [
-            "window", "triangle", "cube", "texture", "blend", "nbody",
+            "window", "triangle", "cube", "mip", "pcf", "texture", "blend", "nbody",
             "raytracing", "ray_query", "hdr", "imgui", "imgui_multi_window",
         ])
         help_text = self.run_demo("--help")

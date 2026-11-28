@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -109,19 +109,6 @@ typedef enum {
 std::string to_string(PhysicalDeviceType type);
 std::string PhysicalDeviceTypeName(PhysicalDeviceType type);
 
-struct PhysicalDevice {
-  std::string name;
-  // Bytes of host/shared memory accessible to the GPU (not additional VRAM).
-  uint64_t unified_memory{};
-  uint64_t dedicated_memory{};
-  PhysicalDeviceType type{PHYSICAL_DEVICE_TYPE_INTEGRATED};
-  bool ray_tracing_pipeline_feature{};
-  bool ray_query_feature{};
-  bool geometry_shader_feature{};
-  // Process-local CUDA ordinal; -1 when unavailable.
-  int cuda_device{-1};
-};
-
 typedef enum {
   PRESENT_MODE_VSYNC,
   PRESENT_MODE_CONTINUOUS,
@@ -183,7 +170,43 @@ typedef enum {
   IMAGE_FORMAT_D16_UNORM,
   IMAGE_FORMAT_D32_SFLOAT,
   IMAGE_FORMAT_D24_UNORM_S8_UINT,
+  IMAGE_FORMAT_COUNT,
 } ImageFormat;
+
+// Native optimal-tiled 2D image capabilities. Unsupported/query-failed formats
+// remain zero. These describe hardware support, not an initialized mip chain.
+struct PhysicalDeviceFormatFeature {
+  uint32_t max_mip_levels{};
+  bool sampled{};
+  bool linear_filter{};
+  bool storage{};
+  bool linear_blit{};
+  bool mip_compute_generation{};
+};
+
+struct PhysicalDeviceMipFeature {
+  uint32_t max_image_dimension_2d{};
+  uint32_t max_anisotropy{1};
+  float min_lod_bias{};
+  float max_lod_bias{};
+};
+
+struct PhysicalDevice {
+  std::string name;
+  // Bytes of host/shared memory accessible to the GPU (not additional VRAM).
+  uint64_t unified_memory{};
+  uint64_t dedicated_memory{};
+  PhysicalDeviceType type{PHYSICAL_DEVICE_TYPE_INTEGRATED};
+  bool ray_tracing_pipeline_feature{};
+  bool ray_query_feature{};
+  bool geometry_shader_feature{};
+  // Compute-stage subgroup vote and basic lane operations; callers need a fallback.
+  bool compute_subgroup_vote_feature{};
+  // Process-local CUDA ordinal; -1 when unavailable.
+  int cuda_device{-1};
+  PhysicalDeviceMipFeature mip_feature;
+  PhysicalDeviceFormatFeature format_features[IMAGE_FORMAT_COUNT]{};
+};
 
 std::string to_string(ImageFormat value);
 std::string ImageFormatName(ImageFormat value);
@@ -221,22 +244,22 @@ union ClearValue {
   ClearValue(const ClearDepthStencilValue &value);
 };
 
-enum PrimitiveTopology {
+typedef enum {
   PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
   PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
   PRIMITIVE_TOPOLOGY_LINE_LIST,
   PRIMITIVE_TOPOLOGY_LINE_STRIP,
   PRIMITIVE_TOPOLOGY_POINT_LIST,
-};
+} PrimitiveTopology;
 
-enum CullMode { CULL_MODE_NONE, CULL_MODE_FRONT, CULL_MODE_BACK };
+typedef enum { CULL_MODE_NONE, CULL_MODE_FRONT, CULL_MODE_BACK } CullMode;
 
 // Winding in NDC (+X right, +Y up), before the viewport Y transform.
 // Matches graphics: Vulkan CCW + negative-height viewport; D3D12
 // FrontCounterClockwise=TRUE and Metal CCW + positive-height viewport.
-enum FrontFace { FRONT_FACE_COUNTER_CLOCKWISE, FRONT_FACE_CLOCKWISE };
+typedef enum { FRONT_FACE_COUNTER_CLOCKWISE, FRONT_FACE_CLOCKWISE } FrontFace;
 
-enum FillMode { FILL_MODE_SOLID, FILL_MODE_WIREFRAME };
+typedef enum { FILL_MODE_SOLID, FILL_MODE_WIREFRAME } FillMode;
 
 struct RasterizerDesc {
   CullMode cull_mode{CULL_MODE_NONE};
@@ -244,7 +267,7 @@ struct RasterizerDesc {
   FillMode fill_mode{FILL_MODE_SOLID};
 };
 
-enum CompareOp {
+typedef enum {
   COMPARE_NEVER,
   COMPARE_LESS,
   COMPARE_EQUAL,
@@ -253,9 +276,9 @@ enum CompareOp {
   COMPARE_NOT_EQUAL,
   COMPARE_GREATER_EQUAL,
   COMPARE_ALWAYS
-};
+} CompareOp;
 
-enum StencilOp {
+typedef enum {
   STENCIL_KEEP,
   STENCIL_ZERO,
   STENCIL_REPLACE,
@@ -264,7 +287,7 @@ enum StencilOp {
   STENCIL_INVERT,
   STENCIL_INCREMENT_WRAP,
   STENCIL_DECREMENT_WRAP
-};
+} StencilOp;
 
 struct StencilFaceDesc {
   StencilOp fail_op{STENCIL_KEEP}, depth_fail_op{STENCIL_KEEP}, pass_op{STENCIL_KEEP};
@@ -283,7 +306,7 @@ struct DepthStencilDesc {
 // Values written to a swapchain must use its declared encoding. No implicit
 // tonemapping or color conversion is performed by CmdPresent; CmdPresentImage
 // explicitly converts from the supplied source encoding.
-enum ColorSpace {
+typedef enum {
   COLOR_SPACE_SRGB_NONLINEAR,
   // Linear Rec.709/scRGB: 1.0 corresponds to 80 cd/m^2; values may exceed 1.
   COLOR_SPACE_EXTENDED_SRGB_LINEAR,
@@ -291,7 +314,7 @@ enum ColorSpace {
   COLOR_SPACE_HDR10_ST2084,
   // Linear Rec.709 with platform-defined luminance mapping; not the scRGB contract.
   COLOR_SPACE_BT709_LINEAR,
-};
+} ColorSpace;
 
 std::string to_string(ColorSpace value);
 std::string ColorSpaceName(ColorSpace value);
@@ -314,7 +337,13 @@ struct ImageDesc {
   uint32_t width{};
   uint32_t height{};
   ImageFormat format{IMAGE_FORMAT_UNKNOWN};
+  // 0 requests the complete chain; GetDesc() always returns the resolved count.
+  uint32_t mip_levels{1};
 };
+
+uint32_t ImageMipLevelCount(uint32_t width, uint32_t height);
+bool NormalizeImageDesc(const ImageDesc &requested, ImageDesc &resolved);
+bool ImageMipDesc(const ImageDesc &image, uint32_t mip_level, ImageDesc &level);
 
 typedef enum {
   SHADER_STAGE_VERTEX,

@@ -1,1 +1,27 @@
 #include "grassland/rhi/rhi_sampler.h"
+
+namespace grassland::rhi {
+SamplerDesc::SamplerDesc(SamplerFilter value, SamplerAddressMode u, SamplerAddressMode v)
+    : min_filter(value),
+      mag_filter(value),
+      mip_filter(value),
+      address_u(u),
+      address_v(v),
+      address_w(v) {
+}
+
+SamplerDesc::SamplerDesc(SamplerFilter min,
+                         SamplerFilter mag,
+                         SamplerFilter mip,
+                         SamplerAddressMode u,
+                         SamplerAddressMode v,
+                         SamplerAddressMode w)
+    : min_filter(min),
+      mag_filter(mag),
+      mip_filter(mip),
+      address_u(u),
+      address_v(v),
+      address_w(w) {
+}
+
+}  // namespace grassland::rhi

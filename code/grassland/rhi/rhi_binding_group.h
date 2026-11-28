@@ -60,24 +60,38 @@ struct BufferView {
   uint64_t offset{}, size{};
 };
 
+// A borrowed mip range. mip_count == 0 selects the remaining levels for sampled
+// textures, or one level for storage textures. Shader LOD zero is base_mip.
+struct ImageView {
+  IImage *image{};
+  uint32_t base_mip{};
+  uint32_t mip_count{};
+};
+
 // Creation allocates the layout without populating resources. BindResource writes
 // slots and retains resources. CmdBindGroup captures the current version; later
 // writes never change recorded commands. CPU access to a group is externally synchronized.
+// BindResource calls using the same image must also be serialized across groups,
+// because obtaining a binding view may update the image's view cache.
 class IBindingGroup : public IObject {
  public:
   virtual const BindingLayoutDesc &GetLayout() const = 0;
-  bool BindResource(uint32_t binding, IBuffer *buffer);
-  bool BindResource(uint32_t binding, const BufferView &buffer);
-  bool BindResource(uint32_t binding, IImage *image);
-  bool BindResource(uint32_t binding, ISampler *sampler);
-  bool BindResource(uint32_t binding, ITopLevelAccelerationStructure *structure);
   virtual bool BindResource(uint32_t binding,
                             const std::vector<ITopLevelAccelerationStructure *> &structures,
                             uint32_t first_element = 0) = 0;
-  bool BindResource(uint32_t binding, const std::vector<IBuffer *> &buffers, uint32_t first_element = 0);
   virtual bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) = 0;
-  virtual bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) = 0;
+  virtual bool BindResource(uint32_t binding, const std::vector<ImageView> &images, uint32_t first_element = 0) = 0;
   virtual bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) = 0;
+
+  // Convenience overloads forward to the virtual array operations above.
+  bool BindResource(uint32_t binding, IBuffer *buffer);
+  bool BindResource(uint32_t binding, const BufferView &buffer);
+  bool BindResource(uint32_t binding, IImage *image);
+  bool BindResource(uint32_t binding, const ImageView &image);
+  bool BindResource(uint32_t binding, ISampler *sampler);
+  bool BindResource(uint32_t binding, ITopLevelAccelerationStructure *structure);
+  bool BindResource(uint32_t binding, const std::vector<IBuffer *> &buffers, uint32_t first_element = 0);
+  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0);
 
  protected:
   ~IBindingGroup() override = default;

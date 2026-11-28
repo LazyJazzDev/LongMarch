@@ -114,6 +114,10 @@ class TestDevice final : public backend::Object<rhi::IDevice> {
     return nullptr;
   }
 #endif
+  const PhysicalDevice &GetPhysicalDevice() const noexcept override {
+    return info_;
+  }
+
   std::string Name() const override {
     return info_.name;
   }
@@ -124,6 +128,10 @@ class TestDevice final : public backend::Object<rhi::IDevice> {
 
   bool SupportRayQuery() const override {
     return info_.ray_query_feature;
+  }
+
+  bool SupportComputeSubgroupVote() const override {
+    return info_.compute_subgroup_vote_feature;
   }
 
   bool SupportGeometryShader() const override {
@@ -311,6 +319,7 @@ TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinati
     EXPECT_EQ(device->SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
     EXPECT_EQ(device->SupportRayQuery(), devices[id].ray_query_feature);
     EXPECT_EQ(device->SupportGeometryShader(), devices[id].geometry_shader_feature);
+    EXPECT_EQ(device->SupportComputeSubgroupVote(), devices[id].compute_subgroup_vote_feature);
   }
   for (unsigned mask = 0; mask < 8; ++mask) {
     DeviceFeatureRequirement requirement{bool(mask & 1), bool(mask & 2), bool(mask & 4)};
@@ -322,6 +331,7 @@ TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinati
       EXPECT_EQ(device->SupportRayTracingPipeline(), devices[id].ray_tracing_pipeline_feature);
       EXPECT_EQ(device->SupportRayQuery(), devices[id].ray_query_feature);
       EXPECT_EQ(device->SupportGeometryShader(), devices[id].geometry_shader_feature);
+      EXPECT_EQ(device->SupportComputeSubgroupVote(), devices[id].compute_subgroup_vote_feature);
     }
   }
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();

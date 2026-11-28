@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/metal/metal_allocated_image.h"
+#include "grassland/rhi/backend/metal/metal_allocated_image.h"
 
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
@@ -12,16 +12,24 @@ MetalAllocatedImageImpl::MetalAllocatedImageImpl(IMetalDevice *device,
       device_(device) {
 }
 
-IImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &desc) {
+IImage *MetalAllocatedImageImpl::Create(IMetalDevice *device, const ImageDesc &requested) {
+  ImageDesc desc;
+  if (!NormalizeImageDesc(requested, desc))
+    return nullptr;
   const auto format = NativeImageFormat(desc.format);
-  if (!desc.width || !desc.height || desc.width > 16384 || desc.height > 16384 || format == MTL::PixelFormatInvalid)
+  const auto &capabilities = device->GetPhysicalDevice();
+  const auto &feature = capabilities.format_features[desc.format];
+  if (desc.width > capabilities.mip_feature.max_image_dimension_2d ||
+      desc.height > capabilities.mip_feature.max_image_dimension_2d || desc.mip_levels > feature.max_mip_levels ||
+      format == MTL::PixelFormatInvalid)
     return nullptr;
 
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto descriptor = MTL::TextureDescriptor::texture2DDescriptor(format, desc.width, desc.height, false);
+  descriptor->setMipmapLevelCount(desc.mip_levels);
   descriptor->setStorageMode(MTL::StorageModePrivate);
   auto usage = MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead;
-  if (SupportsImageStorage(desc.format))
+  if (feature.storage)
     usage |= MTL::TextureUsageShaderWrite;
   descriptor->setUsage(usage);
   auto texture = NS::TransferPtr(device->NativeDevice()->newTexture(descriptor));

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_object.h"
@@ -30,10 +30,15 @@ class IDevice : public IObject {
   virtual ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
       const TopLevelAccelerationStructureDesc &desc) = 0;
   virtual IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) = 0;
+  virtual const PhysicalDevice &GetPhysicalDevice() const noexcept = 0;
   virtual std::string Name() const = 0;
   virtual bool SupportRayTracingPipeline() const = 0;
   virtual bool SupportRayQuery() const = 0;
   virtual bool SupportGeometryShader() const = 0;
+
+  // Compute-stage subgroup vote and basic lane operations; portable code must have a fallback.
+  virtual bool SupportComputeSubgroupVote() const = 0;
+
   // Independent 2D color target, also usable for transfer/clear commands.
   virtual IImage *CreateImage(const ImageDesc &desc) = 0;
   virtual ISampler *CreateSampler(const SamplerDesc &desc = {}) = 0;

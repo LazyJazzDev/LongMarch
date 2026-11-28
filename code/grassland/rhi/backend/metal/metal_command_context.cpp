@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
+#include "grassland/rhi/backend/metal/metal_command_context.h"
 
 #include <array>
 #include <cassert>
@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include "grassland/rhi/backend/backend_download_token.h"
+#include "grassland/rhi/backend/backend_mip_generator.h"
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
@@ -304,18 +305,30 @@ bool MetalCommandContextImpl::CopyBuffer(IMetalBuffer *src,
   return true;
 }
 
-bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
-  auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
-  const uint64_t pitch = native ? uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) : 0;
-  if (sealed_ || encoder_ || !native || !image->IsValid() ||
-      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
-      !IsColorFormat(image->GetDesc().format) || !pitch || row_pitch < pitch ||
-      (image->GetDesc().height - 1) > (SIZE_MAX - pitch) / row_pitch) {
+bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level) {
+#if !defined(NDEBUG)
+  if (!image) {
     recording_failed_ = true;
     return false;
   }
-
-  const auto desc = image->GetDesc();
+#endif
+  ImageDesc level;
+  if (!ImageMipDesc(image->GetDesc(), mip_level, level)) {
+    recording_failed_ = true;
+    return false;
+  }
+  auto native = rhi::QueryInterfacePtr<IMetalImage>(image).Get();
+  const uint64_t pitch = native ? uint64_t(level.width) * ImageFormatSize(level.format) : 0;
+#if !defined(NDEBUG)
+  if (sealed_ || encoder_ || !native || !image->IsValid() ||
+      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
+      !IsColorFormat(level.format) || !pitch || row_pitch < pitch ||
+      (level.height - 1) > (SIZE_MAX - pitch) / row_pitch) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  const auto desc = level;
   const uint64_t size = pitch * desc.height;
   auto upload = device_->UploadPool().Acquire(size);
   if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
@@ -333,7 +346,7 @@ bool MetalCommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
     return false;
   }
   blit->copyFromBuffer(upload->NativeBuffer(), 0, pitch, size, MTL::Size::Make(desc.width, desc.height, 1),
-                       native->NativeImage(), 0, 0, MTL::Origin::Make(0, 0, 0));
+                       native->NativeImage(), 0, mip_level, MTL::Origin::Make(0, 0, 0));
   blit->endEncoding();
   return true;
 }
@@ -368,6 +381,27 @@ bool MetalCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group)
   return true;
 }
 
+bool MetalCommandContextImpl::CmdGenerateMipmaps(IImage *image, uint32_t base_mip, uint32_t mip_count) {
+  auto native = rhi::QueryInterfacePtr<IMetalImage>(image);
+#if !defined(NDEBUG)
+  if (sealed_ || render_target_ || !native || !image->IsValid() || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_ || !native->SupportsStorage() ||
+      !device_->GetPhysicalDevice().format_features[image->GetDesc().format].mip_compute_generation) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!GenerateMipChain(this, rhi::QueryInterfacePtr<IDevice>(device_).Get(), image, base_mip, mip_count, mip_program_,
+                        mip_sampler_)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return true;
+}
+
 bool MetalCommandContextImpl::CmdBindComputeProgram(IComputeProgram *program) {
   auto native = rhi::QueryInterfacePtr<IMetalComputeProgram>(program).Get();
   if (sealed_ || encoder_ || !native || native->Owner() != device_) {
@@ -388,11 +422,8 @@ bool MetalCommandContextImpl::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
     recording_failed_ = true;
     return false;
   }
-  for (size_t i = 0; i < groups_.size(); ++i)
-    if (!groups_[i] && !native_program_->BindingLayout().groups[i].bindings.empty()) {
-      recording_failed_ = true;
-      return false;
-    }
+  if (!ValidateGroups())
+    return false;
   if (!x || !y || !z)
     return true;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
@@ -670,6 +701,37 @@ bool MetalCommandContextImpl::CmdSetScissor(const Scissor &scissor) {
   return true;
 }
 
+bool MetalCommandContextImpl::ValidateGroups() {
+  for (size_t i = 0; i < groups_.size(); ++i) {
+    if (!groups_[i] && !native_program_->BindingLayout().groups[i].bindings.empty()) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (!groups_[i])
+      continue;
+#if !defined(NDEBUG)
+    const auto &layout = groups_[i]->GetLayout();
+    for (size_t b = 0; b < layout.bindings.size(); ++b) {
+      const auto type = layout.bindings[b].type;
+      if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
+        continue;
+      for (const auto &reference : groups_[i]->GetReferences()[b]) {
+        if (reference.Get() == render_target_) {
+          recording_failed_ = true;
+          return false;
+        }
+        for (auto target : color_targets_)
+          if (reference.Get() == target) {
+            recording_failed_ = true;
+            return false;
+          }
+      }
+    }
+#endif
+  }
+  return !recording_failed_;
+}
+
 bool MetalCommandContextImpl::ValidateDraw(bool indexed) {
 #if !defined(NDEBUG)
   if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_ || (indexed && !index_)) {
@@ -683,26 +745,8 @@ bool MetalCommandContextImpl::ValidateDraw(bool indexed) {
     return false;
   }
 #endif
-  for (size_t i = 0; i < groups_.size(); ++i) {
-    if (!groups_[i] && !program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
-      recording_failed_ = true;
-      return false;
-    }
-    if (groups_[i]) {
-      auto &layout = groups_[i]->GetLayout();
-      for (size_t b = 0; b < layout.bindings.size(); ++b) {
-        auto type = layout.bindings[b].type;
-        if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
-          continue;
-        for (auto &image : groups_[i]->GetReferences()[b])
-          for (auto target : color_targets_)
-            if (image.Get() == target) {
-              recording_failed_ = true;
-              return false;
-            }
-      }
-    }
-  }
+  if (!ValidateGroups())
+    return false;
   for (auto resource : AccelerationResources())
     encoder_->useResource(resource, MTL::ResourceUsageRead, MTL::RenderStageVertex | MTL::RenderStageFragment);
   return !recording_failed_;
@@ -777,7 +821,11 @@ IDownloadToken *MetalCommandContextImpl::CmdDownloadImage(IImage *image, const I
     recording_failed_ = true;
     return nullptr;
   }
-  const auto desc = image->GetDesc();
+  ImageDesc desc;
+  if (!ImageMipDesc(image->GetDesc(), region.mip_level, desc)) {
+    recording_failed_ = true;
+    return nullptr;
+  }
   if (region.x >= desc.width || region.y >= desc.height) {
     recording_failed_ = true;
     return nullptr;
@@ -803,14 +851,14 @@ IDownloadToken *MetalCommandContextImpl::CmdDownloadImage(IImage *image, const I
     return nullptr;
   }
   if (stencil) {
-    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+    blit->copyFromTexture(native->NativeImage(), 0, region.mip_level, MTL::Origin::Make(region.x, region.y, 0),
                           MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height,
                           MTL::BlitOptionDepthFromDepthStencil);
-    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+    blit->copyFromTexture(native->NativeImage(), 0, region.mip_level, MTL::Origin::Make(region.x, region.y, 0),
                           MTL::Size::Make(width, height, 1), lease->NativeBuffer(), pitch * height, width,
                           uint64_t(width) * height, MTL::BlitOptionStencilFromDepthStencil);
   } else {
-    blit->copyFromTexture(native->NativeImage(), 0, 0, MTL::Origin::Make(region.x, region.y, 0),
+    blit->copyFromTexture(native->NativeImage(), 0, region.mip_level, MTL::Origin::Make(region.x, region.y, 0),
                           MTL::Size::Make(width, height, 1), lease->NativeBuffer(), 0, pitch, pitch * height);
   }
   blit->endEncoding();

@@ -41,7 +41,7 @@ rhi::ICore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
   VkInstanceCreateFlags flags = 0;
   for (const auto &extension : available) {
     for (const auto name :
-         {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_xlib_surface", "VK_KHR_xcb_surface",
+         {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_xlib_surface", "VK_KHR_xcb_surface", "VK_OHOS_surface",
           "VK_KHR_wayland_surface", "VK_EXT_swapchain_colorspace", "VK_EXT_metal_surface", "VK_MVK_macos_surface"}) {
       if (std::strcmp(extension.extensionName, name) == 0)
         extensions.push_back(name);
@@ -152,9 +152,48 @@ rhi::ICore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
         info.unified_memory += memory.memoryHeaps[i].size;
       }
     }
+    VkPhysicalDeviceSubgroupProperties subgroup{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES};
+    VkPhysicalDeviceProperties2 subgroup_properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+    subgroup_properties.pNext = &subgroup;
+    vkGetPhysicalDeviceProperties2(device, &subgroup_properties);
+    const auto needed = VK_SUBGROUP_FEATURE_BASIC_BIT | VK_SUBGROUP_FEATURE_VOTE_BIT;
+    info.compute_subgroup_vote_feature =
+        (subgroup.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) && (subgroup.supportedOperations & needed) == needed;
     info.geometry_shader_feature = features.Features().features.geometryShader == VK_TRUE;
     info.ray_tracing_pipeline_feature = features.RayTracingPipeline();
     info.ray_query_feature = features.RayQuery();
+    auto &mip = info.mip_feature;
+    mip.max_image_dimension_2d = properties.limits.maxImageDimension2D;
+    mip.max_anisotropy = features.Features().features.samplerAnisotropy
+                             ? static_cast<uint32_t>(properties.limits.maxSamplerAnisotropy)
+                             : 1;
+    mip.min_lod_bias = -properties.limits.maxSamplerLodBias;
+    mip.max_lod_bias = properties.limits.maxSamplerLodBias;
+    for (int index = IMAGE_FORMAT_UNKNOWN + 1; index < IMAGE_FORMAT_COUNT; ++index) {
+      const auto format = static_cast<ImageFormat>(index);
+      const auto native = NativeImageFormat(format);
+      if (native == VK_FORMAT_UNDEFINED)
+        continue;
+      VkFormatProperties format_properties{};
+      vkGetPhysicalDeviceFormatProperties(device, native, &format_properties);
+      const auto flags = format_properties.optimalTilingFeatures;
+      const bool sampled = (flags & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+      VkImageFormatProperties image_properties{};
+      if (vkGetPhysicalDeviceImageFormatProperties(
+              device, native, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+              sampled ? VK_IMAGE_USAGE_SAMPLED_BIT : VK_IMAGE_USAGE_TRANSFER_SRC_BIT, 0,
+              &image_properties) != VK_SUCCESS)
+        continue;
+      auto &entry = info.format_features[index];
+      entry.max_mip_levels = image_properties.maxMipLevels;
+      entry.sampled = sampled;
+      entry.linear_filter = sampled && (flags & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT);
+      entry.storage = (flags & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
+      entry.linear_blit = entry.linear_filter && (flags & VK_FORMAT_FEATURE_BLIT_SRC_BIT) &&
+                          (flags & VK_FORMAT_FEATURE_BLIT_DST_BIT) && IsColorFormat(format);
+      entry.mip_compute_generation =
+          entry.max_mip_levels > 1 && entry.linear_filter && entry.storage && IsColorFormat(format);
+    }
     core->adapters_.push_back({device, device_version, std::move(info)});
   }
   return core.release();

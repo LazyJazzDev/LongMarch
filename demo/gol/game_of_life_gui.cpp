@@ -1,4 +1,4 @@
-﻿#include "game_of_life_gui.h"
+#include "game_of_life_gui.h"
 
 #include <tinyfiledialogs.h>
 
@@ -94,7 +94,7 @@ void GameOfLife::CustomOnInit() {
   OnWindowSize();
   magnify_callback_ =
       GetWindow()->MagnifyEvent().RegisterCallback([this](const grassland::rhi::MagnifyGesture &gesture) {
-        if (gesture.phase == grassland::rhi::MagnifyPhase::kCancel)
+        if (gesture.phase == grassland::rhi::MAGNIFY_PHASE_CANCEL)
           return;
         const glm::vec2 point = FramePosition({gesture.x, gesture.y});
         if (point.x < playground_left_ || point.x >= playground_right_ || point.y < playground_top_ ||
