@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_binding_group.h"
 
 #include <algorithm>
 #include <array>
@@ -14,6 +14,25 @@
 #include "grassland/rhi/rhi_image.h"
 
 namespace grassland::rhi::backend {
+bool NormalizeImageView(ImageView &view, BindingType type) {
+#if !defined(NDEBUG)
+  if (!view.image || !view.image->IsValid() || (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D))
+    return false;
+#endif
+  const auto levels = view.image->GetDesc().mip_levels;
+#if !defined(NDEBUG)
+  if (view.base_mip >= levels)
+    return false;
+#endif
+  if (!view.mip_count)
+    view.mip_count = type == BINDING_RW_TEXTURE2D ? 1 : levels - view.base_mip;
+#if !defined(NDEBUG)
+  if (view.mip_count > levels - view.base_mip || (type == BINDING_RW_TEXTURE2D && view.mip_count != 1))
+    return false;
+#endif
+  return true;
+}
+
 std::vector<MappedBinding> MapBindings(const PipelineLayoutDesc &layout, BackendAPI api) {
   std::vector<MappedBinding> result;
   for (uint32_t group = 0; group < layout.groups.size(); ++group) {

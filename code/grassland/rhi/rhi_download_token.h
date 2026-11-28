@@ -7,6 +7,7 @@ namespace grassland::rhi {
 // A zero width/height extends to the corresponding edge of the image.
 struct ImageDownloadRegion {
   uint32_t x{}, y{}, width{}, height{};
+  uint32_t mip_level{};
 };
 
 // Like other resource handles, tokens must be released before their Device.

@@ -162,6 +162,38 @@ rhi::ICore *VulkanCoreImpl::CreateVulkanCore(const CoreDesc &desc) {
     info.geometry_shader_feature = features.Features().features.geometryShader == VK_TRUE;
     info.ray_tracing_pipeline_feature = features.RayTracingPipeline();
     info.ray_query_feature = features.RayQuery();
+    auto &mip = info.mip_feature;
+    mip.max_image_dimension_2d = properties.limits.maxImageDimension2D;
+    mip.max_anisotropy = features.Features().features.samplerAnisotropy
+                             ? static_cast<uint32_t>(properties.limits.maxSamplerAnisotropy)
+                             : 1;
+    mip.min_lod_bias = -properties.limits.maxSamplerLodBias;
+    mip.max_lod_bias = properties.limits.maxSamplerLodBias;
+    for (int index = IMAGE_FORMAT_UNKNOWN + 1; index < IMAGE_FORMAT_COUNT; ++index) {
+      const auto format = static_cast<ImageFormat>(index);
+      const auto native = NativeImageFormat(format);
+      if (native == VK_FORMAT_UNDEFINED)
+        continue;
+      VkFormatProperties format_properties{};
+      vkGetPhysicalDeviceFormatProperties(device, native, &format_properties);
+      const auto flags = format_properties.optimalTilingFeatures;
+      const bool sampled = (flags & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+      VkImageFormatProperties image_properties{};
+      if (vkGetPhysicalDeviceImageFormatProperties(
+              device, native, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+              sampled ? VK_IMAGE_USAGE_SAMPLED_BIT : VK_IMAGE_USAGE_TRANSFER_SRC_BIT, 0,
+              &image_properties) != VK_SUCCESS)
+        continue;
+      auto &entry = info.format_features[index];
+      entry.max_mip_levels = image_properties.maxMipLevels;
+      entry.sampled = sampled;
+      entry.linear_filter = sampled && (flags & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT);
+      entry.storage = (flags & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
+      entry.linear_blit = entry.linear_filter && (flags & VK_FORMAT_FEATURE_BLIT_SRC_BIT) &&
+                          (flags & VK_FORMAT_FEATURE_BLIT_DST_BIT) && IsColorFormat(format);
+      entry.mip_compute_generation =
+          entry.max_mip_levels > 1 && entry.linear_filter && entry.storage && IsColorFormat(format);
+    }
     core->adapters_.push_back({device, device_version, std::move(info)});
   }
   return core.release();

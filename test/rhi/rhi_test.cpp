@@ -114,6 +114,10 @@ class TestDevice final : public backend::Object<rhi::IDevice> {
     return nullptr;
   }
 #endif
+  const PhysicalDevice &GetPhysicalDevice() const noexcept override {
+    return info_;
+  }
+
   std::string Name() const override {
     return info_.name;
   }

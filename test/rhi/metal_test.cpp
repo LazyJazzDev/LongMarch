@@ -2,8 +2,10 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <thread>
 
+#include "grassland/rhi/backend/backend_shader_cache.h"
 #include "grassland/rhi/backend/metal/metal_core.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_diagnostics.h"
@@ -59,6 +61,58 @@ class RetentionProbeImage final : public backend::Object<IImage, backend::metal:
   ObjPtr<IImage> backing_;
   bool &destroyed_;
 };
+
+TEST(RhiMetal, TierOneStorageBindingWritesSelectedMip) {
+  struct RestoreSettings {
+    backend::ShaderCacheSettings settings = backend::GetShaderCacheSettings();
+
+    ~RestoreSettings() {
+      backend::ConfigureShaderCache(settings);
+    }
+  } restore;
+
+  ASSERT_TRUE(backend::ConfigureShaderCache({{}, false, true}));
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_METAL);
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IImage> image = device->CreateImage({8, 8, IMAGE_FORMAT_R8G8B8A8_UNORM, 2});
+  ASSERT_TRUE(image);
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
+    RHI_RW_TEXTURE2D(0,0,float4,target);
+    [numthreads(4,4,1)] void Main(uint3 id:SV_DispatchThreadID) { target[id.xy] = 1.0; }
+  )",
+                                                          "Main", SHADER_STAGE_COMPUTE);
+  ASSERT_TRUE(shader);
+  BindingLayoutDesc layout{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}};
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), {{layout}}});
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+  ASSERT_TRUE(program && group);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ASSERT_TRUE(queue);
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  std::vector<uint8_t> zero(8 * 8 * 4, 0);
+  ASSERT_TRUE(commands->CmdUploadImage(image.Get(), zero.data(), 32));
+  ASSERT_TRUE(group->BindResource(0, ImageView{image.Get(), 1, 1}));
+  ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  // Recorded bindings must retain the view even after the group changes.
+  ASSERT_TRUE(group->BindResource(0, ImageView{image.Get(), 0, 1}));
+  ASSERT_TRUE(commands->CmdDispatch(1, 1, 1));
+  ObjPtr<IDownloadToken> base = commands->CmdDownloadImage(image.Get(), {0, 0, 0, 0, 0});
+  ObjPtr<IDownloadToken> mip = commands->CmdDownloadImage(image.Get(), {0, 0, 0, 0, 1});
+  ObjPtr<ISubmissionToken> done = commands->Submit();
+  ASSERT_TRUE(done && done->WaitHost());
+  ASSERT_TRUE(base && mip);
+  std::vector<uint8_t> actual_base(base->GetSize()), actual_mip(mip->GetSize());
+  ASSERT_TRUE(base->CopyTo(actual_base.data(), actual_base.size()));
+  ASSERT_TRUE(mip->CopyTo(actual_mip.data(), actual_mip.size()));
+  for (auto value : actual_base)
+    EXPECT_EQ(value, 0);
+  for (auto value : actual_mip)
+    EXPECT_EQ(value, 255);
+}
 
 TEST(RhiMetal, FrontendAndNativeImageUsesShareOneRetentionEntry) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
@@ -171,6 +225,64 @@ TEST(RhiMetal, CoreDebugOptionsAcrossSequentialCores) {
     context.Release();
     ASSERT_TRUE(done);
     EXPECT_TRUE(done->WaitHost());
+  }
+}
+
+TEST(RhiMetal, EveryAdvertisedColorFormatTransfersMipsAndGeneratesWhenSupported) {
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_METAL, {true});
+  ASSERT_TRUE(core);
+  const auto devices = core->GetPhysicalDevices();
+  for (size_t adapter = 0; adapter < devices.size(); ++adapter) {
+    ObjPtr<IDevice> device = core->CreateDevice(static_cast<int32_t>(adapter));
+    ASSERT_TRUE(device);
+    ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_COMPUTE);
+    ASSERT_TRUE(queue);
+    for (int index = IMAGE_FORMAT_UNKNOWN + 1; index < IMAGE_FORMAT_COUNT; ++index) {
+      const auto format = static_cast<ImageFormat>(index);
+      const auto &feature = devices[adapter].format_features[index];
+      if (!IsColorFormat(format) || !feature.sampled)
+        continue;
+      SCOPED_TRACE(testing::Message() << "adapter " << adapter << " format " << index);
+      ObjPtr<IImage> image = device->CreateImage({8, 8, format, 4});
+      ASSERT_TRUE(image);
+      const size_t pixel_size = ImageFormatSize(format);
+      std::vector<uint8_t> pixel(pixel_size, 64);
+      if (format == IMAGE_FORMAT_R32_SFLOAT || format == IMAGE_FORMAT_R32G32_SFLOAT ||
+          format == IMAGE_FORMAT_R32G32B32A32_SFLOAT) {
+        const float value = 0.5f;
+        for (size_t offset = 0; offset < pixel_size; offset += sizeof(value))
+          std::memcpy(pixel.data() + offset, &value, sizeof(value));
+      } else if (format == IMAGE_FORMAT_R16G16B16A16_SFLOAT) {
+        const uint16_t value = 0x3800;  // binary16 0.5
+        for (size_t offset = 0; offset < pixel_size; offset += sizeof(value))
+          std::memcpy(pixel.data() + offset, &value, sizeof(value));
+      }
+      std::vector<uint8_t> input(64 * pixel_size);
+      for (size_t offset = 0; offset < input.size(); offset += pixel_size)
+        std::copy(pixel.begin(), pixel.end(), input.begin() + offset);
+      ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+      ASSERT_TRUE(commands);
+      // All declared levels must support transfer, including integer and packed formats.
+      const std::vector<uint8_t> zeros(input.size(), 0);
+      for (uint32_t mip = 0; mip < 4; ++mip) {
+        const auto &upload = feature.mip_compute_generation && mip ? zeros : input;
+        ASSERT_TRUE(commands->CmdUploadImage(image.Get(), upload.data(), (8u >> mip) * pixel_size, mip));
+      }
+      if (feature.mip_compute_generation)
+        ASSERT_TRUE(commands->CmdGenerateMipmaps(image.Get()));
+      std::vector<ObjPtr<IDownloadToken>> downloads;
+      for (uint32_t mip = 0; mip < 4; ++mip) {
+        downloads.emplace_back(commands->CmdDownloadImage(image.Get(), {0, 0, 0, 0, mip}));
+        ASSERT_TRUE(downloads.back());
+      }
+      ObjPtr<ISubmissionToken> done = commands->Submit();
+      ASSERT_TRUE(done && done->WaitHost());
+      for (auto &download : downloads) {
+        std::vector<uint8_t> actual(download->GetSize());
+        ASSERT_TRUE(download->CopyTo(actual.data(), actual.size()));
+        EXPECT_TRUE(std::equal(actual.begin(), actual.end(), input.begin()));
+      }
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/metal/metal_sampler.h"
+#include "grassland/rhi/backend/metal/metal_sampler.h"
 
 #include "grassland/rhi/backend/metal/metal_device.h"
 
@@ -15,20 +15,48 @@ MTL::SamplerState *MetalSamplerImpl::NativeSampler() const {
 }
 
 rhi::ISampler *MetalSamplerImpl::Create(IMetalDevice *device, const SamplerDesc &desc) {
-  if (!ValidateSamplerDesc(desc))
+  // Metal has no sampler-level LOD bias; do not silently ignore it.
+  const auto &limits = device->GetPhysicalDevice().mip_feature;
+  if (!ValidateSamplerFeatures(desc, limits))
     return nullptr;
+  if (desc.compare_enable && !device->NativeDevice()->supportsFamily(MTL::GPUFamilyApple3) &&
+      !device->NativeDevice()->supportsFamily(MTL::GPUFamilyMac2)) {
+    ReportError(-1, "Metal comparison sampling requires Apple3 or Mac2 GPU support.");
+    return nullptr;
+  }
+  const bool uses_border = desc.address_u == SAMPLER_ADDRESS_CLAMP_TO_BORDER ||
+                           desc.address_v == SAMPLER_ADDRESS_CLAMP_TO_BORDER ||
+                           desc.address_w == SAMPLER_ADDRESS_CLAMP_TO_BORDER;
+  if (uses_border && !device->NativeDevice()->supportsFamily(MTL::GPUFamilyApple7) &&
+      !device->NativeDevice()->supportsFamily(MTL::GPUFamilyMac2)) {
+    ReportError(-1, "Metal border-color sampling requires Apple7 or Mac2 GPU support.");
+    return nullptr;
+  }
 
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto descriptor = NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
   descriptor->setSupportArgumentBuffers(true);
-  descriptor->setMinFilter(desc.filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
-                                                                 : MTL::SamplerMinMagFilterLinear);
-  descriptor->setMagFilter(descriptor->minFilter());
+  descriptor->setCompareFunction(desc.compare_enable ? static_cast<MTL::CompareFunction>(desc.compare_op)
+                                                     : MTL::CompareFunctionNever);
+  descriptor->setMinFilter(desc.min_filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
+                                                                     : MTL::SamplerMinMagFilterLinear);
+  descriptor->setMagFilter(desc.mag_filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
+                                                                     : MTL::SamplerMinMagFilterLinear);
+  descriptor->setMipFilter(desc.mip_filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMipFilterNearest
+                                                                     : MTL::SamplerMipFilterLinear);
+  descriptor->setLodMinClamp(desc.min_lod);
+  descriptor->setLodMaxClamp(desc.max_lod);
+  descriptor->setMaxAnisotropy(desc.max_anisotropy);
   const MTL::SamplerAddressMode modes[] = {MTL::SamplerAddressModeRepeat, MTL::SamplerAddressModeClampToEdge,
-                                           MTL::SamplerAddressModeMirrorRepeat};
+                                           MTL::SamplerAddressModeMirrorRepeat,
+                                           MTL::SamplerAddressModeClampToBorderColor};
   descriptor->setSAddressMode(modes[desc.address_u]);
   descriptor->setTAddressMode(modes[desc.address_v]);
-  descriptor->setRAddressMode(modes[desc.address_v]);
+  descriptor->setRAddressMode(modes[desc.address_w]);
+  const MTL::SamplerBorderColor colors[] = {MTL::SamplerBorderColorTransparentBlack, MTL::SamplerBorderColorOpaqueBlack,
+                                            MTL::SamplerBorderColorOpaqueWhite};
+  if (uses_border)
+    descriptor->setBorderColor(colors[desc.border_color]);
   auto sampler = NS::TransferPtr(device->NativeDevice()->newSamplerState(descriptor.get()));
   if (!sampler) {
     ReportError(-1, "Metal sampler creation failed.");

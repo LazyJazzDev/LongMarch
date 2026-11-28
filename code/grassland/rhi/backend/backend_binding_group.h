@@ -10,5 +10,7 @@ struct MappedBinding {
 
 std::vector<MappedBinding> MapBindings(const PipelineLayoutDesc &layout, BackendAPI api);
 bool ValidateBindingLayout(const BindingLayoutDesc &layout);
+
+bool NormalizeImageView(ImageView &view, BindingType type);
 bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b);
 }  // namespace grassland::rhi::backend

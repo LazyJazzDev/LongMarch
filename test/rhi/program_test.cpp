@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <cstdlib>
 
@@ -248,17 +248,19 @@ TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  EXPECT_FALSE(device->CreateSampler({static_cast<SamplerFilter>(-1)}));
   SamplerDesc desc;
+#if !defined(NDEBUG)
+  EXPECT_FALSE(device->CreateSampler({static_cast<SamplerFilter>(-1)}));
   desc.address_u = static_cast<SamplerAddressMode>(-1);
   EXPECT_FALSE(device->CreateSampler(desc));
   desc = {};
+#endif
   ObjPtr<ISampler> first = device->CreateSampler(desc);
   ObjPtr<ISampler> second = device->CreateSampler({SAMPLER_FILTER_NEAREST});
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
-  desc.filter = SAMPLER_FILTER_NEAREST;
-  EXPECT_EQ(first->GetDesc().filter, SAMPLER_FILTER_LINEAR);
+  desc.min_filter = desc.mag_filter = desc.mip_filter = SAMPLER_FILTER_NEAREST;
+  EXPECT_EQ(first->GetDesc().min_filter, SAMPLER_FILTER_LINEAR);
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup({{{0, BINDING_SAMPLER, 2}}});
   ObjPtr<IBindingGroup> other = device->CreateBindingGroup({{{0, BINDING_SAMPLER}}});
   ASSERT_TRUE(group);
@@ -284,8 +286,10 @@ TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
     EXPECT_FALSE(group->BindResource(0, foreign_sampler.Get()));
     group.Release();
     other.Release();
-    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
-    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][1].Get())->GetDesc().filter, SAMPLER_FILTER_NEAREST);
+    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][0].Get())->GetDesc().min_filter,
+              SAMPLER_FILTER_LINEAR);
+    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][1].Get())->GetDesc().min_filter,
+              SAMPLER_FILTER_NEAREST);
   });
 }
 
@@ -333,6 +337,91 @@ TEST_P(RhiProgram, InvalidShaderIsRejectedAtProgramCreationNotSourceCreation) {
   desc.fragment_shader = fragment.Get();
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   EXPECT_FALSE(program);
+}
+
+TEST_P(RhiProgram, IntegerTextureSamplingIsRejected) {
+  if (GetParam() != BACKEND_API_VULKAN && GetParam() != BACKEND_API_D3D12)
+    GTEST_SKIP() << "D3D12/Vulkan sampling contract.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  BindingLayoutDesc layout{{{0, BINDING_TEXTURE2D, 2, SHADER_VISIBILITY_COMPUTE},
+                            {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_COMPUTE},
+                            {2, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 16}}};
+  for (const std::string type : {"uint4", "int4"}) {
+    for (const std::string operation :
+         {"SampleLevel(sampling, float2(-1, .5), 0)", "GatherRed(sampling, float2(-1, .5))"}) {
+      // D3D12 rejects integer SampleLevel, but accepts the existing Gather path.
+      if (GetParam() == BACKEND_API_D3D12 && operation.find("Gather") == 0)
+        continue;
+      SCOPED_TRACE(type + " " + operation);
+      const std::string source = "typedef " + type + R"( Texel;
+        RHI_TEXTURE2D_ARRAY(0,0,Texel,images);
+        RHI_SAMPLER(0,1,sampling);
+        RHI_RW_STRUCTURED_BUFFER(0,2,Texel,output);
+        Texel Read() { return images[1].)" +
+                                 operation + R"(; }
+        [numthreads(1,1,1)] void Main() { output[0] = Read(); }
+      )";
+      ObjPtr<IShader> shader = device->CreateShaderFromSource(source, "Main", SHADER_STAGE_COMPUTE);
+      ASSERT_TRUE(shader);
+      ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), {{layout}}});
+      EXPECT_FALSE(program);
+    }
+  }
+}
+
+TEST_P(RhiProgram, IntegerTextureLoadWorksAlongsideFloatSampling) {
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IShader> shader = device->CreateShaderFromSource(R"(
+    RHI_TEXTURE2D(0,0,int4,integers);
+    RHI_TEXTURE2D(0,1,float4,colors);
+    RHI_SAMPLER(0,2,sampling);
+    RHI_RW_TEXTURE2D(0,3,int4,output);
+    [numthreads(1,1,1)] void Main() {
+      output[uint2(0,0)] = integers.Load(int3(0,0,0)) + int4(colors.SampleLevel(sampling,float2(.5,.5),0));
+    }
+  )",
+                                                          "Main", SHADER_STAGE_COMPUTE);
+  ASSERT_TRUE(shader);
+  BindingLayoutDesc layout{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
+                            {1, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
+                            {2, BINDING_SAMPLER, 1, SHADER_VISIBILITY_COMPUTE},
+                            {3, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}};
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), {{layout}}});
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+  ObjPtr<IImage> integers = device->CreateImage({1, 1, IMAGE_FORMAT_R32G32B32A32_INT});
+  ObjPtr<IImage> colors = device->CreateImage({1, 1, IMAGE_FORMAT_R8G8B8A8_UNORM});
+  ObjPtr<IImage> output = device->CreateImage({1, 1, IMAGE_FORMAT_R32G32B32A32_INT});
+  ObjPtr<ISampler> sampler = device->CreateSampler({SAMPLER_FILTER_NEAREST});
+  ASSERT_TRUE(program && group && integers && colors && output && sampler);
+  ASSERT_TRUE(group->BindResource(0, integers.Get()));
+  ASSERT_TRUE(group->BindResource(1, colors.Get()));
+  ASSERT_TRUE(group->BindResource(2, sampler.Get()));
+  ASSERT_TRUE(group->BindResource(3, output.Get()));
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
+  ASSERT_TRUE(queue);
+  ObjPtr<ICommandContext> commands = queue->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  const int32_t values[]{-7, 42, -1000, 123456};
+  const uint8_t white[]{255, 255, 255, 255};
+  ASSERT_TRUE(commands->CmdUploadImage(integers.Get(), values, sizeof(values)));
+  ASSERT_TRUE(commands->CmdUploadImage(colors.Get(), white, sizeof(white)));
+  ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdDispatch(1));
+  ObjPtr<IDownloadToken> download = commands->CmdDownloadImage(output.Get());
+  ASSERT_TRUE(download);
+  ObjPtr<ISubmissionToken> done = commands->Submit();
+  ASSERT_TRUE(done && done->WaitHost());
+  int32_t actual[4]{};
+  ASSERT_TRUE(download->CopyTo(actual, sizeof(actual)));
+  for (int i = 0; i < 4; ++i)
+    EXPECT_EQ(actual[i], values[i] + 1);
 }
 
 TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
@@ -611,8 +700,10 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
     EXPECT_EQ(initial->GetReferences()[0][0].Get(), b.Get());
     EXPECT_EQ(initial->GetReferences()[0][1].Get(), a.Get());
     EXPECT_FALSE(group->BindResource(7, b.Get()));
+#if !defined(NDEBUG)
     EXPECT_FALSE(group->BindResource(2, image.Get()));
     EXPECT_FALSE(group->BindResource(9, CreateSamplers(device.Get(), {{static_cast<SamplerFilter>(-1)}})));
+#endif
     // A command's use-reference is the only reason to fork.
     auto captured = RetainBindingVersion(initial);
     EXPECT_FALSE(group->BindResource(2, BufferView{a.Get(), 1, 256}));
@@ -628,7 +719,8 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
     EXPECT_EQ(native->CurrentVersion(), next);
     EXPECT_TRUE(bool(captured->GetReferences()[2][0]));
     ASSERT_EQ(captured->GetReferences()[2].size(), 1u);
-    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[2][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
+    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[2][0].Get())->GetDesc().min_filter,
+              SAMPLER_FILTER_LINEAR);
     // Capture of the unchanged version shares all descriptors and resources.
     auto again = RetainBindingVersion(next);
     EXPECT_EQ(again.Get(), next);
@@ -697,10 +789,12 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
     ASSERT_TRUE(group->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
     EXPECT_TRUE(next->IsComplete());
     EXPECT_EQ(native->CurrentVersion(), next);
+#if !defined(NDEBUG)
     EXPECT_FALSE(group->BindResource(7, std::vector<IImage *>{second.Get(), nullptr}));
     EXPECT_EQ(next->GetReferences()[1][0].Get(), first.Get());
     EXPECT_FALSE(group->BindResource(
         9, CreateSamplers(device.Get(), {{SAMPLER_FILTER_NEAREST}, {static_cast<SamplerFilter>(-1)}})));
+#endif
     EXPECT_EQ(native->CurrentVersion(), next);
     // Image array replacement must retain all inputs before dropping any old slot.
     auto first_ptr = first.Get();

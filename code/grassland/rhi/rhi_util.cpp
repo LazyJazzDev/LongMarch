@@ -1,8 +1,49 @@
-﻿#include "grassland/rhi/rhi_util.h"
+#include "grassland/rhi/rhi_util.h"
 
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi {
+uint32_t ImageMipLevelCount(uint32_t width, uint32_t height) {
+  if (!width || !height)
+    return 0;
+  uint32_t size = width > height ? width : height;
+  uint32_t count = 0;
+  do {
+    ++count;
+    size >>= 1;
+  } while (size);
+  return count;
+}
+
+bool NormalizeImageDesc(const ImageDesc &requested, ImageDesc &resolved) {
+  const uint32_t maximum = ImageMipLevelCount(requested.width, requested.height);
+#if !defined(NDEBUG)
+  if (!maximum || requested.mip_levels > maximum || requested.format <= IMAGE_FORMAT_UNKNOWN ||
+      requested.format >= IMAGE_FORMAT_COUNT)
+    return false;
+#endif
+  resolved = requested;
+  if (!resolved.mip_levels)
+    resolved.mip_levels = maximum;
+  return true;
+}
+
+bool ImageMipDesc(const ImageDesc &image, uint32_t mip_level, ImageDesc &level) {
+#if !defined(NDEBUG)
+  if (!image.width || !image.height || mip_level >= image.mip_levels || mip_level >= 32)
+    return false;
+#endif
+  level = image;
+  level.width = image.width >> mip_level;
+  level.height = image.height >> mip_level;
+  if (!level.width)
+    level.width = 1;
+  if (!level.height)
+    level.height = 1;
+  level.mip_levels = 1;
+  return true;
+}
+
 ClearValue::ClearValue() : color{} {
 }
 

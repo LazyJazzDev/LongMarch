@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 
 #include <utility>
 
@@ -24,7 +24,7 @@ VkImageView VulkanSwapChainImageImpl::AttachmentView() const {
   return attachment_;
 }
 
-VkImageView VulkanSwapChainImageImpl::BindingView() const {
+VkImageView VulkanSwapChainImageImpl::BindingView(uint32_t base_mip, uint32_t mip_count) {
   return VK_NULL_HANDLE;
 }
 

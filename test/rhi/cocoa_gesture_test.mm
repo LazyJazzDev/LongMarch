@@ -53,8 +53,8 @@ void CheckMagnify(grassland::rhi::BackendAPI api) {
         NSMakePoint(bounds.origin.x + 40, view.isFlipped ? bounds.origin.y + 60 : NSMaxY(bounds) - 60);
     event.locationInWindow = [view convertPoint:point toView:nil];
     const NSEventPhase phases[] = {NSEventPhaseBegan, NSEventPhaseChanged, NSEventPhaseEnded, NSEventPhaseCancelled};
-    const MagnifyPhase expected[] = {MagnifyPhase::kBegin, MagnifyPhase::kUpdate, MagnifyPhase::kEnd,
-                                     MagnifyPhase::kCancel};
+    const MagnifyPhase expected[] = {MAGNIFY_PHASE_BEGIN, MAGNIFY_PHASE_UPDATE, MAGNIFY_PHASE_END,
+                                     MAGNIFY_PHASE_CANCEL};
     for (int i = 0; i < 4; ++i) {
       event.phase = phases[i];
       event.magnification = 0.25;

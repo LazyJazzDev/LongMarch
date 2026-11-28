@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 #include <algorithm>
 #include <array>
@@ -64,9 +64,23 @@ ICommandContext *D3D12CommandContextImpl::Create(ID3D12Queue *queue) {
   return object.release();
 }
 
+bool D3D12CommandContextImpl::InitializeImage(IImage *image) {
+  auto native = rhi::QueryInterfacePtr<ID3D12Image>(image);
+  if (sealed_ || rendering_active_ || compute_queue_ || !native || native->DeviceIdentity() != device_)
+    return false;
+  const auto state =
+      IsDepthFormat(image->GetDesc().format) ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
+  if (!RetainResource(native.Get()) || !TransitionResource(native->NativeImage(), state, native->DefaultState()))
+    return false;
+  list_->DiscardResource(native->NativeImage(), nullptr);
+  return true;
+}
+
 bool D3D12CommandContextImpl::TransitionResource(ID3D12Resource *resource,
                                                  D3D12_RESOURCE_STATES state,
-                                                 D3D12_RESOURCE_STATES default_state) {
+                                                 D3D12_RESOURCE_STATES default_state,
+                                                 uint32_t first_mip,
+                                                 uint32_t mip_count) {
   // Upload heaps stay in GENERIC_READ; compatible reads need no transition.
   if (default_state == D3D12_RESOURCE_STATE_GENERIC_READ) {
 #if !defined(NDEBUG)
@@ -78,17 +92,39 @@ bool D3D12CommandContextImpl::TransitionResource(ID3D12Resource *resource,
 #endif
     return true;
   }
-  auto &current =
-      resource_states_.try_emplace(resource, ResourceState{default_state, default_state}).first->second.current;
-  if (current != state) {
-    D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = resource;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    barrier.Transition.StateBefore = current;
-    barrier.Transition.StateAfter = state;
-    list_->ResourceBarrier(1, &barrier);
-    current = state;
+  const auto desc = resource->GetDesc();
+  const uint32_t levels = desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER ? 1 : desc.MipLevels;
+  const uint32_t planes =
+      desc.Format == DXGI_FORMAT_D24_UNORM_S8_UINT || desc.Format == DXGI_FORMAT_R24G8_TYPELESS ? 2 : 1;
+#if !defined(NDEBUG)
+  if (first_mip >= levels || mip_count > levels - first_mip) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (!mip_count)
+    mip_count = levels - first_mip;
+  auto [entry, inserted] = resource_states_.try_emplace(resource);
+  if (inserted) {
+    entry->second.current.assign(levels * planes, default_state);
+    entry->second.default_state = default_state;
+  }
+  auto &states = entry->second.current;
+  for (uint32_t plane = 0; plane < planes; ++plane) {
+    for (uint32_t mip = first_mip; mip < first_mip + mip_count; ++mip) {
+      const uint32_t index = plane * levels + mip;
+      auto &current = states[index];
+      if (current != state) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = resource;
+        barrier.Transition.Subresource = index;
+        barrier.Transition.StateBefore = current;
+        barrier.Transition.StateAfter = state;
+        list_->ResourceBarrier(1, &barrier);
+        current = state;
+      }
+    }
   }
   return true;
 }
@@ -402,6 +438,27 @@ bool D3D12CommandContextImpl::CopyBuffer(ID3D12Buffer *src,
   if (!TransitionResource(dst->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, dst->DefaultState()))
     return false;
   list_->CopyBufferRegion(dst->NativeBuffer(), destination_offset, src->NativeBuffer(), source_offset, size);
+  return true;
+}
+
+bool D3D12CommandContextImpl::CmdGenerateMipmaps(IImage *image, uint32_t base_mip, uint32_t mip_count) {
+  auto native = rhi::QueryInterfacePtr<ID3D12Image>(image);
+#if !defined(NDEBUG)
+  if (sealed_ || rendering_active_ || !native || !image->IsValid() || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_ || !native->SupportsStorage() ||
+      !device_->GetPhysicalDevice().format_features[image->GetDesc().format].mip_compute_generation) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!GenerateMipChain(this, rhi::QueryInterfacePtr<IDevice>(device_).Get(), image, base_mip, mip_count, mip_program_,
+                        mip_sampler_)) {
+    recording_failed_ = true;
+    return false;
+  }
   return true;
 }
 
@@ -788,19 +845,28 @@ bool D3D12CommandContextImpl::PrepareGroups() {
             return false;
         } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
           auto image = rhi::QueryInterfacePtr<ID3D12Image>(version->GetReferences()[binding_index][j].Get()).Get();
+          const auto &view = version->GetImageView(binding_index, j);
+#if !defined(NDEBUG)
+          if (view.image == rendering_.depth_stencil.image) {
+            recording_failed_ = true;
+            return false;
+          }
+#endif
           resource = image->NativeImage();
+#if !defined(NDEBUG)
           for (auto color : rendering_.color_attachments)
             if (color.color_attachment == rhi::QueryInterfacePtr<IImage>(image).Get()) {
               recording_failed_ = true;
               return false;
             }
+#endif
           if (!TransitionResource(resource,
                                   type == BINDING_TEXTURE2D
                                       ? (compute_queue_ ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
                                                         : D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
                                                               D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
                                       : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-                                  image->DefaultState()))
+                                  image->DefaultState(), view.base_mip, view.mip_count))
             return false;
         }
         if (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
@@ -892,21 +958,33 @@ bool D3D12CommandContextImpl::PrepareGroups() {
   return true;
 }
 
-bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
-  auto native = rhi::QueryInterfacePtr<ID3D12Image>(image).Get();
-  if (!native || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !image->IsValid() ||
-      !data || sealed_ || rendering_active_ || IsDepthFormat(image->GetDesc().format) ||
-      row_pitch < uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) ||
-      (image->GetDesc().height - 1) >
-          (SIZE_MAX - uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format)) / row_pitch) {
+bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level) {
+#if !defined(NDEBUG)
+  if (!image) {
     recording_failed_ = true;
     return false;
   }
+#endif
+  ImageDesc level;
+  if (!ImageMipDesc(image->GetDesc(), mip_level, level)) {
+    recording_failed_ = true;
+    return false;
+  }
+  auto native = rhi::QueryInterfacePtr<ID3D12Image>(image).Get();
+#if !defined(NDEBUG)
+  if (!native || (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !image->IsValid() ||
+      !data || sealed_ || rendering_active_ || IsDepthFormat(level.format) ||
+      row_pitch < uint64_t(level.width) * ImageFormatSize(level.format) ||
+      (level.height - 1) > (SIZE_MAX - uint64_t(level.width) * ImageFormatSize(level.format)) / row_pitch) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
   auto desc = native->NativeImage()->GetDesc();
   D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
   UINT rows{};
   UINT64 bytes{}, total{};
-  device_->NativeDevice()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &rows, &bytes, &total);
+  device_->NativeDevice()->GetCopyableFootprints(&desc, mip_level, 1, 0, &footprint, &rows, &bytes, &total);
   auto upload = device_->UploadPool().Acquire(total);
   if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
     recording_failed_ = true;
@@ -919,7 +997,7 @@ bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
       return false;
     }
   }
-  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_DEST, native->DefaultState()))
+  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_DEST, native->DefaultState(), mip_level, 1))
     return false;
   D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
   src.pResource = upload->NativeBuffer();
@@ -927,6 +1005,7 @@ bool D3D12CommandContextImpl::CmdUploadImage(IImage *image, const void *data, ui
   src.PlacedFootprint = footprint;
   dst.pResource = native->NativeImage();
   dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  dst.SubresourceIndex = mip_level;
   list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
   return true;
 }
@@ -1026,11 +1105,15 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const I
     return nullptr;
   }
 #endif
-  if (recording_failed_ || !image->IsValid()) {
+  if (recording_failed_ || !image->IsValid() || image->GetDesc().format == IMAGE_FORMAT_D24_UNORM_S8_UINT) {
     recording_failed_ = true;
     return nullptr;
   }
-  const auto desc = image->GetDesc();
+  ImageDesc desc;
+  if (!ImageMipDesc(image->GetDesc(), region.mip_level, desc)) {
+    recording_failed_ = true;
+    return nullptr;
+  }
   if (region.x >= desc.width || region.y >= desc.height) {
     recording_failed_ = true;
     return nullptr;
@@ -1044,39 +1127,32 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const I
   }
   if (IsDepthFormat(desc.format)) {
     auto native_desc = native->NativeImage()->GetDesc();
-    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprints[2]{};
-    UINT rows[2]{};
-    UINT64 row_bytes[2]{}, total{};
-    const UINT planes = HasStencil(desc.format) ? 2 : 1;
-    device_->NativeDevice()->GetCopyableFootprints(&native_desc, 0, planes, 0, footprints, rows, row_bytes, &total);
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT depth{};
+    UINT64 total{};
+    device_->NativeDevice()->GetCopyableFootprints(&native_desc, region.mip_level, 1, 0, &depth, nullptr, nullptr,
+                                                   &total);
     auto lease = device_->DownloadPool().Acquire(total);
     if (!lease || !RetainResource(native) || !RetainResource(lease.Get())) {
       recording_failed_ = true;
       return nullptr;
     }
-    if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState()))
+    if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState(),
+                            region.mip_level, 1))
       return nullptr;
-    for (UINT plane = 0; plane < planes; ++plane) {
-      D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
-      src.pResource = native->NativeImage();
-      src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-      src.SubresourceIndex = plane;
-      dst.pResource = lease->NativeBuffer();
-      dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-      dst.PlacedFootprint = footprints[plane];
-      list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-    }
-    const auto depth = footprints[0], stencil = footprints[1];
+    D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
+    src.pResource = native->NativeImage();
+    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    src.SubresourceIndex = region.mip_level;
+    dst.pResource = lease->NativeBuffer();
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dst.PlacedFootprint = depth;
+    list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
     DownloadLayout layout;
     layout.offset = depth.Offset + uint64_t(region.y) * depth.Footprint.RowPitch +
                     uint64_t(region.x) * ImageFormatSize(desc.format);
     layout.row_pitch = depth.Footprint.RowPitch;
     layout.row_bytes = packed;
     layout.rows = height;
-    if (planes == 2) {
-      layout.stencil_offset = stencil.Offset + uint64_t(region.y) * stencil.Footprint.RowPitch + region.x;
-      layout.stencil_pitch = stencil.Footprint.RowPitch;
-    }
     return RegisterDownload(ObjectPtr<ID3D12DownloadToken>::Adopt(CreateD3D12DownloadToken(std::move(lease), layout)));
   }
   const uint64_t pitch =
@@ -1090,11 +1166,13 @@ IDownloadToken *D3D12CommandContextImpl::CmdDownloadImage(IImage *image, const I
     recording_failed_ = true;
     return nullptr;
   }
-  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState()))
+  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_SOURCE, native->DefaultState(),
+                          region.mip_level, 1))
     return nullptr;
   D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
   src.pResource = native->NativeImage();
   src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  src.SubresourceIndex = region.mip_level;
   dst.pResource = lease->NativeBuffer();
   dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
   dst.PlacedFootprint.Footprint = {native->NativeImage()->GetDesc().Format, width, height, 1, static_cast<UINT>(pitch)};

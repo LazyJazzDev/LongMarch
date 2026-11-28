@@ -9,10 +9,11 @@ class ID3D12BindingVersion : public IObject {
   virtual bool IsUniquelyOwned() const noexcept = 0;
   virtual const BindingLayoutDesc &GetLayout() const = 0;
   virtual const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const = 0;
+  virtual const ImageView &GetImageView(size_t binding, uint32_t element) const = 0;
   virtual bool IsComplete() const = 0;
   virtual ObjectPtr<ID3D12BindingVersion> Clone() const = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) = 0;
-  virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) = 0;
+  virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<ImageView> &values) = 0;
   virtual bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) = 0;
   virtual bool Write(size_t binding_index,
                      uint32_t first_element,
@@ -61,7 +62,7 @@ class D3D12BindingVersionImpl final : public Object<ID3D12BindingVersion> {
                         const std::vector<ITopLevelAccelerationStructure *> &values);
   D3D12BindingVersionImpl(ID3D12Device *device, const BindingLayoutDesc &layout);
   bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values);
-  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values);
+  bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ImageView> &values);
   bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values);
   std::vector<uint32_t> offsets_;
   std::vector<std::vector<bool>> initialized_;
@@ -78,11 +79,12 @@ class D3D12BindingVersionImpl final : public Object<ID3D12BindingVersion> {
 
   const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const override;
 
+  const ImageView &GetImageView(size_t binding, uint32_t element) const override;
   bool IsComplete() const override;
 
   bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
 
-  bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
+  bool Write(size_t binding_index, uint32_t first_element, const std::vector<ImageView> &values) override;
 
   bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) override;
 
@@ -94,6 +96,7 @@ class D3D12BindingVersionImpl final : public Object<ID3D12BindingVersion> {
   BindingLayoutDesc layout_;
   // Indexed by sorted layout binding, then array element.
   std::vector<std::vector<ObjectPtr<IObject>>> references_;
+  std::vector<std::vector<ImageView>> image_views_;
 };
 
 class D3D12BindingGroupImpl final : public Object<rhi::IBindingGroup, ID3D12BindingGroup> {
@@ -124,7 +127,7 @@ class D3D12BindingGroupImpl final : public Object<rhi::IBindingGroup, ID3D12Bind
  public:
   bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override;
 
-  bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override;
+  bool BindResource(uint32_t binding, const std::vector<ImageView> &images, uint32_t first_element = 0) override;
 
   bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override;
 

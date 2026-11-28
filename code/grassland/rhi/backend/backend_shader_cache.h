@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace grassland::rhi::backend {
-enum class ShaderTargetPlatform { Native, Windows, MacOS, Linux, IOS, OHOS };
+typedef enum { Native, Windows, MacOS, Linux, IOS, OHOS } ShaderTargetPlatform;
 
 // Per-thread offline bundle configuration. Prepare and replay must use the same
 // shader sources, compiler version, platform macros and pipeline layouts.

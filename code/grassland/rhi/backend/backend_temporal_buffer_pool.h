@@ -8,7 +8,7 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
-enum TemporalBufferUsage { TEMPORAL_BUFFER_UPLOAD, TEMPORAL_BUFFER_DOWNLOAD };
+typedef enum { TEMPORAL_BUFFER_UPLOAD, TEMPORAL_BUFFER_DOWNLOAD } TemporalBufferUsage;
 
 // Defined and explicitly instantiated in the .cpp for supported native backends.
 // Pools own storage; intrusive leases borrow it until their final reference dies.

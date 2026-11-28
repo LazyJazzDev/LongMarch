@@ -82,32 +82,47 @@ ICommandContext *VulkanCommandContextImpl::Create(IVulkanQueue *queue) {
 bool VulkanCommandContextImpl::TransitionImage(IVulkanImage *image,
                                                VkImageLayout layout,
                                                VkPipelineStageFlags stages,
-                                               VkAccessFlags access) {
+                                               VkAccessFlags access,
+                                               uint32_t first_mip,
+                                               uint32_t mip_count) {
   const auto default_access = image->DefaultLayout() == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
                                   ? VkAccessFlags{0}
                                   : VkAccessFlags{VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
-  auto &current =
+  const auto levels = rhi::QueryInterfacePtr<IImage>(image)->GetDesc().mip_levels;
+#if !defined(NDEBUG)
+  if (first_mip >= levels || mip_count > levels - first_mip) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (!mip_count)
+    mip_count = levels - first_mip;
+  auto &states =
       image_states_
-          .try_emplace(image, ImageState{image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, default_access})
+          .try_emplace(image, levels,
+                       ImageState{image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, default_access})
           .first->second;
-  constexpr VkAccessFlags writes = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                                   VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
-                                   VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-  // Equal layouts still need a memory dependency for write-after-write/read uses.
-  if (current.layout != layout || (current.access & writes) || (current.access && (access & writes))) {
-    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-    barrier.oldLayout = current.layout;
-    barrier.newLayout = layout;
-    barrier.srcAccessMask = current.access;
-    barrier.dstAccessMask = access;
-    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image->NativeImage();
-    barrier.subresourceRange = {image->Aspect(), 0, 1, 0, 1};
-    vkCmdPipelineBarrier(command_, current.stages, stages, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-    current = {layout, stages, access};
-  } else {
-    current.stages |= stages;
-    current.access |= access;
+  for (uint32_t mip = first_mip; mip < first_mip + mip_count; ++mip) {
+    auto &current = states[mip];
+    constexpr VkAccessFlags writes = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
+                                     VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    // Equal layouts still need a memory dependency for write-after-write/read uses.
+    if (current.layout != layout || (current.access & writes) || (current.access && (access & writes))) {
+      VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+      barrier.oldLayout = current.layout;
+      barrier.newLayout = layout;
+      barrier.srcAccessMask = current.access;
+      barrier.dstAccessMask = access;
+      barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.image = image->NativeImage();
+      barrier.subresourceRange = {image->Aspect(), mip, 1, 0, 1};
+      vkCmdPipelineBarrier(command_, current.stages, stages, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+      current = {layout, stages, access};
+    } else {
+      current.stages |= stages;
+      current.access |= access;
+    }
   }
   return true;
 }
@@ -432,6 +447,27 @@ bool VulkanCommandContextImpl::CopyBuffer(IVulkanBuffer *src,
     return false;
   VkBufferCopy copy{source_offset, destination_offset, size};
   vkCmdCopyBuffer(command_, src->NativeBuffer(), dst->NativeBuffer(), 1, &copy);
+  return true;
+}
+
+bool VulkanCommandContextImpl::CmdGenerateMipmaps(IImage *image, uint32_t base_mip, uint32_t mip_count) {
+  auto native = rhi::QueryInterfacePtr<IVulkanImage>(image);
+#if !defined(NDEBUG)
+  if (sealed_ || render_target_ || !native || !image->IsValid() || native->DeviceIdentity() != device_) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_ || !native->SupportsStorage() ||
+      !device_->GetPhysicalDevice().format_features[image->GetDesc().format].mip_compute_generation) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!GenerateMipChain(this, rhi::QueryInterfacePtr<IDevice>(device_).Get(), image, base_mip, mip_count, mip_program_,
+                        mip_sampler_)) {
+    recording_failed_ = true;
+    return false;
+  }
   return true;
 }
 
@@ -817,18 +853,29 @@ bool VulkanCommandContextImpl::TransitionBuffer(IVulkanBuffer *buffer,
   return true;
 }
 
-bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
-  auto native = rhi::QueryInterfacePtr<IVulkanImage>(image).Get();
-  if (sealed_ || render_target_ || !native || !image->IsValid() ||
-      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
-      IsDepthFormat(image->GetDesc().format) ||
-      row_pitch < uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format) ||
-      (image->GetDesc().height - 1) >
-          (SIZE_MAX - uint64_t(image->GetDesc().width) * ImageFormatSize(image->GetDesc().format)) / row_pitch) {
+bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch, uint32_t mip_level) {
+#if !defined(NDEBUG)
+  if (!image) {
     recording_failed_ = true;
     return false;
   }
-  const auto desc = image->GetDesc();
+#endif
+  ImageDesc level;
+  if (!ImageMipDesc(image->GetDesc(), mip_level, level)) {
+    recording_failed_ = true;
+    return false;
+  }
+  auto native = rhi::QueryInterfacePtr<IVulkanImage>(image).Get();
+#if !defined(NDEBUG)
+  if (sealed_ || render_target_ || !native || !image->IsValid() ||
+      (native->DeviceIdentity() != device_ || !native->SupportsQueue(OwnerQueue())) || !data ||
+      IsDepthFormat(level.format) || row_pitch < uint64_t(level.width) * ImageFormatSize(level.format) ||
+      (level.height - 1) > (SIZE_MAX - uint64_t(level.width) * ImageFormatSize(level.format)) / row_pitch) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  const auto desc = level;
   const uint64_t packed = uint64_t(desc.width) * ImageFormatSize(desc.format);
   std::vector<uint8_t> pixels(packed * desc.height);
   for (uint32_t y = 0; y < desc.height; ++y)
@@ -840,15 +887,15 @@ bool VulkanCommandContextImpl::CmdUploadImage(IImage *image, const void *data, u
     return false;
   }
   if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_ACCESS_TRANSFER_WRITE_BIT))
+                       VK_ACCESS_TRANSFER_WRITE_BIT, mip_level, 1))
     return false;
   VkBufferImageCopy region{};
-  region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, mip_level, 0, 1};
   region.imageExtent = {desc.width, desc.height, 1};
   vkCmdCopyBufferToImage(command_, upload->NativeBuffer(), native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          1, &region);
-  return TransitionImage(native, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                         VK_ACCESS_SHADER_READ_BIT);
+  return TransitionImage(native, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_SHADER_READ_BIT,
+                         mip_level, 1);
 }
 
 bool VulkanCommandContextImpl::CmdBindGroup(uint32_t index, IBindingGroup *group) {
@@ -897,17 +944,25 @@ bool VulkanCommandContextImpl::BindGroupVersion(uint32_t index, IVulkanBindingVe
       }
       if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
         auto image = rhi::QueryInterfacePtr<IVulkanImage>(native->GetReferences()[binding_index][i].Get()).Get();
+        const auto &view = native->GetImageView(binding_index, i);
         if (render_target_) {
-          auto known = image_states_.find(image);
-          if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||
-              image->DefaultLayout() != VK_IMAGE_LAYOUT_GENERAL) {
+          if (image->DefaultLayout() != VK_IMAGE_LAYOUT_GENERAL) {
             recording_failed_ = true;
             return false;
           }
-          auto &state = image_states_.try_emplace(image, ImageState{VK_IMAGE_LAYOUT_GENERAL, 0, 0}).first->second;
-          state.stages |= stages;
-          state.access |= access;
-        } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, stages, access))
+          const auto levels = rhi::QueryInterfacePtr<IImage>(image)->GetDesc().mip_levels;
+          auto &states =
+              image_states_.try_emplace(image, levels, ImageState{VK_IMAGE_LAYOUT_GENERAL, 0, 0}).first->second;
+          for (uint32_t mip = view.base_mip; mip < view.base_mip + view.mip_count; ++mip) {
+            auto &state = states[mip];
+            if (state.layout != VK_IMAGE_LAYOUT_GENERAL) {
+              recording_failed_ = true;
+              return false;
+            }
+            state.stages |= stages;
+            state.access |= access;
+          }
+        } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, stages, access, view.base_mip, view.mip_count))
           return false;
       }
     }
@@ -929,11 +984,19 @@ bool VulkanCommandContextImpl::ValidateGroups() {
       return false;
     }
     if (groups_[i]) {
+#if !defined(NDEBUG)
       const auto &layout = groups_[i]->GetLayout();
       for (size_t binding_index = 0; binding_index < layout.bindings.size(); ++binding_index) {
         const auto type = layout.bindings[binding_index].type;
         if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
           continue;
+        for (uint32_t element = 0; element < layout.bindings[binding_index].count; ++element) {
+          const auto &view = groups_[i]->GetImageView(binding_index, element);
+          if (view.image == rendering_.depth_stencil.image) {
+            recording_failed_ = true;
+            return false;
+          }
+        }
         for (const auto &reference : groups_[i]->GetReferences()[binding_index])
           for (const auto &color : rendering_.color_attachments)
             if (color.color_attachment == reference.Get()) {
@@ -941,6 +1004,7 @@ bool VulkanCommandContextImpl::ValidateGroups() {
               return false;
             }
       }
+#endif
     }
   }
   return !recording_failed_;
@@ -1050,7 +1114,11 @@ IDownloadToken *VulkanCommandContextImpl::CmdDownloadImage(IImage *image, const 
     recording_failed_ = true;
     return nullptr;
   }
-  const auto desc = image->GetDesc();
+  ImageDesc desc;
+  if (!ImageMipDesc(image->GetDesc(), region.mip_level, desc)) {
+    recording_failed_ = true;
+    return nullptr;
+  }
   if (region.x >= desc.width || region.y >= desc.height) {
     recording_failed_ = true;
     return nullptr;
@@ -1070,13 +1138,13 @@ IDownloadToken *VulkanCommandContextImpl::CmdDownloadImage(IImage *image, const 
     return nullptr;
   }
   if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_ACCESS_TRANSFER_READ_BIT) ||
+                       VK_ACCESS_TRANSFER_READ_BIT, region.mip_level, 1) ||
       !TransitionBuffer(lease.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT))
     return nullptr;
   VkBufferImageCopy copy{};
   copy.imageSubresource = {static_cast<VkImageAspectFlags>(IsDepthFormat(desc.format) ? VK_IMAGE_ASPECT_DEPTH_BIT
                                                                                       : VK_IMAGE_ASPECT_COLOR_BIT),
-                           0, 0, 1};
+                           region.mip_level, 0, 1};
   copy.imageOffset = {static_cast<int32_t>(region.x), static_cast<int32_t>(region.y), 0};
   copy.imageExtent = {width, height, 1};
   vkCmdCopyImageToBuffer(command_, native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, lease->NativeBuffer(),

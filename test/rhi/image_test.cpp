@@ -991,7 +991,9 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   Track(device.Get());
+#if !defined(NDEBUG)
   EXPECT_EQ(device->CreateImage({0, 64, IMAGE_FORMAT_R8G8B8A8_UNORM}), nullptr);
+#endif
   EXPECT_EQ(device->CreateImage({64, 64, IMAGE_FORMAT_UNKNOWN}), nullptr);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_MAIN);
   ASSERT_TRUE(queue);
@@ -1394,8 +1396,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   const int draws = GetParam() == BACKEND_API_D3D12 ? 4200 : 1100;
   for (int i = 0; i < draws; ++i) {
     if (i < 300) {
-      SamplerDesc sampler;
-      sampler.filter = i % 2 ? SAMPLER_FILTER_LINEAR : SAMPLER_FILTER_NEAREST;
+      SamplerDesc sampler{i % 2 ? SAMPLER_FILTER_LINEAR : SAMPLER_FILTER_NEAREST};
       ASSERT_TRUE(sampling->BindResource(1, ObjPtr<ISampler>(device->CreateSampler(sampler)).Get()));
       ASSERT_TRUE(commands->CmdBindGroup(2, sampling.Get()));
     }
