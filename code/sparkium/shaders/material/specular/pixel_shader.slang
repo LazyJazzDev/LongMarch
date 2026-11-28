@@ -1,8 +1,8 @@
 struct PSInput {
   float4 position : SV_POSITION;
-  [[vk::location(0)]] float3 world_position : TEXCOORD0;
-  [[vk::location(1)]] float3 world_normal : TEXCOORD1;
-  [[vk::location(2)]] float2 tex_coord : TEXCOORD2;
+  float3 world_position : TEXCOORD0;
+  float3 world_normal : TEXCOORD1;
+  float2 tex_coord : TEXCOORD2;
 };
 
 struct PSOutput {

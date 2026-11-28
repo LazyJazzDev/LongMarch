@@ -25,12 +25,12 @@ struct VSInput {
 
 struct PSInput {
   float4 position : SV_POSITION;
-  [[vk::location(0)]] float2 local_position : TEXCOORD0;
-  [[vk::location(1)]] float4 color : TEXCOORD1;
-  [[vk::location(2)]] nointerpolation uint4 extra : TEXCOORD2;
-  [[vk::location(3)]] float2 screen_position : TEXCOORD3;
-  [[vk::location(4)]] nointerpolation float4 clip_rect : TEXCOORD4;
-  [[vk::location(5)]] noperspective float2 projected_die_position : TEXCOORD5;
+  float2 local_position : TEXCOORD0;
+  float4 color : TEXCOORD1;
+  nointerpolation uint4 extra : TEXCOORD2;
+  float2 screen_position : TEXCOORD3;
+  nointerpolation float4 clip_rect : TEXCOORD4;
+  noperspective float2 projected_die_position : TEXCOORD5;
 };
 
 PSInput VSMain(VSInput input) {
